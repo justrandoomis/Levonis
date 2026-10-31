@@ -15,7 +15,12 @@ import {
   META_CAPI_ENDPOINT,
   META_DATASET_CHECK_URL,
   META_DATASET_ID,
+  META_IDENTITY_CHECK_URL,
+  META_LAST_SEND_KEY,
+  META_QUALITY_CHECK_URL,
   checkMetaCapi,
+  readMetaLastSend,
+  resetMetaSendNoteForTests,
   iqdToUsd,
   isMetaReportedPath,
   metaLinesData,
@@ -31,6 +36,7 @@ import { metaEventRoutes } from '../worker/routes/metaEvents';
 import { classifyHost } from '../worker/lib/hosts';
 import { HttpError } from '../worker/lib/http';
 import type { AppContext } from '../worker/lib/types';
+import { createTableSql, newSqlite, SqliteD1 } from './fixtures/d1';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 const sha = (s: string) => createHash('sha256').update(s, 'utf8').digest('hex');
@@ -224,45 +230,89 @@ test('the server doors send their own figures: AddToCart from the cart, Initiate
   assert.ok(!/console\.\w+\([^)]*token/i.test(lib), 'the token is never logged');
 });
 
-test('the owner\'s check asks Meta about the dataset with the token in a header — never the URL, never an event', async () => {
+test('the owner\'s check: three reads with the token in a header — whose token, the dataset, the quality API — never the URL, never an event', async () => {
   let called = 0;
   const never = (async () => { called++; return new Response('{}'); }) as typeof fetch;
   const off = await checkMetaCapi({}, { fetchImpl: never });
-  assert.deepEqual(off, { configured: false, testMode: false, ok: false, status: null, datasetName: null, error: null });
+  assert.equal(off.configured, false);
+  assert.equal(off.ok, false);
   assert.equal(called, 0, 'no token, no request');
 
   const seen: Array<{ url: string; method: string; auth: string; body: unknown }> = [];
-  const ok = (async (url: RequestInfo | URL, init?: RequestInit) => {
-    seen.push({ url: String(url), method: String(init?.method), auth: new Headers(init?.headers).get('authorization') ?? '', body: init?.body });
-    return new Response(JSON.stringify({ id: META_DATASET_ID, name: 'Levonis pixel' }), { status: 200 });
-  }) as typeof fetch;
-  const good = await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok_SECRET' }, { fetchImpl: ok });
+  const routed = (answers: Record<'me' | 'dataset' | 'quality', [number, unknown]>) =>
+    (async (url: RequestInfo | URL, init?: RequestInit) => {
+      const u = String(url);
+      seen.push({ url: u, method: String(init?.method), auth: new Headers(init?.headers).get('authorization') ?? '', body: init?.body });
+      const [status, body] = u === META_IDENTITY_CHECK_URL ? answers.me : u === META_DATASET_CHECK_URL ? answers.dataset : answers.quality;
+      return new Response(JSON.stringify(body), { status });
+    }) as typeof fetch;
+
+  const good = await checkMetaCapi(
+    { META_CAPI_ACCESS_TOKEN: 'tok_SECRET' },
+    {
+      fetchImpl: routed({
+        me: [200, { id: '6100000000001', name: 'Conversions API System User' }],
+        dataset: [200, { id: META_DATASET_ID, name: 'Levonis' }],
+        quality: [200, { web: [{ event_name: 'PageView' }] }],
+      }),
+    }
+  );
   assert.equal(good.ok, true);
-  assert.equal(good.datasetName, 'Levonis pixel');
-  assert.equal(good.testMode, false);
-  assert.equal(seen.length, 1);
-  assert.equal(seen[0].url, META_DATASET_CHECK_URL);
-  assert.equal(seen[0].url, `https://graph.facebook.com/v26.0/${META_DATASET_ID}?fields=id,name`);
-  assert.equal(seen[0].method, 'GET', 'a read: no event is created');
-  assert.equal(seen[0].auth, 'Bearer tok_SECRET');
-  assert.ok(!seen[0].url.includes('tok_SECRET'), 'the token is never in the URL');
-  assert.equal(seen[0].body, undefined);
+  assert.deepEqual(good.identity, { id: '6100000000001', name: 'Conversions API System User' });
+  assert.equal(good.datasetName, 'Levonis');
+  assert.equal(good.quality.ok, true);
+  assert.deepEqual(seen.map((s) => s.url).sort(), [META_DATASET_CHECK_URL, META_IDENTITY_CHECK_URL, META_QUALITY_CHECK_URL].sort());
+  assert.equal(META_IDENTITY_CHECK_URL, 'https://graph.facebook.com/v26.0/me?fields=id,name');
+  assert.equal(META_DATASET_CHECK_URL, `https://graph.facebook.com/v26.0/${META_DATASET_ID}?fields=id,name`);
+  assert.equal(META_QUALITY_CHECK_URL, `https://graph.facebook.com/v26.0/dataset_quality?dataset_id=${META_DATASET_ID}&fields=web%7Bevent_name%7D`);
+  for (const s of seen) {
+    assert.equal(s.method, 'GET', 'reads only: no event is created');
+    assert.equal(s.auth, 'Bearer tok_SECRET');
+    assert.ok(!s.url.includes('tok_SECRET'), 'the token is never in a URL');
+    assert.equal(s.body, undefined);
+  }
 
-  const tested = await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok', META_CAPI_TEST_EVENT_CODE: 'TEST1' }, { fetchImpl: ok });
-  assert.equal(tested.testMode, true, 'test mode is reported: events land in Test events only');
+  // Meta: a token generated in Events Manager can fetch quality data and send events — so a refused
+  // dataset read with a readable quality API still counts as reaching the dataset.
+  const qualityOnly = await checkMetaCapi(
+    { META_CAPI_ACCESS_TOKEN: 'tok' },
+    {
+      fetchImpl: routed({
+        me: [200, { id: '1', name: 'x' }],
+        dataset: [400, { error: { message: '(#100) Missing Permission', type: 'OAuthException', code: 100 } }],
+        quality: [200, { web: [] }],
+      }),
+    }
+  );
+  assert.equal(qualityOnly.ok, true);
+  assert.equal(qualityOnly.error?.code, 100);
+  assert.equal(qualityOnly.datasetName, null);
 
-  // Meta's own verdict comes back, and the token never does — even if an answer echoed it.
-  const expired = (async () =>
-    new Response(JSON.stringify({ error: { message: 'Error validating access token: tok_SECRET has expired', type: 'OAuthException', code: 190, error_subcode: 463 } }), { status: 400 })) as typeof fetch;
-  const bad = await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok_SECRET' }, { fetchImpl: expired });
-  assert.equal(bad.ok, false);
-  assert.equal(bad.status, 400);
-  assert.deepEqual({ ...bad.error, message: undefined }, { code: 190, subcode: 463, type: 'OAuthException', message: undefined });
-  assert.ok(!JSON.stringify(bad).includes('tok_SECRET'), 'the token never comes back');
+  // Another dataset's id is not a pass; a refused quality read is not one either.
+  const wrong = await checkMetaCapi(
+    { META_CAPI_ACCESS_TOKEN: 'tok' },
+    {
+      fetchImpl: routed({
+        me: [200, { id: '1', name: 'Someone' }],
+        dataset: [200, { id: '1', name: 'other' }],
+        quality: [400, { error: { message: '(#100) Missing Permission', code: 100 } }],
+      }),
+    }
+  );
+  assert.equal(wrong.ok, false);
+  assert.equal(wrong.quality.error?.code, 100);
 
-  // Another dataset's id is not a pass.
-  const other = (async () => new Response(JSON.stringify({ id: '1', name: 'x' }), { status: 200 })) as typeof fetch;
-  assert.equal((await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok' }, { fetchImpl: other })).ok, false);
+  // An expired token: Meta's own verdict comes back, and the token never does — even if an answer echoed it.
+  const expiredBody = { error: { message: 'Error validating access token: tok_SECRET has expired', type: 'OAuthException', code: 190, error_subcode: 463 } };
+  const expired = await checkMetaCapi(
+    { META_CAPI_ACCESS_TOKEN: 'tok_SECRET', META_CAPI_TEST_EVENT_CODE: 'TEST1' },
+    { fetchImpl: routed({ me: [400, expiredBody], dataset: [400, expiredBody], quality: [400, expiredBody] }) }
+  );
+  assert.equal(expired.ok, false);
+  assert.equal(expired.identity, null);
+  assert.deepEqual({ ...expired.identityError, message: undefined }, { code: 190, subcode: 463, type: 'OAuthException', message: undefined });
+  assert.equal(expired.testMode, true, 'test mode is reported: events land in Test events only');
+  assert.ok(!JSON.stringify(expired).includes('tok_SECRET'), 'the token never comes back');
 
   const down = (async () => { throw new Error('network down tok_SECRET'); }) as typeof fetch;
   const unreachable = await checkMetaCapi({ META_CAPI_ACCESS_TOKEN: 'tok_SECRET' }, { fetchImpl: down });
@@ -271,14 +321,55 @@ test('the owner\'s check asks Meta about the dataset with the token in a header 
   assert.ok(!JSON.stringify(unreachable).includes('tok_SECRET'));
 });
 
+test('what Meta said to the last REAL send is kept for the owner: one admin_settings row, codes only, never the token', async () => {
+  const sqlite = newSqlite();
+  sqlite.exec(createTableSql('0001_init.sql', 'admin_settings'));
+  const DB = new SqliteD1(sqlite) as unknown as D1Database;
+  const event: MetaServerEvent = { event_name: 'PageView', event_time: 1, event_id: 'evt_12345678', action_source: 'website', user_data: { client_user_agent: 'x' } };
+  resetMetaSendNoteForTests();
+  assert.equal(await readMetaLastSend({ DB }), null, 'nothing recorded yet');
+
+  const refused = (async () =>
+    new Response(JSON.stringify({ error: { message: '(#100) Missing Permission tok_SECRET', type: 'OAuthException', code: 100, error_subcode: 33 } }), { status: 400 })) as typeof fetch;
+  assert.equal(await sendMetaEvents({ META_CAPI_ACCESS_TOKEN: 'tok_SECRET', DB }, [event], { fetchImpl: refused }), 'failed');
+  const first = await readMetaLastSend({ DB });
+  assert.equal(first?.ok, false);
+  assert.equal(first?.status, 400);
+  assert.equal(first?.error?.code, 100);
+  assert.equal(first?.error?.subcode, 33);
+  const raw = sqlite.prepare('SELECT value FROM admin_settings WHERE key = ?').get(META_LAST_SEND_KEY) as { value: string };
+  assert.ok(!raw.value.includes('tok_SECRET'), 'the token is never stored');
+  assert.ok(!raw.value.includes('evt_12345678') && !raw.value.includes('client_user_agent'), 'no event and no visitor datum is stored');
+
+  // The same refusal again inside the debounce is not rewritten …
+  sqlite.prepare('UPDATE admin_settings SET value = ? WHERE key = ?').run(JSON.stringify({ ...first, at: 'kept' }), META_LAST_SEND_KEY);
+  assert.equal(await sendMetaEvents({ META_CAPI_ACCESS_TOKEN: 'tok_SECRET', DB }, [event], { fetchImpl: refused }), 'failed');
+  assert.equal((await readMetaLastSend({ DB }))?.at, 'kept');
+
+  // … but a CHANGE of outcome is written at once.
+  const ok = (async () => new Response('{"events_received":1}', { status: 200 })) as typeof fetch;
+  assert.equal(await sendMetaEvents({ META_CAPI_ACCESS_TOKEN: 'tok_SECRET', DB }, [event], { fetchImpl: ok }), 'sent');
+  const now = await readMetaLastSend({ DB });
+  assert.equal(now?.ok, true);
+  assert.equal(now?.error, null);
+  assert.notEqual(now?.at, 'kept');
+
+  // A database without the table answers "nothing recorded", never an error.
+  resetMetaSendNoteForTests();
+  const bare = new SqliteD1(newSqlite()) as unknown as D1Database;
+  assert.equal(await readMetaLastSend({ DB: bare }), null);
+  assert.equal(await sendMetaEvents({ META_CAPI_ACCESS_TOKEN: 'tok', DB: bare }, [event], { fetchImpl: ok }), 'sent', 'a failed note never fails the send');
+});
+
 test('Admin → Providers carries the Meta presence and the "check with Meta" door', () => {
   const admin = read('worker/routes/admin.ts');
   assert.match(admin, /meta: \{\s*configured: metaCapiConfigured\(c\.env\),/);
   assert.match(admin, /\['email', 'whatsapp', 'telegram', 'meta'\] as const/);
-  assert.match(admin, /const r = await checkMetaCapi\(c\.env\);/);
+  assert.match(admin, /const \[r, lastSend\] = await Promise\.all\(\[checkMetaCapi\(c\.env\), readMetaLastSend\(c\.env\)\]\);/);
+  assert.match(admin, /lastSend: await readMetaLastSend\(c\.env\),/);
   const ui = read('src/components/AdminChannels.tsx');
   assert.match(ui, /runTest\('meta'\)/);
-  for (const key of ['meta:', 'metaNoToken:', 'metaTestMode:', 'metaCheck:', 'metaOk:', 'metaRefused:']) {
+  for (const key of ['meta:', 'metaNoToken:', 'metaTestMode:', 'metaCheck:', 'metaOk:', 'metaRefused:', 'metaLastOk:', 'metaLastFail:', 'metaLastNone:']) {
     assert.equal(ui.split(`    ${key}`).length - 1, 3, `${key} exists in ar, en and ckb`);
   }
 });

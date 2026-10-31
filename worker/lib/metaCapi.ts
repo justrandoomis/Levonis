@@ -186,9 +186,93 @@ export async function metaEventId(kind: string, ...parts: string[]): Promise<str
   return `${kind}_${(await sha256Hex(['meta-event', kind, ...parts].join('\n'))).slice(0, 40)}`;
 }
 
+/** Meta's error as the owner may read it: codes and Meta's own sentence, never the token. */
+export interface MetaError {
+  code: number | null;
+  subcode: number | null;
+  type: string | null;
+  message: string;
+}
+
+const finiteOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/** Blanks the token wherever it appears, then caps the length. */
+function withoutToken(text: string, token: string, max: number): string {
+  return (token ? text.split(token).join('***') : text).slice(0, max);
+}
+
+/** Meta's `{error: {...}}` answer → a MetaError with the token blanked out wherever it appears. */
+export function metaErrorFrom(body: unknown, status: number | null, token: string): MetaError {
+  const raw = body && typeof body === 'object' ? (body as { error?: unknown }).error : undefined;
+  const e = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  return {
+    code: finiteOrNull(e.code),
+    subcode: finiteOrNull(e.error_subcode),
+    type: typeof e.type === 'string' ? withoutToken(e.type, token, 60) : null,
+    message: withoutToken(typeof e.message === 'string' ? e.message : status != null ? `HTTP ${status}` : 'no answer', token, 300),
+  };
+}
+
+/**
+ * WHAT META SAID TO THE LAST REAL SEND, for the owner's panel (owner report
+ * 2026-10-31: "No server events", while the Worker log was the only place a
+ * refusal was written). One admin_settings row, last writer wins, no
+ * migration: the pattern the WhatsApp session note uses
+ * (worker/lib/channelReadiness.ts). Codes, Meta's sentence and a time — never
+ * the token, never an event, never a customer datum.
+ */
+export interface MetaLastSend {
+  ok: boolean;
+  status: number | null;
+  error: MetaError | null;
+  at: string;
+}
+
+export const META_LAST_SEND_KEY = 'metaCapiLastSend';
+/** The same outcome is written again at most this often per isolate; a CHANGE of outcome is written at once. */
+const META_NOTE_DEBOUNCE_MS = 10 * 60 * 1000;
+let metaNote: { key: string; at: number } | null = null;
+
+/** Bookkeeping beside a send that already happened: never throws; without a DB (a test) nothing is written. */
+async function noteMetaSend(env: { DB?: Env['DB'] }, rec: Omit<MetaLastSend, 'at'>): Promise<void> {
+  if (!env.DB) return;
+  const key = rec.ok ? 'ok' : `fail:${rec.status ?? 'none'}:${rec.error?.code ?? ''}:${rec.error?.subcode ?? ''}`;
+  if (metaNote && metaNote.key === key && Date.now() - metaNote.at < META_NOTE_DEBOUNCE_MS) return;
+  metaNote = { key, at: Date.now() };
+  try {
+    await env.DB.prepare(
+      'INSERT INTO admin_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+    )
+      .bind(META_LAST_SEND_KEY, JSON.stringify({ ...rec, at: new Date().toISOString() }))
+      .run();
+  } catch (e) {
+    console.warn(`meta-capi: last-send note not written ${String(e instanceof Error ? e.message : e).slice(0, 120)}`);
+  }
+}
+
+/** The last recorded real send, or null when nothing was recorded (or the read fails). */
+export async function readMetaLastSend(env: { DB?: Env['DB'] }): Promise<MetaLastSend | null> {
+  if (!env.DB) return null;
+  try {
+    const row = await env.DB.prepare('SELECT value FROM admin_settings WHERE key = ?')
+      .bind(META_LAST_SEND_KEY)
+      .first<{ value: string }>();
+    if (!row) return null;
+    const v = JSON.parse(row.value) as MetaLastSend | null;
+    return v && typeof v === 'object' && typeof v.ok === 'boolean' && typeof v.at === 'string' ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Forget this isolate's write memory (tests). */
+export function resetMetaSendNoteForTests(): void {
+  metaNote = null;
+}
+
 /** One POST to Meta. Never throws; the answer says what happened. */
 export async function sendMetaEvents(
-  env: Pick<Env, 'META_CAPI_ACCESS_TOKEN' | 'META_CAPI_TEST_EVENT_CODE'>,
+  env: Pick<Env, 'META_CAPI_ACCESS_TOKEN' | 'META_CAPI_TEST_EVENT_CODE'> & { DB?: Env['DB'] },
   events: MetaServerEvent[],
   opts: { fetchImpl?: typeof fetch } = {}
 ): Promise<'sent' | 'not-configured' | 'failed'> {
@@ -215,18 +299,37 @@ export async function sendMetaEvents(
       }
     );
     if (!res.ok) {
-      console.warn(`meta-capi: refused (${res.status}) ${(await res.text().catch(() => '')).slice(0, 300)}`);
+      const text = await res.text().catch(() => '');
+      let body: unknown = null;
+      try {
+        body = JSON.parse(text);
+      } catch {
+        // not JSON: the status alone is the answer
+      }
+      const error = metaErrorFrom(body, res.status, token);
+      console.warn(`meta-capi: refused (${res.status}) code ${error.code ?? '-'}/${error.subcode ?? '-'}: ${error.message}`);
+      await noteMetaSend(env, { ok: false, status: res.status, error });
       return 'failed';
     }
+    await noteMetaSend(env, { ok: true, status: res.status, error: null });
     return 'sent';
   } catch (err) {
-    console.warn(`meta-capi: unreachable ${String(err).slice(0, 200)}`);
+    const error: MetaError = { code: null, subcode: null, type: 'unreachable', message: withoutToken(String(err), token, 200) };
+    console.warn(`meta-capi: unreachable ${error.message}`);
+    await noteMetaSend(env, { ok: false, status: null, error });
     return 'failed';
   }
 }
 
-/** The dataset's own id and name: what the owner's check asks Meta for. */
+/** Whose token it is: a token made in Events Manager answers as its "Conversions API System User". */
+export const META_IDENTITY_CHECK_URL = `https://graph.facebook.com/${META_GRAPH_VERSION}/me?fields=id,name`;
+/** The dataset's own id and name. */
 export const META_DATASET_CHECK_URL = `https://graph.facebook.com/${META_GRAPH_VERSION}/${META_DATASET_ID}?fields=id,name`;
+/**
+ * The Dataset Quality API. Meta: a token generated in Events Manager "will be
+ * able to fetch quality data and send events using the Conversions API".
+ */
+export const META_QUALITY_CHECK_URL = `https://graph.facebook.com/${META_GRAPH_VERSION}/dataset_quality?dataset_id=${META_DATASET_ID}&fields=${encodeURIComponent('web{event_name}')}`;
 
 /** Meta's answer to the owner's check (Admin → Providers). Never carries the token. */
 export interface MetaCapiCheck {
@@ -234,19 +337,45 @@ export interface MetaCapiCheck {
   configured: boolean;
   /** META_CAPI_TEST_EVENT_CODE is set: server events land in Events Manager → Test events only. */
   testMode: boolean;
-  /** Meta answered with this dataset's id. */
+  /** The token reaches the dataset: Meta answered the dataset read or the dataset-quality read. */
   ok: boolean;
+  /** Whose token it is (`/me`), or null when Meta did not accept the token at all. */
+  identity: { id: string; name: string } | null;
+  identityError: MetaError | null;
+  /** The dataset read. */
   status: number | null;
   datasetName: string | null;
-  error: { code: number | null; subcode: number | null; type: string | null; message: string } | null;
+  error: MetaError | null;
+  /** The Dataset Quality API read. */
+  quality: { ok: boolean; status: number | null; error: MetaError | null };
+}
+
+interface MetaRead {
+  ok: boolean;
+  status: number | null;
+  body: unknown;
+  thrown: string | null;
+}
+
+async function metaRead(url: string, token: string, fetchImpl?: typeof fetch): Promise<MetaRead> {
+  try {
+    const res = await fetchWithBudget(
+      url,
+      { method: 'GET', headers: { Authorization: `Bearer ${token}` } },
+      { timeoutMs: PROVIDER_BUDGETS.ads.timeoutMs, retries: 0, provider: 'meta_capi', fetchImpl }
+    );
+    return { ok: res.ok, status: res.status, body: await res.json().catch(() => null), thrown: null };
+  } catch (err) {
+    return { ok: false, status: null, body: null, thrown: String(err) };
+  }
 }
 
 /**
  * ASKS META WHETHER THE TOKEN REACHES THE DATASET (owner report 2026-10-31:
- * "No server events"). A secret can be present and wrong, expired, or set on
- * another Worker; only Meta can say. This is a READ of the dataset's own id
- * and name: no event is created and nothing is counted (an event sent with a
- * test code still counts, so none is sent). The token travels in the
+ * "No server events", then "(#100) Missing Permission"). Three READS, sent
+ * together: whose token it is, the dataset's id and name, and the Dataset
+ * Quality API. No event is created and nothing is counted (an event sent with
+ * a test code still counts, so none is sent). The token travels in the
  * Authorization header, never in a URL, and never comes back in the answer.
  */
 export async function checkMetaCapi(
@@ -255,38 +384,45 @@ export async function checkMetaCapi(
 ): Promise<MetaCapiCheck> {
   const token = (env.META_CAPI_ACCESS_TOKEN || '').trim();
   const testMode = (env.META_CAPI_TEST_EVENT_CODE || '').trim().length > 0;
-  const base: MetaCapiCheck = { configured: token.length > 0, testMode, ok: false, status: null, datasetName: null, error: null };
+  const base: MetaCapiCheck = {
+    configured: token.length > 0,
+    testMode,
+    ok: false,
+    identity: null,
+    identityError: null,
+    status: null,
+    datasetName: null,
+    error: null,
+    quality: { ok: false, status: null, error: null },
+  };
   if (!token) return base;
-  const clean = (text: string, max: number) => text.split(token).join('***').slice(0, max);
-  try {
-    const res = await fetchWithBudget(
-      META_DATASET_CHECK_URL,
-      { method: 'GET', headers: { Authorization: `Bearer ${token}` } },
-      { timeoutMs: PROVIDER_BUDGETS.ads.timeoutMs, retries: 0, provider: 'meta_capi', fetchImpl: opts.fetchImpl }
-    );
-    const body = (await res.json().catch(() => null)) as {
-      id?: unknown;
-      name?: unknown;
-      error?: { message?: unknown; type?: unknown; code?: unknown; error_subcode?: unknown };
-    } | null;
-    if (res.ok && body && String(body.id ?? '') === META_DATASET_ID) {
-      return { ...base, ok: true, status: res.status, datasetName: typeof body.name === 'string' ? clean(body.name, 120) : null };
-    }
-    const e = body?.error;
-    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-    return {
-      ...base,
-      status: res.status,
-      error: {
-        code: num(e?.code),
-        subcode: num(e?.error_subcode),
-        type: typeof e?.type === 'string' ? clean(e.type, 60) : null,
-        message: clean(typeof e?.message === 'string' ? e.message : `HTTP ${res.status}`, 300),
-      },
-    };
-  } catch (err) {
-    return { ...base, error: { code: null, subcode: null, type: 'unreachable', message: clean(String(err), 200) } };
-  }
+  const failure = (r: MetaRead): MetaError =>
+    r.thrown != null
+      ? { code: null, subcode: null, type: 'unreachable', message: withoutToken(r.thrown, token, 200) }
+      : metaErrorFrom(r.body, r.status, token);
+  const [me, ds, q] = await Promise.all([
+    metaRead(META_IDENTITY_CHECK_URL, token, opts.fetchImpl),
+    metaRead(META_DATASET_CHECK_URL, token, opts.fetchImpl),
+    metaRead(META_QUALITY_CHECK_URL, token, opts.fetchImpl),
+  ]);
+  const meBody = (me.body && typeof me.body === 'object' ? me.body : {}) as { id?: unknown; name?: unknown };
+  const identity =
+    me.ok && typeof meBody.id === 'string' && meBody.id
+      ? { id: withoutToken(meBody.id, token, 40), name: typeof meBody.name === 'string' ? withoutToken(meBody.name, token, 120) : '' }
+      : null;
+  const dsBody = (ds.body && typeof ds.body === 'object' ? ds.body : {}) as { id?: unknown; name?: unknown };
+  const datasetOk = ds.ok && String(dsBody.id ?? '') === META_DATASET_ID;
+  const qualityOk = q.ok && q.body != null && typeof q.body === 'object' && !('error' in q.body);
+  return {
+    ...base,
+    ok: datasetOk || qualityOk,
+    identity,
+    identityError: identity ? null : failure(me),
+    status: ds.status,
+    datasetName: datasetOk && typeof dsBody.name === 'string' ? withoutToken(dsBody.name, token, 120) : null,
+    error: datasetOk ? null : failure(ds),
+    quality: { ok: qualityOk, status: q.status, error: qualityOk ? null : failure(q) },
+  };
 }
 
 /**

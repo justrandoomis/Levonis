@@ -75,7 +75,7 @@ import { classifyOrderSearch } from '../lib/orderSearch';
 import { arabicFoldSql, phoneDigitsSql } from '../lib/sqlFold';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { telegramConfigured, telegramGetMe } from '../lib/telegram';
-import { checkMetaCapi, META_DATASET_ID, metaCapiConfigured } from '../lib/metaCapi';
+import { checkMetaCapi, META_DATASET_ID, metaCapiConfigured, readMetaLastSend, type MetaError } from '../lib/metaCapi';
 import {
   STAGE_LEGACY_STATUS,
   STAGE_SOURCE,
@@ -280,6 +280,9 @@ adminRoutes.get('/providers', async (c) => {
       configured: metaCapiConfigured(c.env),
       testMode: !!(c.env.META_CAPI_TEST_EVENT_CODE || '').trim(),
       datasetId: META_DATASET_ID,
+      // What Meta said to the last REAL event the site sent (codes and Meta's
+      // sentence only), or null when none was recorded yet.
+      lastSend: await readMetaLastSend(c.env),
     },
   });
 });
@@ -484,24 +487,36 @@ adminRoutes.post('/providers/test', async (c) => {
     // Not a message: a read of the dataset with the token (checkMetaCapi), so
     // nothing is sent to anyone and no event is counted. Meta's own verdict
     // comes back — code 190 is an invalid or expired token.
-    const r = await checkMetaCapi(c.env);
+    const [r, lastSend] = await Promise.all([checkMetaCapi(c.env), readMetaLastSend(c.env)]);
     await audit(c.env.DB, adminUser.id, 'provider.test', 'channel:meta', {
       ok: r.ok,
       status: r.status,
       code: r.error?.code ?? null,
+      quality: r.quality.ok,
+      identified: !!r.identity,
     });
-    const refusal = r.error
-      ? `Meta refused (${r.status ?? 'no answer'}${r.error.code != null ? `, code ${r.error.code}` : ''}${r.error.subcode != null ? `/${r.error.subcode}` : ''}): ${r.error.message}`
-      : 'Meta did not confirm the dataset';
+    const refused = (e: MetaError | null, status: number | null) =>
+      `refused (${status ?? 'no answer'}${e?.code != null ? `, code ${e.code}` : ''}${e?.subcode != null ? `/${e.subcode}` : ''}): ${e?.message ?? ''}`;
+    // Four facts, in the order the owner acts on them: whose token it is, the
+    // dataset, the quality API, and what Meta said to the last real event.
+    const parts = r.configured
+      ? [
+          r.identity ? `token of "${r.identity.name || 'unnamed'}" (${r.identity.id})` : `token not accepted: ${refused(r.identityError, null)}`,
+          r.error ? `dataset ${META_DATASET_ID} ${refused(r.error, r.status)}` : `dataset ${META_DATASET_ID} readable${r.datasetName ? ` ("${r.datasetName}")` : ''}`,
+          r.quality.ok ? 'quality API readable' : `quality API ${refused(r.quality.error, r.quality.status)}`,
+          lastSend
+            ? lastSend.ok
+              ? `last real event ${lastSend.at}: accepted`
+              : `last real event ${lastSend.at}: ${refused(lastSend.error, lastSend.status)}`
+            : 'no real event recorded yet',
+          ...(r.testMode ? ['TEST MODE: events go to Test events only'] : []),
+        ]
+      : [];
     return c.json({
       success: true,
       channel,
       sent: r.ok,
-      detail: !r.configured
-        ? 'META_CAPI_NOT_CONFIGURED'
-        : r.ok
-          ? `Meta answered: dataset ${META_DATASET_ID}${r.datasetName ? ` (${r.datasetName})` : ''}${r.testMode ? ' — TEST MODE: events go to Test events only' : ''}`
-          : refusal,
+      detail: r.configured ? parts.join(' · ') : 'META_CAPI_NOT_CONFIGURED',
     });
   }
 

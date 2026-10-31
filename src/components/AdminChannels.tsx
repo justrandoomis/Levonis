@@ -50,7 +50,18 @@ interface Providers {
     detail?: string | null;
   };
   /** The Meta Conversions API (server events). Absent from an older Worker's answer. */
-  meta?: { configured: boolean; testMode: boolean; datasetId: string };
+  meta?: {
+    configured: boolean;
+    testMode: boolean;
+    datasetId: string;
+    /** What Meta said to the last real event the site sent; null before the first one. */
+    lastSend?: {
+      ok: boolean;
+      status: number | null;
+      error: { code: number | null; subcode: number | null; type: string | null; message: string } | null;
+      at: string;
+    } | null;
+  };
 }
 
 interface TestResult {
@@ -98,6 +109,9 @@ const STRINGS = {
       'لا يوجد META_CAPI_ACCESS_TOKEN على الموقع، فلا تُرسل أحداث الخادم. أضِفه في GitHub ← Settings ← Secrets and variables ← Actions باسم META_CAPI_ACCESS_TOKEN، ويرفعه النشر التالي إلى الموقع.',
     metaTestMode: 'وضع الاختبار مفعّل (META_CAPI_TEST_EVENT_CODE): أحداث الخادم تظهر في «Test events» فقط.',
     metaTestBadge: 'وضع الاختبار',
+    metaLastOk: 'آخر حدث حقيقي أرسله الموقع: قبله Meta',
+    metaLastFail: 'آخر حدث حقيقي أرسله الموقع: رفضه Meta',
+    metaLastNone: 'لم يُسجَّل أي حدث حقيقي بعد.',
     metaCheckNote: 'يسأل Meta عن مجموعة البيانات بهذا الرمز، ولا يُنشئ أي حدث.',
     metaCheck: 'افحص مع Meta',
     metaChecking: 'جارٍ الفحص…',
@@ -142,6 +156,9 @@ const STRINGS = {
       'No META_CAPI_ACCESS_TOKEN on the live site, so no server events are sent. Add it in GitHub → Settings → Secrets and variables → Actions, named META_CAPI_ACCESS_TOKEN; the next deploy uploads it to the site.',
     metaTestMode: 'Test mode is on (META_CAPI_TEST_EVENT_CODE): server events appear under Test events only.',
     metaTestBadge: 'Test mode',
+    metaLastOk: 'Last real event the site sent: accepted by Meta',
+    metaLastFail: 'Last real event the site sent: refused by Meta',
+    metaLastNone: 'No real event recorded yet.',
     metaCheckNote: 'Asks Meta about the dataset with this token; creates no event.',
     metaCheck: 'Check with Meta',
     metaChecking: 'Checking…',
@@ -186,6 +203,9 @@ const STRINGS = {
       'META_CAPI_ACCESS_TOKEN لەسەر ماڵپەڕەکە نییە، بۆیە هیچ ڕووداوێکی ڕاژەکار نانێردرێت. لە GitHub ← Settings ← Secrets and variables ← Actions بە ناوی META_CAPI_ACCESS_TOKEN زیادی بکە؛ بڵاوکردنەوەی داهاتوو بۆ ماڵپەڕەکەی بەرز دەکاتەوە.',
     metaTestMode: 'دۆخی تاقیکردنەوە چالاکە (META_CAPI_TEST_EVENT_CODE): ڕووداوەکانی ڕاژەکار تەنها لە «Test events» دەردەکەون.',
     metaTestBadge: 'دۆخی تاقیکردنەوە',
+    metaLastOk: 'دواین ڕووداوی ڕاستەقینە کە ماڵپەڕەکە ناردی: Meta وەریگرت',
+    metaLastFail: 'دواین ڕووداوی ڕاستەقینە کە ماڵپەڕەکە ناردی: Meta ڕەتیکردەوە',
+    metaLastNone: 'هێشتا هیچ ڕووداوێکی ڕاستەقینە تۆمار نەکراوە.',
     metaCheckNote: 'بەم تۆکنە پرسیار لە Meta دەکات دەربارەی کۆمەڵەی داتاکە، و هیچ ڕووداوێک دروست ناکات.',
     metaCheck: 'لەگەڵ Meta بیپشکنە',
     metaChecking: 'پشکنین…',
@@ -388,6 +408,22 @@ export default function AdminChannels() {
             <Line tone="muted">
               {s.metaDataset}: <span dir="ltr">{data.meta.datasetId}</span>
             </Line>
+            {data.meta.configured ? (
+              data.meta.lastSend ? (
+                <Line tone={data.meta.lastSend.ok ? 'ok' : 'warn'}>
+                  {data.meta.lastSend.ok ? s.metaLastOk : s.metaLastFail}
+                  {' — '}
+                  <span dir="ltr" className="break-words">
+                    {data.meta.lastSend.at.slice(0, 16).replace('T', ' ')} UTC
+                    {data.meta.lastSend.error
+                      ? ` · ${data.meta.lastSend.status ?? '—'}${data.meta.lastSend.error.code != null ? `, code ${data.meta.lastSend.error.code}` : ''}: ${data.meta.lastSend.error.message}`
+                      : ''}
+                  </span>
+                </Line>
+              ) : (
+                <Line tone="muted">{s.metaLastNone}</Line>
+              )
+            ) : null}
             <Line tone="muted">{s.metaCheckNote}</Line>
             <button
               type="button"
