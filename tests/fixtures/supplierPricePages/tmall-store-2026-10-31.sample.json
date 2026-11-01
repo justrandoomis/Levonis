@@ -1,0 +1,551 @@
+{
+  "source": "Tmall 拓竹官方旗舰店 (official Bambu Lab store)",
+  "captured_on": "2026-10-31",
+  "price_basis": "priceText per SKU as shown on the product page; title 优惠前 = the regular price before store discounts, coupons and subsidies",
+  "notes": {
+    "price_range": "price_min_cny/price_max_cny span the SKUs on offer; SKUs with not_for_sale: true (reminder or MakerWorld-link options, unreleased products parked at 9999+) keep their page price but are left out",
+    "colour_names": "colour options with a Bambu colour code use Bambu's official English colour name from data/bambu-import; other options are translated from the Chinese",
+    "sourcing": "EU_STORE_EUR (freight GERMANY_LAND) for electronic devices: printer, multi_material_unit, laser_or_cutter_device, scanner, air_purifier, electronic_part; CHINA_CNY for everything else, freight CHINA_SEA for filament and filament_bundle, CHINA_SEA_OR_AIR for the rest"
+  },
+  "coverage": {
+    "store_list_products": 741,
+    "captured_products": 5,
+    "skus": 18,
+    "not_for_sale_skus": 4,
+    "missing_from_snapshot": [],
+    "not_in_store_list": [],
+    "other_seller_items": [],
+    "unknown_seller_items": [],
+    "items_without_price": [
+      "1092658088711"
+    ]
+  },
+  "items": [
+    {
+      "item_id": "1053109777521",
+      "name_en": "Hand twist drill (pin vise) for model making",
+      "category": "tool",
+      "sourcing": "CHINA_CNY",
+      "freight_route": "CHINA_SEA_OR_AIR",
+      "codes": [
+        "ZH121"
+      ],
+      "flags": [],
+      "price_min_cny": 40,
+      "price_max_cny": 99,
+      "price_source": "skus",
+      "title": "拓竹 3D打印模型手捻钻高达手办文玩钻孔工具手工diy扩孔器 创客宝库-ZH121",
+      "listing_title": "拓竹 3D打印模型手捻钻高达手办文玩钻孔工具手工diy扩孔器 创客宝库-ZH121",
+      "url": "https://detail.tmall.com/item.htm?id=1053109777521",
+      "seller": "拓竹官方旗舰店",
+      "from_price_cny": 40,
+      "from_price_title": "优惠前",
+      "hidden_price": false,
+      "ok": true,
+      "props": [
+        {
+          "pid": "-1",
+          "name": "商品规格",
+          "name_en": "Spec",
+          "values": [
+            {
+              "vid": "-1",
+              "name": "手捻钻全能套装（1套）",
+              "option_en": "Hand drill complete set (1 set)"
+            },
+            {
+              "vid": "-3",
+              "name": "手捻钻钻头套装（1套）",
+              "option_en": "Hand drill bit set (1 set)"
+            }
+          ]
+        }
+      ],
+      "skus": [
+        {
+          "sku_id": "6089953933955",
+          "options": {
+            "商品规格": "手捻钻全能套装（1套）"
+          },
+          "options_en": {
+            "Spec": "Hand drill complete set (1 set)"
+          },
+          "codes": [],
+          "price_cny": 99,
+          "price_title": null,
+          "quantity": 0
+        },
+        {
+          "sku_id": "6264995743059",
+          "options": {
+            "商品规格": "手捻钻钻头套装（1套）"
+          },
+          "options_en": {
+            "Spec": "Hand drill bit set (1 set)"
+          },
+          "codes": [],
+          "price_cny": 40,
+          "price_title": "优惠前",
+          "quantity": 59
+        }
+      ]
+    },
+    {
+      "item_id": "846915661262",
+      "name_en": "Halloween pumpkin candle lamp",
+      "category": "maker_kit",
+      "sourcing": "CHINA_CNY",
+      "freight_route": "CHINA_SEA_OR_AIR",
+      "codes": [
+        "KC008",
+        "DY002",
+        "DY013",
+        "DY014",
+        "DY008",
+        "DY009",
+        "DY010",
+        "DY012"
+      ],
+      "flags": [],
+      "price_min_cny": 19.7,
+      "price_max_cny": 22.6,
+      "price_source": "skus",
+      "title": "拓竹 万圣节南瓜灯蜡烛灯 创客宝库创意3D打印模型组件 KC008",
+      "listing_title": "拓竹 万圣节南瓜灯蜡烛灯 创客宝库创意3D打印模型组件 KC008",
+      "url": "https://detail.tmall.com/item.htm?id=846915661262",
+      "seller": "拓竹官方旗舰店",
+      "from_price_cny": 19.7,
+      "from_price_title": "优惠前",
+      "hidden_price": false,
+      "ok": true,
+      "props": [
+        {
+          "pid": "1627207",
+          "name": "颜色分类",
+          "name_en": "Variant",
+          "values": [
+            {
+              "vid": "34813308702",
+              "name": "D37.2x 36.6 mm暖黄蜡烛灯（12个）",
+              "option_en": "Candle lights Ø37.2 × 36.6 mm, warm yellow (12 pcs)"
+            },
+            {
+              "vid": "34813308701",
+              "name": "D37.2x 36.6 mm暖白蜡烛灯（12个）",
+              "option_en": "Candle lights Ø37.2 × 36.6 mm, warm white (12 pcs)"
+            },
+            {
+              "vid": "34813308703",
+              "name": "D37.2x 36.6 mm冷白蜡烛灯（12个）",
+              "option_en": "Candle lights Ø37.2 × 36.6 mm, cool white (12 pcs)"
+            },
+            {
+              "vid": "34872993178",
+              "name": "南瓜灯-DY002 （默认发暖白）",
+              "option_en": "Pumpkin lamp DY002 (ships with warm white light)"
+            },
+            {
+              "vid": "34872993179",
+              "name": "巫婆炉灯-DY013 （默认发暖白）",
+              "option_en": "Witch's cauldron lamp DY013 (ships with warm white light)"
+            },
+            {
+              "vid": "34872993180",
+              "name": "杰克灯-DY014 （默认发暖白）",
+              "option_en": "Jack-o'-lantern DY014 (ships with warm white light)"
+            },
+            {
+              "vid": "34872993181",
+              "name": "阴森蜡烛架-DY008 （默认发暖白）",
+              "option_en": "Spooky candle holder DY008 (ships with warm white light)"
+            },
+            {
+              "vid": "34872993182",
+              "name": "鬼魂灯-DY009 （默认发暖白）",
+              "option_en": "Ghost lamp DY009 (ships with warm white light)"
+            },
+            {
+              "vid": "34872993183",
+              "name": "鬼魂灯-DY010 （默认发暖白）",
+              "option_en": "Ghost lamp DY010 (ships with warm white light)"
+            },
+            {
+              "vid": "34872993184",
+              "name": "南瓜灯-DY012 （默认发暖白）",
+              "option_en": "Pumpkin lamp DY012 (ships with warm white light)"
+            },
+            {
+              "vid": "34421012849",
+              "name": "访问Maker World获取模型",
+              "option_en": "MakerWorld model link (not for sale: do not order, not shipped)"
+            }
+          ]
+        }
+      ],
+      "skus": [
+        {
+          "sku_id": "5796898454862",
+          "options": {
+            "颜色分类": "D37.2x 36.6 mm暖黄蜡烛灯（12个）"
+          },
+          "options_en": {
+            "Variant": "Candle lights Ø37.2 × 36.6 mm, warm yellow (12 pcs)"
+          },
+          "codes": [],
+          "price_cny": 21,
+          "price_title": "优惠前",
+          "quantity": 38
+        },
+        {
+          "sku_id": "5796898454863",
+          "options": {
+            "颜色分类": "D37.2x 36.6 mm暖白蜡烛灯（12个）"
+          },
+          "options_en": {
+            "Variant": "Candle lights Ø37.2 × 36.6 mm, warm white (12 pcs)"
+          },
+          "codes": [],
+          "price_cny": 19.7,
+          "price_title": "优惠前",
+          "quantity": 43
+        },
+        {
+          "sku_id": "5796898454864",
+          "options": {
+            "颜色分类": "D37.2x 36.6 mm冷白蜡烛灯（12个）"
+          },
+          "options_en": {
+            "Variant": "Candle lights Ø37.2 × 36.6 mm, cool white (12 pcs)"
+          },
+          "codes": [],
+          "price_cny": 22.6,
+          "price_title": "优惠前",
+          "quantity": 8
+        },
+        {
+          "sku_id": "5796898454865",
+          "options": {
+            "颜色分类": "南瓜灯-DY002 （默认发暖白）"
+          },
+          "options_en": {
+            "Variant": "Pumpkin lamp DY002 (ships with warm white light)"
+          },
+          "codes": [
+            "DY002"
+          ],
+          "price_cny": 19.7,
+          "price_title": "优惠前",
+          "quantity": 64
+        },
+        {
+          "sku_id": "5796898454866",
+          "options": {
+            "颜色分类": "巫婆炉灯-DY013 （默认发暖白）"
+          },
+          "options_en": {
+            "Variant": "Witch's cauldron lamp DY013 (ships with warm white light)"
+          },
+          "codes": [
+            "DY013"
+          ],
+          "price_cny": 19.7,
+          "price_title": "优惠前",
+          "quantity": 65
+        },
+        {
+          "sku_id": "5796898454867",
+          "options": {
+            "颜色分类": "杰克灯-DY014 （默认发暖白）"
+          },
+          "options_en": {
+            "Variant": "Jack-o'-lantern DY014 (ships with warm white light)"
+          },
+          "codes": [
+            "DY014"
+          ],
+          "price_cny": 19.7,
+          "price_title": "优惠前",
+          "quantity": 62
+        },
+        {
+          "sku_id": "5796898454868",
+          "options": {
+            "颜色分类": "阴森蜡烛架-DY008 （默认发暖白）"
+          },
+          "options_en": {
+            "Variant": "Spooky candle holder DY008 (ships with warm white light)"
+          },
+          "codes": [
+            "DY008"
+          ],
+          "price_cny": 19.7,
+          "price_title": "优惠前",
+          "quantity": 65
+        },
+        {
+          "sku_id": "5796898454869",
+          "options": {
+            "颜色分类": "鬼魂灯-DY009 （默认发暖白）"
+          },
+          "options_en": {
+            "Variant": "Ghost lamp DY009 (ships with warm white light)"
+          },
+          "codes": [
+            "DY009"
+          ],
+          "price_cny": 19.7,
+          "price_title": "优惠前",
+          "quantity": 65
+        },
+        {
+          "sku_id": "5796898454870",
+          "options": {
+            "颜色分类": "鬼魂灯-DY010 （默认发暖白）"
+          },
+          "options_en": {
+            "Variant": "Ghost lamp DY010 (ships with warm white light)"
+          },
+          "codes": [
+            "DY010"
+          ],
+          "price_cny": 19.7,
+          "price_title": "优惠前",
+          "quantity": 65
+        },
+        {
+          "sku_id": "5796898454871",
+          "options": {
+            "颜色分类": "南瓜灯-DY012 （默认发暖白）"
+          },
+          "options_en": {
+            "Variant": "Pumpkin lamp DY012 (ships with warm white light)"
+          },
+          "codes": [
+            "DY012"
+          ],
+          "price_cny": 19.7,
+          "price_title": "优惠前",
+          "quantity": 64
+        },
+        {
+          "sku_id": "5796898454872",
+          "options": {
+            "颜色分类": "访问Maker World获取模型"
+          },
+          "options_en": {
+            "Variant": "MakerWorld model link (not for sale: do not order, not shipped)"
+          },
+          "codes": [],
+          "price_cny": 9999,
+          "price_title": "优惠前",
+          "quantity": 3,
+          "not_for_sale": true,
+          "not_for_sale_reason": "placeholder_option"
+        }
+      ]
+    },
+    {
+      "item_id": "742608647813",
+      "name_en": "Hotend heating assembly — A1/A1 mini",
+      "category": "electronic_part",
+      "sourcing": "EU_STORE_EUR",
+      "freight_route": "GERMANY_LAND",
+      "codes": [],
+      "flags": [],
+      "price_min_cny": 115,
+      "price_max_cny": 115,
+      "price_source": "skus",
+      "title": "拓竹 热端加热组件 3D打印机配件 【A1/A1 mini 适用】",
+      "listing_title": "拓竹 热端加热组件 3D打印机配件 【A1/A1 mini 适用】",
+      "url": "https://detail.tmall.com/item.htm?id=742608647813",
+      "seller": "拓竹官方旗舰店",
+      "from_price_cny": 115,
+      "from_price_title": "优惠前",
+      "hidden_price": false,
+      "ok": true,
+      "props": [
+        {
+          "pid": "122276375",
+          "name": "配件类型",
+          "name_en": "Part type",
+          "values": [
+            {
+              "vid": "42602854440",
+              "name": "热端加热组件【A1/A1 mini 适用】",
+              "option_en": "Hotend heating assembly (for A1/A1 mini)"
+            },
+            {
+              "vid": "41781165178",
+              "name": "补货时间待定（仅提醒补货时间，勿拍此项，下单不发货）",
+              "option_en": "Restock date to be announced (reminder only, not for sale: do not order, not shipped)"
+            }
+          ]
+        }
+      ],
+      "skus": [
+        {
+          "sku_id": "5293816695460",
+          "options": {
+            "配件类型": "热端加热组件【A1/A1 mini 适用】"
+          },
+          "options_en": {
+            "Part type": "Hotend heating assembly (for A1/A1 mini)"
+          },
+          "codes": [],
+          "price_cny": 115,
+          "price_title": "优惠前",
+          "quantity": 198
+        },
+        {
+          "sku_id": "6197429735840",
+          "options": {
+            "配件类型": "补货时间待定（仅提醒补货时间，勿拍此项，下单不发货）"
+          },
+          "options_en": {
+            "Part type": "Restock date to be announced (reminder only, not for sale: do not order, not shipped)"
+          },
+          "codes": [],
+          "price_cny": 99999,
+          "price_title": "优惠前",
+          "quantity": 12,
+          "not_for_sale": true,
+          "not_for_sale_reason": "placeholder_option"
+        }
+      ]
+    },
+    {
+      "item_id": "785492874870",
+      "name_en": "M2.5x6 pan-head machine screws (20 pcs)",
+      "category": "maker_kit",
+      "sourcing": "CHINA_CNY",
+      "freight_route": "CHINA_SEA_OR_AIR",
+      "codes": [
+        "AA013"
+      ],
+      "flags": [],
+      "price_min_cny": 2.1,
+      "price_max_cny": 2.1,
+      "price_source": "skus",
+      "title": "拓竹3D打印模型专用标准零件 M2.5x6 半圆头机牙螺丝 (20个) AA013 创客宝库",
+      "listing_title": "拓竹3D打印模型专用标准零件 M2.5x6 半圆头机牙螺丝 (20个) AA013 创客宝库",
+      "url": "https://detail.tmall.com/item.htm?id=785492874870",
+      "seller": "拓竹官方旗舰店",
+      "from_price_cny": 2.1,
+      "from_price_title": null,
+      "hidden_price": false,
+      "ok": true,
+      "props": [
+        {
+          "pid": "122276375",
+          "name": "配件类型",
+          "name_en": "Part type",
+          "values": [
+            {
+              "vid": "31954398868",
+              "name": "M2.5x6 半圆头机牙螺丝 (20PCS)- AA013",
+              "option_en": "M2.5x6 pan-head machine screws (20 pcs), AA013"
+            }
+          ]
+        }
+      ],
+      "skus": [
+        {
+          "sku_id": "5365752729795",
+          "options": {
+            "配件类型": "M2.5x6 半圆头机牙螺丝 (20PCS)- AA013"
+          },
+          "options_en": {
+            "Part type": "M2.5x6 pan-head machine screws (20 pcs), AA013"
+          },
+          "codes": [
+            "AA013"
+          ],
+          "price_cny": 2.1,
+          "price_title": null,
+          "quantity": 53
+        }
+      ]
+    },
+    {
+      "item_id": "1092658088711",
+      "name_en": "TPU 75A filament",
+      "category": "filament",
+      "sourcing": "CHINA_CNY",
+      "freight_route": "CHINA_SEA",
+      "codes": [
+        "56200",
+        "56701"
+      ],
+      "flags": [
+        "new",
+        "not_for_sale"
+      ],
+      "price_min_cny": null,
+      "price_max_cny": null,
+      "price_source": null,
+      "title": "【新品上市】拓竹TPU 75A 3D打印耗材 耐用柔韧软弹减震 抗冲击 RFID智能参数识别",
+      "listing_title": "【新品上市】拓竹TPU 75A 3D打印耗材 耐用柔韧软弹减震 抗冲击 RFID智能参数识别",
+      "url": "https://detail.tmall.com/item.htm?id=1092658088711",
+      "seller": "拓竹官方旗舰店",
+      "from_price_cny": 9999,
+      "from_price_title": null,
+      "hidden_price": false,
+      "ok": true,
+      "props": [
+        {
+          "pid": "-1",
+          "name": "商品规格",
+          "name_en": "Spec",
+          "values": [
+            {
+              "vid": "-1",
+              "name": "红色 56200【含料盘】",
+              "option_en": "Red (56200), with spool"
+            },
+            {
+              "vid": "-2",
+              "name": "粉色 56701【含料盘】",
+              "option_en": "Pink (56701), with spool"
+            }
+          ]
+        }
+      ],
+      "skus": [
+        {
+          "sku_id": "6315625903081",
+          "options": {
+            "商品规格": "红色 56200【含料盘】"
+          },
+          "options_en": {
+            "Spec": "Red (56200), with spool"
+          },
+          "codes": [
+            "56200"
+          ],
+          "price_cny": 9999,
+          "price_title": null,
+          "quantity": 1,
+          "not_for_sale": true,
+          "not_for_sale_reason": "placeholder_price"
+        },
+        {
+          "sku_id": "6315625903083",
+          "options": {
+            "商品规格": "粉色 56701【含料盘】"
+          },
+          "options_en": {
+            "Spec": "Pink (56701), with spool"
+          },
+          "codes": [
+            "56701"
+          ],
+          "price_cny": 9999,
+          "price_title": null,
+          "quantity": 1,
+          "not_for_sale": true,
+          "not_for_sale_reason": "placeholder_price"
+        }
+      ]
+    }
+  ]
+}

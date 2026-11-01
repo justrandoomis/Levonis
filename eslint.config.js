@@ -25,6 +25,10 @@ export default tseslint.config(
       // The lab's scratch directory (gitignored by P0): builders' one-off
       // measurement scripts live there, never shipped, never linted.
       'scratchpad/**',
+      // The owner's supplier price captures and their tools (gitignored:
+      // docs/SMART_PRICING.md §3.3, owner question 282(g)): never committed,
+      // never shipped — CI never sees them, so a local lint must not either.
+      'data/bambu-*-prices/**',
       // Handoff material (the Bambu import's P0 corpus tools and agent
       // briefs): reference copies, never shipped, never run by CI.
       'docs/**',

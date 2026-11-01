@@ -200,6 +200,71 @@ export async function trackedStockReady(db: D1Database, productId: string): Prom
 export const trackedEmptyRefusal = (): HttpError =>
   new HttpError(400, serverMessage('IMPORT_STOCK_TRACKED_EMPTY'), 'IMPORT_STOCK_TRACKED_EMPTY', { section: 3, import_stock: 'tracked' });
 
+/** The PREORDER_OFFERED condition as a batch fence (two statements): «بلا تتبّع» is true only where a pre-order is offered. */
+export const preorderOfferedFence = (db: D1Database, productId: string): D1PreparedStatement[] =>
+  fence(db, PREORDER_OFFERED_SQL, preorderOfferedBinds(productId));
+
+/**
+ * AN IMPORTED PRODUCT THAT HOLDS NO STOCK SETUP (docs/SMART_PRICING.md §4.7
+ * (5b)): no stock number on any level — the product, every option value,
+ * colour and variant, active or not — no lot with units left, and no
+ * order-type cell (a cell is the owner's own setup). Only such a product may be
+ * restructured by the estimate apply and recorded «بلا تتبّع» by it: a stocked
+ * or owner-configured product is never touched. The estimate apply reads it and
+ * fences on it in its price batch. Anonymous `?` only (six, each the product
+ * id), for `fence()`.
+ */
+export const NO_STOCK_SETUP_SQL = `NOT EXISTS (SELECT 1 FROM products WHERE id = ? AND stock IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM product_option_values WHERE product_id = ? AND stock IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM product_colors WHERE product_id = ? AND stock IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM product_variants WHERE product_id = ? AND stock IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM inventory_lots WHERE product_id = ? AND qty_remaining > 0)
+  AND NOT EXISTS (SELECT 1 FROM product_option_fulfillment WHERE product_id = ?)`;
+export const noStockSetupBinds = (productId: string): string[] => Array.from({ length: 6 }, () => productId);
+
+/** Does the product hold no stock setup (`NO_STOCK_SETUP_SQL`)? */
+export async function noStockSetup(db: D1Database, productId: string): Promise<boolean> {
+  const row = await db.prepare(`SELECT (${NO_STOCK_SETUP_SQL}) AS ok`).bind(...noStockSetupBinds(productId)).first<{ ok: number | null }>();
+  return Number(row?.ok) === 1;
+}
+
+/**
+ * «بلا تتبّع (حسب الطلب)» RECORDED BY THE ESTIMATE APPLY (docs/SMART_PRICING.md
+ * §4.8 step 4 (iii); DECISIONS row 280): the statement form of
+ * `decideImportStock(…, 'untracked')` — the decision with who and when, and its
+ * audit row (`source: 'estimate_apply'`) — laid INSIDE the estimate's price
+ * batch and BEFORE the V2 writer's `importStockFence` (its step 0), exactly as
+ * worker/lib/procurementImportStock.ts lays «تتبّع الكمية» for a purchase.
+ *
+ * Its own condition — the product offers a pre-order (`PREORDER_OFFERED_SQL`) —
+ * is NOT fenced here: in the same batch the structure that makes the product
+ * pre-order-only comes later (the writer's step 4), so the caller lays
+ * `preorderOfferedFence` AFTER that structure (the writer's `estimate` option
+ * does). A refused batch rolls the decision back with the price, so the
+ * decision is never recorded without the pre-order that makes it true.
+ *
+ * Only a created product still `not_configured` moves (the UPDATE's own
+ * WHERE); any other row is untouched, and the products row is not written (the
+ * writer's stale-edit fence comes after it).
+ */
+export async function untrackedDecisionStatements(db: D1Database, productId: string, actorId: string, now: string): Promise<D1PreparedStatement[]> {
+  const audit = await auditStatements(db, actorId, 'product.import_stock_decision', productId, {
+    product_id: productId,
+    before: 'not_configured',
+    after: 'untracked',
+    source: 'estimate_apply',
+  });
+  return [
+    db
+      .prepare(
+        `UPDATE product_source_refs SET stock_decision = 'untracked', stock_decided_by = ?, stock_decided_at = ?, updated_at = ?
+          WHERE product_id = ? AND match_kind = 'created' AND stock_decision = 'not_configured'`
+      )
+      .bind(actorId, now, now, productId),
+    ...audit.statements,
+  ];
+}
+
 /** What a decision did: the view after it, and whether anything was written. */
 export interface ImportStockDecided {
   import_stock: ImportStockView;

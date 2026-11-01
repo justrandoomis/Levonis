@@ -159,6 +159,8 @@ export interface CompareProductCard {
   multicolor?: MulticolorInfo;
   /** ON A COMPARISON COLUMN: the laser module this configuration ships with (W), or null. */
   laser_module_w?: number | null;
+  /** «سعر تقديري» (docs/SMART_PRICING.md §5.3): an estimated pre-order price; present only when true. */
+  price_estimate?: true;
 }
 
 /** One way to buy the same machine, as the picker and the column switcher offer it. */

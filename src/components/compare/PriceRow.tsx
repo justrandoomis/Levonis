@@ -10,7 +10,7 @@ import {
 } from '../../lib/compare';
 import { compareStrings } from './strings';
 import { productTone } from './tones';
-import { isUnpriced, UNPRICED_TEXT } from '../../lib/priceStatus';
+import { ESTIMATE_TEXT, isEstimated, isUnpriced, UNPRICED_TEXT } from '../../lib/priceStatus';
 
 /**
  * PRICE ON ITS OWN, AS A TRADE-OFF — NEVER AS A WIN.
@@ -39,6 +39,11 @@ import { isUnpriced, UNPRICED_TEXT } from '../../lib/priceStatus';
  * by this shop's own rule — every model, colour and delivery route is an
  * increase on it — so the page has to say so. Without that line a reader
  * compares two machines on figures neither of them will actually cost.
+ *
+ * «سعر تقديري» (docs/SMART_PRICING.md §5.3): a column whose card says its
+ * price is an estimated pre-order price (`isEstimated`) carries the card's own
+ * label beside the figure, so the comparison never presents an estimate as a
+ * confirmed price. The figure and the deltas are unchanged.
  */
 export default function PriceRow({
   products,
@@ -91,9 +96,16 @@ export default function PriceRow({
                     {isUnpriced(product) ? UNPRICED_TEXT[l] : s.missing}
                   </span>
                 ) : (
-                  <span dir="ltr" className="text-[13px] font-bold tabular-nums text-[var(--color-text-primary)]">
-                    {value.text}
-                  </span>
+                  <>
+                    <span dir="ltr" className="text-[13px] font-bold tabular-nums text-[var(--color-text-primary)]">
+                      {value.text}
+                    </span>
+                    {isEstimated(product) ? (
+                      <span data-price-estimate className="text-[11px] font-semibold text-[var(--color-text-muted)]">
+                        {ESTIMATE_TEXT[l]}
+                      </span>
+                    ) : null}
+                  </>
                 )}
                 {delta.cheapest ? (
                   <span className="text-[11px] font-bold text-[var(--color-success)]">{s.cheapest}</span>

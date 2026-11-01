@@ -46,7 +46,16 @@ import { isV2Published, publishV2 } from './fixtures/v2Publish';
 import { adminProductRelationsRoutes } from '../worker/routes/adminProductRelations';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
 import { serverMessage } from '@levonis/contracts/costRefusals';
-import { isImportStockMiss, TRACKED_STOCK_SQL, trackedStockBinds, trackedStockReady } from '../worker/lib/importStock';
+import {
+  importStockFence,
+  isImportStockMiss,
+  noStockSetup,
+  preorderOfferedFence,
+  TRACKED_STOCK_SQL,
+  trackedStockBinds,
+  trackedStockReady,
+  untrackedDecisionStatements,
+} from '../worker/lib/importStock';
 import { fence } from '../worker/lib/operations';
 import { toEditorDoc } from '../src/components/adminProducts/types';
 import { hydrateRelations, relationsToWire, type RelationsResponse } from '../src/components/adminProducts/form/model';
@@ -345,6 +354,78 @@ test('«نشر» of the visible, unpriced product with no price typed is a conte
   assert.equal(isV2Published(w.raw, CAT.id), false, 'and still unpriced');
   const tracked = await put(app, `/api/admin/products/${CAT.id}/import-stock-decision`, { decision: 'tracked' });
   assert.equal(tracked.status, 200, 'the saved stock lets «تتبّع الكمية» through');
+});
+
+/**
+ * THE ESTIMATE APPLY'S «بلا تتبّع» (docs/SMART_PRICING.md §4.8 step 4 (iii)): the statement form of the
+ * decision, laid BEFORE the V2 writer's import fence (its step 0) — which refuses a product still undecided —
+ * and held to its own condition, PREORDER_OFFERED, by a fence laid AFTER the structure that makes the product
+ * pre-order in the same batch: without that structure the whole batch, the decision included, rolls back.
+ * And NO_STOCK_SETUP_SQL: the only products the apply may restructure and decide for hold no stock number, no
+ * lot with units and no order-type cell.
+ */
+test('the in-batch «بلا تتبّع»: before the writer’s import fence, held to PREORDER_OFFERED by a later fence; NO_STOCK_SETUP_SQL', async () => {
+  const raw = freshDb();
+  const db = asD1(raw);
+  raw.exec(`
+    INSERT INTO products (id, slug, name, status, sale_types, selling_type, inventory_mode) VALUES ('p1', 'p1', 'P1', 'active', '["direct_sale"]', 'direct_sale', 'BASE');
+    INSERT INTO product_source_refs (source, source_product_id, product_id, source_handle, canonical_url, match_kind, stock_decision, fingerprint, fetched_at, import_run_id)
+      VALUES ('bambu_us', '581025672340700002', 'p1', 'p1', 'https://us.store.bambulab.com/products/p1', 'created', 'not_configured', 'fp', '2026-10-15T00:00:00.000Z', 'cir_000000000000000000000001');
+  `);
+  const now = '2026-10-31T00:00:00.000Z';
+  const decision = () => raw.prepare("SELECT stock_decision AS d, stock_decided_by AS by, stock_decided_at AS at FROM product_source_refs WHERE product_id = 'p1'").get() as { d: string; by: string; at: string };
+  const audits = () => count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'product.import_stock_decision' AND target = 'p1'");
+
+  // The writer's own fence refuses an undecided product: the reason the decision is laid before it.
+  await assert.rejects(db.batch(importStockFence(db, 'p1')), (e: unknown) => isImportStockMiss(e));
+  // Still direct sale only at the end of the batch: the later fence refuses, and the decision rolls back with it.
+  await assert.rejects(
+    db.batch([...(await untrackedDecisionStatements(db, 'p1', 'usr_owner', now)), ...importStockFence(db, 'p1'), ...preorderOfferedFence(db, 'p1')]),
+    /CHECK constraint failed/
+  );
+  assert.equal(decision().d, 'not_configured');
+  assert.equal(audits(), 0);
+  // The structure that makes it pre-order, in the same batch after the import fence: the decision lands.
+  await db.batch([
+    ...(await untrackedDecisionStatements(db, 'p1', 'usr_owner', now)),
+    ...importStockFence(db, 'p1'),
+    db.prepare(`UPDATE products SET sale_types = '["pre_order"]', selling_type = 'pre_order' WHERE id = 'p1'`),
+    ...preorderOfferedFence(db, 'p1'),
+  ]);
+  assert.deepEqual({ ...decision() }, { d: 'untracked', by: 'usr_owner', at: now });
+  const audit = raw.prepare("SELECT detail FROM audit_log WHERE action = 'product.import_stock_decision' AND target = 'p1'").get() as { detail: string };
+  assert.deepEqual(JSON.parse(audit.detail), { product_id: 'p1', before: 'not_configured', after: 'untracked', source: 'estimate_apply' }, 'ids and the two decisions, never a quantity');
+  // Decided already: the statement moves nothing (its own WHERE), and a merged product's row is never touched.
+  const [update] = await db.batch(await untrackedDecisionStatements(db, 'p1', 'usr_owner', '2026-11-01T00:00:00.000Z'));
+  assert.equal(Number(update!.meta?.changes ?? 0), 0);
+  assert.equal(decision().at, now);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM ops_guards'), 0, 'no guard row left behind');
+
+  // NO_STOCK_SETUP_SQL: no number on any level, no lot with units, no order-type cell.
+  raw.exec(`
+    INSERT INTO product_option_groups (id, product_id, name_en, sort, active) VALUES ('g1', 'p1', 'Size', 0, 1);
+    INSERT INTO product_option_values (id, product_id, group_id, name_en, sort, active) VALUES ('v1', 'p1', 'g1', 'S', 0, 1);
+    INSERT INTO product_colors (id, product_id, name_en, hex, active) VALUES ('c1', 'p1', 'Red', '#ff0000', 1);
+    INSERT INTO product_variants (id, product_id, combo_key, active) VALUES ('pv1', 'p1', 'o:v1|c:c1', 1);
+  `);
+  assert.equal(await noStockSetup(db, 'p1'), true);
+  for (const [stock, reset] of [
+    ["UPDATE products SET stock = 0 WHERE id = 'p1'", "UPDATE products SET stock = NULL WHERE id = 'p1'"],
+    ["UPDATE product_option_values SET stock = 2 WHERE id = 'v1'", "UPDATE product_option_values SET stock = NULL WHERE id = 'v1'"],
+    ["UPDATE product_colors SET stock = 2, active = 0 WHERE id = 'c1'", "UPDATE product_colors SET stock = NULL, active = 1 WHERE id = 'c1'"],
+    ["UPDATE product_variants SET stock = 2 WHERE id = 'pv1'", "UPDATE product_variants SET stock = NULL WHERE id = 'pv1'"],
+    ["INSERT INTO product_option_fulfillment (id, product_id, option_id, fulfillment_type, enabled) VALUES ('f1', 'p1', 'v1', 'pre_order', 0)", "DELETE FROM product_option_fulfillment WHERE id = 'f1'"],
+  ]) {
+    raw.exec(stock!);
+    assert.equal(await noStockSetup(db, 'p1'), false, stock);
+    raw.exec(reset!);
+  }
+  raw.exec(`INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,purchase_unit_iqd,shipping_share_iqd,internal_share_iqd,total_cost_iqd,cost_basis,received_at)
+            VALUES ('lot1','p1','base','',2,0,500000,500000,0,0,1000000,'received','2026-01-01T00:00:00.000Z')`);
+  assert.equal(await noStockSetup(db, 'p1'), true, 'a lot with nothing left holds no stock');
+  raw.exec(`INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,purchase_unit_iqd,shipping_share_iqd,internal_share_iqd,total_cost_iqd,cost_basis,received_at)
+            VALUES ('lot2','p1','base','',2,1,500000,500000,0,0,1000000,'received','2026-01-01T00:00:00.000Z')`);
+  assert.equal(await noStockSetup(db, 'p1'), false, 'a lot with units left is stock');
 });
 
 /** «تتبّع الكمية» per inventory mode: every row a sale can reach carries a number (zero is a number). */

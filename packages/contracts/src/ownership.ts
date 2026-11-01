@@ -111,6 +111,12 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'pricing_v2_purchase_reviews',
     // 0214: one-time snapshot for the owner's received-price repair.
     'pricing_received_recovery',
+    // 0218 (docs/SMART_PRICING.md §2.2; DECISIONS rows 278–282): the owner's supplier price catalogue,
+    // the per-type estimate defaults and switches, and a product's estimate bookkeeping and firm SKUs —
+    // written by the act of pricing a catalogue product.
+    'supplier_price_snapshots', 'supplier_price_items', 'supplier_price_skus', 'supplier_price_keys',
+    'supplier_price_matches', 'supplier_price_manual', 'price_estimate_types', 'price_estimate_control',
+    'product_price_estimates', 'price_estimate_lines', 'price_estimate_firm_skus',
     // 0184 (owner brief 2026-10-10) — each catalogue product's verdict against
     // the one central list of required fields, and the owner's «hide
     // incomplete» hold. Derived from the product row and its pricing data, and
@@ -164,6 +170,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'coupon_redemptions', 'return_cases', 'price_protection_claims',
     // 0140 — an admin's proposed new final total and the customer's decision on it.
     'order_price_adjustments',
+    // 0218 — an order line sold at an estimated price and its settlement, written in the order's own
+    // checkout batch (docs/SMART_PRICING.md §6.3).
+    'order_price_estimates',
     // 0143 — «استبدال الجهاز». A delivered LEVONIS line exchanged against a new
     // device. Commerce's and not Devices': the unit and its warranty are only
     // READ (to date the usage and the cover left); what this feature writes is

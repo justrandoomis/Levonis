@@ -40,6 +40,13 @@ import type { AssistAttachment } from '../components/support/AssistAttach';
  */
 const AssistAttach = lazy(() => import('../components/support/AssistAttach'));
 
+/**
+ * The words of an estimated price (packages/contracts/src/priceEstimates.ts),
+ * fetched only when «تواصل معنا» under one opened this page — a lazy chunk the
+ * product page's notice shares; the Support page itself never carries them.
+ */
+const loadEstimateWords = () => import('../../packages/contracts/src/priceEstimates');
+
 /** A ticket takes at most this many assistant attachments (worker/lib/assist/attachments.ts). */
 const ATTACH_MAX = 6;
 /** How much of the transcript survives a reload in this tab. */
@@ -1386,9 +1393,14 @@ function TicketsTab({
     <div className="min-h-0 flex-1 overflow-y-auto p-4">
       <div className="mx-auto max-w-3xl space-y-3">
         <div className="flex justify-end">
-          <button onClick={load} aria-label={s.retry} className="flex h-10 w-10 items-center justify-center rounded-lg bg-surface text-text-secondary hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
+          <IconButton
+            onClick={() => {
+              void load();
+            }}
+            label={s.retry}
+            variant="secondary"
+            icon={<RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />}
+          />
         </div>
         {loading ? (
           <div className="text-center py-8 text-text-muted">{s.loading}</div>
@@ -1565,6 +1577,8 @@ function readStoredAssist(raw: unknown): StoredAssist {
         subject,
         body,
         ...(typeof raw.draft.unitId === 'string' ? { unitId: raw.draft.unitId.slice(0, 64) } : {}),
+        // The order an estimated price's «تواصل معنا» named (§5.4): an id the server checks again on the ticket.
+        ...(typeof raw.draft.orderId === 'string' ? { orderId: raw.draft.orderId.slice(0, 64) } : {}),
         // Closed-set values the server reads again; never shown, never trusted here.
         ...(isRecord(raw.draft.handoff) ? { handoff: raw.draft.handoff } : {}),
       };
@@ -1644,11 +1658,14 @@ export default function Support() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   // A preselected ticket is only useful if the form is on screen: open it as
-  // soon as the visitor is known to be signed in.
+  // soon as the visitor is known to be signed in. A QUESTION asked by link
+  // (`?ask=price_estimate`, below) is answered first: its subject waits in the
+  // draft until the customer chooses to talk to the team.
   const hasPrefill = !!prefill;
+  const askedByLink = searchParams.get('ask') === 'price_estimate';
   useEffect(() => {
-    if (hasPrefill && isAuthenticated) setShowTicketForm(true);
-  }, [hasPrefill, isAuthenticated]);
+    if (hasPrefill && isAuthenticated && !askedByLink) setShowTicketForm(true);
+  }, [hasPrefill, isAuthenticated, askedByLink]);
 
   // Greeting + main menu are client-side (button-first); every answer after
   // that comes from the server. A conversation already under way is kept on
@@ -1824,6 +1841,35 @@ export default function Support() {
     const item = s.menu.find((m) => m.intent === qAsk);
     if (item) void send({ intent: item.intent }, item.label);
     // `send` and the strings are read at the moment of the navigation only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qAsk, locationKey]);
+
+  /**
+   * `/support?ask=price_estimate` — «تواصل معنا لمزيد من المعلومات» under an
+   * estimated price (docs/SMART_PRICING.md §5.4, src/components/product/
+   * EstimateNotice.tsx). ALLOW-LISTED as the printer question is, and like it a
+   * question that needs no account and changes nothing: the assistant asks
+   * «ما معنى السعر التقديري؟» and answers, a guest included. The link's ticket
+   * subject (and order) becomes the DRAFT, so the form opens with it only when
+   * the customer chooses the team — after a trip to sign in, too — and the
+   * link itself never sends anything. The chip's words are the contract's,
+   * loaded with the question; the answer is the server's.
+   */
+  useEffect(() => {
+    if (qAsk !== 'price_estimate') return;
+    const key = `${qAsk}:${locationKey}`;
+    if (askedRef.current === key) return;
+    askedRef.current = key;
+    setTab('assistant');
+    if (prefill?.subject) {
+      setDraft({ subject: prefill.subject, body: '', ...(prefill.orderId ? { orderId: prefill.orderId } : {}) });
+    }
+    void loadEstimateWords()
+      .then(({ ESTIMATE_STRINGS }) => send({ intent: 'price_estimate' }, ESTIMATE_STRINGS.support.chip[lang]))
+      .catch(() => {
+        /* The words could not load (offline): the page stays as it was, and nothing was sent. */
+      });
+    // `send`, the language and the prefill are read at the moment of the navigation only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qAsk, locationKey]);
 
@@ -2013,7 +2059,9 @@ export default function Support() {
                         ) : (
                           <button
                             key={j}
-                            onClick={() => navigate(l.to)}
+                            // A sign-in answer («تسجيل الدخول») goes through the shared prompt, so the customer
+                            // comes back to this conversation and its draft (docs/SMART_PRICING.md §5.4).
+                            onClick={() => (l.to === '/auth' ? signIn() : navigate(l.to))}
                             className="lv-button lv-button-ghost min-h-9 rounded-full px-3 py-1.5 text-xs text-gold"
                           >
                             {l.label}

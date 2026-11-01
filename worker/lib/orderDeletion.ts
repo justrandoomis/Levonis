@@ -60,6 +60,9 @@ export const ORDER_OWNED_TABLES: Owned[] = [
   { table: 'mystery_draw_audits' },
   { table: 'mystery_allocations' },
   { table: 'order_item_units' },
+  // 0218: an estimated line's record and settlement (a cancelled order's lines are void). Deleted
+  // explicitly, before its order line, because D1's FK cascades are not guaranteed.
+  { table: 'order_price_estimates' },
   { table: 'order_items' },
 ];
 

@@ -21,7 +21,7 @@ import { communityFavoritesApi, type SavedProduct } from '../lib/merchant';
 import { useCommunityAccess } from './community/access';
 import { ArrowLeft, ArrowRight, ShoppingBag, Heart } from 'lucide-react';
 import VariantImg from '../components/ui/VariantImg';
-import { isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
+import { ESTIMATE_TEXT, isEstimated, isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
 
 export default function SavedProducts() {
   const navigate = useNavigate();
@@ -161,6 +161,13 @@ export default function SavedProducts() {
                 ) : (
                 <div className="text-[12px] text-text-secondary mt-0.5" dir="ltr">
                   {Number(p.price_iqd).toLocaleString('en-US')} IQD
+                  {/* «سعر تقديري» (docs/SMART_PRICING.md §5.3): never an estimate shown as a confirmed price. */}
+                  {isEstimated(p) && (
+                    <span className="text-text-muted" dir="auto" data-price-estimate>
+                      {' · '}
+                      {loc(ESTIMATE_TEXT.ar, ESTIMATE_TEXT.en, ESTIMATE_TEXT.ckb)}
+                    </span>
+                  )}
                   {/* `false`, not `null`: unknown says nothing rather than
                       guessing. See the comment on `in_stock` in the route. */}
                   {p.in_stock === false && (

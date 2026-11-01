@@ -55,6 +55,7 @@ const ar = {
   whyGIFT_SELECTION_INVALID: 'الموديل أو اللون لم يعد صالحًا',
   whyGIFT_COMPOSITION_UNSUPPORTED: 'أصبح المنتج حزمة',
   whyGIFT_TRANSPORT_REQUIRED: 'لا يوجد طريق شحن',
+  whyGIFT_PRICE_ESTIMATE: 'سعره تقديري — لا يصبح هدية قبل تأكيد سعره',
 
   product: 'المنتج',
   pickProduct: 'ابحث عن منتج في المتجر',
@@ -205,6 +206,7 @@ const en: Record<AdminStringKey, string> = {
   whyGIFT_SELECTION_INVALID: 'Model or colour no longer valid',
   whyGIFT_COMPOSITION_UNSUPPORTED: 'The product became a bundle',
   whyGIFT_TRANSPORT_REQUIRED: 'No freight route',
+  whyGIFT_PRICE_ESTIMATE: 'Estimated price — not a gift until its price is confirmed',
 
   product: 'Product',
   pickProduct: 'Search a store product',
@@ -353,6 +355,7 @@ const ckb: Record<AdminStringKey, string> = {
   whyGIFT_SELECTION_INVALID: 'مۆدێل یان ڕەنگ چیتر دروست نییە',
   whyGIFT_COMPOSITION_UNSUPPORTED: 'بەرهەمەکە بووە بە کۆمەڵە',
   whyGIFT_TRANSPORT_REQUIRED: 'هیچ ڕێگایەکی بارکردن نییە',
+  whyGIFT_PRICE_ESTIMATE: 'نرخەکەی خەمڵێنراوە — تا نرخەکەی پشتڕاست نەکرێتەوە نابێتە دیاری',
 
   product: 'بەرهەم',
   pickProduct: 'بەدوای بەرهەمێکی فرۆشگادا بگەڕێ',

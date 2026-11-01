@@ -206,6 +206,20 @@ test('the payment policy: wallet and cash for every shipping type; half_advance 
   assert.equal(preorderPricingFor(''), 'prepaid', 'quote mode with no choice yet prices as configured');
 });
 
+test('an estimated price is never financed: `hasEstimate` keeps the wallet and cash and takes BNPL and Gini off, whatever else is on', () => {
+  // docs/SMART_PRICING.md §6.1, DECISIONS rows 90 and 280: a different final price is settled only through
+  // the 0140 proposal, which refuses a financed order — so a cart with an estimated line pays in advance
+  // from the wallet or in cash on delivery (the checkout's own refusal is tests/priceEstimateCheckout.test.ts).
+  const everything = { bnplEligible: true, giniEnabled: true };
+  for (const t of ['direct', 'preorder_air', 'preorder_sea', 'preorder_land'] as const) {
+    assert.deepEqual(allowedPaymentMethods(t, everything), ['wallet', 'cash', 'bnpl', 'gini']);
+    assert.deepEqual(allowedPaymentMethods(t, { ...everything, hasEstimate: true }), ['wallet', 'cash']);
+    assert.deepEqual(allowedPaymentMethods(t, { ...everything, hasEstimate: false }), ['wallet', 'cash', 'bnpl', 'gini'], 'false is today');
+    for (const id of ['wallet', 'cash', 'full_advance']) assert.equal(isPaymentMethodAllowed(id, t, { ...everything, hasEstimate: true }), true, id);
+    for (const id of ['bnpl', 'gini', 'half_advance']) assert.equal(isPaymentMethodAllowed(id, t, { ...everything, hasEstimate: true }), false, id);
+  }
+});
+
 test('the printer note is a public setting with the owner’s 50,000 default, read defensively', () => {
   assert.equal(SETTING_DEFAULTS.printerHomeDeliveryNoteIqd, 50_000);
   assert.ok(PUBLIC_SETTING_KEYS.includes('printerHomeDeliveryNoteIqd'));

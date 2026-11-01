@@ -337,3 +337,57 @@ test('but a DELIBERATE re-open from cancelled still works, and reclaims the slot
   assert.equal(moved.moved, true, JSON.stringify(moved));
   assert.equal(orderOf(raw, orderId).status, 'confirmed');
 });
+
+// ------------------------------------------------- 0218: the shop owes a price
+
+/**
+ * «بانتظار تأكيد السعر النهائي» (migration 0218; docs/SMART_PRICING.md §6.4).
+ * A cash-on-delivery order whose estimated line still waits for its final
+ * price is held at «تم الاستلام» by the SHOP — it is waiting on us, not
+ * abandoned — so the sweep never takes it (and it never spends the batch).
+ * Settled, it is an ordinary pending order again.
+ */
+test('an order waiting for its final estimated price is never expired; once settled it is an ordinary pending order', async () => {
+  const raw = seedCatalogue();
+  raw.exec("DELETE FROM wallet_transactions WHERE user_id = 'buyer'");
+  const { publishSeededV2 } = await import('./fixtures/autoPublish');
+  await publishSeededV2(raw);
+  raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:p_pre2', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = 'p_pre2';
+    DELETE FROM ops_guards WHERE id = 'engine-price:p_pre2';`);
+  raw.exec(`INSERT INTO cart_items (id,user_id,product_id,option_id,option_value_ids,color_id,shipping_method_id,transport_method,warranty_plan_id,qty,fulfillment_type)
+            VALUES ('ci_tpu','buyer','p_pre2','','[]','','','sea','',1,'pre_order')`);
+  const db = asD1(raw);
+  const res = await json(await post(appFor(db), '/api/orders', orderBody({ price_estimate_ack: 1 })));
+  assert.equal(res.success, true, JSON.stringify(res).slice(0, 300));
+  const id = res.order.id as string;
+  raw.prepare('UPDATE orders SET updated_at = ? WHERE id = ?').run(LONG_AGO, id);
+
+  const held = await sweepExpiredOrders(envOf(db), ON, NOW);
+  assert.deepEqual([held.scanned, held.cancelled], [0, 0], 'excluded in SQL: never even scanned');
+  assert.equal(orderOf(raw, id).status, 'pending');
+
+  raw.prepare("UPDATE order_price_estimates SET state = 'confirmed', final_unit_iqd = estimate_unit_iqd, decided_by = 'boss', decided_at = ? WHERE order_id = ?").run(LONG_AGO, id);
+  const settled = await sweepExpiredOrders(envOf(db), ON, NOW);
+  assert.equal(settled.cancelled, 1);
+  assert.equal(orderOf(raw, id).status, 'cancelled');
+});
+
+test('DEPLOY-AHEAD: a database without the estimate table is swept exactly as before; any other failure is not hidden', async () => {
+  const raw = seedCatalogue();
+  const { db, orderId } = await abandonedOrder(raw);
+  /** A binding that refuses the estimate clause with `failure`, and runs every other statement. */
+  const refusing = (failure: string) =>
+    ({
+      prepare: (sql: string) =>
+        sql.includes('order_price_estimates')
+          ? { bind: () => ({ all: async () => { throw new Error(failure); } }) }
+          : (db as D1Database).prepare(sql),
+      batch: (s: D1PreparedStatement[]) => (db as D1Database).batch(s),
+    }) as unknown as D1Database;
+  await assert.rejects(sweepExpiredOrders(envOf(refusing('D1_ERROR: database is locked')), ON, NOW), /database is locked/);
+  assert.equal(orderOf(raw, orderId).status, 'pending');
+  const report = await sweepExpiredOrders(envOf(refusing('D1_ERROR: no such table: order_price_estimates: SQLITE_ERROR')), ON, NOW);
+  assert.equal(report.cancelled, 1, 'read again without the clause');
+  assert.equal(orderOf(raw, orderId).status, 'cancelled');
+});

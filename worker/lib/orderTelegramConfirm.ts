@@ -41,6 +41,7 @@ import { auditAdminBot, isBotAdmin, isGroupChatId, readAdminGroup } from './tele
 import { moveOrderStage } from './orderStageOps';
 import { flushOrderStatusNotice } from './orderNotify';
 import { GINI_RECEIPT_REQUIRED_MESSAGE, giniBlocksConfirmation } from './gini';
+import { PRICE_ESTIMATE_UNCONFIRMED_MESSAGE } from './priceEstimateGate';
 import { actorLabel, sanitizeUserText, type AdminActor } from './walletNotify';
 import { baghdadDayOf } from './baghdadTime';
 
@@ -302,6 +303,13 @@ export async function handleOrderConfirmCallback(
     if (res.reason === 'PRICE_APPROVAL_PENDING') {
       // The button stays: once the customer decides, the same press is right.
       await answerCallbackQuery(env, cb.id, 'الطلب بانتظار موافقة الزبون على السعر الجديد — لا يمكن تأكيده الآن.', true, bot);
+      return 'refused';
+    }
+    if (res.reason === 'PRICE_ESTIMATE_UNCONFIRMED') {
+      // «بانتظار تأكيد السعر النهائي» (0218): the order holds lines at an
+      // estimated price. The button stays: once the final price is settled
+      // from the panel, the same press is right.
+      await answerCallbackQuery(env, cb.id, PRICE_ESTIMATE_UNCONFIRMED_MESSAGE.split(' / ')[0], true, bot);
       return 'refused';
     }
     await answerCallbackQuery(env, cb.id, 'لا يمكن تأكيد الطلب من مرحلته الحالية — أكمل من لوحة الإدارة.', true, bot);

@@ -19,6 +19,7 @@ import { Check, Circle, Clock, Loader2, Truck, User } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { apiRefusal } from '../../lib/refusalStrings';
+import { estimateRefusalText } from '../../../packages/contracts/src/priceEstimates';
 import SerialGateRefusal, { gateRefusalOf, type GateRefusal } from './serials/SerialGateRefusal';
 import type { GateMissing } from './serials/types';
 
@@ -141,8 +142,10 @@ export default function OrderStagePanel({
       }
       // The server's own refusal — an illegal move names both ends, a race
       // says to reload. Never a generic "failed"; a known code reads in the
-      // admin's own language.
-      setError(e instanceof ApiError ? apiRefusal(e, lang === 'en' || lang === 'ckb' ? lang : 'ar', e.message) : e instanceof Error ? e.message : '');
+      // admin's own language — an estimate gate's refusal (PRICE_ESTIMATE_UNCONFIRMED,
+      // PRICE_ESTIMATE_REOPEN_REFUSED; docs/SMART_PRICING.md §6.4) in the estimate contract's words.
+      const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+      setError(e instanceof ApiError ? (estimateRefusalText(e, l) ?? apiRefusal(e, l, e.message)) : e instanceof Error ? e.message : '');
     } finally {
       setBusy('');
     }

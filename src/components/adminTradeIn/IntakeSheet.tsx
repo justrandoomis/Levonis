@@ -13,7 +13,8 @@ import React, { Suspense, useRef, useState } from 'react';
 import { Camera, ScanLine } from 'lucide-react';
 import * as T from '../adminProducts/theme';
 import { api, ApiError } from '../../lib/api';
-import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
+import { apiRefusal, refusalLang, type Lang } from '../../lib/refusalStrings';
+import { estimateRefusalText } from '../../../packages/contracts/src/priceEstimates';
 import { Overlay } from '../ui/Overlay';
 import Spinner from '../ui/Spinner';
 import { checklistOf, familyCountsHours, type TradeInFamily } from '../../../packages/pricing/src/tradeIn';
@@ -34,6 +35,12 @@ interface PartInput {
   faults: string[];
   original_accessories: 'all' | 'partial' | 'none';
 }
+
+/**
+ * A refusal in the reader's language: an estimate refusal (the intake door answers 503
+ * PRICE_ESTIMATES_READ_FAILED when the paid-net read fails) in the contract's words, any other as before.
+ */
+export const intakeRefusalText = (e: unknown, lang: Lang, fallback: string): string => estimateRefusalText(e, lang) ?? apiRefusal(e, lang, fallback);
 
 function initialPart(inputs: Record<string, unknown> | undefined): PartInput {
   const i = (inputs ?? {}) as { cleanliness?: number; exterior?: number; scratches?: number; faults?: string[]; original_accessories?: PartInput['original_accessories'] };
@@ -86,7 +93,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
       );
       setPhotos((cur) => [...cur, p]);
     } catch (e) {
-      setError(apiRefusal(e, refusalLang(lang), a('failed')));
+      setError(intakeRefusalText(e, refusalLang(lang), a('failed')));
     } finally {
       setUploading((n) => n - 1);
     }
@@ -117,7 +124,7 @@ export default function IntakeSheet({ req, ownerScope, onDone }: { req: AdminReq
       onDone(d.request);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'TRADE_IN_SERIAL_MISMATCH') setMismatch(true);
-      setError(apiRefusal(e, refusalLang(lang), a('failed')));
+      setError(intakeRefusalText(e, refusalLang(lang), a('failed')));
     } finally {
       setBusy(false);
     }

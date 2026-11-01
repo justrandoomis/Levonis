@@ -524,6 +524,45 @@ export const FINANCIAL_FIELDS = [
   'trade_in_valuation',
   'trade_in_params',
   'q_bp',
+  // -- Smart pricing (docs/SMART_PRICING.md §8, §3.9; DECISIONS rows 278–281; migration 0218): the
+  // -- owner-only supplier price catalogue — a captured price and its currency, the Tmall / store ids,
+  // -- links and titles, the label printed beside a price, the basis a snapshot was listed on — the
+  // -- matcher's confidence, method, reasons and pack division, the estimator's flags, measure provenance
+  // -- and preview figures, the per-type defaults (measures and the minimum profit in dollars), what the
+  // -- estimator wrote, and where a product's type came from. Kept OUT on purpose: price_estimate (the
+  // -- customer's boolean label), estimate_unit_iqd, final_unit_iqd and notice_version — customer prices
+  // -- and facts the customer and staff screens read.
+  'supplier_price',
+  'supplier_prices',
+  'supplier_price_amount',
+  'supplier_price_currency',
+  'supplier_item_key',
+  'supplier_sku_key',
+  'supplier_url',
+  'supplier_title',
+  'catalogue_price',
+  'price_cny',
+  'price_eur',
+  'price_usd_reference',
+  'price_label',
+  'snapshot_price_basis',
+  'units_per_offer',
+  'match_confidence',
+  'match_method',
+  'match_reasons',
+  'estimate_flags',
+  'measure_basis',
+  'measure_source',
+  'est_cost_iqd',
+  'est_price_iqd',
+  'default_weight_g',
+  'default_length_mm',
+  'default_width_mm',
+  'default_height_mm',
+  'default_cbm',
+  'min_profit_usd',
+  'applied_wire_json',
+  'type_source',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

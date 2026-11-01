@@ -47,10 +47,25 @@
  * points accrual that already RELEASED. The pending accrual is capped so it
  * never rewards more than the new total, and its settlement flag follows the
  * door amount (see `pointsStatements`).
+ *
+ * THE ESTIMATE SETTLEMENT RIDES THIS PROPOSAL (migration 0218; docs/SMART_PRICING.md
+ * §6.5–6.7; worker/lib/orderEstimates.ts). An order holding lines sold at an
+ * estimated price is settled by ONE kind of proposal: `reasonCode:
+ * 'ESTIMATE_FINAL_PRICE'`, whose `extra` statements (the lines' new states and
+ * their fence) ride this batch after the hold's fence. The customer reads the
+ * localized estimate reason instead of the stored free text (which keeps the
+ * same sentence in three languages for the CHECK and any older reader), and
+ * the per-line old → new rows (`publicAdjustment`'s `lines`). An ordinary
+ * proposal on such an order is refused (PRICE_ESTIMATE_OPEN): estimates have
+ * one way to settle. The decide, close, withdraw and void statements, the plan
+ * and the hold trigger are unchanged — trigger T11 carries every decision onto
+ * the lines, whatever door decided.
  */
 import type { Env } from './types';
 import { sha256Hex, randomToken } from './crypto';
 import { isPriceHeld, PRICE_APPROVAL_PENDING_MESSAGE } from './priceHold';
+import { hasOpenEstimates } from './priceEstimateGate';
+import { ESTIMATE_REASON_CODE, ESTIMATE_STRINGS, estimateServerMessage } from '@levonis/contracts/priceEstimates';
 export { isPriceHeld, isPriceHoldAbort, PRICE_APPROVAL_PENDING_MESSAGE } from './priceHold';
 import { auditStatements } from './audit';
 import { notifyStatement } from './notifications';
@@ -79,7 +94,9 @@ export type PriceAdjustCode =
   | 'PRICE_ADJUST_COURIER_BOOKED'
   | 'PRICE_ADJUST_NOT_PENDING'
   | 'PRICE_ADJUST_STALE'
-  | 'IDEMPOTENCY_KEY_REUSED';
+  | 'IDEMPOTENCY_KEY_REUSED'
+  /** An ordinary proposal on an order with estimated lines still unsettled (migration 0218). */
+  | 'PRICE_ESTIMATE_OPEN';
 
 export class PriceAdjustError extends Error {
   constructor(
@@ -146,10 +163,35 @@ export interface PriceAdjustmentRow {
   decided_via: string;
   tg_chat_id: number | null;
   tg_message_id: number | null;
+  /**
+   * Migration 0218: 'ESTIMATE_FINAL_PRICE' on the proposal that settles
+   * estimated lines, '' on every other one. Read through `SELECT *`, so a
+   * database without 0218 has no key — the same as ''.
+   */
+  reason_code?: string;
 }
 
-/** What a screen may see of a proposal. No idempotency key, no Telegram ids. */
-export function publicAdjustment(a: PriceAdjustmentRow) {
+/** Is this the proposal that settles an order's estimated lines? */
+export const isEstimateProposal = (a: Pick<PriceAdjustmentRow, 'reason_code'> | null | undefined): boolean =>
+  String(a?.reason_code ?? '') === ESTIMATE_REASON_CODE;
+
+/** One line an estimate proposal re-prices, as its customer reads it: customer prices only. */
+export interface AdjustmentEstimateLine {
+  order_item_id: string;
+  name: string;
+  variant: string;
+  qty: number;
+  estimate_unit_iqd: number;
+  final_unit_iqd: number | null;
+}
+
+/**
+ * What a screen may see of a proposal. No idempotency key, no Telegram ids.
+ * `reason_code` says which kind it is; an estimate proposal also carries its
+ * per-line old → new rows (`lines`), read by `adjustmentEstimateLines`.
+ */
+export function publicAdjustment(a: PriceAdjustmentRow, estimateLines?: ReadonlyMap<string, AdjustmentEstimateLine[]>) {
+  const estimate = isEstimateProposal(a);
   return {
     id: a.id,
     state: a.state,
@@ -164,7 +206,48 @@ export function publicAdjustment(a: PriceAdjustmentRow) {
     created_at: a.created_at,
     decided_at: a.decided_at,
     decided_via: a.decided_via || null,
+    reason_code: estimate ? ESTIMATE_REASON_CODE : '',
+    ...(estimate ? { lines: (estimateLines?.get(a.id) ?? []).map((l) => ({ ...l })) } : {}),
   };
+}
+
+/**
+ * The lines each of an order's estimate proposals re-prices (the records
+ * still linked to it: proposed while it waits, approved or rejected after),
+ * keyed by proposal id. One indexed read of the order's records; empty on a
+ * database without 0218, and on any failure (the screen then shows the totals
+ * alone — the decision itself never reads this).
+ */
+export async function adjustmentEstimateLines(db: Pick<D1Database, 'prepare'>, orderId: string): Promise<Map<string, AdjustmentEstimateLine[]>> {
+  const out = new Map<string, AdjustmentEstimateLine[]>();
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT e.adjustment_id, e.order_item_id, e.qty, e.estimate_unit_iqd, e.final_unit_iqd, oi.name_snapshot, oi.option_snapshot
+           FROM order_price_estimates e JOIN order_items oi ON oi.id = e.order_item_id
+          WHERE e.order_id = ? AND e.adjustment_id IS NOT NULL
+          ORDER BY oi.rowid`
+      )
+      .bind(orderId)
+      .all<{ adjustment_id: string; order_item_id: string; qty: number; estimate_unit_iqd: number; final_unit_iqd: number | null; name_snapshot: string; option_snapshot: string | null }>();
+    for (const r of results ?? []) {
+      const list = out.get(r.adjustment_id) ?? [];
+      list.push({
+        order_item_id: r.order_item_id,
+        name: r.name_snapshot,
+        variant: r.option_snapshot ?? '',
+        qty: r.qty,
+        estimate_unit_iqd: r.estimate_unit_iqd,
+        final_unit_iqd: r.final_unit_iqd,
+      });
+      out.set(r.adjustment_id, list);
+    }
+  } catch (e) {
+    if (!/no such table/i.test(e instanceof Error ? e.message : String(e))) {
+      console.error('estimate proposal lines unreadable', orderId, e instanceof Error ? e.message : String(e));
+    }
+  }
+  return out;
 }
 
 export async function loadAdjustment(db: D1Database, id: string): Promise<PriceAdjustmentRow | null> {
@@ -189,6 +272,18 @@ export interface ProposeInput {
   reason: string;
   note: string;
   idempotencyKey: string;
+  /**
+   * Migration 0218: the proposal settles estimated lines (worker/lib/orderEstimates.ts).
+   * The INSERT names `reason_code` only when this is set, so an ordinary
+   * proposal is the exact statement it always was (and needs no 0218).
+   */
+  reasonCode?: typeof ESTIMATE_REASON_CODE;
+  /**
+   * Statements laid in this proposal's own batch, after the hold's fence and
+   * before the in-app notice and the audit — the estimate lines' new states
+   * and their fence. A failing one aborts the whole proposal.
+   */
+  extra?: readonly D1PreparedStatement[];
 }
 
 export interface ProposeResult {
@@ -211,6 +306,8 @@ const MESSAGES: Record<PriceAdjustCode, string> = {
   PRICE_ADJUST_NOT_PENDING: 'This price proposal was already decided or withdrawn.',
   PRICE_ADJUST_STALE: 'The order changed while you were editing — reload and retry.',
   IDEMPOTENCY_KEY_REUSED: 'This idempotency key was already used for a different proposal.',
+  // Its Sorani is in packages/contracts/src/priceEstimates.ts (ESTIMATE_REFUSALS).
+  PRICE_ESTIMATE_OPEN: estimateServerMessage('PRICE_ESTIMATE_OPEN'),
 };
 
 const httpOf = (code: PriceAdjustCode, details?: Record<string, unknown>) =>
@@ -238,12 +335,18 @@ export async function proposePriceAdjustment(env: Env, input: ProposeInput): Pro
   if (!order) throw new PriceAdjustError(404, 'NOT_FOUND', 'Order not found');
   const blocker = priceAdjustBlocker(order);
   if (blocker) throw httpOf(blocker, blocker === 'PRICE_APPROVAL_PENDING' ? { price_hold_id: order.price_hold_id } : undefined);
+  // ESTIMATES HAVE ONE WAY TO SETTLE (migration 0218): an ordinary proposal on
+  // an order whose estimated lines are still open is refused — the admin uses
+  // «تأكيد السعر النهائي» instead. One indexed read; a database without 0218
+  // has no such line (any other failure is thrown: nothing was written).
+  if (input.reasonCode !== ESTIMATE_REASON_CODE && (await hasOpenEstimates(db, input.orderId))) throw httpOf('PRICE_ESTIMATE_OPEN');
   const planned = planFor(order, input.newTotalIqd);
   if (!planned.ok) throw httpOf(planned.code);
   const plan = planned.plan;
 
   const now = new Date().toISOString();
   const userId = String(order.user_id);
+  const estimate = input.reasonCode === ESTIMATE_REASON_CODE;
   const audit = await auditStatements(db, input.adminId, 'order.price_adjust.propose', input.orderId, {
     adjustment_id: id,
     old_total_iqd: plan.oldTotalIqd,
@@ -252,39 +355,56 @@ export async function proposePriceAdjustment(env: Env, input: ProposeInput): Pro
     new_due_iqd: plan.newDueIqd,
     wallet_refund_iqd: plan.walletRefundIqd,
     reason: input.reason,
+    ...(estimate ? { reason_code: ESTIMATE_REASON_CODE } : {}),
   });
+  // The customer reads the localized estimate reason, never the stored three-language line (§6.7).
+  const reasonIn = (lang: 'ar' | 'en' | 'ckb') => (estimate ? ESTIMATE_STRINGS.estimateReason[lang] : input.reason);
   const inApp = notifyStatement(db, {
     userId,
     kind: 'order_update',
     title_ar: `مطلوب موافقتك على السعر الجديد لطلبك ${input.orderId}`,
     title_en: `Your approval is needed: new price for order ${input.orderId}`,
-    body_ar: `${iqdText(plan.oldTotalIqd, 'ar')} ← ${iqdText(plan.newTotalIqd, 'ar')} — ${input.reason}`,
-    body_en: `${iqdText(plan.oldTotalIqd, 'en')} → ${iqdText(plan.newTotalIqd, 'en')} — ${input.reason}`,
+    body_ar: `${iqdText(plan.oldTotalIqd, 'ar')} ← ${iqdText(plan.newTotalIqd, 'ar')} — ${reasonIn('ar')}`,
+    body_en: `${iqdText(plan.oldTotalIqd, 'en')} → ${iqdText(plan.newTotalIqd, 'en')} — ${reasonIn('en')}`,
     link: orderPath(input.orderId),
     entity_type: 'order',
     entity_id: input.orderId,
     meta: {
       price_adjustment_id: id,
       title_ckb: `پێویستە نرخی نوێی داواکاریی ${input.orderId} پەسەند بکەیت`,
-      body_ckb: `${iqdText(plan.oldTotalIqd, 'ckb')} ← ${iqdText(plan.newTotalIqd, 'ckb')} — ${input.reason}`,
+      body_ckb: `${iqdText(plan.oldTotalIqd, 'ckb')} ← ${iqdText(plan.newTotalIqd, 'ckb')} — ${reasonIn('ckb')}`,
+      ...(estimate ? { reason_code: ESTIMATE_REASON_CODE } : {}),
     },
     eventKey: `order.price_adjust:${id}`,
   });
 
   try {
     await db.batch([
-      db
-        .prepare(
-          `INSERT INTO order_price_adjustments
-             (id, order_id, user_id, state, old_total_iqd, new_total_iqd, delta_iqd, old_due_iqd, new_due_iqd,
-              old_wallet_iqd, new_wallet_iqd, wallet_refund_iqd, reason, note, proposed_by, idempotency_key, created_at)
-           VALUES (?1, ?2, ?3, 'pending', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`
-        )
-        .bind(
-          id, input.orderId, userId, plan.oldTotalIqd, plan.newTotalIqd, plan.deltaIqd, plan.oldDueIqd, plan.newDueIqd,
-          plan.oldWalletIqd, plan.newWalletIqd, plan.walletRefundIqd, input.reason, input.note, input.adminId,
-          input.idempotencyKey, now
-        ),
+      estimate
+        ? db
+            .prepare(
+              `INSERT INTO order_price_adjustments
+                 (id, order_id, user_id, state, old_total_iqd, new_total_iqd, delta_iqd, old_due_iqd, new_due_iqd,
+                  old_wallet_iqd, new_wallet_iqd, wallet_refund_iqd, reason, note, proposed_by, idempotency_key, created_at, reason_code)
+               VALUES (?1, ?2, ?3, 'pending', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)`
+            )
+            .bind(
+              id, input.orderId, userId, plan.oldTotalIqd, plan.newTotalIqd, plan.deltaIqd, plan.oldDueIqd, plan.newDueIqd,
+              plan.oldWalletIqd, plan.newWalletIqd, plan.walletRefundIqd, input.reason, input.note, input.adminId,
+              input.idempotencyKey, now, ESTIMATE_REASON_CODE
+            )
+        : db
+            .prepare(
+              `INSERT INTO order_price_adjustments
+                 (id, order_id, user_id, state, old_total_iqd, new_total_iqd, delta_iqd, old_due_iqd, new_due_iqd,
+                  old_wallet_iqd, new_wallet_iqd, wallet_refund_iqd, reason, note, proposed_by, idempotency_key, created_at)
+               VALUES (?1, ?2, ?3, 'pending', ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)`
+            )
+            .bind(
+              id, input.orderId, userId, plan.oldTotalIqd, plan.newTotalIqd, plan.deltaIqd, plan.oldDueIqd, plan.newDueIqd,
+              plan.oldWalletIqd, plan.newWalletIqd, plan.walletRefundIqd, input.reason, input.note, input.adminId,
+              input.idempotencyKey, now
+            ),
       // THE HOLD, conditional on every figure the plan was computed from and on
       // the order still being where the blocker check saw it.
       db
@@ -307,6 +427,9 @@ export async function proposePriceAdjustment(env: Env, input: ProposeInput): Pro
             WHERE id = ?1`
         )
         .bind(id, input.orderId),
+      // The caller's statements (an estimate settlement's lines and their
+      // fence), inside the same transaction as the proposal and its hold.
+      ...(input.extra ?? []),
       inApp.stmt,
       ...audit.statements,
     ]);
@@ -759,6 +882,29 @@ const CUSTOMER_COPY = {
 
 const copyFor = (lang: EmailLang) => CUSTOMER_COPY[lang];
 
+/**
+ * THE REASON THE CUSTOMER READS. An estimate proposal prints the localized
+ * estimate reason (packages/contracts/src/priceEstimates.ts) — the stored
+ * `reason` is that sentence in three languages, for the CHECK and older
+ * readers, never something to show one customer whole. Every other proposal
+ * prints the admin's free text, sanitized, as before.
+ */
+function customerReason(a: Pick<PriceAdjustmentRow, 'reason' | 'reason_code'>, lang: EmailLang): string {
+  return isEstimateProposal(a) ? ESTIMATE_STRINGS.estimateReason[lang] : sanitizeUserText(a.reason, { max: 500 });
+}
+
+/**
+ * What a rejection of an ESTIMATE proposal leads to, stamped on the decided
+ * Telegram prompt (§6.6: the shop keeps the original price or cancels with a
+ * full refund — the customer may cancel too). Sorani from the contract's own
+ * words for the same sentence (estimateRejectNote).
+ */
+const ESTIMATE_REJECTED_STAMP = {
+  ar: '✖️ تم الرفض — إما أن نُبقي سعرك الأصلي أو نلغي الطلب ونعيد لك كامل المبلغ، ويمكنك أنت أيضًا إلغاء الطلب.',
+  en: '✖️ Rejected — we will either keep your original price or cancel the order and refund you in full; you can also cancel it yourself.',
+  ckb: '✖️ ڕەت کرایەوە — یان نرخە سەرەتاییەکەت دەهێڵینەوە یان داواکارییەکە هەڵدەوەشێنینەوە و هەموو پارەکەت دەگەڕێنینەوە؛ هەروەها خۆشت دەتوانیت هەڵیبوەشێنیتەوە.',
+} as const satisfies Record<EmailLang, string>;
+
 /** Telegram refuses callback_data over 64 bytes; ours is ~34. */
 export const PRICE_CALLBACK_PREFIX = 'pa:';
 const ADJ_ID_RE = /^padj_[0-9a-f]{24}$/;
@@ -791,11 +937,13 @@ export function priceKeyboard(env: Env, a: Pick<PriceAdjustmentRow, 'id' | 'orde
 function promptText(a: PriceAdjustmentRow, lang: EmailLang): string {
   const t = copyFor(lang);
   const L = lang === 'en' ? 'en' : 'ar';
-  const reason = sanitizeUserText(a.reason, { max: 500 });
+  const reason = customerReason(a, lang);
   const lines = [t.body(a.order_id, iqdText(a.old_total_iqd, L), iqdText(a.new_total_iqd, L), reason)];
   if (a.note) lines.push(`${t.note}: ${sanitizeUserText(a.note, { max: 600 })}`);
   if (a.new_due_iqd > 0) lines.push(`${t.due}: ${iqdText(a.new_due_iqd, L)}`);
   if (a.wallet_refund_iqd > 0) lines.push(`${t.refund}: ${iqdText(a.wallet_refund_iqd, L)}`);
+  // An estimate's rejection is not a dead end: say what it leads to before the buttons.
+  if (isEstimateProposal(a)) lines.push(ESTIMATE_STRINGS.estimateRejectNote[lang]);
   return `LEVONIS\n${lines.join('\n')}`;
 }
 
@@ -819,14 +967,15 @@ export async function notifyCustomerOfProposal(env: Env, a: PriceAdjustmentRow):
     const t = copyFor(lang);
     const L = lang === 'en' ? 'en' : 'ar';
     const origin = appOrigin(env);
-    const reason = sanitizeUserText(a.reason, { max: 500 });
+    const reason = customerReason(a, lang);
+    const body = t.body(a.order_id, iqdText(a.old_total_iqd, L), iqdText(a.new_total_iqd, L), reason);
     await notifyCustomer(
       env,
       a.user_id,
       `order.price_adjust:${a.id}`,
       {
         subject: t.subject(a.order_id),
-        body: t.body(a.order_id, iqdText(a.old_total_iqd, L), iqdText(a.new_total_iqd, L), reason),
+        body: isEstimateProposal(a) ? `${body}\n${ESTIMATE_STRINGS.estimateRejectNote[lang]}` : body,
         details: [
           ...(a.new_due_iqd > 0 ? [{ label: t.due, value: iqdText(a.new_due_iqd, L) }] : []),
           ...(a.wallet_refund_iqd > 0 ? [{ label: t.refund, value: iqdText(a.wallet_refund_iqd, L) }] : []),
@@ -870,6 +1019,8 @@ function outcomeStamp(a: PriceAdjustmentRow, lang: EmailLang): string {
       return pick(`✅ تمت الموافقة — الإجمالي الجديد ${total}.`, `✅ Approved — the new total is ${total}.`, `✅ پەسەند کرا — کۆی گشتیی نوێ ${total}.`);
     }
     case 'rejected': {
+      // An estimate settlement's rejection: the original price is kept or the order is cancelled and refunded.
+      if (isEstimateProposal(a)) return ESTIMATE_REJECTED_STAMP[lang];
       const total = iqdText(a.old_total_iqd, lang);
       return pick(`✖️ تم الرفض — بقي الطلب على ${total}.`, `✖️ Rejected — the order stays at ${total}.`, `✖️ ڕەت کرایەوە — داواکارییەکە لەسەر ${total} مایەوە.`);
     }
@@ -918,7 +1069,10 @@ export async function notifyAdminsOfDecision(env: Env, a: PriceAdjustmentRow): P
       : [
           `❌ رفض الزبون السعر الجديد — ${a.order_id}`,
           `بقي الطلب على ${iqdText(a.old_total_iqd, 'ar')} (المقترح ${iqdText(a.new_total_iqd, 'ar')}).`,
-          'يمكنك متابعة الطلب بالسعر القديم أو إلغاؤه من لوحة الإدارة.',
+          // An estimate settlement leaves the order held until the admin decides (migration 0218, §6.5).
+          isEstimateProposal(a)
+            ? 'اختر: إبقاء السعر التقديري أو الإلغاء مع الاسترداد'
+            : 'يمكنك متابعة الطلب بالسعر القديم أو إلغاؤه من لوحة الإدارة.',
           `عبر: ${via}`,
         ];
   const url = orderAdminLink(env, a.order_id);

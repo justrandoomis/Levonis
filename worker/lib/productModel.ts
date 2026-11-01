@@ -41,6 +41,7 @@ import {
   parseDimensions,
   type PhysicalDimensions as ProductDimensions,
 } from './physicalDimensions';
+import { isEstimateRow } from './priceEstimateLabel';
 
 export { DIMENSION_FIELDS, EMPTY_DIMENSIONS, parseDimensions } from './physicalDimensions';
 export type { PhysicalDimensions as ProductDimensions } from './physicalDimensions';
@@ -312,6 +313,27 @@ export interface ProductDoc {
    * than priced from the ladder. Never parsed, written or published.
    */
   sku_strict?: true;
+  /**
+   * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.1–5.2): the published
+   * price is an estimate the owner has not confirmed against the supplier.
+   * Parsed from `products.price_estimate` — the row every price is read with —
+   * and present ONLY when the column is 1, so every other document is unchanged
+   * (and a database without 0218, whose rows lack the key, labels nothing: the
+   * column's own default). Read-only: it is not in PRODUCT_COLUMNS, so no save
+   * writes it; only the V2 writer's estimate batch sets it (trigger T1) and only
+   * the owner's confirmation clears it (T2). Customers read it through
+   * `skuEstimated` / `selectionEstimated` / `productEstimated`
+   * (worker/lib/commercialState.ts).
+   */
+  price_estimate?: true;
+  /**
+   * The SKUs of a labelled product the owner confirmed (`price_estimate_firm_skus`,
+   * canonical combo keys), set by the relational overlay on a CUSTOMER document
+   * only, and only when there are some. Absent — no firm SKU, a failed read, or a
+   * database without 0218 — means every priced SKU of a labelled product is an
+   * estimate (fail closed). A public fact; never parsed from a row or written.
+   */
+  sku_firm?: string[];
   /**
    * Per-product last-mile rules stored canonically at
    * `ops_policy.delivery_options`. null means a pre-feature product and keeps
@@ -968,6 +990,9 @@ export function parseProductRow(row: Record<string, unknown>): ProductDoc {
     },
     created_at: row.created_at ? String(row.created_at) : undefined,
     updated_at: row.updated_at ? String(row.updated_at) : undefined,
+    // Migration 0218: the estimate label, only when set — an unlabelled document (and every document read
+    // from a database without the column) is byte-for-byte what it was (docs/SMART_PRICING.md §5.2).
+    ...(isEstimateRow(row) ? { price_estimate: true as const } : {}),
   };
 }
 
@@ -1683,6 +1708,11 @@ const coarseLevel = <T extends Record<string, unknown>>(x: T): T =>
  * `applyRelations` had already overlaid the real `product_option_values.stock`
  * and `product_colors.stock` onto `options[]` and `colors[]`, so two anonymous
  * GETs around a confirmation still identified the drawn colour exactly.
+ *
+ * The estimate label (`price_estimate`, `sku_firm`, migration 0218) is not
+ * projected here: it describes a PRICE, so the priced card adds it where a
+ * priced SKU is an estimate (`productEstimated`, worker/routes/products.ts) and
+ * the catalog-only card, which shows no price, never carries it.
  */
 export function projectPublic(doc: ProductDoc, coarse = false) {
   // `source_url` is where a picture was FETCHED from — the supplier listing or

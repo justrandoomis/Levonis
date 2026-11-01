@@ -87,11 +87,14 @@ test('the FX module is imported only by the cron, the pricing workspace, the pub
 });
 
 test('orderProfit and the lot code import nothing from the engine or FX; the engine and FX read no inventory_lots column (§19)', () => {
-  for (const f of ['worker/lib/orderProfit.ts', 'worker/lib/inventoryLots.ts', 'worker/lib/inventoryReceiving.ts', 'worker/lib/walletOps.ts']) {
+  // docs/SMART_PRICING.md §6.3: the estimate ORDER record (worker/lib/orderEstimates.ts) is accounting —
+  // customer prices as charged — so it sits outside pricingEngine/ and imports nothing from it or from FX.
+  for (const f of ['worker/lib/orderProfit.ts', 'worker/lib/inventoryLots.ts', 'worker/lib/inventoryReceiving.ts', 'worker/lib/walletOps.ts', 'worker/lib/orderEstimates.ts']) {
     const src = worker.find((w) => w.f === f)?.src;
     if (!src) continue;
     assert.doesNotMatch(src, /from\s+['"][^'"]*\/(fx|pricingEngine)\//, f);
   }
+  assert.ok(worker.some((w) => w.f === 'worker/lib/orderEstimates.ts'), 'the estimate order record is where §6.3 puts it');
   // DECISIONS row 244: a cost-first model with stock is priced from its costliest batch on the shelf — ONE engine
   // module READS the lots (their cost and what remains), in dinars as paid, and never writes one; the accounting
   // still reads no rate, and nothing else of the engine or FX names a lot.
@@ -112,4 +115,16 @@ test('FX-1 writes no product price: the FX module never names a price column or 
     assert.doesNotMatch(src, /\bUPDATE\s+(products|product_options|product_colors|product_option_cells|product_preorder_routes|price_history)\b/i, f);
     assert.doesNotMatch(src, /\bprice_iqd\b/, f);
   }
+});
+
+test('the estimator (pricingEngine/estimate/) names no order line and imports nothing from FX: rates reach it only through loadPricingRates', () => {
+  // docs/SMART_PRICING.md §6.3 and invariant I8: an estimate is computed from the engine's own rate read
+  // (worker/lib/pricingEngine/rates.ts), never from the FX module, and the order side of the feature
+  // (worker/lib/orderEstimates.ts) is the one place that names an order's lines.
+  for (const { f, src } of worker.filter(({ f }) => f.startsWith('worker/lib/pricingEngine/estimate/'))) {
+    assert.doesNotMatch(src, /\border_items\b/, f);
+    assert.doesNotMatch(src, /from\s+['"][^'"]*\/fx\/[^'"]+['"]/, f);
+  }
+  const record = worker.find((w) => w.f === 'worker/lib/orderEstimates.ts')!.src;
+  assert.doesNotMatch(record, /\b(pricing_fx_rates|fx_rate_pairs|fx_rate_log|pricing_shipping_rates)\b/, 'the order record reads no rate');
 });

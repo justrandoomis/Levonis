@@ -22,8 +22,10 @@
  *     the archive's `hash` column should hold for them. The ledger starts
  *     with the versions current before purchase 6, faq 5, membership 5 and
  *     price_protection 4; price_protection 5 (owner decision 6, DECISIONS
- *     row 196) followed with the pricing engine's writer, and privacy 4 and
- *     faq 6 (owner, 2026-10-31) with the Meta Pixel on the main site.
+ *     row 196) followed with the pricing engine's writer, privacy 4 and
+ *     faq 6 (owner, 2026-10-31) with the Meta Pixel on the main site, and
+ *     purchase 7, price_protection 6 and faq 7 (owner, 2026-10-31; DECISIONS
+ *     row 280) with ordering at an estimated price.
  *
  * Adding a version: bump it in its module, run this file, and copy the
  * `key@version:lang → hash` lines the failure prints into the fixture.
@@ -104,9 +106,10 @@ test('the ledger is what the archive stores: a fresh sync writes exactly these h
 
 /**
  * The current version of each document decision 7 reworded: price_protection
- * moved again, to 5, for decision 6, and faq to 6 for the Meta Pixel.
+ * moved again, to 5, for decision 6, and faq to 6 for the Meta Pixel; then
+ * purchase to 7, price_protection to 6 and faq to 7 for the estimated price.
  */
-const CURRENT_TODAY: Readonly<Record<string, number>> = { purchase: 6, faq: 6, membership: 5, price_protection: 5 };
+const CURRENT_TODAY: Readonly<Record<string, number>> = { purchase: 7, faq: 7, membership: 5, price_protection: 6 };
 
 test('the four documents decision 7 reworded moved to new versions, and their previous versions stay in the ledger', () => {
   const MOVED: ReadonlyArray<[string, number]> = [['purchase', 6], ['faq', 5], ['membership', 5], ['price_protection', 4]];
@@ -122,7 +125,8 @@ test('the four documents decision 7 reworded moved to new versions, and their pr
 
 test('decision 6 moved price_protection to version 5 with the code that applies it; version 4 stays in the ledger as the archive holds it', () => {
   const doc = POLICY_DOCUMENTS.find((d) => d.key === 'price_protection')!;
-  assert.equal(doc.version, 5);
+  // Version 6 (the estimated price) has followed; it keeps decision 6 word for word.
+  assert.ok(doc.version >= 5, `price_protection is version ${doc.version}`);
   for (const lang of POLICY_LANGS) {
     assert.ok(`price_protection@5:${lang}` in LEDGER, `price_protection@5:${lang}`);
     assert.ok(`price_protection@4:${lang}` in LEDGER, `price_protection@4:${lang} left the ledger`);
@@ -145,12 +149,42 @@ test('decision 6 moved price_protection to version 5 with the code that applies 
 test('the Meta Pixel moved privacy to 4 and faq to 6 on one date; privacy 3 and faq 5 stay in the ledger as the archive holds them', () => {
   for (const [key, version] of [['privacy', 4], ['faq', 6]] as const) {
     const doc = POLICY_DOCUMENTS.find((d) => d.key === key)!;
-    assert.equal(doc.version, version, key);
+    // faq has moved once more since, to 7, on the same date (the estimated price, below).
+    assert.ok(doc.version >= version, key);
     assert.equal(doc.effective_at, '2026-10-31', `${key}: the day the pixel's disclosure was published`);
     for (const lang of POLICY_LANGS) {
       assert.ok(`${key}@${version}:${lang}` in LEDGER, `${key}@${version}:${lang}`);
       assert.ok(`${key}@${version - 1}:${lang}` in LEDGER, `${key}@${version - 1}:${lang} left the ledger`);
       assert.notEqual(LEDGER[`${key}@${version}:${lang}`], LEDGER[`${key}@${version - 1}:${lang}`], `${key}/${lang}: the new version is the old text`);
     }
+  }
+  // privacy is a consent document: it moved for the pixel and for nothing since.
+  assert.equal(POLICY_DOCUMENTS.find((d) => d.key === 'privacy')!.version, 4);
+});
+
+/**
+ * ORDERING AT AN ESTIMATED PRICE MOVED purchase TO 7, price_protection TO 6
+ * AND faq TO 7 (owner, 2026-10-31; DECISIONS row 280; docs/SMART_PRICING.md
+ * §6, WP14). purchase gained the clause the estimator's apply switch waits
+ * for (articles 4.11 to 4.17), price_protection the settlement and timing of
+ * an estimated item (5.6, 6.6, 10.12), and the FAQ the question (12.12). None
+ * of the three is a consent document, so nobody is asked to accept again; the
+ * previous versions stay in the ledger as the archive holds them, byte for
+ * byte, and every acceptance recorded against them still resolves.
+ */
+test('the estimated price moved purchase to 7, price_protection to 6 and faq to 7 on one date; purchase 6, price_protection 5 and faq 6 stay in the ledger', () => {
+  for (const [key, version] of [['purchase', 7], ['price_protection', 6], ['faq', 7]] as const) {
+    const doc = POLICY_DOCUMENTS.find((d) => d.key === key)!;
+    assert.equal(doc.version, version, key);
+    assert.equal(doc.effective_at, '2026-10-31', `${key}: the day the estimated-price clause was published`);
+    for (const lang of POLICY_LANGS) {
+      assert.ok(`${key}@${version}:${lang}` in LEDGER, `${key}@${version}:${lang}`);
+      assert.ok(`${key}@${version - 1}:${lang}` in LEDGER, `${key}@${version - 1}:${lang} left the ledger`);
+      assert.notEqual(LEDGER[`${key}@${version}:${lang}`], LEDGER[`${key}@${version - 1}:${lang}`], `${key}/${lang}: the new version is the old text`);
+    }
+  }
+  // The consent documents did not move for it (CHECKOUT_POLICY_KEYS is terms and privacy).
+  for (const [key, version] of [['terms', 4], ['privacy', 4], ['quick_buy', 1]] as const) {
+    assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, `${key} moved: every consent would be asked again`);
   }
 });

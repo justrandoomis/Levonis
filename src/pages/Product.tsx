@@ -91,7 +91,7 @@ import { OfferSaving, SALE_PRICE } from '../components/ui/OfferBadge';
 import Countdown from '../components/ui/Countdown';
 import ConditionPanel from '../components/product/ConditionPanel';
 const StockAlertPanel = React.lazy(() => import('../components/product/StockAlertPanel'));
-import { UNPRICED_TEXT } from '../lib/priceStatus';
+import { ESTIMATE_TEXT, UNPRICED_TEXT } from '../lib/priceStatus';
 import {
   addressWithout,
   decodePriceRequestIntent,
@@ -191,6 +191,18 @@ const ProductTradeInEntry = React.lazy(() => import('../components/tradeIn/Produ
  * a selection, with no V2 price — a priced page never downloads it.
  */
 const PriceRequestPanel = React.lazy(() => import('../components/product/PriceRequestPanel'));
+/**
+ * «سعر تقديري» (docs/SMART_PRICING.md §5.3): the notice and «تواصل معنا لمزيد
+ * من المعلومات» under the price card, mounted only while the selection on
+ * screen is an estimated price — a page with a confirmed price never
+ * downloads it, nor the contract of words it reads.
+ */
+const EstimateNotice = React.lazy(() => import('../components/product/EstimateNotice'));
+/**
+ * The estimate refusals' sentences in the reader's language (§5.5): the
+ * contract is a lazy chunk, fetched only when the door answered one of them.
+ */
+const loadEstimateWords = () => import('../../packages/contracts/src/priceEstimates');
 /**
  * «عدة ألوان» (docs/ux/COLOUR-QUANTITIES.md §3.11): the per-colour list, the
  * batch add and its confirmation sheet are a chunk of their own, warmed when a
@@ -362,6 +374,11 @@ const STRINGS = {
     WARRANTY_PLAN_NOT_FOUND: 'خطة الضمان غير متاحة.',
     REGULAR_PRICE_INVALID: 'سعر هذا المنتج غير صالح — تواصل مع الدعم.',
     OFFER_INACTIVE: 'هذا العرض غير متاح حاليًا.',
+    // Codes the page had no sentence for (review r3-raw-codes): the chooser's words, the route's words, and
+    // for a SKU with no price on the chosen way the cart door's own sentence (src/lib/refusalStrings.ts).
+    VARIANT_NOT_MODELLED: NOT_OFFERED.ar, FULFILLMENT_NOT_OFFERED: NOT_OFFERED.ar, FULFILLMENT_DISABLED: NOT_OFFERED.ar,
+    TRANSPORT_DISABLED: 'وسيلة النقل غير معروضة.',
+    VARIANT_UNAVAILABLE: 'هذا الاختيار لم يعد معروضًا للبيع. اختر خيارًا آخر.',
   },
   en: {
     compareCta: 'Compare', cheaperCta: 'Found it cheaper', giniCta: 'Want it in instalments?',
@@ -432,6 +449,9 @@ const STRINGS = {
     WARRANTY_PLAN_NOT_FOUND: 'That warranty plan is unavailable.',
     REGULAR_PRICE_INVALID: 'This product has an invalid price — please contact support.',
     OFFER_INACTIVE: 'This offer is not available right now.',
+    VARIANT_NOT_MODELLED: NOT_OFFERED.en, FULFILLMENT_NOT_OFFERED: NOT_OFFERED.en, FULFILLMENT_DISABLED: NOT_OFFERED.en,
+    TRANSPORT_DISABLED: 'That transport method is not offered.',
+    VARIANT_UNAVAILABLE: 'That choice is no longer for sale. Choose another option.',
   },
   ckb: {
     compareCta: 'بەراورد', cheaperCta: 'لە شوێنێکی هەرزانتر دۆزیمەوە', giniCta: 'بە قیست دەتەوێت؟',
@@ -518,6 +538,9 @@ const STRINGS = {
     WARRANTY_PLAN_NOT_FOUND: 'ئەم پلانی گەرەنتییە بەردەست نییە.',
     REGULAR_PRICE_INVALID: 'نرخی ئەم بەرهەمە دروست نییە — پەیوەندی بە پشتگیری بکە.',
     OFFER_INACTIVE: 'ئەم ئۆفەرە ئێستا بەردەست نییە.',
+    VARIANT_NOT_MODELLED: NOT_OFFERED.ckb, FULFILLMENT_NOT_OFFERED: NOT_OFFERED.ckb, FULFILLMENT_DISABLED: NOT_OFFERED.ckb,
+    TRANSPORT_DISABLED: 'ئەم شێوازی گواستنەوەیە پێشکەش نەکراوە.',
+    VARIANT_UNAVAILABLE: 'ئەم هەڵبژاردنە چیتر بۆ فرۆشتن نییە. هەڵبژاردەیەکی تر هەڵبژێرە.',
   },
 } as const;
 
@@ -624,6 +647,13 @@ interface ProductDetail {
    *  it by resolving every one of them. This is what «يبدأ من» is allowed to
    *  key off — the page must never infer it from not having a quote yet. */
   display_from?: boolean;
+  /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §5.3): the CARD's label — some priced
+   * SKU of this product is at an estimated pre-order price. The page labels
+   * a selection by its quote; this stands in while no quote answers the
+   * selection on screen (fail closed). Present only when true.
+   */
+  price_estimate?: true;
   /**
    * The scheduled window on this product (worker/routes/products.ts
    * `publicWithDisplayPrice`). Carried for the record; the page prices
@@ -753,6 +783,12 @@ interface Quote {
   offer_before_usd_cents?: number;
   offer_saving_percent_usd?: number | null;
   line_total_usd_cents?: number;
+  /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §5.3): THIS selection's price is an
+   * estimated pre-order price — a firm SKU of a mixed product carries none.
+   * Present only when true (worker/lib/customerPricing.ts `customerLinePrice`).
+   */
+  price_estimate?: true;
 }
 
 /**
@@ -860,8 +896,14 @@ interface DetailResponse {
   product: ProductDetail;
   /** DECISIONS row 240: 'unpriced' = catalog-only — every money field below is null. Absent = priced. */
   price_status?: 'priced' | 'unpriced';
+  /** «سعر تقديري»: the OPENING selection's price is an estimate (§5.3). Present only when true. */
+  price_estimate?: true;
   /** A priced product's SKUs with no V2 price (canonical `skuComboKey`s). */
   unpriced_selections?: string[];
+  /** The combinations the product does not sell (the cart and «طلب السعر» refuse them); absent when none. */
+  unoffered_selections?: string[];
+  /** Past ENGINE_MAX_SKUS, where those are not listed: the SKUs it sells (a selection part of none is not offered). */
+  offered_selections?: string[];
   /** The opening selection's quote, already resolved by the server on this
    *  request. It is the first shelf-backed direct selection when one exists. */
   pricing?: Omit<Quote, 'qty' | 'line_total_iqd'>;
@@ -906,6 +948,8 @@ interface DetailResponse {
 interface QuoteResponse {
   /** 'unpriced': this complete selection has no V2 price — every figure below is null (row 240). */
   price_status?: 'priced' | 'unpriced';
+  /** «سعر تقديري»: THIS selection's price is an estimate (§5.3). Present only when true. */
+  price_estimate?: true;
   quote: Quote | null;
   availability: Availability | null;
   /** The same preview, re-resolved for THIS selection. */
@@ -932,6 +976,23 @@ const PRO_LABEL = tierLabel('pro');
 const levelIsNull = (map: unknown, id: string): boolean => !!map && (map as Record<string, unknown>)[id] === null;
 
 /**
+ * Past ENGINE_MAX_SKUS (the body's `offered_selections`): a selection that is part of no SKU the product
+ * sells. The cart and «طلب السعر» refuse every way to finish it.
+ */
+const outsideOffered = (offered: readonly string[], key: string): boolean =>
+  offered.length > 0 && key !== '' && !offered.some((sku) => key.split('|').every((part) => sku.split('|').includes(part)));
+
+/**
+ * «سعر تقديري» KEPT WITH THE FIGURES IT DESCRIBES (docs/SMART_PRICING.md §5.3).
+ * The server states a selection's label on the answer and on its price block;
+ * either one labels it (fail closed). Held on the quote in state, it speaks for
+ * exactly the selection `quotedFor` names — never for the next tap's.
+ */
+function withEstimate<T extends { price_estimate?: true }>(figures: T, answer: { price_estimate?: true }): T {
+  return answer.price_estimate === true && figures.price_estimate !== true ? { ...figures, price_estimate: true as const } : figures;
+}
+
+/**
  * The product, option and colour NAMES are English in every language
  * (product-form mandate §3: "عنوان/اسم المنتج يبقى باللغة الإنجليزية في جميع
  * الواجهات ولا تتم ترجمته"; §7 defines option and colour names as English
@@ -949,10 +1010,11 @@ function pick(lang: Lang, ar?: string, en?: string, ckb?: string, legacy?: strin
   return (ar || legacy || en || '').trim();
 }
 
+/** The page's sentence for a code, '' when it has none: a customer never reads a code. */
 function reasonText(s: Strings, code: string | null | undefined): string {
   if (!code) return '';
-  const map = s as unknown as Record<string, string | undefined>;
-  return map[code] || code;
+  const said = (s as unknown as Record<string, unknown>)[code];
+  return typeof said === 'string' ? said : '';
 }
 
 function transportLabel(s: Strings, method: string): string {
@@ -1085,6 +1147,8 @@ export default function Product() {
    */
   const [priceStatus, setPriceStatus] = useState<'priced' | 'unpriced'>('priced');
   const [unpricedSelections, setUnpricedSelections] = useState<string[]>([]);
+  const [unofferedSelections, setUnofferedSelections] = useState<string[]>([]);
+  const [offeredSelections, setOfferedSelections] = useState<string[]>([]);
   /** The `priceKey` the quote answered `price_status: 'unpriced'` for. */
   const [unpricedQuoteFor, setUnpricedQuoteFor] = useState<string | null>(null);
 
@@ -1246,6 +1310,8 @@ export default function Product() {
   const [bigQtyDone, setBigQtyDone] = useState(false);
   const [colourMode, setColourMode] = useState<'one' | 'many'>('one');
   const [multiRows, setMultiRows] = useState<Record<string, number>>({});
+  /** «عدة ألوان»: the panel's total is an estimate (`onEstimateChange`) — the notice under the price card follows it. */
+  const [multiEstimate, setMultiEstimate] = useState(false);
   const [multiFocus, setMultiFocus] = useState<string | null>(null);
   /** The single colour (or colour-group value) the page held when it entered «عدة ألوان». */
   const singleColourBeforeMulti = useRef('');
@@ -1412,6 +1478,8 @@ export default function Product() {
         setSource(data.source);
         setPriceStatus(data.price_status === 'unpriced' ? 'unpriced' : 'priced');
         setUnpricedSelections(Array.isArray(data.unpriced_selections) ? data.unpriced_selections : []);
+        setUnofferedSelections(Array.isArray(data.unoffered_selections) ? data.unoffered_selections : []);
+        setOfferedSelections(Array.isArray(data.offered_selections) ? data.offered_selections : []);
         setUnpricedQuoteFor(null);
         setFavorite(data.favorite);
         setRelations(data.relations ?? null);
@@ -1436,7 +1504,7 @@ export default function Product() {
         const initial = data.initial_selection?.fulfillment_type === 'direct_sale'
           ? data.initial_selection
           : null;
-        setQuote(data.pricing ? { ...data.pricing, qty: 1, line_total_iqd: data.pricing.unit_subtotal_iqd } : null);
+        setQuote(data.pricing ? withEstimate({ ...data.pricing, qty: 1, line_total_iqd: data.pricing.unit_subtotal_iqd }, data) : null);
         const openingPriceKey = data.pricing
           ? `${initial?.option_value_ids?.length ? initial.option_value_ids.join(',') : initial?.option_id ?? ''}|${initial?.color_id ?? ''}|${initial ? 'direct_sale' : ''}||`
           : null;
@@ -1588,18 +1656,27 @@ export default function Product() {
   /** The canonical key of what is chosen — the key `unpriced_selections` and the request door speak. */
   const selectionKey = selectionKeyOf(optionValueIds, colorId);
   /**
+   * A combination this product does not sell (the body's `unoffered_selections`;
+   * past ENGINE_MAX_SKUS, a selection part of no SKU in `offered_selections`):
+   * the cart and «طلب السعر» refuse it, so it is «not available» — never
+   * quoted, priced or requested.
+   */
+  const selectionUnoffered = unofferedSelections.includes(selectionKey) || outsideOffered(offeredSelections, selectionKey);
+  /**
    * The page body already named this SKU as having no V2 price — or a chosen
    * value or colour has no priced SKU at all (`price_levels` null), so every
    * way to finish the choice is unpriced and no figure may stand for it.
+   * A combination it does not sell is not one: it is not offered at all.
    */
   const choiceUnpriced =
     !catalogOnly &&
+    !selectionUnoffered &&
     unpricedSelections.length > 0 &&
     ((!!colorId && levelIsNull(priceLevels?.color, colorId)) || optionValueIds.some((id) => levelIsNull(priceLevels?.option, id)));
   const knownUnpriced = !catalogOnly && (unpricedSelections.includes(selectionKey) || choiceUnpriced);
   useEffect(() => {
     if (!productSlug || source !== 'catalog') return;
-    if (catalogOnly || knownUnpriced) {
+    if (catalogOnly || knownUnpriced || selectionUnoffered) {
       setQuoteLoading(false);
       return;
     }
@@ -1649,7 +1726,7 @@ export default function Product() {
           return;
         }
         setUnpricedQuoteFor(null);
-        setQuote(res.quote);
+        setQuote(withEstimate(res.quote, res));
         setQuotedFor(priceKey);
         setLiveAvailability(res.availability);
         if (Array.isArray(res.warranty_plans)) setQuotedPlans(res.warranty_plans);
@@ -1677,7 +1754,7 @@ export default function Product() {
       clearTimeout(timer);
       ac.abort();
     };
-  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, quoteToken, catalogOnly, knownUnpriced]);
+  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, quoteToken, catalogOnly, knownUnpriced, selectionUnoffered]);
 
   /**
    * «يجب التاكد من ان السعر يتحدث» — ON THE SCREEN WHERE THE PRICE IS READ.
@@ -2264,7 +2341,7 @@ export default function Product() {
          * every code it can be refused with, including 0075's
          * PREORDER_CAPACITY_EXHAUSTED, which is the one refusal a customer
          * must not mistake for "sold out": the shelf may be full and the
-         * import quota closed. `reasonText` returns the CODE when it has no
+         * import quota closed. `reasonText` returns '' when it has no
          * sentence, so only a decoded one is used and everything else still
          * falls back to what the server said.
          *
@@ -2286,6 +2363,19 @@ export default function Product() {
          * row 18 suppresses), which this page has no string for.
          */
         const code = err instanceof ApiError ? err.code ?? '' : '';
+        /*
+         * «سعر تقديري» (docs/SMART_PRICING.md §5.5): a refusal of an estimated
+         * line (pre-order only, ordering paused, the state unreadable) is said
+         * from the contract in the reader's language, before anything else —
+         * its words load only when the door answered one of them.
+         */
+        let estimateSaid: string | null = null;
+        if (/^PRICE_(?:ESTIMATE|PROTECTION_ESTIMATE)/.test(code)) {
+          try {
+            const { estimateRefusalText } = await loadEstimateWords();
+            estimateSaid = estimateRefusalText(code, lang);
+          } catch { /* The server's own sentence stays below. */ }
+        }
         // An offline refusal dictionary must not hide the original server
         // message or strand the add-to-cart button in its busy state.
         let counted = '';
@@ -2304,9 +2394,7 @@ export default function Product() {
         }
         const said = code ? reasonText(s, code) : '';
         const raw = err instanceof Error ? err.message : 'Failed to add to cart';
-        setActionError(
-          counted || (said && said !== code ? said : translated || raw)
-        );
+        setActionError(estimateSaid || counted || said || translated || raw);
       } finally {
         addInFlight.current = false;
         setAddingToCart(false);
@@ -2858,7 +2946,8 @@ export default function Product() {
   // this sits below the page's early return where a hook cannot go.
   const levelPrice: PriceLevel | null = (() => {
     const L = priceLevels;
-    if (!L) return null;
+    // A combination it does not sell has no price: the grid's pair figure is another SKU's.
+    if (!L || selectionUnoffered) return null;
     // The compact level grid predates relational multi-group combinations.
     // Only the live quote can authoritatively price those; showing the first
     // group's figure as final would be a false price while the request runs.
@@ -3041,10 +3130,11 @@ export default function Product() {
   const proInvite =
     proPreview !== null && !isPro && (!shownPrice || proPreview.unit_iqd < shownPrice.applied) ? proPreview : null;
 
+  // A code the page has no sentence for says nothing: a customer never reads a code.
   const blockingCodes: string[] = [
     ...(availability?.selection.errors ?? []),
     ...quoteErrors.filter((e) => !(availability?.selection.errors ?? []).includes(e)),
-  ];
+  ].filter((code) => reasonText(s, code) !== '');
   /**
    * A PRE-ORDER WITH NO ROUTE IS NOT A LINE THE DOOR ACCEPTS, so the button
    * must not offer it. This is the client half of the cart's own refusal
@@ -3062,10 +3152,25 @@ export default function Product() {
    * product is catalog-only, or this priced product's chosen SKU has no V2
    * price (the body named it, or the quote just answered `unpriced`). The
    * page then shows the label and «طلب السعر» instead of the price, and every
-   * buying control steps aside — for this selection only.
+   * buying control steps aside — for this selection only. A combination it
+   * does not sell (`selectionUnoffered`) has no price either: it is said, never
+   * requested.
    */
   const selectionUnpriced = !catalogOnly && (knownUnpriced || unpricedQuoteFor === priceKey);
-  const noPrice = catalogOnly || selectionUnpriced;
+  const noPrice = catalogOnly || selectionUnpriced || selectionUnoffered;
+  /**
+   * «سعر تقديري» ON THE SELECTION ON SCREEN (docs/SMART_PRICING.md §5.3;
+   * invariant I2: the label fails closed). The quote that answers THIS
+   * selection says whether its price is an estimate — a firm SKU of a mixed
+   * product says no. Until one does (a tap painted from `price_levels`, a
+   * quote in flight or refused), the product's own label stands in, so an
+   * estimate is never shown as a confirmed price while the page waits. A
+   * selection with no price carries no label: there is no figure to qualify.
+   * It draws the chip beside the price and the notice under the card, and it
+   * takes ⚡ Quick Buy away (an estimate is ordered through the cart, where the
+   * notice is read and acknowledged).
+   */
+  const selectionEstimate = !noPrice && (quoteFresh ? quote!.price_estimate === true : product.price_estimate === true);
   const canBuy =
     source === 'catalog' &&
     !noPrice &&
@@ -3293,6 +3398,53 @@ export default function Product() {
   const codReprices = pricingModes?.cod_reprices === true;
 
   // ------------------------------------------------------------ sub-renders
+  /** What names the figure beside it: the member rung that priced it (§8), else a live offer (§8.3); null = the plain «السعر». */
+  const figureLabel = appliedMemberTier ? (
+    /* §8 — NAMED BY TIER, from tierMeta: «سعر PRO» / «سعر PREMIUM». */
+    <span
+      data-testid="product-applied-tier"
+      data-tier={appliedMemberTier}
+      className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${
+        appliedMemberTier === 'pro' ? 'bg-crimson/15 text-coral' : 'bg-gold/10 text-gold'
+      }`}
+    >
+      {/* PRO is red across the shop — the tier's own colour (tierMeta). */}
+      {appliedMemberTier === 'pro' ? (
+        <Sparkles aria-hidden="true" className="w-3 h-3" />
+      ) : (
+        <Star aria-hidden="true" className="w-3 h-3 fill-gold" />
+      )}
+      {s.appliedPriceOf(appliedMemberLabel)}
+    </span>
+  ) : offerBefore !== null ? (
+    /* A live offer set this price (§8.3): «سعر العرض», never the plain «السعر». */
+    <span data-testid="product-sale-label" className="text-text-secondary text-[12px] font-bold">
+      {lang === 'en' ? SALE_PRICE.en : lang === 'ckb' ? SALE_PRICE.ckb : SALE_PRICE.ar}
+    </span>
+  ) : null;
+  /** «سعر تقديري» — the chip beside an estimated price (docs/SMART_PRICING.md §5.3), from the eager card label. */
+  const estimateChip = selectionEstimate ? (
+    <span
+      data-price-estimate
+      className="inline-flex items-center rounded-full border border-warning/30 bg-warning/10 px-2.5 py-1 text-[11px] font-bold leading-normal text-warning"
+    >
+      {tr(ESTIMATE_TEXT.ar, ESTIMATE_TEXT.en, ESTIMATE_TEXT.ckb)}
+    </span>
+  ) : null;
+  /**
+   * The notice and «تواصل معنا» under the price card (§5.3–5.4), a lazy chunk.
+   * Mounted in ONE of the two layouts only, as the request panel is, so its
+   * link and its words exist once on the page. In «عدة ألوان» it follows the
+   * panel's total too: any colour with a quantity that is an estimate.
+   */
+  const estimateNotice = (wide: boolean) =>
+    (selectionEstimate || (colourMulti && multiEstimate)) && source === 'catalog' && wideLayout === wide ? (
+      <ChunkBoundary compact>
+        <React.Suspense fallback={<div className="min-h-20" aria-hidden="true" />}>
+          <EstimateNotice key={product.id} name={name} />
+        </React.Suspense>
+      </ChunkBoundary>
+    ) : null;
   // Without a price the card is `unpricedBlock` (below), drawn in the same place.
   const priceBlock = noPrice ? null : (
     <div className="lv-surface p-4">
@@ -3316,30 +3468,14 @@ export default function Product() {
             >
               {money(unitPrice!, shownUsd.price)}
             </span>
-            {appliedMemberTier ? (
-              /* §8 — NAMED BY TIER, from tierMeta: «سعر PRO» / «سعر PREMIUM». */
-              <span
-                data-testid="product-applied-tier"
-                data-tier={appliedMemberTier}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-black uppercase tracking-wide ${
-                  appliedMemberTier === 'pro' ? 'bg-crimson/15 text-coral' : 'bg-gold/10 text-gold'
-                }`}
-              >
-                {/* PRO is red across the shop — the tier's own colour (tierMeta). */}
-                {appliedMemberTier === 'pro' ? (
-                  <Sparkles aria-hidden="true" className="w-3 h-3" />
-                ) : (
-                  <Star aria-hidden="true" className="w-3 h-3 fill-gold" />
-                )}
-                {s.appliedPriceOf(appliedMemberLabel)}
-              </span>
-            ) : offerBefore !== null ? (
-              /* A live offer set this price (§8.3): «سعر العرض», never the plain «السعر». */
-              <span data-testid="product-sale-label" className="text-text-secondary text-[12px] font-bold">
-                {lang === 'en' ? SALE_PRICE.en : lang === 'ckb' ? SALE_PRICE.ckb : SALE_PRICE.ar}
+            {/* «سعر تقديري» (§5.3) stands beside whatever names the figure, and replaces the plain «السعر». */}
+            {selectionEstimate ? (
+              <span className="inline-flex flex-wrap items-center gap-1.5">
+                {figureLabel}
+                {estimateChip}
               </span>
             ) : (
-              <span className="text-text-secondary text-[12px] font-bold">{s.regularPrice}</span>
+              figureLabel ?? <span className="text-text-secondary text-[12px] font-bold">{s.regularPrice}</span>
             )}
           </div>
           {/* A LIVE OFFER (docs/ux/PRODUCT-DISCOUNT.md §8.3, F1, F8): the published price it replaced,
@@ -3413,6 +3549,7 @@ export default function Product() {
             <span className="text-text-primary font-bold text-xl tabular-nums opacity-80">
               {money(product.display_price_iqd ?? product.price_iqd, typeof product.display_price_iqd === 'number' ? product.display_price_usd_cents : null)}
             </span>
+            {estimateChip}
           </div>
           <p className="text-text-secondary text-[13px] mt-2">{quoteLoading ? s.updatingPrice : s.priceUnavailable}</p>
         </>
@@ -3479,12 +3616,26 @@ export default function Product() {
    * own scale, one sentence, and the lazy request panel — inside the card from
    * 1024 px, its 48 px button in the phone bar below that (`requestBarSlot`).
    * Mounted in ONE of the two layouts only, so the caller's rows are read once.
+   * A priced product's combination it does not sell has no «no price yet» to
+   * say: only the chooser's own words, in the price's place.
    */
-  const unpricedBlock = (wide: boolean) => (
+  const unpricedBlock = (wide: boolean) =>
+    selectionUnoffered && !catalogOnly ? (
+      <div className="lv-surface p-4">
+        <p className="text-text-muted font-black text-xl sm:text-2xl leading-snug" data-selection-not-offered>
+          {tr(NOT_OFFERED.ar, NOT_OFFERED.en, NOT_OFFERED.ckb)}
+        </p>
+      </div>
+    ) : (
     <div className="lv-surface p-4" data-price-status="unpriced" data-unpriced-scope={catalogOnly ? 'product' : 'selection'}>
       <p className="text-text-muted font-black text-xl sm:text-2xl leading-snug">{tr(UNPRICED_TEXT.ar, UNPRICED_TEXT.en, UNPRICED_TEXT.ckb)}</p>
       <p className="mt-1.5 text-text-secondary text-[13px] leading-relaxed">{catalogOnly ? s.browseNow : s.selectionNoPrice}</p>
-      {source === 'catalog' && wideLayout === wide ? (
+      {source === 'catalog' && wideLayout === wide && selectionUnoffered ? (
+        // A combination the product does not sell: said, never requested (the request door refuses it).
+        <p className="mt-3 border-t border-border-subtle pt-3 text-[13px] font-bold text-text-muted" data-selection-not-offered>
+          {tr(NOT_OFFERED.ar, NOT_OFFERED.en, NOT_OFFERED.ckb)}
+        </p>
+      ) : source === 'catalog' && wideLayout === wide ? (
         <div className="mt-3 border-t border-border-subtle pt-3">
           <ChunkBoundary compact>
             <React.Suspense fallback={<div className="min-h-12" aria-hidden="true" />}>
@@ -3570,6 +3721,9 @@ export default function Product() {
     if (optionId) return L.complete ? (L.combo[`${optionId}|${id}`] ?? null) : null;
     return L.color[id] ?? null;
   };
+  /** A colour row the product does not sell with the shared selection: never quoted or priced, it says so. */
+  const rowUnoffered = (key: string): boolean => unofferedSelections.includes(key) || outsideOffered(offeredSelections, key);
+  const notOfferedChip = { text: tr(NOT_OFFERED.ar, NOT_OFFERED.en, NOT_OFFERED.ckb), cls: 'text-text-muted' };
   /** The rows of «عدة ألوان», in the chips' own order (in stock first on a direct sale). */
   const colourRows: ColourRow[] = (() => {
     const direct = requestedOrderType === 'direct_sale';
@@ -3579,8 +3733,9 @@ export default function Product() {
           .map((v) => {
             const option = options.find((o) => o.id === v.id);
             const shelf = colourShelf(v.id);
-            const unpriced = optionNoPrice([...sharedIds, v.id], v.id);
-            const level = colourLevel(v.id);
+            const unoffered = rowUnoffered(selectionKeyOf([...sharedIds, v.id], null));
+            const unpriced = !unoffered && optionNoPrice([...sharedIds, v.id], v.id);
+            const level = unoffered ? null : colourLevel(v.id);
             return {
               id: v.id,
               name: option ? pickName(option.name_en, option.name, option.name_ar) || v.name_en || v.id : v.name_en || v.id,
@@ -3588,8 +3743,8 @@ export default function Product() {
               image: optionImage(v.id) || v.swatch?.url || '',
               noPrice: unpriced,
               soldOut: direct && shelf !== null && shelf <= 0,
-              offered: !unpriced && !(direct && shelf !== null && shelf <= 0),
-              chip: unpriced ? null : levelChip(shelf),
+              offered: !unpriced && !unoffered && !(direct && shelf !== null && shelf <= 0),
+              chip: unoffered ? notOfferedChip : unpriced ? null : levelChip(shelf),
               ownMax: direct ? shelf : null,
               levelUnit: level?.unit_subtotal_iqd ?? null,
               levelRegular: level?.regular_iqd ?? null,
@@ -3601,8 +3756,9 @@ export default function Product() {
           })
       : orderedColors.map((col) => {
           const shelf = colourShelf(col.id);
-          const unpriced = colorNoPrice(col.id);
-          const level = colourLevel(col.id);
+          const unoffered = rowUnoffered(selectionKeyOf(optionValueIds, col.id));
+          const unpriced = !unoffered && colorNoPrice(col.id);
+          const level = unoffered ? null : colourLevel(col.id);
           return {
             id: col.id,
             name: pickName(col.name_en, col.name, col.name_ar) || col.id,
@@ -3610,8 +3766,8 @@ export default function Product() {
             image: colorImage(col.id),
             noPrice: unpriced,
             soldOut: direct && shelf !== null && shelf <= 0,
-            offered: !unpriced && !(direct && shelf !== null && shelf <= 0),
-            chip: unpriced ? null : levelChip(shelf),
+            offered: !unpriced && !unoffered && !(direct && shelf !== null && shelf <= 0),
+            chip: unoffered ? notOfferedChip : unpriced ? null : levelChip(shelf),
             ownMax: direct ? shelf : null,
             levelUnit: level?.unit_subtotal_iqd ?? null,
             levelRegular: level?.regular_iqd ?? null,
@@ -3704,6 +3860,12 @@ export default function Product() {
     if (closed.colour !== singleColourId) setSingleColour(closed.colour);
     setQty(Math.max(1, closed.qty));
     setColourHint({ kind: 'closed', names: closed.dropped.map(colourNameOf) });
+  } else if (colourMode === 'many' && !colourRows.some((r) => r.id === singleColourId && r.offered)) {
+    // The colour held behind the rows is no longer offered (the shared option changed to a combination the product
+    // does not sell, or one with no price): the page takes the first that can take a quantity, as `enterMulti` does,
+    // so the panel keeps its summary, total and add.
+    const probe = colourRows.find((r) => r.offered)?.id;
+    if (probe && probe !== singleColourId) setSingleColour(probe);
   }
 
   /**
@@ -3882,11 +4044,11 @@ export default function Product() {
             wide={wideLayout}
             money={money}
             usdTotal={usdTotal}
-            quickBuyOn={quickBuyFor === product.id}
-            reasonFor={(code) => {
-              const said = reasonText(s, code);
-              return said === code ? '' : said;
-            }}
+            quickBuyOn={quickBuyFor === product.id && !selectionEstimate}
+            // «سعر تقديري» (§5.3): stands in for each row until its own quote answers (fail closed).
+            estimate={selectionEstimate || product.price_estimate === true}
+            onEstimateChange={setMultiEstimate}
+            reasonFor={(code) => reasonText(s, code)}
           />
         </React.Suspense>
       </ChunkBoundary>
@@ -4971,9 +5133,11 @@ export default function Product() {
    * never add what the cart would have refused. Everyone else keeps the one
    * button: a guest's already says «سجّل الدخول للشراء».
    */
-  const quickBuyOn = !!product && quickBuyFor === product.id;
+  // «سعر تقديري» (docs/SMART_PRICING.md §5.3, §6.1): ⚡ is not offered for an estimated selection — the order
+  // goes through the cart, where the notice is read and acknowledged (the server refuses PRICE_ESTIMATE_QUICK_BUY too).
+  const quickBuyOn = !!product && quickBuyFor === product.id && !selectionEstimate;
   const quickBuyWords = quickBuyChrome(lang);
-  const showQuickBuyToggle = isAuthenticated && source === 'catalog';
+  const showQuickBuyToggle = isAuthenticated && source === 'catalog' && !selectionEstimate;
   const cartIcon = justAdded ? <Check aria-hidden="true" className="w-5 h-5" /> : <ShoppingCart aria-hidden="true" className="w-5 h-5" />;
   const buyButton =
     showQuickBuyToggle && product ? (
@@ -5325,6 +5489,7 @@ export default function Product() {
             <div className="mt-5 space-y-3 lg:hidden">
               {noPrice ? unpricedBlock(false) : null}
               {priceBlock}
+              {estimateNotice(false)}
               {selectionBlocks(false)}
               {noPrice ? null : statusMessages}
             </div>
@@ -5739,6 +5904,7 @@ export default function Product() {
             </div>
             {noPrice ? unpricedBlock(true) : null}
             {priceBlock}
+            {estimateNotice(true)}
             {selectionBlocks(true)}
             {noPrice ? null : (
             <div className="lv-surface space-y-3 p-4">
@@ -5762,10 +5928,18 @@ export default function Product() {
       {/* ------------------------------------------------ phone purchase bar */}
       <div ref={buyBarRef} data-testid="product-buybar" data-bottom-bar className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-dock">
         {noPrice ? (
-          /* «طلب السعر» TAKES THE BAR'S PLACE (DECISIONS row 240): no price, no
-             stepper and no cart button — the lazy request panel draws its one
-             full-width 48 px button into this slot; its switch stays in the page. */
-          <div ref={setRequestBarSlot} data-price-request-bar className="mx-auto w-full max-w-[640px]" />
+          selectionUnoffered ? (
+            /* A combination the product does not sell: nothing here can be bought or
+               requested, so the bar says why in the chooser's words instead of standing empty. */
+            <p className="mx-auto w-full max-w-[640px] py-3 text-center text-[13px] font-bold text-text-muted" data-bar-not-offered>
+              {tr(NOT_OFFERED.ar, NOT_OFFERED.en, NOT_OFFERED.ckb)}
+            </p>
+          ) : (
+            /* «طلب السعر» TAKES THE BAR'S PLACE (DECISIONS row 240): no price, no
+               stepper and no cart button — the lazy request panel draws its one
+               full-width 48 px button into this slot; its switch stays in the page. */
+            <div ref={setRequestBarSlot} data-price-request-bar className="mx-auto w-full max-w-[640px]" />
+          )
         ) : (
         <>
         {/*
@@ -5818,13 +5992,16 @@ export default function Product() {
           */}
           <div className="min-w-0 sm:basis-[7.5rem] sm:shrink-0">
             {/* «السعر · ● Black» (§3.12): the line that names the colour while ⚡ has the wide capsule. */}
+            {/* «سعر تقديري» names the bar's figure too (§5.3): the card above may be scrolled away. */}
             {chosenColour ? (
-              <div className="flex min-w-0 items-center gap-1 text-[11px] text-text-muted" data-price-colour>
-                <span className="shrink-0">{cs.priceWithColour}</span>
+              <div className="flex min-w-0 items-center gap-1 text-[11px] text-text-muted" data-price-colour data-price-estimate={selectionEstimate || undefined}>
+                <span className="shrink-0">{selectionEstimate ? `${tr(ESTIMATE_TEXT.ar, ESTIMATE_TEXT.en, ESTIMATE_TEXT.ckb)} ·` : cs.priceWithColour}</span>
                 <ColourTag size="sm" name={chosenColour.name} hex={chosenColour.hex} image={chosenColourImage} nameClassName="text-[11px] font-semibold text-text-muted" />
               </div>
             ) : (
-              <div className="text-[11px] text-text-muted">{s.price}</div>
+              <div className="text-[11px] text-text-muted" data-price-estimate={selectionEstimate || undefined}>
+                {selectionEstimate ? tr(ESTIMATE_TEXT.ar, ESTIMATE_TEXT.en, ESTIMATE_TEXT.ckb) : s.price}
+              </div>
             )}
             <div
               aria-busy={priceIsPending || undefined}

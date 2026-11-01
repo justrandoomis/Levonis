@@ -30,6 +30,7 @@
 
 import { listing } from '../lib/listing';
 import { rowPriceIfSellable } from '../lib/commercialState';
+import { ESTIMATE_STRINGS } from '@levonis/contracts/priceEstimates';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { deliversToHome, getSetting, getSettings, type CheckoutPaymentMethod, type DeliveryMethod } from '../lib/settings';
 import { allowedPaymentMethods } from '../lib/paymentPolicy';
@@ -217,6 +218,15 @@ const INTENTS = [
   'account_help',
   'cancel_order',
   'contact_info',
+  /**
+   * «ما معنى السعر التقديري؟» (docs/SMART_PRICING.md §5.4; the contract's
+   * ESTIMATE_SUPPORT_INTENT). The product page's «تواصل معنا لمزيد من
+   * المعلومات» opens `/support?ask=price_estimate`: the answer is public — a
+   * guest reads it without signing in — and its one next step is the team,
+   * where the ticket still needs an account. It reads nothing and writes
+   * nothing: the words are the contract's own (support.answer).
+   */
+  'price_estimate',
 ] as const;
 type Intent = (typeof INTENTS)[number];
 
@@ -446,6 +456,19 @@ const LEXICON: Record<Intent, LexEntry> = {
       'where are you located', 'your address', 'phone number', 'opening hours', 'ناونیشان',
     ],
     stems: ['العنوان', 'الدوام', 'موقعكم', 'محلكم', 'فرعكم', 'رقمكم', 'هاتفكم', 'تلفونكم'],
+  },
+  /**
+   * PHRASES ONLY. «سعر» alone is the price question and «تقديري» alone also
+   * qualifies a delivery date; it is the two together — the words the card
+   * label prints, «سعر تقديري» / "Estimated price" / «نرخی خەمڵێنراو» — that
+   * ask what an estimated price is.
+   */
+  price_estimate: {
+    phrases: [
+      'سعر تقديري', 'السعر التقديري', 'الأسعار التقديرية', 'اسعار تقديرية',
+      'estimated price', 'estimated prices', 'price estimate',
+      'نرخی خەمڵێنراو', 'نرخە خەمڵێنراوەکان',
+    ],
   },
 };
 
@@ -758,6 +781,10 @@ const T: Record<Locale, Record<string, string>> = {
       'التواصل مع فريق Levonis يكون من داخل تذكرة دعم بالموقع — هاي القناة الرسمية وتنحفظ بيها كل الردود. ما عندي عنوان ولا رقم هاتف منشور بالموقع، وما أريد أعطيك معلومة مو مسجلة.',
     pickup_map: 'موقع الاستلام على الخريطة',
     fee_free: 'مجاناً',
+    // «سعر تقديري» (docs/SMART_PRICING.md §5.4–5.5): the contract's own words, never a second copy.
+    c_price_estimate: ESTIMATE_STRINGS.support.chip.ar,
+    price_estimate_answer: ESTIMATE_STRINGS.support.answer.ar,
+    price_estimate_label: ESTIMATE_STRINGS.label.ar,
   },
   en: {
     sign_in_needed: 'This information is private to your account. Please sign in to continue.',
@@ -899,6 +926,9 @@ const T: Record<Locale, Record<string, string>> = {
       'You reach the LEVONIS team from inside a support ticket on the site — that is the official channel and every reply is kept in it. No shop address or phone number is published on the site, and I will not hand you a detail that is not recorded.',
     pickup_map: 'Pickup location on the map',
     fee_free: 'Free',
+    c_price_estimate: ESTIMATE_STRINGS.support.chip.en,
+    price_estimate_answer: ESTIMATE_STRINGS.support.answer.en,
+    price_estimate_label: ESTIMATE_STRINGS.label.en,
   },
   ckb: {
     sign_in_needed: 'ئەم زانیارییە تایبەتە بە هەژمارەکەت. بۆ بەردەوامبوون بچۆ ژوورەوە.',
@@ -1040,6 +1070,9 @@ const T: Record<Locale, Record<string, string>> = {
       'پەیوەندی بە تیمی Levonisەوە لە ناو تیکێتی پشتگیری ماڵپەڕەکەدا دەکرێت — ئەمە کەناڵە فەرمییەکەیە و هەموو وەڵامێک تێیدا دەپارێزرێت. هیچ ناونیشان یان ژمارەی تەلەفۆن لە ماڵپەڕەکەدا بڵاو نەکراوەتەوە، و زانیاری تۆمارنەکراوت پێ ناڵێم.',
     pickup_map: 'شوێنی وەرگرتن لەسەر نەخشە',
     fee_free: 'بەخۆڕایی',
+    c_price_estimate: ESTIMATE_STRINGS.support.chip.ckb,
+    price_estimate_answer: ESTIMATE_STRINGS.support.answer.ckb,
+    price_estimate_label: ESTIMATE_STRINGS.label.ckb,
   },
 };
 
@@ -1107,13 +1140,16 @@ const AVAILABILITY_WORD: Record<AvailabilityState, string | null> = {
  * gets no word (the members-only line, the countdown). A locked one has no
  * price at all.
  */
-function assistantCardFrom(loc: Locale, card: Record<string, unknown>, row: Record<string, unknown>, title: string): AssistantCard {
+export function assistantCardFrom(loc: Locale, card: Record<string, unknown>, row: Record<string, unknown>, title: string): AssistantCard {
   const composition = String(row.composition ?? '') !== '';
   const locked = card.locked === true;
   const unpriced = card.price_status === 'unpriced';
   const figure = card.display_price_iqd ?? card.price_iqd;
   const price = !locked && !unpriced && typeof figure === 'number' && figure > 0 ? figure : null;
   const from = price !== null && card.display_from === true;
+  // «سعر تقديري» (docs/SMART_PRICING.md §5.3): the card the grid labels is labelled here too — never an
+  // estimate quoted as a confirmed price. The figure is the card's own, unchanged.
+  const estimate = price !== null && card.price_estimate === true;
   const availability: AvailabilityState = composition
     ? compositionAvailability(card.availability_state)
     : cardAvailability(card).state;
@@ -1123,7 +1159,11 @@ function assistantCardFrom(loc: Locale, card: Record<string, unknown>, row: Reco
   const slug = String(card.product_slug ?? card.slug ?? row.slug ?? '');
   return {
     title,
-    subtitle: locked ? tr(loc, 'price_members_only') : priceSubtitle(loc, price, from),
+    subtitle: locked
+      ? tr(loc, 'price_members_only')
+      : estimate
+        ? `${priceSubtitle(loc, price, from)} · ${tr(loc, 'price_estimate_label')}`
+        : priceSubtitle(loc, price, from),
     price_status: unpriced ? 'unpriced' : 'priced',
     image,
     badge: word ? tr(loc, word) : undefined,
@@ -1131,6 +1171,8 @@ function assistantCardFrom(loc: Locale, card: Record<string, unknown>, row: Reco
     price_iqd: price,
     price_from: from,
     availability,
+    // The listing card's boolean label, copied only when true (§5.3): no figure, no source.
+    ...(estimate ? { price_estimate: true as const } : {}),
   };
 }
 
@@ -1186,6 +1228,8 @@ interface AssistantCard {
   price_iqd?: number | null;
   price_from?: boolean;
   availability?: AvailabilityState;
+  /** «سعر تقديري» (docs/SMART_PRICING.md §5.3): the listing card's label, present only when true. */
+  price_estimate?: true;
   /** The product this card is, so the conversation context can name what it showed. */
   product_id?: string;
 }
@@ -1316,6 +1360,7 @@ const CHOICE_LABELS: Record<Intent, string> = {
   account_help: 'c_account',
   cancel_order: 'c_cancel_order',
   contact_info: 'c_contact',
+  price_estimate: 'c_price_estimate',
 };
 
 /**
@@ -2438,6 +2483,8 @@ export function contextualChoices(loc: Locale, intent: string): AssistantChoice[
     contact_info: ['human_handoff', 'open_ticket'],
     bot_identity: ['human_handoff'],
     printer_problem: ['product_search', 'human_handoff'],
+    // «هل تريد التحدث مع فريقنا؟» — the answer's own question, and its one next step (§5.4).
+    price_estimate: ['human_handoff'],
   };
   const next = followups[intent as Intent] ?? [];
   return menuChoices(loc, next);
@@ -2809,6 +2856,10 @@ supportRoutes.post('/assistant', async (c) => {
     case 'printer_problem':
       // Reached only if the orchestrator declined, which a start never does.
       reply = { intent, text: tr(loc, 'clarify'), choices: menuChoices(loc) };
+      break;
+    case 'price_estimate':
+      // Public, and the same words for everyone (§5.4); «التحدث مع الفريق» follows (`contextualChoices`).
+      reply = { intent, text: tr(loc, 'price_estimate_answer') };
       break;
   }
   return send(withFollowups(reply, loc));

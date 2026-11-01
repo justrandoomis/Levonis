@@ -17,7 +17,7 @@
  *
  * Pure: no I/O.
  */
-import { skuComboKey } from '@levonis/pricing/skuChannel';
+import { parseSkuComboKey, skuComboKey } from '@levonis/pricing/skuChannel';
 import type { SkuPriceRow } from './pricing';
 import type { ProductDoc } from './productModel';
 import type { ProductRelationsView } from './productOverlay';
@@ -63,6 +63,64 @@ export function skuPriced(doc: { sku_strict?: true; sku_prices?: readonly SkuPri
 export const selectionKey = (optionValueIds: readonly string[], colorId: string | null | undefined): string =>
   skuComboKey({ option_value_ids: [...optionValueIds], color_id: colorId ?? null });
 
+// ------------------------------------------------------------- the estimate label
+// (docs/SMART_PRICING.md §5.1–5.2; migration 0218; DECISIONS rows 278 and 281)
+//
+// An ESTIMATED price is an ordinary priced SKU — `price_status` stays binary —
+// whose product the owner has not yet confirmed against the supplier. The label
+// lives on the product row the price is read with (`products.price_estimate`,
+// parsed by `parseProductRow` only when it is 1), and the owner may make single
+// SKUs firm (`price_estimate_firm_skus`, read by the overlay into `sku_firm`).
+//
+// FAIL CLOSED, AND ONLY FOR LABELLED PRODUCTS (I2): a document whose firm list
+// could not be read carries no `sku_firm`, so every priced SKU of a labelled
+// product is an estimate; an unlabelled product is never one, whatever was read.
+// A boolean and a list of keys: no figure, source or flag ever rides along (I6).
+
+/** The two document fields the label reads. */
+export type EstimateLabelled = { price_estimate?: true; sku_firm?: readonly string[] };
+
+/** Is this SKU's price an estimate? Its product is labelled and the owner has not made this very SKU firm. */
+export function skuEstimated(doc: EstimateLabelled, comboKey: string): boolean {
+  return doc.price_estimate === true && !(doc.sku_firm ?? []).includes(comboKey);
+}
+
+/**
+ * Is ANY priced SKU of this product an estimate — the card's label («سعر تقديري»)? The priced SKUs are the
+ * live price rows of a strict (V2) document (`skuPriced`); a document whose rows are not known (not strict,
+ * no row read) cannot prove any SKU firm, so a labelled one is labelled.
+ */
+export function productEstimated(doc: EstimateLabelled & { sku_strict?: true; sku_prices?: readonly SkuPriceRow[] | null }): boolean {
+  if (doc.price_estimate !== true) return false;
+  const firm = doc.sku_firm ?? [];
+  if (firm.length === 0 || doc.sku_strict !== true) return true;
+  const rows = doc.sku_prices ?? [];
+  return rows.length === 0 || rows.some((r) => !firm.includes(r.combo_key));
+}
+
+/**
+ * The label of a SELECTION, as the product page and the quote state it. A selection that names a priced SKU
+ * carries that SKU's own label (`skuEstimated`). One that names none yet — nothing or part of it chosen — is
+ * labelled while any priced SKU that could finish it is an estimate, so it is never labelled once all of
+ * them are firm; with no such SKU known (not strict, nothing read) it answers as the product (fail closed).
+ */
+export function selectionEstimated(
+  doc: EstimateLabelled & { sku_strict?: true; sku_prices?: readonly SkuPriceRow[] | null },
+  optionValueIds: readonly string[],
+  colorId: string | null | undefined
+): boolean {
+  if (doc.price_estimate !== true) return false;
+  const key = selectionKey(optionValueIds, colorId);
+  const rows = doc.sku_strict === true ? (doc.sku_prices ?? []) : [];
+  if (rows.some((r) => r.combo_key === key)) return skuEstimated(doc, key);
+  const ids = [...new Set(optionValueIds.filter(Boolean))];
+  const finishing = rows.filter((r) => {
+    const sku = parseSkuComboKey(r.combo_key);
+    return sku !== null && ids.every((id) => sku.option_value_ids.includes(id)) && (!colorId || sku.color_id === colorId);
+  });
+  return finishing.length === 0 ? productEstimated(doc) : finishing.some((r) => skuEstimated(doc, r.combo_key));
+}
+
 /**
  * The structurally sellable SKUs (the V2 writer's own universe, `sellableSkus`)
  * with no live price row. Empty unless the document is strict; empty too when
@@ -76,6 +134,68 @@ export function unpricedSkuKeys(doc: ProductDoc, view: ProductRelationsView | un
   const out: string[] = [];
   for (const s of skus) if (!priced.has(s.combo_key) && !out.includes(s.combo_key)) out.push(s.combo_key);
   return out;
+}
+
+/**
+ * THE COMBINATIONS A PRODUCT DOES NOT SELL (review r2-quote): the cells of a
+ * VARIANT_COMBINATION product's grid that `sellableSkus` leaves out — no
+ * active variant row, while each of their choices is stocked in another
+ * combination. The cart refuses them (VARIANT_NOT_MODELLED) and so does
+ * «طلب السعر» (SELECTION_INVALID), so the quote and the page answer them
+ * «not available», never «طلب السعر». Empty for every other product: another
+ * mode, a grid with a row for every cell, no active row — and for a grid past
+ * ENGINE_MAX_SKUS, which is not listed: the page reads `offeredPastLimitKeys`
+ * there, and `selectionUnoffered` still answers such a grid with relations
+ * (one without relations answers false, see there).
+ */
+export function unofferedSkuKeys(doc: ProductDoc, view: ProductRelationsView | undefined): string[] {
+  if (!view || view.inventory_mode !== 'VARIANT_COMBINATION') return [];
+  const sold = sellableSkus(doc, view);
+  if (sold.overflow) return [];
+  // The whole grid: the same cells with no variant row read (`sellableSkus` then leaves none out).
+  const whole = sellableSkus(doc, { ...view, variants: [] });
+  if (whole.overflow || whole.skus.length === sold.skus.length) return [];
+  const kept = new Set(sold.skus.map((s) => s.combo_key));
+  const out: string[] = [];
+  for (const s of whole.skus) if (!kept.has(s.combo_key) && !out.includes(s.combo_key)) out.push(s.combo_key);
+  return out;
+}
+
+/**
+ * THE SKUS A PRODUCT SELLS, WHERE THOSE COMBINATIONS ARE NOT LISTED (review
+ * r3-unoffered-large): a VARIANT_COMBINATION grid past ENGINE_MAX_SKUS that
+ * `sellableSkus` still counts on the cells it keeps (at most ENGINE_MAX_SKUS of
+ * them). The selection check answers from exactly these, so a selection that
+ * is part of none of them is refused by the cart and by «طلب السعر». Empty for
+ * every other product: another mode, a grid `unofferedSkuKeys` covers, or one
+ * too large to count.
+ */
+export function offeredPastLimitKeys(doc: ProductDoc, view: ProductRelationsView | undefined): string[] {
+  if (!view || view.inventory_mode !== 'VARIANT_COMBINATION') return [];
+  const sold = sellableSkus(doc, view);
+  if (sold.overflow || !sellableSkus(doc, { ...view, variants: [] }).overflow) return [];
+  return [...new Set(sold.skus.map((s) => s.combo_key))];
+}
+
+/**
+ * Does this selection name one of those combinations? It is a complete cell of
+ * the grid (the selection check passes with no variant row read) that is not a
+ * SKU the product sells, nor a part of one. Any grid size; false for every
+ * other product, and for a grid without relations too large to list (its
+ * check cannot tell a whole cell from a part of one there).
+ */
+export function selectionUnoffered(
+  doc: ProductDoc,
+  view: ProductRelationsView | undefined,
+  optionValueIds: readonly string[],
+  colorId: string | null
+): boolean {
+  if (!view || view.inventory_mode !== 'VARIANT_COMBINATION') return false;
+  const sold = checkSelection(doc, view, optionValueIds, colorId);
+  if (sold.ok || sold.code === 'PRICE_REQUEST_SELECTION_REQUIRED') return false;
+  const whole = { ...view, variants: [] };
+  if (!view.has_relations && sellableSkus(doc, whole).overflow) return false;
+  return checkSelection(doc, whole, optionValueIds, colorId).ok;
 }
 
 // ------------------------------------------------------------- the selection, checked on the server

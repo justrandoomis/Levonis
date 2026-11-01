@@ -4,6 +4,56 @@ Read `CLAUDE.md` first. The default branch is `claude/new-session-2hq4ci`;
 code pushes deploy through workflow 7 only. No feature branches, merges,
 force-pushes, or alternate deployment path.
 
+## Smart pricing: estimated pre-order prices for Bambu Lab products (DECISIONS 278–282, design recorded 2026-10-31)
+
+> The design is `docs/SMART_PRICING.md`. Its §12 splits the work into packages WP0–WP15 with disjoint files.
+> No customer can see or buy an estimate until WP15 is live **and** the owner turns on **apply**, which is
+> refused until the purchase policy in force is version 7 (row 280). The import is unchanged: it still writes
+> no price, cost or stock (row 239). The supplier price catalogue is a separate, owner-only store (row 278;
+> `docs/bambu-import/IMPORT-SPEC.md` §1, the note on row 10). Row 282 lists the owner's open questions and
+> the defaults applied until they are answered.
+
+**Before any revert, or any redeploy of an older commit, once 0218 is applied** (design §2.5), run this on the
+live database:
+
+    npx wrangler d1 execute levonis-db-staging --remote --env staging --command "SELECT COUNT(*) FROM products WHERE price_estimate = 1"
+
+- **0** (or `no such column: price_estimate`, which means 0218 is not applied): no product carries the label,
+  and an older Worker serves exactly what it served before.
+- **More than 0:** an older Worker ignores the label and shows those products' estimates as ordinary prices,
+  without the notice. It still cannot sell them: 0218's trigger `trg_order_items_price_estimate_guard` (T6)
+  refuses their order lines, so their checkout fails. Nor can it confirm, prepare or ship an open estimate
+  order (`trg_orders_price_estimate_gate`, T8). Prefer a forward fix, and revert only on the owner's decision.
+
+Workflow 7 only deploys forward, and workflow 51 (live migrations) is manual.
+
+**Go-live, for the owner** (design §12; after WP15 is live):
+
+1. The 2026-10-31 captures are done, and their upload files are built:
+   `data/bambu-cn-prices/tmall-store-2026-10-31.v1.json` (Tmall: 737 items, 1,617 options; the H3C and S1
+   pre-launch listings, TPU 75A and one placeholder are left out) and
+   `data/bambu-eu-prices/eu-store-2026-10-31.v1.json` (EU store: 266 items, 358 variants, regular prices for the
+   86 variants that were on sale). For a later capture, rerun `data/bambu-cn-prices/tools/assemble-snapshot.mjs`
+   then `scripts/supplier-prices/normalize-tmall.mjs`.
+2. For a later EU capture, read the pages in a browser with `?skr=yes` on every page (without it, a visitor from
+   Iraq is sent to another region's store; the store answers fast automated access with a Cloudflare challenge,
+   so the capture is slow and stops at a challenge), then run `data/bambu-eu-prices/tools/assemble-snapshot.mjs`
+   and `scripts/supplier-prices/normalize-eu-snapshot.mjs`. Optionally, capture the US reference with
+   `capture-store-offers.ts --store us`.
+3. Fill in the type table: minimum profit, default weight and box or CBM, extra cost, routes. Use "suggest"
+   where it helps.
+4. Run «تعبئة أبعاد الشحن من بيانات الاستيراد» while the products are still unpriced.
+5. Upload the snapshots and run matching. Audit the automatic confirmations and review the suggestions. The
+   Links tab then lists every matched product with its Tmall id and its supplier links (design §3.9).
+6. Turn on **apply** (needs the published purchase policy v7).
+7. Apply one filament, one part and one printer as a canary. Check the label, the notice, the contact link,
+   the acknowledgement, the order held at «تم استلام الطلب», the courier refusal, and both settlement paths
+   (same price, and a different price approved).
+8. Apply the rest in bulk.
+
+The supplier price files under `data/bambu-*-prices/` are the shop's cost basis: they stay out of git
+(row 282(g)) and reach the Worker only through the owner's upload (design §3.4).
+
 ## Bambu Lab one-time catalogue import (DECISIONS 239–241, in progress)
 
 > **Resumed 2026-10-15 ≈20:40 UTC.** The resume plan is `docs/bambu-import/HANDOFF-PLAN.md`; the spec and the

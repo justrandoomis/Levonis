@@ -1,0 +1,229 @@
+{
+ "format": "levonis.supplier-prices.v1",
+ "source": "bambu_eu",
+ "currency": "EUR",
+ "price_basis": "list",
+ "capture": "browser_sweep",
+ "captured_on": "2026-10-31",
+ "captured_by": "browser sweep (?skr=yes)",
+ "items": [
+  {
+   "item_key": "h2d",
+   "url": "https://eu.store.bambulab.com/products/h2d",
+   "page_host": "eu.store.bambulab.com",
+   "title": "Bambu Lab H2D",
+   "name_en": "Bambu Lab H2D",
+   "category": "printer",
+   "sourcing": "EU_STORE_EUR",
+   "freight_route": "GERMANY_LAND",
+   "skus": [
+    {
+     "sku_key": "596571526982115329",
+     "options": {
+      "option1": "H2D AMS Combo",
+      "option2": "Standard"
+     },
+     "options_en": {
+      "option1": "H2D AMS Combo",
+      "option2": "Standard"
+     },
+     "price": 1599
+    },
+    {
+     "sku_key": "596571526990503937",
+     "options": {
+      "option1": "H2D Laser Full Combo",
+      "option2": "10W"
+     },
+     "options_en": {
+      "option1": "H2D Laser Full Combo",
+      "option2": "10W"
+     },
+     "price": 1949
+    },
+    {
+     "sku_key": "596571526990503942",
+     "options": {
+      "option1": "H2D Laser Full Combo",
+      "option2": "40W"
+     },
+     "options_en": {
+      "option1": "H2D Laser Full Combo",
+      "option2": "40W"
+     },
+     "price": 2299
+    },
+    {
+     "sku_key": "596571526990503947",
+     "options": {
+      "option1": "H2D",
+      "option2": "Standard"
+     },
+     "options_en": {
+      "option1": "H2D",
+      "option2": "Standard"
+     },
+     "price": 1399
+    },
+    {
+     "sku_key": "622679523065323523",
+     "options": {
+      "option1": "H2D AMS Combo",
+      "option2": "AMS HT bundle"
+     },
+     "options_en": {
+      "option1": "H2D AMS Combo",
+      "option2": "AMS HT bundle"
+     },
+     "price": 1699
+    },
+    {
+     "sku_key": "789701095558488064",
+     "options": {
+      "option1": "H2D Print More Bundle",
+      "option2": "Standard"
+     },
+     "options_en": {
+      "option1": "H2D Print More Bundle",
+      "option2": "Standard"
+     },
+     "price": 1849
+    }
+   ]
+  },
+  {
+   "item_key": "h2c",
+   "url": "https://eu.store.bambulab.com/products/h2c",
+   "page_host": "eu.store.bambulab.com",
+   "title": "Bambu Lab H2C",
+   "name_en": "Bambu Lab H2C",
+   "category": "printer",
+   "sourcing": "EU_STORE_EUR",
+   "freight_route": "GERMANY_LAND",
+   "skus": [
+    {
+     "sku_key": "666136020008767488",
+     "options": {
+      "option1": "H2C AMS Combo",
+      "option2": "Standard"
+     },
+     "options_en": {
+      "option1": "H2C AMS Combo",
+      "option2": "Standard"
+     },
+     "price": 1799
+    },
+    {
+     "sku_key": "666136020008767498",
+     "options": {
+      "option1": "H2C Laser Full Combo",
+      "option2": "10W Laser"
+     },
+     "options_en": {
+      "option1": "H2C Laser Full Combo",
+      "option2": "10W Laser"
+     },
+     "price": 2149
+    },
+    {
+     "sku_key": "666136020008767503",
+     "options": {
+      "option1": "H2C Laser Full Combo",
+      "option2": "40W Laser"
+     },
+     "options_en": {
+      "option1": "H2C Laser Full Combo",
+      "option2": "40W Laser"
+     },
+     "price": 2499
+    },
+    {
+     "sku_key": "761060179809759232",
+     "options": {
+      "option1": "H2C Vortek Ultimate Bundle",
+      "option2": "Standard"
+     },
+     "options_en": {
+      "option1": "H2C Vortek Ultimate Bundle",
+      "option2": "Standard"
+     },
+     "price": 2019
+    }
+   ]
+  },
+  {
+   "item_key": "x2d",
+   "url": "https://eu.store.bambulab.com/products/x2d",
+   "page_host": "eu.store.bambulab.com",
+   "title": "Bambu Lab X2D",
+   "name_en": "Bambu Lab X2D",
+   "category": "printer",
+   "sourcing": "EU_STORE_EUR",
+   "freight_route": "GERMANY_LAND",
+   "skus": [
+    {
+     "sku_key": "720057962001530884",
+     "options": {
+      "option1": "X2D"
+     },
+     "options_en": {
+      "option1": "X2D"
+     },
+     "price": 549
+    },
+    {
+     "sku_key": "720057962001530888",
+     "options": {
+      "option1": "X2D AMS Combo"
+     },
+     "options_en": {
+      "option1": "X2D AMS Combo"
+     },
+     "price": 749
+    },
+    {
+     "sku_key": "753851744855769090",
+     "options": {
+      "option1": "X2D Print More Bundle"
+     },
+     "options_en": {
+      "option1": "X2D Print More Bundle"
+     },
+     "price": 999
+    },
+    {
+     "sku_key": "776216578906652674",
+     "options": {
+      "option1": "X2D Combo Print with Care Bundle"
+     },
+     "options_en": {
+      "option1": "X2D Combo Print with Care Bundle"
+     },
+     "price": 789
+    }
+   ]
+  },
+  {
+   "item_key": "filament-buffer",
+   "url": "https://eu.store.bambulab.com/products/filament-buffer",
+   "page_host": "eu.store.bambulab.com",
+   "title": "Filament Buffer",
+   "name_en": "Filament Buffer",
+   "category": "spare_part",
+   "sourcing": "EU_STORE_EUR",
+   "freight_route": "GERMANY_LAND",
+   "skus": [
+    {
+     "sku_key": "43719762903259",
+     "options": {
+      "option1": "X1 Series and P1 Series"
+     },
+     "options_en": {
+      "option1": "X1 Series and P1 Series"
+     },
+     "price": 27.99
+    }
+   ]
+  }
+ ]
+}

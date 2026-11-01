@@ -59,6 +59,17 @@
  * snapshot — recorded at receipt (migration 0182), derived from its own
  * purchase and labelled so, or known only in IQD (worker/lib/batchSnapshot.ts).
  * A read: nothing written.
+ *
+ * «التسعير التقديري» (docs/SMART_PRICING.md; migration 0218; DECISIONS rows
+ * 278–282) mounts two owner routers below the door, so they inherit it:
+ *   /supplier-prices/*  the supplier price catalogue: snapshots, matching and
+ *                       review, the owner's typed prices, lookup, the one-page
+ *                       store read and the supplier links
+ *                       (worker/routes/adminSupplierPrices.ts, §3.4–§3.9)
+ *   /estimates/*        the estimator: the switches, the types, compute, apply
+ *                       and confirm (worker/routes/adminPriceEstimates.ts, §4)
+ * Their writes are the owner's own (assertCostWrite on each). An estimate
+ * price is still written only by the V2 writer (invariant I1).
  */
 import { completenessAfterWrite } from '../lib/completenessHooks';
 import { Hono, type Context } from 'hono';
@@ -123,6 +134,8 @@ import { FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../lib/session';
 import { loadBatches, type BatchFilter } from '../lib/batchSnapshot';
 import { v2PublicationCounts } from '../lib/pricingEngine/v2/queue';
 import { procurementLinePricing } from '../lib/pricingEngine/v2/procurementLine';
+import { adminSupplierPricesRoutes } from './adminSupplierPrices';
+import { adminPriceEstimatesRoutes } from './adminPriceEstimates';
 
 export const adminPricingRoutes = new Hono<AppContext>();
 
@@ -138,6 +151,13 @@ adminPricingRoutes.use('*', limitByMethod(['pricing-read', 1200], ['pricing-writ
 // Owner brief 2026-10-10: saved supplier costs, rules or an adopted engine price
 // re-evaluate the product against the required-field list (completenessHooks.ts).
 adminPricingRoutes.use('*', completenessAfterWrite);
+
+// «التسعير التقديري» (docs/SMART_PRICING.md §3.4, §4.8; DECISIONS rows 278–282): the supplier price
+// catalogue and the estimator, mounted BELOW the door and the completeness hook above, so every one of
+// their routes passes requireAdmin → the pricing limit → requireCostRead first (each router also keeps
+// its own requireCostRead, and every write its assertCostWrite). Classified in tests/routeClass/pricing.ts.
+adminPricingRoutes.route('/supplier-prices', adminSupplierPricesRoutes);
+adminPricingRoutes.route('/estimates', adminPriceEstimatesRoutes);
 
 /** 409 PRICING_V2_MANAGED {section}: an old pricing door is closed (codes and the section only; see «the legacy doors» below). */
 const refuseLegacyPricing = (section: 3 | 5) => () => {

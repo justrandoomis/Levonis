@@ -1,0 +1,389 @@
+{
+  "source": "Bambu Lab EU store (eu.store.bambulab.com)",
+  "captured_on": "2026-10-31",
+  "price_basis": "JSON-LD offer price per variant as shown to EU visitors; the store's own currency EUR, VAT as the store displays it",
+  "products": [
+    {
+      "handle": "h2d",
+      "name": "Bambu Lab H2D",
+      "type": "printer",
+      "sourcing": "EU_STORE_EUR",
+      "freight_route": "GERMANY_LAND",
+      "sourcing_basis": "type printer",
+      "price_min_eur": 1399,
+      "price_max_eur": 2299,
+      "url": "https://eu.store.bambulab.com/products/h2d",
+      "product_group_id": "14937650200924",
+      "manifest_title": "Bambu Lab H2D",
+      "variants": [
+        {
+          "sku": "596571526982115329",
+          "name": "Bambu Lab H2D - H2D AMS Combo / Standard",
+          "option_values": [
+            "H2D AMS Combo",
+            "Standard"
+          ],
+          "colour_code": null,
+          "price_eur": 1599,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/h2d?id=596571526982115329"
+        },
+        {
+          "sku": "596571526990503937",
+          "name": "Bambu Lab H2D - H2D Laser Full Combo / 10W",
+          "option_values": [
+            "H2D Laser Full Combo",
+            "10W"
+          ],
+          "colour_code": null,
+          "price_eur": 1949,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/h2d?id=596571526990503937"
+        },
+        {
+          "sku": "596571526990503942",
+          "name": "Bambu Lab H2D - H2D Laser Full Combo / 40W",
+          "option_values": [
+            "H2D Laser Full Combo",
+            "40W"
+          ],
+          "colour_code": null,
+          "price_eur": 2299,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/h2d?id=596571526990503942"
+        },
+        {
+          "sku": "596571526990503947",
+          "name": "Bambu Lab H2D - H2D / Standard",
+          "option_values": [
+            "H2D",
+            "Standard"
+          ],
+          "colour_code": null,
+          "price_eur": 1399,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/h2d?id=596571526990503947"
+        },
+        {
+          "sku": "622679523065323523",
+          "name": "Bambu Lab H2D - H2D AMS Combo / AMS HT bundle",
+          "option_values": [
+            "H2D AMS Combo",
+            "AMS HT bundle"
+          ],
+          "colour_code": null,
+          "price_eur": 1699,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/h2d?id=622679523065323523"
+        },
+        {
+          "sku": "789701095558488064",
+          "name": "Bambu Lab H2D - H2D Print More Bundle / Standard",
+          "option_values": [
+            "H2D Print More Bundle",
+            "Standard"
+          ],
+          "colour_code": null,
+          "price_eur": 1849,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/h2d?id=789701095558488064"
+        }
+      ]
+    },
+    {
+      "handle": "h2c",
+      "name": "Bambu Lab H2C",
+      "type": "printer",
+      "sourcing": "EU_STORE_EUR",
+      "freight_route": "GERMANY_LAND",
+      "sourcing_basis": "type printer",
+      "price_min_eur": 1799,
+      "price_max_eur": 2499,
+      "url": "https://eu.store.bambulab.com/products/h2c",
+      "product_group_id": "666136020000378880",
+      "manifest_title": "Bambu Lab H2C",
+      "variants": [
+        {
+          "sku": "666136020008767488",
+          "name": "Bambu Lab H2C - H2C AMS Combo / Standard",
+          "option_values": [
+            "H2C AMS Combo",
+            "Standard"
+          ],
+          "colour_code": null,
+          "price_eur": 1799,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/h2c?id=666136020008767488"
+        },
+        {
+          "sku": "666136020008767498",
+          "name": "Bambu Lab H2C - H2C Laser Full Combo / 10W Laser",
+          "option_values": [
+            "H2C Laser Full Combo",
+            "10W Laser"
+          ],
+          "colour_code": null,
+          "price_eur": 2149,
+          "currency": "EUR",
+          "availability": "OutOfStock",
+          "url": "https://eu.store.bambulab.com/products/h2c?id=666136020008767498"
+        },
+        {
+          "sku": "666136020008767503",
+          "name": "Bambu Lab H2C - H2C Laser Full Combo / 40W Laser",
+          "option_values": [
+            "H2C Laser Full Combo",
+            "40W Laser"
+          ],
+          "colour_code": null,
+          "price_eur": 2499,
+          "currency": "EUR",
+          "availability": "OutOfStock",
+          "url": "https://eu.store.bambulab.com/products/h2c?id=666136020008767503"
+        },
+        {
+          "sku": "761060179809759232",
+          "name": "Bambu Lab H2C - H2C Vortek Ultimate Bundle / Standard",
+          "option_values": [
+            "H2C Vortek Ultimate Bundle",
+            "Standard"
+          ],
+          "colour_code": null,
+          "price_eur": 2019,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/h2c?id=761060179809759232"
+        }
+      ]
+    },
+    {
+      "handle": "filament-buffer",
+      "name": "Filament Buffer",
+      "type": "spare_part",
+      "sourcing": "EU_STORE_EUR",
+      "freight_route": "GERMANY_LAND",
+      "sourcing_basis": "electronic spare part: \"buffer\"",
+      "price_min_eur": 27.99,
+      "price_max_eur": 27.99,
+      "url": "https://eu.store.bambulab.com/products/filament-buffer",
+      "product_group_id": "7725940998363",
+      "manifest_title": "Filament Buffer",
+      "variants": [
+        {
+          "sku": "43719762903259",
+          "name": "Filament Buffer - X1 Series and P1 Series",
+          "option_values": [
+            "X1 Series and P1 Series"
+          ],
+          "colour_code": null,
+          "price_eur": 27.99,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/filament-buffer?id=43719762903259"
+        }
+      ]
+    },
+    {
+      "handle": "h2d-pro",
+      "name": "Bambu Lab H2D Pro",
+      "type": "printer",
+      "sourcing": "EU_STORE_EUR",
+      "freight_route": "GERMANY_LAND",
+      "sourcing_basis": "type printer",
+      "price_min_eur": null,
+      "price_max_eur": null,
+      "url": "https://eu.store.bambulab.com/products/h2d-pro",
+      "product_group_id": "631286032295866368",
+      "manifest_title": "Bambu Lab H2D Pro",
+      "variants": [
+        {
+          "sku": "631286032295866372",
+          "name": "Bambu Lab H2D Pro - Hotend",
+          "option_values": [
+            "Hotend"
+          ],
+          "colour_code": null,
+          "price_eur": null,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/h2d-pro?id=631286032295866372"
+        }
+      ]
+    },
+    {
+      "handle": "usb%E2%80%91c-soldering-iron-kit-for-heat-set-inserts",
+      "name": "USB-C Soldering Iron Kit for Heat-Set Inserts",
+      "type": "accessory",
+      "sourcing": "EU_STORE_EUR",
+      "freight_route": "GERMANY_LAND",
+      "sourcing_basis": "electronic accessory: soldering iron",
+      "price_min_eur": 109,
+      "price_max_eur": 109,
+      "url": "https://eu.store.bambulab.com/products/usb%E2%80%91c-soldering-iron-kit-for-heat-set-inserts",
+      "product_group_id": "621587261510578176",
+      "manifest_title": "USB‑C Soldering Iron Kit for Heat-Set Inserts",
+      "variants": [
+        {
+          "sku": "621587261518966786",
+          "name": "USB-C Soldering Iron Kit for Heat-Set Inserts - 100W USB-C Smart Soldering Iron Kit",
+          "option_values": [
+            "100W USB-C Smart Soldering Iron Kit"
+          ],
+          "colour_code": null,
+          "price_eur": 109,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/usb%E2%80%91c-soldering-iron-kit-for-heat-set-inserts?id=621587261518966786"
+        }
+      ]
+    },
+    {
+      "handle": "toolhead-enhanced-cooling-fan",
+      "name": "Toolhead Enhanced Cooling Fan",
+      "type": "accessory",
+      "sourcing": "EU_STORE_EUR",
+      "freight_route": "GERMANY_LAND",
+      "sourcing_basis": "electronic accessory: \"fan\"",
+      "price_min_eur": 34.39,
+      "price_max_eur": 34.39,
+      "url": "https://eu.store.bambulab.com/products/toolhead-enhanced-cooling-fan",
+      "product_group_id": "664731881264488448",
+      "manifest_title": "Toolhead Enhanced Cooling Fan",
+      "variants": [
+        {
+          "sku": "664731881302237187",
+          "name": "Toolhead Enhanced Cooling Fan - H2D and H2D Laser / Upgrade",
+          "option_values": [
+            "H2D and H2D Laser",
+            "Upgrade"
+          ],
+          "colour_code": null,
+          "price_eur": 34.39,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/toolhead-enhanced-cooling-fan?id=664731881302237187"
+        },
+        {
+          "sku": "715053107883114497",
+          "name": "Toolhead Enhanced Cooling Fan - H2C and H2C Laser / Replacement / Spare",
+          "option_values": [
+            "H2C and H2C Laser",
+            "Replacement",
+            "Spare"
+          ],
+          "colour_code": null,
+          "price_eur": 34.39,
+          "currency": "EUR",
+          "availability": "InStock",
+          "url": "https://eu.store.bambulab.com/products/toolhead-enhanced-cooling-fan?id=715053107883114497"
+        }
+      ]
+    },
+    {
+      "handle": "vision-encoder-r1",
+      "name": "Vision Encoder - R1",
+      "type": "accessory",
+      "sourcing": "CHINA_CNY",
+      "freight_route": "CHINA_SEA_OR_AIR",
+      "sourcing_basis": "accessory, not electronic by name (vision encoder: a calibration plate)",
+      "price_min_eur": 99.99,
+      "price_max_eur": 99.99,
+      "url": "https://eu.store.bambulab.com/products/vision-encoder-r1",
+      "product_group_id": "778459507108880384",
+      "manifest_title": "Vision Encoder - R1",
+      "variants": [
+        {
+          "sku": "778459507121463296",
+          "name": "Vision Encoder - R1 - R1",
+          "option_values": [
+            "R1"
+          ],
+          "colour_code": null,
+          "price_eur": 99.99,
+          "currency": "EUR",
+          "availability": "OutOfStock",
+          "url": "https://eu.store.bambulab.com/products/vision-encoder-r1?id=778459507121463296"
+        }
+      ]
+    },
+    {
+      "handle": "laser-module",
+      "name": "Laser Module",
+      "type": "accessory",
+      "sourcing": "EU_STORE_EUR",
+      "freight_route": "GERMANY_LAND",
+      "sourcing_basis": "electronic accessory: laser or cutting module",
+      "price_min_eur": 269,
+      "price_max_eur": 819,
+      "url": "https://eu.store.bambulab.com/products/laser-module",
+      "product_group_id": "686086595025870848",
+      "manifest_title": "Laser Module",
+      "variants": [
+        {
+          "sku": "686086595038453766",
+          "name": "Laser Module - H2D/H2C / 10 W",
+          "option_values": [
+            "H2D/H2C",
+            "10 W"
+          ],
+          "colour_code": null,
+          "price_eur": 269,
+          "currency": "EUR",
+          "availability": "OutOfStock",
+          "url": "https://eu.store.bambulab.com/products/laser-module?id=686086595038453766"
+        },
+        {
+          "sku": "686086595042648067",
+          "name": "Laser Module - H2D/H2C / 40 W",
+          "option_values": [
+            "H2D/H2C",
+            "40 W"
+          ],
+          "colour_code": null,
+          "price_eur": 819,
+          "currency": "EUR",
+          "availability": "OutOfStock",
+          "url": "https://eu.store.bambulab.com/products/laser-module?id=686086595042648067"
+        },
+        {
+          "sku": "686086595042648072",
+          "name": "Laser Module - H2S / 10 W",
+          "option_values": [
+            "H2S",
+            "10 W"
+          ],
+          "colour_code": null,
+          "price_eur": 269,
+          "currency": "EUR",
+          "availability": "OutOfStock",
+          "url": "https://eu.store.bambulab.com/products/laser-module?id=686086595042648072"
+        }
+      ]
+    }
+  ],
+  "coverage": {
+    "manifest_products": 1115,
+    "products": 8,
+    "variants": 19,
+    "batch_files": [
+      "batch-001.json",
+      "batch-002.json",
+      "batch-003.json",
+      "batch-004.json",
+      "batch-005.json"
+    ],
+    "not_in_eu_store": [],
+    "capture_failed": [],
+    "missing_from_snapshot": [
+      "a1-mini",
+      "p1s"
+    ]
+  }
+}

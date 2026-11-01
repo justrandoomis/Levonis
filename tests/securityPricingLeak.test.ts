@@ -20,17 +20,57 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import type { DatabaseSync } from 'node:sqlite';
 import worker from '../worker/index';
-import { APEX, asD1, ctx } from './fixtures/app';
-import { OWNER, ROLES, seededCopy, sweepGets, type SweepResult } from './fixtures/roleMatrix';
+import { APEX, asD1, ctx, get, json } from './fixtures/app';
+import { OWNER, ROLES, appFor, seededCopy, sweepGets, type SweepResult } from './fixtures/roleMatrix';
 import { BATCH_SENTINELS, FX_DISPLAY_RATE, FX_SENTINELS, V2_SENTINELS, seedBatchSentinels, seedFxSentinels } from './fixtures/fxSentinels';
 import { arithmeticLeaks } from './fixtures/costlyProduct';
+import { productRoutes } from '../worker/routes/products';
+
+/**
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §8, invariant I6): the costly product is made an
+ * estimate — the label set as the V2 writer's estimate batch sets it — and every owner-only 0218 table is
+ * seeded with a sentinel: a captured supplier price in each currency, the per-type defaults and minimum
+ * profit, the estimator's figures and what it wrote. `price_estimate` is allowed (a public boolean); none of
+ * these may reach a non-owner, and their key names are FINANCIAL_FIELDS (worker/lib/adminScope.ts).
+ */
+const ESTIMATE_SENTINELS = ['173.37', '419.83', '58.91', '4.73', '18.8613', '77731', '37731', '29173', '17331', '67891', '676767', '686868'];
+
+function seedEstimateSentinels(raw: DatabaseSync, pid = 'p_a1'): void {
+  const now = '2026-11-01T00:00:00.000Z';
+  raw.exec(`
+    INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${pid}', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = '${pid}';
+    DELETE FROM ops_guards WHERE id = 'engine-price:${pid}';
+    INSERT INTO supplier_price_snapshots (id, source, currency, capture, captured_on, captured_by, file_sha256, item_count, sku_count, state, created_by, created_at, completed_at)
+      VALUES ('sps_s1_cn', 'tmall_cn', 'CNY', 'browser_sweep', '2026-10-31', 'usr_owner', '${'a'.repeat(64)}', 1, 1, 'complete', 'usr_owner', '${now}', '${now}'),
+             ('sps_s1_eu', 'bambu_eu', 'EUR', 'browser_sweep', '2026-10-31', 'usr_owner', '${'b'.repeat(64)}', 1, 1, 'complete', 'usr_owner', '${now}', '${now}');
+    INSERT INTO supplier_price_items (snapshot_id, item_key, url, page_host, title) VALUES
+      ('sps_s1_cn', 'item_s1', 'https://supplier.example/item', 'supplier.example', 'S1 title'),
+      ('sps_s1_eu', 'item_s1', 'https://supplier.example/eu', 'supplier.example', 'S1 title');
+    INSERT INTO supplier_price_skus (snapshot_id, item_key, sku_key, price, net_weight_g) VALUES
+      ('sps_s1_cn', 'item_s1', 'sku_s1', '173.37', 77731),
+      ('sps_s1_eu', 'item_s1', 'sku_s1', '419.83', NULL);
+    INSERT INTO supplier_price_matches (product_id, combo_key, source, item_key, sku_key, confidence, method, state, decided_by, decided_at, found_in_snapshot, updated_at)
+      VALUES ('${pid}', '', 'tmall_cn', 'item_s1', 'sku_s1', 'exact', 'sku_code', 'confirmed', 'auto', '${now}', 'sps_s1_cn', '${now}');
+    INSERT INTO supplier_price_manual (product_id, combo_key, amount, currency, entered_by, entered_at) VALUES ('${pid}', 'c:x', '58.91', 'USD', 'usr_owner', '${now}');
+    UPDATE price_estimate_types SET default_weight_g = 77731, default_length_mm = 37731, default_width_mm = 29173, default_height_mm = 17331,
+                                    default_cbm = '18.8613', additional_cost_iqd = 67891, min_profit_usd = '4.73' WHERE key = 'printer';
+    INSERT INTO product_price_estimates (product_id, type_key, type_source, state, measure_basis, flags_json, applied_at, applied_by, applied_wire_json, updated_at)
+      VALUES ('${pid}', 'printer', 'supplier_category', 'estimated', 'type_default', '["EST_DEFAULT_WEIGHT"]', '${now}', 'usr_owner', '{"supplier_cost_amount":"419.83","min_profit_usd":"4.73"}', '${now}');
+    INSERT INTO price_estimate_lines (product_id, combo_key, channel, price_source, supplier_amount, supplier_currency, measure_source, est_cost_iqd, est_price_iqd, computed_at)
+      VALUES ('${pid}', '', 'pre_order_sea', 'tmall_cn', '173.37', 'CNY', 'type_default', 676767, 686868, '${now}');
+  `);
+}
 
 const seed = () => {
   const raw = seededCopy();
   seedFxSentinels(raw);
   // FX-6: a batch whose purchase snapshot carries sentinels (migration 0182).
   seedBatchSentinels(raw);
+  // 0218: the costly product as an estimate, its supplier catalogue and estimator rows full of sentinels.
+  seedEstimateSentinels(raw);
   return raw;
 };
 // Pricing V2 (0189): the role matrix seeds its costly product's V2 stores with
@@ -38,7 +78,7 @@ const seed = () => {
 // serves them; the V2 routes' sweep over the same sentinels — with the product
 // made V2, and the owner's read proving it is not vacuous — is
 // tests/pricingV2Roles.test.ts (spec §8, V2-3b deviation 11).
-const SENTINELS = [...FX_SENTINELS, ...BATCH_SENTINELS, ...V2_SENTINELS];
+const SENTINELS = [...FX_SENTINELS, ...BATCH_SENTINELS, ...V2_SENTINELS, ...ESTIMATE_SENTINELS];
 const extra = { decimals: SENTINELS, numbers: SENTINELS.map(Number) };
 
 let sweep: Promise<Record<string, SweepResult>> | null = null;
@@ -81,3 +121,19 @@ test('S1: the public answers carry the display rate and nothing else of FX; the 
 /** Key names that are the arithmetic of a price and nothing else, as they would appear in serialized JSON. */
 const ARITHMETIC_ONLY_KEYS =
   /"(member_rule|regular_price_iqd|regular_adjust_iqd|prime_adjust_iqd|pro_adjust_iqd|direct_surcharge_iqd|surcharge_iqd|commission_iqd|membership_adjustment_iqd|transport_fee_iqd|direct_fee_iqd|warranty_fee_iqd)"\s*:/;
+
+test('S1 (0218): the estimate is really there — the costly product carries its label, a boolean and nothing of its catalogue', async () => {
+  const raw = seed();
+  try {
+    const app = appFor(raw, ROLES.guest, [['/api/products', productRoutes]]);
+    const res = await get(app, '/api/products/a1');
+    assert.equal(res.status, 200);
+    const body = await json(res);
+    assert.equal(body.product.price_estimate, true, 'the label reaches the guest');
+    const text = JSON.stringify(body);
+    for (const s of ESTIMATE_SENTINELS) assert.equal(text.includes(s), false, `the page carries ${s}`);
+    assert.doesNotMatch(text, /supplier_price|tmall_cn|EST_DEFAULT|type_default|applied_wire|est_cost|min_profit/);
+  } finally {
+    raw.close();
+  }
+});

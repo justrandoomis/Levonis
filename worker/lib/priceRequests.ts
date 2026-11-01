@@ -33,6 +33,15 @@
  * DEPLOY-AHEAD (CLAUDE.md rule 2): without 0193 every customer door answers
  * 503 PRICE_REQUESTS_UNAVAILABLE, the sweep and the digest return at once, and
  * the admin reads fall back (no column, today's order).
+ *
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.5, §8; DECISIONS row
+ * 278 amending 240). An estimated price is a price — the selection is SOLD, by
+ * pre-order — so the sweep tells the requester, but in the estimate's own
+ * words (`priceAvailableText`): «{name} ئێستا بە نرخی خەمڵێنراو بۆ پێشداواکاری
+ * بەردەستە» as the title and the estimate notice as the body, never «the price
+ * is now available» about a price the owner has not confirmed. Per selection:
+ * a SKU the owner made firm is told the ordinary way. The label is read off the
+ * document the sweep already builds; a database without 0218 has none.
  */
 import { parseSkuComboKey } from '@levonis/pricing/skuChannel';
 import {
@@ -43,13 +52,14 @@ import {
   requestersText,
   type PriceRequestText,
 } from '@levonis/contracts/priceRequests';
+import { ESTIMATE_STRINGS, fillEstimateText } from '@levonis/contracts/priceEstimates';
 import type { Env } from './types';
 import type { ProductDoc } from './productModel';
 import { applyRelations, loadRelationsView, loadRelationsViews } from './productOverlay';
 import { parseProductRow } from './productModel';
 import { unitNamesOf } from './pricingEngine/legacy';
 import { listing } from './listing';
-import { checkSelection, skuPriced } from './commercialState';
+import { checkSelection, skuEstimated, skuPriced } from './commercialState';
 import { quoteOptionValueIds } from '../routes/products';
 import { notifyStatement } from './notifications';
 import { planNotifyCustomer, reachForMany, type CustomerMessage, type CustomerReach } from './customerNotify';
@@ -156,6 +166,25 @@ export function selectionLabel(doc: ProductDoc, key: string): PriceRequestText {
 export function productNames(doc: ProductDoc): PriceRequestText {
   const en = doc.name_en || doc.name_ar || '';
   return { ar: doc.name_ar || en, en, ckb: doc.name_ckb || doc.name_ar || en };
+}
+
+/**
+ * THE WORDS THAT TELL A REQUESTER, in three languages. `name` is the product's
+ * name with the selection's label after « — » when the request named one.
+ *
+ * An ordinary price: «صار السعر متوفراً» and «{name}: يمكنك الآن رؤية السعر
+ * والشراء» (`priceAvailableMessage`). An ESTIMATED one (migration 0218; the
+ * selection's SKU is `skuEstimated`): the title is the contract's
+ * priceRequest.title — «{name} متاح الآن للطلب المسبق بسعر تقديري» — and the
+ * body is the estimate notice the product page shows, so the message never
+ * calls an unconfirmed price final and says what the customer will be asked.
+ */
+export function priceAvailableText(name: PriceRequestText, estimated: boolean): { title: PriceRequestText; body: PriceRequestText } {
+  if (!estimated) return priceAvailableMessage(name);
+  return {
+    title: fillEstimateText(ESTIMATE_STRINGS.priceRequest.title, { name }),
+    body: { ...ESTIMATE_STRINGS.notice },
+  };
 }
 
 // ------------------------------------------------------------- the sweep
@@ -348,7 +377,8 @@ export async function sweepPriceRequests(
         const full: PriceRequestText = label
           ? { ar: `${name.ar} — ${label.ar}`, en: `${name.en} — ${label.en}`, ckb: `${name.ckb} — ${label.ckb}` }
           : name;
-        const { title, body } = priceAvailableMessage(full);
+        // «سعر تقديري» (migration 0218): an estimated selection is told in the estimate's words (see the header).
+        const { title, body } = priceAvailableText(full, skuEstimated(doc, r.selection));
         const reach = reaches.get(r.user_id);
         const lang = reach?.lang ?? 'ar';
         const slug = String(doc.slug ?? '');

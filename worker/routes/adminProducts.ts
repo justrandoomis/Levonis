@@ -143,6 +143,7 @@ import { ProductMediaIngestError, verifyStoredProductMedia, type ProductMediaRef
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { loadPrinterFitIds, printerOptions } from '../lib/printerFits';
 import { loadImportStock } from '../lib/importStock';
+import { isMissingEstimateSchema } from '../lib/priceEstimateLabel';
 import { planProcurementImportStock, withPreparedProcurementStock } from '../lib/procurementImportStock';
 
 /** Kept under its old name: the diff is now the contract's (productPersistence). */
@@ -1576,6 +1577,7 @@ adminProductsRoutes.get('/:id', async (c) => {
   // The 409 names the panel that owns it instead.
   if (stored.row.composition !== '') throw compositionConflict(id, stored.row.slug);
   const pricingV2 = await productV2Flag(c.env.DB, id);
+  const [importStock, priceEstimate] = await Promise.all([loadImportStock(c.env.DB, id), priceEstimateStateOf(c.env.DB, id)]);
   return c.json({
     success: true,
     // §11: an assistant admin gets the same document with every financial
@@ -1593,9 +1595,32 @@ adminProductsRoutes.get('/:id', async (c) => {
     // «إعداد المخزون للمنتج المستورد» (Bambu import spec §B.10): the stock decision of a product the catalogue
     // import created or merged — `not_configured` until an admin chooses, and its V2 publish is refused until
     // then. Staff only: no customer projection reads it. Null for every other product (and without 0194).
-    import_stock: await loadImportStock(c.env.DB, id),
+    import_stock: importStock,
+    // «سعر تقديري» (docs/SMART_PRICING.md §7): whether customers see the label, and the estimate's state —
+    // a flag, never a figure, so every admin may know it (the owner's banner reads the rest behind the cost door).
+    price_estimate: priceEstimate,
   });
 });
+
+/**
+ * The product's estimate as any admin may read it (docs/SMART_PRICING.md §7): `label` — customers see
+ * «سعر تقديري» (`products.price_estimate`) — and the state of the owner's bookkeeping (candidate, estimated,
+ * confirmed, paused), or null when the product was never enrolled. No type, source, figure or flag. Null on a
+ * database without 0218 (CLAUDE.md rule 2: the column and the table absent read as no estimate).
+ */
+async function priceEstimateStateOf(db: D1Database, id: string): Promise<{ label: boolean; state: string | null } | null> {
+  try {
+    const row = await db
+      .prepare('SELECT p.price_estimate AS label, e.state AS state FROM products p LEFT JOIN product_price_estimates e ON e.product_id = p.id WHERE p.id = ?')
+      .bind(id)
+      .first<{ label: number | null; state: string | null }>();
+    if (!row) return null;
+    return { label: Number(row.label) === 1, state: row.state ?? null };
+  } catch (e) {
+    if (isMissingEstimateSchema(e)) return null;
+    throw e;
+  }
+}
 
 /**
  * Create/update from a ProductDoc-ish body.

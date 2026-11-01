@@ -19,6 +19,7 @@ import OrderStagePanel from './OrderStagePanel';
 import GiniReceiptPanel from './GiniReceiptPanel';
 import OrderStatusCorrection from './OrderStatusCorrection';
 import PriceAdjustPanel from './PriceAdjustPanel';
+import { EstimateLineChip } from './EstimateConfirmPanel';
 import InventoryOriginsPanel from './InventoryOriginsPanel';
 import PreorderOriginsPanel from './PreorderOriginsPanel';
 import SerialsBlockerCard from './serials/SerialsBlockerCard';
@@ -30,6 +31,13 @@ import VariantImg from '../ui/VariantImg';
 
 // The §16 serial / warranty page, opened from a linked slot's serial.
 const SerialDetail = React.lazy(() => import('../adminWarranty/serial/SerialDetail'));
+
+/**
+ * The order read since migration 0218 (worker/routes/admin.ts): true while a
+ * line sold at an estimated price waits for its final price — the order then
+ * stays at «تم استلام الطلب» (trigger T8). Absent from an older server.
+ */
+type EstimateOrderDetail = AdminOrderDetail & { price_estimate_open?: boolean };
 
 /**
  * The order fulfilment screen.
@@ -48,7 +56,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const { loc, lang, dir } = useLanguage();
   const m = useMotion();
   const [tab, setTab] = useState<'order' | 'stages' | 'chat'>('order');
-  const [detail, setDetail] = useState<AdminOrderDetail | null>(null);
+  const [detail, setDetail] = useState<EstimateOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
@@ -94,7 +102,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
     setLoading(true);
     setError(null);
     try {
-      const data = await api.get<{ order: AdminOrderDetail }>(`/api/admin/orders/${orderId}`);
+      const data = await api.get<{ order: EstimateOrderDetail }>(`/api/admin/orders/${orderId}`);
       setDetail(data.order);
       setSerials(data.order.serials && data.order.serials.installed ? data.order.serials : null);
     } catch (e) {
@@ -165,6 +173,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const govLabel = govId ? GOVERNORATE_LABELS[govId]?.[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'] ?? govId : '';
   const fin = detail?.financial;
   const collectIqd = collectOnDeliveryIqd(fin, detail?.total_iqd);
+  /** «بانتظار تأكيد السعر النهائي» (0218): an estimated line still waits, so the order cannot move yet. */
+  const estimateOpen = detail?.price_estimate_open === true;
 
   // WHY `Overlay` AND NOT `Sheet`, AND WHY IT STILL RISES FROM THE BOTTOM EDGE.
   //
@@ -265,13 +275,26 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 method, so an ordinary order sees nothing extra. */}
             {/* THE PRICE HOLD, above the path it freezes (0140): every move
                 below answers PRICE_APPROVAL_PENDING until the customer decides
-                or the proposal is withdrawn from the «معلومات الطلب» tab.
-                OWNER: Sorani to be written by hand. */}
+                or the proposal is withdrawn from the «معلومات الطلب» tab. */}
             {detail.price_hold_id ? (
               <p data-price-hold-note role="status" className="rounded-xl border border-warning/35 bg-warning/10 px-3 py-2 text-[12.5px] font-bold text-warning">
                 {loc(
                   'الطلب بانتظار موافقة الزبون على السعر الجديد — لا يمكن نقله حتى يقرر أو يُسحب الاقتراح.',
-                  'This order is waiting for the customer to approve a new price — it cannot move until they decide or the proposal is withdrawn.'
+                  'This order is waiting for the customer to approve a new price — it cannot move until they decide or the proposal is withdrawn.',
+                  'داواکارییەکە چاوەڕێی پەسەندکردنی نرخی نوێیە لەلایەن کڕیارەوە — تا بڕیار نەدات یان پێشنیارەکە نەکشێنرێتەوە ناگوازرێتەوە.'
+                )}
+              </p>
+            ) : estimateOpen ? (
+              // THE ESTIMATE GATE, above the path it freezes (0218, trigger T8):
+              // every move below answers PRICE_ESTIMATE_UNCONFIRMED until each
+              // estimated line is settled from «تأكيد السعر النهائي» in the
+              // «معلومات الطلب» tab. While the settlement's own proposal waits
+              // on the customer, the hold note above is the true one.
+              <p data-price-estimate-note role="status" className="rounded-xl border border-warning/35 bg-warning/10 px-3 py-2 text-[12.5px] font-bold text-warning">
+                {loc(
+                  'في الطلب منتجات بسعر تقديري — يبقى في «تم استلام الطلب» ولا يُؤكَّد أو يُجهَّز أو يُشحن حتى يُؤكَّد سعرها النهائي من تبويب «معلومات الطلب».',
+                  'This order has items at an estimated price — it stays at “Order received” and cannot be confirmed, prepared or shipped until their final price is confirmed in the “Order” tab.',
+                  'ئەم داواکارییە بەرهەمی بە نرخی خەمڵێنراوی تێدایە — لە «داواکاری وەرگیرا» دەمێنێتەوە و پشتڕاست ناکرێتەوە و ئامادە ناکرێت و نانێردرێت تا نرخی کۆتاییان لە بەشی «زانیاری داواکاری» پشتڕاست نەکرێتەوە.'
                 )}
               </p>
             ) : null}
@@ -377,6 +400,18 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                   </>
                 )}
               </p>
+              {/* An estimated line's final price may still move this figure
+                  (0218), so the sheet says so before anyone copies it onto a
+                  receipt — the order cannot ship before it is settled anyway. */}
+              {estimateOpen && (
+                <p data-collect-estimate className="text-[12px] font-bold text-warning mt-1">
+                  {loc(
+                    'المبلغ تقديري حتى يُؤكَّد السعر النهائي.',
+                    'This amount is an estimate until the final price is confirmed.',
+                    'ئەم بڕە خەمڵێنراوە تا نرخی کۆتایی پشتڕاست دەکرێتەوە.'
+                  )}
+                </p>
+              )}
 
               {/* The breakdown is collapsed by default: the number above is
                   what goes on the receipt, and everything below explains how
@@ -423,7 +458,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                       />
                       {(fin.price_adjustment_iqd ?? 0) !== 0 && (
                         <Row
-                          label={loc('تعديل السعر (بموافقة الزبون)', 'Price adjustment (customer-approved)')}
+                          label={loc('تعديل السعر (بموافقة الزبون)', 'Price adjustment (customer-approved)', 'گۆڕینی نرخ (بە پەسەندی کڕیار)')}
                           value={`${(fin.price_adjustment_iqd ?? 0) > 0 ? '+' : '−'} ${formatIqd(Math.abs(fin.price_adjustment_iqd ?? 0))}`}
                         />
                       )}
@@ -460,7 +495,11 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
 
             {/* «تعديل السعر النهائي» (0140): propose a new total the customer
                 must approve, or see / withdraw the open proposal. Reloads the
-                detail on change, because the hold freezes the stage panel. */}
+                detail on change, because the hold freezes the stage panel.
+                While estimated lines wait (0218) it shows «تأكيد السعر
+                النهائي» (EstimateConfirmPanel) in place of the free proposal:
+                per line the estimate, today's price and the final, customer
+                prices only — any admin reads it, a financial admin acts. */}
             <PriceAdjustPanel orderId={orderId} onChanged={load} />
 
             {/* -------------------------------------------------- the customer */}
@@ -572,6 +611,12 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           {' · '}
                           <span className="text-text-secondary">{formatIqd(it.line_total_iqd)}</span>
                         </p>
+                        {/* Sold at an estimated price (0218): where its final price stands. */}
+                        {it.price_estimate && (
+                          <span className="mt-2 flex" data-order-item-estimate={it.id}>
+                            <EstimateLineChip state={it.price_estimate.state} labelled />
+                          </span>
+                        )}
                         {serialChip(it.id)}
                         {units.length > 0 && (
                           <p className="text-[11px] text-text-muted mt-1">

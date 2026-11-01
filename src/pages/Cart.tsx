@@ -44,6 +44,25 @@ import { groupCartLines, groupPictures } from '../lib/cartGroups';
 import { colourLang, colourStrings, groupSummaryText, isolate } from '../lib/colourQuantities';
 import { ColourSwatch, ColourTag } from '../components/product/ColourTag';
 import VariantChoices from '../components/cart/VariantChoices';
+import { ESTIMATE_TEXT } from '../lib/priceStatus';
+
+/**
+ * «سعر تقديري» ON THE CART (docs/SMART_PRICING.md §5.3, §5.5; WP11). Each line
+ * at an estimated pre-order price carries a chip — the eager card label,
+ * pinned equal to the contract's — and the cart carries ONE note under the
+ * total. The note's words are the contract's (packages/contracts/src/
+ * priceEstimates.ts), a lazy chunk: this page is prefetched for every visitor
+ * (src/App.tsx `prefetchable`), so the contract never rides with it and is
+ * fetched only for a cart holding an estimated line, or for an estimate
+ * refusal.
+ */
+const loadEstimateWords = () => import('../../packages/contracts/src/priceEstimates');
+type EstimateWords = Awaited<ReturnType<typeof loadEstimateWords>>;
+/** An estimate refusal (PRICE_ESTIMATE_*, PRICE_ESTIMATES_*, PRICE_PROTECTION_ESTIMATE_*): said from the contract first. */
+const ESTIMATE_REFUSAL_CODE = /^PRICE_(?:ESTIMATE|PROTECTION_ESTIMATE)/;
+/** A line at an estimated price: the line says so, or its price block does (worker/routes/cart.ts). Never a figure. */
+const lineEstimated = (item: Pick<CartItem, 'price_estimate' | 'breakdown'>): boolean =>
+  item.price_estimate === true || item.breakdown?.price_estimate === true;
 
 /**
  * Component-local trilingual strings for the support-code block (§3.3).
@@ -426,6 +445,8 @@ export default function Cart() {
   // "+12 months → 24 months total": the arrow follows the reading direction,
   // so it points from the extension to the total in both scripts.
   const arrow = dir === 'rtl' ? '←' : '→';
+  /** The reader's language for a «سعر تقديري» word (ar / en / ckb — never the Arabic for a Sorani reader). */
+  const estimateLang = asLang(lang);
 
   const [items, setItems] = useState<CartItem[]>([]);
   const [unavailableLines, setUnavailableLines] = useState<UnavailableLine[]>([]);
@@ -457,6 +478,30 @@ export default function Cart() {
   // a total that changes under the customer's eyes is told, not hidden.
   const [movedPrices, setMovedPrices] = useState<Map<string, { from: number; to: number }>>(new Map());
   const itemsRef = useRef<CartItem[]>([]);
+  /**
+   * «سعر تقديري» — the contract's words once fetched (null until a cart holds an
+   * estimated line, or an estimate refusal arrives). The ref lets a refusal read
+   * them in the same tick they land.
+   */
+  const [estimateWords, setEstimateWords] = useState<EstimateWords | null>(null);
+  const estimateWordsRef = useRef<EstimateWords | null>(null);
+  const loadWords = useCallback(async (): Promise<EstimateWords | null> => {
+    if (estimateWordsRef.current) return estimateWordsRef.current;
+    try {
+      const words = await loadEstimateWords();
+      estimateWordsRef.current = words;
+      setEstimateWords(words);
+      return words;
+    } catch {
+      // The cart stays usable without the note; a refusal keeps the server's own sentence.
+      return null;
+    }
+  }, []);
+  /** Some line is at an estimated price — the server's `has_estimates`, read off the same lines (worker/routes/cart.ts `cartEstimateFlag`). */
+  const hasEstimates = items.some(lineEstimated);
+  useEffect(() => {
+    if (hasEstimates) void loadWords();
+  }, [hasEstimates, loadWords]);
   // A quantity tap or a delete is a write followed by a read. A refresh that
   // lands between the two would paint the pre-write cart back over the
   // customer's own change, so the wake is held for the length of the action.
@@ -658,12 +703,37 @@ export default function Cart() {
    */
   const cartRefusal = useCallback(
     (err: unknown, fallback: string): string => {
-      const said = apiRefusal(err, lang as 'ar' | 'en' | 'ckb', fallback);
       const code = err instanceof ApiError ? err.code ?? '' : '';
+      // «سعر تقديري» (docs/SMART_PRICING.md §5.5): an estimate refusal — pre-order only, ordering paused, the
+      // state unreadable — is said from the contract first, in the reader's language, once its words are here.
+      const estimateSaid = ESTIMATE_REFUSAL_CODE.test(code)
+        ? estimateWordsRef.current?.estimateRefusalText(code, lang as 'ar' | 'en' | 'ckb') ?? null
+        : null;
+      if (estimateSaid) return estimateSaid;
+      const said = apiRefusal(err, lang as 'ar' | 'en' | 'ckb', fallback);
       const counter = counterNamed(code);
       return counter ? `${said} ${counter}` : said;
     },
     [counterNamed, lang]
+  );
+
+  /**
+   * A refusal said now — and, when it is an estimate refusal whose words had not
+   * arrived (a line changed onto an estimated selection), said again in the
+   * contract's words the moment they do, unless something newer replaced it.
+   */
+  const sayRefusal = useCallback(
+    (err: unknown, fallback: string, put: React.Dispatch<React.SetStateAction<string>>) => {
+      const first = cartRefusal(err, fallback);
+      put(first);
+      const code = err instanceof ApiError ? err.code ?? '' : '';
+      if (!ESTIMATE_REFUSAL_CODE.test(code) || estimateWordsRef.current) return;
+      void loadWords().then((words) => {
+        const said = words?.estimateRefusalText(code, lang as 'ar' | 'en' | 'ckb');
+        if (said) put((prev) => (prev === first ? said : prev));
+      });
+    },
+    [cartRefusal, lang, loadWords]
   );
 
   const loadCart = useCallback(async (opts?: { silent?: boolean }) => {
@@ -926,7 +996,7 @@ export default function Cart() {
         applyCartWrite(data);
       } catch (err) {
         if (qtySeqRef.current.get(item.id) !== seq) return;
-        setError(cartRefusal(err, 'Failed to update quantity'));
+        sayRefusal(err, 'Failed to update quantity', setError);
         loadCart();
       } finally {
         actionBusyRef.current -= 1;
@@ -1032,7 +1102,7 @@ export default function Cart() {
       applyCartWrite(data);
       setVariantModalOpen(false);
     } catch (err) {
-      setVariantError(cartRefusal(err, 'Failed to update variant'));
+      sayRefusal(err, 'Failed to update variant', setVariantError);
     } finally {
       setVariantSaving(false);
     }
@@ -1055,7 +1125,7 @@ export default function Cart() {
       applyCartWrite(data);
       setShippingModalOpen(false);
     } catch (err) {
-      setShippingError(cartRefusal(err, 'Failed to update shipping method'));
+      sayRefusal(err, 'Failed to update shipping method', setShippingError);
     } finally {
       setShippingSaving(false);
     }
@@ -1741,6 +1811,16 @@ export default function Cart() {
 
           <div className="min-w-0 flex flex-wrap items-baseline gap-1.5 mb-2 mt-1">
             <span className="max-w-full text-text-primary font-semibold text-[15px] sm:text-[17px] tabular-nums">{money(item.unit_price_iqd, lineUsd.price)}</span>
+            {/* «سعر تقديري» (docs/SMART_PRICING.md §5.3): this line's price is an estimated pre-order price — the
+                eager card label beside the figure it qualifies; the note under the total says what it means. */}
+            {lineEstimated(item) && (
+              <span
+                data-cart-line-estimate={item.id}
+                className="inline-flex items-center rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-bold leading-normal text-warning"
+              >
+                {ESTIMATE_TEXT[estimateLang]}
+              </span>
+            )}
             {hasSale && (
               <>
                 <span className="sr-only">{loc('بدل', 'instead of', 'لە جیاتی')} </span>
@@ -2691,6 +2771,14 @@ export default function Cart() {
             {/* The charge in dinars first, then the dollars (DECISIONS row 248) — as the checkout prints it. */}
             <span className="text-text-primary font-bold text-[17px]">{moneyBoth(total, totalUsd)}</span>
           </div>
+          {/* «سعر تقديري» (docs/SMART_PRICING.md §5.3, §5.5): ONE note under the total while the cart holds a line
+              at an estimated price — the contract's own sentence, never a figure. The checkout asks for the
+              acknowledgement; this only says it before the customer gets there. */}
+          {hasEstimates && estimateWords && (
+            <p data-cart-estimate-notice className="text-[12px] leading-relaxed text-text-secondary">
+              {estimateWords.ESTIMATE_STRINGS.cartNotice[estimateLang]}
+            </p>
+          )}
         </div>
         </div>
         )}

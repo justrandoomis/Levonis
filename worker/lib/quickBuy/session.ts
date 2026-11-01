@@ -33,7 +33,13 @@ import { freeOnTargets, planInventory, stockRowKey, type InventoryPlan, type Sto
 import { assertHoldStateStatement, purchaseHoldInsertStatement, releaseHoldStatement } from '../walletOps';
 import { walletFreeDeliveryPublic, WALLET_FREE_DELIVERY_LABEL } from '../walletFreeDelivery';
 import { CART_LINE_COLUMNS } from '../cartLineProjection';
+import { isEstimateRow } from '../priceEstimateLabel';
+import { selectionEstimated } from '../commercialState';
+import { applyRelations, loadRelationsView } from '../productOverlay';
+import { parseProductRow } from '../productModel';
+import { canonicalOptionValueIds } from '../cartSelectionIdentity';
 import { isUsdCents } from '@levonis/pricing/usdCents';
+import { ESTIMATE_REFUSALS, estimateServerMessage } from '@levonis/contracts/priceEstimates';
 import {
   checkoutInputFrom,
   computeCheckout,
@@ -403,6 +409,39 @@ const directOnly = () =>
     'QUICK_BUY_DIRECT_ONLY'
   );
 
+/** 409 PRICE_ESTIMATE_QUICK_BUY (docs/SMART_PRICING.md §5.5): the contract's status and its "ar / en" sentence. */
+const estimateQuickBuy = () =>
+  new HttpError(
+    ESTIMATE_REFUSALS.PRICE_ESTIMATE_QUICK_BUY.status,
+    estimateServerMessage('PRICE_ESTIMATE_QUICK_BUY'),
+    'PRICE_ESTIMATE_QUICK_BUY'
+  );
+
+/**
+ * «سعر تقديري» — IS THE SELECTION THIS ADD NAMES AN ESTIMATED PRICE?
+ * (migration 0218; docs/SMART_PRICING.md §5.3, §6.1.)
+ *
+ * Quick Buy pays at once from the wallet and its finaliser places the order
+ * with no acknowledgement, so an estimated SKU never enters a session: the
+ * customer adds it to the cart, where the notice and the checkout's
+ * acknowledgement are. Asked only of a LABELLED product row (`isEstimateRow`),
+ * so every other add costs nothing more. The selection is read as the
+ * checkout will read the stored line (`selectionFromCartRow`: the canonical
+ * values, the legacy single option only when there are none) and judged as
+ * the product page judges it (`selectionEstimated`), so the page hides ⚡ for
+ * exactly the selections refused here. A firm SKU of a mixed product is an
+ * ordinary price and passes; a firm list that could not be read labels every
+ * SKU (fail closed, invariant I2).
+ */
+async function quickBuySelectionEstimated(db: D1Database, product: Record<string, unknown>, a: QuickBuyAddInput): Promise<boolean> {
+  const view = await loadRelationsView(db, String(product.id), product.inventory_mode);
+  const doc = applyRelations(parseProductRow(product), view);
+  const stored = parseJson<unknown>(a.optionValueIds, []);
+  const full = canonicalOptionValueIds(Array.isArray(stored) ? stored : []);
+  const ids = full.length ? full : canonicalOptionValueIds([], a.optionId);
+  return selectionEstimated(doc, ids, a.colorId || null);
+}
+
 /** Price the candidate lines exactly as the cart checkout would. */
 async function quoteCandidates(
   c: Context<AppContext>,
@@ -589,6 +628,9 @@ export async function applyQuickBuyChange(
       throw conflict('هذا المنتج غير متاح حالياً / This product is not available', 'QUICK_BUY_UNSUPPORTED_PRODUCT');
     }
     if (String(product.composition ?? '') !== '') throw directOnly();
+    // «سعر تقديري» (docs/SMART_PRICING.md §6.1): an estimated SKU is bought through the cart only — said before
+    // anything is priced, held or reserved, and before the direct-sale rule would answer with another sentence.
+    if (isEstimateRow(product) && (await quickBuySelectionEstimated(db, product, a))) throw estimateQuickBuy();
     touched =
       lines.find(
         (l) =>

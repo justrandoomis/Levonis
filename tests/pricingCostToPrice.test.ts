@@ -1088,11 +1088,12 @@ test('skuComboKey is byte-identical to the product_variants comboKey (worker/lib
 
 /* ---------------------------------------------------- confidentiality -- */
 
-test('the pricing formula never ships to the browser: src/ imports neither costToPrice, ruleResolution, legacyTargets nor the Pricing V2 maths', () => {
+test('the pricing formula never ships to the browser: src/ imports neither costToPrice, ruleResolution, legacyTargets, the Pricing V2 maths nor the estimate inputs', () => {
   for (const file of tsFiles(join(ROOT, 'src'))) {
     for (const spec of importSpecifiers(readFileSync(file, 'utf8'))) {
-      // priceV2 (spec V2-1 §1.1) is as confidential as costToPrice.
-      assert.ok(!/costToPrice|ruleResolution|legacyTargets|pricingEngine|priceV2/.test(spec), `${file} imports ${spec}`);
+      // priceV2 (spec V2-1 §1.1) is as confidential as costToPrice; so are the estimate inputs
+      // (docs/SMART_PRICING.md §4.4: supplier prices, measures and the per-type profit are the owner's).
+      assert.ok(!/costToPrice|ruleResolution|legacyTargets|pricingEngine|priceV2|estimateInputs/.test(spec), `${file} imports ${spec}`);
     }
   }
 });

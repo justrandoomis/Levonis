@@ -24,6 +24,15 @@
  *
  * tests/cartBatchParity.test.ts holds the two doors to the same status, code
  * and details for every refusal, and to the identical row for a success.
+ *
+ * «سعر تقديري» (docs/SMART_PRICING.md §6.1; migration 0218; DECISIONS row
+ * 280). An estimated price sells by PRE-ORDER only and only while the owner's
+ * ordering switch is on. Both are LINE rules — a firm SKU of a labelled product
+ * is an ordinary price — so they live in `judgeLevonisLineOrThrow`, where both
+ * doors meet them in one order; the switch itself is read once per request, in
+ * `loadAddContext`, and only for a labelled product (`estimateOrderingOf`), so
+ * an unlabelled add costs no statement more than before. The line-update door
+ * (worker/routes/cart.ts) and the checkout ask the same two functions.
  */
 import type { Context } from 'hono';
 import type { AppContext } from './types';
@@ -40,7 +49,10 @@ import type { TierStatus } from './entitlements';
 import type { ProductDoc } from './productModel';
 import { canonicalOptionValueIds, optionValueIdsJson } from './cartSelectionIdentity';
 import { resolveForOrderType, type OrderType, type StockResolution } from './inventory';
+import { selectionKey, skuEstimated, type EstimateLabelled } from './commercialState';
+import { isEstimateRow } from './priceEstimateLabel';
 import { LINE_QTY_MAX } from '@levonis/pricing/quantity';
+import { ESTIMATE_REFUSALS, estimateServerMessage, type EstimateRefusalCode } from '@levonis/contracts/priceEstimates';
 import {
   cartPricing,
   refuseIncompleteSelection,
@@ -78,6 +90,12 @@ export interface AddContext {
   offer: { view: OfferView | null; eligible: boolean; nowMs: number };
   /** §8.2 row 18: a mystery-pool member's refusals carry no count. */
   coarseStock: boolean;
+  /**
+   * The owner's ordering switch for estimated prices (`estimateOrderingOf`):
+   * null for a product that is not labelled — nothing was read, and none of
+   * its lines is an estimate.
+   */
+  estimateOrdering: EstimateOrdering | null;
 }
 
 /** What a line that passed every check carries to the write. */
@@ -113,6 +131,69 @@ export async function loadAddProduct(c: Context<AppContext>, productId: string):
 /** A composition row (bundle, mystery) takes its own door (§5); the batch has none. */
 export const isComposition = (product: Record<string, unknown>): boolean => String(product.composition ?? '') !== '';
 
+// ------------------------------------------------------------- «سعر تقديري»
+
+/**
+ * THE OWNER'S EMERGENCY BRAKE (`price_estimate_control.ordering_enabled`,
+ * migration 0218; docs/SMART_PRICING.md §6.1): 'open' while estimated lines
+ * may be added, updated and ordered, 'paused' while they may not, 'unread'
+ * when the switch could not be read — the doors then refuse an estimated line
+ * rather than guess (fail closed, §2.4).
+ */
+export type EstimateOrdering = 'open' | 'paused' | 'unread';
+
+/** An estimate refusal as a door throws it: the contract's status and its "ar / en" sentence (§5.5). */
+export function estimateRefusal(code: EstimateRefusalCode): HttpError {
+  return new HttpError(ESTIMATE_REFUSALS[code].status, estimateServerMessage(code), code);
+}
+
+/**
+ * The switch, asked only for a LABELLED product row (`isEstimateRow`): null —
+ * and no statement — for every other product, which is also every product of a
+ * database without 0218 (no label can exist there). One indexed read of the
+ * one-row table. The migration seeds that row; a row nobody seeded answers the
+ * column's own default (open). Any failure is logged and answered 'unread'.
+ */
+export async function estimateOrderingOf(db: D1Database, product: Record<string, unknown> | null | undefined): Promise<EstimateOrdering | null> {
+  if (!isEstimateRow(product)) return null;
+  try {
+    const row = await db.prepare('SELECT ordering_enabled FROM price_estimate_control WHERE id = 1').first<{ ordering_enabled: number | null }>();
+    return row && Number(row.ordering_enabled) === 0 ? 'paused' : 'open';
+  } catch (e) {
+    console.error(`price estimate ordering switch unreadable: ${e instanceof Error ? e.message : String(e)}`);
+    return 'unread';
+  }
+}
+
+/**
+ * THE ESTIMATE RULES OF ONE LINE (docs/SMART_PRICING.md §6.1), in this order,
+ * or null when the line's SKU is not an estimate (`skuEstimated`: an
+ * unlabelled product, or a SKU the owner made firm):
+ *
+ *   503 PRICE_ESTIMATES_READ_FAILED   the switch could not be read;
+ *   409 PRICE_ESTIMATE_ORDERING_PAUSED the owner paused ordering at estimates;
+ *   409 PRICE_ESTIMATE_PREORDER_ONLY  a direct sale of an estimated SKU — it
+ *       matters only if the owner re-enabled direct sale before confirming,
+ *       and it is named here before the generic order-type refusal would be.
+ *
+ * `lineType` is the type the row will be (`lineOrderType`); '' — a line the
+ * description cannot type at all — is refused by the availability rules after
+ * this, never here. Pure: no I/O.
+ */
+export function estimateLineRefusal(
+  doc: EstimateLabelled,
+  selection: { optionValueIds: readonly string[]; colorId: string | null | undefined },
+  lineType: '' | OrderType,
+  ordering: EstimateOrdering | null
+): HttpError | null {
+  if (!skuEstimated(doc, selectionKey(selection.optionValueIds, selection.colorId || null))) return null;
+  // A labelled document whose switch was never read cannot be judged open: refused, never guessed.
+  if (ordering === null || ordering === 'unread') return estimateRefusal('PRICE_ESTIMATES_READ_FAILED');
+  if (ordering === 'paused') return estimateRefusal('PRICE_ESTIMATE_ORDERING_PAUSED');
+  if (lineType === 'direct_sale') return estimateRefusal('PRICE_ESTIMATE_PREORDER_ONLY');
+  return null;
+}
+
 /**
  * The product-level half of an add: every read and every refusal that does not
  * depend on which line is being added. Done ONCE for a batch of forty lines.
@@ -123,7 +204,7 @@ export async function loadAddContext(
   opts: { warrantyPlanId: string }
 ): Promise<AddContext> {
   const productId = String(product.id);
-  const [{ tier, active: tierActive, status, ctx }, views, isPrinter, addOffers, pool] = await Promise.all([
+  const [{ tier, active: tierActive, status, ctx }, views, isPrinter, addOffers, pool, estimateOrdering] = await Promise.all([
     cartPricing(c),
     loadRelationsViews(c.env.DB, [{ id: productId, inventory_mode: product.inventory_mode }]),
     // The owner's catalog flag decides whether an extended warranty may ride
@@ -145,6 +226,9 @@ export async function loadAddContext(
     // branch returns `available: null`, so both refusals take their existing
     // count-free path with no new branch.
     degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(c.env.DB, [productId]), new Set<string>()),
+    // «سعر تقديري» (migration 0218): the owner's ordering switch — read for a LABELLED product only, so every
+    // other add pays nothing; whether a line is an estimate is its SKU's question (`estimateLineRefusal`).
+    estimateOrderingOf(c.env.DB, product),
   ]);
   refuseNonPrinterWarranty(isPrinter, opts.warrantyPlanId);
   // ADD-TO-CART RE-CHECKS THE OFFER INDEPENDENTLY (§15.1 rule 6). A window
@@ -172,6 +256,7 @@ export async function loadAddContext(
     isPrinter,
     offer: { view: offerView, eligible: offerCheck.ok, nowMs },
     coarseStock: pool.size > 0,
+    estimateOrdering,
   };
 }
 
@@ -272,6 +357,11 @@ export function judgeLevonisLineOrThrow(actx: AddContext, line: AddLine, shared:
   // against one counter and described by another in the same response.
   // `lineOrderType` is the read model's own rule and the checkout's own rule.
   const lineType = lineOrderType(availability, fulfillmentType, transportMethod);
+  // «سعر تقديري» (docs/SMART_PRICING.md §6.1): an estimated SKU is sold by pre-order only, and only while the
+  // owner's ordering switch is on — said here, after the selection is known to be complete (an incomplete one
+  // names no SKU) and before the order type and the stock speak, so a direct sale of an estimate is told why.
+  const estimate = estimateLineRefusal(doc, { optionValueIds, colorId }, lineType, actx.estimateOrdering);
+  if (estimate) throw estimate;
   const stated = unusableOrderType(availability, lineType);
   if (stated) throw badRequest(stated.message, stated.code);
   // A PRE-ORDER WITHOUT A ROUTE IS A LINE NO PART OF THIS SHOP AGREES ABOUT.

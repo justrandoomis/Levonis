@@ -159,6 +159,10 @@ const COST_ROUTERS: Array<{ file: string; router: string; guard: RegExp; paths?:
 const LATER_ROUTERS: Array<{ file: string; guard: RegExp }> = [
   { file: 'worker/routes/adminSecurity.ts', guard: /requireOwner/ },
   { file: 'worker/routes/adminPricing.ts', guard: /requireCost(Read|Write)/ },
+  // Smart pricing (docs/SMART_PRICING.md §3.4, §4.8): the owner's supplier catalogue and estimates. Both are
+  // mounted INSIDE adminPricingRoutes (its door runs first) and still declare their own use('*', requireCostRead).
+  { file: 'worker/routes/adminSupplierPrices.ts', guard: /requireCostRead/ },
+  { file: 'worker/routes/adminPriceEstimates.ts', guard: /requireCostRead/ },
 ];
 
 function firstRouteAt(src: string, router: string): number {

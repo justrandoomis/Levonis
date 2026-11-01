@@ -14,6 +14,7 @@
  */
 
 import { listing } from '../listing';
+import { estimateClause, runWithEstimateClause } from '../priceEstimateLabel';
 import {
   iqd,
   type AnalysisMaterial,
@@ -273,6 +274,13 @@ export async function loadMerchantPrinters(db: D1Database, merchantId: string): 
  * remaining weight, which would make filament get more expensive as it is used.
  * A merchant with three spools of the same material gets the CHEAPEST, because
  * that is the one a sensible shop reaches for first.
+ *
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.3, §8): a filament
+ * product whose price is an estimate the owner has not confirmed prices no
+ * material — neither the linked-product rung nor the type rung reads it — so
+ * the material falls back to the next rung and no firm print quote ever rests
+ * on an estimate. The exclusion is `estimateClause` in both statements, run
+ * through `runWithEstimateClause`: a database without 0218 runs today's.
  */
 export async function loadMaterialPrices(
   db: D1Database,
@@ -315,16 +323,16 @@ export async function loadMaterialPrices(
 
   // The catalogue rung: the shop's own filament PRODUCT, priced from its net
   // weight exactly as the old calculator did — that part of it was right, and
-  // reusing it is what §32 means by not building a parallel system.
-  const { results: mats } = await db
-    .prepare(
-      `SELECT m.id, m.material_type, m.default_iqd_per_kg, p.price_iqd, p.spec_fields
-         FROM print_materials m
-         LEFT JOIN products p ON p.id = m.product_id AND ${(await listing(db)).sellable('p')}
-        WHERE m.active = 1 AND m.id IN (SELECT value FROM json_each(?))`
-    )
-    .bind(materialsJson)
-    .all<Row>();
+  // reusing it is what §32 means by not building a parallel system. A labelled
+  // product (an estimated price, 0218) joins as no product: the material keeps its row.
+  const { results: mats } = await runWithEstimateClause(
+    db,
+    `SELECT m.id, m.material_type, m.default_iqd_per_kg, p.price_iqd, p.spec_fields
+       FROM print_materials m
+       LEFT JOIN products p ON p.id = m.product_id AND ${(await listing(db)).sellable('p')}${estimateClause('p')}
+      WHERE m.active = 1 AND m.id IN (SELECT value FROM json_each(?))`,
+    (sql) => db.prepare(sql).bind(materialsJson).all<Row>()
+  );
 
   const catalogue: Record<string, number> = {};
   const platformByType: Record<string, number> = {};
@@ -371,14 +379,15 @@ export async function loadMaterialPrices(
   // is the provenance that makes `cost.ts` answer `estimated` with a ±12%
   // band rather than `exact` to the dinar.
   if (wantedTypes.size) {
-    const { results: filaments } = await db
-      .prepare(
-        `SELECT price_iqd, spec_fields
-           FROM products
-          WHERE ${(await listing(db)).sellable('products')} AND template_family = 'materials' AND price_iqd > 0
-          LIMIT 500`
-      )
-      .all<Row>();
+    // Never an estimated price (0218): a type is priced only from filament whose price the owner confirmed.
+    const { results: filaments } = await runWithEstimateClause(
+      db,
+      `SELECT price_iqd, spec_fields
+         FROM products
+        WHERE ${(await listing(db)).sellable('products')} AND template_family = 'materials' AND price_iqd > 0${estimateClause('products')}
+        LIMIT 500`,
+      (sql) => db.prepare(sql).all<Row>()
+    );
     for (const row of filaments ?? []) {
       const price = num(row.price_iqd);
       if (!(price > 0)) continue;

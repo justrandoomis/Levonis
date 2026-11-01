@@ -87,7 +87,8 @@ test('1 — the real session loader on 0176: the owner’s and the full admin’
 
 test('2 — every GET answers on 0176 exactly as on the migrated database, for the owner and a full admin; the listed later-migration routes give exactly their refusal', async () => {
   assert.deepEqual(unknownMigrations(), [], 'every listed refusal names a real migration');
-  assert.ok(DESIGNED_ON_OLDER_DB.length <= 4, 'the list is for routes that read ONLY a later migration, not a way to wave differences through');
+  // 0218 added the eight owner reads of the supplier catalogue and the estimator (each reads only 0218's tables).
+  assert.ok(DESIGNED_ON_OLDER_DB.length <= 12, 'the list is for routes that read ONLY a later migration, not a way to wave differences through');
   const paths = getPaths();
   const diffs: string[] = [];
   const fullLeaks: string[] = [];

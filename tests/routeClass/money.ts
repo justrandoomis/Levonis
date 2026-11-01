@@ -34,6 +34,11 @@ export default {
         'GET /:id/price-adjustment': 'op',
         'POST /:id/price-adjustment': 'money',
         'POST /:id/price-adjustment/:pid/withdraw': { cls: 'op', noBody: 'withdraws a pending adjustment by id; needs one the role fixture does not seed' },
+        // «تأكيد السعر النهائي» (migration 0218; docs/SMART_PRICING.md §6.5): the estimated lines'
+        // sold-at prices, today's published price and their states — customer prices only, any admin reads.
+        'GET /:id/price-estimate': 'op',
+        // Settles them: the same total confirms, a different one is a 0140 proposal — the financial scope.
+        'POST /:id/price-estimate/confirm': 'money',
       },
     },
     {

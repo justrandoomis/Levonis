@@ -11,9 +11,16 @@
  * the customer's own pricing context — never `products.price_iqd` (the V2
  * writer's rollback figure). A product with no direct-sale price today is not
  * offered: the credit is spent on a direct sale only (§16 D-16).
+ *
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §8; owner question
+ * 282(h), default: excluded): a product whose price is an estimate the owner
+ * has not confirmed is never a target. It is sold by pre-order only, so it has
+ * no direct-sale price here anyway — this is defence in depth, read off the
+ * product row both readers already select (`SELECT *`), at no statement's cost.
  */
 import type { Env } from './types';
 import { listing } from './listing';
+import { isEstimateRow } from './priceEstimateLabel';
 import { parseProductRow } from './productModel';
 import { resolveUnitPrice } from './pricing';
 import { applyRelations, loadRelationsViews } from './productOverlay';
@@ -105,6 +112,8 @@ export async function searchTargets(env: Env, userId: string, q: { q: string; fa
   let consumed = 0;
   for (const row of rows) {
     consumed++;
+    // A labelled product (an estimated price) is looked at and passed over, so the keyset cursor still moves past it.
+    if (isEstimateRow(row)) continue;
     const family = familyOfProduct(row, idx);
     if (family && DEVICE_FAMILIES.includes(family) && (!q.family || q.family === family)) devices.push({ row, family });
     if (devices.length >= TARGET_PAGE) break;
@@ -174,7 +183,8 @@ export async function isListedDeviceTarget(env: Env, productId: string): Promise
     .prepare(`SELECT * FROM products WHERE id = ? AND ${(await listing(db)).sellable('products')} AND COALESCE(composition, '') = ''`)
     .bind(productId)
     .first<Record<string, unknown>>();
-  if (!row) return false;
+  // An estimated price is never a target (see the header): the product page draws no trade-in entry for it.
+  if (!row || isEstimateRow(row)) return false;
   const family = familyOfProduct(row, await catalogIndexFor(db));
   return !!family && DEVICE_FAMILIES.includes(family);
 }

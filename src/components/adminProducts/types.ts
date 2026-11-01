@@ -12,6 +12,7 @@ import type {
   CatalogV2,
   TranslationMetaV2,
 } from '../../lib/productTypes';
+import type { AdminProductEstimate } from '../../lib/api';
 
 // ---------------------------------------------------------------- editor doc
 
@@ -310,6 +311,12 @@ export interface ProductResponse {
   engine_direct_only?: boolean;
   /** The imported product's stock decision (absent on an older server: treated as none). */
   import_stock?: ImportStockState | null;
+  /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §7): whether customers see the label and where the estimator holds the
+   * product — a flag and a state, never a figure, so every admin may know it. Null without 0218; absent on an
+   * older server.
+   */
+  price_estimate?: AdminProductEstimate | null;
 }
 
 export interface SaveResponse {

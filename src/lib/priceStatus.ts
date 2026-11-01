@@ -18,3 +18,26 @@ export const isUnpriced = (p: { price_status?: string | null } | null | undefine
 
 /** «السعر غير متوفر حالياً» — real Sorani, never the Arabic copied (row 183). */
 export const UNPRICED_TEXT = { ar: 'السعر غير متوفر حالياً', en: 'Price not available yet', ckb: 'نرخ هێشتا بەردەست نییە' } as const;
+
+/**
+ * «سعر تقديري» — AN ESTIMATED PRE-ORDER PRICE (docs/SMART_PRICING.md §5.1–5.3;
+ * migration 0218; DECISIONS rows 278 and 281).
+ *
+ * `price_status` stays binary: an estimate is a PRICED figure the owner has not
+ * confirmed against the supplier yet. The server adds one boolean beside it,
+ * `price_estimate: true`, only on a priced card or selection that is an
+ * estimate, so every other payload is what it was. It carries no figure,
+ * source or flag. A card that says it is unpriced is never an estimate.
+ */
+export const isEstimated = (p: { price_status?: string | null; price_estimate?: unknown } | null | undefined): boolean =>
+  p?.price_estimate === true && !isUnpriced(p);
+
+/**
+ * The two card labels, EAGER for the same reason as UNPRICED_TEXT. They are
+ * COPIES of `ESTIMATE_STRINGS.label` and `ESTIMATE_STRINGS.labelShort`
+ * (packages/contracts/src/priceEstimates.ts, which only the Worker and lazy
+ * chunks import); tests/estimateStorefrontUi.test.ts pins them equal.
+ */
+export const ESTIMATE_TEXT = { ar: 'سعر تقديري', en: 'Estimated price', ckb: 'نرخی خەمڵێنراو' } as const;
+/** The compact card's second line. */
+export const ESTIMATE_SHORT = { ar: 'تقديري', en: 'Estimate', ckb: 'خەمڵێنراو' } as const;

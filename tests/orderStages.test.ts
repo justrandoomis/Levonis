@@ -356,3 +356,35 @@ test('cancelling is allowed until the goods are delivered, and re-opening lands 
   assert.ok(!canMoveStage('cancelled', 'out_for_delivery', 'direct'));
   assert.ok(!canMoveStage('cancelled', 'arrived_iraq', 'preorder_air'));
 });
+
+// ------------------------------------------------- the estimate gate (0218)
+
+/**
+ * «بانتظار تأكيد السعر النهائي» (migration 0218; docs/SMART_PRICING.md §6.4).
+ * An order with a line at an estimated price waits at «تم الاستلام» until the
+ * line's final price is settled, and the stage machine answers the two new
+ * reasons (PRICE_ESTIMATE_UNCONFIRMED, PRICE_ESTIMATE_REOPEN_REFUSED). The
+ * design rests on facts of the paths themselves, pinned here: the waiting
+ * stage has no clock (so the stage sweep can never starve or move it), the
+ * stages the gate allows are exactly the legacy statuses it allows, and every
+ * other stage of either path is a move the gate guards.
+ */
+test('the estimate gate: «تم الاستلام» has no clock, its stages map to the statuses the gate allows, and every other stage is guarded', async () => {
+  const { estimateGateGuards } = await import('../worker/lib/orderStageOps');
+  const at = '2026-01-01T00:00:00.000Z';
+  for (const type of ['direct', 'preorder_air', 'preorder_sea', 'preorder_land'] as const) {
+    // No clock: the sweep (next_stage_at IS NOT NULL) never selects a held order.
+    assert.equal(scheduleFrom('received', type, DEFAULT_STAGE_DURATIONS, at).next_stage_at, null, type);
+    assert.equal(STAGE_SOURCE[nextStageOf('received', type)!], 'manual', type);
+    for (const stage of stagesFor(type)) {
+      const guarded = estimateGateGuards({ legacyFrom: 'pending', legacyTo: STAGE_LEGACY_STATUS[stage], storedStage: 'received', to: stage });
+      assert.equal(guarded, stage !== 'received', `${type}: received → ${stage}`);
+    }
+  }
+  // The two stages the gate lets through carry the two statuses it lets through.
+  assert.equal(STAGE_LEGACY_STATUS.received, 'pending');
+  assert.equal(STAGE_LEGACY_STATUS.cancelled, 'cancelled');
+  assert.equal(estimateGateGuards({ legacyFrom: 'pending', legacyTo: 'cancelled', storedStage: 'received', to: 'cancelled' }), false, 'the customer may always leave');
+  // A re-opening asks the gate (the trigger answers REOPEN_REFUSED for an order that held estimate lines).
+  assert.equal(estimateGateGuards({ legacyFrom: 'cancelled', legacyTo: 'confirmed', storedStage: 'cancelled', to: 'confirmed' }), true);
+});

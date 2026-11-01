@@ -8,16 +8,60 @@ import React, { useCallback, useId, useLayoutEffect, useRef } from 'react';
 import { Camera, Check, Loader2, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { failureText } from '../../lib/api';
-import { apiRefusal } from '../../lib/refusalStrings';
+import { apiRefusal, type Lang } from '../../lib/refusalStrings';
 import { useT } from './useT';
 import type { PhotoView } from './model';
 
-/** A server refusal in the reader's language (src/lib/refusalStrings.ts), else the fallback. */
+/**
+ * The estimate refusals these screens can receive, COPIED from `ESTIMATE_REFUSALS`
+ * (packages/contracts/src/priceEstimates.ts) so a /trade-in visit does not load the contract. Kept
+ * here, not in copy.ts, which the product page's trade-in entry and the profile also load.
+ * 503 PRICE_ESTIMATES_READ_FAILED: the paid-net read of the eligible, draft, preview and submit
+ * doors, or the cart's estimate switch. 409 PRICE_ESTIMATE_ORDERING_PAUSED and
+ * PRICE_ESTIMATE_PREORDER_ONLY: the cart door «أكمل الشراء» adds the new device through, once its
+ * price became an estimate. tests/tradeInEstimateRefusal.test.ts pins them equal to the contract.
+ */
+export const ESTIMATE_REFUSAL_COPY = {
+  PRICE_ESTIMATES_READ_FAILED: {
+    ar: 'تعذّرت قراءة الأسعار التقديرية الآن؛ لم يتغيّر شيء ولم يُخصم أي مبلغ. أعد المحاولة بعد لحظة.',
+    en: 'Estimated prices could not be read just now; nothing was changed and nothing was charged. Try again in a moment.',
+    ckb: 'نرخە خەمڵێنراوەکان ئێستا نەخوێندرانەوە؛ هیچ شتێک نەگۆڕا و هیچ پارەیەک وەرنەگیرا. کەمێکی تر دووبارە هەوڵ بدەرەوە.',
+  },
+  PRICE_ESTIMATE_ORDERING_PAUSED: {
+    ar: 'الطلب بالسعر التقديري متوقف مؤقتًا لهذا المنتج. تواصل معنا لمزيد من المعلومات.',
+    en: 'Ordering at the estimated price is paused for this item for now. Contact us for more information.',
+    ckb: 'داواکردن بە نرخی خەمڵێنراو بۆ ئەم بەرهەمە بە شێوەیەکی کاتی ڕاگیراوە. بۆ زانیاریی زیاتر پەیوەندیمان پێوە بکە.',
+  },
+  PRICE_ESTIMATE_PREORDER_ONLY: {
+    ar: 'هذا المنتج متاح بالطلب المسبق فقط لأن سعره تقديري.',
+    en: 'This item is available by pre-order only, because its price is an estimate.',
+    ckb: 'ئەم بەرهەمە تەنها بە پێشداواکاری بەردەستە، چونکە نرخەکەی خەمڵێنراوە.',
+  },
+} as const satisfies Record<string, Record<Lang, string>>;
+
+/** The reader's sentence for one of those refusals (its code, or an error carrying it), or null for any other. */
+export function estimateRefusalCopy(e: unknown, lang: Lang): string | null {
+  const code = e !== null && typeof e === 'object' ? (e as { code?: unknown }).code : e;
+  if (typeof code !== 'string' || !Object.prototype.hasOwnProperty.call(ESTIMATE_REFUSAL_COPY, code)) return null;
+  const words: Record<Lang, string> = ESTIMATE_REFUSAL_COPY[code as keyof typeof ESTIMATE_REFUSAL_COPY];
+  return words[lang] ?? words.ar;
+}
+
+/**
+ * A server refusal in the reader's language. An estimate refusal these doors can answer takes the
+ * contract's words from the copy above; any other code reads src/lib/refusalStrings.ts, then the
+ * server's sentence, then the fallback, as before.
+ */
+export function tradeInRefusalText(e: unknown, lang: Lang, fallback: string): string {
+  return estimateRefusalCopy(e, lang) ?? (apiRefusal(e, lang) || failureText(e, fallback));
+}
+
+/** `tradeInRefusalText` in the reader's language, with the screens' generic fallback. */
 export function useErrText() {
   const { lang } = useLanguage();
   const { t } = useT();
   return useCallback(
-    (e: unknown, fallback?: string) => apiRefusal(e, lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar') || failureText(e, fallback ?? t('genericError')),
+    (e: unknown, fallback?: string) => tradeInRefusalText(e, lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar', fallback ?? t('genericError')),
     [lang, t]
   );
 }

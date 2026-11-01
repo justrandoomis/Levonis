@@ -187,7 +187,7 @@ const PRODUCT_SCHEMA = object(
           'The ways to pre-order and their unit prices (the opening choice), offers applied.'
         ),
       },
-      'How the product can be bought and what the cart charges per unit for each way. These are the prices to quote as what a customer pays; `price` is the item price, which a way to buy can exceed. Null when the price is not available yet (`price.status: unpriced`).'
+      'How the product can be bought and what the cart charges per unit for each way. These are the prices to quote as what a customer pays; `price` is the item price, which a way to buy can exceed. When `price.estimate` is true they are estimated pre-order prices too: the final price may differ, and the site asks the buyer to approve any change before charging it. Null when the price is not available yet (`price.status: unpriced`).'
     )),
     options: array(OPTION_SCHEMA),
     colors: array(COLOR_SCHEMA),
@@ -453,6 +453,7 @@ function productDetailDto(
     sections: sections.filter((s): s is NonNullable<typeof s> => !!s),
     images,
     light_image: urls.media(product.light_image),
+    // `price.estimate` (0218) is the page card's own label: any priced SKU of the product is an estimate.
     price: priceFromCard(product),
     availability: unpriced
       ? { state: 'unknown' as const, quantity: null, low_stock: false, sale_modes: [] }

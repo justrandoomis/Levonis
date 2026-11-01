@@ -270,7 +270,21 @@ export interface OrderAnnouncementInput {
   bnplDueAt?: unknown;
   dueOnDeliveryIqd?: unknown;
   lines?: OrderAnnouncementLine[];
+  /**
+   * The order holds lines sold at an ESTIMATED price (migration 0218;
+   * docs/SMART_PRICING.md §7): the message warns, second line, that the final
+   * price is confirmed before anything is ordered from the supplier. Only a
+   * literal `true` prints it.
+   */
+  priceEstimate?: unknown;
 }
+
+/**
+ * «⚠️ يتضمن أسعارًا تقديرية — أكّد السعر النهائي قبل الطلب من المورّد» — the
+ * owner's warning on a new order with estimated lines: it waits at «تم
+ * الاستلام» until every line's final price is settled (the confirm panel).
+ */
+export const ORDER_ESTIMATE_WARNING = '⚠️ يتضمن أسعارًا تقديرية — أكّد السعر النهائي قبل الطلب من المورّد';
 
 /**
  * THE TWO PAYMENT METHODS, IN WORDS THE OWNER ALREADY WROTE.
@@ -338,6 +352,8 @@ export function orderAnnouncement(input: OrderAnnouncementInput = {}): string {
 
   out.push(storeName ? `🛒 طلب متجر جديد — ${orderId}` : `🛒 طلب جديد — ${orderId}`);
   if (storeName) out.push(`المتجر: ${storeName}`);
+  // Second, before anything else: this order may not be prepared until its final price is settled (0218).
+  if (input.priceEstimate === true) out.push(ORDER_ESTIMATE_WARNING);
 
   // THE PARCEL'S PERSON FIRST — the name on the delivery address, which is who
   // answers the phone below — and the account holder only when it is someone

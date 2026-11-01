@@ -19,7 +19,8 @@ import { adminRoutes } from '../worker/routes/admin';
 import { orderRoutes } from '../worker/routes/orders';
 import { telegramRoutes } from '../worker/routes/telegram';
 import { adminOrderPriceRoutes, orderPriceRoutes } from '../worker/routes/orderPriceAdjust';
-import { decidePriceAdjustment, parsePriceCallbackData, priceCallbackData } from '../worker/lib/orderPriceAdjust';
+import { decidePriceAdjustment, parsePriceCallbackData, priceCallbackData, proposePriceAdjustment, PriceAdjustError } from '../worker/lib/orderPriceAdjust';
+import { ESTIMATE_REASON_CODE, ESTIMATE_STRINGS } from '../packages/contracts/src/priceEstimates';
 import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { sweepExpiredOrders } from '../worker/lib/orderExpirySweep';
 import { planPriceAdjustment } from '../packages/pricing/src/priceAdjustment';
@@ -713,6 +714,85 @@ test('Telegram: reject from the button releases the hold and keeps the price', a
     await settle();
     assert.equal(adjOf(raw, pid).state, 'rejected');
     assert.deepEqual([orderOf(raw).total_iqd, orderOf(raw).price_hold_id], [100_000, null]);
+  } finally {
+    f.restore();
+  }
+});
+
+// =========================================================================
+//  MIGRATION 0218 — reason_code AND extra (docs/SMART_PRICING.md §6.7)
+// =========================================================================
+
+test('an ordinary proposal says so: reason_code "" and no lines, its INSERT unchanged', async () => {
+  const f = stubFetch();
+  try {
+    const raw = seed();
+    const body = await json(await propose(raw));
+    assert.equal(body.adjustment.reason_code, '');
+    assert.equal('lines' in body.adjustment, false);
+    assert.equal(adjOf(raw, body.adjustment.id).reason_code, '', 'the column default: never written by an ordinary proposal');
+    const shown = await json(await get(customerApp(raw), '/api/orders/ORD-PA1/price-adjustment'));
+    assert.equal(shown.pending.reason_code, '');
+    await settle();
+  } finally {
+    f.restore();
+  }
+});
+
+test('`extra` statements ride the proposal’s own batch: they commit with it, and a failing one aborts all of it — hold, row and notice', async () => {
+  const raw = seed();
+  const env = envOf(raw);
+  const db = env.DB;
+  const ok = await proposePriceAdjustment(env, {
+    orderId: 'ORD-PA1', adminId: 'boss', newTotalIqd: 120_000, reason: 'ارتفع سعر المورد', note: '', idempotencyKey: 'extra-key-0001',
+    extra: [db.prepare("INSERT INTO ops_guards (id, ok) VALUES ('extra-rode-the-batch', 1)")],
+  });
+  assert.equal(ok.replayed, false);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM ops_guards WHERE id = 'extra-rode-the-batch'"), 1);
+
+  const raw2 = seed();
+  const env2 = envOf(raw2);
+  await assert.rejects(
+    proposePriceAdjustment(env2, {
+      orderId: 'ORD-PA1', adminId: 'boss', newTotalIqd: 120_000, reason: 'ارتفع سعر المورد', note: '', idempotencyKey: 'extra-key-0002',
+      // ops_guards.ok is CHECK(ok = 1): this statement fails, inside the proposal's transaction.
+      extra: [env2.DB.prepare("INSERT INTO ops_guards (id, ok) VALUES ('extra-fails', 0)")],
+    }),
+    (e: unknown) => e instanceof PriceAdjustError && e.code === 'PRICE_ADJUST_STALE'
+  );
+  assert.equal(count(raw2, 'SELECT COUNT(*) AS n FROM order_price_adjustments'), 0, 'no proposal row');
+  assert.equal(orderOf(raw2).price_hold_id, null, 'no hold');
+  assert.equal(count(raw2, "SELECT COUNT(*) AS n FROM user_notifications WHERE user_id = 'cust'"), 0, 'no notice');
+  assert.equal(count(raw2, "SELECT COUNT(*) AS n FROM audit_log WHERE action = 'order.price_adjust.propose'"), 0, 'no audit');
+});
+
+test('reasonCode ESTIMATE_FINAL_PRICE: stored on the row, and every customer text prints the localized estimate reason, never the stored line', async () => {
+  const f = stubFetch();
+  try {
+    const raw = seed();
+    const stored = `${ESTIMATE_STRINGS.estimateReason.ar} / ${ESTIMATE_STRINGS.estimateReason.en} / ${ESTIMATE_STRINGS.estimateReason.ckb}`;
+    const res = await proposePriceAdjustment(envOf(raw), {
+      orderId: 'ORD-PA1', adminId: 'boss', newTotalIqd: 120_000, reason: stored, note: '', idempotencyKey: 'estimate-reason-0001',
+      reasonCode: ESTIMATE_REASON_CODE,
+    });
+    const row0 = adjOf(raw, res.adjustment.id);
+    assert.deepEqual([row0.reason_code, row0.reason], [ESTIMATE_REASON_CODE, stored]);
+    const inApp = row<Record<string, string>>(raw, "SELECT * FROM user_notifications WHERE user_id = 'cust'")!;
+    assert.ok(inApp.body_ar.endsWith(ESTIMATE_STRINGS.estimateReason.ar), inApp.body_ar);
+    assert.ok(inApp.body_en.endsWith(ESTIMATE_STRINGS.estimateReason.en), inApp.body_en);
+    assert.ok(String(JSON.parse(inApp.meta).body_ckb).endsWith(ESTIMATE_STRINGS.estimateReason.ckb));
+    const shown = await json(await get(customerApp(raw), '/api/orders/ORD-PA1/price-adjustment'));
+    assert.equal(shown.pending.reason_code, ESTIMATE_REASON_CODE);
+    assert.deepEqual(shown.pending.lines, [], 'no estimate line is linked to it here');
+    // The customer's Telegram prompt: one language (ar), the estimate reason and what a rejection leads to.
+    const { notifyCustomerOfProposal } = await import('../worker/lib/orderPriceAdjust');
+    await notifyCustomerOfProposal(envOf(raw), res.adjustment);
+    const tg = f.calls.find((c) => c.method === 'sendMessage' && Number(c.body.chat_id) === CUSTOMER_TG);
+    assert.ok(tg);
+    assert.ok(String(tg!.body.text).includes(ESTIMATE_STRINGS.estimateReason.ar));
+    assert.ok(String(tg!.body.text).includes(ESTIMATE_STRINGS.estimateRejectNote.ar));
+    assert.ok(!String(tg!.body.text).includes(ESTIMATE_STRINGS.estimateReason.en));
+    await settle();
   } finally {
     f.restore();
   }

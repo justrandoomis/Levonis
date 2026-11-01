@@ -72,6 +72,47 @@ export const PROTECTED_TABLES: readonly ProtectedTable[] = [
   { table: 'product_price_request_stats', since: '0193_price_requests.sql' },
 ];
 
+export interface LateProtectedTable {
+  table: string;
+  /**
+   * The migration that creates the table AND its three guard triggers
+   * (`trg_import_guard_<table>_{ins,upd,del}`), hand-written there in the
+   * exact shape the generator prints for 0195 — the way 0200 and 0211 re-emit
+   * the triggers of the tables they rebuild.
+   */
+  guardedBy: string;
+}
+
+/**
+ * Tables NEWER than 0195, guarded the same way by the migration that creates
+ * them. They are kept out of PROTECTED_TABLES on purpose: the generator writes
+ * only 0195's block, a table that does not exist before 0195 cannot carry a
+ * trigger there, and 0195's committed block stays byte for byte what it is.
+ * tests/catalogImportGuards.test.ts proves each table carries its three
+ * triggers, in the generated shape, in the fully migrated schema, and that
+ * they abort inside an import batch and stay silent outside one.
+ *
+ * Migration 0218 (docs/SMART_PRICING.md §2.2, DECISIONS row 239 extended by row
+ * 278): the supplier price catalogue, the per-type estimate defaults, the
+ * owner's switches, a product's estimate bookkeeping and firm SKUs, and the
+ * order's estimate lines. The import writes no price, cost or stock, and none
+ * of these either.
+ */
+export const LATE_PROTECTED_TABLES: readonly LateProtectedTable[] = [
+  { table: 'supplier_price_snapshots', guardedBy: '0218_price_estimates.sql' },
+  { table: 'supplier_price_items', guardedBy: '0218_price_estimates.sql' },
+  { table: 'supplier_price_skus', guardedBy: '0218_price_estimates.sql' },
+  { table: 'supplier_price_keys', guardedBy: '0218_price_estimates.sql' },
+  { table: 'supplier_price_matches', guardedBy: '0218_price_estimates.sql' },
+  { table: 'supplier_price_manual', guardedBy: '0218_price_estimates.sql' },
+  { table: 'price_estimate_types', guardedBy: '0218_price_estimates.sql' },
+  { table: 'price_estimate_control', guardedBy: '0218_price_estimates.sql' },
+  { table: 'product_price_estimates', guardedBy: '0218_price_estimates.sql' },
+  { table: 'price_estimate_lines', guardedBy: '0218_price_estimates.sql' },
+  { table: 'price_estimate_firm_skus', guardedBy: '0218_price_estimates.sql' },
+  { table: 'order_price_estimates', guardedBy: '0218_price_estimates.sql' },
+];
+
 /**
  * How a guarded column's value reads when an import-created row leaves it
  * alone: the column's schema default.

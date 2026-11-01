@@ -13,11 +13,17 @@
  * list are gone (their routes answer PRICING_V2_MANAGED): every price is the
  * product's own V2 write, opened from the queue and reviewed in its sheet.
  *
+ *   - «التسعير التقديري» (docs/SMART_PRICING.md §7): a card that opens the
+ *     owner's estimates workspace — its own lazy chunk
+ *     (src/components/adminEstimates/EstimateWorkspace.tsx), loaded only when
+ *     opened. The address carries it (`?view=estimates`), so the product
+ *     form's banner and a reload open it directly.
+ *
  * WHO. Mounted by src/pages/Admin.tsx only on `can_write_cost === true` — a
  * courtesy; the router refuses everyone but the verified owner before a query
  * runs. A refusal is said BY CODE (`PricingFailure`).
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useLanguage } from '../../LanguageContext';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
@@ -26,6 +32,36 @@ import { PricingFailure } from './parts';
 import RatesPanel from './RatesPanel';
 import { pricingStrings } from './strings';
 import { hiddenBanner, NEEDS_PRICING, tri } from '../adminProducts/needsPricingStrings';
+
+/**
+ * «التسعير التقديري»: the owner's estimates workspace and the card that opens
+ * it — each a chunk of its own (their words live in
+ * src/components/adminEstimates/strings.ts), so this tab's first load carries
+ * none of them.
+ */
+const EstimateWorkspace = lazy(() => import('../adminEstimates/EstimateWorkspace'));
+const EstimatesCard = lazy(() => import('../adminEstimates/EstimatesCard'));
+
+/** `?view=estimates` opens the workspace (the product form's banner links there). */
+function estimatesInAddress(): boolean {
+  try {
+    return new URLSearchParams(window.location.search).get('view') === 'estimates';
+  } catch {
+    return false;
+  }
+}
+
+/** The workspace in the address, or out of it (its own tab and product go with it). */
+function writeEstimatesView(open: boolean) {
+  try {
+    const url = new URL(window.location.href);
+    if (open) url.searchParams.set('view', 'estimates');
+    else for (const k of ['view', 'etab', 'product']) url.searchParams.delete(k);
+    window.history.replaceState(window.history.state, '', url);
+  } catch {
+    /* the address is a courtesy */
+  }
+}
 
 const V2_CARD = {
   title: { ar: 'أسعار المنتجات بالدولار', en: 'Product prices in dollars', ckb: 'نرخی بەرهەمەکان بە دۆلار' },
@@ -60,8 +96,15 @@ export default function AdminPricing() {
   const [error, setError] = useState<unknown>(null);
   const [reload, setReload] = useState(0);
   const refresh = useCallback(() => setReload((n) => n + 1), []);
+  const [estimatesOpen, setEstimatesOpen] = useState<boolean>(estimatesInAddress);
+  const openEstimates = useCallback((open: boolean) => {
+    writeEstimatesView(open);
+    setEstimatesOpen(open);
+  }, []);
 
   useEffect(() => {
+    // The workspace has its own reads; the counts load when the tab itself is on screen.
+    if (estimatesOpen) return;
     const ac = new AbortController();
     setError(null);
     fetchPricingV2Counts({ signal: ac.signal })
@@ -72,7 +115,22 @@ export default function AdminPricing() {
         if (!ac.signal.aborted) setError(e);
       });
     return () => ac.abort();
-  }, [reload]);
+  }, [reload, estimatesOpen]);
+
+  if (estimatesOpen) {
+    return (
+      <Suspense
+        fallback={
+          <div className="mx-auto w-full max-w-[1120px] space-y-3 px-4 sm:px-0" aria-busy="true">
+            <Skeleton className="h-8 w-1/2" />
+            <Skeleton className="h-40 w-full" />
+          </div>
+        }
+      >
+        <EstimateWorkspace onBack={() => openEstimates(false)} />
+      </Suspense>
+    );
+  }
 
   return (
     <div dir={dir} data-admin-pricing className="mx-auto w-full max-w-[1120px] min-w-0 space-y-4 px-4 pb-16 sm:px-0">
@@ -121,6 +179,10 @@ export default function AdminPricing() {
           </>
         )}
       </section>
+
+      <Suspense fallback={null}>
+        <EstimatesCard onOpen={() => openEstimates(true)} />
+      </Suspense>
     </div>
   );
 }

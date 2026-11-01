@@ -48,7 +48,7 @@ import {
   type LegacyRouteObservation,
   type LegacyRung,
 } from '@levonis/pricing/legacyTargets';
-import { PREORDER_ROUTES, SKU_CHANNELS, routeOfChannel, skuComboKey, type PreorderRoute, type SkuChannel } from '@levonis/pricing/skuChannel';
+import { PREORDER_ROUTES, SKU_CHANNELS, parseSkuComboKey, routeOfChannel, skuComboKey, type PreorderRoute, type SkuChannel } from '@levonis/pricing/skuChannel';
 
 /** One channel of one model, as a guest's cart is charged for it today. */
 export interface ChannelToday {
@@ -365,6 +365,121 @@ export interface SellableSku {
   combo_key: string;
 }
 
+/** A row flag as the overlay reads it (`snapshotFrom`): only 0 and false are off. */
+const isOn = (v: unknown): boolean => v !== 0 && v !== false;
+
+/**
+ * The combinations a VARIANT_COMBINATION product stocks: the keys of its active
+ * `product_variants` rows. Null for any other mode, or when no row is active.
+ */
+function modelledCombos(view: ProductRelationsView | undefined): Set<string> | null {
+  if (!view || view.inventory_mode !== 'VARIANT_COMBINATION') return null;
+  const keys = new Set((view.variants ?? []).filter((v) => isOn(v.active)).map((v) => v.combo_key));
+  return keys.size ? keys : null;
+}
+
+/** The choices of one cell, as combo-key parts: each option value (`o:id`) and its colour (`c:id`). */
+const choicesOf = (s: SellableSku): string[] => [...s.option_value_ids.map((id) => `o:${id}`), ...(s.color ? [`c:${s.color.id}`] : [])];
+
+/**
+ * A VARIANT_COMBINATION PRODUCT'S GRID, CUT TO THE COMBINATIONS IT STOCKS
+ * (review finding data-1). The cart refuses a combination with no active
+ * variant row (inventory.ts `resolveStock`, VARIANT_NOT_MODELLED), and the
+ * Bambu import writes one row per real SKU, never a missing combination — so
+ * a cell with no row whose every choice (each option value, and its colour)
+ * is stocked in another combination is not a SKU: Bus Cable 4pin · 510 mm,
+ * when 4pin is sold at 260 mm and 510 mm with 6pin.
+ *
+ * A cell with a row stays, and so does every cell of a choice that no stocked
+ * cell holds (a model or a value with no row, a colour no row names): those
+ * answer exactly as before. So every choice the grid offered is still offered
+ * — every model keeps a SKU, its option level and the writer's C-13 floor
+ * (writer.ts), and every value or colour the page lists still names a SKU
+ * (`namesUnpricedChoice`, `checkSelection`). A grid none of whose cells is
+ * stocked (another mode, no active row, rows naming no cell) is answered whole.
+ * Past ENGINE_MAX_SKUS the same cells are read from the rows (`stockedPastLimit`).
+ */
+function stockedCells(grid: SellableSku[], view: ProductRelationsView | undefined): SellableSku[] {
+  const modelled = modelledCombos(view);
+  if (!modelled) return grid;
+  const stocked = grid.filter((s) => modelled.has(s.combo_key));
+  if (!stocked.length) return grid;
+  const held = new Set(stocked.flatMap(choicesOf));
+  return grid.filter((s) => modelled.has(s.combo_key) || choicesOf(s).some((c) => !held.has(c)));
+}
+
+/**
+ * The most grid cells (combinations × colours) `stockedPastLimit` scans. It
+ * only keeps that scan bounded: a bigger grid is SKU_GRID_TOO_LARGE, as before.
+ */
+export const SKU_GRID_SCAN_MAX = 4096;
+
+interface GridShape {
+  /** The active option groups that hold a value, each with its values (authored order). */
+  groups: Array<{ id: string; values: OptionV2[] }>;
+  colours: ColorV2[];
+  /** Whether a colour is offered with one combination (one value per group, group order). */
+  offeredWith: (sel: OptionV2[]) => (c: ColorV2) => boolean;
+  /** The grid cells of one combination. */
+  cellsOf: (sel: OptionV2[]) => SellableSku[];
+}
+
+const SKU_OVERFLOW = (): { skus: SellableSku[]; overflow: boolean } => ({ skus: [], overflow: true });
+
+/**
+ * A GRID PAST ENGINE_MAX_SKUS (review r2-grid). A VARIANT_COMBINATION product
+ * with active rows is counted on the cells `stockedCells` would keep: each row's
+ * combination, checked as the grid checks it (`cellsOf`: colour visibility,
+ * `validateSelection`), then every cell of a choice no stocked cell holds, in
+ * grid order. Only when those pass ENGINE_MAX_SKUS is it `overflow`. Any other
+ * product, a grid no row names, and a grid of more than SKU_GRID_SCAN_MAX
+ * cells overflow, as before.
+ */
+function stockedPastLimit(shape: GridShape, view: ProductRelationsView | undefined): { skus: SellableSku[]; overflow: boolean } {
+  const { groups, colours, offeredWith, cellsOf } = shape;
+  const modelled = modelledCombos(view);
+  const size = groups.reduce((n, g) => n * g.values.length, 1);
+  if (!modelled || !groups.length || size * Math.max(1, colours.length) > SKU_GRID_SCAN_MAX) return SKU_OVERFLOW();
+  const keyOf = (sel: readonly OptionV2[]) => skuComboKey({ option_value_ids: sel.map((o) => o.id), color_id: null });
+  // The stocked cells, by combination: a row naming one value of each group, and its cells a row names.
+  const slot = new Map<string, [number, OptionV2]>();
+  groups.forEach((g, i) => g.values.forEach((v) => slot.set(v.id, [i, v])));
+  const stocked = new Map<string, SellableSku[]>();
+  let count = 0;
+  for (const key of modelled) {
+    const picks = (parseSkuComboKey(key)?.option_value_ids ?? []).map((id) => slot.get(id));
+    if (picks.length !== groups.length || picks.some((p) => !p) || new Set(picks.map((p) => p![0])).size !== groups.length) continue;
+    const sel = groups.map((_, i) => picks.find((p) => p![0] === i)![1]);
+    const combo = keyOf(sel);
+    if (stocked.has(combo)) continue;
+    const cells = cellsOf(sel).filter((s) => modelled.has(s.combo_key));
+    stocked.set(combo, cells);
+    count += cells.length;
+    if (count > ENGINE_MAX_SKUS) return SKU_OVERFLOW();
+  }
+  if (!count) return SKU_OVERFLOW();
+  const held = new Set([...stocked.values()].flat().flatMap(choicesOf));
+  const unheld = colours.filter((c) => !held.has(`c:${c.id}`));
+  // Every combination in grid order (the last group fastest). When its values and every colour offered with it are
+  // held, only its stocked cells stay; any other combination is checked cell by cell.
+  const skus: SellableSku[] = [];
+  const at = groups.map(() => 0);
+  for (let n = 0; n < size; n += 1) {
+    const sel = groups.map((g, i) => g.values[at[i]!]!);
+    const own = sel.every((o) => held.has(`o:${o.id}`)) && !(unheld.length && unheld.some(offeredWith(sel)));
+    skus.push(
+      ...(own ? (stocked.get(keyOf(sel)) ?? []) : cellsOf(sel).filter((s) => modelled.has(s.combo_key) || choicesOf(s).some((c) => !held.has(c))))
+    );
+    if (skus.length > ENGINE_MAX_SKUS) return SKU_OVERFLOW();
+    for (let i = groups.length - 1; i >= 0; i -= 1) {
+      at[i] = at[i]! + 1;
+      if (at[i]! < groups[i]!.values.length) break;
+      at[i] = 0;
+    }
+  }
+  return { skus, overflow: false };
+}
+
 /**
  * EVERY SKU A CUSTOMER CAN BUY (FX-7): one active value of every active option
  * group that holds one (one implicit group for a product with options but no
@@ -372,7 +487,11 @@ export interface SellableSku {
  * links' AND/OR algebra, `validateSelection`, the very check the cart runs —
  * or no colour when none is visible. The model is the first value in relation
  * order (`optionValueIdsInRelationOrder`), the one the cart prices a line from.
- * At most ENGINE_MAX_SKUS; more is `overflow` (SKU_GRID_TOO_LARGE).
+ * A VARIANT_COMBINATION product leaves out a combination it does not stock
+ * when each of its choices is stocked in another (`stockedCells`). At most
+ * ENGINE_MAX_SKUS combinations in the whole grid, as before; more is
+ * `overflow` (SKU_GRID_TOO_LARGE), except that a VARIANT_COMBINATION product
+ * with active rows is then counted on the cells it keeps (`stockedPastLimit`).
  */
 export function sellableSkus(doc: ProductDoc, view: ProductRelationsView | undefined): { skus: SellableSku[]; overflow: boolean } {
   const active = doc.options.filter((o) => o.active !== false && !o.merged_into);
@@ -385,22 +504,18 @@ export function sellableSkus(doc: ProductDoc, view: ProductRelationsView | undef
     if (!groups.length) groups = [{ id: '', values: active }];
   }
   const colours = doc.colors.filter((c) => c.active !== false);
-  let selections: Array<OptionV2[]> = [[]];
-  for (const g of groups) {
-    const next: Array<OptionV2[]> = [];
-    for (const sel of selections) for (const v of g.values) next.push([...sel, v]);
-    selections = next;
-    if (selections.length > ENGINE_MAX_SKUS) return { skus: [], overflow: true };
-  }
-  const skus: SellableSku[] = [];
-  for (const sel of selections) {
-    const ids = relational ? optionValueIdsInRelationOrder(sel.map((o) => o.id), view) : sel.map((o) => o.id);
-    const model = ids.length ? (doc.options.find((o) => o.id === ids[0]) ?? null) : null;
+  // The colour links' AND/OR algebra, or (no relations) a colour scoped to the model, the combination's first value.
+  const offeredWith = (sel: OptionV2[]): ((c: ColorV2) => boolean) => {
+    if (!relational) return (c) => !c.option_id || c.option_id === (sel[0]?.id ?? null);
     const selection: GroupSelection = {};
     for (const o of sel) selection[groupOf.get(o.id) ?? ''] = o.id;
-    const visible = colours.filter((c) =>
-      relational ? colorVisibility(c.id, view!.links, selection).visible : !c.option_id || c.option_id === (model?.id ?? null)
-    );
+    return (c) => colorVisibility(c.id, view!.links, selection).visible;
+  };
+  const cellsOf = (sel: OptionV2[]): SellableSku[] => {
+    const ids = relational ? optionValueIdsInRelationOrder(sel.map((o) => o.id), view) : sel.map((o) => o.id);
+    const model = ids.length ? (doc.options.find((o) => o.id === ids[0]) ?? null) : null;
+    const visible = colours.filter(offeredWith(sel));
+    const cells: SellableSku[] = [];
     for (const color of visible.length ? visible : [null]) {
       if (relational) {
         const errors = validateSelection({
@@ -413,11 +528,23 @@ export function sellableSkus(doc: ProductDoc, view: ProductRelationsView | undef
         });
         if (errors.length) continue;
       }
-      skus.push({ option_value_ids: ids, model, color, combo_key: skuComboKey({ option_value_ids: ids, color_id: color?.id ?? null }) });
-      if (skus.length > ENGINE_MAX_SKUS) return { skus: [], overflow: true };
+      cells.push({ option_value_ids: ids, model, color, combo_key: skuComboKey({ option_value_ids: ids, color_id: color?.id ?? null }) });
     }
+    return cells;
+  };
+  let selections: Array<OptionV2[]> = [[]];
+  for (const g of groups) {
+    const next: Array<OptionV2[]> = [];
+    for (const sel of selections) for (const v of g.values) next.push([...sel, v]);
+    selections = next;
+    if (selections.length > ENGINE_MAX_SKUS) return stockedPastLimit({ groups, colours, offeredWith, cellsOf }, view);
   }
-  return { skus, overflow: false };
+  const grid: SellableSku[] = [];
+  for (const sel of selections) {
+    grid.push(...cellsOf(sel));
+    if (grid.length > ENGINE_MAX_SKUS) return stockedPastLimit({ groups, colours, offeredWith, cellsOf }, view);
+  }
+  return { skus: stockedCells(grid, view), overflow: false };
 }
 
 /** A SKU worth its own level: a colour, or more than one option value (one value alone is the model's level). */

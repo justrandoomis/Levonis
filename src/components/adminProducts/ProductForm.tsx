@@ -39,7 +39,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowRight, ArrowLeft, Save, Eye, RefreshCw, AlertTriangle, Check, Plus, FileUp } from 'lucide-react';
-import { api, ApiError, failureText } from '../../lib/api';
+import { api, ApiError, failureText, type AdminProductEstimate } from '../../lib/api';
 import { PRODUCT_WRITE_TIMEOUT_MS, STILL_SAVING_AFTER_MS, confirmSaveOutcome, saveOutcomeText, writeOutcomeUnknown } from './saveOutcome';
 import { refusalIssues } from './applyResult';
 import { contractRefusal, refusalLang, refusalText } from '../../lib/refusalStrings';
@@ -337,6 +337,8 @@ export default function ProductForm({
   const [importStock, setImportStock] = useState<ImportStockState | null>(null);
   /** The stock mode was just chosen here: section ٣ says so once, where the card was. */
   const [importStockDone, setImportStockDone] = useState(false);
+  /** «سعر تقديري» (docs/SMART_PRICING.md §7): the product read's label and estimate state, for every admin's banner. */
+  const [priceEstimate, setPriceEstimate] = useState<AdminProductEstimate | null>(null);
 
   // ------------------------------------------------------------- loading
 
@@ -396,6 +398,7 @@ export default function ProductForm({
     setBaseline(JSON.stringify({ d, rs }));
     setImportStock(p.import_stock ?? null);
     setImportStockDone(false);
+    setPriceEstimate(p.price_estimate ?? null);
   }, []);
   const loadProduct = useCallback(async (id: string) => {
     setLoading(true);
@@ -1569,7 +1572,7 @@ export default function ProductForm({
           </p>
         ) : null}
 
-        <PricesSectionV2 modelNames={modelNames} firstModelId={firstModelId} packageDims={doc.dimensions ?? null} onJump={showPricing} productId={doc.id || null} />
+        <PricesSectionV2 modelNames={modelNames} firstModelId={firstModelId} packageDims={doc.dimensions ?? null} onJump={showPricing} productId={doc.id || null} priceEstimate={priceEstimate} />
 
         {/* The real cost layers behind the stock (the owner's batches): renders nothing
             for a product with no batches, or for an admin whose payload carries no costs. */}

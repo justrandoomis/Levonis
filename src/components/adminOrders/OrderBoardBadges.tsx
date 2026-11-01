@@ -1,5 +1,5 @@
 /**
- * The four small things a board row says about an order, and the digits they
+ * The small things a board row says about an order, and the digits they
  * are written in.
  *
  * They live together because the header line and the row both need them and
@@ -143,20 +143,53 @@ export function DayChip({
 }
 
 /**
- * «بانتظار موافقة الزبون على السعر» (migration 0140). The order is frozen
- * until the customer approves or rejects a new price: no stage moves, no
- * courier shipment. Amber — pending, not an error — and in words, never colour
- * alone. OWNER: Sorani to be written by hand.
+ * A board row since migration 0218 (worker/routes/admin.ts): `price_estimate_open`
+ * is present, and true, only while one of its lines sold at an estimated price
+ * waits for its final price — and the server then offers the row no one-tap
+ * move (`quick_next` is null), because the gate would refuse it.
  */
-export function PriceHoldBadge({ order, loc }: { order: AdminOrderRow; loc: Loc }) {
-  if (!order.price_hold_id) return null;
+export type EstimateBoardRow = AdminOrderRow & { price_estimate_open?: boolean };
+
+/**
+ * THE ORDER IS HELD ON ITS PRICE — one badge for both holds, so the row needs
+ * no second slot:
+ *   · «بانتظار موافقة السعر» (migration 0140): frozen until the customer
+ *     approves or rejects a new price — no stage moves, no courier shipment;
+ *   · otherwise «بانتظار تأكيد السعر» (migration 0218, `EstimateBadge`): lines
+ *     sold at an estimated price wait for a financial admin's final price.
+ * While an estimate's own proposal waits on the customer the 0140 badge is the
+ * true one: the next move is theirs. Amber — pending, not an error — and in
+ * words, never colour alone.
+ */
+export function PriceHoldBadge({ order, loc }: { order: EstimateBoardRow; loc: Loc }) {
+  if (!order.price_hold_id) return <EstimateBadge order={order} loc={loc} />;
   return (
     <span
       data-order-price-hold
       className="lv-chip inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold [--chip:var(--color-warning)]"
     >
       <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
-      {loc('بانتظار موافقة السعر', 'Awaiting price approval')}
+      {loc('بانتظار موافقة السعر', 'Awaiting price approval', 'چاوەڕێی پەسەندکردنی نرخ')}
+    </span>
+  );
+}
+
+/**
+ * «بانتظار تأكيد السعر» (migration 0218; docs/SMART_PRICING.md §7): the order
+ * holds lines sold at an estimated pre-order price and stays at «تم استلام
+ * الطلب» — no confirm, preparation, shipping or courier — until their final
+ * price is settled in the order's «تأكيد السعر النهائي». The board's filter of
+ * the same name lists exactly these orders.
+ */
+export function EstimateBadge({ order, loc }: { order: EstimateBoardRow; loc: Loc }) {
+  if (order.price_estimate_open !== true) return null;
+  return (
+    <span
+      data-order-price-estimate
+      className="lv-chip inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold [--chip:var(--color-warning)]"
+    >
+      <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
+      {loc('بانتظار تأكيد السعر', 'Awaiting price confirmation', 'چاوەڕێی پشتڕاستکردنەوەی نرخ')}
     </span>
   );
 }

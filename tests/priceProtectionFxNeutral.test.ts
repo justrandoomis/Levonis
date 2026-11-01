@@ -214,9 +214,10 @@ test('on a database without the engine tables no line gets a snapshot (the INSER
   assert.equal(none.size, 0);
 });
 
-test('policy price_protection v5: effective 2026-10-09, the base-price definition, §10.4, §11.8 and §12.3 in all three languages', () => {
-  assert.equal(price_protection.version, 5);
-  assert.equal(price_protection.effective_at, '2026-10-09');
+test('policy price_protection v5 articles, kept word for word in v6 (effective 2026-10-31): the base-price definition, §10.4, §11.8 and §12.3 in all three languages', () => {
+  // v6 (2026-10-31, the estimated price) keeps every v5 article word for word.
+  assert.equal(price_protection.version, 6);
+  assert.equal(price_protection.effective_at, '2026-10-31');
   for (const lang of ['ar', 'en', 'ckb'] as const) assert.match(price_protection.body[lang], /### 11\.8 /);
   assert.match(price_protection.body.ar, /السعر الأساسي بالدولار/);
   assert.match(price_protection.body.en, /Base price in USD/);

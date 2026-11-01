@@ -275,3 +275,79 @@ test('customer channels carry final numbers, never the arithmetic of a price, fo
     assert.deepEqual(line.warranty.duration_months, 12);
   } finally { raw.close(); }
 });
+
+/**
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5, invariant I6): an estimated product's customer
+ * channels carry the boolean label and final numbers — never the supplier catalogue behind the estimate,
+ * its flags, measures, type defaults or the estimator's figures, all seeded here with sentinels in every
+ * owner-only 0218 table. A line sold at an estimate is read back with its label.
+ */
+const ESTIMATE_PRIVATE = { decimals: ['173.37', '419.83', '58.91', '4.73', '18.861'], numbers: [7731, 67891, 676767, 686868, 3731, 2917, 1733] };
+const ESTIMATE_WORDS = ['TMALL-TITLE-SECRET-7E', 'SUPPLIER-ITEM-7E', 'supplier-secret-7e.example', 'EST_DEFAULT_WEIGHT', 'EST_US_REFERENCE', 'tmall_cn', 'type_default'];
+
+function seedEstimate(raw: ReturnType<typeof seededCopy>, pid: string): void {
+  const now = '2026-11-01T00:00:00.000Z';
+  raw.exec(`
+    INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${pid}', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = '${pid}';
+    DELETE FROM ops_guards WHERE id = 'engine-price:${pid}';
+    INSERT INTO supplier_price_snapshots (id, source, currency, capture, captured_on, captured_by, file_sha256, item_count, sku_count, state, created_by, created_at, completed_at)
+      VALUES ('sps_7e_cn', 'tmall_cn', 'CNY', 'browser_sweep', '2026-10-31', 'usr_owner', '${'a'.repeat(64)}', 1, 1, 'complete', 'usr_owner', '${now}', '${now}');
+    INSERT INTO supplier_price_items (snapshot_id, item_key, url, page_host, title, name_en, category, sourcing_hint, route_hint)
+      VALUES ('sps_7e_cn', 'SUPPLIER-ITEM-7E', 'https://supplier-secret-7e.example/item', 'supplier-secret-7e.example', 'TMALL-TITLE-SECRET-7E', 'A1', 'printer', 'CHINA_CNY', 'CHINA_SEA');
+    INSERT INTO supplier_price_skus (snapshot_id, item_key, sku_key, price, price_label, net_weight_g)
+      VALUES ('sps_7e_cn', 'SUPPLIER-ITEM-7E', 'SUPPLIER-ITEM-7E-sku', '173.37', '优惠前', 7731);
+    INSERT INTO supplier_price_matches (product_id, combo_key, source, item_key, sku_key, confidence, method, reasons_json, state, decided_by, decided_at, found_in_snapshot, updated_at)
+      VALUES ('${pid}', '', 'tmall_cn', 'SUPPLIER-ITEM-7E', 'SUPPLIER-ITEM-7E-sku', 'exact', 'sku_code', '["EST_US_REFERENCE"]', 'confirmed', 'auto', '${now}', 'sps_7e_cn', '${now}');
+    INSERT INTO supplier_price_manual (product_id, combo_key, amount, currency, entered_by, entered_at) VALUES ('${pid}', 'c:x', '58.91', 'USD', 'usr_owner', '${now}');
+    UPDATE price_estimate_types SET default_weight_g = 7731, default_length_mm = 3731, default_width_mm = 2917, default_height_mm = 1733,
+                                    default_cbm = '18.861', additional_cost_iqd = 67891, min_profit_usd = '4.73' WHERE key = 'printer';
+    INSERT INTO product_price_estimates (product_id, type_key, type_source, state, measure_basis, flags_json, applied_at, applied_by, applied_wire_json, updated_at)
+      VALUES ('${pid}', 'printer', 'supplier_category', 'estimated', 'type_default', '["EST_DEFAULT_WEIGHT"]', '${now}', 'usr_owner', '{"supplier_cost_amount":"419.83","source":"tmall_cn"}', '${now}');
+    INSERT INTO price_estimate_lines (product_id, combo_key, channel, price_source, supplier_amount, supplier_currency, measure_source, est_cost_iqd, est_price_iqd, computed_at)
+      VALUES ('${pid}', '', 'pre_order_sea', 'tmall_cn', '173.37', 'CNY', 'type_default', 676767, 686868, '${now}');
+  `);
+}
+
+test('an estimated product on every customer channel: the label and final numbers, never the catalogue behind it, for every caller', async () => {
+  const raw = seededCopy();
+  try {
+    seedEstimate(raw, 'p_a1');
+    // The checkout froze the acknowledged notice version into the line it sold at an estimate (§6.3).
+    const snapshot = JSON.parse(String((raw.prepare("SELECT pricing_snapshot AS s FROM order_items WHERE id = 'oi1'").get() as { s: string }).s || '{}'));
+    raw.prepare("UPDATE order_items SET pricing_snapshot = ? WHERE id = 'oi1'").run(JSON.stringify({ ...snapshot, applied_iqd: 900000, unit_subtotal_iqd: 900000, estimate: { v: 1 } }));
+    const mounts = [...publicMounts, ['/api/cart', cartRoutes], ['/api/orders', orderRoutes]] as const;
+    const problems: string[] = [];
+    for (const role of ['guest', 'customer', 'merchant', 'employee', 'investor'] as const) {
+      const app = appFor(raw, ROLES[role], mounts);
+      const answers: Array<[string, Response]> = [
+        ['GET /api/products/a1', await get(app, '/api/products/a1')],
+        ['GET /api/products', await get(app, '/api/products')],
+        ['GET /api/home', await get(app, '/api/home')],
+        ['POST /api/products/a1/quote', await post(app, '/api/products/a1/quote', { qty: 1, optionValueIds: ['v_a1'], colorId: 'c_blk' })],
+      ];
+      if (role === 'customer') {
+        answers.push(['GET /api/cart', await get(app, '/api/cart')]);
+        answers.push(['GET /api/orders', await get(app, '/api/orders')]);
+        answers.push(['GET /api/orders/ord1', await get(app, '/api/orders/ord1')]);
+      }
+      for (const [at, res] of answers) {
+        assert.equal(res.status, 200, `${role} ${at}`);
+        const body = await json(res);
+        problems.push(...leaks(body, ESTIMATE_PRIVATE).map((l) => `${role} ${at}: ${l}`));
+        problems.push(...arithmeticLeaks(body).map((l) => `${role} ${at}: ${l}`));
+        const text = JSON.stringify(body);
+        for (const word of ESTIMATE_WORDS) if (text.includes(word)) problems.push(`${role} ${at}: carries «${word}»`);
+      }
+    }
+    assert.deepEqual(problems, []);
+    // Not vacuous: the label is on the page and on the order line sold at an estimate, and only there.
+    const guest = appFor(raw, ROLES.guest, mounts);
+    const page = await json(await get(guest, '/api/products/a1'));
+    assert.equal(page.product.price_estimate, true);
+    const customer = appFor(raw, ROLES.customer, mounts);
+    const line = ((await json(await get(customer, '/api/orders/ord1'))).order.items as Array<{ id?: string; pricing: Record<string, unknown> }>)[0]!;
+    assert.equal(line.pricing.price_estimate, true, 'the line sold at an estimate says so');
+    assert.equal(JSON.stringify(line.pricing).includes('"v"'), false, 'never the notice version or any other field of the record');
+  } finally { raw.close(); }
+});

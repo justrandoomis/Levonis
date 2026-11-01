@@ -24,6 +24,7 @@ import { CHECKOUT_POLICY_KEYS } from '../worker/lib/policyOps';
 import { asD1, freshDb } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { ensurePolicyCorpus, resetPolicyCorpusMemo } from '../worker/lib/policySync';
+import { stageLabel } from '../worker/lib/orderStages';
 
 /**
  * THE CORPUS ITSELF — successor to tests/policyDrafts.test.ts.
@@ -866,4 +867,200 @@ test('privacy 7.5–7.9, 12.6 and 12.10 describe the Meta Pixel and the server e
   assert.match(articleOf(faq.body.ar, '9.4'), /بكسل Meta[^\n]*خادم المتجر[^\n]*مجزَّأين/);
   assert.match(articleOf(faq.body.ckb, '9.4'), /پیکسڵی Meta[^\n]*ڕاژەی فرۆشگا[^\n]*هاشکراوی/);
   assert.notEqual(articleOf(faq.body.ckb, '9.4'), articleOf(faq.body.ar, '9.4'));
+});
+
+// =========================================================================
+// ORDERING AT AN ESTIMATED PRICE — purchase 7, price_protection 6, faq 7
+// (owner, 2026-10-31; DECISIONS row 280; docs/SMART_PRICING.md §6, WP14)
+// =========================================================================
+
+/**
+ * An item may be sold at an ESTIMATED price: the shop's expected pre-order
+ * price before the supplier confirms it. The order is then held at «تم
+ * استلام الطلب» until every estimated line is settled, a different final
+ * price reaches the customer as the 0140 proposal they approve or reject,
+ * and price protection waits for the final price. These tests pin that the
+ * words a customer is bound by say exactly that, in all three languages —
+ * and that the estimator's apply switch (`purchase.version >= 7`) waits for
+ * a version that really carries the clause.
+ */
+const ESTIMATE_LABEL = { ar: 'سعر تقديري', en: 'Estimated price', ckb: 'نرخی خەمڵێنراو' } as const;
+const ESTIMATE_PURCHASE_ARTICLES = ['4.11', '4.12', '4.13', '4.14', '4.15', '4.16', '4.17'] as const;
+const ESTIMATE_PROTECTION_ARTICLES = ['5.6', '6.6', '10.12'] as const;
+
+/** The one definition bullet a document gives the estimated price. */
+function estimateDefinition(body: string, lang: (typeof POLICY_LANGS)[number]): string {
+  const term = { ar: 'السعر التقديري', en: 'Estimated price', ckb: 'نرخی خەمڵێنراو' }[lang];
+  const lines = body.split('\n').filter((l) => l.startsWith(`- ${term}: `));
+  assert.equal(lines.length, 1, `no single «${term}» definition`);
+  return lines[0];
+}
+
+test('purchase 7 carries the estimated-price clause (1.3, 3.10, 4.11–4.17) in every language — the version the apply switch waits for', () => {
+  const purchase = published('purchase');
+  const source = POLICY_SOURCE_DOCUMENTS.find((d) => d.key === 'purchase')!;
+  assert.ok(purchase.version >= 7, `purchase is version ${purchase.version}: the estimate clause is version 7`);
+
+  for (const lang of POLICY_LANGS) {
+    const body = purchase.body[lang];
+    // Every article is PUBLISHED — none cites a withheld article, none states an unknown.
+    for (const n of ESTIMATE_PURCHASE_ARTICLES) {
+      assert.equal(articleOf(body, n), articleOf(source.body[lang], n), `purchase ${n}/${lang} was altered or withheld on publication`);
+    }
+    // The definition names the mark the customer sees and the articles that govern it.
+    const definition = estimateDefinition(body, lang);
+    assert.ok(definition.includes(`«${ESTIMATE_LABEL[lang]}»`) || definition.includes(`"${ESTIMATE_LABEL[lang]}"`), `purchase 1.3/${lang}: the mark`);
+    assert.match(definition, /4\.11 (to|إلى|تا) 4\.17/, `purchase 1.3/${lang}: the governing articles`);
+    // The hold names the stage exactly as the order page shows it.
+    assert.ok(articleOf(body, '4.14').includes(stageLabel('received', 'preorder_sea', lang)), `purchase 4.14/${lang}: the «received» stage label`);
+    // 4.15 has the three outcomes, one bullet each; 4.16 the two money moves.
+    assert.equal(articleOf(body, '4.15').split('\n').filter((l) => l.startsWith('- ')).length, 3, `purchase 4.15/${lang}: three outcomes`);
+    assert.equal(articleOf(body, '4.16').split('\n').filter((l) => l.startsWith('- ')).length, 2, `purchase 4.16/${lang}: a rise and a fall`);
+  }
+
+  const en = (n: string) => articleOf(purchase.body.en, n);
+  assert.match(en('4.11'), /is sold by pre-order alone: it is not sold by direct sale or through Quick Buy, and it is ordered through the cart and the checkout\./);
+  assert.match(en('4.12'), /expressly acknowledged that its price may change, that their order is not prepared before the final price is confirmed, and that any change will be put to them to approve, or to cancel the order, before it is charged\./);
+  assert.match(en('4.12'), /recorded on each item at an estimated price with the version number of the notice they were shown, and where the wording of the notice changes, the order is created only on an acknowledgement of its current version\./);
+  assert.match(en('4.13'), /is paid only in advance from the wallet or in cash on delivery\. Deferred payment and instalment services are not offered on it/);
+  assert.match(en('4.14'), /stays in the pending state, at its first stage, "Order received", until the final price of every item at an estimated price in it has been confirmed under article 4\.15\. Until then the Store does not confirm the order, prepare it, ship it or hand it to a delivery company\./);
+  assert.match(en('4.15'), /asks for their approval; the final price is confirmed by their approval\. None of it is applied before they approve, their silence is not approval, and what is applied on approval is exactly what they approved\./);
+  assert.match(en('4.16'), /^- if the order's total rose, the difference is added to the amount due on delivery and is collected only at the door; nothing is debited from the wallet again for it;$/m);
+  assert.match(en('4.16'), /^- if the total fell, the difference is first deducted from the amount due on delivery, and whatever remains of it is returned to the wallet\.$/m);
+  assert.match(en('4.16'), /keeps the estimated price as the confirmed final price and continues the order at it, or cancels the order and returns everything paid on it in full/);
+  assert.match(en('4.16'), /the order is carried out only at the total at which it was created or at a total the customer approved\./);
+  assert.match(en('4.17'), /the customer may cancel the order themselves at any time, and everything they paid on it is returned in full under article 12\.2; after that, article 12\.1 applies\./);
+  assert.match(en('4.17'), /even if the mark is later removed from the product page\. Its price protection begins only once its final price is confirmed/);
+  assert.match(en('3.10'), /The one exception is the final price of an item at an estimated price, which changes the order only under articles 4\.15 and 4\.16\.$/m);
+
+  // The authoritative Arabic says the same things in its own words.
+  const ar = (n: string) => articleOf(purchase.body.ar, n);
+  assert.match(ar('4.11'), /تُباع بالطلب المسبق وحده، فلا تُباع بالبيع المباشر ولا عبر الشراء السريع/);
+  assert.match(ar('4.12'), /ويقرّ الزبون صراحةً[^\n]*رقم نسخة الملاحظة/);
+  assert.match(ar('4.13'), /لا يُدفع إلا مسبقاً من المحفظة أو نقداً عند الاستلام\. ولا يُتاح فيه الدفع المؤجل ولا خدمات التقسيط/);
+  assert.match(ar('4.14'), /لا يؤكد المتجر الطلب، ولا يجهّزه، ولا يشحنه، ولا يسلّمه إلى شركة توصيل/);
+  assert.match(ar('4.15'), /ولا يُعدّ سكوته موافقة/);
+  assert.match(ar('4.16'), /ولا يُحصَّل إلا عند الباب، ولا يُخصم لأجله من المحفظة شيء من جديد/);
+  assert.match(ar('4.16'), /وإما إلغاء الطلب وإعادة كل ما دُفع عليه كاملاً/);
+  assert.match(ar('4.17'), /للزبون أن يلغي طلبه بنفسه في أي وقت، ويُعاد إليه كل ما دفعه عليه كاملاً وفق المادة 12\.2/);
+  assert.match(ar('3.10'), /ويُستثنى من ذلك السعر النهائي للقطعة بسعر تقديري، فلا يغيّر الطلب إلا وفق المادتين 4\.15 و4\.16\./);
+
+  // Real Sorani (row 183): the corpus's own words, never the Arabic pasted across.
+  const ckb = (n: string) => articleOf(purchase.body.ckb, n);
+  assert.match(ckb('4.13'), /پارەدانی دواخراو و خزمەتگوزارییەکانی قیست لەسەری بەردەست نین/);
+  assert.match(ckb('4.16'), /تەنها لە بەردەرگا وەردەگیرێت؛ لە پێناویدا هیچ لە جزدان نابڕدرێتەوە/);
+  assert.match(ckb('4.17'), /بەپێی بڕگەی 12\.2 بە تەواوی بۆی دەگەڕێتەوە/);
+  for (const n of [...ESTIMATE_PURCHASE_ARTICLES, '3.10']) {
+    assert.notEqual(ckb(n), ar(n), `purchase ${n}: the ckb is the ar`);
+    assert.match(ckb(n), /[ێۆڕەڵ]/, `purchase ${n}/ckb is not Sorani`);
+  }
+  for (const n of ESTIMATE_PURCHASE_ARTICLES) {
+    // The document's own pre-order word (1.3, 4.2), not a second term for the same thing.
+    assert.ok(!ckb(n).includes('پێشداواکاری'), `purchase ${n}/ckb: the corpus says «داواکاری پێشوەخت»`);
+  }
+});
+
+test('price_protection 6: an estimated item\'s final price is settled only by approval (5.6, 6.6), and protection starts at its confirmation (10.12)', () => {
+  const pp = published('price_protection');
+  const source = POLICY_SOURCE_DOCUMENTS.find((d) => d.key === 'price_protection')!;
+  assert.ok(pp.version >= 6, `price_protection is version ${pp.version}: the estimate articles are version 6`);
+  for (const lang of POLICY_LANGS) {
+    for (const n of ESTIMATE_PROTECTION_ARTICLES) {
+      assert.equal(articleOf(pp.body[lang], n), articleOf(source.body[lang], n), `price_protection ${n}/${lang} was altered or withheld on publication`);
+    }
+    assert.match(estimateDefinition(pp.body[lang], lang), /4\.11 (to|إلى|تا) 4\.17/, `price_protection 1.2/${lang}: the purchase articles`);
+  }
+
+  const en = (n: string) => articleOf(pp.body.en, n);
+  assert.match(en('5.6'), /^Neither this chapter nor chapter 6 governs the final price of an item bought at an estimated price, whether the order is unpaid or paid from the wallet; that price is confirmed under articles 4\.15 and 4\.16 of the Purchase Policy\./m);
+  assert.match(en('5.6'), /it is applied only after the customer approves it: if the total rises, the difference is collected only at the door, with nothing debited from the wallet again;/);
+  assert.match(en('5.6'), /the Store either keeps the estimated price or cancels the order and returns everything paid on it in full\. Until the final price is confirmed, the customer may cancel the order themselves at any time\./);
+  assert.match(en('6.6'), /^Paying an estimated price from the wallet does not make it the final price\. Until the item's final price is confirmed, article 5\.6 governs it;/m);
+  assert.match(en('10.12'), /^Price protection for an item bought at an estimated price begins only once its final price is confirmed, and a claim filed on it before then is refused\./m);
+  assert.match(en('10.12'), /its final price as confirmed under the Purchase Policy, not the estimate, and article 10\.4 is applied on that basis\./);
+
+  const ar = (n: string) => articleOf(pp.body.ar, n);
+  assert.match(ar('5.6'), /لا يحكم هذا الفصل ولا الفصل السادس السعر النهائي لقطعة اشتُريت بسعر تقديري/);
+  assert.match(ar('5.6'), /المادتين 4\.15 و4\.16 من سياسة الشراء/);
+  assert.match(ar('10.12'), /لا تبدأ حماية سعر القطعة المشتراة بسعر تقديري إلا بعد تأكيد سعرها النهائي، وتُرفض المطالبة المقدمة عنها قبل ذلك/);
+
+  const ckb = (n: string) => articleOf(pp.body.ckb, n);
+  assert.match(ckb('5.6'), /بڕگەکانی 4\.15 و 4\.16ی سیاسەتی کڕین/);
+  assert.match(ckb('10.12'), /تەنها دوای پشتڕاستکردنەوەی نرخی کۆتاییەکەی دەست پێدەکات/);
+  for (const n of ESTIMATE_PROTECTION_ARTICLES) {
+    assert.notEqual(ckb(n), ar(n), `price_protection ${n}: the ckb is the ar`);
+    assert.match(ckb(n), /[ێۆڕەڵ]/, `price_protection ${n}/ckb is not Sorani`);
+  }
+
+  // The rules of versions 4 and 5 stand: the Direct Sale Extra in 2.3, the
+  // exchange-rate article 11.8, and chapter 6's "the paid price is honoured"
+  // for every price that is not an estimate.
+  for (const lang of POLICY_LANGS) {
+    assert.ok(articleOf(pp.body[lang], '2.3').includes(DIRECT_SALE_EXTRA[lang]), `price_protection 2.3/${lang}`);
+    articleOf(pp.body[lang], '11.8');
+  }
+  assert.match(en('6.2'), /the Store absorbs the increase in full and executes the order at the price paid; no difference is claimed from the customer\./);
+});
+
+test('faq 12.12 answers «سعر تقديري» and routes to the rules that decide it — purchase 4.11–4.17, price_protection 5.6 and 10.12', () => {
+  const faq = published('faq');
+  const purchase = published('purchase');
+  const pp = published('price_protection');
+  assert.ok(faq.version >= 7, `faq is version ${faq.version}: the estimate entry is version 7`);
+  const REFERENCE: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
+    ar: /المرجع: وثيقة الشراء، المواد 4\.11 إلى 4\.17، ووثيقة حماية السعر، المادتان 5\.6 و10\.12\.$/m,
+    en: /Reference: the Purchase document, articles 4\.11 to 4\.17, and the Price Protection document, articles 5\.6 and 10\.12\.$/m,
+    ckb: /سەرچاوە: بەڵگەنامەی کڕین، ماددەکانی 4\.11 تا 4\.17، و بەڵگەنامەی پاراستنی نرخ، ماددەکانی 5\.6 و 10\.12\.$/m,
+  };
+  for (const lang of POLICY_LANGS) {
+    const entry = articleOf(faq.body[lang], '12.12');
+    assert.ok(entry.split('\n')[0].includes(`«${ESTIMATE_LABEL[lang]}»`) || entry.split('\n')[0].includes(`"${ESTIMATE_LABEL[lang]}"`), `faq 12.12/${lang}: the question names the mark`);
+    assert.match(entry, REFERENCE[lang], `faq 12.12/${lang}: the reference`);
+    assert.ok(entry.includes(stageLabel('received', 'preorder_sea', lang)), `faq 12.12/${lang}: the «received» stage label`);
+    // A pointer to nothing is the defect render.ts withholds for its own
+    // document; across documents it is this test's job.
+    for (const n of ESTIMATE_PURCHASE_ARTICLES) articleOf(purchase.body[lang], n);
+    for (const n of ['5.6', '10.12']) articleOf(pp.body[lang], n);
+  }
+  const en = articleOf(faq.body.en, '12.12');
+  assert.match(en, /pay from the wallet or in cash on delivery, after acknowledging at checkout that you understand its price may change\./);
+  assert.match(en, /if your order's total does not change, it is confirmed as it is; if it does, the new price is sent to you to approve or reject, and no additional amount is taken from you without your approval\./);
+  assert.match(en, /Until the final price is confirmed you can cancel the order and get back everything you paid, and price protection starts only once it is confirmed\./);
+  assert.notEqual(articleOf(faq.body.ckb, '12.12'), articleOf(faq.body.ar, '12.12'));
+  assert.match(articleOf(faq.body.ckb, '12.12'), /بەبێ ڕەزامەندیی تۆ هیچ بڕە پارەیەکی زیاترت لێ وەرناگیرێت/);
+});
+
+/**
+ * INVARIANT I6 IN THE WORDS A CUSTOMER IS BOUND BY. The estimate is the
+ * shop's price; how it is made — the supplier's own price, freight, rates,
+ * the per-type profit — is owner-only, and DECISIONS row 281 records that
+ * published inputs already let a determined reader fit the rest. So the
+ * estimate articles state prices and rules and NOTHING about the making:
+ * no cost word, no rate, no profit and no figure at all (article numbers
+ * aside), in any language.
+ */
+test('the estimated-price articles name no cost, supplier price, freight, rate, profit or figure — prices and rules only (invariant I6)', () => {
+  const BANNED: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
+    ar: /كلفة|تكلفة|ربح|أرباح|هامش|سعر الصرف|سعر المورّد|سعر المورد|جمرك|أجرة النقل|معادلة/,
+    en: /\b(costs?|profits?|margins?|markup|freight|exchange rate|customs|supplier'?s? price|purchase price|formula)\b/i,
+    ckb: /تێچوو|قازانج|نرخی ئاڵوگۆڕ|گومرگ|نرخی دابینکەر|کرێی گواستنەوە|هاوکێشە/,
+  };
+  const purchase = published('purchase');
+  const pp = published('price_protection');
+  const faq = published('faq');
+  for (const lang of POLICY_LANGS) {
+    const texts: Array<[string, string]> = [
+      ['purchase 1.3', estimateDefinition(purchase.body[lang], lang)],
+      ...ESTIMATE_PURCHASE_ARTICLES.map((n): [string, string] => [`purchase ${n}`, articleOf(purchase.body[lang], n)]),
+      ['price_protection 1.2', estimateDefinition(pp.body[lang], lang)],
+      ...ESTIMATE_PROTECTION_ARTICLES.map((n): [string, string] => [`price_protection ${n}`, articleOf(pp.body[lang], n)]),
+      ['faq 12.12', articleOf(faq.body[lang], '12.12')],
+    ];
+    for (const [where, text] of texts) {
+      assert.doesNotMatch(text, BANNED[lang], `${where}/${lang} says how an estimate is made`);
+      // Article numbers and (in English) chapter numbers are references, not figures.
+      const unreferenced = text.replace(/\d+\.\d+/g, '').replace(/\bchapters? \d+/gi, '');
+      assert.doesNotMatch(unreferenced, /[0-9٠-٩۰-۹]/, `${where}/${lang} states a figure`);
+    }
+  }
 });

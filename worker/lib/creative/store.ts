@@ -18,6 +18,9 @@
  *
  * PRICE SEMANTICS (spec §9, acceptance 2):
  *   unpriced      status 'unpriced', amount null — NEVER 0
+ *   estimate      treated as unpriced (docs/SMART_PRICING.md §5.3): a card labelled
+ *                 «سعر تقديري» quotes no figure, so no advert states an estimate as
+ *                 a price — and none of its options either
  *   members-only  status 'members_only' (a locked composition): no public number
  *   live PUBLIC offer  the offer window and the struck regular price; a
  *                 members-only window is not an offer here
@@ -82,7 +85,8 @@ export function priceOfCard(card: Row): SnapshotPrice {
   const locked = card.locked === true;
   const p = priceFromCard(card, locked);
   if (p.status === 'members_only') return { ...UNPRICED, status: 'members_only' };
-  if (p.status !== 'priced' || p.amount === null || p.amount <= 0) return { ...UNPRICED };
+  // An estimated price is never an advert's price (migration 0218): unpriced for the studio.
+  if (p.status !== 'priced' || p.amount === null || p.amount <= 0 || p.estimate) return { ...UNPRICED };
   const offer = livePublicOffer(card);
   const before = intOrNull(card.display_offer_before_iqd);
   const teasers = [intOrNull(card.display_pro_iqd), intOrNull(card.display_prime_iqd)].filter((x): x is number => x !== null && x > 0 && x < p.amount!);

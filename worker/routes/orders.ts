@@ -108,13 +108,28 @@ import {
   allowedPaymentMethods,
   isBnpl,
   isCod,
+  isFinancedPaymentMethod,
   isPaymentMethodAllowed,
   isGini,
   GINI_ORDER_NO_RE,
   isPrepaid,
   preorderPricingFor,
   PAYMENT_METHOD_NOT_ALLOWED,
+  PRICE_ESTIMATE_PAYMENT_NOT_ALLOWED,
 } from '../lib/paymentPolicy';
+import { selectionKey, skuEstimated } from '../lib/commercialState';
+import { isEstimateRow } from '../lib/priceEstimateLabel';
+import { ESTIMATE_NOTICE_VERSION, estimateServerMessage } from '@levonis/contracts/priceEstimates';
+import {
+  attachEstimateStates,
+  estimateChannelOf,
+  estimateCheckoutStatements,
+  estimateOrderingEnabled,
+  isEstimateCheckoutAbort,
+  withEstimateSnapshot,
+  type EstimateChannel,
+  type EstimateCheckoutLine,
+} from '../lib/orderEstimates';
 import { SKU_STRICT_ERROR, type PreorderPricing } from '../lib/pricing';
 import { printerProductIds } from '../lib/printerIdentity';
 import { catalogIndexFor } from '../lib/catalogPresentation';
@@ -899,6 +914,14 @@ export function orderPublic(
          */
         is_gift: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '',
         gift_id: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '' ? it.gift_entitlement_id : null,
+        /**
+         * «سعر تقديري» (migration 0218; §5.3): a line sold at an estimated
+         * price and where its final price stands — open, proposed, confirmed,
+         * approved, rejected or void. Present only on such a line, and only
+         * when the reader attached the states (`attachEstimateStates`); a
+         * state, never a figure, source or flag.
+         */
+        ...(typeof it.price_estimate_state === 'string' ? { price_estimate: { state: it.price_estimate_state } } : {}),
         // Read-side projection also protects historical/imported snapshots
         // written before current checkout validation existed.
         // A customer reads the line's final numbers, its gift and — DEFERRED to
@@ -1008,6 +1031,8 @@ async function loadOrder(db: D1Database, orderId: string) {
   const order = await db.prepare('SELECT * FROM orders WHERE id = ?').bind(orderId).first<Record<string, unknown>>();
   if (!order) return null;
   const { results: items } = await db.prepare(`${ORDER_ITEMS_SELECT} WHERE oi.order_id = ?`).bind(orderId).all();
+  // Each estimated line's state (0218): `items[].price_estimate.state` on every order read.
+  await attachEstimateStates(db, items as Array<Record<string, unknown>>);
   return { order, items };
 }
 
@@ -1923,6 +1948,23 @@ export interface ComputedLine {
     option_value_ids: string[];
     color_id: string;
   } | null;
+  /**
+   * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §6.1–6.3): set on an
+   * ORDINARY pre-order line whose SKU is an estimate (`skuEstimated` on the
+   * line's own selection) — the line the order batch records in
+   * `order_price_estimates`, with the SKU's canonical key and the route's
+   * channel. Never on a gift, a bundle part or a mystery spool. Not written to
+   * any column and never a figure: the customer reads only `price_estimate:
+   * true` (the quote) and the record's state (the order).
+   */
+  price_estimate?: { combo_key: string; channel: EstimateChannel } | null;
+  /**
+   * The line's PRODUCT ROW carries the label (`products.price_estimate`): the
+   * order batch must hold the checkout token for its `order_items` row (T6),
+   * whether or not the line is recorded (a gift line of a labelled product is
+   * not — it is priced at 0).
+   */
+  estimate_label?: true;
 }
 
 /** What the settlement resolved about this member, carried to the snapshot. */
@@ -2066,6 +2108,15 @@ export interface CheckoutComputation {
   policies: PolicyRef[];
   printerGiftConfig: unknown;
   preorderGiftConfig: unknown;
+  /**
+   * «سعر تقديري» (migration 0218; §6.1–6.2): the cart items whose lines are at
+   * an estimated price, and the owner's ordering switch as this checkout read
+   * it — null when no line is estimated (the quote then carries no `estimate`
+   * block and the order needs no acknowledgement).
+   */
+  estimate: { lines: string[]; ordering_paused: boolean } | null;
+  /** Some line's product row is labelled: the order batch holds the checkout token (T6). */
+  estimateLabelled: boolean;
 }
 
 /**
@@ -2673,6 +2724,8 @@ export async function computeCheckout(
             colorId: sel.colorId || null,
           }),
           gift: { ...block, order_seq: verdict.nextOrderSeq },
+          // A gift is never an estimate line (it is priced at 0), but its row still needs the token (T6).
+          ...(isEstimateRow(row) ? { estimate_label: true as const } : {}),
         });
         productIds.push(String(row.id));
         shippingItems.push({ product_id: String(row.id), qty: sel.qty, is_printer: isPrinter, ...shippingFactsFrom(row.ops_policy, row) });
@@ -2817,6 +2870,28 @@ export async function computeCheckout(
       // rule the cart applies, instead of being priced at the base and stored
       // with an empty option_id.
       refuseIncompleteSelection(described, displayName);
+      /**
+       * «سعر تقديري» (migration 0218; §6.1, §6.3). The label is on the product
+       * row this line was priced from (`p.*`) and the owner's firm SKUs on the
+       * overlay view it was priced with, so the line's own SKU decides —
+       * `skuEstimated` on the canonical key of the line's selection, which
+       * covers a line priced under an offer window too. An estimated SKU is
+       * sold ONLY as a pre-order on a route (the cart refuses the same first):
+       * its record needs the route's channel, and a direct-sale line would
+       * carry a price nobody has confirmed against a shelf.
+       */
+      const estimateKey = selectionKey(sel.optionValueIds ?? [], sel.colorId || null);
+      const estimated = skuEstimated(doc, estimateKey);
+      let estimateChannel: EstimateChannel | null = null;
+      if (estimated) {
+        const routeMethod = (resolved.transport as { method?: unknown } | null | undefined)?.method ?? sel.transportMethod;
+        estimateChannel = orderType === 'pre_order' ? estimateChannelOf(routeMethod) : null;
+        if (!estimateChannel) {
+          throw new HttpError(409, estimateServerMessage('PRICE_ESTIMATE_PREORDER_ONLY'), 'PRICE_ESTIMATE_PREORDER_ONLY', {
+            product_id: String(row.id),
+          });
+        }
+      }
       // An extended warranty is a PRINTER's option (owner mandate). The cart
       // already refuses it elsewhere; the checkout re-checks the stored row so
       // a line written before the rule, or a product that left the printer
@@ -3007,6 +3082,9 @@ export async function computeCheckout(
           view ?? EMPTY_RELATIONS,
           { optionValueIds: sel.optionValueIds ?? [], colorId: sel.colorId || null }
         ),
+        // 0218: the estimate record's SKU and channel (only on an estimated line), and the label's token.
+        ...(estimated && estimateChannel ? { price_estimate: { combo_key: estimateKey, channel: estimateChannel } } : {}),
+        ...(isEstimateRow(row) ? { estimate_label: true as const } : {}),
       });
     }
     // THE PHYSICAL-LINE CEILING (§3.1) — a door refusal naming the limit, not a
@@ -3039,6 +3117,29 @@ export async function computeCheckout(
   // single dinar here (it does not when no line carries a direct premium, or
   // when this customer is exempt from it).
   let priced = priceLines(requestedPricing);
+  /**
+   * «سعر تقديري» (migration 0218; §6.1). Which lines are estimates is a fact
+   * of the product rows and the selections, never of the pricing basis, so the
+   * requested pass answers for every pass.
+   *
+   *   - NEVER FINANCED: wallet or cash on delivery only. A posted `bnpl` /
+   *     `gini` is refused here — a financed order could never be settled
+   *     (0140 refuses PRICE_ADJUST_FINANCED) — with the list this cart may use.
+   *   - THE OWNER'S BRAKE: `price_estimate_control.ordering_enabled`, read only
+   *     for a cart with an estimated line (fail closed: 503 when unreadable).
+   *     The quote reports a pause as a blocker; the order door refuses it.
+   */
+  const estimatedLines = priced.lines.filter((l) => l.price_estimate);
+  const hasEstimate = estimatedLines.length > 0;
+  const estimateMethodOptions = { ...methodOptions, hasEstimate };
+  if (hasEstimate && isFinancedPaymentMethod(input.paymentMethodId)) {
+    throw badRequest(estimateServerMessage('PRICE_ESTIMATE_PAYMENT_NOT_ALLOWED'), PRICE_ESTIMATE_PAYMENT_NOT_ALLOWED, {
+      payment_method_id: input.paymentMethodId,
+      allowed_payment_methods: allowedPaymentMethods(shippingType, estimateMethodOptions),
+      shipping_type: shippingType,
+    });
+  }
+  const estimateOrdering = hasEstimate ? await estimateOrderingEnabled(c.env.DB) : true;
   const prepaidPriced = isPreorderCart ? (requestedPricing === 'prepaid' ? priced : priceLines('prepaid')) : priced;
   const codPriced = isPreorderCart ? (requestedPricing === 'cod' ? priced : priceLines('cod')) : priced;
   /**
@@ -3992,11 +4093,12 @@ export async function computeCheckout(
     atApprovedDefault,
     proContext,
     shippingType,
-    allowedPaymentMethods: allowedMethods,
-    bnpl: finalBnpl ?? (bnplBase.eligible ? bnplBase : null),
+    // An estimated line takes the financed ids off the list (0218, §6.1): wallet or cash on delivery.
+    allowedPaymentMethods: hasEstimate ? allowedPaymentMethods(shippingType, estimateMethodOptions) : allowedMethods,
+    bnpl: hasEstimate ? null : finalBnpl ?? (bnplBase.eligible ? bnplBase : null),
     bnplAmount: settled.financedIqd,
     bnplDueAt: finalBnplDueAt,
-    giniEnabled,
+    giniEnabled: giniEnabled && !hasEstimate,
     giniPolicy,
     // From `settled`, never recomputed out here: the basis that won is the
     // only one whose figures belong on this order.
@@ -4064,6 +4166,10 @@ export async function computeCheckout(
     policies,
     printerGiftConfig: settings.printerGiftConfig,
     preorderGiftConfig: settings.preorderGiftConfig,
+    estimate: hasEstimate
+      ? { lines: [...new Set(priced.lines.filter((l) => l.price_estimate).map((l) => l.cart_item_id))], ordering_paused: !estimateOrdering }
+      : null,
+    estimateLabelled: priced.lines.some((l) => l.estimate_label === true),
   };
 }
 
@@ -4175,6 +4281,8 @@ orderRoutes.get('/', async (c) => {
       if (list) list.push(it);
       else itemsByOrder.set(key, [it]);
     }
+    // Each estimated line's state (0218), one read for the page: the card's «بانتظار تأكيد السعر النهائي».
+    await attachEstimateStates(c.env.DB, items);
   }
   const mysteryView = await mysteryViewFor(c.env.DB, ids, 'customer', langOf(c));
   // One read for the page's stores (A6): «طلبك من {store}» on each merchant order.
@@ -4256,6 +4364,8 @@ function quoteLines(lines: ComputedLine[]) {
           : {}),
         is_printer: l.is_printer,
         breakdown: l.breakdown,
+        // «سعر تقديري» (0218): this line is at an estimated pre-order price — a label, never a figure.
+        ...(l.price_estimate ? { price_estimate: true as const } : {}),
         // A live offer that lowered this line (docs/ux/PRODUCT-DISCOUNT.md §8.1, §8.5): the struck UNIT
         // before price and its «−N٪», beside the bundle's two figures — IQD only.
         ...(l.breakdown && typeof l.breakdown.offer_before_iqd === 'number'
@@ -4303,7 +4413,19 @@ orderRoutes.post('/quote', async (c) => {
   // READ-ONLY: `allocate: false` — the quote prices and reports availability,
   // and nothing is drawn and nothing is written (§7.4).
   const comp = await computeCheckout(c, user, input, { allocate: false });
+  // Meta Conversions API: InitiateCheckout, once per customer, cart and day, after the response.
+  queueMetaInitiateCheckout(c, user, comp);
+  return c.json({ success: true, quote: quotePayload(comp, input) });
+});
 
+/**
+ * THE QUOTE'S BODY — what `POST /api/orders/quote` answers with, and the FRESH
+ * quote a refused estimate checkout carries back (409 PRICE_ESTIMATE_ACK_REQUIRED,
+ * docs/SMART_PRICING.md §6.2), so a tab that missed the estimate notice
+ * re-renders from the server's own answer instead of guessing. Pure over the
+ * computation: it reads and writes nothing.
+ */
+function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
   const blockers: string[] = [];
   if (comp.shipping.needs_config.length > 0) blockers.push('SHIPPING_NEEDS_CONFIG');
   /**
@@ -4324,12 +4446,10 @@ orderRoutes.post('/quote', async (c) => {
    * but reports everything is supposed to do.
    */
   if (comp.requiredAdvance > comp.walletApplied) blockers.push('ADVANCE_NOT_COVERED');
-  // Meta Conversions API: InitiateCheckout, once per customer, cart and day, after the response.
-  queueMetaInitiateCheckout(c, user, comp);
+  // «سعر تقديري» (0218): the owner paused ordering at estimated prices — the order door refuses it too.
+  if (comp.estimate?.ordering_paused) blockers.push('PRICE_ESTIMATE_ORDERING_PAUSED');
 
-  return c.json({
-    success: true,
-    quote: {
+  return {
       /**
        * THE PRICE AUTHORITY for the checkout screen. The cart prices a
        * pre-order line as prepaid; these lines are priced for the payment
@@ -4512,11 +4632,26 @@ orderRoutes.post('/quote', async (c) => {
         pro_benefits_context: comp.proContext,
       },
       policies: comp.policies,
+      /**
+       * «سعر تقديري» (migration 0218; §6.2) — present only when a line is at an
+       * estimated price: which cart lines, and the notice version the order's
+       * `price_estimate_ack` must equal. The screen shows the notice, the
+       * REQUIRED checkbox and «اطلب بالسعر التقديري»; the payment list above
+       * already holds only the wallet and cash on delivery.
+       */
+      ...(comp.estimate
+        ? {
+            estimate: {
+              lines: comp.estimate.lines,
+              notice_version: ESTIMATE_NOTICE_VERSION,
+              ...(comp.estimate.ordering_paused ? { ordering_paused: true } : {}),
+            },
+          }
+        : {}),
       blockers,
       can_checkout: blockers.length === 0,
-    },
-  });
-});
+  };
+}
 
 orderRoutes.post('/', async (c) => {
   await rateLimit(c, 'checkout', 15, 300);
@@ -4609,6 +4744,29 @@ export async function placeOrder(
       'Delivery fees for part of this order are not configured yet (printer/carton delivery mapping). Please contact support or try again later.',
       'SHIPPING_NEEDS_CONFIG'
     );
+  }
+
+  /**
+   * «اطلب بالسعر التقديري» (migration 0218; docs/SMART_PRICING.md §6.1–6.2),
+   * before anything is written:
+   *   - the owner's emergency brake refuses every estimated line;
+   *   - the buyer must have acknowledged THIS notice: `price_estimate_ack`
+   *     equals ESTIMATE_NOTICE_VERSION, never a bare boolean — a tab on an
+   *     older bundle, or one showing older words, is answered with the fresh
+   *     quote to render (Quick Buy's finaliser carries no acknowledgement, so
+   *     an estimated SKU cannot be ordered through it either).
+   */
+  if (comp.estimate) {
+    if (comp.estimate.ordering_paused) {
+      throw new HttpError(409, estimateServerMessage('PRICE_ESTIMATE_ORDERING_PAUSED'), 'PRICE_ESTIMATE_ORDERING_PAUSED', {
+        lines: comp.estimate.lines,
+      });
+    }
+    if (body.price_estimate_ack !== ESTIMATE_NOTICE_VERSION) {
+      throw new HttpError(409, estimateServerMessage('PRICE_ESTIMATE_ACK_REQUIRED'), 'PRICE_ESTIMATE_ACK_REQUIRED', {
+        quote: quotePayload(comp, input),
+      });
+    }
   }
 
   // `CheckoutStarted` (03-EVENTS.md §3.6) — the quote step, keyed on the
@@ -4905,6 +5063,36 @@ export async function placeOrder(
   }
 
   /**
+   * «سعر تقديري» — THE RECORD (migration 0218; §6.3). Every estimated line is
+   * recorded in THIS batch: the checkout token goes in before the first
+   * `order_items` row (T6 refuses a line of a labelled product without it),
+   * and the records plus the token's removal follow the last one (T7 accepts
+   * a record only here). Each record keeps the SKU, the route's channel, the
+   * quantity, the regular unit price the line was sold at and the notice
+   * version acknowledged; the line's snapshot gains `estimate: {v}`, which the
+   * order read serves as its label. A gift, a bundle part or a mystery spool is
+   * never recorded (none is estimated: §8 keeps labelled products out of
+   * them) — but a gift of a labelled product still needs the token. An order
+   * with no labelled product writes none of this: its batch is what it was.
+   */
+  const estimateRecords: EstimateCheckoutLine[] = comp.lines
+    .filter((it) => it.price_estimate && !it.gift && !it.mystery_spool && !it.bundle_parent_item_id && it.benefit)
+    .map((it) => ({
+      order_item_id: it.id,
+      product_id: it.product_id,
+      combo_key: it.price_estimate!.combo_key,
+      channel: it.price_estimate!.channel,
+      qty: it.qty,
+      estimate_unit_iqd: it.benefit!.regular_unit_iqd,
+    }));
+  const recordedIds = new Set(estimateRecords.map((r) => r.order_item_id));
+  const estimateCheckout =
+    comp.estimateLabelled || estimateRecords.length > 0
+      ? estimateCheckoutStatements(c.env.DB, orderId, estimateRecords, ESTIMATE_NOTICE_VERSION, now)
+      : null;
+  if (estimateCheckout) stmts.push(...estimateCheckout.before);
+
+  /**
    * OWNER DECISION 6: AN ENGINE-PRICED LINE CARRIES THE ENGINE PRICE AND THE
    * RATE IT WAS BOUGHT AT (migration 0181 §12; ODP §5.1 item 10). Only a line
    * whose regular price is exactly its model's stored engine price gets the six
@@ -4959,8 +5147,13 @@ export async function placeOrder(
         product_id: it.mystery_spool ? null : it.product_id,
         // …and `pricing_snapshot = null`, never the drawn item's ladder
         // (§6.2, §8.2 row 19). The share it was worth is on
-        // `component_value_iqd`, offer-derived.
-        pricing_snapshot: it.mystery_spool ? null : it.pricing_snapshot,
+        // `component_value_iqd`, offer-derived. A recorded estimate line's
+        // snapshot carries the acknowledged notice version (0218, §6.3).
+        pricing_snapshot: it.mystery_spool
+          ? null
+          : recordedIds.has(it.id)
+            ? withEstimateSnapshot(it.pricing_snapshot, ESTIMATE_NOTICE_VERSION)
+            : it.pricing_snapshot,
         // §19 — WHAT THE MEMBERSHIP TOOK OFF THIS LINE, and under which rule.
         membership_discount_iqd: comp.benefits.byLine.get(it.id)?.total_iqd ?? 0,
         membership_rule_id: comp.benefits.byLine.get(it.id)?.rule_id ?? null,
@@ -5046,6 +5239,8 @@ export async function placeOrder(
     // below): it needs its own idempotency-keyed batch so a retry of the whole
     // checkout is a no-op rather than a second deduction.
   }
+  // The estimate records, after their lines exist (T7), and the token's removal (0218, §6.3).
+  if (estimateCheckout) stmts.push(...estimateCheckout.after);
 
   /**
    * THE GIFT FENCE (0175) — the reservation fence's idea, for the gift flips
@@ -5352,6 +5547,23 @@ export async function placeOrder(
         'IDEMPOTENCY_KEY_REUSED'
       );
     }
+    /**
+     * A LABEL THAT LANDED AFTER THIS CHECKOUT READ THE PRODUCT (0218, T6): the
+     * database refused a line of a now-labelled product sold without the
+     * estimate record. Nothing was written. The buyer is answered with the
+     * fresh quote — which now carries the estimate notice — so the retry goes
+     * through the acknowledgement; anything the fresh read refuses is thrown
+     * as itself.
+     */
+    if (isEstimateCheckoutAbort(e)) {
+      const fresh = await computeCheckout(c, user, input, { allocate: false, source: quickBuy?.source });
+      if (fresh.estimate) {
+        throw new HttpError(409, estimateServerMessage('PRICE_ESTIMATE_ACK_REQUIRED'), 'PRICE_ESTIMATE_ACK_REQUIRED', {
+          quote: quotePayload(fresh, input),
+        });
+      }
+      throw badRequest('Order could not be placed: a price changed. Please review your cart and try again.', 'CONFLICT_RETRY');
+    }
     if (msg.includes('COUPON_PER_USER_LIMIT')) {
       throw badRequest('Coupon could not be applied (PER_USER_LIMIT_REACHED)', 'PER_USER_LIMIT_REACHED');
     }
@@ -5594,6 +5806,8 @@ export async function placeOrder(
       bnplDueAt: comp.bnplDueAt,
       dueOnDeliveryIqd: comp.dueOnDelivery,
       lines: comp.lines,
+      // 0218: «⚠️ يتضمن أسعارًا تقديرية — أكّد السعر النهائي قبل الطلب من المورّد».
+      priceEstimate: estimateRecords.length > 0,
     }),
     confirmKeyboard ? { reply_markup: confirmKeyboard } : {}
   );

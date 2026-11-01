@@ -1,0 +1,2793 @@
+{
+ "format": "levonis.supplier-prices.v1",
+ "source": "tmall_cn",
+ "currency": "CNY",
+ "price_basis": "list",
+ "capture": "browser_sweep",
+ "captured_on": "2026-10-31",
+ "captured_by": "browser sweep",
+ "items": [
+  {
+   "item_key": "693972799714",
+   "url": "https://detail.tmall.com/item.htm?id=693972799714",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹PLA Basic基础 3D打印耗材 高韧性易打印 RFID智能参数识别",
+   "name_en": "PLA Basic filament",
+   "category": "filament",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA",
+   "codes": [
+    "10102",
+    "10200",
+    "10101",
+    "10601",
+    "10501",
+    "10401",
+    "10801",
+    "10700",
+    "10300",
+    "10602",
+    "10103",
+    "10800",
+    "10201",
+    "10203",
+    "10100",
+    "10400",
+    "10202",
+    "10603",
+    "10104",
+    "10105",
+    "10502",
+    "10802",
+    "10301",
+    "10402",
+    "10204",
+    "10604",
+    "10205",
+    "10701",
+    "10503",
+    "10605"
+   ],
+   "props": [
+    {
+     "pid": "1627207",
+     "name": "颜色",
+     "values": [
+      {
+       "vid": "34728588357",
+       "name": "银色10102【含料盘】"
+      },
+      {
+       "vid": "34728588358",
+       "name": "红色10200【含料盘】"
+      },
+      {
+       "vid": "34728588359",
+       "name": "黑色10101【含料盘】"
+      },
+      {
+       "vid": "44508076815",
+       "name": "蓝色10601【含料盘】"
+      },
+      {
+       "vid": "35878148504",
+       "name": "拓竹绿10501【含料盘】"
+      },
+      {
+       "vid": "34728588362",
+       "name": "金色10401【含料盘】"
+      },
+      {
+       "vid": "34728588363",
+       "name": "青铜色10801【含料盘】"
+      },
+      {
+       "vid": "34728588364",
+       "name": "紫色10700【含料盘】"
+      },
+      {
+       "vid": "36270818617",
+       "name": "橙色10300【含料盘】"
+      },
+      {
+       "vid": "39913882626",
+       "name": "蓝灰10602【含料盘】"
+      },
+      {
+       "vid": "34728588367",
+       "name": "灰色10103【含料盘】"
+      },
+      {
+       "vid": "34728588368",
+       "name": "棕色10800【含料盘】"
+      },
+      {
+       "vid": "40719010431",
+       "name": "杏色10201【含料盘】"
+      },
+      {
+       "vid": "40719010432",
+       "name": "粉色10203【含料盘】"
+      },
+      {
+       "vid": "35980488442",
+       "name": "玉石白10100【含料盘】"
+      },
+      {
+       "vid": "34728588372",
+       "name": "黄色10400【含料盘】"
+      },
+      {
+       "vid": "34728588373",
+       "name": "品红色10202【含料盘】"
+      },
+      {
+       "vid": "34728588374",
+       "name": "青色10603【含料盘】"
+      },
+      {
+       "vid": "33848969957",
+       "name": "浅灰10104【无料盘】"
+      },
+      {
+       "vid": "33848969958",
+       "name": "深灰10105【无料盘】"
+      },
+      {
+       "vid": "34728588375",
+       "name": "金色10401【无料盘】"
+      },
+      {
+       "vid": "34728588376",
+       "name": "紫色10700【无料盘】"
+      },
+      {
+       "vid": "34728588377",
+       "name": "品红色10202【无料盘】"
+      },
+      {
+       "vid": "34728588378",
+       "name": "青色10603【无料盘】"
+      },
+      {
+       "vid": "34728588379",
+       "name": "圣诞绿10502【无料盘】"
+      },
+      {
+       "vid": "34728588380",
+       "name": "青铜色10801【无料盘】"
+      },
+      {
+       "vid": "34727212993",
+       "name": "可可棕10802【无料盘】"
+      },
+      {
+       "vid": "35878390421",
+       "name": "红色10200【无料盘】"
+      },
+      {
+       "vid": "34727212994",
+       "name": "南瓜橙10301【无料盘】"
+      },
+      {
+       "vid": "34727212995",
+       "name": "暖黄色10402【无料盘】"
+      },
+      {
+       "vid": "34727212996",
+       "name": "桃红色10204【无料盘】"
+      },
+      {
+       "vid": "34727212997",
+       "name": "钴蓝色10604【无料盘】"
+      },
+      {
+       "vid": "34727213000",
+       "name": "胭脂红10205【无料盘】"
+      },
+      {
+       "vid": "35878390422",
+       "name": "玉石白10100【无料盘】"
+      },
+      {
+       "vid": "34727385001",
+       "name": "绀紫色10701【无料盘】"
+      },
+      {
+       "vid": "36270818618",
+       "name": "橙色10300【无料盘】"
+      },
+      {
+       "vid": "44508076816",
+       "name": "蓝色10601【无料盘】"
+      },
+      {
+       "vid": "35878390426",
+       "name": "灰色10103【无料盘】"
+      },
+      {
+       "vid": "40719010433",
+       "name": "杏色10201【无料盘】"
+      },
+      {
+       "vid": "35878390428",
+       "name": "银色10102【无料盘】"
+      },
+      {
+       "vid": "35878390431",
+       "name": "黄色10400【无料盘】"
+      },
+      {
+       "vid": "39913882627",
+       "name": "蓝灰10602【无料盘】"
+      },
+      {
+       "vid": "40719010434",
+       "name": "粉色10203【无料盘】"
+      },
+      {
+       "vid": "35878390435",
+       "name": "棕色10800【无料盘】"
+      },
+      {
+       "vid": "34727385002",
+       "name": "苹果绿10503【无料盘】"
+      },
+      {
+       "vid": "34727385003",
+       "name": "松石绿10605【无料盘】"
+      },
+      {
+       "vid": "34729500293",
+       "name": "圣诞绿10502【含料盘】"
+      },
+      {
+       "vid": "35878148506",
+       "name": "拓竹绿10501【无料盘】"
+      },
+      {
+       "vid": "35878390436",
+       "name": "黑色10101【无料盘】"
+      },
+      {
+       "vid": "37025312131",
+       "name": "南瓜橙10301【含料盘】"
+      },
+      {
+       "vid": "37025312132",
+       "name": "暖黄色10402【含料盘】"
+      },
+      {
+       "vid": "37025312133",
+       "name": "绀紫色10701【含料盘】"
+      },
+      {
+       "vid": "37025312134",
+       "name": "桃红色10204【含料盘】"
+      },
+      {
+       "vid": "37025312135",
+       "name": "可可棕10802【含料盘】"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "4930331344240",
+     "options": {
+      "颜色": "银色10102【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Silver 10102 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "4930331344241",
+     "options": {
+      "颜色": "红色10200【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Red 10200 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "4930331344242",
+     "options": {
+      "颜色": "黑色10101【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Black 10101 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5160195022454",
+     "options": {
+      "颜色": "蓝色10601【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Blue 10601 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5169818698793",
+     "options": {
+      "颜色": "拓竹绿10501【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Bambu green 10501 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5185505466364",
+     "options": {
+      "颜色": "金色10401【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Gold 10401 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5185505466365",
+     "options": {
+      "颜色": "青铜色10801【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Bronze 10801 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5185505466366",
+     "options": {
+      "颜色": "紫色10700【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Purple 10700 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5185505466367",
+     "options": {
+      "颜色": "橙色10300【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Orange 10300 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5185505466368",
+     "options": {
+      "颜色": "蓝灰10602【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Blue grey 10602 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5185505466363",
+     "options": {
+      "颜色": "灰色10103【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Grey 10103 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5185505466369",
+     "options": {
+      "颜色": "棕色10800【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Brown 10800 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5205803262503",
+     "options": {
+      "颜色": "杏色10201【含料盘】"
+     },
+     "options_en": {},
+     "price": "75",
+     "quantity": 0
+    },
+    {
+     "sku_key": "5205803262504",
+     "options": {
+      "颜色": "粉色10203【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Pink 10203 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5221616359902",
+     "options": {
+      "颜色": "玉石白10100【含料盘】"
+     },
+     "options_en": {},
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5221616359903",
+     "options": {
+      "颜色": "黄色10400【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Yellow 10400 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5221616359904",
+     "options": {
+      "颜色": "品红色10202【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Magenta 10202 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5221616359905",
+     "options": {
+      "颜色": "青色10603【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Cyan 10603 (with spool)"
+     },
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5559267372025",
+     "options": {
+      "颜色": "浅灰10104【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Light grey 10104 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5559267372026",
+     "options": {
+      "颜色": "深灰10105【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Dark grey 10105 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5570197828445",
+     "options": {
+      "颜色": "金色10401【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Gold 10401 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5740697063533",
+     "options": {
+      "颜色": "紫色10700【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Purple 10700 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5570197828444",
+     "options": {
+      "颜色": "品红色10202【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Magenta 10202 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5570197828447",
+     "options": {
+      "颜色": "青色10603【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Cyan 10603 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5570197828448",
+     "options": {
+      "颜色": "圣诞绿10502【无料盘】"
+     },
+     "options_en": {},
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5590858848793",
+     "options": {
+      "颜色": "青铜色10801【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Bronze 10801 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5621342520716",
+     "options": {
+      "颜色": "可可棕10802【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Cocoa brown 10802 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 131,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5789497398754",
+     "options": {
+      "颜色": "红色10200【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Red 10200 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5621342520717",
+     "options": {
+      "颜色": "南瓜橙10301【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Pumpkin orange 10301 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5621342520718",
+     "options": {
+      "颜色": "暖黄色10402【无料盘】"
+     },
+     "options_en": {},
+     "price": "65",
+     "quantity": 138,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5621342520719",
+     "options": {
+      "颜色": "桃红色10204【无料盘】"
+     },
+     "options_en": {},
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5621342520720",
+     "options": {
+      "颜色": "钴蓝色10604【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Cobalt blue 10604 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5621342520721",
+     "options": {
+      "颜色": "胭脂红10205【无料盘】"
+     },
+     "options_en": {},
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "4921295904031",
+     "options": {
+      "颜色": "玉石白10100【无料盘】"
+     },
+     "options_en": {},
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5621342520722",
+     "options": {
+      "颜色": "绀紫色10701【无料盘】"
+     },
+     "options_en": {},
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "4921295904032",
+     "options": {
+      "颜色": "橙色10300【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Orange 10300 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5789497398757",
+     "options": {
+      "颜色": "蓝色10601【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Blue 10601 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5783517379453",
+     "options": {
+      "颜色": "灰色10103【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Grey 10103 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "4921295904035",
+     "options": {
+      "颜色": "杏色10201【无料盘】"
+     },
+     "options_en": {},
+     "price": "65",
+     "quantity": 0
+    },
+    {
+     "sku_key": "4921295904036",
+     "options": {
+      "颜色": "银色10102【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Silver 10102 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5789497398756",
+     "options": {
+      "颜色": "黄色10400【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Yellow 10400 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "4921295904038",
+     "options": {
+      "颜色": "蓝灰10602【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Blue grey 10602 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5789497398758",
+     "options": {
+      "颜色": "粉色10203【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Pink 10203 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "4921295904041",
+     "options": {
+      "颜色": "棕色10800【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Brown 10800 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5621342520723",
+     "options": {
+      "颜色": "苹果绿10503【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Apple green 10503 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5621342520724",
+     "options": {
+      "颜色": "松石绿10605【无料盘】"
+     },
+     "options_en": {},
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5791325191224",
+     "options": {
+      "颜色": "圣诞绿10502【含料盘】"
+     },
+     "options_en": {},
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5856362242910",
+     "options": {
+      "颜色": "拓竹绿10501【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Bambu green 10501 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5789497398755",
+     "options": {
+      "颜色": "黑色10101【无料盘】"
+     },
+     "options_en": {
+      "Colour": "Black 10101 (refill, no spool)"
+     },
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5747048792108",
+     "options": {
+      "颜色": "南瓜橙10301【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Pumpkin orange 10301 (with spool)"
+     },
+     "price": "75",
+     "quantity": 18,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5747048792109",
+     "options": {
+      "颜色": "暖黄色10402【含料盘】"
+     },
+     "options_en": {},
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5747048792110",
+     "options": {
+      "颜色": "绀紫色10701【含料盘】"
+     },
+     "options_en": {},
+     "price": "75",
+     "quantity": 95,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5747048792111",
+     "options": {
+      "颜色": "桃红色10204【含料盘】"
+     },
+     "options_en": {},
+     "price": "75",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5747048792112",
+     "options": {
+      "颜色": "可可棕10802【含料盘】"
+     },
+     "options_en": {
+      "Colour": "Cocoa brown 10802 (with spool)"
+     },
+     "price": "75",
+     "quantity": 151,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "1001036512689",
+   "url": "https://detail.tmall.com/item.htm?id=1001036512689",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹PLA Basic实惠10件装 多色组合 3D打印耗材 净重10kg RFID智能参数识别",
+   "name_en": "PLA Basic value pack, 10 spools (10 kg net)",
+   "category": "filament_bundle",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA",
+   "codes": [
+    "10601",
+    "10103",
+    "10200"
+   ],
+   "props": [
+    {
+     "pid": "1627207",
+     "name": "颜色",
+     "values": [
+      {
+       "vid": "41683853013",
+       "name": "PLA Basic 无料盘 黑*10"
+      },
+      {
+       "vid": "41683853014",
+       "name": "PLA Basic 无料盘 白*10"
+      },
+      {
+       "vid": "41683853015",
+       "name": "PLA Basic 无料盘 黑*5+白*5"
+      },
+      {
+       "vid": "41683853016",
+       "name": "PLA Basic 无料盘 黑*4+白*4+灰色*2"
+      },
+      {
+       "vid": "41683853017",
+       "name": "PLA Basic 无料盘 黑*2+白*2+彩6色*1"
+      },
+      {
+       "vid": "42151235706",
+       "name": "PLA Basic 无料盘 蓝*10 | 蓝色10601"
+      },
+      {
+       "vid": "42151235707",
+       "name": "PLA Basic 无料盘 灰*10  | 灰色10103"
+      },
+      {
+       "vid": "42151235708",
+       "name": "PLA Basic 无料盘 红*10红色 | 红色10200"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6002722924646",
+     "options": {
+      "颜色": "PLA Basic 无料盘 黑*10"
+     },
+     "options_en": {
+      "Colour": "PLA Basic refill, no spool black ×10"
+     },
+     "price": "690",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6002722924647",
+     "options": {
+      "颜色": "PLA Basic 无料盘 白*10"
+     },
+     "options_en": {
+      "Colour": "PLA Basic refill, no spool white ×10"
+     },
+     "price": "690",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6002722924648",
+     "options": {
+      "颜色": "PLA Basic 无料盘 黑*5+白*5"
+     },
+     "options_en": {
+      "Colour": "PLA Basic refill, no spool black ×5+ white ×5"
+     },
+     "price": "690",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6002722924649",
+     "options": {
+      "颜色": "PLA Basic 无料盘 黑*4+白*4+灰色*2"
+     },
+     "options_en": {
+      "Colour": "PLA Basic refill, no spool black ×4+ white ×4+ grey ×2"
+     },
+     "price": "690",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6002722924650",
+     "options": {
+      "颜色": "PLA Basic 无料盘 黑*2+白*2+彩6色*1"
+     },
+     "options_en": {},
+     "price": "690",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6174959067489",
+     "options": {
+      "颜色": "PLA Basic 无料盘 蓝*10 | 蓝色10601"
+     },
+     "options_en": {
+      "Colour": "PLA Basic refill, no spool blue ×10 | blue 10601"
+     },
+     "price": "690",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6174959067490",
+     "options": {
+      "颜色": "PLA Basic 无料盘 灰*10  | 灰色10103"
+     },
+     "options_en": {
+      "Colour": "PLA Basic refill, no spool grey ×10 | grey 10103"
+     },
+     "price": "690",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6174959067491",
+     "options": {
+      "颜色": "PLA Basic 无料盘 红*10红色 | 红色10200"
+     },
+     "options_en": {
+      "Colour": "PLA Basic refill, no spool red ×10 red | red 10200"
+     },
+     "price": "690",
+     "quantity": 0
+    }
+   ]
+  },
+  {
+   "item_key": "998916499888",
+   "url": "https://detail.tmall.com/item.htm?id=998916499888",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹PLA Matte实惠10件装 多色组合 3D打印耗材 净重10kg RFID智能参数识别",
+   "name_en": "PLA Matte value pack, 10 spools (10 kg net)",
+   "category": "filament_bundle",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA",
+   "codes": [],
+   "props": [
+    {
+     "pid": "1627207",
+     "name": "颜色",
+     "values": [
+      {
+       "vid": "41683893122",
+       "name": "PLA Matte 无料盘 黑*10"
+      },
+      {
+       "vid": "41683893123",
+       "name": "PLA Matte 无料盘 白*10"
+      },
+      {
+       "vid": "42039575714",
+       "name": "PLA Matte 无料盘 黑*5+白*5"
+      },
+      {
+       "vid": "41683893124",
+       "name": "PLA Matte 无料盘 黑*4+白*4+灰色*2"
+      },
+      {
+       "vid": "41683893125",
+       "name": "PLA Matte 无料盘 黑*2+白*2+彩6色*1"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6002725684338",
+     "options": {
+      "颜色": "PLA Matte 无料盘 黑*10"
+     },
+     "options_en": {
+      "Colour": "PLA Matte refill, no spool black ×10"
+     },
+     "price": "655",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6002725684339",
+     "options": {
+      "颜色": "PLA Matte 无料盘 白*10"
+     },
+     "options_en": {
+      "Colour": "PLA Matte refill, no spool white ×10"
+     },
+     "price": "655",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6002725684342",
+     "options": {
+      "颜色": "PLA Matte 无料盘 黑*5+白*5"
+     },
+     "options_en": {
+      "Colour": "PLA Matte refill, no spool black ×5+ white ×5"
+     },
+     "price": "655",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6002725684340",
+     "options": {
+      "颜色": "PLA Matte 无料盘 黑*4+白*4+灰色*2"
+     },
+     "options_en": {
+      "Colour": "PLA Matte refill, no spool black ×4+ white ×4+ grey ×2"
+     },
+     "price": "655",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6002725684341",
+     "options": {
+      "颜色": "PLA Matte 无料盘 黑*2+白*2+彩6色*1"
+     },
+     "options_en": {},
+     "price": "655",
+     "quantity": 200,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "749375355825",
+   "url": "https://detail.tmall.com/item.htm?id=749375355825",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹TPU 95A HF高速 3D打印耗材 柔软高韧抗冲击",
+   "name_en": "TPU 95A HF filament",
+   "category": "filament",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA",
+   "codes": [
+    "51200",
+    "51100",
+    "51400",
+    "51600",
+    "51101",
+    "51102"
+   ],
+   "props": [
+    {
+     "pid": "1627207",
+     "name": "颜色",
+     "values": [
+      {
+       "vid": "35888859643",
+       "name": "红色51200"
+      },
+      {
+       "vid": "1677172385",
+       "name": "黑色51100"
+      },
+      {
+       "vid": "35888859644",
+       "name": "黄色51400"
+      },
+      {
+       "vid": "35888859645",
+       "name": "蓝色51600"
+      },
+      {
+       "vid": "1496605413",
+       "name": "灰色51101"
+      },
+      {
+       "vid": "1315176251",
+       "name": "白色51102"
+      }
+     ]
+    },
+    {
+     "pid": "633485108",
+     "name": "有无料盘（FDM线材）",
+     "values": [
+      {
+       "vid": "43848052132",
+       "name": "有料盘（可复用）"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5858514475573",
+     "options": {
+      "颜色": "红色51200",
+      "有无料盘（FDM线材）": "有料盘（可复用）"
+     },
+     "options_en": {
+      "Colour": "Red 51200"
+     },
+     "price": "165",
+     "quantity": 134,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5858514475572",
+     "options": {
+      "颜色": "黑色51100",
+      "有无料盘（FDM线材）": "有料盘（可复用）"
+     },
+     "options_en": {
+      "Colour": "Black 51100"
+     },
+     "price": "165",
+     "quantity": 0
+    },
+    {
+     "sku_key": "5858514475574",
+     "options": {
+      "颜色": "黄色51400",
+      "有无料盘（FDM线材）": "有料盘（可复用）"
+     },
+     "options_en": {
+      "Colour": "Yellow 51400"
+     },
+     "price": "165",
+     "quantity": 57,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5858514475575",
+     "options": {
+      "颜色": "蓝色51600",
+      "有无料盘（FDM线材）": "有料盘（可复用）"
+     },
+     "options_en": {
+      "Colour": "Blue 51600"
+     },
+     "price": "165",
+     "quantity": 97,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5168186329826",
+     "options": {
+      "颜色": "灰色51101",
+      "有无料盘（FDM线材）": "有料盘（可复用）"
+     },
+     "options_en": {
+      "Colour": "Grey 51101"
+     },
+     "price": "165",
+     "quantity": 12,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5858514475571",
+     "options": {
+      "颜色": "白色51102",
+      "有无料盘（FDM线材）": "有料盘（可复用）"
+     },
+     "options_en": {
+      "Colour": "White 51102"
+     },
+     "price": "165",
+     "quantity": 0
+    }
+   ]
+  },
+  {
+   "item_key": "718106932700",
+   "url": "https://detail.tmall.com/item.htm?id=718106932700",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹ASA 3D打印耗材 抗晒耐候抗高温 坚韧耐用 RFID智能参数识别",
+   "name_en": "ASA filament 1 kg",
+   "category": "filament",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA",
+   "codes": [
+    "45101",
+    "45100",
+    "45102",
+    "45500",
+    "45600",
+    "45200"
+   ],
+   "props": [
+    {
+     "pid": "1627207",
+     "name": "颜色",
+     "values": [
+      {
+       "vid": "44233275813",
+       "name": "黑色 45101【含料盘】 【含料盘】1kg"
+      },
+      {
+       "vid": "44233275814",
+       "name": "白色 45100【含料盘】 【含料盘】1kg"
+      },
+      {
+       "vid": "44233275815",
+       "name": "灰色 45102【含料盘】 【含料盘】1kg"
+      },
+      {
+       "vid": "44233275816",
+       "name": "绿色 45500【含料盘】 【含料盘】1kg"
+      },
+      {
+       "vid": "44233275817",
+       "name": "蓝色 45600【含料盘】 【含料盘】1kg"
+      },
+      {
+       "vid": "44233275818",
+       "name": "红色 45200【含料盘】 1kg"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5856931926070",
+     "options": {
+      "颜色": "黑色 45101【含料盘】 【含料盘】1kg"
+     },
+     "options_en": {
+      "Colour": "Black 45101 (with spool) (with spool) 1 kg"
+     },
+     "price": "99",
+     "quantity": 0
+    },
+    {
+     "sku_key": "5856931926071",
+     "options": {
+      "颜色": "白色 45100【含料盘】 【含料盘】1kg"
+     },
+     "options_en": {
+      "Colour": "White 45100 (with spool) (with spool) 1 kg"
+     },
+     "price": "99",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5184822319565",
+     "options": {
+      "颜色": "灰色 45102【含料盘】 【含料盘】1kg"
+     },
+     "options_en": {
+      "Colour": "Grey 45102 (with spool) (with spool) 1 kg"
+     },
+     "price": "99",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5856931926073",
+     "options": {
+      "颜色": "绿色 45500【含料盘】 【含料盘】1kg"
+     },
+     "options_en": {
+      "Colour": "Green 45500 (with spool) (with spool) 1 kg"
+     },
+     "price": "99",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5856931926074",
+     "options": {
+      "颜色": "蓝色 45600【含料盘】 【含料盘】1kg"
+     },
+     "options_en": {
+      "Colour": "Blue 45600 (with spool) (with spool) 1 kg"
+     },
+     "price": "99",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5932901053835",
+     "options": {
+      "颜色": "红色 45200【含料盘】 1kg"
+     },
+     "options_en": {
+      "Colour": "Red 45200 (with spool) 1 kg"
+     },
+     "price": "99",
+     "quantity": 66,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "1036834158903",
+   "url": "https://detail.tmall.com/item.htm?id=1036834158903",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 3D打印模型斜口剪钳高达拼装专用水口钳 创客宝库-QA018",
+   "name_en": "Flush cutters (sprue nippers)",
+   "category": "tool",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [
+    "QA018"
+   ],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "43729590208",
+       "name": "模型斜口剪钳（1个）"
+      }
+     ]
+    },
+    {
+     "pid": "20021",
+     "name": "材质",
+     "values": [
+      {
+       "vid": "20369",
+       "name": "金属"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6054830021130",
+     "options": {
+      "材质": "金属",
+      "配件类型": "模型斜口剪钳（1个）"
+     },
+     "options_en": {
+      "Material": "Metallic"
+     },
+     "price": "75",
+     "quantity": 178,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "1053109777521",
+   "url": "https://detail.tmall.com/item.htm?id=1053109777521",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 3D打印模型手捻钻高达手办文玩钻孔工具手工diy扩孔器 创客宝库-ZH121",
+   "name_en": "Hand twist drill (pin vise) for model making",
+   "category": "tool",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [
+    "ZH121"
+   ],
+   "props": [
+    {
+     "pid": "-1",
+     "name": "商品规格",
+     "values": [
+      {
+       "vid": "-1",
+       "name": "手捻钻全能套装（1套）"
+      },
+      {
+       "vid": "-3",
+       "name": "手捻钻钻头套装（1套）"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6089953933955",
+     "options": {
+      "商品规格": "手捻钻全能套装（1套）"
+     },
+     "options_en": {},
+     "price": "99",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6264995743059",
+     "options": {
+      "商品规格": "手捻钻钻头套装（1套）"
+     },
+     "options_en": {},
+     "price": "40",
+     "quantity": 59,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "846915661262",
+   "url": "https://detail.tmall.com/item.htm?id=846915661262",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 万圣节南瓜灯蜡烛灯 创客宝库创意3D打印模型组件 KC008",
+   "name_en": "Halloween pumpkin candle lamp",
+   "category": "maker_kit",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [
+    "KC008",
+    "DY002",
+    "DY013",
+    "DY014",
+    "DY008",
+    "DY009",
+    "DY010",
+    "DY012"
+   ],
+   "props": [
+    {
+     "pid": "1627207",
+     "name": "颜色分类",
+     "values": [
+      {
+       "vid": "34813308702",
+       "name": "D37.2x 36.6 mm暖黄蜡烛灯（12个）"
+      },
+      {
+       "vid": "34813308701",
+       "name": "D37.2x 36.6 mm暖白蜡烛灯（12个）"
+      },
+      {
+       "vid": "34813308703",
+       "name": "D37.2x 36.6 mm冷白蜡烛灯（12个）"
+      },
+      {
+       "vid": "34872993178",
+       "name": "南瓜灯-DY002 （默认发暖白）"
+      },
+      {
+       "vid": "34872993179",
+       "name": "巫婆炉灯-DY013 （默认发暖白）"
+      },
+      {
+       "vid": "34872993180",
+       "name": "杰克灯-DY014 （默认发暖白）"
+      },
+      {
+       "vid": "34872993181",
+       "name": "阴森蜡烛架-DY008 （默认发暖白）"
+      },
+      {
+       "vid": "34872993182",
+       "name": "鬼魂灯-DY009 （默认发暖白）"
+      },
+      {
+       "vid": "34872993183",
+       "name": "鬼魂灯-DY010 （默认发暖白）"
+      },
+      {
+       "vid": "34872993184",
+       "name": "南瓜灯-DY012 （默认发暖白）"
+      },
+      {
+       "vid": "34421012849",
+       "name": "访问Maker World获取模型"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5796898454862",
+     "options": {
+      "颜色分类": "D37.2x 36.6 mm暖黄蜡烛灯（12个）"
+     },
+     "options_en": {},
+     "price": "21",
+     "quantity": 38,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454863",
+     "options": {
+      "颜色分类": "D37.2x 36.6 mm暖白蜡烛灯（12个）"
+     },
+     "options_en": {},
+     "price": "19.7",
+     "quantity": 43,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454864",
+     "options": {
+      "颜色分类": "D37.2x 36.6 mm冷白蜡烛灯（12个）"
+     },
+     "options_en": {},
+     "price": "22.6",
+     "quantity": 8,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454865",
+     "options": {
+      "颜色分类": "南瓜灯-DY002 （默认发暖白）"
+     },
+     "options_en": {},
+     "price": "19.7",
+     "quantity": 64,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454866",
+     "options": {
+      "颜色分类": "巫婆炉灯-DY013 （默认发暖白）"
+     },
+     "options_en": {},
+     "price": "19.7",
+     "quantity": 65,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454867",
+     "options": {
+      "颜色分类": "杰克灯-DY014 （默认发暖白）"
+     },
+     "options_en": {},
+     "price": "19.7",
+     "quantity": 62,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454868",
+     "options": {
+      "颜色分类": "阴森蜡烛架-DY008 （默认发暖白）"
+     },
+     "options_en": {},
+     "price": "19.7",
+     "quantity": 65,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454869",
+     "options": {
+      "颜色分类": "鬼魂灯-DY009 （默认发暖白）"
+     },
+     "options_en": {},
+     "price": "19.7",
+     "quantity": 65,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454870",
+     "options": {
+      "颜色分类": "鬼魂灯-DY010 （默认发暖白）"
+     },
+     "options_en": {},
+     "price": "19.7",
+     "quantity": 65,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454871",
+     "options": {
+      "颜色分类": "南瓜灯-DY012 （默认发暖白）"
+     },
+     "options_en": {},
+     "price": "19.7",
+     "quantity": 64,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5796898454872",
+     "options": {
+      "颜色分类": "访问Maker World获取模型"
+     },
+     "options_en": {},
+     "price": "9999",
+     "quantity": 3,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "743686111205",
+   "url": "https://detail.tmall.com/item.htm?id=743686111205",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 硬化钢不锈钢热端喷嘴【适配A2L/A1/A1 mini】0.2/0.4/0.6/0.8mm 硬化钢不锈钢喷头3D打印机配件",
+   "name_en": "Hardened or stainless steel hotend nozzle — A2L/A1/A1 mini",
+   "category": "nozzle_hotend",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "42658772882",
+       "name": "0.2mm 不锈钢热端【精细打印】"
+      },
+      {
+       "vid": "42658772883",
+       "name": "0.4mm 不锈钢热端【日常打印】"
+      },
+      {
+       "vid": "42658772884",
+       "name": "0.4mm 硬化钢热端【日常打印】"
+      },
+      {
+       "vid": "42658772885",
+       "name": "0.6mm 硬化钢热端【快速打印】"
+      },
+      {
+       "vid": "42658772886",
+       "name": "0.8mm 硬化钢热端【大件打印】"
+      },
+      {
+       "vid": "42658772887",
+       "name": "热端硅胶套-适配A1/A1 mini"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5126105092403",
+     "options": {
+      "配件类型": "0.2mm 不锈钢热端【精细打印】"
+     },
+     "options_en": {},
+     "price": "79",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5126105092404",
+     "options": {
+      "配件类型": "0.4mm 不锈钢热端【日常打印】"
+     },
+     "options_en": {},
+     "price": "65",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5126105092405",
+     "options": {
+      "配件类型": "0.4mm 硬化钢热端【日常打印】"
+     },
+     "options_en": {},
+     "price": "79",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5126105092406",
+     "options": {
+      "配件类型": "0.6mm 硬化钢热端【快速打印】"
+     },
+     "options_en": {},
+     "price": "79",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5127021028907",
+     "options": {
+      "配件类型": "0.8mm 硬化钢热端【大件打印】"
+     },
+     "options_en": {},
+     "price": "79",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6200250971038",
+     "options": {
+      "配件类型": "热端硅胶套-适配A1/A1 mini"
+     },
+     "options_en": {
+      "配件类型": "Hotend silicone sock - for A1/A1 mini"
+     },
+     "price": "15",
+     "quantity": 200,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "902156974306",
+   "url": "https://detail.tmall.com/item.htm?id=902156974306",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 硬化钢不锈钢热端喷嘴【适配X2D/P2S/H2D/H2S/H2C】0.2/0.4/0.6/0.8mm 标准流量快拆喷头3D打印机配件",
+   "name_en": "Hardened or stainless steel hotend nozzle — X2D/P2S/H2 series",
+   "category": "nozzle_hotend",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "42658772882",
+       "name": "0.2mm 不锈钢热端【精细打印】"
+      },
+      {
+       "vid": "42658772884",
+       "name": "0.4mm 硬化钢热端【日常打印】"
+      },
+      {
+       "vid": "42658772885",
+       "name": "0.6mm 硬化钢热端【快速打印】"
+      },
+      {
+       "vid": "42658772886",
+       "name": "0.8mm 硬化钢热端【大件打印】"
+      },
+      {
+       "vid": "43317247191",
+       "name": "【推荐加购】热端硅胶套-适配X2D/P2S"
+      },
+      {
+       "vid": "42667990389",
+       "name": "【推荐加购】热端硅胶套-适配H2系列"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5761073729112",
+     "options": {
+      "配件类型": "0.2mm 不锈钢热端【精细打印】"
+     },
+     "options_en": {},
+     "price": "119",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5761073729113",
+     "options": {
+      "配件类型": "0.4mm 硬化钢热端【日常打印】"
+     },
+     "options_en": {},
+     "price": "119",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5761073729114",
+     "options": {
+      "配件类型": "0.6mm 硬化钢热端【快速打印】"
+     },
+     "options_en": {},
+     "price": "119",
+     "quantity": 173,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5761073729115",
+     "options": {
+      "配件类型": "0.8mm 硬化钢热端【大件打印】"
+     },
+     "options_en": {},
+     "price": "119",
+     "quantity": 104,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6035709421220",
+     "options": {
+      "配件类型": "【推荐加购】热端硅胶套-适配X2D/P2S"
+     },
+     "options_en": {},
+     "price": "19",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6035709421221",
+     "options": {
+      "配件类型": "【推荐加购】热端硅胶套-适配H2系列"
+     },
+     "options_en": {},
+     "price": "19",
+     "quantity": 0
+    }
+   ]
+  },
+  {
+   "item_key": "903027880049",
+   "url": "https://detail.tmall.com/item.htm?id=903027880049",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 高流量硬化钢热端喷嘴【适配X2D/P2S/H2D/H2S/H2C】0.4/0.6/0.8mm大流量喷头3D打印机配件",
+   "name_en": "High-flow hardened steel hotend nozzle — X2D/P2S/H2 series",
+   "category": "nozzle_hotend",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "42667982689",
+       "name": "0.4mm 高流量硬化钢热端【日常打印】"
+      },
+      {
+       "vid": "42667982690",
+       "name": "0.6mm 高流量硬化钢热端【快速打印】"
+      },
+      {
+       "vid": "42667982691",
+       "name": "0.8mm 高流量硬化钢热端【大件打印】"
+      },
+      {
+       "vid": "43317247191",
+       "name": "【推荐加购】热端硅胶套-适配X2D/P2S"
+      },
+      {
+       "vid": "42667990389",
+       "name": "【推荐加购】热端硅胶套-适配H2系列"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5927790667643",
+     "options": {
+      "配件类型": "0.4mm 高流量硬化钢热端【日常打印】"
+     },
+     "options_en": {},
+     "price": "239",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5927790667644",
+     "options": {
+      "配件类型": "0.6mm 高流量硬化钢热端【快速打印】"
+     },
+     "options_en": {},
+     "price": "239",
+     "quantity": 193,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5927790667645",
+     "options": {
+      "配件类型": "0.8mm 高流量硬化钢热端【大件打印】"
+     },
+     "options_en": {},
+     "price": "239",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6035710097617",
+     "options": {
+      "配件类型": "【推荐加购】热端硅胶套-适配X2D/P2S"
+     },
+     "options_en": {},
+     "price": "19",
+     "quantity": 106,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6035710097618",
+     "options": {
+      "配件类型": "【推荐加购】热端硅胶套-适配H2系列"
+     },
+     "options_en": {},
+     "price": "19",
+     "quantity": 47,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "728613928927",
+   "url": "https://detail.tmall.com/item.htm?id=728613928927",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 纹理 PEI 打印板 转印板【适配X2D/P2S/P1/A1/X1】 PEI 板 纹理板 创意花纹板 3D打印板 3D打印配件",
+   "name_en": "Textured PEI plate — X2D/P2S/P1/A1/X1",
+   "category": "build_plate",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "43317151580",
+       "name": "二代纹理 PEI 打印板-适配X2D/P2S/A1/P1/X1"
+      },
+      {
+       "vid": "42630957773",
+       "name": "【推荐加购】固体胶*1"
+      },
+      {
+       "vid": "42630957774",
+       "name": "【推荐加购】液体胶*1"
+      },
+      {
+       "vid": "42833325643",
+       "name": "一代纹理 PEI 打印板-适配A1/P1/X1"
+      },
+      {
+       "vid": "42857699571",
+       "name": "【创意打印】星空纹转印板-适配P1/A1/X1C"
+      },
+      {
+       "vid": "42857316499",
+       "name": "【创意打印】八角星纹转印板-适配P1/A1/X1C"
+      },
+      {
+       "vid": "42857316500",
+       "name": "【创意打印】碳纤纹转印板-适配P1/A1/X1C"
+      },
+      {
+       "vid": "42857316501",
+       "name": "【创意打印】钻石纹转印板-适配P1/A1/X1C"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6207134270420",
+     "options": {
+      "配件类型": "二代纹理 PEI 打印板-适配X2D/P2S/A1/P1/X1"
+     },
+     "options_en": {},
+     "price": "149",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6198834143492",
+     "options": {
+      "配件类型": "【推荐加购】固体胶*1"
+     },
+     "options_en": {},
+     "price": "25",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6198834143493",
+     "options": {
+      "配件类型": "【推荐加购】液体胶*1"
+     },
+     "options_en": {},
+     "price": "59.9",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "5226725323060",
+     "options": {
+      "配件类型": "一代纹理 PEI 打印板-适配A1/P1/X1"
+     },
+     "options_en": {},
+     "price": "149",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6208672791653",
+     "options": {
+      "配件类型": "【创意打印】星空纹转印板-适配P1/A1/X1C"
+     },
+     "options_en": {},
+     "price": "66",
+     "quantity": 24,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6208672791654",
+     "options": {
+      "配件类型": "【创意打印】八角星纹转印板-适配P1/A1/X1C"
+     },
+     "options_en": {},
+     "price": "66",
+     "quantity": 11,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6208672791655",
+     "options": {
+      "配件类型": "【创意打印】碳纤纹转印板-适配P1/A1/X1C"
+     },
+     "options_en": {},
+     "price": "66",
+     "quantity": 132,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6208672791656",
+     "options": {
+      "配件类型": "【创意打印】钻石纹转印板-适配P1/A1/X1C"
+     },
+     "options_en": {},
+     "price": "66",
+     "quantity": 18,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "742608647813",
+   "url": "https://detail.tmall.com/item.htm?id=742608647813",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 热端加热组件 3D打印机配件 【A1/A1 mini 适用】",
+   "name_en": "Hotend heating assembly — A1/A1 mini",
+   "category": "electronic_part",
+   "sourcing": "EU_STORE_EUR",
+   "freight_route": "GERMANY_LAND",
+   "codes": [],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "42602854440",
+       "name": "热端加热组件【A1/A1 mini 适用】"
+      },
+      {
+       "vid": "41781165178",
+       "name": "补货时间待定（仅提醒补货时间，勿拍此项，下单不发货）"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5293816695460",
+     "options": {
+      "配件类型": "热端加热组件【A1/A1 mini 适用】"
+     },
+     "options_en": {
+      "配件类型": "Hotend heating assembly (A1/A1 mini for)"
+     },
+     "price": "115",
+     "quantity": 198,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6197429735840",
+     "options": {
+      "配件类型": "补货时间待定（仅提醒补货时间，勿拍此项，下单不发货）"
+     },
+     "options_en": {},
+     "price": "99999",
+     "quantity": 12,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "1001355372982",
+   "url": "https://detail.tmall.com/item.htm?id=1001355372982",
+   "page_host": "detail.tmall.com",
+   "title": "【秒杀专区】拓竹3D打印耗材 单件6折限时抢购",
+   "name_en": "Filament promotion link (single items at 60% of the regular price) [flash-sale listing]",
+   "category": "filament",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA",
+   "codes": [
+    "41500",
+    "41400",
+    "72400",
+    "72500",
+    "72800"
+   ],
+   "props": [
+    {
+     "pid": "1627207",
+     "name": "颜色分类",
+     "values": [
+      {
+       "vid": "42042770599",
+       "name": "ABS-GF-绿色41500 有盘"
+      },
+      {
+       "vid": "42042770600",
+       "name": "ABS-GF-黄色41400 有盘"
+      },
+      {
+       "vid": "42104389780",
+       "name": "PA6-GF黄色 | 72400 有盘"
+      },
+      {
+       "vid": "42104389781",
+       "name": "PA6-GF柠檬绿 | 72500 有盘"
+      },
+      {
+       "vid": "42104389782",
+       "name": "PA6-GF棕色 | 72800 有盘"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5987131529360",
+     "options": {
+      "颜色分类": "ABS-GF-绿色41500 有盘"
+     },
+     "options_en": {},
+     "price": "72",
+     "quantity": 0
+    },
+    {
+     "sku_key": "5987131529361",
+     "options": {
+      "颜色分类": "ABS-GF-黄色41400 有盘"
+     },
+     "options_en": {},
+     "price": "72",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6172300703536",
+     "options": {
+      "颜色分类": "PA6-GF黄色 | 72400 有盘"
+     },
+     "options_en": {},
+     "price": "166.8",
+     "quantity": 19,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6172300703537",
+     "options": {
+      "颜色分类": "PA6-GF柠檬绿 | 72500 有盘"
+     },
+     "options_en": {},
+     "price": "166.8",
+     "quantity": 4,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6172300703538",
+     "options": {
+      "颜色分类": "PA6-GF棕色 | 72800 有盘"
+     },
+     "options_en": {},
+     "price": "166.8",
+     "quantity": 22,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "985511290426",
+   "url": "https://detail.tmall.com/item.htm?id=985511290426",
+   "page_host": "detail.tmall.com",
+   "title": "【会员专享】拓竹3D打印配件 单件56折起",
+   "name_en": "Printer parts promotion link (single items from 56% of the regular price) [members-only offer]",
+   "category": "spare_part",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "43765261306",
+       "name": "P2S 创作升级配件包"
+      },
+      {
+       "vid": "43765261307",
+       "name": "X2D 创作升级配件包"
+      },
+      {
+       "vid": "43765261308",
+       "name": "H2S 创作升级配件包"
+      },
+      {
+       "vid": "43765261311",
+       "name": "液体胶囤货装（单支到手6折）"
+      },
+      {
+       "vid": "43765261312",
+       "name": "固体胶囤货装（单支到手6折）"
+      },
+      {
+       "vid": "43555553910",
+       "name": "磁吸合金铲刀"
+      },
+      {
+       "vid": "44967934123",
+       "name": "A1 常用备件包"
+      },
+      {
+       "vid": "44967934124",
+       "name": "A2L 常用备件包"
+      },
+      {
+       "vid": "44967934125",
+       "name": "H2C 常用备件包"
+      },
+      {
+       "vid": "44967934126",
+       "name": "H2D 常用备件包"
+      },
+      {
+       "vid": "44967934127",
+       "name": "H2S 常用备件包"
+      },
+      {
+       "vid": "44967934128",
+       "name": "P2S 常用备件包"
+      },
+      {
+       "vid": "44967934129",
+       "name": "X1C/P1 常用备件包"
+      },
+      {
+       "vid": "44967934130",
+       "name": "X2D 常用备件包"
+      },
+      {
+       "vid": "44967934131",
+       "name": "A1 入门创作配件包"
+      },
+      {
+       "vid": "44967934132",
+       "name": "P1 入门创作配件包"
+      },
+      {
+       "vid": "44967934133",
+       "name": "A2L 创作升级配件包"
+      },
+      {
+       "vid": "44967934134",
+       "name": "H2D 全能创作配件包"
+      },
+      {
+       "vid": "44967934135",
+       "name": "H2C 全能创作配件包"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6082795713978",
+     "options": {
+      "配件类型": "P2S 创作升级配件包"
+     },
+     "options_en": {},
+     "price": "820",
+     "quantity": 85
+    },
+    {
+     "sku_key": "6082795713979",
+     "options": {
+      "配件类型": "X2D 创作升级配件包"
+     },
+     "options_en": {},
+     "price": "1119",
+     "quantity": 84
+    },
+    {
+     "sku_key": "6082795713980",
+     "options": {
+      "配件类型": "H2S 创作升级配件包"
+     },
+     "options_en": {},
+     "price": "1220",
+     "quantity": 200
+    },
+    {
+     "sku_key": "6186464487016",
+     "options": {
+      "配件类型": "液体胶囤货装（单支到手6折）"
+     },
+     "options_en": {},
+     "price": "180",
+     "quantity": 200
+    },
+    {
+     "sku_key": "6186464487017",
+     "options": {
+      "配件类型": "固体胶囤货装（单支到手6折）"
+     },
+     "options_en": {},
+     "price": "75",
+     "quantity": 200
+    },
+    {
+     "sku_key": "6082795713975",
+     "options": {
+      "配件类型": "磁吸合金铲刀"
+     },
+     "options_en": {},
+     "price": "66",
+     "quantity": 200
+    },
+    {
+     "sku_key": "6149489949151",
+     "options": {
+      "配件类型": "A1 常用备件包"
+     },
+     "options_en": {},
+     "price": "168",
+     "quantity": 2
+    },
+    {
+     "sku_key": "6149489949152",
+     "options": {
+      "配件类型": "A2L 常用备件包"
+     },
+     "options_en": {},
+     "price": "143",
+     "quantity": 2
+    },
+    {
+     "sku_key": "6149489949153",
+     "options": {
+      "配件类型": "H2C 常用备件包"
+     },
+     "options_en": {},
+     "price": "303",
+     "quantity": 2
+    },
+    {
+     "sku_key": "6149489949154",
+     "options": {
+      "配件类型": "H2D 常用备件包"
+     },
+     "options_en": {},
+     "price": "273",
+     "quantity": 2
+    },
+    {
+     "sku_key": "6149489949155",
+     "options": {
+      "配件类型": "H2S 常用备件包"
+     },
+     "options_en": {},
+     "price": "280",
+     "quantity": 2
+    },
+    {
+     "sku_key": "6149489949156",
+     "options": {
+      "配件类型": "P2S 常用备件包"
+     },
+     "options_en": {},
+     "price": "237",
+     "quantity": 2
+    },
+    {
+     "sku_key": "6149489949157",
+     "options": {
+      "配件类型": "X1C/P1 常用备件包"
+     },
+     "options_en": {},
+     "price": "241",
+     "quantity": 2
+    },
+    {
+     "sku_key": "6149489949158",
+     "options": {
+      "配件类型": "X2D 常用备件包"
+     },
+     "options_en": {},
+     "price": "258",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6149489949159",
+     "options": {
+      "配件类型": "A1 入门创作配件包"
+     },
+     "options_en": {},
+     "price": "476",
+     "quantity": 10
+    },
+    {
+     "sku_key": "6149489949160",
+     "options": {
+      "配件类型": "P1 入门创作配件包"
+     },
+     "options_en": {},
+     "price": "531",
+     "quantity": 104
+    },
+    {
+     "sku_key": "6149489949161",
+     "options": {
+      "配件类型": "A2L 创作升级配件包"
+     },
+     "options_en": {},
+     "price": "557",
+     "quantity": 33
+    },
+    {
+     "sku_key": "6149489949162",
+     "options": {
+      "配件类型": "H2D 全能创作配件包"
+     },
+     "options_en": {},
+     "price": "1519",
+     "quantity": 200
+    },
+    {
+     "sku_key": "6149489949163",
+     "options": {
+      "配件类型": "H2C 全能创作配件包"
+     },
+     "options_en": {},
+     "price": "1828",
+     "quantity": 156
+    }
+   ]
+  },
+  {
+   "item_key": "1076932251478",
+   "url": "https://detail.tmall.com/item.htm?id=1076932251478",
+   "page_host": "detail.tmall.com",
+   "title": "【拓竹官方翻新】拓竹X2D 3D打印机器大尺寸FDM家用桌面多色",
+   "name_en": "X2D 3D printer [official refurbished]",
+   "category": "printer",
+   "sourcing": "EU_STORE_EUR",
+   "freight_route": "GERMANY_LAND",
+   "codes": [],
+   "props": [
+    {
+     "pid": "-1",
+     "name": "商品规格",
+     "values": [
+      {
+       "vid": "-3",
+       "name": "X2D单机【官翻机】"
+      },
+      {
+       "vid": "-4",
+       "name": "X2D多色打印套装【官翻机】"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6295160503586",
+     "options": {
+      "商品规格": "X2D单机【官翻机】"
+     },
+     "options_en": {},
+     "price": "4499",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6295160503587",
+     "options": {
+      "商品规格": "X2D多色打印套装【官翻机】"
+     },
+     "options_en": {},
+     "price": "5999",
+     "quantity": 85,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "1040900100796",
+   "url": "https://detail.tmall.com/item.htm?id=1040900100796",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 X2D 3D智能打印机器双头双喷嘴立体手办自动儿童教育家用桌面FDM高速多色AIUL认证排放安全X1升级x2d",
+   "name_en": "X2D 3D printer",
+   "category": "printer",
+   "sourcing": "EU_STORE_EUR",
+   "freight_route": "GERMANY_LAND",
+   "codes": [],
+   "props": [
+    {
+     "pid": "-1",
+     "name": "商品规格",
+     "values": [
+      {
+       "vid": "-5",
+       "name": "X2D 单机 【大陆版】"
+      },
+      {
+       "vid": "-6",
+       "name": "X2D 多色套装 【大陆版】"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6081704436658",
+     "options": {
+      "商品规格": "X2D 单机 【大陆版】"
+     },
+     "options_en": {
+      "Spec": "X2D printer only (China mainland version)"
+     },
+     "price": "5399",
+     "quantity": 200,
+     "price_label": "优惠前"
+    },
+    {
+     "sku_key": "6234379822053",
+     "options": {
+      "商品规格": "X2D 多色套装 【大陆版】"
+     },
+     "options_en": {
+      "Spec": "X2D multi-colour combo (China mainland version)"
+     },
+     "price": "7199",
+     "quantity": 200,
+     "price_label": "优惠前"
+    }
+   ]
+  },
+  {
+   "item_key": "785492874870",
+   "url": "https://detail.tmall.com/item.htm?id=785492874870",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹3D打印模型专用标准零件 M2.5x6 半圆头机牙螺丝 (20个) AA013 创客宝库",
+   "name_en": "M2.5x6 pan-head machine screws (20 pcs)",
+   "category": "maker_kit",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [
+    "AA013"
+   ],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "31954398868",
+       "name": "M2.5x6 半圆头机牙螺丝 (20PCS)- AA013"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5365752729795",
+     "options": {
+      "配件类型": "M2.5x6 半圆头机牙螺丝 (20PCS)- AA013"
+     },
+     "options_en": {
+      "配件类型": "M2.5x6 pan-head machine screws (20 pcs)- AA013"
+     },
+     "price": "2.1",
+     "quantity": 53
+    }
+   ]
+  },
+  {
+   "item_key": "900979520783",
+   "url": "https://detail.tmall.com/item.htm?id=900979520783",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 AMS 2 Pro上下料组件 3D打印机配件",
+   "name_en": "AMS 2 Pro feeder assembly",
+   "category": "spare_part",
+   "sourcing": "CHINA_CNY",
+   "freight_route": "CHINA_SEA_OR_AIR",
+   "codes": [],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "37313412326",
+       "name": "AMS 2 Pro 上下料组件"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "5758765053754",
+     "options": {
+      "配件类型": "AMS 2 Pro 上下料组件"
+     },
+     "options_en": {
+      "配件类型": "AMS 2 Pro feeder assembly"
+     },
+     "price": "229",
+     "quantity": 22
+    }
+   ]
+  },
+  {
+   "item_key": "1036813526277",
+   "url": "https://detail.tmall.com/item.htm?id=1036813526277",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 X2D 热端风扇【适配X2D】 3D打印机配件",
+   "name_en": "Hotend fan — X2D",
+   "category": "electronic_part",
+   "sourcing": "EU_STORE_EUR",
+   "freight_route": "GERMANY_LAND",
+   "codes": [],
+   "props": [
+    {
+     "pid": "-1",
+     "name": "商品规格",
+     "values": [
+      {
+       "vid": "-1",
+       "name": "X2D 热端风扇"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6219554715476",
+     "options": {
+      "商品规格": "X2D 热端风扇"
+     },
+     "options_en": {
+      "Spec": "X2D hotend fan"
+     },
+     "price": "65",
+     "quantity": 4
+    }
+   ]
+  },
+  {
+   "item_key": "1052136734939",
+   "url": "https://detail.tmall.com/item.htm?id=1052136734939",
+   "page_host": "detail.tmall.com",
+   "title": "拓竹 空气净化器 E1 Pro【适配拓竹R1激光切割机】",
+   "name_en": "E1 Pro air purifier (for the R1 laser cutter)",
+   "category": "air_purifier",
+   "sourcing": "EU_STORE_EUR",
+   "freight_route": "GERMANY_LAND",
+   "codes": [],
+   "props": [
+    {
+     "pid": "122276375",
+     "name": "配件类型",
+     "values": [
+      {
+       "vid": "44817483291",
+       "name": "E1 Pro 空气净化器"
+      },
+      {
+       "vid": "44819715065",
+       "name": "【敬请期待（此选项仅提醒，拍下不发货）】"
+      }
+     ]
+    }
+   ],
+   "skus": [
+    {
+     "sku_key": "6089957685845",
+     "options": {
+      "配件类型": "E1 Pro 空气净化器"
+     },
+     "options_en": {},
+     "price": "5499",
+     "quantity": 0
+    },
+    {
+     "sku_key": "6304656691258",
+     "options": {
+      "配件类型": "【敬请期待（此选项仅提醒，拍下不发货）】"
+     },
+     "options_en": {},
+     "price": "99999",
+     "quantity": 5
+    }
+   ]
+  }
+ ]
+}

@@ -38,6 +38,7 @@ import { toast } from '../../lib/toastStore';
 import { groupedNumber } from '../../lib/localeNumber';
 import { pairedUsd, scaleUsdLine, unitUsdBase, type UsdLine } from '../../CurrencyContext';
 import { refusalText, stockRefusal } from '../../lib/refusalStrings';
+import { ESTIMATE_SHORT, ESTIMATE_TEXT } from '../../lib/priceStatus';
 import { LINE_QTY_MAX } from '../../../packages/pricing/src/quantity';
 import {
   colourLang,
@@ -116,9 +117,16 @@ export interface ColourQuantityPanelProps {
   quickBuyOn?: boolean;
   /** The page's own sentence for a refusal code ('' when it has none). */
   reasonFor?: (code: string) => string;
+  /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §5.3): the product or the page's selection is an estimate. It labels a
+   * row until that row's own quote answers (the label fails closed), and the total while no row has a quantity.
+   */
+  estimate?: boolean;
+  /** The total's label, told to the page: its notice and «تواصل معنا» follow it in «عدة ألوان». */
+  onEstimateChange?: (estimate: boolean) => void;
 }
 
-interface RowQuote {
+export interface RowQuote {
   unit: number;
   regular: number;
   applied: number;
@@ -136,10 +144,14 @@ interface RowQuote {
   quotaTracked: boolean;
   errors: string[];
   unpriced: boolean;
+  /** «سعر تقديري»: this row's own quote says its price is an estimate. */
+  estimate: boolean;
 }
 
-interface QuoteAnswer {
+/** What `POST /api/products/:slug/quote` answers a row (the fields the panel reads). */
+export interface QuoteAnswer {
   price_status?: 'priced' | 'unpriced';
+  price_estimate?: boolean;
   quote: {
     unit_subtotal_iqd: number;
     regular_iqd: number;
@@ -148,6 +160,7 @@ interface QuoteAnswer {
     applied_usd_cents?: number;
     regular_usd_cents?: number;
     errors?: string[];
+    price_estimate?: boolean;
   } | null;
   availability: {
     mode?: string;
@@ -172,6 +185,40 @@ interface AddedLine {
 const SHARED_SCOPES = new Set(['product', 'base', 'option']);
 const MAX_IN_FLIGHT = 3;
 const VISIBLE_OTHERS = 8;
+
+/** A quote says «سعر تقديري» only on a priced answer; the flag rides on the answer and on its quote. */
+export const quoteEstimated = (res: Pick<QuoteAnswer, 'price_status' | 'price_estimate' | 'quote'>): boolean =>
+  res.price_status !== 'unpriced' && !!res.quote && (res.price_estimate === true || res.quote.price_estimate === true);
+
+/** A row's label: its own quote decides; until one answers, the page's label stands in (fail closed). */
+export const rowEstimated = (quote: { estimate: boolean } | null, standIn: boolean): boolean => (quote ? quote.estimate : standIn);
+
+/** The total is an estimate while any row in it is; with no row yet, the page's label. */
+export const totalEstimated = (live: ReadonlyArray<{ estimate: boolean } | null>, standIn: boolean): boolean =>
+  live.length > 0 ? live.some((q) => rowEstimated(q, standIn)) : standIn;
+
+/** A row as its own quote (qty 1) answers it: the figures, the ceiling, the errors and the label. Pure. */
+export function rowQuoteOf(res: QuoteAnswer): RowQuote {
+  const stock = res.availability?.stock;
+  const capacity = res.availability?.preorder?.capacity;
+  const unpriced = res.price_status === 'unpriced' || !res.quote;
+  return {
+    unit: res.quote?.unit_subtotal_iqd ?? 0,
+    regular: res.quote?.regular_iqd ?? 0,
+    applied: res.quote?.applied_iqd ?? 0,
+    unitBase: unitUsdBase(res.quote),
+    appliedUsd: res.quote?.applied_usd_cents ?? null,
+    regularUsd: res.quote?.regular_usd_cents ?? null,
+    maxQty: unpriced ? 0 : Math.max(0, Math.trunc(stock?.max_qty ?? LINE_QTY_MAX)),
+    tracked: stock?.tracked === true,
+    scope: String(stock?.scope ?? ''),
+    preorder: res.availability?.mode === 'preorder',
+    quotaTracked: capacity?.tracked === true,
+    errors: [...(res.quote?.errors ?? []), ...(res.availability?.selection?.errors ?? [])],
+    unpriced,
+    estimate: quoteEstimated(res),
+  };
+}
 
 export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
   const {
@@ -203,6 +250,8 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     usdTotal,
     quickBuyOn = false,
     reasonFor,
+    estimate = false,
+    onEstimateChange,
   } = props;
   const cs = colourStrings(lang);
   const cl = colourLang(lang);
@@ -272,27 +321,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
           { signal: ac.signal, timeoutMs: 12000 }
         )
         .then((res) => {
-          const stock = res.availability?.stock;
-          const capacity = res.availability?.preorder?.capacity;
-          const unpriced = res.price_status === 'unpriced' || !res.quote;
-          setQuotes((now) => ({
-            ...now,
-            [key]: {
-              unit: res.quote?.unit_subtotal_iqd ?? 0,
-              regular: res.quote?.regular_iqd ?? 0,
-              applied: res.quote?.applied_iqd ?? 0,
-              unitBase: unitUsdBase(res.quote),
-              appliedUsd: res.quote?.applied_usd_cents ?? null,
-              regularUsd: res.quote?.regular_usd_cents ?? null,
-              maxQty: unpriced ? 0 : Math.max(0, Math.trunc(stock?.max_qty ?? LINE_QTY_MAX)),
-              tracked: stock?.tracked === true,
-              scope: String(stock?.scope ?? ''),
-              preorder: res.availability?.mode === 'preorder',
-              quotaTracked: capacity?.tracked === true,
-              errors: [...(res.quote?.errors ?? []), ...(res.availability?.selection?.errors ?? [])],
-              unpriced,
-            },
-          }));
+          setQuotes((now) => ({ ...now, [key]: rowQuoteOf(res) }));
         })
         .catch((err) => {
           if (ac.signal.aborted) return;
@@ -427,16 +456,23 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
           live.map((r) => scaleUsdLine(unitBaseOf(r), quantities[r.id] ?? 0)).filter((l): l is UsdLine => l !== null)
         )
       : null;
+  // «سعر تقديري» (§5.3) names the total in the bar and the panel: the price card above may be scrolled away.
+  const totalEstimate = totalEstimated(live.map((r) => freshQuote(r.id)), estimate);
   const [announced, setAnnounced] = useState('');
   useEffect(() => {
     if (live.length === 0) return;
     // Written 600 ms after the last change, so holding + is not read out on every step.
-    const t = window.setTimeout(
-      () => setAnnounced(cs.announceTotal(pieces, live.length, total === null ? '—' : money(total, totalUsd))),
-      600
-    );
+    const t = window.setTimeout(() => {
+      const said = total === null ? '—' : money(total, totalUsd);
+      setAnnounced(cs.announceTotal(pieces, live.length, totalEstimate ? `${said} · ${ESTIMATE_TEXT[cl]}` : said));
+    }, 600);
     return () => window.clearTimeout(t);
-  }, [pieces, live.length, total]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [pieces, live.length, total, totalEstimate]); // eslint-disable-line react-hooks/exhaustive-deps
+  // The page's notice and «تواصل معنا» follow the total's label; once the panel is gone it says nothing.
+  useEffect(() => {
+    onEstimateChange?.(totalEstimate);
+  }, [totalEstimate, onEstimateChange]);
+  useEffect(() => () => onEstimateChange?.(false), [onEstimateChange]);
 
   // ---------------------------------------------------------- the gate
   const [busy, setBusy] = useState(false);
@@ -466,7 +502,7 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     return rows.find((r) => ids.includes(r.id))?.id ?? null;
   };
 
-  const sentenceFor = (code: string, details: Record<string, unknown>, message: string): string => {
+  const sayRefusal = (code: string, details: Record<string, unknown>, message: string): string => {
     const counted = stockRefusal({ code, details }, cl);
     if (counted) return counted;
     const own = reasonFor?.(code) ?? '';
@@ -585,6 +621,17 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
     }
     const details = (err.details ?? {}) as Record<string, unknown>;
     const lineRefusals = Array.isArray(details.lines) ? (details.lines as Array<Record<string, unknown>>) : [];
+    /*
+     * «سعر تقديري» (docs/SMART_PRICING.md §5.5): a refusal of an estimated line (pre-order only, ordering
+     * paused, the state unreadable) is said in the estimate contract's words, in the reader's language —
+     * loaded only when the door answered one of them; otherwise the sentences below are unchanged.
+     */
+    const ESTIMATE_CODE = /^PRICE_(?:ESTIMATE|PROTECTION_ESTIMATE)/;
+    const estimateWords = [err.code ?? '', ...lineRefusals.map((l) => String(l.code ?? ''))].some((c) => ESTIMATE_CODE.test(c))
+      ? await import('../../../packages/contracts/src/priceEstimates').catch(() => null)
+      : null;
+    const sentenceFor = (code: string, d: Record<string, unknown>, message: string): string =>
+      estimateWords?.estimateRefusalText(code, cl) ?? sayRefusal(code, d, message);
     const marks: Record<string, string> = {};
     const lowered: Record<string, number> = {};
     for (const l of lineRefusals) {
@@ -680,7 +727,9 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
 
   const totalFigure = (
     <div className="min-w-0">
-      <div className="text-[11px] text-text-muted">{cs.totalCaption}</div>
+      <div className="text-[11px] text-text-muted" data-price-estimate={totalEstimate || undefined}>
+        {totalEstimate ? `${ESTIMATE_TEXT[cl]} · ${cs.totalCaption}` : cs.totalCaption}
+      </div>
       <div
         aria-busy={pending || undefined}
         className={`text-text-primary font-black text-[15px] tabular-nums truncate transition-opacity duration-200 ${pending ? 'opacity-55' : 'opacity-100'}`}
@@ -739,6 +788,14 @@ export default function ColourQuantityPanel(props: ColourQuantityPanelProps) {
                 ) : null}
               </span>
             );
+            // «تقديري» beside this colour's price while it is an estimate.
+            if (rowEstimated(q, estimate)) {
+              facts.push(
+                <span key="estimate" data-price-estimate className="font-semibold text-text-muted">
+                  {ESTIMATE_SHORT[cl]}
+                </span>
+              );
+            }
           }
           if (inCart > 0) facts.push(<span key="cart" className="tabular-nums">{cs.inCart(groupedNumber(inCart))}</span>);
           const lastTwo = i >= visible.length - 2;

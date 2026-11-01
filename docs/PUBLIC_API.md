@@ -60,6 +60,17 @@ by the reference in its web address (`/requests/<reference>`, the request's
 own page since Community Phase 5; the older `/requests?request=<reference>`
 still redirects there) — the only handle the site's own board uses.
 
+Every `price` carries `estimate` (always present). `estimate: true` marks an
+**estimated pre-order price** — the site labels it «سعر تقديري» (DECISIONS
+rows 278–281, docs/SMART_PRICING.md): the amounts and the product's
+`purchase` block are what the cart charges today, but the final price may
+differ once the order is confirmed with the supplier, and the site asks the
+buyer to approve any change before charging it. It is the storefront card's
+own label (true when any priced variant of the product is an estimate) and is
+`false` for every other price and whenever `status` is not `priced`. It is a
+boolean only: no supplier, supplier price, source or estimation detail is ever
+published.
+
 ## Rules (and where each is enforced)
 
 - **Anonymous by construction.** `worker/index.ts` never loads a session for
@@ -74,7 +85,9 @@ still redirects there) — the only handle the site's own board uses.
   (`additionalProperties: false`, every property required) and the tests
   validate every live answer against them.
 - **Never published** (tested with a secret marker in each place): cost and
-  purchase prices, profits, suppliers and supplier links on pictures, SKUs,
+  purchase prices, profits, suppliers and supplier links on pictures, the
+  supplier price catalogue behind an estimated price (captured prices, matches,
+  per-type defaults, flags — only `price.estimate` is public), SKUs,
   raw stock/reserved counts and thresholds, pre-order capacities, internal
   ids, customers (names are masked as on the site), orders, sessions, admin
   settings (e.g. the bank details of wallet top-up methods), drafts, hidden
@@ -139,6 +152,8 @@ Add a `PublicRoute` to a resource list in `worker/lib/publicApi/resources/`
 and `/context` pick it up; `tests/publicApi.test.ts` crawls it, scans it for
 leaks and validates it against its schema.
 
-Tests: `tests/publicApi.test.ts` (25): the leak crawl runs with the community
+Tests: `tests/publicApi.test.ts` (26): the leak crawl runs with the community
 open, over a shop seeded with a secret in every private place and a
-suspended shop beside it.
+suspended shop beside it; `price.estimate` is checked on an estimated product
+(and `tests/priceEstimateCustomerSurfaces.test.ts` keeps the supplier
+catalogue behind it out of every answer).

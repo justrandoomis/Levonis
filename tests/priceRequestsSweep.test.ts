@@ -17,6 +17,11 @@
  *     told, and is told when its own price arrives;
  *   - a sale hold (the completeness switch) keeps a request waiting; lifting
  *     it lets the next pass tell;
+ *   - «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.5, §8): a
+ *     selection whose price is an estimate is told in the estimate's own
+ *     words — the contract's priceRequest.title and the estimate notice, in
+ *     Arabic, English and real Sorani, in-app and by email — while a SKU the
+ *     owner made firm on the same product is told the ordinary way;
  *   - the pass spends no statement its budget did not grant (counted on the
  *     D1 itself), takes ten products a pass, and the cursor carries the rest;
  *     the quarter-hour tick stays at or under 950 with the sweep last.
@@ -35,6 +40,7 @@ import { CAT, CAT_SEL, CUSTOMER_ROLES, catalogOnlyWorld, type CatalogOnlyWorld }
 import { priceAvailableEventKey, sweepPriceRequests, type PriceRequestBudget } from '../worker/lib/priceRequests';
 import { PRICE_REQUEST_TICK_BUDGET, QUARTER_HOUR_TICK_LIMIT, quarterHourPriceRequestBudget } from '../worker/lib/quarterHourBudget';
 import { PRICE_AVAILABLE_TEXT } from '@levonis/contracts/priceRequests';
+import { ESTIMATE_STRINGS } from '@levonis/contracts/priceEstimates';
 
 const U1 = P.U1;
 
@@ -195,6 +201,62 @@ test('a sale hold keeps a request waiting; lifting it (the owner’s switch off,
   const report = await sweepPriceRequests(envOf(w), budget(40));
   assert.equal(report.notified, 1);
   assert.equal(reqRow(w.raw, 'u_cust', P.P1S, '').state, 'notified');
+});
+
+test('an estimated price is told in the estimate’s own words (three languages, in-app and by email); a firm SKU of the same product the ordinary way', async () => {
+  const w = await catalogOnlyWorld();
+  const grey = CAT_SEL.key(CAT_SEL.std, CAT_SEL.grey);
+  const white = CAT_SEL.key(CAT_SEL.combo, CAT_SEL.white);
+  for (const [user, body] of [
+    ['customer', { product_id: CAT.id, option_value_ids: [CAT_SEL.std], color_id: CAT_SEL.grey, notify: true }],
+    ['pro', { product_id: CAT.id, option_value_ids: [CAT_SEL.combo], color_id: CAT_SEL.white, notify: true }],
+  ] as const) {
+    const res = await request(w, user, body);
+    assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
+  }
+  // The H2D's first price is an estimate (the apply writes the price and the label in one batch); the owner
+  // then confirms the white Combo's price, so that one SKU is a firm price on a labelled product.
+  await publishV2(w.raw, CAT.id);
+  w.raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${CAT.id}', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = '${CAT.id}';
+    DELETE FROM ops_guards WHERE id = 'engine-price:${CAT.id}';`);
+  w.raw
+    .prepare('INSERT INTO price_estimate_firm_skus (product_id, combo_key, confirmed_by, confirmed_at) VALUES (?, ?, ?, ?)')
+    .run(CAT.id, white, 'usr_owner', '2026-11-01T00:00:00.000Z');
+
+  const report = await sweepPriceRequests(envOf(w), budget(40));
+  assert.equal(report.notified, 2, 'an estimate is a price: both requesters are told');
+  const noteOf = (user: string) =>
+    row<Record<string, unknown>>(w.raw, "SELECT * FROM user_notifications WHERE user_id = ? AND kind = 'price_available'", user)!;
+
+  // The estimated selection: the contract's title with the product and its selection, and the estimate notice.
+  const est = noteOf('u_cust');
+  const titleTail = (lang: 'ar' | 'en' | 'ckb') => ESTIMATE_STRINGS.priceRequest.title[lang].split('{name}')[1];
+  assert.match(String(est.title_en), /^Levo Catalog Printer H2D — /);
+  assert.ok(String(est.title_en).endsWith(titleTail('en')), String(est.title_en));
+  assert.ok(String(est.title_ar).endsWith(titleTail('ar')), String(est.title_ar));
+  assert.equal(est.body_en, ESTIMATE_STRINGS.notice.en);
+  assert.equal(est.body_ar, ESTIMATE_STRINGS.notice.ar);
+  const meta = JSON.parse(String(est.meta)) as Record<string, string>;
+  assert.ok(meta.title_ckb.startsWith('چاپکەری کەتەلۆگ H2D — '), meta.title_ckb);
+  assert.ok(meta.title_ckb.endsWith(titleTail('ckb')), meta.title_ckb);
+  assert.equal(meta.body_ckb, ESTIMATE_STRINGS.notice.ckb);
+  assert.notEqual(meta.title_ckb, est.title_ar, 'the Sorani is never the Arabic pasted across');
+  assert.notEqual(meta.body_ckb, est.body_ar);
+  assert.equal(JSON.stringify(est).includes(PRICE_AVAILABLE_TEXT.title.en), false, 'never «the price is now available» about an estimate');
+  // The email says the same: its subject is the estimate's title in the customer's language.
+  const key = priceAvailableEventKey(String(reqRow(w.raw, 'u_cust', CAT.id, grey).id), 1);
+  const mail = row<{ payload: string }>(w.raw, 'SELECT payload FROM outbox WHERE event_key = ?', `${key}:email`)!;
+  const subject = String((JSON.parse(mail.payload) as { subject?: unknown }).subject);
+  assert.ok([est.title_ar, est.title_en, meta.title_ckb].includes(subject), subject);
+
+  // The firm SKU: an ordinary price, told the ordinary way.
+  const firm = noteOf('u_pro');
+  assert.equal(firm.title_en, PRICE_AVAILABLE_TEXT.title.en);
+  assert.equal(firm.title_ar, PRICE_AVAILABLE_TEXT.title.ar);
+  assert.match(String(firm.body_en), /Levo Catalog Printer H2D — H2D Combo.*: you can now see the price and buy\.$/);
+  assert.equal(String(firm.body_en).includes(ESTIMATE_STRINGS.notice.en), false);
+  statsEqualSource(w.raw, CAT.id);
 });
 
 // ------------------------------------------------------------- the budget

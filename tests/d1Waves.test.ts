@@ -343,3 +343,41 @@ test('an imported product page reads its translation memory in the existing wave
   assert.equal(saved.sqls.filter((q) => q.includes('catalog_translation')).length, 0, 'a product saved in the admin form pays nothing');
   assert.ok(saved.prepares <= 23, `${saved.prepares} prepares`);
 });
+
+/**
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.2): the label is read off the product row every route
+ * already reads (`SELECT *`), and a labelled product's firm SKUs ride the overlay's ONE SKU-price statement (its
+ * firm arm) — so a catalogue holding labelled products and firm SKUs costs the hot routes no wave and no
+ * prepared statement more than one without.
+ */
+test('0218: a labelled product and a firm SKU add no wave and no statement to the hot routes', async () => {
+  const w = world();
+  const [labelled, confirmed] = [LIVE_PRODUCTS[0], LIVE_PRODUCTS[1]];
+  const paths = [`/api/products/${labelled.slug}`, `/api/products/${confirmed.slug}`, '/api/products', '/api/home'];
+  const before = new Map<string, Awaited<ReturnType<typeof w.measure>>>();
+  for (const p of paths) {
+    await w.measure(p);
+    before.set(p, await w.measure(p));
+  }
+  for (const id of [labelled.id, confirmed.id]) {
+    w.raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${id}', 1);
+      UPDATE products SET price_estimate = 1 WHERE id = '${id}';
+      DELETE FROM ops_guards WHERE id = 'engine-price:${id}';`);
+  }
+  // The option-less product's own SKU ('') confirmed: its card carries no label, its firm row is still read.
+  w.raw.prepare('INSERT INTO price_estimate_firm_skus (product_id, combo_key, confirmed_by, confirmed_at) VALUES (?, ?, ?, ?)').run(confirmed.id, '', 'usr_owner', 'x');
+  for (const p of paths) {
+    const after = await w.measure(p);
+    const was = before.get(p)!;
+    assert.equal(after.waves, was.waves, `${p}: ${after.waves} waves, was ${was.waves}\n${after.sqls.join('\n')}`);
+    assert.equal(after.prepares, was.prepares, `${p}: ${after.prepares} statements, was ${was.prepares}\n${after.sqls.join('\n')}`);
+  }
+  // Not vacuous: the label is on the answers, and the firm SKU is honoured.
+  const app = stubApp(w.db, null, mount, { env: ENV });
+  const page = (await (await get(app, `/api/products/${labelled.slug}`)).json()) as { price_estimate?: boolean; product: { price_estimate?: boolean } };
+  assert.equal(page.price_estimate, true);
+  assert.equal(page.product.price_estimate, true);
+  const cards = ((await (await get(app, '/api/products')).json()) as { products: Array<{ id: string; price_estimate?: boolean }> }).products;
+  assert.equal(cards.find((c) => c.id === labelled.id)?.price_estimate, true);
+  assert.equal(cards.find((c) => c.id === confirmed.id)?.price_estimate, undefined, 'every priced SKU firm: no label');
+});

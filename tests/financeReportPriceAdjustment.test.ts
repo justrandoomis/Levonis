@@ -150,3 +150,40 @@ test('a frozen operational refund remains authoritative after accepted-price all
   assert.equal(r.summary.totals.net_profit_iqd, 37);
   db.close();
 });
+
+/**
+ * «تأكيد السعر النهائي» (migration 0218; docs/SMART_PRICING.md §6.5, §6.8): an
+ * estimate settlement the customer approved is an ordinary 0140 adjustment —
+ * its delta lands on `orders.price_adjustment_iqd` by the unchanged approval
+ * batch — so the finance report treats it exactly as any accepted price
+ * change: the same revenue, profit and per-product split, whatever its
+ * `reason_code`, and the estimate records (customer prices only) change none
+ * of it.
+ */
+test('an approved estimate settlement is revenue exactly as an ordinary accepted price change', async () => {
+  const build = (estimate: boolean) => {
+    const db = seed();
+    order(db, { delta: 2000 });
+    item(db, 'a', 'p1', 45000);
+    item(db, 'b', 'p2', 40000);
+    db.prepare(
+      `INSERT INTO order_price_adjustments (id,order_id,user_id,state,old_total_iqd,new_total_iqd,delta_iqd,old_due_iqd,new_due_iqd,
+                                            old_wallet_iqd,new_wallet_iqd,wallet_refund_iqd,reason,note,proposed_by,idempotency_key,
+                                            decided_at,decided_by,decided_via,reason_code)
+       VALUES ('padj_settle','o','buyer','approved',100,2100,2000,0,0,0,0,0,'reason line','','owner','k1','2026-10-02T10:00:00Z','buyer','web',?)`
+    ).run(estimate ? 'ESTIMATE_FINAL_PRICE' : '');
+    if (estimate) {
+      // The settled record of line a, written past the checkout-only insert guard (T7) for this fixture.
+      db.exec(`DROP TRIGGER trg_ope_insert_guard;
+        INSERT INTO order_price_estimates (order_item_id,order_id,product_id,combo_key,channel,qty,estimate_unit_iqd,notice_version,state,final_unit_iqd,adjustment_id,decided_by,decided_at,created_at)
+          VALUES ('a','o','p1','','pre_order_sea',1,45000,1,'approved',47000,'padj_settle','buyer','2026-10-02T10:00:00Z','2026-10-01T10:00:00Z');`);
+    }
+    return db;
+  };
+  const plain = await reports(build(false));
+  const est = await reports(build(true));
+  assert.deepEqual(est.summary.totals, plain.summary.totals);
+  assert.deepEqual(est.products, plain.products);
+  assert.deepEqual(est.categories, plain.categories);
+  assert.equal(est.summary.totals.revenue_iqd, 45000 + 40000 + 2000);
+});

@@ -140,7 +140,7 @@ Multi mode (the switch) is offered when **all** of these hold:
 
 - `source === 'catalog'` (not a community listing), and the page is not catalog-only or unpriced (`!noPrice`; DECISIONS rows 239-240);
 - the product is not a composition (bundle or mystery); those have their own door;
-- the **colour dimension** has at least **2 values that can take a quantity** for the current shared selection. Such a value is offered with the chosen options (`colorsForOption`, `:1605`; or `valueOffered` for a colour group), is not «بلا سعر» (`colorNoPrice`, `:3070`), and is not sold out when the order type is direct sale (`levelChip`, `:2426`).
+- the **colour dimension** has at least **2 values that can take a quantity** for the current shared selection. Such a value is offered with the chosen options (`colorsForOption`, `:1605`; or `valueOffered` for a colour group), is not a combination the product does not sell (§3.3), is not «بلا سعر» (`colorNoPrice`, `:3070`), and is not sold out when the order type is direct sale (`levelChip`, `:2426`).
 
 The **colour dimension** is `product.colors` when there are any (`orderedColors`, `:2390`). Otherwise it is the relational option group with `kind === 'color'`, which only exists where migration 0194 is installed. When both exist, `product.colors` wins.
 
@@ -175,6 +175,7 @@ inline-start                                                   inline-end
 - **Second line** (12 px): items joined by « · », each shown only when it has something true to say:
   - availability: `levelChip` for this colour, so the shelf is shown only for a direct sale, with the existing «نفد» / «بقي n» / «متوفر n» words and tints;
   - «بلا سعر» (`noPriceTag`) for an unpriced colour;
+  - «غير متاح مع هذا الاختيار» (the chooser's `NOT_OFFERED`) in the availability's place, for a colour the product does not sell with the shared selection: a combination its grid leaves out (DECISIONS row 283; `docs/SMART_PRICING.md` §5.3). Such a row is never quoted and shows no price;
   - the unit price, **only when the rows' unit prices differ**, from `price_levels` (`L.combo[optionId|colorId]` or `L.color[colorId]`) or the row's fresh quote (§3.6). The struck regular price is shown when the applied price is lower, as on the cart line;
   - «في السلة: n» when the cart already holds this exact selection, by the same identity as `inCartQty` (`:1805`).
 - **Stepper:** `QuantityInput` `size="sm"` with **`min={0}`** (§3.10), `max` = the row's ceiling (§3.5), `autoClamp`, and `hintPlacement="above"` on the last two visible rows (`"below"` otherwise). The labels name the colour (§3.10). A row that cannot take a quantity (sold out on direct sale, unpriced, or not offered) has its stepper **disabled**. Such rows sit after the rows that can take a quantity, by the same stable rule as `orderedColors` (`:2390`).
@@ -757,6 +758,7 @@ The review of the build found places where the page could still say one thing an
 - **The memory of D4.** Every quantity typed for a colour the customer moved away from is kept for this view, not only the last: at the third colour, «حدّد كمية لكل لون» and the switch bring Black 50 and White 5. «أبقِ 50 لـ White» drops Black's number (the customer meant White). A successful add clears it.
 - **D6 counts the colour the tap left**, so the colour the page opened on counts: two taps away from it are three colours.
 - **In «عدة ألوان» the header's shelf note is hidden.** It described the colour the page holds behind the scenes, which is in no line being added.
+- **The colour held behind the rows stays one that can take a quantity** (2026-11-01). When a change of the shared selection (§3.4) makes it a combination the product does not sell, or leaves it with no price, sold out on a direct sale or no longer offered with that selection, the page takes the first row that can, as entering «عدة ألوان» does, so the panel keeps its summary, total and add.
 - **⚡ names what it buys** (principle 2): «شراء سريع: 56 × Beige», "Quick Buy: 56 × Beige", «کڕینی خێرا: 56 × Beige», with the full name as its accessible name. Its success toast names what was bought: «أُضيف إلى طلب الشراء السريع: 56 × Beige». A confirmation step for ⚡ is not added (open question Q6).
 - **The several-colours button for a guest** reads «سجّل الدخول للشراء», as single mode does. Rows are still not carried through sign-in (Q4).
 - **Focus after the confirmation sheet (§3.8).** With no row filled, the add button is `aria-disabled` rather than `disabled`, so focus really returns to it; its press then does nothing.

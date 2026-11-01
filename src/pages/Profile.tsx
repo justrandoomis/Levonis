@@ -27,7 +27,7 @@ import { useCommunityAccess } from './community/access';
 import VariantImg from '../components/ui/VariantImg';
 import { IMAGE_SIZES } from '../../packages/contracts/src/imageSizes';
 import { initialOf } from '../lib/initials';
-import { isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
+import { ESTIMATE_TEXT, isEstimated, isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
 
 interface FavoriteItem {
   id: string;
@@ -38,6 +38,8 @@ interface FavoriteItem {
   /** NULL for a catalog-only product (DECISIONS rows 239-240): never 0. */
   price_iqd: number | null;
   price_status?: 'priced' | 'unpriced';
+  /** «سعر تقديري» (docs/SMART_PRICING.md §5.3): an estimated pre-order price; present only when true. */
+  price_estimate?: true;
 }
 
 interface ReferralReward {
@@ -889,6 +891,12 @@ export default function Profile() {
                          ) : (
                          <div className="flex items-baseline gap-1.5 text-scarlet font-bold mb-1.5 mt-auto">
                            <span className="text-[15px] leading-none">{money(item.price_iqd)}</span>
+                           {/* «سعر تقديري» (docs/SMART_PRICING.md §5.3): never an estimate shown as a confirmed price. */}
+                           {isEstimated(item) && (
+                             <span data-price-estimate className="text-[11px] font-medium text-text-muted">
+                               {loc(ESTIMATE_TEXT.ar, ESTIMATE_TEXT.en, ESTIMATE_TEXT.ckb)}
+                             </span>
+                           )}
                          </div>
                          )}
 

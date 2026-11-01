@@ -19,7 +19,19 @@ import {
   runListed,
   visibleProductBySlug,
 } from '../lib/listing';
-import { checkSelection, namesUnpricedChoice, sellableNowOf, selectionKey, skuPriced, unpricedSkuKeys } from '../lib/commercialState';
+import {
+  checkSelection,
+  namesUnpricedChoice,
+  offeredPastLimitKeys,
+  productEstimated,
+  selectionEstimated,
+  sellableNowOf,
+  selectionKey,
+  selectionUnoffered,
+  skuPriced,
+  unofferedSkuKeys,
+  unpricedSkuKeys,
+} from '../lib/commercialState';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -27,7 +39,7 @@ import type { AppContext } from '../lib/types';
 import { safeParse, localeToApi } from '../lib/types';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { ProductViewedV1 } from '@levonis/contracts/events/v1/ProductViewed';
-import { notFound, int, str } from '../lib/http';
+import { HttpError, notFound, int, str } from '../lib/http';
 import { getSetting, getSettings, PUBLIC_SETTING_KEYS, projectPublicSettings, publicPrintServiceRates } from '../lib/settings';
 import { getPublicDisplayRate } from '../lib/fx/displayRate';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
@@ -142,6 +154,7 @@ import {
   optionValueIdsInRelationOrder,
 } from '../lib/cartSelectionIdentity';
 import { merchantPublicSql, storePublicSql, withApprovalSchema } from '../lib/merchantApproval';
+import { estimateClause, runWithEstimateClause } from '../lib/priceEstimateLabel';
 
 export const productRoutes = new Hono<AppContext>();
 
@@ -3111,6 +3124,9 @@ export function publicWithDisplayPrice(
     }
   }
   out.price_status = 'priced';
+  // THE ESTIMATE LABEL (migration 0218; docs/SMART_PRICING.md §5.2–5.3): read off the very row the price was
+  // read with, and only when a priced SKU is an estimate, so every other card is byte-identical.
+  if (productEstimated(doc)) out.price_estimate = true;
   out.display_price_iqd = resolved.applied_iqd;
   // The F5 label (display only, §9.4): a member clamped up to the offer reads «سعر العرض».
   out.display_applied_tier = offerLabelTier(resolved);
@@ -3354,6 +3370,10 @@ const CARD_FIELDS = [
   'light_image',
   // DECISIONS row 240: 'priced' or 'unpriced' (the catalog-only card: every price below is null).
   'price_status',
+  // «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.3): `true` on a PRICED card when any priced SKU
+  // is an estimate (`productEstimated`), absent otherwise — a boolean, never a figure, source or flag. The
+  // catalog-only card never carries it.
+  'price_estimate',
   'price_iqd',
   'display_price_iqd',
   'display_regular_iqd',
@@ -3768,13 +3788,18 @@ export { cover as compositionCover };
  */
 productRoutes.get('/print-calculator', async (c) => {
   const L = await listingOf(c.env.DB);
-  const { results } = await c.env.DB.prepare(
+  // «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.3, §8): a labelled filament's price is an estimate,
+  // so it is never published here as a per-gram figure — the print quote's materials skip it too
+  // (worker/lib/printQuote/repository.ts `loadMaterialPrices`). Without 0218 the clause is dropped.
+  const { results } = await runWithEstimateClause(
+    c.env.DB,
     `SELECT id, slug, name, name_ar, name_ku, price_iqd, spec_fields, images, template_family
        FROM products
-      WHERE ${L.sellable('products')} AND template_family = 'materials' AND price_iqd > 0
+      WHERE ${L.sellable('products')} AND template_family = 'materials' AND price_iqd > 0${estimateClause('products')}
       ORDER BY price_iqd
-      LIMIT 200`
-  ).all<Record<string, unknown>>();
+      LIMIT 200`,
+    (sql) => c.env.DB.prepare(sql).all<Record<string, unknown>>()
+  );
 
   const filaments: Array<Record<string, unknown>> = [];
   for (const row of results ?? []) {
@@ -5011,11 +5036,16 @@ export async function catalogProductDetail(
      * the plans empty, and the resolver never ran (the row still holds the
      * archived dinar ladder).
      */
-    const product = catalogOnlyCard(applyRelations(parsed, relations), poolMember);
+    const catalogDoc = applyRelations(parsed, relations);
+    const product = catalogOnlyCard(catalogDoc, poolMember);
     product.is_printer = isPrinter;
     product.warranty_plans = [];
     // The imported prose in Arabic and Sorani, on the outgoing body only (a slot a human approved stays).
     overlayImportedText(product, translations, parsed.translation_meta);
+    // The combinations it does not sell: «not available», never «طلب السعر» (review r2-quote). Past
+    // ENGINE_MAX_SKUS they are not listed: the SKUs it sells are, and a selection part of none is not offered.
+    const unoffered = unofferedSkuKeys(catalogDoc, relations);
+    const offered = offeredPastLimitKeys(catalogDoc, relations);
     return {
       ctx,
       ...(opts.lowestSku ? { lowestSku: { option: {}, color: {} } } : {}),
@@ -5023,6 +5053,8 @@ export async function catalogProductDetail(
         product,
         source: 'catalog',
         price_status: 'unpriced',
+        ...(unoffered.length ? { unoffered_selections: unoffered } : {}),
+        ...(offered.length ? { offered_selections: offered } : {}),
         brand: brandRow ?? null,
         sales_badge: salesBadge,
         rating: ratingSummary,
@@ -5066,6 +5098,10 @@ export async function catalogProductDetail(
   });
   // DECISIONS row 240 (per SKU): the selections the engine has not priced yet — shown, requested, never sold.
   const unpricedKeys = unpricedSkuKeys(doc, relations);
+  // The combinations it does not sell: «not available», never «طلب السعر» (review r2-quote); past
+  // ENGINE_MAX_SKUS, the SKUs it sells instead.
+  const unofferedKeys = unofferedSkuKeys(doc, relations);
+  const offeredKeys = offeredPastLimitKeys(doc, relations);
   const unpricedSet = new Set(unpricedKeys);
   const initialSelection = firstUsableDirectSelection(doc, {
     inventory,
@@ -5088,6 +5124,10 @@ export async function catalogProductDetail(
   const openingStandIn = initialSelection ? null : unchosenStandIn(doc, ctx, offer, now);
   const openingValueIds = openingStandIn ? [openingStandIn.optionId] : initialOptionValueIds;
   const openingOptionId = openingValueIds[0] ?? null;
+  // «سعر تقديري» of the opening selection (migration 0218; docs/SMART_PRICING.md §5.3): the page's chip and
+  // notice on first paint — the quote answers each selection after it. A selection that names no single SKU
+  // yet (a stand-in model, nothing chosen) is labelled while any SKU that could finish it is an estimate.
+  const openingEstimate = selectionEstimated(doc, openingValueIds, initialColorId);
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: openingOptionId,
@@ -5146,6 +5186,9 @@ export async function catalogProductDetail(
     product: out,
     source: 'catalog',
     price_status: 'priced',
+    // The opening selection's price is an estimate (`openingEstimate`) — absent otherwise; `product.price_estimate`
+    // is the card's label (any priced SKU).
+    ...(openingEstimate ? { price_estimate: true as const } : {}),
     brand: brandRow ?? null,
     /**
      * The two header signals the page could not previously show.
@@ -5188,8 +5231,8 @@ export async function catalogProductDetail(
           fulfillment_type: 'direct_sale' as const,
         }
       : null,
-    // The opening selection's price, final numbers only (V2-0, C5).
-    pricing: customerLinePrice(openingPrice),
+    // The opening selection's price, final numbers only (V2-0, C5), with its estimate label (0218).
+    pricing: customerLinePrice(openingPrice, { estimate: openingEstimate }),
     // §8/§9: the opening selection's member prices, from the live rules, so the
     // page can state the benefit on first paint rather than waiting for the
     // debounced quote to say what a membership is worth here.
@@ -5205,6 +5248,8 @@ export async function catalogProductDetail(
     // Per SKU (DECISIONS row 240): an unpriced selection's level is null, never another SKU's price.
     price_levels: unpricedKeys.length ? partialPriceLevels(doc, relations, ctx, offer, now) : priceLevels(doc, ctx, offer, now),
     ...(unpricedKeys.length ? { unpriced_selections: unpricedKeys } : {}),
+    ...(unofferedKeys.length ? { unoffered_selections: unofferedKeys } : {}),
+    ...(offeredKeys.length ? { offered_selections: offeredKeys } : {}),
     // The final price of every way to get the opening selection (the quote
     // re-computes them per selection) — the page's fulfilment pills and
     // transport rows read these, and compute nothing. A live offer prices
@@ -5400,6 +5445,32 @@ async function productDetail(c: Context<AppContext>): Promise<Response> {
 }
 
 /**
+ * THE QUOTE OF A PRODUCT SHOWN BUT NOT SOLD (DECISIONS row 240): 409
+ * PRICE_NOT_AVAILABLE, the refusal of every purchase door. A combination the
+ * product does not sell (`selectionUnoffered`, review r2-quote) carries that
+ * verdict as well, `selection_errors: ['VARIANT_NOT_MODELLED']`: it is «not
+ * available», and «طلب السعر» would refuse it. Only a VARIANT_COMBINATION
+ * product asked about two choices or more can name one, so no other quote
+ * reads anything; a failed read answers the plain refusal.
+ */
+async function catalogOnlyQuoteRefusal(db: D1Database, row: Record<string, unknown>, raw: unknown): Promise<HttpError> {
+  const refusal = priceNotAvailable();
+  const body = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  const optionId = typeof body.optionId === 'string' && body.optionId ? body.optionId : null;
+  const colorId = typeof body.colorId === 'string' && body.colorId ? body.colorId : null;
+  const named = (Array.isArray(body.optionValueIds) ? body.optionValueIds.length : 0) + (optionId ? 1 : 0) + (colorId ? 1 : 0);
+  if (row.inventory_mode !== 'VARIANT_COMBINATION' || named < 2) return refusal;
+  try {
+    const relations = await loadRelationsView(db, String(row.id), row.inventory_mode);
+    const ids = quoteOptionValueIds(body.optionValueIds, optionId, relations);
+    if (!selectionUnoffered(applyRelations(parseProductRow(row), relations), relations, ids, colorId)) return refusal;
+  } catch {
+    return refusal;
+  }
+  return new HttpError(refusal.status, refusal.message, refusal.code, { ...refusal.details, selection_errors: ['VARIANT_NOT_MODELLED'] });
+}
+
+/**
  * Live price quote for the product page (auth optional). The viewer's tier
  * comes exclusively from the session — a tier in the body is ignored. The
  * result never contains cost fields; checkout re-resolves server-side.
@@ -5409,14 +5480,14 @@ productRoutes.post('/:slug/quote', async (c) => {
   const slug = c.req.param('slug');
   const row = await visibleProductBySlug(c.env.DB, slug);
   if (!row) throw notFound('Product not found');
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   // Shown but not sold (DECISIONS row 240): the door's own refusal. The page never asks for it. A composition
   // is never shown unless sellable (default D6), so it answers 404 exactly as before.
   if (row.sellable_now !== 1) {
     if (String(row.composition ?? '') !== '') throw notFound('Product not found');
-    throw priceNotAvailable();
+    throw await catalogOnlyQuoteRefusal(c.env.DB, row, body);
   }
 
-  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   // Read up to what the quantity field can hold; above the ceiling the answer
   // is `availability.qty_ok: false` with `max_qty`, never a VALIDATION error.
   const qty = int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX, def: 1 });
@@ -5562,13 +5633,16 @@ productRoutes.post('/:slug/quote', async (c) => {
    * number at all, never the ladder, which is another SKU's price or the
    * archive. The page shows «السعر غير متوفر حالياً» and «طلب السعر» for this
    * selection; the others price and sell as before. A SKU priced on another
-   * channel only keeps today's `VARIANT_UNAVAILABLE`.
+   * channel only keeps today's `VARIANT_UNAVAILABLE`. A combination the
+   * product does not sell (`selectionUnoffered`) is not one: «طلب السعر» would
+   * refuse it, so it takes the path below and answers VARIANT_NOT_MODELLED.
    */
   if (doc.sku_strict === true) {
     const key = selectionKey(optionValueIds, colorId);
     if (
       !skuPriced(doc, key) &&
-      (namesUnpricedChoice(doc, relations, optionValueIds, colorId) || checkSelection(doc, relations, optionValueIds, colorId).ok)
+      (namesUnpricedChoice(doc, relations, optionValueIds, colorId) || checkSelection(doc, relations, optionValueIds, colorId).ok) &&
+      !selectionUnoffered(doc, relations, optionValueIds, colorId)
     ) {
       return c.json({
         success: true,
@@ -5615,13 +5689,19 @@ productRoutes.post('/:slug/quote', async (c) => {
   // C2: priced under the live offer exactly as the cart line will be, so the
   // figure that lands here is never higher than the one the cart charges.
   const priced = withLiveOffer(resolved, doc, ctx, offer, now);
+  // «سعر تقديري» FOLLOWS THE SELECTION (migration 0218; docs/SMART_PRICING.md §5.3): the SKU this request
+  // names (`skuEstimated`) — a firm SKU of a mixed product carries none; a selection that names no single SKU
+  // yet is labelled while any SKU that could finish it is an estimate.
+  const estimate = selectionEstimated(doc, optionValueIds, colorId);
 
   return c.json({
     success: true,
     price_status: 'priced',
+    // Only when true: every other quote is byte-identical.
+    ...(estimate ? { price_estimate: true as const } : {}),
     // C5: the final numbers only — no components, no fee, no rule.
     quote: {
-      ...customerLinePrice(priced),
+      ...customerLinePrice(priced, { estimate }),
       qty,
       line_total_iqd: priced.unit_subtotal_iqd * qty,
       // The line in the shop's dollars (DECISIONS row 248): exact integer cents × quantity.

@@ -395,3 +395,52 @@ test('C3: the public API prices each option and each colour of a per-SKU product
   assert.equal(combo.price, dear);
   w.raw.close();
 });
+
+// ------------------------------------------------------------------- the estimate label (0218)
+
+/** What the V2 writer's estimate batch does to the label (trigger T1: only under the product's price token). */
+function labelEstimate(raw: DatabaseSync, pid: string): void {
+  raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${pid}', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = '${pid}';
+    DELETE FROM ops_guards WHERE id = 'engine-price:${pid}';`);
+}
+
+/** The answer with the estimate label taken out, to compare its figures with the unlabelled answer. */
+const withoutLabel = (v: unknown): unknown =>
+  Array.isArray(v) ? v.map(withoutLabel) : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).filter(([k]) => k !== 'price_estimate').map(([k, x]) => [k, withoutLabel(x)])) : v;
+
+test('C5 with an estimated product (migration 0218): the label is the one new key — every figure unchanged, final numbers only', async () => {
+  const { db, raw } = await setup();
+  cartLine(raw, 'ci_s', 'sea', 'sea');
+  const seaApp = appAs(db, 'sea');
+  const guest = appAs(db, null);
+  const product = async () => ({
+    page: await json(await guest.request('/api/products/a1')),
+    list: await json(await guest.request('/api/products')),
+    direct: await json(await post(guest, '/api/products/a1/quote', { qty: 1, fulfillmentType: 'direct_sale' })),
+    sea: await json(await post(seaApp, '/api/products/a1/quote', { qty: 1, fulfillmentType: 'pre_order', transportMethod: 'sea' })),
+  });
+  const before = await product();
+  assert.equal(JSON.stringify(before).includes('price_estimate'), false, 'an unlabelled product carries no label');
+  labelEstimate(raw, 'p_a1');
+  const after = await product();
+  // The label, where the page, the card and the quote read it — never a figure (DECISIONS row 281).
+  assert.equal(after.page.price_estimate, true);
+  assert.equal(after.page.product.price_estimate, true);
+  assert.equal(after.page.pricing.price_estimate, true);
+  assert.equal((after.list.products as J[]).find((c) => c.id === 'p_a1')?.price_estimate, true);
+  for (const q of [after.direct, after.sea]) {
+    assert.equal(q.price_estimate, true);
+    assert.equal(q.quote.price_estimate, true);
+  }
+  // Every figure — the offer, the pills, the levels, the dollars — is exactly what it was.
+  assert.deepEqual(withoutLabel(after), before, 'the label moves no number and adds no other key');
+  // Final numbers only, on every customer answer the label reaches (the cart and the checkout quote included).
+  const answers: Array<[string, unknown]> = [
+    ...Object.entries(after),
+    ['GET /api/cart', await json(await seaApp.request('/api/cart'))],
+    ['POST /api/orders/quote', await json(await post(seaApp, '/api/orders/quote', quoteBody('addr_s', 'cash')))],
+  ];
+  assert.deepEqual(answers.flatMap(([at, body]) => arithmeticLeaks(body).map((l) => `${at}: ${l}`)), []);
+  await Promise.allSettled(pending);
+});

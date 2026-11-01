@@ -112,6 +112,12 @@ Row 9 in detail:
 - "Unpriced" is derived: VISIBLE and not SELLABLE, with no `pricing_v2_sku_results` row. Every customer projection emits `price_iqd: null`, `price_status: 'unpriced'` and never reads the column (catalog-only §3.1).
 - `stock` is `NULL`, which in Levonis means **untracked and unlimited** (`worker/lib/inventory.ts:126`, `:205-210`), not "not configured". So the import records "not configured" explicitly: `product_source_refs.stock_decision = 'not_configured'`. The Pricing V2 write refuses to publish such a product (409 `IMPORT_STOCK_NOT_CONFIGURED`) until the owner chooses "track quantity" or "untracked, to order" (§B.10, L-16). This is the brief's PRICED_NOT_CONFIGURED_FOR_SALE (§18C).
 
+Row 10 and the supplier price catalogue (2026-10-31, DECISIONS rows 278–282, `docs/SMART_PRICING.md`):
+
+- **The supplier price catalogue is separate from the import.** Its owner-only tables (`supplier_price_*`, migration 0218) are filled only through the owner's upload door under `/api/admin/pricing/supplier-prices`, from dated Tmall, EU-store and US-store captures and the owner's typed prices. The importer writes none of them: 0218's import-guard triggers refuse every write to them inside `ops_guards('catalog-import-batch')`, as 0195's guards do for the money tables (§B.4, row 239). The import still writes no price, cost or stock, and keeps no sync.
+- **The catalogue only reads the import's identities to match:** `product_external_ids` (`bambu_variant_id`, `bambu_sku_code`, `color_code`) and `product_source_refs.source_handle`. The EU store shares the US store's handles but not its ids (the same variant has a different id there), so an EU match rests on the handle and the English option labels.
+- **Logistics still never link to pricing.** The estimator never reads the `logistics` spec rows. Its measures are the model and colour packages, the product's own `products.package_*` and, failing those, the product type's default, which is written only to the private pricing input. «تعبئة أبعاد الشحن من بيانات الاستيراد» (`worker/lib/catalogImport/packageMeasures.ts`) stays the owner's own act: it copies verified logistics rows into the empty package columns of a product that is not yet priced. The estimate go-live list runs it before the first estimate (`docs/SMART_PRICING.md` §4.4 and §12).
+
 Every other rule is met as written. The R1–R15 matrix is in §M.
 
 ---

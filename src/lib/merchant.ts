@@ -533,6 +533,8 @@ export interface SavedProduct {
   price_iqd: number | null;
   /** 'unpriced' = shown in the catalogue without a price yet; absent reads as priced. */
   price_status?: 'priced' | 'unpriced';
+  /** «سعر تقديري» (docs/SMART_PRICING.md §5.3): a shop product at an estimated pre-order price; present only when true. */
+  price_estimate?: true;
   original_price_iqd: number | null;
   /**
    * null on a catalogue product: its availability is the whole availability

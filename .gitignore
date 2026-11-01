@@ -24,3 +24,10 @@ artifacts/
 # The performance lab's raw runs (scripts/perf-lab.mjs); the tables that
 # matter are copied into docs/PERFORMANCE_LOG.md.
 scratchpad/
+
+# Supplier price captures (Tmall, the Bambu Lab EU and US stores) and the v1
+# files made from them (scripts/supplier-prices/): the shop's cost basis. They
+# are uploaded through the owner's door, never committed (docs/SMART_PRICING.md
+# §3.3, owner question 282(g)). The few records the tests need are copied into
+# tests/fixtures/supplierPrices/ and tests/fixtures/supplierPricePages/.
+data/bambu-*-prices/

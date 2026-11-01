@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { listing } from '../lib/listing';
 import { priceStatusOf, sellableNowOf } from '../lib/commercialState';
+import { estimateClause, isEstimateRow, runWithEstimateClause } from '../lib/priceEstimateLabel';
 import type { AppContext } from '../lib/types';
 import { publicUser, localeToDb } from '../lib/types';
 import { requireAuth, badRequest, conflict, notFound, str, oneOf, username, displayName } from '../lib/http';
@@ -330,13 +331,16 @@ profileRoutes.get('/favorites', async (c) => {
   // VISIBLE, with the SELLABLE flag (DECISIONS row 240): a catalog-only favourite stays in the
   // collection with no price — its row's `price_iqd` is the archived dinar figure and never leaves.
   const L = await listing(c.env.DB);
-  const { results } = await c.env.DB.prepare(
-    `SELECT p.id, p.slug, p.name, p.name_ar, p.price_iqd, ${L.sellableFlag('p')} AS sellable_now
+  // «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.3): the label, computed from the row the price is
+  // read with. On a database without 0218 the clause is dropped and the column reads 0 (no product is labelled).
+  const { results } = await runWithEstimateClause(
+    c.env.DB,
+    `SELECT p.id, p.slug, p.name, p.name_ar, p.price_iqd, ${L.sellableFlag('p')} AS sellable_now,
+            CASE WHEN 1${estimateClause('p')} THEN 0 ELSE 1 END AS price_estimate
        FROM favorites f JOIN products p ON p.id = f.product_id
-      WHERE f.user_id = ? AND ${L.visible('p')} ORDER BY f.created_at DESC LIMIT 100`
-  )
-    .bind(user.id)
-    .all<Record<string, unknown>>();
+      WHERE f.user_id = ? AND ${L.visible('p')} ORDER BY f.created_at DESC LIMIT 100`,
+    (sql) => c.env.DB.prepare(sql).bind(user.id).all<Record<string, unknown>>()
+  );
   const images = await loadAuthoritativeProductImages(
     c.env.DB,
     results.map((product) => String(product.id))
@@ -351,6 +355,8 @@ profileRoutes.get('/favorites', async (c) => {
       image: images.get(String(p.id)) ?? '',
       price_status: priceStatusOf(sellableNowOf(p)),
       price_iqd: sellableNowOf(p) ? p.price_iqd : null,
+      // A boolean label on a priced favourite only, never a figure or a source.
+      ...(sellableNowOf(p) && isEstimateRow(p) ? { price_estimate: true as const } : {}),
     })),
   });
 });

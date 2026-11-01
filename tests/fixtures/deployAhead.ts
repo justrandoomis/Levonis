@@ -32,6 +32,11 @@ export interface DesignedRefusal {
   readonly code: string;
   /** The migration whose tables the route reads; the refusal applies on any database before it. */
   readonly migration: string;
+  /**
+   * What the MIGRATED database answers when that is not a 2xx: a read by id whose sweep id (`p_a1`) names
+   * nothing there answers 404. Absent: the migrated database must answer 2xx.
+   */
+  readonly ahead?: number;
 }
 
 export const DESIGNED_ON_OLDER_DB: readonly DesignedRefusal[] = [
@@ -51,6 +56,19 @@ export const DESIGNED_ON_OLDER_DB: readonly DesignedRefusal[] = [
   // 403 on both databases (the cost door comes first) and stays strict; every
   // other S-P2 door answers an older database as it answers the migrated one.
   { path: '/api/admin/trade-in/component-refs', who: ['owner'], status: 503, code: 'TRADE_IN_V2_NOT_INSTALLED', migration: '0192_trade_in_v2.sql' },
+  // Smart pricing (docs/SMART_PRICING.md §2.4, §3.4, §4): the owner's supplier catalogue and the estimator read
+  // only 0218's tables, so an older database hears 503 PRICE_ESTIMATES_NOT_INSTALLED — the shape of
+  // PRICING_NOT_INSTALLED. Non-owners (403 on both, the cost door comes first) and the two supplier-link reads
+  // (an empty list on both) stay strict. The two by-id reads name the sweep's `p_a1`, which is no type key and
+  // has no stored estimate on the migrated database: 404 there.
+  { path: '/api/admin/pricing/supplier-prices/snapshots', who: ['owner'], status: 503, code: 'PRICE_ESTIMATES_NOT_INSTALLED', migration: '0218_price_estimates.sql' },
+  { path: '/api/admin/pricing/supplier-prices/matches', who: ['owner'], status: 503, code: 'PRICE_ESTIMATES_NOT_INSTALLED', migration: '0218_price_estimates.sql' },
+  { path: '/api/admin/pricing/supplier-prices/lookup', who: ['owner'], status: 503, code: 'PRICE_ESTIMATES_NOT_INSTALLED', migration: '0218_price_estimates.sql' },
+  { path: '/api/admin/pricing/estimates/control', who: ['owner'], status: 503, code: 'PRICE_ESTIMATES_NOT_INSTALLED', migration: '0218_price_estimates.sql' },
+  { path: '/api/admin/pricing/estimates/types', who: ['owner'], status: 503, code: 'PRICE_ESTIMATES_NOT_INSTALLED', migration: '0218_price_estimates.sql' },
+  { path: '/api/admin/pricing/estimates/products', who: ['owner'], status: 503, code: 'PRICE_ESTIMATES_NOT_INSTALLED', migration: '0218_price_estimates.sql' },
+  { path: '/api/admin/pricing/estimates/types/p_a1/suggest', who: ['owner'], status: 503, code: 'PRICE_ESTIMATES_NOT_INSTALLED', migration: '0218_price_estimates.sql', ahead: 404 },
+  { path: '/api/admin/pricing/estimates/products/p_a1', who: ['owner'], status: 503, code: 'PRICE_ESTIMATES_NOT_INSTALLED', migration: '0218_price_estimates.sql', ahead: 404 },
 ];
 
 /** The listed refusal for this user and path on a database migrated through `through` (e.g. '0176'), if any. */
@@ -86,8 +104,8 @@ export function judge(
     return out;
   }
   reached.add(`${who} ${path}`);
-  if (ahead.status < 200 || ahead.status >= 300) {
-    out.push(`${who} ${path}: ${ahead.status} on the migrated database, where it must answer`);
+  if (designed.ahead === undefined ? ahead.status < 200 || ahead.status >= 300 : ahead.status !== designed.ahead) {
+    out.push(`${who} ${path}: ${ahead.status} on the migrated database, where it must answer${designed.ahead === undefined ? '' : ` ${designed.ahead}`}`);
   }
   const code = behind.body && typeof behind.body === 'object' ? (behind.body as { code?: unknown }).code : undefined;
   if (behind.status !== designed.status || code !== designed.code) {

@@ -102,6 +102,7 @@ import OrderBoardRow from './OrderBoardRow';
 import OrderSearchField from './OrderSearchField';
 import { countText } from './OrderBoardBadges';
 import { apiRefusal, refusalText } from '../../lib/refusalStrings';
+import { estimateRefusalText } from '../../../packages/contracts/src/priceEstimates';
 import { gateRefusalOf } from './serials/SerialGateRefusal';
 
 /** Unchanged from the board this replaces: thirty rows and their items in two
@@ -174,11 +175,23 @@ const EMPTY_COUNTS: AdminOrdersResponse['counts'] = {
   total: 0, overdue: 0, today: 0, tomorrow: 0, week: 0, later: 0, unscheduled: 0,
 };
 
+/**
+ * The board's answer since migration 0218 (worker/routes/admin.ts): the
+ * «بانتظار تأكيد السعر» filter's state and its board-wide count. (Each row's
+ * `price_estimate_open` is read by the row's price badge, `EstimateBoardRow`.)
+ * An older server sends neither, and the filter then never shows — absence
+ * reads as "no such order".
+ */
+type BoardResponse = AdminOrdersResponse & {
+  price_estimate?: boolean;
+  price_estimate_count?: number;
+};
+
 export default function OrdersBoard() {
   const { loc, lang } = useLanguage();
   const latin = lang === 'en';
 
-  const [data, setData] = useState<AdminOrdersResponse | null>(null);
+  const [data, setData] = useState<BoardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -199,6 +212,13 @@ export default function OrdersBoard() {
   const [archive, setArchive] = useState(false);
   /** «بانتظار موافقة الزبون على السعر» (0140) — narrows whatever else is chosen. */
   const [priceHold, setPriceHold] = useState(false);
+  /**
+   * «بانتظار تأكيد السعر» (0218) — orders whose estimated lines wait for their
+   * final price, the work only a financial admin can clear. Narrows whatever
+   * else is chosen, like the hold; the live board only (an archived order has
+   * no line left waiting — a cancel voids them).
+   */
+  const [priceEstimate, setPriceEstimate] = useState(false);
   const [archiveScope, setArchiveScope] = useState<ArchiveScope>('delivered');
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
@@ -275,8 +295,9 @@ export default function OrdersBoard() {
     }
     if (query) params.set('q', query);
     if (priceHold && !archive) params.set('price_hold', '1');
+    if (priceEstimate && !archive) params.set('price_estimate', '1');
     try {
-      setData(await api.get<AdminOrdersResponse>(`/api/admin/orders?${params}`));
+      setData(await api.get<BoardResponse>(`/api/admin/orders?${params}`));
     } catch (e) {
       // The STANDALONE `loc`, which LanguageContext documents for exactly this:
       // the context's own is a fresh closure on every provider render, and a
@@ -286,7 +307,7 @@ export default function OrdersBoard() {
     } finally {
       setLoading(false);
     }
-  }, [archive, archiveScope, journey, status, query, page, lang, priceHold]);
+  }, [archive, archiveScope, journey, status, query, page, lang, priceHold, priceEstimate]);
 
   useEffect(() => {
     loadOrders();
@@ -375,7 +396,13 @@ export default function OrdersBoard() {
         setError(`${refusalText('SERIALS_REQUIRED', l, e instanceof Error ? e.message : '')}${n ? ` (${n})` : ''}`);
         return;
       }
-      setError(e instanceof ApiError ? apiRefusal(e, l, e.message) : loc('تعذّر تحديث الحالة', 'Failed to update the status', 'دۆخ نوێ نەکرایەوە'));
+      // An estimate gate's refusal (0218: PRICE_ESTIMATE_UNCONFIRMED …) reads in the
+      // admin's language from the contract; the shop's table covers the rest.
+      setError(
+        e instanceof ApiError
+          ? (estimateRefusalText(e, l) ?? apiRefusal(e, l, e.message))
+          : loc('تعذّر تحديث الحالة', 'Failed to update the status', 'دۆخ نوێ نەکرایەوە')
+      );
     } finally {
       setAdvancing(null);
     }
@@ -503,10 +530,9 @@ export default function OrdersBoard() {
         >
           <option value="all">{opt(loc('الكل', 'All', 'هەموو'), typeOpts?.all)}</option>
           {/* «يجب تجهيزها» — every box to pack now, direct or pre-order. The
-              archive has nothing left to prepare, so it is offered live only.
-              OWNER: Sorani to be written by hand. */}
+              archive has nothing left to prepare, so it is offered live only. */}
           {!archive && (
-            <option value="prepare">{opt(loc('يجب تجهيزها', 'To prepare'), typeOpts?.prepare)}</option>
+            <option value="prepare">{opt(loc('يجب تجهيزها', 'To prepare', 'بۆ ئامادەکردن'), typeOpts?.prepare)}</option>
           )}
           <option value="direct">{opt(loc('مباشر', 'Direct', 'ڕاستەوخۆ'), typeOpts?.direct)}</option>
           <optgroup label={loc('الطلبات المسبقة', 'Pre-orders', 'داواکارییە پێشوەختەکان')}>
@@ -569,24 +595,48 @@ export default function OrdersBoard() {
         </button>
       </div>
 
-      {/* «بانتظار موافقة الزبون على السعر» — shown only while some order is
-          held (or the filter is on), with the board-wide count beside it.
-          OWNER: Sorani to be written by hand. */}
-      {!archive && (priceHold || (data?.price_hold_count ?? 0) > 0) && (
-        <button
-          type="button"
-          data-order-filter="price-hold"
-          aria-pressed={priceHold}
-          onClick={() => {
-            setPriceHold((v) => !v);
-            setPage(0);
-          }}
-          className="lv-choice press-scale inline-flex min-h-[44px] items-center gap-2 self-start px-3 text-[13px] leading-[1.4] font-bold"
-        >
-          <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden />
-          {loc('بانتظار موافقة الزبون على السعر', 'Waiting for the customer to approve a price')}
-          <span className="tabular-nums text-text-secondary">{countText(data?.price_hold_count ?? 0, latin)}</span>
-        </button>
+      {/* THE TWO PRICE HOLDS, side by side — each shown only while some order
+          is held that way (or its filter is on), with the board-wide count:
+            «بانتظار موافقة الزبون على السعر» (0140) — the customer decides;
+            «بانتظار تأكيد السعر» (0218) — a financial admin settles estimated
+            lines; until then the order cannot leave «تم استلام الطلب».
+          The second is ABSENCE-TOLERANT: an older server sends no count, and a
+          database without 0218 counts none, so it simply never appears. */}
+      {!archive && (priceHold || priceEstimate || (data?.price_hold_count ?? 0) > 0 || (data?.price_estimate_count ?? 0) > 0) && (
+        <div data-order-price-filters className="flex flex-wrap gap-2 min-w-0">
+          {(priceHold || (data?.price_hold_count ?? 0) > 0) && (
+            <button
+              type="button"
+              data-order-filter="price-hold"
+              aria-pressed={priceHold}
+              onClick={() => {
+                setPriceHold((v) => !v);
+                setPage(0);
+              }}
+              className="lv-choice press-scale inline-flex min-h-[44px] items-center gap-2 px-3 text-[13px] leading-[1.4] font-bold"
+            >
+              <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden />
+              {loc('بانتظار موافقة الزبون على السعر', 'Waiting for the customer to approve a price', 'چاوەڕێی پەسەندکردنی نرخ لەلایەن کڕیارەوە')}
+              <span className="tabular-nums text-text-secondary">{countText(data?.price_hold_count ?? 0, latin)}</span>
+            </button>
+          )}
+          {(priceEstimate || (data?.price_estimate_count ?? 0) > 0) && (
+            <button
+              type="button"
+              data-order-filter="price-estimate"
+              aria-pressed={priceEstimate}
+              onClick={() => {
+                setPriceEstimate((v) => !v);
+                setPage(0);
+              }}
+              className="lv-choice press-scale inline-flex min-h-[44px] items-center gap-2 px-3 text-[13px] leading-[1.4] font-bold"
+            >
+              <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden />
+              {loc('بانتظار تأكيد السعر', 'Awaiting price confirmation', 'چاوەڕێی پشتڕاستکردنەوەی نرخ')}
+              <span className="tabular-nums text-text-secondary">{countText(data?.price_estimate_count ?? 0, latin)}</span>
+            </button>
+          )}
+        </div>
       )}
 
       {error && (

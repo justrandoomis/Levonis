@@ -276,7 +276,17 @@ function bundleDto(b: ResolvedBundle, urls: PublicUrls, familyNames: Map<string,
     api_url: urls.api(`/bundles/${encodeURIComponent(slug)}`),
     image: imageFromUrl(cover, urls, localized(doc.name_ar, doc.name_en, doc.name_ckb)),
     members_only: locked,
-    price: { currency: 'IQD' as const, amount, regular, from: false, member_price: null },
+    // PRICE_SCHEMA in full: a locked composition is members-only, one with no figure is not priced yet, and a
+    // bundle or mystery offer is never an estimate (docs/SMART_PRICING.md §8: their members exclude labelled products).
+    price: {
+      currency: 'IQD' as const,
+      status: (locked ? 'members_only' : amount === null ? 'unpriced' : 'priced') as 'priced' | 'unpriced' | 'members_only',
+      amount,
+      regular,
+      from: false,
+      member_price: null,
+      estimate: false,
+    },
     saving_percent: locked ? null : typeof b.pricing.saving_percent === 'number' ? b.pricing.saving_percent : null,
     availability: availabilityFromComposition(locked ? 'member_exclusive' : b.availability.state),
     offer: w && w.active ? { starts_at: isoOrNull(w.starts_at), ends_at: isoOrNull(w.ends_at) } : null,

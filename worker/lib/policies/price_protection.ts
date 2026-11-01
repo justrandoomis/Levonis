@@ -68,11 +68,38 @@ import type { PolicyDocument } from './types';
  * §2.3 wording (the Direct Sale Extra, never a premium) is unchanged. The new
  * lines cite only chapter 10 and article 5.5, neither of which is withheld
  * (./render.ts).
+ *
+ * VERSION 6 — WHY IT MOVED (owner, 2026-10-31; DECISIONS rows 280 and
+ * 282(h); docs/SMART_PRICING.md §6.8, §6.9). The archive keeps version 5
+ * byte for byte. Published with purchase 7, which lets an item be sold at an
+ * ESTIMATED price whose final price is settled after the order. Chapter 5's
+ * cancel-and-reissue and chapter 6's "the paid price stands" were written for
+ * a price that is final when the order is created; an estimate is not. So:
+ *   * 1.2 defines the estimated price;
+ *   * 5.6 takes its final price out of chapters 5 and 6 and points to
+ *     purchase 4.15 / 4.16: a changed total only on the customer's approval
+ *     (the 0140 proposal, its money rule unchanged: a rise at the door only,
+ *     never a second wallet debit; a fall off the door amount, then to the
+ *     wallet), a rejection honoured or cancelled in full, the customer's own
+ *     cancel open until then;
+ *   * 6.6 says a wallet-paid estimate is not the paid final price until it
+ *     is settled, and the whole of chapter 6 applies from then on;
+ *   * 10.12 starts price protection only at settlement (the claim door's
+ *     `PRICE_PROTECTION_ESTIMATE_PENDING`), and compares the settled final
+ *     price, never the estimate (the claim's paid unit is the charged unit
+ *     plus final − estimate, the same shift the order total took).
+ * 5.6 is therefore the one place this document lets a standing order's total
+ * change in place — through the 0140 proposal, and only on the customer's
+ * approval; "WHY CHAPTER 5 DOES NOT PROMISE AN IN-PLACE REPRICE" above still
+ * holds for every price that is not an estimate. The rules of versions 4 and 5
+ * stand word for word. The new lines cite only 5.6 and 10.4 of this
+ * document, neither withheld (./render.ts), and the purchase articles by
+ * naming the Purchase Policy.
  */
 export const price_protection: PolicyDocument = {
   key: 'price_protection',
-  version: 5,
-  effective_at: '2026-10-09',
+  version: 6,
+  effective_at: '2026-10-31',
   title: {
     ar: 'سياسة الأسعار وتغييرها وإلغاء الطلب',
     en: 'Pricing, Price Changes and Order Cancellation Policy',
@@ -93,6 +120,7 @@ export const price_protection: PolicyDocument = {
 - نافذة العرض: المدة المعلنة بين بداية العرض ونهايته.
 - حماية السعر: مطالبة الزبون بفرق السعر عن قطعة سُلِّمت إليه ثم انخفض سعرها خلال سبعة أيام.
 - السعر الأساسي بالدولار: سعر المنتج المسعَّر على أساس الدولار معبَّرًا عنه بالدولار، أي سعره بالدينار مقسومًا على سعر الصرف الذي حُسب به.
+- السعر التقديري: سعر قطعة تُباع بالطلب المسبق وتحمل علامة «سعر تقديري»، ويتأكد سعرها النهائي بعد الطلب وفق المواد 4.11 إلى 4.17 من سياسة الشراء.
 
 ### 1.3 النص المعتمد
 النص العربي هو المعتمد، والنسختان الإنكليزية والكردية ترجمتان أمينتان له بالترقيم نفسه.
@@ -168,6 +196,9 @@ export const price_protection: PolicyDocument = {
 ### 5.5 ما لا يبرر التعديل
 لا يُعدَّل سعر طلب لمجرد أن قيمة العملة تحركت بعد إنشائه، ولا لأن العرض انتهى بعد إنشائه، ولا لأن الزبون استعمل مزية كان مستحقاً لها.
 
+### 5.6 القطعة المشتراة بسعر تقديري
+لا يحكم هذا الفصل ولا الفصل السادس السعر النهائي لقطعة اشتُريت بسعر تقديري، سواء كان الطلب غير مدفوع أو مدفوعاً من المحفظة، بل يتأكد ذلك السعر وفق المادتين 4.15 و4.16 من سياسة الشراء. فإذا غيّر مجموع الطلب لم يُطبَّق إلا بعد موافقة الزبون: إن ارتفع المجموع حُصِّل الفرق عند الباب وحده دون أي خصم جديد من المحفظة، وإن انخفض خُصم الفرق من المبلغ المستحق عند الباب وأُعيد ما بقي منه إلى المحفظة. وإذا رفض الزبون السعر النهائي فللمتجر إما إبقاء السعر التقديري وإما إلغاء الطلب وإعادة كل ما دُفع عليه كاملاً. وحتى يتأكد السعر النهائي، للزبون أن يلغي طلبه بنفسه في أي وقت.
+
 ## 6. صون السعر المدفوع
 
 ### 6.1 القاعدة
@@ -184,6 +215,9 @@ export const price_protection: PolicyDocument = {
 
 ### 6.5 إذا تعذر التنفيذ بالسعر المدفوع
 إذا تعذر على المتجر تنفيذ الطلب بالسعر المدفوع — لنفاد القطعة أو اعتذار المجهّز — فليس له رفع السعر. يكون له إلغاء الطلب وإعادة المبلغ كاملاً، أو عرض بديل على الزبون يقبله أو يرفضه.
+
+### 6.6 السعر التقديري المدفوع مسبقاً
+دفع السعر التقديري من المحفظة لا يجعله السعر النهائي. فحتى يتأكد السعر النهائي للقطعة تحكمه المادة 5.6، وبعد تأكيده يكون السعر المؤكد هو السعر النافذ، ويسري عليه هذا الفصل كاملاً.
 
 ## 7. حق المتجر في إلغاء الطلب
 
@@ -286,6 +320,9 @@ export const price_protection: PolicyDocument = {
 ### 10.11 لا تعويض مزدوج
 لا يُجمع بين تعويض حماية السعر وبين استرداد ثمن القطعة نفسها بالإرجاع. ومن أرجع القطعة واسترد ثمنها لا يستحق فرق سعرها.
 
+### 10.12 القطعة المشتراة بسعر تقديري
+لا تبدأ حماية سعر القطعة المشتراة بسعر تقديري إلا بعد تأكيد سعرها النهائي، وتُرفض المطالبة المقدمة عنها قبل ذلك. والسعر الذي يُعدّ الزبون قد دفعه عنها هو سعرها النهائي كما تأكد وفق سياسة الشراء، لا السعر التقديري، وعلى أساسه تُطبَّق المادة 10.4.
+
 ## 11. ما لا تشمله حماية السعر
 
 ### 11.1 الرسوم والأجور
@@ -354,6 +391,7 @@ This document sets out how a price is determined, when the Store may change it o
 - The offer window: the declared period between an offer's start and its end.
 - Price protection: the customer's claim for the price difference on an item delivered to them whose price then fell within seven days.
 - Base price in USD: the price of a product priced on a dollar basis, expressed in dollars — its dinar price divided by the exchange rate it was computed at.
+- Estimated price: the price of an item sold by pre-order and marked "Estimated price", whose final price is confirmed after the order under articles 4.11 to 4.17 of the Purchase Policy.
 
 ### 1.3 Authoritative text
 The Arabic text is authoritative; the English and Kurdish versions are faithful translations of it under the same numbering.
@@ -429,6 +467,9 @@ The customer may refuse the corrected price with no consequence. Their silence i
 ### 5.5 What does not justify a change
 An order's price is not changed merely because the currency moved after it was created, nor because an offer ended after it was created, nor because the customer used a benefit to which they were entitled.
 
+### 5.6 An item bought at an estimated price
+Neither this chapter nor chapter 6 governs the final price of an item bought at an estimated price, whether the order is unpaid or paid from the wallet; that price is confirmed under articles 4.15 and 4.16 of the Purchase Policy. Where it changes the order's total, it is applied only after the customer approves it: if the total rises, the difference is collected only at the door, with nothing debited from the wallet again; if it falls, the difference is deducted from the amount due at the door and whatever remains of it is returned to the wallet. Where the customer rejects the final price, the Store either keeps the estimated price or cancels the order and returns everything paid on it in full. Until the final price is confirmed, the customer may cancel the order themselves at any time.
+
 ## 6. The Paid Price is Honoured
 
 ### 6.1 The rule
@@ -445,6 +486,9 @@ An order on which only an advance has been paid is treated as paid to the extent
 
 ### 6.5 Where execution at the paid price is impossible
 Where the Store cannot execute the order at the price paid — because the item is exhausted or the supplier has declined — it may not raise the price. It may cancel the order and return the amount in full, or offer the customer an alternative for them to accept or refuse.
+
+### 6.6 An estimated price paid in advance
+Paying an estimated price from the wallet does not make it the final price. Until the item's final price is confirmed, article 5.6 governs it; once it is confirmed, the confirmed price is the price in force, and this chapter applies to it in full.
 
 ## 7. The Store's Right to Cancel an Order
 
@@ -547,6 +591,9 @@ The price difference is credited to the customer's wallet. Any other destination
 ### 10.11 No double compensation
 Price-protection compensation is not combined with a refund of the same item's price on a return. A customer who returned the item and recovered its price is not entitled to its price difference.
 
+### 10.12 An item bought at an estimated price
+Price protection for an item bought at an estimated price begins only once its final price is confirmed, and a claim filed on it before then is refused. The price the customer is taken to have paid for it is its final price as confirmed under the Purchase Policy, not the estimate, and article 10.4 is applied on that basis.
+
 ## 11. What Price Protection Does Not Cover
 
 ### 11.1 Fees and charges
@@ -615,6 +662,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 - پەنجەرەی ئۆفەر: ئەو ماوە ڕاگەیەنراوەی نێوان دەستپێک و کۆتایی ئۆفەرەکە.
 - پاراستنی نرخ: داواکاری کڕیار بۆ جیاوازی نرخی کاڵایەک کە بۆی گەیەنراوە و پاشان لە ماوەی حەوت ڕۆژدا نرخەکەی داشکاوە.
 - نرخی بنەڕەتی بە دۆلار: نرخی ئەو بەرهەمەی لەسەر بنەمای دۆلار نرخی بۆ دانراوە، بە دۆلار، واتە نرخەکەی بە دینار دابەش بەسەر ئەو نرخی ئاڵوگۆڕەی پێی هەژمار کراوە.
+- نرخی خەمڵێنراو: نرخی کاڵایەک کە بە داواکاری پێشوەخت دەفرۆشرێت و نیشانەی «نرخی خەمڵێنراو»ی هەیە، و نرخی کۆتاییەکەی دوای داواکاری بەپێی بڕگەکانی 4.11 تا 4.17ی سیاسەتی کڕین پشتڕاست دەکرێتەوە.
 
 ### 1.3 دەقی پەسەندکراو
 دەقی عەرەبی پەسەندکراوە، و وەشانی ئینگلیزی و کوردی وەرگێڕانی دڵسۆزی ئەون بە هەمان ژمارەگوزاری.
@@ -690,6 +738,9 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 ### 5.5 ئەوەی گۆڕانەکە ناسەلمێنێت
 نرخی داواکارییەک ناگۆڕدرێت تەنها لەبەر ئەوەی دراوەکە دوای دروستبوونی جوڵاوە، و نە لەبەر ئەوەی ئۆفەرەکە دوای دروستبوونی کۆتایی هاتووە، و نە لەبەر ئەوەی کڕیار سوودێکی بەکارهێناوە کە شایستەی بووە.
 
+### 5.6 کاڵای کڕدراو بە نرخی خەمڵێنراو
+ئەم بەشە و بەشی شەشەم نرخی کۆتایی ئەو کاڵایە ڕێک ناخەن کە بە نرخی خەمڵێنراو کڕدراوە، جا داواکارییەکە نەدراو بێت یان لە جزدانەوە درابێت؛ ئەو نرخە بەپێی بڕگەکانی 4.15 و 4.16ی سیاسەتی کڕین پشتڕاست دەکرێتەوە. ئەگەر کۆی داواکارییەکەی گۆڕی، تەنها دوای پەسەندکردنی کڕیار جێبەجێ دەکرێت: ئەگەر کۆکە بەرز بووەوە، جیاوازییەکە تەنها لە بەردەرگا وەردەگیرێت و هیچ لە جزدان نابڕدرێتەوە؛ ئەگەر دابەزی، جیاوازییەکە لەو بڕەی لە بەردەرگا دەدرێت کەم دەکرێتەوە و ئەوەی لێی دەمێنێتەوە بۆ جزدان دەگەڕێتەوە. ئەگەر کڕیار نرخی کۆتایی ڕەت کردەوە، فرۆشگا یان نرخی خەمڵێنراو دەهێڵێتەوە یان داواکارییەکە هەڵدەوەشێنێتەوە و هەموو ئەوەی لەسەری دراوە بە تەواوی دەگەڕێنێتەوە. هەتا نرخی کۆتایی پشتڕاست دەکرێتەوە، کڕیار دەتوانێت لە هەر کاتێکدا خۆی داواکارییەکەی هەڵبوەشێنێتەوە.
+
 ## 6. پاراستنی ئەو نرخەی دراوە
 
 ### 6.1 ڕێسا
@@ -706,6 +757,9 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 
 ### 6.5 ئەگەر جێبەجێکردن بەو نرخەی دراوە نەکرا
 ئەگەر فرۆشگا نەیتوانی داواکارییەکە بەو نرخە جێبەجێ بکات کە دراوە — بەهۆی تەواوبوونی کاڵاکە یان لێبوردنی دابینکەر — بۆی نییە نرخەکە بەرز بکاتەوە. دەتوانێت داواکارییەکە هەڵبوەشێنێتەوە و بڕەکە بە تەواوی بگەڕێنێتەوە، یان جێگرەوەیەک پێشکەشی کڕیار بکات کە وەریبگرێت یان ڕەتی بکاتەوە.
+
+### 6.6 نرخی خەمڵێنراوی پێشەکی دراو
+دانی نرخی خەمڵێنراو لە جزدانەوە نایکاتە نرخی کۆتایی. هەتا نرخی کۆتایی کاڵاکە پشتڕاست دەکرێتەوە، بڕگەی 5.6 ڕێکی دەخات؛ و دوای پشتڕاستکردنەوەی، نرخە پشتڕاستکراوەکە نرخی کارپێکراوە و ئەم بەشە بە تەواوی لەسەری جێبەجێ دەبێت.
 
 ## 7. مافی فرۆشگا لە هەڵوەشاندنەوەی داواکاری
 
@@ -807,6 +861,9 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 
 ### 10.11 قەرەبووی دووجارە نییە
 قەرەبووی پاراستنی نرخ لەگەڵ گەڕاندنەوەی نرخی هەمان کاڵا لە ڕێگەی گەڕاندنەوەوە کۆ ناکرێتەوە. ئەو کەسەی کاڵاکەی گەڕاندووەتەوە و نرخەکەی وەرگرتووەتەوە شایستەی جیاوازی نرخەکەی نییە.
+
+### 10.12 کاڵای کڕدراو بە نرخی خەمڵێنراو
+پاراستنی نرخی ئەو کاڵایەی بە نرخی خەمڵێنراو کڕدراوە تەنها دوای پشتڕاستکردنەوەی نرخی کۆتاییەکەی دەست پێدەکات، و ئەو داواکارییەی پێش ئەوە لەسەری پێشکەش دەکرێت ڕەت دەکرێتەوە. ئەو نرخەی وا دادەنرێت کڕیار بۆی داوە نرخی کۆتاییەکەیەتی وەک بەپێی سیاسەتی کڕین پشتڕاست کراوەتەوە، نەک نرخی خەمڵێنراو، و بڕگەی 10.4 لەسەر ئەو بنەمایە جێبەجێ دەکرێت.
 
 ## 11. ئەوەی پاراستنی نرخ ناینوێنێت
 

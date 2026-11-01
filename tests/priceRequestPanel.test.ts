@@ -204,8 +204,9 @@ test('every word of the panel exists in ar, en and real Sorani (row 183)', () =>
 test('the page: the panel is lazy, a catalog-only product never asks the quote, and nothing can be bought', () => {
   const src = readFileSync(join(ROOT, 'src/pages/Product.tsx'), 'utf8');
   assert.match(src, /const PriceRequestPanel = React\.lazy\(\(\) => import\('\.\.\/components\/product\/PriceRequestPanel'\)\);/);
-  assert.match(src, /if \(catalogOnly \|\| knownUnpriced\) \{\s*setQuoteLoading\(false\);\s*return;/);
-  assert.match(src, /const noPrice = catalogOnly \|\| selectionUnpriced;/);
+  // …nor for a combination it does not sell, which has no price either (review r3-unoffered-page).
+  assert.match(src, /if \(catalogOnly \|\| knownUnpriced \|\| selectionUnoffered\) \{\s*setQuoteLoading\(false\);\s*return;/);
+  assert.match(src, /const noPrice = catalogOnly \|\| selectionUnpriced \|\| selectionUnoffered;/);
   // A chosen colour or value with no priced SKU at all: no figure stands for it while the choice is unfinished.
   assert.match(src, /const knownUnpriced = !catalogOnly && \(unpricedSelections\.includes\(selectionKey\) \|\| choiceUnpriced\);/);
   assert.match(src, /levelIsNull\(priceLevels\?\.color, colorId\)\) \|\| optionValueIds\.some\(\(id\) => levelIsNull\(priceLevels\?\.option, id\)\)/);

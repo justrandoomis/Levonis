@@ -485,7 +485,7 @@ function staticClosure(start: string): Set<string> {
  */
 const PRODUCT_OPENING_BUDGET = 283 * KB;
 
-test('opening a product excludes below-fold reviews, closed purchase dialogs, refusal translations, the price-request panel, the knowledge tabs and the several-colours panel', () => {
+test('opening a product excludes below-fold reviews, closed purchase dialogs, refusal translations, the price-request panel, the knowledge tabs, the several-colours panel and the estimate notice', () => {
   const files = readdirSync(ASSETS).filter((file) => file.endsWith('.js'));
   const product = files.find((file) => file.startsWith('Product-'));
   assert.ok(product, 'the product page has its own route chunk');
@@ -509,7 +509,9 @@ test('opening a product excludes below-fold reviews, closed purchase dialogs, re
   // The Bambu import spec §G.6: the knowledge tabs (specifications, documents …) load near the viewport, never with the page.
   // docs/ux/COLOUR-QUANTITIES.md §3.11: «عدة ألوان» (the per-colour list, the batch add, its sheet) loads when the
   // switch is reached — most product visits never open it.
-  for (const name of ['ReviewSection', 'CheaperElsewhereSheet', 'GiniInstalmentsSheet', 'refusalStrings', 'PriceRequestPanel', 'ProductKnowledgeTabs', 'ColourQuantityPanel']) {
+  // docs/SMART_PRICING.md §5.3: «سعر تقديري»'s notice and «تواصل معنا» are mounted only for an estimated selection, and
+  // the words of an estimated price (`priceEstimates`, the contract) come with them or with an estimate refusal.
+  for (const name of ['ReviewSection', 'CheaperElsewhereSheet', 'GiniInstalmentsSheet', 'refusalStrings', 'PriceRequestPanel', 'ProductKnowledgeTabs', 'ColourQuantityPanel', 'EstimateNotice', 'priceEstimates']) {
     const file = files.find((candidate) => candidate.startsWith(`${name}-`));
     assert.ok(file, `${name} remains available in its own deferred chunk`);
     assert.equal(opening.has(file!), false, `${name} became a static product import and would compete with the lead image`);
@@ -928,6 +930,44 @@ test('the compare tray is a lazy chunk of its own, never in the initial payload'
   const own = gz(join(ASSETS, tray!));
   console.log(`bundle: compare tray ${kb(own)} gzip`);
   assert.ok(own <= COMPARE_TRAY_CHUNK_BUDGET, `the compare tray chunk is ${kb(own)} gzip, over ${kb(COMPARE_TRAY_CHUNK_BUDGET)}`);
+});
+
+/**
+ * «سعر تقديري» COSTS THE FIRST BYTE TWO LABELS (docs/SMART_PRICING.md §5.5 and
+ * §11 «Bundle size»; WP10). The two card labels are COPIED into the eager
+ * src/lib/priceStatus.ts (about 120 bytes); nothing else of the feature is
+ * eager. The contract of its words — every sentence, the refusals, the owner's
+ * codes, packages/contracts/src/priceEstimates.ts — is a lazy chunk of its own
+ * (`priceEstimates`), reached by the product page's lazy notice, by an estimate
+ * refusal and by the support page's estimate question, and never statically by
+ * the entry, the product opening, the Support page or a store page. The entry
+ * budget above is unchanged by the feature.
+ */
+test('the words of an estimated price are lazy: never in the first byte, the product opening, the Support page or a store page', () => {
+  const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
+  const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
+  const words = chunk('priceEstimates');
+  const notice = chunk('EstimateNotice');
+  assert.ok(words, 'the estimate contract has no chunk of its own — something imports it statically');
+  assert.ok(notice, 'the estimate notice has no chunk of its own');
+  assert.ok(staticClosure(notice!).has(words!), 'the notice does not bring the words it reads');
+  const initial = staticClosure(entryFromHtml(readFileSync(join(DIST, 'index.html'), 'utf8'))!);
+  const closures: Array<[string, Set<string>]> = [
+    ['the initial payload', initial],
+    ['the product opening', staticClosure(chunk('Product')!)],
+    ['the Support page', staticClosure(chunk('Support')!)],
+    ['a store page', new Set(['Storefront', 'StorefrontProduct'].flatMap((n) => [...staticClosure(chunk(n)!)]))],
+  ];
+  for (const [name, closure] of closures) {
+    assert.equal(closure.has(words!), false, `the estimate contract is a static import of ${name}`);
+    assert.equal(closure.has(notice!), false, `the estimate notice is a static import of ${name}`);
+  }
+  // No sentence of the contract reaches the first byte: the notice (in every language) is the longest of them.
+  const eager = [...initial].map((f) => readFileSync(join(ASSETS, f), 'utf8')).join('\n');
+  for (const sentence of ['ئەمە نرخێکی خەمڵێنراوە', 'This is an estimated pre-order price', 'هذا سعر تقديري للطلب المسبق']) {
+    assert.equal(eager.includes(sentence), false, `«${sentence}» reached the first byte`);
+  }
+  console.log(`bundle: estimate notice ${kb(gz(join(ASSETS, notice!)))} gzip, its words ${kb(gz(join(ASSETS, words!)))} gzip — both lazy`);
 });
 
 /**

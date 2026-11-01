@@ -78,6 +78,29 @@ for (const [coreFile, kitFile, names] of PARITY) {
   });
 }
 
+/**
+ * Smart pricing (docs/SMART_PRICING.md §8, §3.9; migration 0218): the owner-only supplier catalogue,
+ * matcher, estimator and per-type defaults join BOTH copies of FINANCIAL_FIELDS — the gateway can never
+ * hand a non-owner what the core strips — and the customer's own estimate facts stay out of both.
+ */
+const SMART_PRICING_PRIVATE = [
+  'supplier_price', 'supplier_prices', 'supplier_price_amount', 'supplier_price_currency', 'supplier_item_key', 'supplier_sku_key',
+  'supplier_url', 'supplier_title', 'catalogue_price', 'price_cny', 'price_eur', 'price_usd_reference', 'price_label',
+  'snapshot_price_basis', 'units_per_offer', 'match_confidence', 'match_method', 'match_reasons', 'estimate_flags', 'measure_basis',
+  'measure_source', 'est_cost_iqd', 'est_price_iqd', 'default_weight_g', 'default_length_mm', 'default_width_mm', 'default_height_mm',
+  'default_cbm', 'min_profit_usd', 'applied_wire_json', 'type_source',
+];
+const SMART_PRICING_PUBLIC = ['price_estimate', 'estimate_unit_iqd', 'final_unit_iqd', 'notice_version'];
+
+test('both copies of FINANCIAL_FIELDS carry the smart-pricing private names and keep the public estimate facts out', () => {
+  const namesIn = (file: string) => new Set([...extractDeclaration(read(file), 'FINANCIAL_FIELDS').matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]!));
+  for (const file of ['worker/lib/adminScope.ts', `${KIT}/scope.ts`]) {
+    const names = namesIn(file);
+    assert.deepEqual(SMART_PRICING_PRIVATE.filter((k) => !names.has(k)), [], `${file} is missing private names`);
+    assert.deepEqual(SMART_PRICING_PUBLIC.filter((k) => names.has(k)), [], `${file} would strip a customer fact`);
+  }
+});
+
 test('the extractor itself: balanced braces, strings with braces, trailing consts', () => {
   const src = "export function a() {\n  const s = '}';\n  if (x) { return 1; }\n}\nexport const B = ['}', '{'] as const;\nconst c = 1;";
   assert.equal(extractDeclaration(src, 'a'), "export function a() {\n  const s = '}';\n  if (x) { return 1; }\n}");

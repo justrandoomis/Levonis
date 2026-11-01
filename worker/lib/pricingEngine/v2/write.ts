@@ -29,6 +29,11 @@
  *      `pricing_v2_sku_results` replaced in chunks of 60, each pair written whole;
  *   9. `product_pricing_state`: mode engine, the method, write_seq + 1, priced_*,
  *      v2_since, the blocked repricing code cleared;
+ *  9b. «طلب السعر»: the requests the write answers;
+ *  9c. (the estimate apply only, `estimate`) the estimate's own statements —
+ *      the label `products.price_estimate`, which trigger T1 of 0218 lets in
+ *      only while this batch holds `engine-price:<id>` (docs/SMART_PRICING.md
+ *      §4.8): the label and the first price commit together;
  *  10. `pricing_audit` (values, owner-only) and `audit_log` (ids and counts),
  *      the tokens deleted, `batchTail`.
  *
@@ -111,6 +116,16 @@ export interface V2WriteOptions {
    * price-request sweep moves any request a new rate answered (its step 0, `repairAnsweredRequests`).
    */
   priceRequests?: RequestGate | false;
+  /**
+   * THE ESTIMATE (docs/SMART_PRICING.md §4.8 step 4 (iv); migration 0218), the one additive option: the
+   * estimate apply's own statements (worker/lib/pricingEngine/estimate/apply.ts) — the «بلا تتبّع» decision's
+   * PREORDER_OFFERED fence (true only after the structure of step 4), `products.price_estimate = 1` (trigger
+   * T1 lets it in only while this batch holds `engine-price:<id>`), the firm SKUs cleared and the owner's
+   * bookkeeping. Laid after step 9b and before the audit, inside the token: the label exists in the same
+   * commit as the price, so there is no unlabelled moment. Never with `auto` (FX-5 lays none and never
+   * touches the label). Absent — every other caller — the batch is byte-identical.
+   */
+  estimate?: readonly D1PreparedStatement[];
 }
 
 /** The private result row of one planned SKU × channel (each 0189 pair written whole). */
@@ -174,7 +189,7 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
   const points = pointWrites(ev.v2?.points ?? [], ev.points);
   const discounts = discountWrites(ev.v2?.discounts ?? [], ev.discounts);
   // An automatic repricing never creates and never carries drafts: only an owner's (or editor's) save does.
-  if (auto && (create || methodMoves || ev.inputWrites.length || ev.ruleWrites.length || points.length || discounts.length || o.structure?.length))
+  if (auto && (create || methodMoves || ev.inputWrites.length || ev.ruleWrites.length || points.length || discounts.length || o.structure?.length || o.estimate?.length))
     throw new Error('v2WriteStatements: an automatic repricing writes prices only');
   const writePrices = !auto?.pricesUnchanged;
   const plan = ev.plan;
@@ -298,6 +313,8 @@ export async function v2WriteStatements(db: D1Database, ev: V2Evaluation, o: V2W
     // 9b. «طلب السعر»: the requests this batch answers move on with it, the stats recounted (the chip and the
     //     queue are right the moment the price is; the sweep tells the people who asked).
     ...(requests ? priceRequestTransitions(db, pid, o.now, requests) : []),
+    // 9c. The estimate apply's own statements (the label and its bookkeeping), inside the token.
+    ...(o.estimate ?? []),
     // 10. The audit.
     ...pricingAuditStatements(db, audits),
     ...(o.extraAudits ?? []),

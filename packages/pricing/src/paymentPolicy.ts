@@ -47,12 +47,29 @@
  *
  * The merchant storefront (routes/storeOrders.ts) has its own vocabulary
  * ('cod' | 'wallet') and is deliberately not touched by this module.
+ *
+ * AN ESTIMATED PRICE IS NEVER FINANCED (docs/SMART_PRICING.md §6.1, DECISIONS
+ * row 280). A cart holding a line at an estimated pre-order price («سعر
+ * تقديري») is paid in advance from the wallet or in cash on delivery — row 90's
+ * two methods for a pre-order — and `hasEstimate` takes `bnpl` and `gini` off
+ * the offered list whatever the account or the owner's switch says. The reason
+ * is the settlement, not taste: a different final price is settled only
+ * through the 0140 proposal, and `planPriceAdjustment` refuses a financed
+ * order (PRICE_ADJUST_FINANCED), so a financed estimate could never be
+ * settled. The checkout refuses a posted `bnpl` / `gini` with
+ * PRICE_ESTIMATE_PAYMENT_NOT_ALLOWED.
  */
 
 import type { ShippingType } from './shippingType';
 
 /** 400 code for a payment id the policy refuses. */
 export const PAYMENT_METHOD_NOT_ALLOWED = 'PAYMENT_METHOD_NOT_ALLOWED';
+
+/**
+ * 400 code for a financed id (`bnpl`, `gini`) posted for a cart with a line at
+ * an estimated price. Its words live in packages/contracts/src/priceEstimates.ts.
+ */
+export const PRICE_ESTIMATE_PAYMENT_NOT_ALLOWED = 'PRICE_ESTIMATE_PAYMENT_NOT_ALLOWED';
 
 /**
  * What the server may offer for this cart.
@@ -62,14 +79,15 @@ export const PAYMENT_METHOD_NOT_ALLOWED = 'PAYMENT_METHOD_NOT_ALLOWED';
  * proved this account eligible, and Gini only while the owner has the service
  * switched on (`giniPolicy.enabled`). A client that posts either id without
  * the server having said so is refused by `isPaymentMethodAllowed` below.
+ * `hasEstimate` takes both off again: an estimated price is never financed.
  */
 export function allowedPaymentMethods(
   _shippingType: ShippingType | null,
   options: PaymentMethodOptions = {}
 ): string[] {
   const ids = ['wallet', 'cash'];
-  if (options.bnplEligible) ids.push('bnpl');
-  if (options.giniEnabled) ids.push('gini');
+  if (options.bnplEligible && !options.hasEstimate) ids.push('bnpl');
+  if (options.giniEnabled && !options.hasEstimate) ids.push('gini');
   return ids;
 }
 
@@ -78,6 +96,16 @@ export interface PaymentMethodOptions {
   bnplEligible?: boolean;
   /** «خدمه اقساطي على تطبيق جني» — the owner's switch, never the client's. */
   giniEnabled?: boolean;
+  /**
+   * The cart holds a line at an estimated pre-order price (migration 0218):
+   * wallet or cash on delivery only, never `bnpl` or `gini` (see the header).
+   */
+  hasEstimate?: boolean;
+}
+
+/** A financed id — BNPL on our own ledger, or Gini inside the bank's app. Neither can settle an estimate. */
+export function isFinancedPaymentMethod(paymentMethodId: string): boolean {
+  return isBnpl(paymentMethodId) || isGini(paymentMethodId);
 }
 
 /** Cash on delivery — the platform id is 'cash'. */

@@ -66,7 +66,7 @@ import { resolveReturnedOriginIds, planUnsellableOriginReturn, type ReturnedOrig
 import { operationsInstalled, baghdadDay } from '../lib/operations';
 import { recordReturnFinancials, recordFinancialFailure } from '../lib/orderFinance';
 import { calculateGoods, spread, type GoodsLine } from '../lib/orderProfit';
-import { paidNetUnit } from '../lib/paidNet';
+import { estimateFactsOf, estimateLineAdjustments, estimatesUnreadable, paidNetUnit } from '../lib/paidNet';
 import { validateInvestorReturnEvidence } from '../lib/investorFinance';
 import { isRevealed, loadAllocations, paidOrderIds } from '../lib/mysteryReveal';
 import { mysteryRefusal } from '../lib/mystery/issues';
@@ -95,14 +95,19 @@ import {
   claimForCustomer,
   claimForStaff,
   creditedNotice,
+  estimateBlocksProtection,
+  settledEstimateShift,
   historyFieldsOf,
   historyKeysOf,
   itemLabel,
   lineChannelOf,
+  orderEstimateFacts,
   rejectedNotice,
   tierOfClass,
+  type EstimateLineFact,
 } from '../lib/protectionClaims';
 import { PRICE_PROTECTION_NOTICES, PRICE_PROTECTION_REASON_CODES } from '../../packages/contracts/src/priceProtection';
+import { estimateServerMessage } from '../../packages/contracts/src/priceEstimates';
 import { notifyCustomer } from '../lib/customerNotify';
 import type { EmailLang } from '../lib/emailTemplates';
 
@@ -882,6 +887,13 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
     const order = await c.env.DB.prepare('SELECT * FROM orders WHERE id=?')
       .bind(kase.order_id).first<Record<string, unknown>>();
     if (!item || !order) throw notFound('Return invoice not found');
+    // A LINE SETTLED AT ITS OWN FINAL PRICE (0218, §6.9) is refunded at it, as price protection
+    // and trade-in read it (paidNet.ts `estimateLineAdjustments`): its own final − estimate stays
+    // on it and only the rest of the adjustment is spread. Unreadable records refuse (503), as the
+    // claim door does; a database without 0218 has none, and such an order reads as before.
+    const estimateFacts = await estimateFactsOf(c.env.DB, [kase.order_id]);
+    if (estimateFacts === 'unreadable') throw estimatesUnreadable();
+    const ownPrice = estimateLineAdjustments(order, orderItems, estimateFacts.get(kase.order_id) ?? []);
     // THE TRADE-IN CREDIT IS THE NEW DEVICE'S, NOT THE ORDER'S (plan §1.2): attributed to the line
     // it paid for, never spread as a residual over the other lines; given back, never paid as cash.
     const tradeInCredit = (await tradeInV2Installed(c.env.DB)) ? await tradeInCreditOf(c.env.DB, order, orderItems as never) : null;
@@ -952,15 +964,18 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         const couponNet = lineCouponBasis.lines.find((v) => v.id === line.id)?.net_goods_iqd ?? memberNet;
         const lineCouponReduction = Math.max(0, memberNet - couponNet);
         const discount = base > 0 ? Math.floor((discounts * gross) / base) : 0;
-        return Math.max(0, gross - discount - memberReduction - lineCouponReduction + line.price_adjustment_iqd);
+        const adjustment = ownPrice ? (ownPrice.get(String(line.id)) ?? 0) : line.price_adjustment_iqd;
+        return Math.max(0, gross - discount - memberReduction - lineCouponReduction + adjustment);
       });
       // A final-price cut can exhaust the goods and then reduce delivery.
       // The old discount split must not resurrect goods that were fully cut,
       // or refund more than the entire accepted invoice. Ordinary splits stay
       // unchanged below this ceiling; any necessary cap is exact across lines.
+      // An order whose lines carry their own estimate shifts is held to the
+      // same ceiling.
       const acceptedGoods = acceptedBasis.lines.reduce((sum, line) => sum + line.net_goods_iqd, 0);
       const ceiling = acceptedGoods === 0 ? 0 : Math.max(0, Number(order.total_iqd) || 0);
-      const cappedRefunds = Number(order.price_adjustment_iqd) < 0 && fullRefunds.reduce((sum, value) => sum + value, 0) > ceiling
+      const cappedRefunds = (Number(order.price_adjustment_iqd) < 0 || ownPrice !== null) && fullRefunds.reduce((sum, value) => sum + value, 0) > ceiling
         ? spread(ceiling, fullRefunds) : fullRefunds;
       const fullRefund = cappedRefunds[acceptedBasis.lines.findIndex((line) => line.id === item.id)] ?? 0;
       const ledgerDinars = await walletLedgerDinarsReady(c.env.DB);
@@ -1331,10 +1346,37 @@ async function refuseReturnedProtection(db: D1Database, itemId: string, opts: { 
  * the order charged. A trade-in credit counts as paid (owner decision 5).
  * Trade-in reads the very same figure. Current membership rules and finance
  * report overrides are not customer payment facts and never enter it. */
-async function protectionPaidUnit(db: D1Database, orderId: string, itemId: string): Promise<{ unit: number; orderTotal: number }> {
-  const paid = await paidNetUnit(db, orderId, itemId);
+async function protectionPaidUnit(
+  db: D1Database,
+  orderId: string,
+  itemId: string,
+  known?: EstimateLineFact[]
+): Promise<{ unit: number; orderTotal: number }> {
+  // A line sold at an estimated price (0218, §6.9): refused until settled, and
+  // after settlement its paid unit carries its own final − estimate — the same
+  // shift the order total took (paidNet.ts `estimateLineAdjustments`, which the
+  // return refund and trade-in read too). An order without a settled estimate
+  // line reads exactly as before.
+  const estimates = known ?? (await claimEstimates(db, orderId, itemId));
+  const paid = await paidNetUnit(db, orderId, itemId, estimates);
   if (!paid) throw badRequest(serverMessage('PRICE_PROTECTION_REVIEW_REQUIRED'), 'PRICE_PROTECTION_REVIEW_REQUIRED');
   return paid;
+}
+
+/**
+ * «حماية السعر تبدأ بعد تأكيد السعر النهائي» (migration 0218; docs/SMART_PRICING.md
+ * §6.9; owner default 282(h)). The order's estimate records, after refusing a
+ * claim on a line whose record is not settled (confirmed or approved) with
+ * 409 PRICE_PROTECTION_ESTIMATE_PENDING. Unreadable records refuse (503): a
+ * claim is never decided on a guess. A database without 0218 has none.
+ */
+async function claimEstimates(db: D1Database, orderId: string, itemId: string): Promise<EstimateLineFact[]> {
+  const estimates = await orderEstimateFacts(db, orderId);
+  if (estimates === 'unreadable') throw estimatesUnreadable();
+  if (estimateBlocksProtection(estimates.find((e) => e.order_item_id === itemId))) {
+    throw new HttpError(409, estimateServerMessage('PRICE_PROTECTION_ESTIMATE_PENDING'), 'PRICE_PROTECTION_ESTIMATE_PENDING');
+  }
+  return estimates;
 }
 
 /** Units of a line held by a trade-in (draft to complete): each slot counts once, whatever part was claimed. */
@@ -1389,6 +1431,9 @@ priceProtectionRoutes.post('/claims', async (c) => {
     .bind(orderItemId)
     .first<Record<string, unknown>>();
   if (!item || item.owner_id !== user.id) throw notFound('Order item not found');
+  // Price protection of a line sold at an estimated price starts once its final
+  // price is settled (0218, §6.9) — said before anything else about the claim.
+  const estimates = await claimEstimates(c.env.DB, String(item.order_id), orderItemId);
   if (item.status !== 'delivered' || !item.delivered_at) {
     throw badRequest('Price protection applies after delivery', 'NOT_DELIVERED');
   }
@@ -1486,7 +1531,7 @@ priceProtectionRoutes.post('/claims', async (c) => {
     item.component_value_iqd === null || item.component_value_iqd === undefined
       ? null
       : Number(item.component_value_iqd) || 0;
-  const originalUnit = (await protectionPaidUnit(c.env.DB, String(item.order_id), orderItemId)).unit;
+  const originalUnit = (await protectionPaidUnit(c.env.DB, String(item.order_id), orderItemId, estimates)).unit;
 
   // Exact variant: ids persisted at checkout (migration 0008). Legacy items
   // with only a display label cannot be matched reliably → honest support route.
@@ -1588,7 +1633,13 @@ priceProtectionRoutes.post('/claims', async (c) => {
   const transportMethod = transportSnap?.method;
   const engineSnapshot =
     item.price_basis === 'engine' && typeof item.usd_iqd_at_purchase === 'string' && Number.isSafeInteger(Number(item.engine_regular_iqd))
-      ? { regular_iqd: Number(item.engine_regular_iqd), usd_iqd_at_purchase: item.usd_iqd_at_purchase, base_usd_at_purchase: (item.base_usd_at_purchase as string | null) ?? null }
+      ? {
+          // A settled estimate line (0218, §6.9) was bought at its final price: the frozen engine regular moves by the
+          // same final − estimate its paid unit did, so the USD-base rule compares what the customer really paid.
+          regular_iqd: Number(item.engine_regular_iqd) + settledEstimateShift(estimates, orderItemId),
+          usd_iqd_at_purchase: item.usd_iqd_at_purchase,
+          base_usd_at_purchase: (item.base_usd_at_purchase as string | null) ?? null,
+        }
       : null;
   const lineChannel =
     (engineSnapshot && typeof item.engine_channel === 'string' ? item.engine_channel : null) ??

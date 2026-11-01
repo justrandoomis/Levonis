@@ -67,11 +67,40 @@ import type { PolicyDocument } from './types';
  * «الزيادة», which in price_protection 6.2 means a price increase. Wording
  * only: no rule moved, and no consent document moved with it, so nobody is
  * asked to accept anything again.
+ *
+ * VERSION 7 — WHY IT MOVED (owner, 2026-10-31; DECISIONS row 280;
+ * docs/SMART_PRICING.md §6). The archive keeps version 6 byte for byte. An
+ * item may now be sold at an ESTIMATED price — the shop's expected pre-order
+ * price before the supplier confirms it — and this is the clause that sale
+ * rests on: the new definition in 1.3, and articles 4.11 to 4.17 —
+ *   * 4.11 pre-order only, never direct sale or Quick Buy, the mark shown;
+ *   * 4.12 the checkout acknowledgement, recorded on each estimated line with
+ *     the notice version (`ESTIMATE_NOTICE_VERSION`), never an older one;
+ *   * 4.13 the wallet or cash on delivery only: a financed order could never
+ *     be settled (`planPriceAdjustment` refuses `PRICE_ADJUST_FINANCED`);
+ *   * 4.14 the hold: pending, at «تم استلام الطلب», until every estimated
+ *     line is settled (the gate trigger of migration 0218);
+ *   * 4.15 / 4.16 settlement: an equal price, or an equal total, is
+ *     confirmed; a changed total is the 0140 proposal, applied only on the
+ *     customer's approval, with 0140's money rule unchanged (a rise is
+ *     collected at the door only, a fall shrinks the door amount and then
+ *     returns to the wallet); a rejection is honoured or cancelled in full;
+ *   * 4.17 the customer's own cancel until then, with article 12.2's full
+ *     return, and price protection from settlement (price_protection 6).
+ * 3.10 names the one exception to the snapshot. The articles cite only 4.15,
+ * 4.16, 12.1 and 12.2 of this document, none of them withheld (./render.ts),
+ * and they state no cost, supplier price, freight, rate or profit: a
+ * customer is told prices, never how an estimate is made (invariant I6).
+ * This is not a consent document (CHECKOUT_POLICY_KEYS is terms and
+ * privacy), so nobody is asked to accept it again; what an estimated line
+ * requires is the checkout's own acknowledgement. The apply switch of the
+ * estimator waits for this version (`purchase.version >= 7`), so no product
+ * can carry the mark before the clause is published.
  */
 export const purchase: PolicyDocument = {
   key: 'purchase',
-  version: 6,
-  effective_at: '2026-10-09',
+  version: 7,
+  effective_at: '2026-10-31',
   title: {
     ar: 'سياسة الشراء',
     en: 'Purchase Policy',
@@ -93,6 +122,7 @@ export const purchase: PolicyDocument = {
 - الطلب: الطلب المسجل في النظام برقمه، بكل ما يحمله من أسطر وأسعار وعنوان ووسيلة دفع.
 - البيع المباشر: بيع قطعة متوفرة فعلاً لدى المتجر وقت الطلب.
 - الطلب المسبق: شراء قطعة تُجلب بعد الطلب عبر الشحن الجوي أو البحري أو البري.
+- السعر التقديري: سعر قطعة تُباع بالطلب المسبق وتحمل علامة «سعر تقديري» على صفحة المنتج وفي السلة وفي شاشة الدفع. وهو السعر الذي يتوقعه المتجر للقطعة قبل أن يؤكد المورّد سعرها، وقد يختلف عنه السعر النهائي، وتحكمه المواد 4.11 إلى 4.17.
 - المحفظة: رصيد الزبون داخل المنصة، بأحكامه المبيّنة في سياسة الدفع والمحفظة.
 - شركة التوصيل: الشركة التي تنقل الطرد وتحدد أجرته وضريبته.
 - عرض السعر: الحساب الذي يعرضه النظام قبل إتمام الطلب، بكل بنوده.
@@ -165,7 +195,7 @@ export const purchase: PolicyDocument = {
 يُسجَّل قبول الزبون للسياسات المطلوبة في المعاملة نفسها التي يُكتب فيها الطلب، بنسختها ورقمها ووقتها. فلا يوجد طلب مؤكد دون قبول مسجل، ولا قبول مسجل دون طلب.
 
 ### 3.10 لقطة الطلب وحجيّتها
-تُحفظ مع الطلب لقطة ثابتة لما كان عليه السعر والعنوان ووسيلة الدفع والمزايا وقت الشراء. وتغيير الإعدادات أو الأسعار لاحقاً لا يغيّر طلباً سابقاً، وهذه اللقطة هي المرجع عند أي خلاف على ما جرى الاتفاق عليه.
+تُحفظ مع الطلب لقطة ثابتة لما كان عليه السعر والعنوان ووسيلة الدفع والمزايا وقت الشراء. وتغيير الإعدادات أو الأسعار لاحقاً لا يغيّر طلباً سابقاً، وهذه اللقطة هي المرجع عند أي خلاف على ما جرى الاتفاق عليه. ويُستثنى من ذلك السعر النهائي للقطعة بسعر تقديري، فلا يغيّر الطلب إلا وفق المادتين 4.15 و4.16.
 
 ### 3.11 الطلبات المتفق عليها خارج المنصة
 لا يُعتدّ بطلب أو سعر أو وعد اتُّفق عليه خارج المنصة ولم يُسجَّل طلباً فيها. والمتجر غير ملزم بما لا رقم طلب له.
@@ -201,6 +231,33 @@ export const purchase: PolicyDocument = {
 
 ### 4.10 اختلاف التسعير بين المسارين
 سعر القطعة في الطلب المسبق يحمل عمولة النقل الخاصة بالمسار المختار، وسعرها في البيع المباشر قد يحمل زيادة البيع المباشر مقابل التوفر الفوري. ولا يُجمع الاثنان على السطر الواحد أبداً.
+
+### 4.11 القطعة بسعر تقديري
+القطعة بسعر تقديري تُباع بالطلب المسبق وحده، فلا تُباع بالبيع المباشر ولا عبر الشراء السريع، وتُطلب عبر السلة وشاشة الدفع. وتظهر علامتها بجانب سعرها على صفحة المنتج وفي السلة وفي شاشة الدفع، والسعر المعروض لها سعر تقديري لا سعر نهائي.
+
+### 4.12 الإقرار قبل إنشاء الطلب
+لا يُنشأ طلب فيه قطعة بسعر تقديري إلا بعد أن تعرض شاشة الدفع ملاحظة السعر التقديري، ويقرّ الزبون صراحةً بأنه يفهم أن سعرها قد يتغيّر، وأن طلبه لا يُجهَّز قبل تأكيد السعر النهائي، وأن أي تغيير يُعرض عليه ليوافق عليه أو يلغي الطلب قبل أن يُحصَّل منه. ويُسجَّل الإقرار على كل قطعة بسعر تقديري مع رقم نسخة الملاحظة التي عُرضت عليه، وإذا تغيّر نص الملاحظة لم يُنشأ الطلب إلا بإقرار على نسختها الحالية.
+
+### 4.13 الدفع في الطلب بسعر تقديري
+الطلب الذي فيه قطعة بسعر تقديري لا يُدفع إلا مسبقاً من المحفظة أو نقداً عند الاستلام. ولا يُتاح فيه الدفع المؤجل ولا خدمات التقسيط، لأن فرق السعر النهائي لا يُسوّى إلا عبر المحفظة أو عند الباب.
+
+### 4.14 الطلب ينتظر السعر النهائي
+يبقى الطلب الذي فيه قطعة بسعر تقديري في حالة قيد الانتظار، في مرحلته الأولى «تم استلام الطلب»، حتى يتأكد السعر النهائي لكل قطعة بسعر تقديري فيه وفق المادة 4.15. وقبل ذلك لا يؤكد المتجر الطلب، ولا يجهّزه، ولا يشحنه، ولا يسلّمه إلى شركة توصيل.
+
+### 4.15 تأكيد السعر النهائي
+يؤكد المتجر السعر النهائي لكل قطعة بسعر تقديري على الطلب نفسه:
+- إذا ساوى السعر النهائي السعر التقديري، تأكدت القطعة به وأُبلغ الزبون.
+- إذا اختلفت الأسعار النهائية دون أن يتغيّر مجموع الطلب، تأكدت القطع بأسعارها النهائية وأُبلغ الزبون، ولا يُحصَّل منه شيء ولا يُعاد إليه شيء.
+- إذا غيّرت الأسعار النهائية مجموع الطلب، أرسل المتجر إلى الزبون، في صفحة الطلب وعبر قنوات الإشعار المسجلة له، السعر القديم والجديد لكل قطعة والمجموع الجديد للطلب، وطلب موافقته، ويتأكد السعر النهائي بموافقته. ولا يُطبَّق شيء من ذلك قبل موافقته، ولا يُعدّ سكوته موافقة، وما يُطبَّق عند الموافقة هو ما وافق عليه بعينه.
+
+### 4.16 الموافقة على السعر النهائي أو رفضه
+إذا وافق الزبون على ما أُرسل إليه:
+- فإن ارتفع مجموع الطلب أُضيف الفرق إلى المبلغ المستحق عند التسليم، ولا يُحصَّل إلا عند الباب، ولا يُخصم لأجله من المحفظة شيء من جديد.
+- وإن انخفض خُصم الفرق أولاً من المبلغ المستحق عند التسليم، وأُعيد ما بقي منه إلى المحفظة.
+وإذا رفضه بقي الطلب منتظراً، وكان للمتجر إما إبقاء السعر التقديري سعراً نهائياً مؤكداً ومتابعة الطلب به، وإما إلغاء الطلب وإعادة كل ما دُفع عليه كاملاً. وللمتجر قبل أن يقرر الزبون أن يسحب ما أرسله، وله أن يرسل سعراً نهائياً للموافقة من جديد، لكن الطلب لا يُنفَّذ إلا بالمجموع الذي أُنشئ به أو بمجموع وافق عليه الزبون.
+
+### 4.17 الإلغاء حتى تأكيد السعر النهائي
+حتى يتأكد السعر النهائي لكل قطعة بسعر تقديري في الطلب، للزبون أن يلغي طلبه بنفسه في أي وقت، ويُعاد إليه كل ما دفعه عليه كاملاً وفق المادة 12.2، وبعد ذلك تسري المادة 12.1. وتبقى القطعة التي طُلبت بسعر تقديري كذلك في ذلك الطلب حتى يتأكد سعرها النهائي، ولو أُزيلت العلامة عن صفحة المنتج بعد الطلب. ولا تبدأ حماية سعرها إلا بعد تأكيد سعرها النهائي، وفق سياسة الأسعار وتغييرها وإلغاء الطلب.
 
 ## 5. الكميات والحدود
 
@@ -433,6 +490,7 @@ The first party is the Store: {{LEVONIS_LEGAL_NAME}}, registered under number {{
 - The Order: the order recorded in the system under its number, with its lines, prices, address and payment method.
 - Direct Sale: the sale of an item actually held by the Store at the time of the order.
 - Pre-order: the purchase of an item brought in after the order by air, sea or land freight.
+- Estimated price: the price of an item sold by pre-order and marked "Estimated price" on the product page, in the cart and at checkout. It is the price the Store expects for the item before the supplier confirms its price, the final price may differ from it, and articles 4.11 to 4.17 govern it.
 - The Wallet: the customer's balance inside the platform, governed by the Payment and Wallet Policy.
 - The Delivery Company: the company that carries the parcel and sets its fee and its tax.
 - The Quote: the calculation the system displays before the order is placed, with all of its lines.
@@ -505,7 +563,7 @@ Every checkout carries a key that prevents duplication, so a double tap or a ret
 The customer's acceptance of the required policies is recorded in the same transaction in which the order is written, with the version, the number and the time. There is therefore no confirmed order without a recorded acceptance, and no recorded acceptance without an order.
 
 ### 3.10 The order snapshot and its evidential value
-A fixed snapshot of the price, address, payment method and benefits as at the time of purchase is stored with the order. Later changes to settings or prices do not change an earlier order, and that snapshot is the reference in any dispute about what was agreed.
+A fixed snapshot of the price, address, payment method and benefits as at the time of purchase is stored with the order. Later changes to settings or prices do not change an earlier order, and that snapshot is the reference in any dispute about what was agreed. The one exception is the final price of an item at an estimated price, which changes the order only under articles 4.15 and 4.16.
 
 ### 3.11 Arrangements made outside the platform
 No order, price or promise agreed outside the platform and not recorded as an order within it is recognised. The Store is not bound by anything that has no order number.
@@ -541,6 +599,33 @@ The supplier may prove unable to secure the item or its specification after the 
 
 ### 4.10 The difference in pricing between the two routes
 The price of a pre-order line carries the transport commission of the chosen route, and the price of a direct sale may carry the Direct Sale Extra for immediate availability. The two are never combined on the same line.
+
+### 4.11 An item at an estimated price
+An item at an estimated price is sold by pre-order alone: it is not sold by direct sale or through Quick Buy, and it is ordered through the cart and the checkout. Its mark appears beside its price on the product page, in the cart and at checkout, and the price displayed for it is an estimate, not a final price.
+
+### 4.12 The acknowledgement before the order is created
+An order containing an item at an estimated price is created only after the checkout has shown the estimate notice and the customer has expressly acknowledged that its price may change, that their order is not prepared before the final price is confirmed, and that any change will be put to them to approve, or to cancel the order, before it is charged. The acknowledgement is recorded on each item at an estimated price with the version number of the notice they were shown, and where the wording of the notice changes, the order is created only on an acknowledgement of its current version.
+
+### 4.13 Payment on an order at an estimated price
+An order containing an item at an estimated price is paid only in advance from the wallet or in cash on delivery. Deferred payment and instalment services are not offered on it, because a difference in the final price can be settled only through the wallet or at the door.
+
+### 4.14 The order waits for the final price
+An order containing an item at an estimated price stays in the pending state, at its first stage, "Order received", until the final price of every item at an estimated price in it has been confirmed under article 4.15. Until then the Store does not confirm the order, prepare it, ship it or hand it to a delivery company.
+
+### 4.15 Confirming the final price
+The Store confirms the final price of each item at an estimated price on the order itself:
+- Where the final price equals the estimated price, the item is confirmed at it and the customer is notified.
+- Where the final prices differ but leave the order's total unchanged, the items are confirmed at their final prices and the customer is notified; nothing is collected from them and nothing is returned to them.
+- Where the final prices change the order's total, the Store sends the customer, on the order page and through the notification channels registered for them, the old and the new price of each item and the order's new total, and asks for their approval; the final price is confirmed by their approval. None of it is applied before they approve, their silence is not approval, and what is applied on approval is exactly what they approved.
+
+### 4.16 Approving or rejecting the final price
+Where the customer approves what was sent to them:
+- if the order's total rose, the difference is added to the amount due on delivery and is collected only at the door; nothing is debited from the wallet again for it;
+- if the total fell, the difference is first deducted from the amount due on delivery, and whatever remains of it is returned to the wallet.
+Where they reject it, the order keeps waiting, and the Store either keeps the estimated price as the confirmed final price and continues the order at it, or cancels the order and returns everything paid on it in full. Before the customer decides, the Store may withdraw what it sent, and it may send a final price for approval again; but the order is carried out only at the total at which it was created or at a total the customer approved.
+
+### 4.17 Cancellation until the final price is confirmed
+Until the final price of every item at an estimated price in the order is confirmed, the customer may cancel the order themselves at any time, and everything they paid on it is returned in full under article 12.2; after that, article 12.1 applies. An item ordered at an estimated price remains one on that order until its final price is confirmed, even if the mark is later removed from the product page. Its price protection begins only once its final price is confirmed, under the Pricing, Price Changes and Order Cancellation Policy.
 
 ## 5. Quantities and Limits
 
@@ -773,6 +858,7 @@ The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CON
 - داواکاری: ئەو داواکارییەی بە ژمارەی خۆیەوە لە سیستەمدا تۆمار کراوە، بە هەموو دێڕ و نرخ و ناونیشان و شێوازی پارەدانییەوە.
 - فرۆشتنی ڕاستەوخۆ: فرۆشتنی کاڵایەک کە لە کاتی داواکاریدا بە ڕاستی لای فرۆشگا بەردەستە.
 - داواکاری پێشوەخت: کڕینی کاڵایەک کە دوای داواکاری بە بارهەڵگری ئاسمانی یان دەریایی یان وشکانی دەهێنرێت.
+- نرخی خەمڵێنراو: نرخی کاڵایەک کە بە داواکاری پێشوەخت دەفرۆشرێت و لەسەر پەڕەی بەرهەم و لە سەبەتە و لە شاشەی پارەداندا نیشانەی «نرخی خەمڵێنراو»ی هەیە. ئەو نرخەیە کە فرۆشگا پێش ئەوەی دابینکەر نرخەکەی پشتڕاست بکاتەوە بۆ کاڵاکە چاوەڕێی دەکات، لەوانەیە نرخی کۆتایی لێی جیاواز بێت، و بڕگەکانی 4.11 تا 4.17 ڕێکی دەخەن.
 - جزدان: باڵانسی کڕیار لە ناو پلاتفۆرمەکە، بەپێی سیاسەتی پارەدان و جزدان.
 - کۆمپانیای گەیاندن: ئەو کۆمپانیایەی پاکەتەکە دەگوازێتەوە و کرێ و باجەکەی دیاری دەکات.
 - نرخاندن: ئەو حسابەی سیستەم پێش تەواوکردنی داواکاری پیشانی دەدات، بە هەموو بڕگەکانییەوە.
@@ -845,7 +931,7 @@ The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CON
 وەرگرتنی کڕیار بۆ سیاسەتە داواکراوەکان لە هەمان ئەو مامەڵەیەدا تۆمار دەکرێت کە داواکارییەکەی تێدا دەنووسرێت، بە وەشان و ژمارە و کاتەوە. بۆیە هیچ داواکارییەکی پشتڕاستکراو بەبێ وەرگرتنی تۆمارکراو نییە، و هیچ وەرگرتنێکی تۆمارکراو بەبێ داواکاری نییە.
 
 ### 3.10 وێنەگرتنی داواکاری و بەهای بەڵگەیی
-وێنەیەکی جێگیر لە نرخ و ناونیشان و شێوازی پارەدان و سوودەکان وەک لە کاتی کڕیندا بوون لەگەڵ داواکارییەکەدا هەڵدەگیرێت. گۆڕانی ڕێکخستن یان نرخەکان لە دواتردا داواکارییەکی پێشووتر ناگۆڕێت، و ئەم وێنەیە سەرچاوەیە لە هەر ناکۆکییەک لەسەر ئەوەی چی ڕێککەوتی لەسەر کراوە.
+وێنەیەکی جێگیر لە نرخ و ناونیشان و شێوازی پارەدان و سوودەکان وەک لە کاتی کڕیندا بوون لەگەڵ داواکارییەکەدا هەڵدەگیرێت. گۆڕانی ڕێکخستن یان نرخەکان لە دواتردا داواکارییەکی پێشووتر ناگۆڕێت، و ئەم وێنەیە سەرچاوەیە لە هەر ناکۆکییەک لەسەر ئەوەی چی ڕێککەوتی لەسەر کراوە. تەنها نرخی کۆتایی کاڵای بە نرخی خەمڵێنراو لەمە بەدەرە، کە تەنها بەپێی بڕگەکانی 4.15 و 4.16 داواکارییەکە دەگۆڕێت.
 
 ### 3.11 ڕێککەوتنی دەرەوەی پلاتفۆرم
 هیچ داواکاری یان نرخ یان بەڵێنێک کە لە دەرەوەی پلاتفۆرم ڕێککەوتی لەسەر کراوە و وەک داواکارییەک تێیدا تۆمار نەکراوە، دان پێدا نانرێت. فرۆشگا پابەند نییە بەوەی ژمارەی داواکاری نییە.
@@ -881,6 +967,33 @@ The approved contact point for complaints and enquiries is {{LEVONIS_SUPPORT_CON
 
 ### 4.10 جیاوازی نرخاندن لە نێوان دوو ڕێڕەودا
 نرخی دێڕی داواکاری پێشوەخت کۆمیسیۆنی گواستنەوەی ڕێڕەوی هەڵبژێردراو هەڵدەگرێت، و نرخی فرۆشتنی ڕاستەوخۆ لەوانەیە زیادەی فرۆشتنی ڕاستەوخۆ هەڵبگرێت لە بەرامبەر بەردەستبوونی دەستبەجێ. هەرگیز هەردووکیان لەسەر یەک دێڕ کۆناکرێنەوە.
+
+### 4.11 کاڵا بە نرخی خەمڵێنراو
+کاڵای بە نرخی خەمڵێنراو تەنها بە داواکاری پێشوەخت دەفرۆشرێت: نە بە فرۆشتنی ڕاستەوخۆ دەفرۆشرێت و نە لە ڕێگەی کڕینی خێراوە، و لە ڕێگەی سەبەتە و شاشەی پارەدانەوە داوا دەکرێت. نیشانەکەی لە تەنیشت نرخەکەیەوە لەسەر پەڕەی بەرهەم و لە سەبەتە و لە شاشەی پارەداندا دەردەکەوێت، و ئەو نرخەی بۆی پیشان دەدرێت نرخێکی خەمڵێنراوە نەک نرخی کۆتایی.
+
+### 4.12 دانپێدانان پێش دروستبوونی داواکاری
+داواکارییەک کە کاڵایەکی بە نرخی خەمڵێنراوی تێدایە تەنها دوای ئەوە دروست دەبێت کە شاشەی پارەدان تێبینیی نرخی خەمڵێنراو پیشان بدات و کڕیار بە ڕوونی دان بەوەدا بنێت کە تێدەگات نرخەکەی لەوانەیە بگۆڕێت، و داواکارییەکەی پێش پشتڕاستکردنەوەی نرخی کۆتایی ئامادە ناکرێت، و هەر گۆڕانکارییەک پێش وەرگرتنی پارەکەی دەخرێتە بەردەمی تا پەسەندی بکات یان داواکارییەکە هەڵبوەشێنێتەوە. دانپێدانانەکە لەسەر هەر کاڵایەکی بە نرخی خەمڵێنراو تۆمار دەکرێت لەگەڵ ژمارەی وەشانی ئەو تێبینییەی پیشانی دراوە، و ئەگەر دەقی تێبینییەکە گۆڕا، داواکارییەکە تەنها بە دانپێدانان بە وەشانی ئێستای دروست دەبێت.
+
+### 4.13 پارەدان لە داواکاری بە نرخی خەمڵێنراودا
+داواکارییەک کە کاڵایەکی بە نرخی خەمڵێنراوی تێدایە تەنها بە پارەدانی پێشەکی لە جزدانەوە یان بە پارەدان لە کاتی وەرگرتن دەدرێت. پارەدانی دواخراو و خزمەتگوزارییەکانی قیست لەسەری بەردەست نین، چونکە جیاوازیی نرخی کۆتایی تەنها لە ڕێگەی جزدانەوە یان لە بەردەرگا یەکلایی دەکرێتەوە.
+
+### 4.14 داواکارییەکە چاوەڕێی نرخی کۆتایی دەکات
+داواکارییەک کە کاڵایەکی بە نرخی خەمڵێنراوی تێدایە لە دۆخی چاوەڕوانیدا دەمێنێتەوە، لە یەکەم قۆناغیدا «داواکاری وەرگیرا»، هەتا نرخی کۆتایی هەموو کاڵایەکی بە نرخی خەمڵێنراوی ناوی بەپێی بڕگەی 4.15 پشتڕاست دەکرێتەوە. پێش ئەوە نە داواکارییەکە پشتڕاست دەکرێتەوە، نە ئامادە دەکرێت، نە دەنێردرێت، و نە ڕادەستی کۆمپانیایەکی گەیاندن دەکرێت.
+
+### 4.15 پشتڕاستکردنەوەی نرخی کۆتایی
+فرۆشگا نرخی کۆتایی هەر کاڵایەکی بە نرخی خەمڵێنراو لەسەر خودی داواکارییەکە پشتڕاست دەکاتەوە:
+- ئەگەر نرخی کۆتایی یەکسان بوو بە نرخی خەمڵێنراو، کاڵاکە بەو نرخە پشتڕاست دەکرێتەوە و کڕیار ئاگادار دەکرێتەوە.
+- ئەگەر نرخە کۆتاییەکان جیاواز بوون بەڵام کۆی داواکارییەکەیان نەگۆڕی، کاڵاکان بە نرخە کۆتاییەکانیان پشتڕاست دەکرێنەوە و کڕیار ئاگادار دەکرێتەوە، و نە هیچی لێ وەردەگیرێت و نە هیچی بۆ دەگەڕێتەوە.
+- ئەگەر نرخە کۆتاییەکان کۆی داواکارییەکەیان گۆڕی، فرۆشگا لە پەڕەی داواکارییەکەدا و لە ڕێگەی ئەو کەناڵە ئاگادارکردنەوانەی بۆی تۆمار کراون، نرخی کۆن و نوێی هەر کاڵایەک و کۆی نوێی داواکارییەکە بۆ کڕیار دەنێرێت و داوای پەسەندکردنی لێ دەکات، و نرخی کۆتایی بە پەسەندکردنی ئەو پشتڕاست دەبێتەوە. هیچ شتێک لەمانە پێش پەسەندکردنی جێبەجێ ناکرێت، بێدەنگیی ئەو پەسەندکردن نییە، و ئەوەی لە کاتی پەسەندکردندا جێبەجێ دەکرێت ڕێک ئەوەیە کە پەسەندی کردووە.
+
+### 4.16 پەسەندکردن یان ڕەتکردنەوەی نرخی کۆتایی
+ئەگەر کڕیار ئەوەی بۆی نێردراوە پەسەند بکات:
+- ئەگەر کۆی داواکارییەکە بەرز بووەوە، جیاوازییەکە دەخرێتە سەر ئەو بڕەی لە کاتی گەیاندندا دەدرێت و تەنها لە بەردەرگا وەردەگیرێت؛ لە پێناویدا هیچ لە جزدان نابڕدرێتەوە.
+- ئەگەر کۆکە دابەزی، جیاوازییەکە سەرەتا لەو بڕە کەم دەکرێتەوە کە لە کاتی گەیاندندا دەدرێت، و ئەوەی لێی دەمێنێتەوە بۆ جزدان دەگەڕێتەوە.
+ئەگەر ڕەتی بکاتەوە، داواکارییەکە هەر چاوەڕێ دەمێنێتەوە، و فرۆشگا یان نرخی خەمڵێنراو وەک نرخی کۆتایی پشتڕاستکراو دەهێڵێتەوە و داواکارییەکە پێی بەردەوام دەکات، یان داواکارییەکە هەڵدەوەشێنێتەوە و هەموو ئەوەی لەسەری دراوە بە تەواوی دەگەڕێنێتەوە. پێش ئەوەی کڕیار بڕیار بدات، فرۆشگا دەتوانێت ئەوەی ناردوویەتی بکشێنێتەوە، و دەتوانێت دووبارە نرخێکی کۆتایی بۆ پەسەندکردن بنێرێت؛ بەڵام داواکارییەکە تەنها بەو کۆیەی پێی دروست کراوە یان بە کۆیەک کە کڕیار پەسەندی کردبێت جێبەجێ دەکرێت.
+
+### 4.17 هەڵوەشاندنەوە هەتا پشتڕاستکردنەوەی نرخی کۆتایی
+هەتا نرخی کۆتایی هەموو کاڵایەکی بە نرخی خەمڵێنراوی ناو داواکارییەکە پشتڕاست دەکرێتەوە، کڕیار دەتوانێت لە هەر کاتێکدا خۆی داواکارییەکەی هەڵبوەشێنێتەوە، و هەموو ئەوەی لەسەری داویەتی بەپێی بڕگەی 12.2 بە تەواوی بۆی دەگەڕێتەوە؛ دوای ئەوە بڕگەی 12.1 جێبەجێ دەبێت. ئەو کاڵایەی بە نرخی خەمڵێنراو داوا کراوە لەو داواکارییەدا هەر بە نرخی خەمڵێنراو دەمێنێتەوە هەتا نرخی کۆتاییەکەی پشتڕاست دەکرێتەوە، تەنانەت ئەگەر دواتر نیشانەکە لەسەر پەڕەی بەرهەمەکە لابرێت. پاراستنی نرخەکەی تەنها دوای پشتڕاستکردنەوەی نرخی کۆتاییەکەی دەست پێدەکات، بەپێی سیاسەتی نرخ و گۆڕانی نرخ و هەڵوەشاندنەوەی داواکاری.
 
 ## 5. بڕەکان و سنوورەکان
 

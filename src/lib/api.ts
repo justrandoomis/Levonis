@@ -517,6 +517,16 @@ export interface ApiProduct {
   /** 'unpriced' = shown in the catalogue, not for sale yet. Absent = priced
    *  (an older server never served an unpriced product). */
   price_status?: 'priced' | 'unpriced';
+  /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §5.1–5.3, migration 0218): a PRICED card
+   * whose price — some priced SKU of it — is an estimated pre-order price the
+   * owner has not confirmed with the supplier yet. Present only when true; a
+   * boolean, never a figure, source or flag. Read it through
+   * src/lib/priceStatus.ts `isEstimated`. On the product detail it is the
+   * card's label; the opening selection's own label is the detail's
+   * top-level `price_estimate`, and each quote states its selection's.
+   */
+  price_estimate?: true;
   prime_price_iqd?: number | null;
   pro_price_iqd?: number | null;
   /** What this viewer actually pays, and the regular price it is compared
@@ -689,7 +699,16 @@ export interface CartItem {
     unit_subtotal_usd_cents?: number;
     offer_before_usd_cents?: number;
     offer_saving_percent_usd?: number | null;
+    /** «سعر تقديري»: this line's price is an estimate (worker/lib/customerPricing.ts `CustomerLinePrice`). Present only when true. */
+    price_estimate?: true;
   };
+  /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §5.3, §6.1): this line is at an
+   * estimated pre-order price — a chip on the line, and the one cartNotice
+   * under the total (`CartEstimateFields.has_estimates`). Present only when
+   * true; never a figure.
+   */
+  price_estimate?: true;
   /** The chosen extended-warranty plan id ('' = none). One plan per line,
    *  applied to every unit of the line. */
   warranty_plan_id?: string;
@@ -834,6 +853,171 @@ export interface CartComposition {
   };
 }
 
+// --------------------------------------------------- «سعر تقديري» (0218)
+//
+// THE ESTIMATED PRE-ORDER PRICE ON THE WIRE (docs/SMART_PRICING.md §5–§7;
+// DECISIONS rows 278–281). The words live in packages/contracts/src/
+// priceEstimates.ts, which only the Worker and lazy chunks import; these are
+// the SHAPES the server answers with, for every screen that reads them. Each
+// field is absent from a payload with no estimate in it, so every other
+// response is what it was. None carries a source, a supplier price, a flag, a
+// type or a measure (invariant I6): a customer reads a boolean, a line state
+// and customer prices.
+
+/** Every state of an estimated order line (migration 0218's CHECK; the contract's `isEstimateLineState`). */
+export type EstimateLineState = import('../../packages/contracts/src/priceEstimates').EstimateLineState;
+
+/** GET /api/cart and every cart answer, beside `items` (§5.3). */
+export interface CartEstimateFields {
+  /** Some line is at an estimated price (`CartItem.price_estimate`): the one cartNotice under the total. */
+  has_estimates?: boolean;
+}
+
+/**
+ * POST /api/orders/quote's `estimate` block (§6.2), present only when a line
+ * is estimated: the estimated cart lines, and the notice version the
+ * acknowledgement must equal. The payment methods it answers with already
+ * leave out BNPL and Gini (§6.1).
+ */
+export interface CheckoutEstimateBlock {
+  /** The cart line ids at an estimated price. */
+  lines: string[];
+  /** `ESTIMATE_NOTICE_VERSION` when the quote was made. */
+  notice_version: number;
+  /**
+   * The owner paused ordering at estimated prices (`price_estimate_control.ordering_enabled = 0`): the quote's
+   * blockers carry PRICE_ESTIMATE_ORDERING_PAUSED and the order door refuses it too. Present only when true.
+   */
+  ordering_paused?: true;
+}
+
+/**
+ * The body field POST /api/orders requires whenever a line is estimated
+ * (§6.2): it must EQUAL the quote's `estimate.notice_version`, else 409
+ * PRICE_ESTIMATE_ACK_REQUIRED with the fresh quote.
+ */
+export interface CheckoutEstimateAck {
+  price_estimate_ack?: number;
+}
+
+/** An estimated order line's settlement, as its buyer reads it (§5.3, §6.3–6.5). */
+export interface OrderItemEstimate {
+  state: EstimateLineState;
+}
+
+/** `reason_code` of a 0140 price proposal (migration 0218): '' for an ordinary one. */
+export type PriceAdjustmentReasonCode = '' | 'ESTIMATE_FINAL_PRICE';
+
+/**
+ * One line of an estimate proposal, as its customer reads it (§6.7 `publicAdjustment`; the server's
+ * `AdjustmentEstimateLine`, worker/lib/orderPriceAdjust.ts): customer prices only.
+ */
+export interface PriceAdjustmentEstimateLine {
+  order_item_id: string;
+  name: string;
+  /** The option and colour as frozen at checkout ('' when none). */
+  variant: string;
+  qty: number;
+  /** The unit price the customer ordered at. */
+  estimate_unit_iqd: number;
+  /** The supplier-confirmed unit price proposed; null only on a line that carries no final price (yet). */
+  final_unit_iqd: number | null;
+}
+
+/** What a 0140 proposal carries since 0218 (§6.7), customer and admin reads alike. Absent from an older server. */
+export interface PriceAdjustmentEstimateFields {
+  reason_code?: PriceAdjustmentReasonCode;
+  /** Only on an ESTIMATE_FINAL_PRICE proposal: per line, old → new. */
+  lines?: PriceAdjustmentEstimateLine[];
+}
+
+/**
+ * One line of GET /api/admin/orders/:id/price-estimate (§6.5, class `op`: any
+ * admin may read it; the server's `estimateLineView`, worker/lib/orderEstimates.ts).
+ * Customer prices only — never a cost. POST …/price-estimate/confirm answers its
+ * lines in the same shape but reads no price today: `current_unit_iqd` is null
+ * there and `offer_today_unit_iqd` is left out.
+ */
+export interface AdminOrderEstimateLine {
+  order_item_id: string;
+  name: string;
+  /** The option and colour as frozen at checkout ('' when none). */
+  variant: string;
+  qty: number;
+  /** The pre-order route the line was sold on. */
+  channel: 'pre_order_air' | 'pre_order_sea' | 'pre_order_land';
+  /** The 0140 proposal a proposed, approved or rejected line rides; null otherwise. */
+  adjustment_id: string | null;
+  decided_at: string | null;
+  /** The unit price the customer acknowledged at checkout. */
+  estimate_unit_iqd: number;
+  /** The SKU × channel's current published price; null when it has none now. */
+  current_unit_iqd: number | null;
+  /**
+   * Only on a line bought under an offer (its estimate is the offer price): the regular unit price
+   * just before the offer, frozen at checkout — what today's published price is compared with.
+   */
+  offer_before_unit_iqd?: number;
+  /** Only on a line bought under an offer, in the GET read: the same offer on today's published price; null when there is none. */
+  offer_today_unit_iqd?: number | null;
+  /** The final unit price once confirmed or proposed; null while open. */
+  final_unit_iqd: number | null;
+  state: EstimateLineState;
+}
+
+/**
+ * GET /api/admin/orders/:id/price-estimate (§6.5). The estimate proposal waiting on the customer
+ * (`pending`, the 0140 `publicAdjustment` shape) is typed where it is drawn
+ * (src/components/adminOrders/PriceAdjustPanel.tsx `PublicAdjustment`).
+ */
+export interface AdminOrderEstimateRead {
+  order: {
+    id: string;
+    status: string;
+    stage: string;
+    total_iqd: number;
+    due_on_delivery_iqd: number;
+    wallet_applied_iqd: number;
+    payment_method_id: string;
+    price_hold_id: string | null;
+  };
+  lines: AdminOrderEstimateLine[];
+  /** Lines that still hold the order at «تم الاستلام» (open, proposed or rejected). */
+  unsettled: number;
+  /** The viewer may move money (`canMoveMoney`). */
+  financial_scope: boolean;
+  /** Settling needs the financial scope, an open or rejected line, and no proposal waiting. */
+  can_confirm: boolean;
+}
+
+/**
+ * POST /api/admin/orders/:id/price-estimate/confirm (§6.5, class `money`,
+ * financial scope): every `open` or `rejected` line, each final on the
+ * rounding rule; an edited total only when the total changes.
+ */
+export interface AdminOrderEstimateConfirmBody {
+  idempotency_key: string;
+  lines: Array<{ order_item_id: string; final_unit_iqd: number }>;
+  new_total_iqd?: number;
+  note?: string;
+}
+
+/** `product_price_estimates.state` (migration 0218). */
+export type ProductEstimateState = 'candidate' | 'estimated' | 'confirmed' | 'paused';
+
+/**
+ * GET /api/admin/products-v2/:id's non-financial `price_estimate` (§7): what
+ * EVERY admin may see — whether the storefront labels the product and where
+ * the estimator holds it. The owner's banner, sources and flags are read
+ * behind the cost door (src/components/adminEstimates/api.ts).
+ */
+export interface AdminProductEstimate {
+  /** `products.price_estimate`: the storefront shows «سعر تقديري». */
+  label: boolean;
+  /** null: the product never entered the estimator, or the database predates 0218. */
+  state: ProductEstimateState | null;
+}
+
 export interface ApiAddress {
   id: string;
   label: string;
@@ -907,6 +1091,12 @@ export interface OrderItemPricing {
   price_source?: string;
   /** 0175: on a gift line only — the gift, and its value (regular price × qty, never charged). */
   gift?: { gift_id: string; level: number; value_iqd: number } | null;
+  /**
+   * «سعر تقديري» (migration 0218): the line was sold at an estimated pre-order
+   * price (`customerOrderPricing` projects the frozen `estimate`). Present only
+   * when true; its settlement is `ApiOrderItem.price_estimate`.
+   */
+  price_estimate?: true;
 }
 
 /** The exact selection bought, in the shape POST /api/cart/items accepts. */
@@ -933,6 +1123,12 @@ export interface ApiOrderItem {
   unit_price_iqd: number;
   line_total_iqd: number;
   pricing?: OrderItemPricing | null;
+  /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §5.3, §6.4): this line was ordered at
+   * an estimated price, and where its final price stands. Absent on every
+   * other line, and on an older server.
+   */
+  price_estimate?: OrderItemEstimate;
   /** The extended-warranty plan frozen at checkout; `total_months` /
    *  `base_months` are present on orders placed since the extension round. */
   warranty?: {
@@ -1397,6 +1593,8 @@ export interface AdminOrderRow extends ApiOrder {
    * the owner's §19 gate would refuse `quick_next` right now.
    */
   serials?: { required: number; linked: number; gate: boolean; holds_next: boolean };
+  /** «بانتظار تأكيد السعر النهائي» (migration 0218): an estimated line still holds the order (the server sends it only when true). */
+  price_estimate_open?: boolean;
 }
 
 /** The whole board in one answer: a page, its totals, and what it understood. */
@@ -1440,6 +1638,9 @@ export interface AdminOrdersResponse {
   /** «بانتظار موافقة الزبون على السعر» (0140): the filter's state and its board-wide count. */
   price_hold?: boolean;
   price_hold_count?: number;
+  /** «بانتظار تأكيد السعر» (0218): the filter's state and its board-wide count; absent on an older server. */
+  price_estimate?: boolean;
+  price_estimate_count?: number;
   /**
    * «عدد بجانب كل خيار» — how many rows each filter option would return.
    *
@@ -1470,6 +1671,8 @@ export interface AdminOrdersResponse {
 /** Everything the fulfilment screen needs for ONE order. */
 export interface AdminOrderDetail extends ApiOrder {
   admin_note: string;
+  /** «بانتظار تأكيد السعر النهائي» (migration 0218): an estimated line still waits; absent on an older server. */
+  price_estimate_open?: boolean;
   membership_tier_snapshot?: string;
   delivery_waived?: boolean;
   coupon?: { code?: string; discount_iqd?: number } | null;

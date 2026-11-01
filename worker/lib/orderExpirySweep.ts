@@ -76,10 +76,21 @@ export interface OrderExpiryReport {
 }
 
 /**
+ * «بانتظار تأكيد السعر النهائي» (migration 0218; docs/SMART_PRICING.md §6.4):
+ * an order whose estimated lines wait for their final price is held at
+ * «تم الاستلام» BY THE SHOP — it is waiting on us, not abandoned by the
+ * customer, who may cancel it themselves at any time. Excluded in SQL, so a
+ * held order never spends the batch's LIMIT.
+ */
+const ESTIMATE_HOLD_CLAUSE = `
+     AND NOT EXISTS (SELECT 1 FROM order_price_estimates e
+                      WHERE e.order_id = o.id AND e.state IN ('open','proposed','rejected'))`;
+
+/**
  * The candidates. Every clause is a refusal, and the comment on each says
  * which legitimate order it protects.
  */
-const CANDIDATES = `
+const candidatesSql = (estimateHold: boolean) => `
   SELECT o.* FROM orders o
    WHERE o.status = 'pending'                       -- never a deducted state
      AND o.stage  = 'received'                      -- the only stage that maps to pending
@@ -97,9 +108,28 @@ const CANDIDATES = `
      AND NOT EXISTS (SELECT 1 FROM order_status_history h
                       WHERE h.order_id = o.id AND h.stage <> 'received') -- nobody has moved it
      AND NOT EXISTS (SELECT 1 FROM mystery_allocations a
-                      WHERE a.order_id = o.id AND a.revealed_at IS NOT NULL)
+                      WHERE a.order_id = o.id AND a.revealed_at IS NOT NULL)${estimateHold ? ESTIMATE_HOLD_CLAUSE : ''}
    ORDER BY o.updated_at
    LIMIT ?2`;
+
+/**
+ * DEPLOY-AHEAD (CLAUDE.md rule 2): a database without 0218 has no estimate
+ * line and refuses the clause with exactly this error — the candidates are
+ * then read without it, today's statement. Any other error is not ours to
+ * hide and is thrown.
+ */
+const MISSING_ESTIMATES = /no such table:?\s*(?:main\.)?order_price_estimates\b/i;
+
+async function candidates(env: Env, cutoff: string, limit: number): Promise<Record<string, unknown>[]> {
+  const read = async (estimateHold: boolean) =>
+    (await env.DB.prepare(candidatesSql(estimateHold)).bind(cutoff, limit).all<Record<string, unknown>>()).results ?? [];
+  try {
+    return await read(true);
+  } catch (e) {
+    if (!MISSING_ESTIMATES.test(e instanceof Error ? e.message : String(e))) throw e;
+    return read(false);
+  }
+}
 
 export async function sweepExpiredOrders(
   env: Env,
@@ -111,10 +141,7 @@ export async function sweepExpiredOrders(
   out.configured = true;
 
   const cutoff = new Date(new Date(nowIso).getTime() - cfg.ttl_minutes * 60_000).toISOString();
-  const { results } = await env.DB.prepare(CANDIDATES)
-    .bind(cutoff, cfg.batch_limit)
-    .all<Record<string, unknown>>();
-  const rows = results ?? [];
+  const rows = await candidates(env, cutoff, cfg.batch_limit);
   out.scanned = rows.length;
 
   for (const order of rows) {

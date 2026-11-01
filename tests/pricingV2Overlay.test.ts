@@ -16,7 +16,14 @@
  *     database migrated only through 0188 reads exactly as it did;
  *   - a malformed `o:*` row on a product WITH options never reaches its document;
  *   - the public projection carries neither the strict flag, nor the rows, nor
- *     their V2 flag.
+ *     their V2 flag;
+ *   - migration 0218 (docs/SMART_PRICING.md §2.4, §5.2): the same statement
+ *     carries the firm arm — a labelled product's firm SKU keys, marker 3,
+ *     never a price row — onto the CUSTOMER document only (`sku_firm`), with
+ *     one fallback tier in front of V2 → V1: without the firm table the read
+ *     is today's statement and the binding remembers that for a minute; any
+ *     other failure of the arm is read around (prices intact, no firm list:
+ *     the label fails closed) and is not remembered.
  *
  * Run: REQUIRE_DIST=1 node --import tsx --test tests/pricingV2Overlay.test.ts
  */
@@ -29,8 +36,10 @@ import { OWNER_ROW_SQL, applyRate } from './fixtures/fx';
 import { pricingWorld, AMS } from './fixtures/procurementPricing';
 import { legacyProductId, seedLegacyCatalogue, seedProfileRates } from './fixtures/legacyCatalogue';
 import { seedOptionless, writeV2, cartGrid } from './fixtures/pricingV2';
-import { loadRelationsViews, applyRelations } from '../worker/lib/productOverlay';
+import { loadRelationsView, loadRelationsViews, applyRelations } from '../worker/lib/productOverlay';
 import { parseProductRow, projectPublic } from '../worker/lib/productModel';
+import { estimateAbsentLately } from '../worker/lib/priceEstimateLabel';
+import type { DatabaseSync } from 'node:sqlite';
 import { loadProducts } from '../worker/lib/pricingEngine/load';
 import { v2EditorAnswer, v2OwnerAnswer } from '../worker/lib/pricingEngine/v2/dto';
 import { v2Offerable } from '../worker/lib/skuLevels';
@@ -183,4 +192,128 @@ test('the public product page of a V2 product carries its final prices only: no 
       if (path.includes(slug)) assert.match(text, /1580250/, 'the final price is published');
     }
   }
+});
+
+// ---------------------------------------------------------------- 0218: the firm arm (docs/SMART_PRICING.md §5.2)
+
+/** The label as the V2 writer's estimate batch sets it (trigger T1: only under the price token). */
+function label(raw: DatabaseSync, pid: string): void {
+  raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${pid}', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = '${pid}';
+    DELETE FROM ops_guards WHERE id = 'engine-price:${pid}';`);
+}
+/** The owner's confirmation of one SKU, under the key the confirm route stores (trigger T4: a labelled product only). */
+const firm = (raw: DatabaseSync, pid: string, key: string) =>
+  raw.prepare('INSERT INTO price_estimate_firm_skus (product_id, combo_key, confirmed_by, confirmed_at) VALUES (?, ?, ?, ?)').run(pid, key, 'usr_owner', 'x');
+
+/** A V2 option-less product with two colours (four SKU × channel rows), labelled, beside the AMS (V2, never labelled). */
+async function estimateWorld() {
+  const w = pricingWorld();
+  seedOptionless(w.raw, OL, { routes: ['land'], colours: 2 });
+  await writeV2(w.db, OL, { method: 'usd', points: [fixed('500')], discounts: [off('25')] });
+  await writeV2(w.db, AMS, { method: 'usd', points: [fixed('1000')], discounts: [off('50')] });
+  const before = await viewsOf(w, [OL, AMS]);
+  label(w.raw, OL);
+  return { w, before };
+}
+
+/** Counts the statements that name the firm table; `failing` makes them fail with an ordinary D1 error. */
+class ArmSpy {
+  arm = 0;
+  failing = false;
+  constructor(readonly inner: D1Database) {}
+  prepare(sql: string) {
+    if (!sql.includes('price_estimate_firm_skus')) return this.inner.prepare(sql);
+    this.arm += 1;
+    if (!this.failing) return this.inner.prepare(sql);
+    const boom = async (): Promise<never> => {
+      throw new Error('D1_ERROR: simulated read failure (injected by the test)');
+    };
+    const failed = { all: boom, first: boom, run: boom, raw: boom };
+    return { ...failed, bind: () => failed };
+  }
+  batch(statements: unknown[]) {
+    return (this.inner as unknown as { batch: (s: unknown[]) => Promise<unknown> }).batch(statements);
+  }
+}
+
+const quietly = async <T>(run: () => Promise<T>): Promise<{ value: T; logged: string[] }> => {
+  const logged: string[] = [];
+  const log = console.error;
+  console.error = (...a: unknown[]) => void logged.push(a.map(String).join(' '));
+  try {
+    return { value: await run(), logged };
+  } finally {
+    console.error = log;
+  }
+};
+
+test('0218: the firm keys ride the SKU statement (marker 3) — never a price row, only on their own product, `o:*` is the product itself', async () => {
+  const { w, before } = await estimateWorld();
+  firm(w.raw, OL, `c:${OL}_c1`);
+  firm(w.raw, OL, 'o:*');
+  const views = await viewsOf(w, [OL, AMS]);
+  const ol = views.get(OL)!;
+  assert.deepEqual([...(ol.sku_firm ?? [])].sort(), ['', `c:${OL}_c1`], 'the firm keys, canonical');
+  assert.deepEqual(ol.sku_prices, before.get(OL)!.sku_prices, 'the arm adds no price row and moves none');
+  assert.equal(ol.sku_strict, true);
+  assert.equal(views.get(AMS)!.sku_firm, undefined, 'another product reads none');
+  assert.deepEqual(views.get(AMS)!.sku_prices, before.get(AMS)!.sku_prices);
+  // The one-product loader reads the same.
+  const single = await loadRelationsView(w.db, OL, 'BASE');
+  assert.deepEqual([...(single.sku_firm ?? [])].sort(), ['', `c:${OL}_c1`]);
+  assert.deepEqual(single.sku_prices, ol.sku_prices);
+
+  // The customer's document carries the label and the firm keys; the admin overlay edits the ladder and carries no firm list.
+  const raw = row<Record<string, unknown>>(w.raw, 'SELECT * FROM products WHERE id = ?', OL)!;
+  const doc = applyRelations(parseProductRow(raw), single);
+  assert.equal(doc.price_estimate, true, 'parsed off the row the price is read with');
+  assert.deepEqual([...(doc.sku_firm ?? [])].sort(), ['', `c:${OL}_c1`]);
+  assert.equal(applyRelations(parseProductRow(raw), single, { includeInactive: true }).sku_firm, undefined);
+  const pub = JSON.stringify(projectPublic(doc));
+  for (const key of ['sku_firm', 'price_estimate']) assert.ok(!pub.includes(key), `the bare projection carries no ${key} (the priced card decides the label)`);
+  // An unlabelled row parses without the key at all — byte-identical documents.
+  assert.equal('price_estimate' in parseProductRow(row<Record<string, unknown>>(w.raw, 'SELECT * FROM products WHERE id = ?', AMS)!), false);
+  assert.equal('price_estimate' in parseProductRow({ id: 'x', slug: 'x', price_estimate: 0 }), false);
+  assert.equal(parseProductRow({ id: 'x', slug: 'x', price_estimate: 1 }).price_estimate, true);
+});
+
+test('0218 absent: the read is today’s statement, the same rows, no firm list — and the binding remembers it for a minute', async () => {
+  const { w, before } = await estimateWorld();
+  // A deploy ahead of 0218 (the deploy-ahead suite drives a database cut before it end to end).
+  w.raw.exec('DROP TABLE price_estimate_firm_skus');
+  const spy = new ArmSpy(w.db);
+  const db = spy as unknown as D1Database;
+  const read = () => loadRelationsViews(db, [{ id: OL }, { id: AMS }]);
+  const { value: first, logged } = await quietly(read);
+  for (const pid of [OL, AMS]) {
+    assert.deepEqual(first.get(pid)!.sku_prices, before.get(pid)!.sku_prices, `${pid}: today's rows`);
+    assert.equal(first.get(pid)!.sku_prices_unread, undefined, `${pid}: not a failed read`);
+    assert.equal(first.get(pid)!.sku_strict, true);
+    assert.equal(first.get(pid)!.sku_firm, undefined);
+  }
+  assert.deepEqual(logged, [], 'an expected window, not a fault: nothing is logged');
+  assert.equal(spy.arm, 1, 'the arm was asked once');
+  assert.equal(estimateAbsentLately(db), true, 'and its absence remembered');
+  await read();
+  await loadRelationsView(db, OL, 'BASE');
+  assert.equal(spy.arm, 1, 'while remembered, today’s statement is read straight away');
+});
+
+test('0218: an ordinary failure of the arm is read around — prices intact, no firm list (the label fails closed) — and is not remembered', async () => {
+  const { w, before } = await estimateWorld();
+  firm(w.raw, OL, `c:${OL}_c1`);
+  const spy = new ArmSpy(w.db);
+  spy.failing = true;
+  const db = spy as unknown as D1Database;
+  const { value: views, logged } = await quietly(() => loadRelationsViews(db, [{ id: OL }, { id: AMS }]));
+  for (const pid of [OL, AMS]) {
+    assert.deepEqual(views.get(pid)!.sku_prices, before.get(pid)!.sku_prices, `${pid}: the prices stand`);
+    assert.equal(views.get(pid)!.sku_prices_unread, undefined);
+    assert.equal(views.get(pid)!.sku_firm, undefined, `${pid}: no firm list`);
+  }
+  assert.ok(logged.some((l) => l.includes('firm skus')), 'the failure is logged');
+  assert.equal(estimateAbsentLately(db), false, 'a failure is not an absent migration');
+  spy.failing = false;
+  assert.deepEqual((await loadRelationsView(db, OL, 'BASE')).sku_firm, [`c:${OL}_c1`], 'the next read asks again and reads it');
 });

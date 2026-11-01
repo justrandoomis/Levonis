@@ -12,6 +12,10 @@
  *     exception dies the day the file appears);
  *   - with the guard row present, every INSERT, UPDATE and DELETE on a
  *     protected table aborts with IMPORT_FINANCIAL_WRITE_REFUSED;
+ *   - the tables newer than 0195 (LATE_PROTECTED_TABLES: 0218's twelve
+ *     smart-pricing tables) carry the same three triggers, in the generated
+ *     shape, from the migration that creates them, and abort the same way —
+ *     while 0195's generated block stays exactly as the generator prints it;
  *   - on products, option values, variants and colours, a new row with any
  *     money, stock or package value aborts, and so does a REPLACE that puts a
  *     priced row back; an upsert whose DO UPDATE would change one aborts; an
@@ -40,6 +44,7 @@ import {
   GUARDED_ROW_TABLES,
   IMPORT_GUARD_ID,
   IMPORT_GUARD_REFUSAL,
+  LATE_PROTECTED_TABLES,
   PROTECTED_TABLES,
   STOCK_DECISION_GUARD,
 } from '../worker/lib/catalogImport/protectedTables';
@@ -77,8 +82,11 @@ function dummyRow(db: DatabaseSync, table: string, overrides: Record<string, unk
   const names = Object.keys(row);
   db.exec('PRAGMA ignore_check_constraints = ON');
   try {
-    db.prepare(`INSERT INTO "${table}" (${names.map((n) => `"${n}"`).join(', ')}) VALUES (${names.map(() => '?').join(', ')})`)
-      .run(...(names.map((n) => row[n]) as never[]));
+    // A table whose every column has a default (0218's control row) is written with DEFAULT VALUES.
+    if (names.length === 0) db.exec(`INSERT INTO "${table}" DEFAULT VALUES`);
+    else
+      db.prepare(`INSERT INTO "${table}" (${names.map((n) => `"${n}"`).join(', ')}) VALUES (${names.map(() => '?').join(', ')})`)
+        .run(...(names.map((n) => row[n]) as never[]));
   } finally {
     db.exec('PRAGMA ignore_check_constraints = OFF');
   }
@@ -141,6 +149,78 @@ test('armed, every INSERT, UPDATE and DELETE on a protected table aborts; disarm
     disarm(db);
     // Outside an import batch the same writes go through.
     assert.equal(refusal(() => db.exec(`UPDATE "${table}" SET "${first}" = "${first}"`)), null, `${table}: update without the guard row`);
+    assert.equal(refusal(() => db.exec(`DELETE FROM "${table}"`)), null, `${table}: delete without the guard row`);
+  }
+});
+
+/**
+ * THE LATE TABLES (LATE_PROTECTED_TABLES): newer than 0195, so its generated
+ * block cannot carry them — the migration that creates each one writes its
+ * three triggers in the generator's own shape, as 0200 and 0211 re-emit the
+ * triggers of the tables they rebuild. Migration 0218's twelve smart-pricing
+ * tables are the first (docs/SMART_PRICING.md §2.2 T12; DECISIONS row 239).
+ */
+const GUARD_SHAPE = (table: string, verb: string, suffix: string) =>
+  `CREATE TRIGGER trg_import_guard_${table}_${suffix} BEFORE ${verb} ON ${table}\n` +
+  `WHEN EXISTS (SELECT 1 FROM ops_guards WHERE id = '${IMPORT_GUARD_ID}')\n` +
+  `BEGIN SELECT RAISE(ABORT, '${IMPORT_GUARD_REFUSAL}'); END`;
+const VERBS = [['ins', 'INSERT'], ['upd', 'UPDATE'], ['del', 'DELETE']] as const;
+
+test('the late tables each carry their three guard triggers, in the generated shape, from the migration that creates them', () => {
+  assert.ok(LATE_PROTECTED_TABLES.length >= 12, 'the 0218 tables are listed');
+  const db = raw();
+  const live = tables(db);
+  const early = new Set(PROTECTED_TABLES.map((t) => t.table));
+  const seen = new Set<string>();
+  const stored = new Map(
+    (db.prepare("SELECT name, sql FROM sqlite_master WHERE type = 'trigger' AND name GLOB 'trg_import_guard_*'").all() as Array<{ name: string; sql: string }>).map(
+      (r) => [r.name, r.sql]
+    )
+  );
+  for (const t of LATE_PROTECTED_TABLES) {
+    assert.ok(!seen.has(t.table), `${t.table} is listed twice`);
+    seen.add(t.table);
+    // Never in both lists: the generator would then try to guard it inside 0195, where it does not exist.
+    assert.ok(!early.has(t.table), `${t.table} is in PROTECTED_TABLES too`);
+    assert.ok(GUARDED_ROW_TABLES.every((g) => g.table !== t.table), `${t.table} is a guarded row table`);
+    // A missing table is a failure, never a skip: its migration has landed.
+    assert.ok(existsSync(join(ROOT, 'migrations', t.guardedBy)), `${t.guardedBy} is not in migrations/`);
+    assert.ok(live.has(t.table), `${t.table} is missing from the schema`);
+    const file = readFileSync(join(ROOT, 'migrations', t.guardedBy), 'utf8');
+    for (const [suffix, verb] of VERBS) {
+      const name = `trg_import_guard_${t.table}_${suffix}`;
+      assert.equal(stored.get(name), GUARD_SHAPE(t.table, verb, suffix), `${name}: not in the generated shape`);
+      assert.ok(file.includes(GUARD_SHAPE(t.table, verb, suffix).replace('CREATE TRIGGER ', 'CREATE TRIGGER IF NOT EXISTS ')), `${name} is not created by ${t.guardedBy}`);
+    }
+  }
+  // 0195's generated block never names a late table: it is left byte for byte as it was (first test above).
+  const committed = committedGuardBlock() as string;
+  for (const t of LATE_PROTECTED_TABLES) assert.ok(!new RegExp(`\\b${t.table}\\b`).test(committed), `0195's block names ${t.table}`);
+});
+
+test('armed, every write on a late table aborts; disarmed, these triggers stay silent', () => {
+  const db = raw();
+  // Isolate the guard, as for the 0195 tables: the late tables carry their own rules (the estimate label, the
+  // order gate, the route rules …) that would refuse the dummy rows below for their own reasons.
+  for (const { name } of db.prepare("SELECT name FROM sqlite_master WHERE type = 'trigger' AND name NOT LIKE 'trg_import_guard_%'").all() as Array<{ name: string }>) {
+    db.exec(`DROP TRIGGER "${name}"`);
+  }
+  for (const { table } of LATE_PROTECTED_TABLES) {
+    dummyRow(db, table);
+    const first = colsOf(db, table)[0].name;
+    arm(db);
+    assert.equal(refusal(() => db.exec(`INSERT INTO "${table}" DEFAULT VALUES`)), IMPORT_GUARD_REFUSAL, `${table}: insert`);
+    assert.equal(refusal(() => db.exec(`UPDATE "${table}" SET "${first}" = "${first}"`)), IMPORT_GUARD_REFUSAL, `${table}: update`);
+    assert.equal(refusal(() => db.exec(`DELETE FROM "${table}"`)), IMPORT_GUARD_REFUSAL, `${table}: delete`);
+    disarm(db);
+    // The dummy row was written with CHECKs off, and an UPDATE checks the whole row again: it is re-written the
+    // same way, because only the guard is under test here (0218's CHECKs: tests/migration0218PriceEstimates.test.ts).
+    db.exec('PRAGMA ignore_check_constraints = ON');
+    try {
+      assert.equal(refusal(() => db.exec(`UPDATE "${table}" SET "${first}" = "${first}"`)), null, `${table}: update without the guard row`);
+    } finally {
+      db.exec('PRAGMA ignore_check_constraints = OFF');
+    }
     assert.equal(refusal(() => db.exec(`DELETE FROM "${table}"`)), null, `${table}: delete without the guard row`);
   }
 });

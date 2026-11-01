@@ -1110,6 +1110,41 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'creative_events.evidence_json': 'the availability transition the sync saw: two states and two times',
   // -- Creative Studio planning (0216): campaign names and planned days, no file ----
   'creative_document_plans.document_id': 'a creative_documents id',
+  // -- Smart pricing (0218): the owner's supplier price catalogue, the estimator's stores and the
+  // estimated order lines — ids, codes, hashes and JSON, no media key. The two URL columns name the
+  // supplier's own page (Tmall or the Bambu store), never an R2 key, and are never turned into a link.
+  'supplier_price_snapshots.file_sha256': "the uploaded file's SHA-256 hex digest; no media",
+  'supplier_price_items.snapshot_id': 'a snapshot id (sps_…); no media',
+  'supplier_price_items.item_key': 'a Tmall item id or a store handle; no media',
+  'supplier_price_items.url': "the supplier's product page URL as captured (Tmall or the Bambu store), never an R2 key; no media",
+  'supplier_price_items.codes_json': 'Bambu colour and part codes (short strings); no media',
+  'supplier_price_items.props_json': "the store's own property list as captured (names and values); no media",
+  'supplier_price_skus.snapshot_id': 'a snapshot id (sps_…); no media',
+  'supplier_price_skus.item_key': 'a Tmall item id or a store handle; no media',
+  'supplier_price_skus.sku_key': 'a Tmall sku id or a store variant id; no media',
+  'supplier_price_skus.options_json': "the SKU's option labels as the source writes them; no media",
+  'supplier_price_skus.options_en_json': "the SKU's option labels in English; no media",
+  'supplier_price_skus.codes_json': 'Bambu colour and part codes of the SKU; no media',
+  'supplier_price_keys.snapshot_id': 'a snapshot id (sps_…); no media',
+  'supplier_price_keys.item_key': 'a Tmall item id or a store handle; no media',
+  'supplier_price_keys.sku_key': "a Tmall sku id or a store variant id ('' for the item); no media",
+  'supplier_price_matches.combo_key': "a canonical SKU combo key ('' for the product); no media",
+  'supplier_price_matches.item_key': 'a Tmall item id or a store handle; no media',
+  'supplier_price_matches.sku_key': 'a Tmall sku id or a store variant id; no media',
+  'supplier_price_matches.reasons_json': 'match reason codes; no media',
+  'supplier_price_matches.found_in_snapshot': 'a snapshot id (sps_…); no media',
+  'supplier_price_manual.combo_key': "a canonical SKU combo key ('' for the product); no media",
+  'supplier_price_manual.evidence_url': 'the EU or US store page the owner read (https), never an R2 key; no media',
+  'supplier_price_manual.evidence_host': "that page's host name; no media",
+  'price_estimate_types.key': 'a product type key (printer, filament …); no media',
+  'product_price_estimates.type_key': 'a product type key; no media',
+  'product_price_estimates.flags_json': 'estimate flag codes; no media',
+  'product_price_estimates.preview_hash': "the estimate preview's SHA-256 hex digest; no media",
+  'product_price_estimates.applied_wire_json': 'the pricing inputs and minimum profit the estimator wrote, with their sources; no media',
+  'price_estimate_lines.combo_key': "a canonical SKU combo key ('' for the product); no media",
+  'price_estimate_lines.flags_json': 'estimate flag codes; no media',
+  'price_estimate_firm_skus.combo_key': "a canonical SKU combo key ('' for the product); no media",
+  'order_price_estimates.combo_key': "a canonical SKU combo key ('' for the product); no media",
 };
 
 /**

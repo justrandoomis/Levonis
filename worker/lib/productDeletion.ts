@@ -211,6 +211,15 @@ export const OWNED_TABLES: OwnedTable[] = [
   // worthless without it (the FK cascades too; listed so the registry stays
   // the whole truth).
   { table: 'product_completeness', by: { column: 'product_id' } },
+  // 0218 (smart pricing, docs/SMART_PRICING.md §2.2): the product's supplier matches and typed supplier
+  // prices, its estimate bookkeeping and preview lines, and its firm SKUs — the owner's private pricing,
+  // worthless without the product (the FKs cascade too; listed so the registry stays the whole truth).
+  // No 0218 trigger refuses these deletes; the label itself goes with the product row.
+  { table: 'supplier_price_matches', by: { column: 'product_id' } },
+  { table: 'supplier_price_manual', by: { column: 'product_id' } },
+  { table: 'price_estimate_lines', by: { column: 'product_id' } },
+  { table: 'price_estimate_firm_skus', by: { column: 'product_id' } },
+  { table: 'product_price_estimates', by: { column: 'product_id' } },
   // 0192: the owner's private component reference for a Combo / device (trade-in B.4 rules 2–4) —
   // worthless without the product it values.
   { table: 'trade_in_component_refs', by: { column: 'product_id' } },
@@ -440,6 +449,13 @@ export const FROZEN_HISTORY: FrozenTable[] = [
     table: 'order_items',
     columns: ['option_id', 'color_id'],
     why: 'NOT NULL, and part of the frozen description of what was bought; option_snapshot carries the display data.',
+  },
+  {
+    table: 'order_price_estimates',
+    columns: ['product_id'],
+    why:
+      '0218. An order line sold at an estimated price and its settlement (estimate, final price, the customer decision); ' +
+      'it carries its own order line and figures, and trg_ope_frozen refuses any change to its product_id.',
   },
   {
     table: 'mystery_draw_audits',
@@ -1066,6 +1082,8 @@ const ENGINE_PRIVATE_TABLES: ReadonlySet<string> = new Set([
   'product_pricing_state', 'pricing_inputs', 'pricing_rules', 'pricing_sku_costs', 'pricing_direct_purchase',
   'pricing_price_points', 'pricing_preorder_discounts', 'pricing_v2_sku_results', 'pricing_legacy_snapshots',
   'pricing_v2_purchase_reviews', 'pricing_received_recovery',
+  // 0218: the owner's supplier matches, typed prices and estimate bookkeeping (supplier data, invariant I6).
+  'supplier_price_matches', 'supplier_price_manual', 'product_price_estimates', 'price_estimate_lines',
 ]);
 
 /**

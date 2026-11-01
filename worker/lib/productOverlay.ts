@@ -52,6 +52,7 @@ import {
   type OptionValueRow,
 } from './productRelations';
 import { withKnowledgeFallback } from './knowledge/schema';
+import { estimateAbsentLately, isMissingEstimateSchema, rememberEstimateAbsent } from './priceEstimateLabel';
 import {
   isInventoryMode,
   type CapacitySnapshot,
@@ -183,6 +184,15 @@ export interface ProductRelationsView {
    * on a database without 0189, and when the V2-aware read fell back to V1's.
    */
   sku_strict?: true;
+  /**
+   * Migration 0218 (docs/SMART_PRICING.md §5.2): the canonical keys of the SKUs
+   * of a labelled product the owner made firm (`price_estimate_firm_skus`), read
+   * in the SAME statement as the SKU rows — no statement and no wave of its own.
+   * Present only when there are some. Absent — none, a firm read that failed,
+   * or a database without 0218 — the label fails closed: every priced SKU of a
+   * labelled product is an estimate, and no other product is ever one.
+   */
+  sku_firm?: string[];
 }
 
 export const EMPTY_RELATIONS: ProductRelationsView = {
@@ -244,7 +254,12 @@ interface SkuPriceDbRow extends SkuPriceRow {
   product_id: string;
 }
 
-/** A row as the read returns it: a V2 product's marker row has no key (spec C-13). */
+/**
+ * A row as the read returns it. `v2` says what it is: 1 a live V2 price row, 0
+ * a V1 one; 2 a V2 product's marker row, which has no key (spec C-13); 3 a firm
+ * key of a labelled product (`FIRM_MARKER`, migration 0218), which has a key and
+ * no price.
+ */
 interface SkuPriceReadRow {
   product_id: string;
   combo_key: string | null;
@@ -261,7 +276,12 @@ interface SkuRead {
   rows: SkuPriceDbRow[];
   /** The V2 products among those read (their customer document is strict). */
   strict: Set<string>;
+  /** Migration 0218: each labelled product's firm SKU keys (canonical), when the firm arm was read. */
+  firm?: Map<string, string[]>;
 }
+
+/** The marker of a firm-key row in the SKU statement's `v2` column (docs/SMART_PRICING.md §5.2). */
+const FIRM_MARKER = 3;
 
 /**
  * THE SKU RUNG'S ROWS (0183, FX-7), read QUIETLY: a database without the table
@@ -281,18 +301,41 @@ interface SkuRead {
  * under the models' keys. A row left like that is inert — the ladder answers,
  * as it does for that older Worker — instead of overriding the manual prices
  * typed since, or the engine's newer figures, once this Worker is back.
+ *
+ * THE FIRM ARM (migration 0218; docs/SMART_PRICING.md §2.4, §5.2). The V2-aware
+ * statement carries one more arm — the labelled products' firm SKU keys — so
+ * the estimate label costs no statement and no wave. ONE fallback tier sits in
+ * front of the existing chain: with the arm, then without it (today's
+ * statement), then V2 → V1 as before. A database without 0218 refuses the arm
+ * ("no such table: price_estimate_firm_skus"): the binding remembers that for a
+ * minute (`rememberEstimateAbsent`, as listing.ts `absentLately` does) and reads
+ * today's statement straight away meanwhile. Any other failure of the arm is
+ * logged and the rows are read without it: the prices stand, and with no firm
+ * list every priced SKU of a labelled product is an estimate — fail closed,
+ * and never a label on an unlabelled product.
  */
 async function skuPriceRows(
-  v2: () => Promise<{ results: SkuPriceReadRow[] }>,
+  db: object,
+  v2: (firm: boolean) => Promise<{ results: SkuPriceReadRow[] }>,
   v1: () => Promise<{ results: SkuPriceReadRow[] }>
 ): Promise<SkuRead | 'absent' | 'failed'> {
   const parse = (rows: readonly SkuPriceReadRow[]): SkuRead => {
     const strict = new Set<string>();
+    const firm = new Map<string, string[]>();
     const out: SkuPriceDbRow[] = [];
     for (const r of rows) {
       // Pricing V2: one marker row per V2 product (no key), read in the same statement as its rows.
       if (r.combo_key === null || r.combo_key === undefined) {
         strict.add(String(r.product_id));
+        continue;
+      }
+      // Migration 0218: a firm key of a labelled product — a fact about the label, never a price row.
+      if (Number(r.v2) === FIRM_MARKER) {
+        const pid = String(r.product_id);
+        const key = skuKeyOfStored(String(r.combo_key));
+        const keys = firm.get(pid);
+        if (!keys) firm.set(pid, [key]);
+        else if (!keys.includes(key)) keys.push(key);
         continue;
       }
       const usdCents = usdCeilCentsOf(r.usd_ceil6);
@@ -312,33 +355,54 @@ async function skuPriceRows(
       };
       if (Number.isSafeInteger(row.regular_price_iqd) && row.regular_price_iqd > 0) out.push(row);
     }
-    return { rows: out, strict };
+    return { rows: out, strict, firm };
   };
   const fail = (e: unknown): 'absent' | 'failed' => {
     if (isMissingRelationTable(e)) return 'absent';
     console.error(`product relations unavailable (sku prices): ${e instanceof Error ? e.message : String(e)}`);
     return 'failed';
   };
-  try {
-    return parse((await v2()).results ?? []);
-  } catch (e) {
-    // A database without 0189 (a deploy ahead of its migration): V1's read, where every V2 row is inert and
-    // the ladder answers with the highest price (0183's rollback rule) — never 'absent' for this error.
-    if (!isMissingV2Schema(e)) return fail(e);
+  const legacy = async (): Promise<SkuRead | 'absent' | 'failed'> => {
     try {
       return parse((await v1()).results ?? []);
     } catch (e1) {
       return fail(e1);
     }
+  };
+  if (!estimateAbsentLately(db)) {
+    try {
+      return parse((await v2(true)).results ?? []);
+    } catch (e) {
+      // A database without 0189 has no V2 statement to read, with or without the arm: V1's, exactly as before.
+      if (isMissingV2Schema(e)) return legacy();
+      // A database without 0218 has no label to read: today's statement, and the binding remembers it a minute.
+      if (isMissingEstimateSchema(e)) rememberEstimateAbsent(db);
+      else console.error(`product relations unavailable (firm skus, read without them): ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  try {
+    return parse((await v2(false)).results ?? []);
+  } catch (e) {
+    // A database without 0189 (a deploy ahead of its migration): V1's read, where every V2 row is inert and
+    // the ladder answers with the highest price (0183's rollback rule) — never 'absent' for this error.
+    if (!isMissingV2Schema(e)) return fail(e);
+    return legacy();
   }
 }
 
-/** The view's SKU fields from one read: the rows, null when absent or failed, the failure flag, and V2's strict flag. */
-function skuFields(read: SkuRead | SkuPriceDbRow[] | 'absent' | 'failed', productId?: string): Pick<ProductRelationsView, 'sku_prices' | 'sku_prices_unread' | 'sku_strict'> {
+/**
+ * The view's SKU fields from one read: the rows, null when absent or failed, the failure flag, V2's strict
+ * flag, and the labelled product's firm SKU keys (0218) — only where there are some.
+ */
+function skuFields(
+  read: SkuRead | SkuPriceDbRow[] | 'absent' | 'failed',
+  productId?: string
+): Pick<ProductRelationsView, 'sku_prices' | 'sku_prices_unread' | 'sku_strict' | 'sku_firm'> {
   if (read === 'failed') return { sku_prices: null, sku_prices_unread: true };
   if (read === 'absent') return { sku_prices: null };
   const rows = Array.isArray(read) ? read : read.rows;
   const strict = !Array.isArray(read) && productId !== undefined && read.strict.has(productId);
+  const firm = !Array.isArray(read) && productId !== undefined ? read.firm?.get(productId) : undefined;
   return {
     sku_prices: rows.map(({ combo_key, channel, regular_price_iqd, v2, usd_iqd_rate, usd_cents }) => ({
       combo_key,
@@ -349,6 +413,7 @@ function skuFields(read: SkuRead | SkuPriceDbRow[] | 'absent' | 'failed', produc
       ...(v2 && typeof usd_cents === 'number' ? { usd_cents } : {}),
     })),
     ...(strict ? { sku_strict: true as const } : {}),
+    ...(firm && firm.length ? { sku_firm: [...firm] } : {}),
   };
 }
 
@@ -397,13 +462,29 @@ const SKU_ROW_USD_V2 = `(SELECT r.usd_ceil6 FROM pricing_v2_sku_results r
     AND r.combo_key = CASE product_sku_prices.combo_key WHEN '${PRODUCT_SKU_ROW_KEY}' THEN '' ELSE product_sku_prices.combo_key END
     AND r.channel = product_sku_prices.channel AND r.final_price_iqd = product_sku_prices.regular_price_iqd)`;
 
-/** The V2-aware read: the live rows (V1 or V2, each flagged, V2 with its rate and dollars) and one marker row per V2 product, in one statement. */
-const skuRowsV2Sql = (where: string) => `SELECT ${SKU_PRICE_COLUMNS}, (${SKU_ROW_LIVE_V2}) AS v2, ${SKU_ROW_RATE_V2} AS usd_iqd_rate, ${SKU_ROW_USD_V2} AS usd_ceil6 FROM product_sku_prices WHERE ${where}
+/**
+ * THE FIRM ARM (migration 0218; docs/SMART_PRICING.md §5.2): one row per SKU of a labelled product the owner
+ * confirmed — its key and `FIRM_MARKER`, no price — on the table's primary key. A public fact.
+ */
+const firmArmSql = (where: string) => `
+UNION ALL
+SELECT product_id, combo_key, NULL, NULL, ${FIRM_MARKER}, NULL, NULL FROM price_estimate_firm_skus
+  WHERE ${where}`;
+
+/**
+ * The V2-aware read: the live rows (V1 or V2, each flagged, V2 with its rate and dollars), one marker row per V2
+ * product and — `firm` — the labelled products' firm SKU keys, in one statement. `where` is bound once per arm
+ * (`skuRowsBinds`).
+ */
+const skuRowsV2Sql = (where: string, firm: boolean) => `SELECT ${SKU_PRICE_COLUMNS}, (${SKU_ROW_LIVE_V2}) AS v2, ${SKU_ROW_RATE_V2} AS usd_iqd_rate, ${SKU_ROW_USD_V2} AS usd_ceil6 FROM product_sku_prices WHERE ${where}
   AND (${SKU_ROW_LIVE} OR ${SKU_ROW_LIVE_V2})
 UNION ALL
 SELECT product_id, NULL, NULL, NULL, 2, NULL, NULL FROM product_pricing_state
-  WHERE ${where} AND mode = 'engine' AND pricing_method IS NOT NULL
+  WHERE ${where} AND mode = 'engine' AND pricing_method IS NOT NULL${firm ? firmArmSql(where) : ''}
 ORDER BY product_id, combo_key, channel`;
+
+/** The binds of `skuRowsV2Sql`: its one `where` parameter, once per arm. */
+const skuRowsBinds = (firm: boolean, value: unknown): unknown[] => (firm ? [value, value, value] : [value, value]);
 
 /** A V2 table or column is not on this database (0189 not applied). */
 export function isMissingV2Schema(e: unknown): boolean {
@@ -460,7 +541,8 @@ export async function loadRelationsView(
       )
     ),
     skuPriceRows(
-      () => db.prepare(skuRowsV2Sql('product_id = ?')).bind(productId, productId).all<SkuPriceReadRow>(),
+      db,
+      (firm) => db.prepare(skuRowsV2Sql('product_id = ?', firm)).bind(...skuRowsBinds(firm, productId)).all<SkuPriceReadRow>(),
       () => db.prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id = ? AND ${SKU_ROW_LIVE} ORDER BY combo_key, channel`).bind(productId).all<SkuPriceReadRow>()
     ),
   ]);
@@ -576,7 +658,12 @@ export async function loadRelationsViewsForIds(
         .all<OptionTransportRow>()
     ),
     skuPriceRows(
-      () => db.prepare(skuRowsV2Sql('product_id IN (SELECT value FROM json_each(?))')).bind(JSON.stringify(ids), JSON.stringify(ids)).all<SkuPriceReadRow>(),
+      db,
+      (firm) =>
+        db
+          .prepare(skuRowsV2Sql('product_id IN (SELECT value FROM json_each(?))', firm))
+          .bind(...skuRowsBinds(firm, JSON.stringify(ids)))
+          .all<SkuPriceReadRow>(),
       () =>
         db
           .prepare(`SELECT ${SKU_PRICE_COLUMNS} FROM product_sku_prices WHERE product_id IN (SELECT value FROM json_each(?)) AND ${SKU_ROW_LIVE} ORDER BY product_id, combo_key, channel`)
@@ -627,7 +714,9 @@ export async function loadRelationsViewsForIds(
       fulfillments: fl.get(row.id) ?? [],
       transports: ot.get(row.id) ?? [],
       ...skuFields(
-        sp === null || typeof skuPrices !== 'object' ? (skuPrices as 'absent' | 'failed') : { rows: sp.get(row.id) ?? [], strict: skuPrices.strict },
+        sp === null || typeof skuPrices !== 'object'
+          ? (skuPrices as 'absent' | 'failed')
+          : { rows: sp.get(row.id) ?? [], strict: skuPrices.strict, firm: skuPrices.firm },
         row.id
       ),
     });
@@ -919,11 +1008,18 @@ export function applyRelations(
  * The product's own row (`''`, stored `o:*`) is dropped on a product that has an
  * active option (risk R-13): a malformed one must never price a line whose model
  * was not chosen. V1 never writes that key, so every V1 document is unchanged.
+ * A labelled product's firm SKU keys ride along (migration 0218), only when there
+ * are some: the estimate label of a SKU is `skuEstimated` (commercialState.ts).
  */
 function withSkuRung(doc: ProductDoc, view: ProductRelationsView, options: readonly OptionV2[]): ProductDoc {
   const hasOption = options.some((o) => o.active !== false && !o.merged_into);
   const rows = (view.sku_prices ?? []).filter((r) => r.combo_key !== '' || !hasOption);
-  return { ...doc, ...(rows.length ? { sku_prices: rows } : {}), ...(view.sku_strict === true ? { sku_strict: true as const } : {}) };
+  return {
+    ...doc,
+    ...(rows.length ? { sku_prices: rows } : {}),
+    ...(view.sku_strict === true ? { sku_strict: true as const } : {}),
+    ...(view.sku_firm?.length ? { sku_firm: [...view.sku_firm] } : {}),
+  };
 }
 
 /** The snapshot the inventory engine needs, from an already-loaded view. */

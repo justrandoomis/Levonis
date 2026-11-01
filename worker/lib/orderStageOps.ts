@@ -60,6 +60,7 @@ import { reclaimOrderRedemptionsStatement } from './offers';
 import { notifyOrderStatus } from './orderNotify';
 import { runOrderDeliveredEffects } from './orderDeliveredEffects';
 import { isPriceHeld, isPriceHoldAbort } from './priceHold';
+import { hasOpenEstimates, isEstimateGateAbort, isEstimateReopenAbort } from './priceEstimateGate';
 import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
@@ -124,7 +125,24 @@ export interface MoveResult {
     | 'SERIALS_REQUIRED'
     | 'ORDER_REOPEN_COUPON_SPENT'
     | 'TRADE_IN_ORDER_DELIVERED'
-    | 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED';
+    | 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED'
+    /** An estimated line waits for its final price: the order stays at «تم الاستلام» (0218, T8). */
+    | 'PRICE_ESTIMATE_UNCONFIRMED'
+    /** A cancelled order that held estimated lines is never re-opened (0218, T9). */
+    | 'PRICE_ESTIMATE_REOPEN_REFUSED';
+}
+
+/**
+ * Would this move be one the estimate gate (0218, T8) refuses while a line is
+ * unsettled? The trigger's own condition, on the values this move writes: a
+ * status other than pending / cancelled, or a stage other than received /
+ * cancelled. A cancellation always passes — the customer may always leave.
+ */
+export function estimateGateGuards(move: { legacyFrom: string; legacyTo: string; storedStage: string; to: string }): boolean {
+  return (
+    (move.legacyTo !== move.legacyFrom && move.legacyTo !== 'pending' && move.legacyTo !== 'cancelled') ||
+    (move.to !== move.storedStage && move.to !== 'received' && move.to !== 'cancelled')
+  );
 }
 
 export interface MoveOptions {
@@ -334,6 +352,23 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   if (isPriceHeld(row)) {
     return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'PRICE_APPROVAL_PENDING' };
   }
+  // «بانتظار تأكيد السعر النهائي» (0218): while an estimated line is open,
+  // proposed or rejected the order stays at «تم الاستلام» — not even forced,
+  // not by the sweep, not by the courier sync. One indexed read, asked only of
+  // a move the gate would refuse. "No such table" is a database without 0218
+  // (no line, no trigger); any other failure lets the move run and the
+  // trigger `trg_orders_price_estimate_gate` decide inside the flip.
+  if (estimateGateGuards({ legacyFrom, legacyTo, storedStage, to: opts.to })) {
+    let held = false;
+    try {
+      held = await hasOpenEstimates(env.DB, order.id);
+    } catch (e) {
+      console.error('estimate gate pre-check unreadable — the trigger decides', order.id, e instanceof Error ? e.message : String(e));
+    }
+    if (held) {
+      return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'PRICE_ESTIMATE_UNCONFIRMED' };
+    }
+  }
   /*
    * A COMMUNITY-STORE ORDER NEVER ENTERS OR LEAVES `cancelled` HERE — not even
    * forced. A store order's cancellation must refund the buyer, restock the store and
@@ -484,6 +519,22 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
       return {
         moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
         next_stage: null, next_stage_at: null, notes: [], reason: 'PRICE_APPROVAL_PENDING',
+      };
+    }
+    // The estimate gate (0218, T8) refused inside the flip — a line became
+    // unsettled after the pre-check, or the pre-check could not be read.
+    if (isEstimateGateAbort(e)) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'PRICE_ESTIMATE_UNCONFIRMED',
+      };
+    }
+    // A cancelled order that held estimated lines stays cancelled (0218, T9):
+    // the customer places a new order — the same shape as the gift rule below.
+    if (isEstimateReopenAbort(e)) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'PRICE_ESTIMATE_REOPEN_REFUSED',
       };
     }
     // A cancelled order that held a gift line stays cancelled (0175,

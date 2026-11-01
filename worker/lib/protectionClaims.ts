@@ -26,9 +26,25 @@
  * The customer reads their own claim — amounts, state, the decision reason —
  * and never the staff's comparison inputs (PP-B7). The decision is told to the
  * customer in the same batch as the decision itself (PP-B6).
+ *
+ * A LINE SOLD AT AN ESTIMATED PRICE (migration 0218; docs/SMART_PRICING.md
+ * §6.9; owner default 282(h)): price protection starts at SETTLEMENT. A claim
+ * on a line whose estimate record is not confirmed or approved is refused
+ * (PRICE_PROTECTION_ESTIMATE_PENDING); after settlement the line's paid unit
+ * is what it was charged plus its own final − estimate — the same shift the
+ * order total took (`settledEstimatePaidUnit`).
  */
 import { SKU_STRICT_ERROR, type Tier } from '../../packages/pricing/src/pricing';
+import { paidNetPerUnit } from '../../packages/pricing/src/paidNet';
 import { notifyStatement } from './notifications';
+import {
+  estimateFactsOf,
+  isSettledEstimate,
+  ownEstimateShifts,
+  paidNetFacts,
+  type EstimateLineFact,
+} from './paidNet';
+import type { GoodsLine } from './orderProfit';
 import { safeParse } from './types';
 import {
   PRICE_PROTECTION_NOTICES,
@@ -126,6 +142,67 @@ export function historyKeysOf(a: { todaySource: string; purchaseSource?: unknown
   if (a.todaySource === 'option') return a.optionId ? [`option:${a.optionId}`] : [];
   if (a.todaySource === 'color') return a.colorId ? [`color:${a.colorId}`] : [];
   return [];
+}
+
+// ------------------------------------------------------------- estimated lines (0218)
+
+/** One line's estimate record (migration 0218), as the claim reads it: customer prices only. */
+export type { EstimateLineFact };
+
+/** The two states that settle an estimate line: confirmed by the shop, or approved by the customer. */
+const SETTLED_ESTIMATE = new Set(['confirmed', 'approved']);
+
+/**
+ * Price protection starts at settlement: a line WITH an estimate record that
+ * is not confirmed or approved (open, proposed, rejected, void) is refused.
+ * A line without a record is not an estimate and is never refused here.
+ */
+export function estimateBlocksProtection(fact: EstimateLineFact | null | undefined): boolean {
+  return !!fact && !SETTLED_ESTIMATE.has(fact.state);
+}
+
+/**
+ * Every estimate record of one order, or 'unreadable'. A database without 0218
+ * has none (an empty list); any other failure is 'unreadable' — a claim is
+ * never decided on a guess about whether its price was an estimate.
+ */
+export async function orderEstimateFacts(db: Pick<D1Database, 'prepare'>, orderId: string): Promise<EstimateLineFact[] | 'unreadable'> {
+  const facts = await estimateFactsOf(db, [orderId]);
+  return facts === 'unreadable' ? facts : (facts.get(orderId) ?? []);
+}
+
+/**
+ * THE SETTLED BASELINE (§6.9): one unit's paid net on an order holding
+ * settled estimate lines — the shared paid-net rule with the estimate
+ * settlement placed on its own lines (worker/lib/paidNet.ts
+ * `estimateLineAdjustments`, which return refunds and trade-in read too).
+ */
+export function settledEstimatePaidUnit(
+  order: Record<string, unknown>,
+  items: GoodsLine[],
+  tradeInCredit: boolean,
+  estimates: readonly EstimateLineFact[],
+  itemId: string
+): { unit: number; orderTotal: number } | null {
+  const facts = paidNetFacts(order, items, tradeInCredit, estimates);
+  if (!facts) return null;
+  const unit = paidNetPerUnit(facts.order, facts.lines, itemId);
+  return unit === null ? null : { unit, orderTotal: facts.order.total_iqd };
+}
+
+/** Does any record of this order carry a settled final price? */
+export const hasSettledEstimate = (estimates: readonly EstimateLineFact[]): boolean => estimates.some(isSettledEstimate);
+
+/**
+ * One unit's final − estimate of a settled estimate line whose shift counts
+ * (`ownEstimateShifts`), 0 for any other line: what the line's per-unit price
+ * moved at settlement. The claim moves the frozen engine regular (0181's
+ * snapshot, written at checkout at the estimate) by it, so the USD-base rule
+ * of a V2 line compares the price the customer finally paid.
+ */
+export function settledEstimateShift(estimates: readonly EstimateLineFact[], itemId: string): number {
+  const e = estimates.find((x) => x.order_item_id === itemId);
+  return e && ownEstimateShifts(estimates).has(itemId) ? Number(e.final_unit_iqd) - Math.trunc(Number(e.estimate_unit_iqd) || 0) : 0;
 }
 
 // ------------------------------------------------------------- projections

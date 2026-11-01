@@ -27,6 +27,7 @@ import ReviewSheet from '../components/orders/ReviewSheet';
 import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
 import StoreReceipt from '../components/orders/StoreReceipt';
 import PriceApprovalCard from '../components/orders/PriceApprovalCard';
+import ChunkBoundary from '../components/ChunkBoundary';
 import { apiRefusal } from '../lib/refusalStrings';
 import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, orderStatusLabel, statusStyle } from '../components/orders/format';
 import { pairedUsd, useMoney } from '../CurrencyContext';
@@ -38,6 +39,14 @@ import { OfferSaving } from '../components/ui/OfferBadge';
 const MaintenanceShelf = React.lazy(() => import('../components/product/MaintenanceShelf'));
 /** Its own chunk: only a store order asks for its purchased files. */
 const OrderFiles = React.lazy(() => import('../components/orders/OrderFiles'));
+/**
+ * «بانتظار تأكيد السعر النهائي» (docs/SMART_PRICING.md §5.3, §6.4; WP11): the
+ * banner of an order bought at an estimated price and each estimated line's
+ * state — one lazy chunk with the contract's words, fetched only for an order
+ * whose lines carry `price_estimate`.
+ */
+const EstimateStatusCard = React.lazy(() => import('../components/orders/EstimateStatusCard'));
+const EstimateLineChip = React.lazy(() => import('../components/orders/EstimateStatusCard').then((m) => ({ default: m.EstimateLineChip })));
 
 /**
  * ONE order, everything the customer can know or do about it.
@@ -466,6 +475,8 @@ export default function OrderDetail() {
   const orderTotalUsd = order
     ? usdTotal(order.total_iqd, order.items.flatMap((it) => orderItemUsdBase(it)?.line ?? []))
     : null;
+  /** Some line was sold at an estimated price (0218; `items[].price_estimate`): only then is the estimate chunk fetched. */
+  const estimated = !!order && order.items.some((it) => !!it.price_estimate);
 
   return (
     <div className="w-full pb-24 text-text-secondary min-h-screen">
@@ -512,6 +523,17 @@ export default function OrderDetail() {
                 await load({ quiet: true });
               }}
             />
+            {/* «سعر تقديري» (0218, §6.4): while a line's final price is open, proposed or rejected the order waits
+                at «تم الاستلام» — the banner says so, says it can still be cancelled, and offers «تواصل معنا» with
+                this order. It draws nothing once every line is settled, and never repeats the approval card's
+                question: while that card asks, only the cancel line and «تواصل معنا» stay. */}
+            {estimated && (
+              <ChunkBoundary compact>
+                <React.Suspense fallback={null}>
+                  <EstimateStatusCard order={order} />
+                </React.Suspense>
+              </ChunkBoundary>
+            )}
             {/* The store this order came from (A6), before the summary: on a
                 store order it is the first thing a customer wants to know. */}
             {order.store && <OrderStoreStrip store={order.store} label={s.fromStore(order.store.name)} cta={s.openStore} />}
@@ -761,6 +783,15 @@ export default function OrderDetail() {
                                   percentUsd={it.pricing.offer_saving_percent_usd}
                                 />
                               ) : null}
+                              {/* «سعر تقديري» (0218): this line was sold at an estimated price — where its final
+                                  price stands, in the contract's words. A void line (a cancelled order's) says nothing. */}
+                              {it.price_estimate && (
+                                <ChunkBoundary compact renderFallback={() => null}>
+                                  <React.Suspense fallback={null}>
+                                    <EstimateLineChip state={it.price_estimate.state} />
+                                  </React.Suspense>
+                                </ChunkBoundary>
+                              )}
                               {/* A GIFT LINE (0175): given, not bought — «هدية — 0 د.ع» with its value. */}
                               {it.is_gift && (
                                 <p className="mt-1 flex flex-wrap items-center gap-1.5" data-order-gift-line={it.id}>

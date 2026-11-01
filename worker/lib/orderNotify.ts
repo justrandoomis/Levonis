@@ -45,6 +45,7 @@ import {
 import { notify } from './notifications';
 import { processOutbox } from './outbox';
 import type { EmailLang } from './emailTemplates';
+import { ESTIMATE_STRINGS } from '@levonis/contracts/priceEstimates';
 
 /** The transitions worth telling a customer about. `processing` is not one. */
 export const NOTIFIED_ORDER_STATUSES = ['confirmed', 'shipped', 'delivered', 'cancelled'] as const;
@@ -223,17 +224,41 @@ async function loadOrderRow(env: Env, orderId: string): Promise<OrderRow | null>
 }
 
 /**
+ * Does this order hold lines sold at an estimated price (migration 0218)? One
+ * indexed read. A database without 0218 has none; any other failure reads as
+ * "no" — the receipt still goes out, and the order page carries the label.
+ */
+async function hasEstimateLines(env: Env, orderId: string): Promise<boolean> {
+  try {
+    const row = await env.DB.prepare('SELECT 1 AS x FROM order_price_estimates WHERE order_id = ? LIMIT 1').bind(orderId).first<{ x: number }>();
+    return !!row;
+  } catch (e) {
+    if (!/no such table/i.test(e instanceof Error ? e.message : String(e))) {
+      console.error('notifyOrderPlaced: estimate lines unreadable for', orderId, e instanceof Error ? e.message : String(e));
+    }
+    return false;
+  }
+}
+
+/**
  * "We have your order." Queued once per order — the event key is the order
  * id, so a replayed checkout (the idempotency-key path) re-notifies nobody.
+ *
+ * AN ORDER AT AN ESTIMATED PRICE (0218; docs/SMART_PRICING.md §5.3) adds one
+ * sentence on every channel: the final price is confirmed before anything is
+ * ordered from the supplier, and a change is sent for approval. A server text,
+ * so it reaches a customer on an old tab too.
  */
 export async function notifyOrderPlaced(env: Env, orderId: string): Promise<void> {
   try {
     const row = await loadOrderRow(env, orderId);
     if (!row) return;
-    const t = COPY[notificationLang(row)];
+    const lang = notificationLang(row);
+    const t = COPY[lang];
+    const placed = t.placedBody(row.id);
     const msg: CustomerMessage = {
       subject: t.placedSubject(row.id),
-      body: t.placedBody(row.id),
+      body: (await hasEstimateLines(env, row.id)) ? `${placed}\n${ESTIMATE_STRINGS.orderPlaced[lang]}` : placed,
       details: [
         // No «رقم الطلب» line: the number is in the sentence above, and on a
         // lock screen the money is the only thing worth a second line.

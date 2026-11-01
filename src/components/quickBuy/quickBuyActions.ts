@@ -42,7 +42,7 @@ import {
 } from '../../lib/quickBuy';
 import { formatQuickBuyClock } from '../../lib/quickBuyStore';
 import { toast } from '../../lib/toastStore';
-import { quickBuyRefusal, quickBuyStrings } from './strings';
+import { quickBuyRefusal, quickBuyStrings, type QuickBuyRefusalMessage } from './strings';
 
 /** What the account needs before an add can go through. */
 export type QuickBuyReadiness = 'ready' | 'activate' | 'reconsent' | 'address' | 'unknown';
@@ -182,7 +182,16 @@ export async function quickBuyAdd(input: QuickBuyAddInput, ctx: QuickBuyAddConte
     if (code === 'QUICK_BUY_ADDRESS_INVALID') return { kind: 'address' };
     const policy = printerPolicyOf(err);
     if (policy) return { kind: 'printer', policy };
-    const said = quickBuyRefusal(err, ctx.lang, ctx.money);
+    /*
+     * «سعر تقديري» (docs/SMART_PRICING.md §5.5): Quick Buy is hidden for an estimated selection, so only a stale
+     * page reaches PRICE_ESTIMATE_QUICK_BUY (or the brake, or an unreadable state) — said in the estimate
+     * contract's words, loaded only for such a refusal, before the feature's own table.
+     */
+    const estimateWords = /^PRICE_(?:ESTIMATE|PROTECTION_ESTIMATE)/.test(code)
+      ? await import('../../../packages/contracts/src/priceEstimates').catch(() => null)
+      : null;
+    const estimateTitle: string | null = estimateWords?.estimateRefusalText(code, ctx.lang === 'en' || ctx.lang === 'ckb' ? ctx.lang : 'ar') ?? null;
+    const said: QuickBuyRefusalMessage = estimateTitle ? { code, title: estimateTitle } : quickBuyRefusal(err, ctx.lang, ctx.money);
     const action =
       code === 'QUICK_BUY_INSUFFICIENT_BALANCE'
         ? { label: t.topUp, onClick: () => ctx.navigate('/wallet') }

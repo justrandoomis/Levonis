@@ -15,9 +15,18 @@
  * Loading is split from checking: `loadGiftProduct` reads a product once and
  * `checkGiftSelection` is pure, so a list of level items costs one read per
  * product, not per item.
+ *
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §8; owner question
+ * 282(h), default: excluded). A product whose price is an estimate the owner
+ * has not confirmed is never a gift — not granted, not a level item, not
+ * offered as a choice, not redeemed (GIFT_PRICE_ESTIMATE): gifts may be
+ * pre-orders, and a gift of an estimate would carry a value nobody confirmed.
+ * The label rides on the `products` row read here (`SELECT *`), so asking costs
+ * nothing; a database without 0218 has no label and nothing changes.
  */
 import { getSettings } from '../settings';
 import { listing } from '../listing';
+import { isEstimateRow } from '../priceEstimateLabel';
 import { applyRelations, capacityFrom, loadRelationsViews, snapshotFrom, type ProductRelationsView } from '../productOverlay';
 import { parseProductRow, type ProductDoc } from '../productModel';
 import { canonicalOptionValueIds, optionValueIdsInRelationOrder } from '../cartSelectionIdentity';
@@ -51,6 +60,8 @@ export type GiftSelectionCode =
   | 'GIFT_TRANSPORT_REQUIRED'
   | 'GIFT_SELECTION_INVALID'
   | 'GIFT_QTY_INVALID'
+  /** The product's price is an estimate (migration 0218): never a gift until the owner confirms it. */
+  | 'GIFT_PRICE_ESTIMATE'
   | 'OUT_OF_STOCK';
 
 /** The canonical, frozen selection a gift row stores (`gift_*` columns). */
@@ -191,6 +202,8 @@ function productGate(p: GiftProductContext): Failure | null {
   // incomplete) is never a NEW gift — not granted, not a level item, not offered as a choice — until it is
   // listed again. A gift already granted keeps its frozen line (the cart and the checkout never ask this).
   if (p.listed === false) return fail('GIFT_PRODUCT_INACTIVE', ['PRODUCT_NOT_LISTED']);
+  // «سعر تقديري» (see the header): every gift door asks this one gate, so none of them can hand out an estimate.
+  if (isEstimateRow(p.row)) return fail('GIFT_PRICE_ESTIMATE', ['PRICE_ESTIMATE']);
   return null;
 }
 
@@ -558,8 +571,9 @@ export function giftOptionsProjection(p: GiftProductContext) {
       // The clean start: never an old dinar figure — the V2 writer's price only while the product is listed.
       price_iqd: p.listed === false ? null : Number(row.price_iqd) || 0,
     },
-    // A new gift choice offers only a product a customer may see and buy (listed, spec addendum A.5).
-    giftable: text(row.status) === 'active' && text(row.composition) === '' && p.listed !== false,
+    // A new gift choice offers only a product a customer may see and buy (listed, spec addendum A.5), and never
+    // one whose price is an estimate (migration 0218 — `productGate`).
+    giftable: text(row.status) === 'active' && text(row.composition) === '' && p.listed !== false && !isEstimateRow(row),
     sale_types: availability.modes.map((m) => m.type),
     groups: groups.length ? groups : legacyOptions.length ? [{ id: '', name_en: '', values: legacyOptions }] : [],
     colors: colors.length ? colors : legacyColors,

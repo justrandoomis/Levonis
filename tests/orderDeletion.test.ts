@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { ROOT, SqliteD1 } from './fixtures/d1';
 import { failingD1 } from './fixtures/app';
 import { planOrderFinanceSnapshot } from '../worker/lib/orderFinance';
+import { estimateCheckoutGuardId } from '../worker/lib/priceEstimateGate';
 import {
   deleteCancelledOrder,
   CANCELLED_ORDER_RETENTION_DAYS,
@@ -200,4 +201,64 @@ test('an unfinished refund retains the order; a settled wallet refund remains in
   db.exec("INSERT INTO wallet_transactions(id,user_id,type,currency,amount,status,ref,created_by) VALUES ('wtx_refund_wallet_usd','u1','deposit','USD',100,'approved','wallet','system')");
   assert.equal((await deleteCancelledOrder(adapter(db), 'wallet')).deleted, true);
   assert.equal(db.prepare("SELECT amount FROM wallet_transactions WHERE id='wtx_refund_wallet_usd'").get()!.amount, 100);
+});
+
+/** A cancelled order placed through the estimate checkout (0218): one line on a labelled product, its estimate row void. */
+function addCancelledEstimateOrder(db: DatabaseSync, id: string): void {
+  db.exec(`INSERT INTO products (id, slug, name) VALUES ('p-est', 'p-est', 'Estimated product');
+    INSERT INTO ops_guards (id, ok) VALUES ('engine-price:p-est', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = 'p-est';
+    DELETE FROM ops_guards WHERE id = 'engine-price:p-est';`);
+  db.prepare(
+    `INSERT INTO orders
+      (id, user_id, status, address_snapshot, delivery_method_id, delivery_method_snapshot,
+       payment_method_id, subtotal_iqd, exchange_rate, total_iqd, due_on_delivery_iqd, created_at, updated_at)
+     VALUES (?, 'u1', 'pending', '{}', 'delivery', '{}', 'cod', 1000, 1500, 1000, 1000, '2026-01-01T00:00:00.000Z', '2026-01-01T00:00:00.000Z')`
+  ).run(id);
+  const token = estimateCheckoutGuardId(id);
+  db.exec(`INSERT INTO ops_guards (id, ok) VALUES ('${token}', 1);
+    INSERT INTO order_items (id, order_id, product_id, name_snapshot, qty, unit_price_iqd, line_total_iqd)
+      VALUES ('${id}-item', '${id}', 'p-est', 'Estimated product', 1, 1000, 1000);
+    INSERT INTO order_price_estimates (order_item_id, order_id, product_id, combo_key, channel, qty, estimate_unit_iqd, notice_version, created_at)
+      VALUES ('${id}-item', '${id}', 'p-est', '', 'pre_order_sea', 1, 1000, 1, '2026-01-01T00:00:00.000Z');
+    DELETE FROM ops_guards WHERE id = '${token}';
+    UPDATE orders SET status = 'cancelled', stage = 'cancelled' WHERE id = '${id}';
+    UPDATE orders SET cancelled_at = '2026-01-01T00:00:00.000Z' WHERE id = '${id}';`);
+  assert.equal(db.prepare('SELECT state FROM order_price_estimates WHERE order_id = ?').get(id)!.state, 'void');
+}
+
+// 0218 T9 must not read the deletion fence's NULL as a reopening, or a lost race
+// surfaces as a raw PRICE_ESTIMATE_REOPEN_REFUSED (HTTP 500, a sweep error).
+test('a lost race on a cancelled estimate order is ORDER_CHANGED, and the order and its estimate row stay', async () => {
+  const races: Record<string, (db: DatabaseSync) => void> = {
+    'cancellation clock moved': (db) => db.exec("UPDATE orders SET cancelled_at = '2026-01-02T00:00:00.000Z' WHERE id = 'estimate'"),
+    'receipt recorded': (db) => db.exec("INSERT INTO finance_collections(id,order_id,payer,amount_iqd,collection_day,actor_id,created_at) VALUES ('receipt','estimate','customer',1000,'2026-01-01','u1','2026-01-01')"),
+    'posting error recorded': (db) => db.exec("INSERT INTO finance_posting_errors(event_key,order_id,message,last_attempt_at) VALUES ('cogs:estimate','estimate','Unfinished financial posting','2026-01-01')"),
+  };
+  for (const [name, race] of Object.entries(races)) {
+    const db = database(); addCancelledEstimateOrder(db, 'estimate');
+    const wrapped = failingD1(db);
+    wrapped.failing.beforeBatch = () => race(db);
+    await assert.rejects(() => deleteCancelledOrder(wrapped.db, 'estimate', { cutoff: '2026-03-01T00:00:00.000Z' }),
+      (error: unknown) => error instanceof OrderDeletionRefusal && error.code === 'ORDER_CHANGED', name);
+    for (const table of ['orders', 'order_items', 'order_price_estimates'])
+      assert.equal(db.prepare(`SELECT COUNT(*) n FROM ${table}`).get()!.n, 1, `${name}: ${table}`);
+    assert.equal(db.prepare('SELECT COUNT(*) n FROM ops_guards').get()!.n, 0, name);
+  }
+});
+
+test('the sweep skips a cancelled estimate order that lost its race; uncontended, it is deleted with its estimate row', async () => {
+  const db = database(); addCancelledEstimateOrder(db, 'estimate');
+  const wrapped = failingD1(db);
+  wrapped.failing.beforeBatch = () => {
+    wrapped.failing.beforeBatch = null;
+    db.exec("INSERT INTO finance_posting_errors(event_key,order_id,message,last_attempt_at) VALUES ('cogs:estimate','estimate','Unfinished financial posting','2026-01-01')");
+  };
+  const report = await sweepCancelledOrders(wrapped.db, '2026-03-01T00:00:00.000Z');
+  assert.deepEqual({ scanned: report.scanned, deleted: report.deleted, skipped: report.skipped, errors: report.errors },
+    { scanned: 1, deleted: 0, skipped: 1, errors: 0 });
+  db.exec('DELETE FROM finance_posting_errors');
+  assert.equal((await deleteCancelledOrder(adapter(db), 'estimate')).deleted, true);
+  for (const table of ['orders', 'order_items', 'order_price_estimates'])
+    assert.equal(db.prepare(`SELECT COUNT(*) n FROM ${table}`).get()!.n, 0, table);
 });

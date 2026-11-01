@@ -177,6 +177,12 @@ export interface PublicPrice {
   regular: number | null;
   from: boolean;
   member_price: { tier: 'PRO'; amount: number } | null;
+  /**
+   * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.3): the amounts are an estimated pre-order price —
+   * the card's own label (`price_estimate`). Always present: false on every other price, and on an unpriced or
+   * members-only one. A boolean: never a source, a supplier price or a flag.
+   */
+  estimate: boolean;
 }
 
 export const PRICE_SCHEMA = object(
@@ -202,14 +208,17 @@ export const PRICE_SCHEMA = object(
         'The price a PRO member would pay, when the site advertises one.'
       )
     ),
+    estimate: boolean(
+      'True when the amounts are an estimated pre-order price: the final price may differ once the order is confirmed with the supplier (the site labels it «سعر تقديري» and asks the buyer to approve any change before charging it). False for every other price, and when `status` is not `priced`.'
+    ),
   },
   'A price as the site shows it to a signed-out visitor. Delivery is not included.'
 );
 
 export function priceFromCard(card: Record<string, unknown>, locked = false): PublicPrice {
-  if (locked) return { currency: 'IQD', status: 'members_only', amount: null, regular: null, from: false, member_price: null };
+  if (locked) return { currency: 'IQD', status: 'members_only', amount: null, regular: null, from: false, member_price: null, estimate: false };
   // A catalog-only card carries no number at all (DECISIONS row 240): never 0, never the row's archive.
-  if (card.price_status === 'unpriced') return { currency: 'IQD', status: 'unpriced', amount: null, regular: null, from: false, member_price: null };
+  if (card.price_status === 'unpriced') return { currency: 'IQD', status: 'unpriced', amount: null, regular: null, from: false, member_price: null, estimate: false };
   const amount = int(card.display_price_iqd) ?? int(card.price_iqd);
   const regular = int(card.display_regular_iqd) ?? amount;
   const pro = int(card.display_pro_iqd);
@@ -220,6 +229,8 @@ export function priceFromCard(card: Record<string, unknown>, locked = false): Pu
     regular,
     from: card.display_from === true,
     member_price: pro !== null && amount !== null && pro < amount ? { tier: 'PRO', amount: pro } : null,
+    // The storefront card's own label (worker/routes/products.ts `productEstimated`).
+    estimate: card.price_estimate === true,
   };
 }
 

@@ -22,6 +22,16 @@ import InlineCopy from './InlineCopy';
 import { asLang, countItems, formatDate, formatDateTime, itemCountLabel, orderStatusLabel } from './format';
 import { StatusChip, type Tone } from '../ui/Badge';
 import { useMoney } from '../../CurrencyContext';
+import ChunkBoundary from '../ChunkBoundary';
+
+/**
+ * «بانتظار تأكيد السعر النهائي» (docs/SMART_PRICING.md §5.3; WP11): the small
+ * chip of an order bought at an estimated price, from the lazy order-estimate
+ * chunk that carries the contract's words. Mounted only on an order whose
+ * lines carry `price_estimate`, so a list without one never downloads it; the
+ * chip itself draws nothing once every line is settled.
+ */
+const EstimateOrderChip = React.lazy(() => import('./EstimateStatusCard').then((m) => ({ default: m.EstimateOrderChip })));
 
 const STRINGS = {
   ar: {
@@ -187,6 +197,8 @@ export default function OrderCard({
       reviewableLines.some((it) => !reviewedProductIds.has(it.product_id!)));
   const allReviewed =
     order.status === 'delivered' && reviewedProductIds !== null && reviewableLines.length > 0 && !canReview;
+  /** Each estimated line's settlement (0218): the server's states, never a figure. */
+  const estimateStates = order.items.flatMap((it) => (it.price_estimate ? [it.price_estimate.state] : []));
 
   return (
     <article
@@ -256,6 +268,15 @@ export default function OrderCard({
             <Gift className="w-3 h-3 shrink-0" aria-hidden="true" />
             {order.order_kind === 'gift' ? s.giftOrder : `${s.giftLine} — ${money(0)}`}
           </p>
+        )}
+        {/* «سعر تقديري» (0218): the order waits at «تم الاستلام» until its final price is settled. A chunk that
+            fails to arrive costs this card its chip, never the list. */}
+        {estimateStates.length > 0 && (
+          <ChunkBoundary compact renderFallback={() => null}>
+            <React.Suspense fallback={null}>
+              <EstimateOrderChip states={estimateStates} />
+            </React.Suspense>
+          </ChunkBoundary>
         )}
 
         <div className="mt-3 flex items-end justify-between gap-3">

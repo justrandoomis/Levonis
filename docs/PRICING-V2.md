@@ -1053,3 +1053,59 @@ purchase lines are open under the current level (`INVENTORY_MODE_HAS_STOCK`, als
 derives the level from the stock typed, so its save is not refused for it: the stored level is kept while
 it still has rows, with a note in the three languages, and moves on a later save once those units are sold
 and those lines closed. Only a save that leaves the stored level nothing to count on is refused.
+
+## 12. Estimated pre-order prices for Bambu Lab products (DECISIONS rows 278–282, migration 0218)
+
+The design is `docs/SMART_PRICING.md`. What it means for V2, in short:
+
+- **One price system.** An estimate is an ordinary V2 cost-first price: the product form's own wire
+  (`{method: 'cost', cost: {inputs, minimum_profit}}`), evaluated by the same engine at the rates of
+  `loadPricingRates` only and written by `v2WriteStatements`. There is no estimate price table, no sweep and
+  no third `price_status`.
+- **Inputs.** The supplier cost comes from an owner-only supplier price catalogue (Tmall in CNY, the EU store
+  in EUR, the US store in USD as a flagged reference, or the owner's typed price) and is written as ordinary
+  `MANUAL_OVERRIDE` input rows; the retired `SOURCE` origin (§1.9) is not revived. The minimum profit is the
+  product type's USD figure as a product-scope `target_profit` rule (row 184(3): no percentage). Measures keep
+  row 247's precedence; a missing weight or box takes the type's default, written only to the private base
+  input, never to `products.package_*`.
+- **One route.** An estimated product is pre-order-only on its type's one route (land for EU electronics, sea
+  for filament, sea or air for other China items), so no route spread is published (row 220 (a)). A
+  pre-order-only SKU has no discount (§7 default 3), so the route sells at D.
+- **The label.** `products.price_estimate` is set in the batch that first prices the product, through one
+  additive option of `v2/write.ts` (`estimate`, laid after step 9b inside the `engine-price:` token), and is
+  cleared only by the owner's confirmation. FX-5 (`autoReprice.ts`) reprices an estimate like any V2 product,
+  under the same large-change and drop holds, and never touches the label. `price_status` stays binary.
+- **The apply** is a reviewed bulk publish, product by product, each bound to its own preview hash. For
+  estimates only, it amends row 222 and addendum A.8's "no bulk publish" (row 278). The «يحتاج تسعيرًا» queue
+  (`v2/queue.ts`) is unchanged.
+- **Orders.** For an estimate line the price is fixed at settlement, not at placement (§7 default 1, row 280).
+  The order waits at «تم استلام الطلب» until every line is settled, and a different final price goes through
+  the 0140 approval.
+- **Unchanged:** SELLABLE (`worker/lib/listing.ts`), completeness (`productCompleteness.ts`), the rounding rule
+  (row 245), `priceV2.ts`, `costToPrice.ts` and `skuChannel.ts`.
+- **Which SKUs a product has (for every V2 product, row 283).** For a product stocked by combination
+  (`VARIANT_COMBINATION`), the structurally sellable SKUs (`sellableSkus`, `worker/lib/pricingEngine/legacy.ts`)
+  leave out a combination that has no active `product_variants` row when each of its choices (every option
+  value, and its colour) is stocked in another combination. The cart already refused such a combination
+  (`VARIANT_NOT_MODELLED`). The same set is what V2 and the V1 engine price, what `checkSelection` accepts (a
+  left-out combination is `PRICE_REQUEST_SELECTION_INVALID`), and what completeness and the offer editor list.
+  A choice that no stocked combination holds keeps all its combinations, exactly as before, so every model keeps
+  a SKU and its option level and every value the page lists still names a SKU. A grid none of whose cells has an
+  active row is answered whole. A product whose stored SKU rows include a left-out combination keeps them until
+  its next write (an owner save or FX-5), which drops only those rows; `products.price_iqd` («from») can then only
+  rise, and a model's level only fall, when a left-out combination held the lowest or the model's highest figure.
+  The 2026-10-07 census of the live catalogue has no such product: every `VARIANT_COMBINATION` product has one
+  group and a row for every cell.
+  Past `ENGINE_MAX_SKUS` (240 cells) such a product with active rows is counted on the cells it keeps
+  (`stockedPastLimit`; the review's second round, `docs/SMART_PRICING.md` §13): each row's combination, checked as
+  the grid checks it (colour visibility, `validateSelection`), then every cell of a choice no row holds, in grid
+  order. It is `SKU_GRID_TOO_LARGE` only when those cells pass 240, when no active row names a cell, or when the
+  grid passes `SKU_GRID_SCAN_MAX` = 4,096 cells (combinations × colours, `legacy.ts`; the bound keeps the scan
+  finite). A product with no option group (colours only) past 240, and every other inventory mode, overflow as
+  before, and a failed read of the variants makes such a product overflow (fail closed). `checkSelection` then
+  answers from the kept set instead of the relational validator, and so does the import's default-selection check
+  (`verifyD1`, through `validatePriceRequestSelection`). Measured: 0.5–1.6 ms per `sellableSkus` call on realistic
+  shapes, up to about 10 ms near 4,096 cells with about 170 values and several colours, and about 0.8 ms for a
+  product that overflows anyway; a product under the limit costs what it did. No live product is past 60 cells;
+  in the manifest none is confirmed past 240, and only the wireless inductive coil kit (3 groups, 30 values,
+  22 variants) can be past 240.

@@ -18,6 +18,7 @@ import { ROOT } from './fixtures/d1';
 import { formatDate, formatDateTime } from '../src/components/orders/format';
 import { validUntil } from '../src/components/community/offers/types';
 import { dayLabel } from '../worker/lib/deliveryDay';
+import { ESTIMATE_SHORT, ESTIMATE_TEXT } from '../src/lib/priceStatus';
 
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 
@@ -31,13 +32,14 @@ const literal = (n: ts.Node | undefined): string | null =>
  * extended to the search, assist and diagnose files), whose Sorani slot is
  * the Arabic string copied letter for letter (DECISIONS row 183). A string
  * that is the same in every language by nature (a code, a brand) is written
- * without `loc`.
+ * without `loc`. `names` adds a page's own three-language helper of the same
+ * shape (the product page's `tr(ar, en, ckb)`).
  */
-function twoLanguageLoc(rel: string, { copies = false }: { copies?: boolean } = {}): string[] {
+function twoLanguageLoc(rel: string, { copies = false, names = ['loc'] }: { copies?: boolean; names?: readonly string[] } = {}): string[] {
   const sf = ts.createSourceFile(rel, read(rel), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const out: string[] = [];
   const visit = (n: ts.Node) => {
-    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'loc') {
+    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression) && names.includes(n.expression.text)) {
       const ar = literal(n.arguments[0]);
       if (n.arguments.length < 3 || (copies && ar !== null && ar === literal(n.arguments[2]))) {
         out.push(`${rel}:${sf.getLineAndCharacterOfPosition(n.getStart()).line + 1} ${n.getText().slice(0, 80)}`);
@@ -189,6 +191,49 @@ test('the extended check catches what it is for: two languages, and the Arabic c
   try {
     assert.equal(twoLanguageLoc(probe).length, 1, 'the old check: only the two-language call');
     assert.deepEqual(twoLanguageLoc(probe, { copies: true }).map((l) => l.split(' ')[0]), [`${probe}:1`, `${probe}:2`]);
+  } finally {
+    rmSync(path, { force: true });
+  }
+});
+
+// ------------------------------------------------- «سعر تقديري» on the storefront
+
+/**
+ * THE ESTIMATED PRICE SPEAKS SORANI WHEREVER IT IS SHOWN (docs/SMART_PRICING.md
+ * §5.5, WP10; DECISIONS row 183). The card, the compare row, the product page's
+ * notice, the support page and the product page itself pass the extended check
+ * — no two-language string and no Arabic copied into the Sorani slot, the
+ * product page's own `tr(ar, en, ckb)` included. Their estimate words are the
+ * contract's (tests/estimateStrings.test.ts holds those to the same rule) or
+ * its two eager copies in src/lib/priceStatus.ts.
+ */
+const ESTIMATE_STOREFRONT = [
+  'src/components/CardPrice.tsx',
+  'src/components/compare/PriceRow.tsx',
+  'src/components/product/EstimateNotice.tsx',
+  'src/pages/Support.tsx',
+  'src/pages/Product.tsx',
+];
+
+test('the estimated-price storefront speaks Sorani: no two-language string and no Arabic in a Sorani slot', () => {
+  assert.deepEqual(ESTIMATE_STOREFRONT.flatMap((f) => twoLanguageLoc(f, { copies: true, names: ['loc', 'tr'] })), []);
+  for (const words of [ESTIMATE_TEXT, ESTIMATE_SHORT]) {
+    assert.notEqual(words.ckb as string, words.ar, 'the Sorani label is not the Arabic');
+    assert.match(words.ckb, /[ڕڵێۆە]/, 'the Sorani label is written in Sorani letters');
+    assert.doesNotMatch(words.ckb, /[ةىيك]/, 'no Arabic-only letter in the Sorani label');
+  }
+  for (const f of ['src/components/CardPrice.tsx', 'src/components/compare/PriceRow.tsx', 'src/components/product/EstimateNotice.tsx']) {
+    assert.doesNotMatch(read(f), /OWNER: Sorani to be written by hand/, `${f} says its Sorani is missing`);
+  }
+});
+
+test('the extended check reads the product page’s own helper too, and still only `loc` by default', () => {
+  const probe = join('tests', 'fixtures', '__soraniProbeTr.tsx');
+  const path = join(ROOT, probe);
+  writeFileSync(path, "tr('سعر', 'Price', 'سعر');\nloc('سعر', 'Price', 'نرخ');\n");
+  try {
+    assert.deepEqual(twoLanguageLoc(probe, { copies: true }), [], 'by default a `tr` call is not read');
+    assert.deepEqual(twoLanguageLoc(probe, { copies: true, names: ['loc', 'tr'] }).map((l) => l.split(' ')[0]), [`${probe}:1`]);
   } finally {
     rmSync(path, { force: true });
   }

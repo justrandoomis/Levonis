@@ -106,6 +106,14 @@ import {
 } from '../lib/serialAssignments';
 import { isLostRace } from '../lib/gifts/fence';
 import { isPriceHeld, PRICE_APPROVAL_PENDING_MESSAGE } from '../lib/priceHold';
+import {
+  hasOpenEstimates,
+  isEstimateGateAbort,
+  isEstimateReopenAbort,
+  PRICE_ESTIMATE_REOPEN_REFUSED_MESSAGE,
+  PRICE_ESTIMATE_UNCONFIRMED_MESSAGE,
+} from '../lib/priceEstimateGate';
+import { attachEstimateStates, estimatesReadFailed, itemsHoldOrder } from '../lib/orderEstimates';
 import { ALWASEET, alwaseetDriver, resolveWire } from '../lib/delivery/alwaseet';
 import {
   escposReceipt,
@@ -2021,6 +2029,25 @@ adminRoutes.get('/orders', async (c) => {
   // «بانتظار موافقة الزبون على السعر» (0140) — narrows whatever else is chosen.
   const priceHoldOnly = c.req.query('price_hold') === '1';
   if (priceHoldOnly) clauses.push('o.price_hold_id IS NOT NULL');
+  // «بانتظار تأكيد السعر» (0218): orders whose estimated lines wait for their
+  // final price — narrows whatever else is chosen, like the hold above. A
+  // database without 0218 has no such order: the clause becomes '0' rather
+  // than a statement that cannot run (asked only when the filter is on).
+  const estimateOnly = c.req.query('price_estimate') === '1';
+  if (estimateOnly) {
+    let installed = true;
+    try {
+      await c.env.DB.prepare('SELECT 1 FROM order_price_estimates LIMIT 1').first();
+    } catch (e) {
+      if (!/no such table/i.test(e instanceof Error ? e.message : String(e))) throw e;
+      installed = false;
+    }
+    clauses.push(
+      installed
+        ? "EXISTS (SELECT 1 FROM order_price_estimates e WHERE e.order_id = o.id AND e.state IN ('open','proposed','rejected'))"
+        : '0'
+    );
+  }
 
   const where = clauses.length > 0 ? ` WHERE ${clauses.map((x) => `(${x})`).join(' AND ')}` : '';
   const facetWhere = facetClauses.length > 0 ? ` WHERE ${facetClauses.map((x) => `(${x})`).join(' AND ')}` : '';
@@ -2038,7 +2065,7 @@ adminRoutes.get('/orders', async (c) => {
    */
   const FROM = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id';
 
-  const [{ results }, countRow, facetRows, heldRow] = await Promise.all([
+  const [{ results }, countRow, facetRows, heldRow, estimateRow] = await Promise.all([
     c.env.DB.prepare(
       `SELECT o.*, u.email, u.username, u.name AS user_name, u.phone_e164 AS user_phone
          ${FROM}${where}
@@ -2086,6 +2113,12 @@ adminRoutes.get('/orders', async (c) => {
     // many orders are waiting on a customer's price decision anywhere, which is
     // the number an admin acts on. One seek on idx_orders_price_hold.
     c.env.DB.prepare('SELECT COUNT(*) AS n FROM orders WHERE price_hold_id IS NOT NULL')
+      .first<{ n: number }>()
+      .catch(() => ({ n: 0 })),
+    // «بانتظار تأكيد السعر» (0218), board-wide like the held count: the orders an
+    // admin must settle before they can move. The partial index ix_ope_open is
+    // exactly this WHERE. 0 on a database without the table, or on any failure.
+    c.env.DB.prepare("SELECT COUNT(DISTINCT order_id) AS n FROM order_price_estimates WHERE state IN ('open','proposed','rejected')")
       .first<{ n: number }>()
       .catch(() => ({ n: 0 })),
   ]);
@@ -2174,6 +2207,8 @@ adminRoutes.get('/orders', async (c) => {
       .bind(...ids)
       .all<Record<string, unknown>>();
     for (const it of items) byOrder.get(String(it.order_id))?.push(it);
+    // Each estimated line's state (0218), one read for the page: the row's badge and `items[].price_estimate`.
+    await attachEstimateStates(c.env.DB, items);
   }
 
   // ADMINS SEE THE PICK THROUGHOUT (§8.2). It is operational access — the
@@ -2186,10 +2221,15 @@ adminRoutes.get('/orders', async (c) => {
   const lang = langOf(c);
   const out = results.map((o) => {
     const day = typeof o.delivery_due_day === 'string' ? o.delivery_due_day : '';
-    const next = quickNextOf(o, lang);
+    // An order held by unsettled estimated lines (0218) offers no one-tap move:
+    // the gate would refuse it — the row shows the badge instead of a button.
+    const estimateHeld = itemsHoldOrder(byOrder.get(String(o.id)) ?? []);
+    const next = estimateHeld ? { quick_next: null } : quickNextOf(o, lang);
     const sc = serialCounts.get(String(o.id));
     return {
       ...next,
+      /** «بانتظار تأكيد السعر النهائي» (0218): present only while an estimated line waits. */
+      ...(estimateHeld ? { price_estimate_open: true as const } : {}),
       /**
        * Units needing a serial and how many have one, while the order is on
        * the shelf. `holds_next`: the owner's §19 gate would refuse the row's
@@ -2279,6 +2319,9 @@ adminRoutes.get('/orders', async (c) => {
     /** «بانتظار موافقة الزبون على السعر» (0140): the filter's state and its board-wide count. */
     price_hold: priceHoldOnly,
     price_hold_count: Number(heldRow?.n ?? 0),
+    /** «بانتظار تأكيد السعر» (0218): the filter's state and its board-wide count. */
+    price_estimate: estimateOnly,
+    price_estimate_count: Number(estimateRow?.n ?? 0),
   });
 });
 
@@ -2411,11 +2454,15 @@ adminRoutes.get('/orders/:id', async (c) => {
   // an order is packed for where it was sent, and a later edit must not
   // silently repoint a parcel that is already being prepared.
   const address = safeParse<Record<string, unknown>>(o.address_snapshot, {});
+  // Each estimated line's state (0218): `items[].price_estimate` and the modal's estimate panel.
+  await attachEstimateStates(c.env.DB, items);
 
   return c.json({
     success: true,
     order: {
       ...orderPublic(o, items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'admin'), 'admin'),
+      /** «بانتظار تأكيد السعر النهائي» (0218): an estimated line still waits — the modal opens the estimate panel. */
+      price_estimate_open: itemsHoldOrder(items),
       admin_note: o.admin_note ?? '',
       customer: {
         id: o.user_id,
@@ -2668,6 +2715,28 @@ function tradeInDeliveredRefusal(): HttpError {
 /** 409 for every admin door that would move a price-held order (0140). */
 function priceHeldRefusal(orderId: string): HttpError {
   return new HttpError(409, PRICE_APPROVAL_PENDING_MESSAGE, 'PRICE_APPROVAL_PENDING', { order_id: orderId });
+}
+
+/**
+ * 409 for every admin door that would confirm, prepare, ship or book a courier
+ * for an order whose estimated lines still wait for their final price (0218,
+ * trigger T8): settle them first from «تأكيد السعر النهائي». Its Sorani is in
+ * packages/contracts/src/priceEstimates.ts (the admin screens resolve the code).
+ */
+function estimateUnconfirmedRefusal(orderId: string): HttpError {
+  return new HttpError(409, PRICE_ESTIMATE_UNCONFIRMED_MESSAGE, 'PRICE_ESTIMATE_UNCONFIRMED', { order_id: orderId });
+}
+
+/** 409 for every admin door that would re-open a cancelled order that held estimated lines (0218, trigger T9). */
+function estimateReopenRefusal(): HttpError {
+  return new HttpError(409, PRICE_ESTIMATE_REOPEN_REFUSED_MESSAGE, 'PRICE_ESTIMATE_REOPEN_REFUSED');
+}
+
+/** The estimate gate's own aborts, as the admin doors answer them (a lost race or an older pre-check). */
+function estimateAbortRefusal(e: unknown, orderId: string): HttpError | null {
+  if (isEstimateGateAbort(e)) return estimateUnconfirmedRefusal(orderId);
+  if (isEstimateReopenAbort(e)) return estimateReopenRefusal();
+  return null;
 }
 
 const ORDER_TRANSITIONS: Record<string, string[]> = {
@@ -3189,6 +3258,19 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
   // A courier shipment copies the door amount — never while that amount is
   // waiting on the customer's price decision (0140).
   if (isPriceHeld(order)) throw priceHeldRefusal(id);
+  // …nor while an estimated line waits for its final price (0218). Asked
+  // BEFORE the courier is called: a shipment booked at the courier and then
+  // refused here (trigger T8 is the backstop on the store below) would carry a
+  // door amount nobody agreed to. An unreadable answer refuses (503) — the
+  // courier is never called on a guess. A database without 0218 has no line.
+  let estimateHeld: boolean;
+  try {
+    estimateHeld = await hasOpenEstimates(c.env.DB, id);
+  } catch (e) {
+    console.error('estimate gate unreadable at the courier door', id, e instanceof Error ? e.message : String(e));
+    throw estimatesReadFailed();
+  }
+  if (estimateHeld) throw estimateUnconfirmedRefusal(id);
   if (order.delivery_remote_id) {
     throw badRequest('This order already has a delivery shipment.', 'SHIPMENT_EXISTS', {
       remote_id: order.delivery_remote_id,
@@ -3285,8 +3367,19 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
   // The owner's gate override rides the SAME batch that stores the shipment
   // it allowed (integrity review #12): the shipment is never on the order
   // without the override's audit row, and a failed audit is not swallowed.
-  if (serialGate.overridden) await c.env.DB.batch([storeShipment, ...serialGate.statements]);
-  else await storeShipment.run();
+  try {
+    if (serialGate.overridden) await c.env.DB.batch([storeShipment, ...serialGate.statements]);
+    else await storeShipment.run();
+  } catch (e) {
+    // T8 refused to record the shipment (0218): unreachable after the pre-check
+    // above (a settled line never re-opens), answered as the gate all the same.
+    const refusal = estimateAbortRefusal(e, id);
+    if (refusal) {
+      console.error('courier shipment created but refused by the estimate gate', id, res.value.remoteId);
+      throw refusal;
+    }
+    throw e;
+  }
   await audit(c.env.DB, adminUser.id, 'delivery.shipment_create', id, {
     provider: driver.provider, remote_id: res.value.remoteId, tracking_no: res.value.trackingNo,
   });
@@ -3517,6 +3610,9 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     if (res.reason === 'TRADE_IN_ORDER_DELIVERED') throw tradeInDeliveredRefusal();
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
     if (res.reason === 'PRICE_APPROVAL_PENDING') throw priceHeldRefusal(id);
+    // «بانتظار تأكيد السعر النهائي» (0218): settle the estimated lines first.
+    if (res.reason === 'PRICE_ESTIMATE_UNCONFIRMED') throw estimateUnconfirmedRefusal(id);
+    if (res.reason === 'PRICE_ESTIMATE_REOPEN_REFUSED') throw estimateReopenRefusal();
     // The re-claim trigger refused (§17 decision 4). The transition itself is
     // legal, so ILLEGAL_STAGE_MOVE would send staff hunting a nonexistent
     // transition bug — and the sibling status route already answers this exact
@@ -3692,17 +3788,24 @@ adminRoutes.patch('/orders/:id', async (c) => {
       if (msg.includes('GIFT_ORDER_REOPEN_REFUSED')) throw giftReopenRefusal();
       if (ORDER_REOPEN_COUPON_SPENT_RE.test(msg)) throw couponSpentReopenRefusal();
       if (msg.includes('TRADE_IN_DEVICE_NOT_RECEIVED')) throw tradeInNotReceivedReopenRefusal();
-      throw e;
+      // A cancelled order that held estimated lines stays cancelled (0218, T9).
+      throw estimateAbortRefusal(e, id) ?? e;
     }
   } else if (serialGate.statements.length) {
     try {
       flipped = (await c.env.DB.batch([flipStmt, ...serialGate.statements]))[0]?.meta.changes ?? 0;
     } catch (e) {
       if (isLostRace(e)) throw serialsRequiredError(await serialGateState(c.env, id));
-      throw e;
+      // This dropdown changes the STATUS first, so the estimate gate (0218, T8) refuses the flip itself.
+      throw estimateAbortRefusal(e, id) ?? e;
     }
   } else {
-    flipped = (await flipStmt.run()).meta.changes;
+    try {
+      flipped = (await flipStmt.run()).meta.changes;
+    } catch (e) {
+      // «بانتظار تأكيد السعر النهائي» (0218, T8): no confirm, preparation or shipping before settlement.
+      throw estimateAbortRefusal(e, id) ?? e;
+    }
   }
   if (flipped === 0) throw badRequest('The order changed while you were editing — reload and retry');
 

@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { ShieldCheck, Clock } from 'lucide-react';
-import { api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 import type { ApiOrder } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import Spinner from '../ui/Spinner';
@@ -136,7 +136,17 @@ export default function PriceProtection({ order }: { order: ApiOrder }) {
       await api.post('/api/price-protection/claims', { orderItemId });
       await load();
     } catch (e) {
-      setErrors((prev) => ({ ...prev, [orderItemId]: apiRefusal(e, asLang(lang), s.loadError) }));
+      // «سعر تقديري» (docs/SMART_PRICING.md §5.5, §6.9): a claim on a line whose final price is not settled yet
+      // is refused in the estimate contract's words — loaded lazily, only for that refusal — so a Sorani or
+      // English reader is not handed the server's "ar / en" sentence.
+      const code = e instanceof ApiError ? e.code ?? '' : '';
+      const said =
+        code === 'PRICE_PROTECTION_ESTIMATE_PENDING'
+          ? await import('../../../packages/contracts/src/priceEstimates')
+              .then((w) => w.estimateRefusalText(code, asLang(lang)))
+              .catch(() => null)
+          : null;
+      setErrors((prev) => ({ ...prev, [orderItemId]: said ?? apiRefusal(e, asLang(lang), s.loadError) }));
     } finally {
       setBusyItem(null);
     }

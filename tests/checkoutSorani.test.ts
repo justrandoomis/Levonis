@@ -24,6 +24,7 @@ import { ROOT } from './fixtures/d1';
 import { asD1 } from './fixtures/app';
 import { SETTING_DEFAULTS, getSetting, getSettings } from '../worker/lib/settings';
 import { methodDesc, methodTitle } from '../src/lib/methodText';
+import { ESTIMATE_REFUSALS, ESTIMATE_STRINGS } from '../packages/contracts/src/priceEstimates';
 
 const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 const ARABIC = /[؀-ۿ]/;
@@ -132,4 +133,52 @@ test('the admin can write the Sorani of every method, so a lent Sorani is visibl
     assert.match(admin, new RegExp(`value=\\{row\\.value\\.${field} \\|\\| ''\\}`), `no ${field} field in the method editor`);
   }
   assert.equal((admin.match(/placeholder="Title \(Ckb\)"/g) || []).length, 3, 'delivery, payment and cart shipping each take a Sorani title');
+});
+
+// ------------------------------------------------- «سعر تقديري» at checkout
+
+/** The string value of `STRINGS.<lang>.<key>` in src/pages/Checkout.tsx, read from the syntax tree. */
+function pageString(lang: 'ar' | 'en' | 'ckb', key: string): string | null {
+  const rel = 'src/pages/Checkout.tsx';
+  const sf = ts.createSourceFile(rel, read(rel), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let found: string | null = null;
+  const visit = (n: ts.Node) => {
+    if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.name.text === 'STRINGS' && n.initializer && ts.isObjectLiteralExpression(n.initializer)) {
+      const block = n.initializer.properties.find((p) => ts.isPropertyAssignment(p) && p.name.getText() === lang);
+      if (block && ts.isPropertyAssignment(block) && ts.isObjectLiteralExpression(block.initializer)) {
+        const prop = block.initializer.properties.find((p) => ts.isPropertyAssignment(p) && p.name.getText() === key);
+        if (prop && ts.isPropertyAssignment(prop) && ts.isStringLiteral(prop.initializer)) found = prop.initializer.text;
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(sf);
+  return found;
+}
+
+test('the estimated-price checkout speaks Sorani: the contract’s words by the reader’s language, the page’s own sentences written in Sorani', () => {
+  const page = read('src/pages/Checkout.tsx');
+  // Every estimate word is picked by LANGUAGE — the reader's ar / en / ckb — never by text direction.
+  assert.match(page, /const estimateLangOf = \(lang: string\): EstimateLang => \(lang === 'en' \|\| lang === 'ckb' \? lang : 'ar'\);/);
+  for (const key of ['notice', 'checkoutAck', 'checkoutButton', 'checkoutCancel', 'label', 'orderPlaced']) {
+    assert.ok(page.includes(`ESTIMATE_STRINGS.${key}[estimateLang]`), `the ${key} is not read in the reader's language`);
+    const words = ESTIMATE_STRINGS[key as 'notice'];
+    assert.notEqual(words.ckb, words.ar, `${key}: the contract's Sorani is the Arabic`);
+    assert.match(words.ckb, /[ڕڵێۆە]/, `${key}: the contract's Sorani is written in Sorani letters`);
+  }
+  // The refusals the checkout says from the contract carry their own Sorani too.
+  for (const code of ['PRICE_ESTIMATE_ACK_REQUIRED', 'PRICE_ESTIMATE_PAYMENT_NOT_ALLOWED', 'PRICE_ESTIMATE_ORDERING_PAUSED'] as const) {
+    assert.notEqual(ESTIMATE_REFUSALS[code].ckb, ESTIMATE_REFUSALS[code].ar, code);
+  }
+  // The page's own three sentences (the block reason, the stale notice and its verb): all three languages, no copy.
+  for (const key of ['estimateAckBlock', 'estimateStale', 'reload']) {
+    const [ar, en, ckb] = (['ar', 'en', 'ckb'] as const).map((l) => pageString(l, key));
+    assert.ok(ar && en && ckb, `${key} is missing a language`);
+    assert.ok(ARABIC.test(ar!) && !ARABIC.test(en!) && ARABIC.test(ckb!), `${key}: each language in its own script`);
+    assert.notEqual(ckb, ar, `${key}: the Sorani slot carries the Arabic`);
+    assert.match(ckb!, /[ڕڵێۆە]/, `${key}: the Sorani is written in Sorani letters`);
+    assert.doesNotMatch(ckb!, /[يكة]/, `${key}: an Arabic-only letter in the Sorani`);
+  }
+  // The reader of a reload sentence is handed the verb the chunk boundary already uses for the same act.
+  assert.equal(pageString('ckb', 'reload'), 'دووبارە باربکە');
 });

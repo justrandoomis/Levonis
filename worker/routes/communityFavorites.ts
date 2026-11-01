@@ -13,6 +13,7 @@
 
 import { listing } from '../lib/listing';
 import { priceStatusOf, sellableNowOf } from '../lib/commercialState';
+import { estimateClause, isEstimateRow, runWithEstimateClause } from '../lib/priceEstimateLabel';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAuth, notFound } from '../lib/http';
@@ -87,18 +88,20 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
    */
   // VISIBLE, with the SELLABLE flag (DECISIONS row 240): a catalog-only product is kept with no price.
   const L = await listing(db);
-  const catalogue = await db
-    .prepare(
-      `SELECT f.product_id, f.created_at AS saved_at,
-              p.slug, p.name, p.name_ar, p.price_iqd, p.original_price_iqd, ${L.sellableFlag('p')} AS sellable_now
-         FROM favorites f
-         JOIN products p ON p.id = f.product_id
-        WHERE f.user_id = ? AND ${L.visible('p')}
-        ORDER BY f.created_at DESC
-        LIMIT 100`
-    )
-    .bind(user.id)
-    .all<Record<string, unknown>>();
+  // «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.3): the label, computed from the row the price is
+  // read with. On a database without 0218 the clause is dropped and the column reads 0 (no product is labelled).
+  const catalogue = await runWithEstimateClause(
+    db,
+    `SELECT f.product_id, f.created_at AS saved_at,
+            p.slug, p.name, p.name_ar, p.price_iqd, p.original_price_iqd, ${L.sellableFlag('p')} AS sellable_now,
+            CASE WHEN 1${estimateClause('p')} THEN 0 ELSE 1 END AS price_estimate
+       FROM favorites f
+       JOIN products p ON p.id = f.product_id
+      WHERE f.user_id = ? AND ${L.visible('p')}
+      ORDER BY f.created_at DESC
+      LIMIT 100`,
+    (sql) => db.prepare(sql).bind(user.id).all<Record<string, unknown>>()
+  );
   const catalogueRows = catalogue.results ?? [];
   const catalogueImages = await loadAuthoritativeProductImages(
     db,
@@ -166,6 +169,8 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
     price_status: priceStatusOf(sellableNowOf(r)),
     price_iqd: sellableNowOf(r) ? r.price_iqd : null,
     original_price_iqd: sellableNowOf(r) ? (r.original_price_iqd ?? null) : null,
+    // «سعر تقديري» (0218): a boolean label on a priced favourite only.
+    ...(sellableNowOf(r) && isEstimateRow(r) ? { price_estimate: true as const } : {}),
     /**
      * NOT KNOWN FROM HERE, and so not claimed.
      *

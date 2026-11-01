@@ -15,7 +15,22 @@ import ProAddressNotice from '../components/membership/ProAddressNotice';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, newIdempotencyKey, usdCentsToIqd, formatIqd } from '../lib/api';
 import { methodDesc, methodTitle } from '../lib/methodText';
-import type { CartColourTag, DeliveryDayOption } from '../lib/api';
+import type { CartColourTag, CheckoutEstimateBlock, DeliveryDayOption } from '../lib/api';
+/**
+ * «سعر تقديري» — THE WORDS OF AN ESTIMATED PRICE (docs/SMART_PRICING.md §5.5,
+ * §6.1–6.2; WP11): the notice, the acknowledgement, the button, the cancel
+ * line, the refusals and the version the acknowledgement binds to. The
+ * contract is imported only by lazy chunks and the server (§5.5); this page is
+ * one — a route chunk that is not prefetched — and it needs the words in the
+ * same render as the quote that asks for them, because the box it draws is
+ * what the order's `price_estimate_ack` swears to.
+ */
+import {
+  ESTIMATE_NOTICE_VERSION,
+  ESTIMATE_STRINGS,
+  estimateRefusalText,
+  type EstimateLang,
+} from '../../packages/contracts/src/priceEstimates';
 import { groupCartLines } from '../lib/cartGroups';
 import { colourLang, colourStrings, groupSummaryText } from '../lib/colourQuantities';
 import { choiceName, unnamedChoice } from '../lib/choiceNames';
@@ -190,7 +205,15 @@ interface CheckoutQuoteLineDto {
     unit_subtotal_usd_cents?: number;
     offer_before_usd_cents?: number;
     offer_saving_percent_usd?: number | null;
+    /** «سعر تقديري»: the line's price is an estimate (worker/lib/customerPricing.ts). Present only when true. */
+    price_estimate?: true;
   };
+  /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §5.3, §6.1–6.3): this line is at an
+   * estimated pre-order price — its chip in the summary, and one of the lines
+   * the order records. A label, never a figure. Present only when true.
+   */
+  price_estimate?: true;
   /** A live offer lowered this line (docs/ux/PRODUCT-DISCOUNT.md §8.5): the struck UNIT before price and its percent. */
   offer_before_iqd?: number | null;
   offer_saving_percent?: number | null;
@@ -381,6 +404,14 @@ interface CheckoutQuoteDto {
   due_on_delivery_iqd: number;
   tier: { tier: string; active: boolean; at_approved_default_address: boolean; pro_benefits_context: boolean };
   policies: Array<{ key: string; version: number }>;
+  /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §6.1–6.2), present only when a line is
+   * at an estimated price: the estimated cart lines and the notice version the
+   * order's `price_estimate_ack` must equal. `ordering_paused` while the owner
+   * has paused ordering at estimated prices (then also a blocker). The payment
+   * list above already holds only the wallet and cash on delivery.
+   */
+  estimate?: CheckoutEstimateBlock & { ordering_paused?: boolean };
   blockers: string[];
   can_checkout: boolean;
 }
@@ -443,6 +474,10 @@ const STRINGS = {
     giniWarning: (hours: string) =>
       `طلبك لا يُعتبر مؤكداً إلا بعد شرائه من تطبيق جني ومسح باركود الاستلام. بدون ذلك يبقى الطلب معلقاً ${hours} ساعة ثم يُلغى تلقائياً.`,
     giniPlacedTitle: 'بقي مسح باركود الاستلام',
+    // ── «سعر تقديري» (docs/SMART_PRICING.md §6.2): the page's own two sentences; every other estimate word is the contract's.
+    estimateAckBlock: 'أكّد ملاحظة السعر التقديري أعلاه لإتمام الطلب.',
+    estimateStale: 'تغيّرت ملاحظة السعر التقديري منذ فتحت هذه الصفحة — أعد تحميلها لتقرأ الملاحظة الحالية قبل الطلب.',
+    reload: 'إعادة التحميل',
   },
   en: {
     quoteLoading: 'Calculating delivery...',
@@ -497,6 +532,9 @@ const STRINGS = {
     giniWarning: (hours: string) =>
       `Your order is not confirmed until you buy it in the Gini app and the receipt barcode is scanned. Without that it stays pending for ${hours} hours and is then cancelled automatically.`,
     giniPlacedTitle: 'The receipt barcode still has to be scanned',
+    estimateAckBlock: 'Confirm the estimated-price note above to place the order.',
+    estimateStale: 'The estimated-price note has changed since this page opened — reload it to read the current note before ordering.',
+    reload: 'Reload',
   },
   ckb: {
     quoteLoading: 'حسابکردنی گەیاندن...',
@@ -555,11 +593,23 @@ const STRINGS = {
     giniWarning: (hours: string) =>
       `داواکارییەکەت دڵنیا ناکرێتەوە تا لە ئەپی جینی نەیکڕیت و باڕکۆدی وەرگرتن سکان نەکرێت. بەبێ ئەوە داواکارییەکە ${hours} کاتژمێر چاوەڕوان دەمێنێتەوە و پاشان خۆکارانە هەڵدەوەشێتەوە.`,
     giniPlacedTitle: 'هێشتا دەبێت باڕکۆدی وەرگرتن سکان بکرێت',
+    estimateAckBlock: 'بۆ تەواوکردنی داواکاری، تێبینیی نرخی خەمڵێنراوی سەرەوە پشتڕاست بکەرەوە.',
+    estimateStale: 'تێبینیی نرخی خەمڵێنراو لەو کاتەوەی ئەم پەڕەیەت کردەوە گۆڕاوە — پێش داواکردن پەڕەکە دووبارە باربکە بۆ ئەوەی تێبینییە نوێیەکە بخوێنیتەوە.',
+    reload: 'دووبارە باربکە',
   },
 };
 
 /** What the server offers when no quote has answered yet (worker/lib/paymentPolicy.ts). */
 const DEFAULT_OFFERED_PAYMENT_IDS = ['wallet', 'cash'];
+
+/**
+ * A MATERIAL change of the quote (§7) — the totals and the policy versions:
+ * the consent resets on it, whether the quote came back from the quote door
+ * or with a refusal (an estimate acknowledgement's fresh quote, §6.2).
+ */
+function quoteSignature(q: Pick<CheckoutQuoteDto, 'total_iqd' | 'shipping' | 'due_on_delivery_iqd' | 'policies'>): string {
+  return [q.total_iqd, q.shipping.total_iqd, q.due_on_delivery_iqd, q.policies.map((p) => `${p.key}:${p.version}`).join('|')].join('~');
+}
 
 /**
  * 0075 — WHICH COUNTER MOVED, AT THE LAST SCREEN BEFORE PAYMENT.
@@ -654,8 +704,18 @@ function counterNamed(code: string): string {
   return '';
 }
 
-/** The refusal as the server said it, followed by the counter it names. */
+/** The reader's language for a «سعر تقديري» word: ar / en / ckb, never the Arabic for a Sorani reader. */
+const estimateLangOf = (lang: string): EstimateLang => (lang === 'en' || lang === 'ckb' ? lang : 'ar');
+
+/**
+ * The refusal as the server said it, followed by the counter it names. An
+ * estimate refusal (PRICE_ESTIMATE_*: the acknowledgement, the payment, the
+ * pre-order rule, the owner's pause) is said from the contract first, in the
+ * reader's language (docs/SMART_PRICING.md §5.5).
+ */
 function refusalWithCounter(err: unknown, lang: string, fallback: string): string {
+  const estimateSaid = estimateRefusalText(err, estimateLangOf(lang));
+  if (estimateSaid) return estimateSaid;
   const said = apiRefusal(err, lang as 'ar' | 'en' | 'ckb', fallback);
   const code = err instanceof ApiError ? err.code ?? '' : '';
   const counter = counterNamed(code);
@@ -861,6 +921,21 @@ export default function Checkout() {
   // change (totals / shipping / required versions) resets it.
   const [policyAccepted, setPolicyAccepted] = useState(false);
   useEffect(() => { setPolicyAccepted(false); }, [lang]);
+  /**
+   * «سعر تقديري» — THE ACKNOWLEDGEMENT (docs/SMART_PRICING.md §6.2; invariant
+   * I3). Like the consent above: unticked by default, and required whenever the
+   * quote holds an estimated line. It swears to the words this screen shows, so
+   * the order sends THIS bundle's `ESTIMATE_NOTICE_VERSION` — never the quote's
+   * number — and a new set of estimated lines, another notice version or
+   * another language asks again.
+   */
+  const [estimateAck, setEstimateAck] = useState(false);
+  const estimateAckKey = quote?.estimate
+    ? `${quote.estimate.notice_version}|${[...quote.estimate.lines].sort().join(',')}`
+    : '';
+  useEffect(() => { setEstimateAck(false); }, [estimateAckKey, lang]);
+  /** A financed method was refused because the cart holds an estimated line: said in the estimate box for the visit. */
+  const [estimatePaymentRefused, setEstimatePaymentRefused] = useState(false);
   const [consentResetNote, setConsentResetNote] = useState(false);
   const quoteSignatureRef = useRef('');
   const quoteSeqRef = useRef(0);
@@ -1057,12 +1132,7 @@ export default function Checkout() {
         setQuote(data.quote);
         setCouponError('');
         // Material-change detection → consent reset (§7).
-        const sig = [
-          data.quote.total_iqd,
-          data.quote.shipping.total_iqd,
-          data.quote.due_on_delivery_iqd,
-          data.quote.policies.map((p) => `${p.key}:${p.version}`).join('|'),
-        ].join('~');
+        const sig = quoteSignature(data.quote);
         if (quoteSignatureRef.current && quoteSignatureRef.current !== sig) {
           setPolicyAccepted((prev) => {
             if (prev) setConsentResetNote(true);
@@ -1084,6 +1154,9 @@ export default function Checkout() {
           storePromo('');
           return;
         }
+        // «سعر تقديري» (docs/SMART_PRICING.md §6.1): a financed method chosen before the cart held an estimated
+        // line. The list falls back to the wallet and cash on delivery and re-quotes; the estimate box says why.
+        if (code === 'PRICE_ESTIMATE_PAYMENT_NOT_ALLOWED') setEstimatePaymentRefused(true);
         setQuote(null);
         setUnavailableInCart(code === 'PRODUCT_CURRENTLY_UNAVAILABLE');
         setQuoteError(refusalWithCounter(err, lang, 'quote failed'));
@@ -1215,12 +1288,16 @@ export default function Checkout() {
     mysterySpools?: number | null;
     /** A gift line (0175): the server priced it at 0; the «هدية» chip and its value are shown. */
     gift?: { level: number; value_iqd: number } | null;
+    /** «سعر تقديري» (0218): the line is at an estimated pre-order price — its chip, beside the figure. */
+    estimate?: boolean;
   }> =
     quote
       ? quote.lines.map((l) => {
           const cartLine = cartById.get(l.cart_item_id);
           const tag = colourTagOf(l.color_tag, cartLine);
           return {
+            // The quote's own word for its line, or its estimate block naming it (§6.2).
+            estimate: l.price_estimate === true || l.breakdown?.price_estimate === true || (quote.estimate?.lines ?? []).includes(l.cart_item_id),
             // The server alone marks a gift line, in the quote and in the cart.
             gift: l.gift ?? (cartLine?.kind === 'gift' ? cartLine.gift ?? { level: 0, value_iqd: 0 } : null),
             key: l.cart_item_id,
@@ -1277,6 +1354,8 @@ export default function Checkout() {
         })
       : items.map((i) => ({
           gift: i.kind === 'gift' ? i.gift ?? { level: 0, value_iqd: 0 } : null,
+          // Before the first quote, the cart line's own label (worker/routes/cart.ts).
+          estimate: i.price_estimate === true || i.breakdown?.price_estimate === true,
           key: i.id,
           productId: i.productId,
           colourTag: colourTagOf(undefined, i),
@@ -1596,6 +1675,19 @@ export default function Checkout() {
   const serverAllows = quote ? quote.can_checkout !== false : true;
 
   /**
+   * «سعر تقديري» (docs/SMART_PRICING.md §6.1–6.2). The quote says which lines
+   * are at an estimated price (`estimate`); this screen knows which words it
+   * shows. Nothing here decides a price: the box, the button and the refusals
+   * only follow the server's answer.
+   */
+  const estimateLang = estimateLangOf(lang);
+  const estimate = quote?.estimate ?? null;
+  /** The quote's notice is newer than this bundle's words: a tab cannot acknowledge words it does not show. */
+  const estimateStale = !!estimate && estimate.notice_version !== ESTIMATE_NOTICE_VERSION;
+  /** The owner's emergency brake (`price_estimate_control.ordering_enabled = 0`): the order door refuses it too. */
+  const estimatePaused = !!quote && (quote.blockers.includes('PRICE_ESTIMATE_ORDERING_PAUSED') || estimate?.ordering_paused === true);
+
+  /**
    * ═══ «عند الضغط على تأكيد الطلب لا يحدث شيء» ═══
    *
    * THE BUTTON AND THE REASON ARE NOW ONE EXPRESSION, and that is the whole
@@ -1640,7 +1732,16 @@ export default function Checkout() {
      */
     if (isGiniMethod && !giniOrderNoValid) return S.giniOrderNoBlock;
     if (shippingNeedsConfig) return S.needsConfig;
+    /**
+     * «سعر تقديري» (§6.1–6.2): two refusals the box cannot answer come before
+     * it — a tab older than the notice reloads, and the owner's pause is said
+     * in the contract's words (never «تعذّر تسعير هذا الطلب», which it is not)
+     * — and the acknowledgement itself is required, beside the consent.
+     */
+    if (estimateStale) return S.estimateStale;
+    if (estimatePaused) return estimateRefusalText('PRICE_ESTIMATE_ORDERING_PAUSED', estimateLang) ?? S.blockQuote;
     if (!consentSatisfied) return S.policyRequired;
+    if (estimate && !estimateAck) return S.estimateAckBlock;
     /**
      * The full-advance method with a short balance is not the printer-advance
      * refusal (`S.blockAdvance` sends the customer to store pickup). It is the
@@ -1792,6 +1893,9 @@ export default function Checkout() {
         policyAcceptance: policyAccepted
           ? requiredPolicies.map((p) => ({ key: p.key, version: p.version }))
           : [],
+        // «سعر تقديري» (§6.2): the version of the notice THIS screen showed and the customer ticked — sent only
+        // then; the server requires it to equal its own whenever a line is estimated.
+        price_estimate_ack: estimate && estimateAck ? ESTIMATE_NOTICE_VERSION : undefined,
       });
       setPlacedInvoiceNo(data.invoice_no ?? null);
       setPlacedOrder(data.order);
@@ -1869,6 +1973,28 @@ export default function Checkout() {
         setSubmitError(S.policyRequired);
       } else if (err instanceof ApiError && err.code === 'SHIPPING_NEEDS_CONFIG') {
         setSubmitError(S.needsConfig);
+      } else if (err instanceof ApiError && err.code === 'PRICE_ESTIMATE_ACK_REQUIRED') {
+        /**
+         * «سعر تقديري» (§6.2): the order holds an estimated line this screen had
+         * not acknowledged — a label that landed after the quote, or a tab that
+         * never showed it. The server answers with the FRESH quote: it is drawn
+         * at once (the notice and the box appear, the box unticked), and the
+         * contract's sentence says what to do. Nothing was written.
+         */
+        const fresh = err.details?.quote as CheckoutQuoteDto | undefined;
+        if (fresh && Array.isArray(fresh.lines) && fresh.shipping && Array.isArray(fresh.policies)) {
+          const sig = quoteSignature(fresh);
+          if (quoteSignatureRef.current && quoteSignatureRef.current !== sig) {
+            setPolicyAccepted((prev) => {
+              if (prev) setConsentResetNote(true);
+              return false;
+            });
+          }
+          quoteSignatureRef.current = sig;
+          setQuote(fresh);
+        }
+        setEstimateAck(false);
+        setSubmitError(msg);
       } else if (err instanceof ApiError && couponCode && COUPON_FAILURES.has(err.code ?? '')) {
         /**
          * THE CODE STOPPED BEING VALID BETWEEN THE QUOTE AND THE PRESS (switched
@@ -1941,10 +2067,13 @@ export default function Checkout() {
           button that still said «تأكيد الطلب» and explained nothing — the dead
           button again. `S.quoteLoading` is the same sentence the delivery row
           shows, already hand-written in all three languages. */}
+      {/* «اطلب بالسعر التقديري» (§5.3): an order holding an estimated line says so on the verb itself. */}
       {submitting
         ? loc('جارٍ تأكيد الطلب…', 'Placing order…', 'داواکاری دەنێردرێت…')
         : quoteLoading
         ? S.quoteLoading
+        : estimate
+        ? ESTIMATE_STRINGS.checkoutButton[estimateLang]
         : loc('تأكيد الطلب', 'Place order', 'دڵنیاکردنەوەی داواکاری')}
     </button>
   );
@@ -1992,6 +2121,53 @@ export default function Checkout() {
         )}
       </div>
     ) : null;
+
+  /**
+   * «سعر تقديري» — THE NOTICE AND THE BOX (docs/SMART_PRICING.md §5.3, §6.1–6.2;
+   * invariant I3). Drawn only when the quote holds an estimated line, beside
+   * the consent and above the button: the notice (the price is an estimate,
+   * the final price may differ, a change is sent to approve or cancel, nothing
+   * extra is charged without approval), the REQUIRED box in the contract's
+   * words, and the line that says the order can be cancelled — and what was
+   * paid returned — until the final price is confirmed. A tab older than the
+   * notice is told to reload instead of being handed a box it cannot honour.
+   */
+  const estimateBlock = estimate ? (
+    <div data-checkout-estimate className="mt-4 mb-4 p-4 rounded-lg border border-warning/40 bg-warning/10 space-y-3">
+      <p className="flex items-start gap-2 text-[12.5px] leading-relaxed text-text-secondary" data-checkout-estimate-notice>
+        <Info aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0 text-warning" strokeWidth={1.5} />
+        <span>{ESTIMATE_STRINGS.notice[estimateLang]}</span>
+      </p>
+      {estimatePaymentRefused && (
+        <p className="text-[12px] leading-relaxed text-text-secondary" data-checkout-estimate-payment>
+          {estimateRefusalText('PRICE_ESTIMATE_PAYMENT_NOT_ALLOWED', estimateLang)}
+        </p>
+      )}
+      {estimateStale ? (
+        <div className="flex flex-wrap items-center gap-3" data-checkout-estimate-stale>
+          <p className="min-w-0 flex-1 text-[12px] font-medium leading-relaxed text-warning">{S.estimateStale}</p>
+          <button type="button" onClick={() => window.location.reload()} className="lv-button lv-button-secondary lv-button-sm">
+            {S.reload}
+          </button>
+        </div>
+      ) : (
+        <label className="flex items-start gap-3 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            data-checkout-estimate-ack
+            checked={estimateAck}
+            aria-required="true"
+            onChange={(e) => setEstimateAck(e.target.checked)}
+            className="mt-0.5 w-4 h-4 shrink-0 accent-white"
+          />
+          <span className="text-xs text-text-primary leading-relaxed">{ESTIMATE_STRINGS.checkoutAck[estimateLang]}</span>
+        </label>
+      )}
+      <p className="text-[11.5px] text-text-muted font-light leading-relaxed" data-checkout-estimate-cancel>
+        {ESTIMATE_STRINGS.checkoutCancel[estimateLang]}
+      </p>
+    </div>
+  ) : null;
 
   if (placedOrder) {
     return (
@@ -2123,6 +2299,24 @@ export default function Checkout() {
                   </span>
                 </p>
               ) : null}
+            </div>
+          ) : null}
+
+          {/*
+            «سعر تقديري» (docs/SMART_PRICING.md §5.3, §6.4): the order includes
+            lines at an estimated price, so it waits at «تم الاستلام» until the
+            final price is confirmed. Said here in the contract's words — the
+            same sentence the order-placed message carries — with the line that
+            the customer may still cancel. Drawn off the SERVER'S order (its
+            lines' `price_estimate`), not off what this screen had quoted.
+          */}
+          {placedOrder.items.some((it) => !!it.price_estimate) ? (
+            <div data-estimate-placed className="lv-alert lv-alert-warning mb-10 w-full max-w-sm p-4 text-start">
+              <p className="flex items-start gap-2 text-[13px] font-medium text-text-primary">
+                <Info aria-hidden="true" className="mt-px w-4 h-4 shrink-0 text-warning" strokeWidth={1.5} />
+                {ESTIMATE_STRINGS.orderPlaced[estimateLang]}
+              </p>
+              <p className="mt-2 text-[12px] font-light leading-relaxed text-text-secondary">{ESTIMATE_STRINGS.checkoutCancel[estimateLang]}</p>
             </div>
           ) : null}
 
@@ -2701,6 +2895,15 @@ export default function Checkout() {
                             <span className="shrink-0 font-medium tabular-nums text-text-primary">{money(line.lineTotal, line.lineTotalUsd)}</span>
                           </div>
                           {line.colourTag && line.optionsLabel ? <p className="ps-5 text-[12px] text-text-muted truncate">{line.optionsLabel}</p> : null}
+                          {/* «سعر تقديري» (§5.3): this colour's figure is an estimated pre-order price. */}
+                          {line.estimate ? (
+                            <span
+                              data-checkout-line-estimate={line.key}
+                              className="ms-5 inline-flex w-max items-center rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-bold leading-normal text-warning"
+                            >
+                              {ESTIMATE_STRINGS.label[estimateLang]}
+                            </span>
+                          ) : null}
                         </li>
                       ))}
                     </ul>
@@ -2737,6 +2940,15 @@ export default function Checkout() {
                     <span className="text-sm font-medium text-text-primary tabular-nums">
                       {money(line.lineTotal, struckLineUsd(line).price)}
                     </span>
+                    {/* «سعر تقديري» (§5.3): the figure above is an estimated pre-order price. */}
+                    {line.estimate && (
+                      <span
+                        data-checkout-line-estimate={line.key}
+                        className="mt-0.5 inline-flex w-max items-center rounded-full border border-warning/30 bg-warning/10 px-2 py-0.5 text-[11px] font-bold leading-normal text-warning"
+                      >
+                        {ESTIMATE_STRINGS.label[estimateLang]}
+                      </span>
+                    )}
                     {line.offerBeforeIqd ? (
                       <OfferSaving
                         className="mt-0.5"
@@ -3712,6 +3924,9 @@ export default function Checkout() {
               These stay in the document so they can be read and scrolled to —
               a message under a fixed bar is a message nobody sees. */}
           <div className="pt-6">
+            {/* «سعر تقديري» (§6.2): the notice and its required box first — what the consent below agrees to
+                includes the purchase policy's estimated-price clause. */}
+            {estimateBlock}
             {consentBlock}
             {/* A price moved while this screen was open. It sits ABOVE the
                 button, because a warning underneath the control it warns about

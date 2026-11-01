@@ -12,12 +12,18 @@
  *     equal the batch's `details.lines[0]` beyond its index and identity;
  *   * a PRODUCT refusal (said once per batch) carries the same `details`;
  *   * a success writes the identical `cart_items` row.
+ *
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §6.1): the estimate's
+ * LINE rules — a direct sale of an estimated SKU, the owner's paused ordering
+ * switch, and a switch that cannot be read — are refused alike by both doors,
+ * and a pre-order of an estimated SKU writes the identical row through either.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { all, asD1, freshDb, json, post, stubApp } from './fixtures/app';
 import { cartRoutes } from '../worker/routes/cart';
+import { estimateServerMessage } from '@levonis/contracts/priceEstimates';
 
 const PLANS = JSON.stringify([
   { id: 'wp_ext12', title_ar: 'ضمان +12', title_en: 'Extended +12', duration_months: 12, duration_kind: 'extension', fee_iqd: 0, fee_percent: 7.5, order: 0, active: true },
@@ -74,6 +80,17 @@ interface Case {
 
 const fil = (over: Record<string, unknown>) => ({ productId: 'p_fil', fulfillmentType: 'direct_sale', qty: 1, ...over });
 
+/**
+ * What the V2 writer's estimate batch does to a product's label (migration 0218, trigger T1: only under its
+ * price token) — the fixture stages it after the publish, as an applied estimate leaves it.
+ */
+function labelEstimate(raw: DatabaseSync, pid: string): void {
+  raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${pid}', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = '${pid}';
+    DELETE FROM ops_guards WHERE id = 'engine-price:${pid}';`);
+}
+const PRE_AIR = { productId: 'p_pre', qty: 1, fulfillmentType: 'pre_order', transportMethod: 'air' };
+
 const CASES: Case[] = [
   { name: 'a group left unchosen (no SKU for half a selection)', code: 'VARIANT_UNAVAILABLE', body: fil({ optionValueIds: ['v_spool'], colorId: 'c_black' }) },
   { name: 'no option at all', code: 'OPTION_REQUIRED', body: fil({ optionValueIds: [], colorId: 'c_black' }) },
@@ -113,6 +130,37 @@ const CASES: Case[] = [
   },
   { name: 'a warranty plan on a non-printer', code: 'WARRANTY_NOT_PRINTER', product: true, body: fil({ optionValueIds: ['v_spool', 'v_1kg'], colorId: 'c_black', warrantyPlanId: 'wp_ext12' }) },
   { name: 'an unknown product', code: 'NOT_FOUND', product: true, body: { productId: 'p_none', qty: 1 } },
+  // ---- «سعر تقديري» (migration 0218): the estimate's line rules, one door as the other ----
+  {
+    name: 'a direct sale of an estimated SKU',
+    code: 'PRICE_ESTIMATE_PREORDER_ONLY',
+    body: { productId: 'p_dir', qty: 1, fulfillmentType: 'direct_sale' },
+    before: (raw) => labelEstimate(raw, 'p_dir'),
+  },
+  {
+    name: 'a direct sale of an estimated SKU that also sells by pre-order (named before the empty shelf)',
+    code: 'PRICE_ESTIMATE_PREORDER_ONLY',
+    body: { productId: 'p_dual', qty: 1, fulfillmentType: 'direct_sale' },
+    before: (raw) => labelEstimate(raw, 'p_dual'),
+  },
+  {
+    name: 'a pre-order of an estimated SKU while the owner has paused ordering at estimates',
+    code: 'PRICE_ESTIMATE_ORDERING_PAUSED',
+    body: PRE_AIR,
+    before: (raw) => {
+      labelEstimate(raw, 'p_pre');
+      raw.exec('UPDATE price_estimate_control SET ordering_enabled = 0 WHERE id = 1');
+    },
+  },
+  {
+    name: 'a pre-order of an estimated SKU when the ordering switch cannot be read (fail closed)',
+    code: 'PRICE_ESTIMATES_READ_FAILED',
+    body: PRE_AIR,
+    before: (raw) => {
+      labelEstimate(raw, 'p_pre');
+      raw.exec('DROP TABLE price_estimate_control');
+    },
+  },
 ];
 
 /** One fresh database per door, published by the first customer request, then the case's own setup. */
@@ -138,6 +186,8 @@ for (const c of CASES) {
     const s = await json(single);
     assert.equal(s.code, c.code, `the single door answers ${c.code} here: ${JSON.stringify(s)}`);
     if (c.details) assert.deepEqual(s.details, c.details);
+    // An estimate refusal speaks the contract's own sentence ("ar / en"); the client words it per language.
+    if (c.code.startsWith('PRICE_ESTIMATE')) assert.equal(s.error, estimateServerMessage(c.code as Parameters<typeof estimateServerMessage>[0]));
 
     const two = await world(c.before);
     const batch = await post(two.app, '/api/cart/items/batch', asBatch(c.body));
@@ -167,6 +217,23 @@ test('parity: a success writes the identical row through either door', async () 
   assert.equal(batch.status, 200, JSON.stringify(await json(batch.clone())));
   assert.deepEqual(rowsOf(two.raw), rowsOf(one.raw));
   assert.equal(rowsOf(one.raw)[0].option_value_ids, '["v_1kg","v_spool"]', 'canonical identity, either door');
+});
+
+test('parity: a pre-order of an estimated SKU writes the identical row through either door, and both answers carry the label', async () => {
+  const one = await world((raw) => labelEstimate(raw, 'p_pre'));
+  const single = await post(one.app, '/api/cart/items', PRE_AIR);
+  const s = await json(single);
+  assert.equal(single.status, 200, JSON.stringify(s));
+  const two = await world((raw) => labelEstimate(raw, 'p_pre'));
+  const batch = await post(two.app, '/api/cart/items/batch', asBatch(PRE_AIR));
+  const b = await json(batch);
+  assert.equal(batch.status, 200, JSON.stringify(b));
+  assert.deepEqual(rowsOf(two.raw), rowsOf(one.raw));
+  for (const body of [s, b]) {
+    assert.equal(body.has_estimates, true, 'the cart says it holds an estimate');
+    assert.equal(body.items[0].price_estimate, true, 'the line says so');
+    assert.equal(body.items[0].breakdown.price_estimate, true, 'and so does its price block');
+  }
 });
 
 test('parity: a second add merges to the same ceiling through either door', async () => {

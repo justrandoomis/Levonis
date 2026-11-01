@@ -36,9 +36,21 @@
  *
  * 4. NOTHING HERE IS DECIDED BY THE BROWSER. Every value is computed from
  *    stored rows and a server clock; the client classifies nothing.
+ *
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §8; owner question
+ * 282(h), default: excluded). A member whose price is an estimate the owner
+ * has not confirmed is never packed into a bundle a customer can buy: a bundle
+ * derives values from its members (the component total, the allocation, the
+ * saving), a component line is never an estimate line at the checkout, and the
+ * order would otherwise carry a price nobody confirmed. The label rides on the
+ * member's own `SELECT *` row, so the customer read treats a labelled member
+ * as a hidden one (`loadCompositionMembers`) and the admin's save names it
+ * (COMPONENT_PRICE_ESTIMATE) — no statement more, and a database without 0218
+ * has no label.
  */
 
 import { listing } from './listing';
+import { isEstimateRow } from './priceEstimateLabel';
 import {
   isCapacityScope,
   isLowStock,
@@ -792,6 +804,11 @@ const ISSUE_TEXT: Record<string, { ar: string; en: string; ckb: string }> = {
     en: 'the component {name} is draft or hidden, so the bundle cannot be sold with it',
     ckb: 'پێکهاتەی «{name}» ڕەشنووس یان شاراوەیە، بۆیە پاکێجەکە پێی نافرۆشرێت',
   },
+  COMPONENT_PRICE_ESTIMATE: {
+    ar: 'سعر المكوّن «{name}» تقديري، فلن تُباع الحزمة به حتى يُؤكَّد سعره النهائي',
+    en: 'the component {name} has an estimated price, so the bundle cannot be sold with it until its final price is confirmed',
+    ckb: 'نرخی پێکهاتەی «{name}» خەمڵێنراوە، بۆیە تا نرخی کۆتایی پشتڕاست نەکرێتەوە پاکێجەکە پێی نافرۆشرێت',
+  },
   // ---- refusals -----------------------------------------------------------
   BUNDLE_VALIDATION: {
     ar: '{why}',
@@ -1009,6 +1026,10 @@ export async function loadCompositionMembers(
   for (const r of rows) {
     const id = String(r.id);
     if (held.has(id)) r.status = 'hidden';
+    // «سعر تقديري» (migration 0218; see the header): to a customer read — the card, the cart and the checkout
+    // door — a labelled member is a hidden one, in memory only, so the bundle is unavailable through the very
+    // path a hidden member takes (COMPONENT_UNAVAILABLE) and no component line of an estimate reaches an order.
+    if (opts.customer && isEstimateRow(r)) r.status = 'hidden';
     const view = views.get(id) ?? EMPTY_RELATIONS;
     out.set(id, { row: r, doc: applyRelations(parseProductRow(r), view, { includeInactive: false }), view });
   }
@@ -1144,6 +1165,11 @@ export async function resolveComposition(
     }
     if (m.doc.status !== 'active') {
       warnings.push(bundleIssue('COMPONENT_PRODUCT_INACTIVE', { name }, { line, component_id: c.id }));
+    }
+    // «سعر تقديري» (migration 0218): the customer read treats this member as hidden until the owner confirms its
+    // price, so the admin is told why the bundle will not sell — a warning, as for an inactive member.
+    if (isEstimateRow(m.row)) {
+      warnings.push(bundleIssue('COMPONENT_PRICE_ESTIMATE', { name }, { line, component_id: c.id }));
     }
 
     // ---- the selection the admin pinned, validated against the real rows ---

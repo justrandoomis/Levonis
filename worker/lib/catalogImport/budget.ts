@@ -32,7 +32,6 @@
  * triggers fire per row, exactly as with one statement each.
  */
 import { D1_INVOCATION_STATEMENT_LIMIT } from '../quarterHourBudget';
-import { registerD1View } from '../d1Count';
 
 /** Kept free under D1's 1,000 for anything a counter could miss. */
 export const IMPORT_RESERVE = 100;
@@ -49,83 +48,11 @@ export const IMPORT_PACKED_PARAMS_MAX = 100;
  */
 export const D1_FUNCTION_ARGS_MAX = 32;
 
-/** How many statements an invocation has sent so far. */
-export interface InvocationCounter {
-  readonly count: number;
-  /** Charges statements sent outside the counted binding (none in this codebase; kept for callers). */
-  charge(n: number): void;
-}
-
-export interface CountedD1 {
-  db: D1Database;
-  counter: InvocationCounter;
-}
-
-type AnyStatement = D1PreparedStatement & Record<string, unknown>;
-
 /**
- * Wraps a D1 binding so every statement it sends is counted. The wrapper is a
- * Proxy: every other member of the binding passes through untouched.
+ * The counting view itself lives in worker/lib/invocationCounter.ts, a neutral module the owner's estimator
+ * shares (docs/SMART_PRICING.md §4.8) without importing the import's code; re-exported here unchanged.
  */
-export function countingD1(inner: D1Database): CountedD1 {
-  let n = 0;
-  const counter: InvocationCounter = {
-    get count() {
-      return n;
-    },
-    charge(k: number) {
-      n += Math.max(0, Math.trunc(k));
-    },
-  };
-  const innerOf = new WeakMap<object, D1PreparedStatement>();
-  const wrap = (stmt: D1PreparedStatement): D1PreparedStatement => {
-    const proxy = new Proxy(stmt as AnyStatement, {
-      get(target, key, receiver) {
-        if (key === 'bind') {
-          return (...values: unknown[]) => wrap((target.bind as (...v: unknown[]) => D1PreparedStatement)(...values));
-        }
-        if (key === 'first' || key === 'all' || key === 'run' || key === 'raw') {
-          const fn = Reflect.get(target, key, receiver);
-          // A test double may expose `raw` as a property (tests/fixtures/d1Limits.ts); only a call is a statement.
-          if (typeof fn !== 'function') return fn;
-          return (...args: unknown[]) => {
-            n += 1;
-            return (fn as (...a: unknown[]) => unknown).apply(target, args);
-          };
-        }
-        const v = Reflect.get(target, key, receiver);
-        return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;
-      },
-    });
-    innerOf.set(proxy, stmt);
-    return proxy as D1PreparedStatement;
-  };
-  const db = new Proxy(inner as D1Database & Record<string, unknown>, {
-    get(target, key, receiver) {
-      if (key === 'prepare') {
-        return (sql: string) => wrap(target.prepare(sql));
-      }
-      if (key === 'batch') {
-        return (statements: D1PreparedStatement[]) => {
-          n += statements.length;
-          return target.batch(statements.map((s) => innerOf.get(s as object) ?? s));
-        };
-      }
-      if (key === 'exec') {
-        return (sql: string) => {
-          n += 1;
-          return target.exec(sql);
-        };
-      }
-      const v = Reflect.get(target, key, receiver);
-      return typeof v === 'function' ? (v as (...a: unknown[]) => unknown).bind(target) : v;
-    },
-  });
-  // The bus must still see the binding behind the view (d1Count.ts `d1Base`, DECISIONS row 212): with
-  // EVENT_BUS_ENABLED the save's ProductAdded outbox row and the audits' dual write are planned as on the raw binding.
-  registerD1View(db as D1Database, inner);
-  return { db: db as D1Database, counter };
-}
+export { countingD1, type CountedD1, type InvocationCounter } from '../invocationCounter';
 
 /**
  * Rows of ONE shape as multi-row INSERTs. `head` is everything before

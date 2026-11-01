@@ -25,7 +25,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { all, count, get, json, post, row, stubApp } from './fixtures/app';
+import { all, count, failingD1, get, json, post, row, stubApp } from './fixtures/app';
 import { pricingWorld, AMS } from './fixtures/procurementPricing';
 import { legacyOptionId, legacyProductId } from './fixtures/legacyCatalogue';
 import { seedOptionless, writeV2, cartGrid } from './fixtures/pricingV2';
@@ -33,6 +33,7 @@ import { loadPreviewContext, loadProducts, type LoadedProduct } from '../worker/
 import { resolveCartLine, cartRoutes } from '../worker/routes/cart';
 import { routeOfChannel, skuPriceHistoryKey } from '@levonis/pricing/skuChannel';
 import type { V2Evaluation } from '../worker/lib/pricingEngine/v2/evaluate';
+import { v2WriteStatements } from '../worker/lib/pricingEngine/v2/write';
 import type { PricingContext } from '../worker/routes/cart';
 import { stageV1Engine } from './fixtures/v1Engine';
 
@@ -257,6 +258,46 @@ test('a cost-first route whose cost is at or above the discounted price sells at
   const grid = await cartGrid(w.db, AMS2);
   assert.equal(grid[`o:${legacyOptionId('bambu-lab-ams-2-pro', 0)}@pre_order_air`], undefined, 'the blocked route is not offered');
   assert.equal(grid[`o:${legacyOptionId('bambu-lab-ams-2-pro', 0)}@pre_order_land`]!.prepaid, 992_000, 'land sells at D: its discount would have sold it at its own cost');
+});
+
+test('the estimate option (docs/SMART_PRICING.md §4.8): laid after 9b and before the audit, inside the engine-price token; absent, the batch is unchanged; never with an automatic repricing', async () => {
+  const w = pricingWorld();
+  const { db } = failingD1(w.raw);
+  const inputs = { supplier_cost_amount: '450', supplier_cost_currency: 'EUR' as const, shipping_profile: 'GERMANY_LAND' as const, shipping_weight_g: 2500 };
+  const ev = await writeV2(w.db, AMS2, { method: 'cost', inputs, minimumProfitUsd: '120', dryRun: true });
+  const opts = { actor: 'usr_owner', now: '2026-10-31T00:00:00.000Z', source: 'test', idempotencyKey: `test:${AMS2}` };
+  type Stmt = { sql: string; params: unknown[] };
+  // Minted ids (audit rows, guards, the history batch) differ between two plans of the same write; nothing else may.
+  const norm = (s: D1PreparedStatement) => {
+    const x = s as unknown as Stmt;
+    return `${x.sql.replace(/\s+/g, ' ').trim()} ${JSON.stringify(x.params).replace(/\b(?:[a-z0-9]+_)?[0-9a-f]{20}\b/g, '<id>')}`;
+  };
+  const plain = await v2WriteStatements(db, ev, opts);
+  const marks = [db.prepare("SELECT 'estimate-1'"), db.prepare("SELECT 'estimate-2'")];
+  const laid = await v2WriteStatements(db, ev, { ...opts, estimate: marks });
+  const at = laid.findIndex((s) => (s as unknown as Stmt).sql.includes("'estimate-1'"));
+  assert.ok(at > 0);
+  assert.ok((laid[at + 1] as unknown as Stmt).sql.includes("'estimate-2'"), 'in the order given');
+  assert.deepEqual([...laid.slice(0, at), ...laid.slice(at + 2)].map(norm), plain.map(norm), 'the option adds its statements and changes nothing else');
+  assert.equal(laid.length, plain.length + 2);
+
+  const find = (re: RegExp, param?: string) =>
+    laid.findIndex((s) => re.test((s as unknown as Stmt).sql) && (param === undefined || (s as unknown as Stmt).params.includes(param)));
+  const token = find(/^INSERT INTO ops_guards \(id, ok\) VALUES \(\?, 1\)$/, `engine-price:${AMS2}`);
+  const state = find(/UPDATE product_pricing_state\s+SET mode = 'engine'/);
+  const audit = laid.findIndex((s, i) => i > state && /^INSERT INTO pricing_audit/.test((s as unknown as Stmt).sql));
+  const release = find(/^DELETE FROM ops_guards WHERE id = \?$/, `engine-price:${AMS2}`);
+  assert.ok(token >= 0 && state > token && at > state && audit > at + 1 && release > audit, `token ${token} < state ${state} < estimate ${at} < audit ${audit} < release ${release}`);
+  // Between the state row and the estimate: only step 9b, the price-request transitions.
+  for (const s of laid.slice(state + 1, at)) assert.match((s as unknown as Stmt).sql, /price_request/i, 'only 9b sits between the state row and the estimate');
+
+  // An automatic repricing (FX-5) never lays it: refused, as every other non-price write is.
+  await writeV2(w.db, AMS2, { method: 'cost', inputs, minimumProfitUsd: '120' });
+  const again = await writeV2(w.db, AMS2, { method: 'cost', dryRun: true });
+  assert.equal(again.kind, 'v2_reprice');
+  const auto = { trigger: 'fx', reasons: ['EUR'], pricesUnchanged: false, priceSource: 'engine_fx' as const };
+  await v2WriteStatements(db, again, { ...opts, auto });
+  await assert.rejects(v2WriteStatements(db, again, { ...opts, auto, estimate: marks }), /an automatic repricing writes prices only/);
 });
 
 test('strict mode: a model added to a V2 product before it is priced is refused, at the resolver and at the cart door', async () => {

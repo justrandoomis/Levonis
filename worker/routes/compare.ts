@@ -76,6 +76,7 @@ import { adviseFromSpecs, type PowerAdvice } from '../lib/powerAdvice';
 import { loadAuthoritativeProductImages, loadLightProductImages } from '../lib/productSelectionImage';
 import { parseProductRow } from '../lib/productModel';
 import { applyRelations, loadRelationsViews } from '../lib/productOverlay';
+import { isEstimateRow } from '../lib/priceEstimateLabel';
 import { multicolorBadge, multicolorProfile, variantSheet, type MulticolorBadge, type MulticolorProfile } from '../lib/multicolor';
 import { pricingCtx, resolveVariantPricing, type PricingCtx } from './products';
 import { hasKnowledgeValue, knowledgeCellsFor, loadCompareKnowledge } from '../lib/knowledge/compare';
@@ -211,6 +212,20 @@ export interface CompareProductCard {
   multicolor?: MulticolorProfile & { badge: MulticolorBadge };
   /** ON A COMPARISON COLUMN ONLY: the laser module this configuration ships with (W), or null. */
   laser_module_w?: number | null;
+  /**
+   * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.3): the price is an
+   * estimated pre-order price. Present only when true, and only on a priced
+   * card. Read off the product row the price is read with (`SELECT *`), so a
+   * database without 0218 has no key and no card carries it. Product level, so
+   * it fails closed (I2): every priced configuration of a labelled product is
+   * an estimate here, firm SKUs included.
+   */
+  price_estimate?: true;
+}
+
+/** «سعر تقديري»: the ids of the rows (read with `SELECT *`) that are sellable and labelled. */
+function estimatedIds(rows: ReadonlyArray<Record<string, unknown>>, sellable: ReadonlySet<string>): Set<string> {
+  return new Set(rows.filter((r) => sellable.has(String(r.id)) && isEstimateRow(r)).map((r) => String(r.id)));
 }
 
 const tri = (ar: string, en: string, ckb: string): Trilingual => ({
@@ -572,6 +587,7 @@ compareRoutes.get('/', async (c) => {
   ]);
   const tax = taxonomy(catalogRows);
   const placed = rows.map((row) => place(row, tax));
+  const estimated = estimatedIds(full, sellableIds);
 
   /**
    * THE OPTION EACH COLUMN IS, resolved before anything is drawn.
@@ -727,6 +743,7 @@ compareRoutes.get('/', async (c) => {
       multicolor: { ...profile, badge: multicolorBadge(profile) },
       /** The laser module THIS configuration ships with, in watts; null = none stated. */
       laser_module_w: laserWatts(sheets[i]),
+      ...(estimated.has(product.row.id) ? { price_estimate: true as const } : {}),
     };
   });
   /**
@@ -984,8 +1001,11 @@ async function withOptions(
    */
   const labelled = new Map<string, NonNullable<CompareProductCard['options']>>();
   const sellable = new Set(cards.filter((card) => card.price_status === 'priced').map((card) => card.id));
+  let estimated = new Set<string>();
   if (ctx) {
     const { results } = await db.prepare(`SELECT * FROM products WHERE id IN (${marks})`).bind(...ids).all<Record<string, unknown>>();
+    // «سعر تقديري» (0218): a priced card of a labelled product says so, read off the same rows.
+    estimated = estimatedIds(results ?? [], sellable);
     // Only a SELLABLE product's options are priced (DECISIONS row 240); a catalog-only one's are named.
     const [pricing, named] = await Promise.all([
       resolveVariantPricing(db, (results ?? []).filter((r) => sellable.has(String(r.id))), ctx),
@@ -1005,10 +1025,12 @@ async function withOptions(
       labelled.set(String(r.id), doc.options.filter((o) => o.active !== false).map(optionLabel));
     }
   }
-  return cards.map((card) => {
-    const options = labelled.get(card.id) ?? [];
-    return options.length >= 2 ? { ...card, options } : card;
-  });
+  return cards
+    .map((card) => (estimated.has(card.id) ? { ...card, price_estimate: true as const } : card))
+    .map((card) => {
+      const options = labelled.get(card.id) ?? [];
+      return options.length >= 2 ? { ...card, options } : card;
+    });
 }
 
 /**

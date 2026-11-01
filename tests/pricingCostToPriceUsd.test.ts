@@ -470,5 +470,45 @@ test('the storefront never recomputes: only the owner pricing router, the engine
   for (const f of ['worker/routes/products.ts', 'worker/routes/cart.ts', 'worker/routes/orders.ts', 'worker/routes/catalog.ts', 'worker/routes/compare.ts', 'worker/routes/seo.ts', 'worker/lib/listing.ts', 'worker/lib/publicApi/resources/products.ts']) {
     assert.doesNotMatch(files.find((x) => x.f === f)!.src, /from\s+['"][^'"]*\/adminProducts['"]/, `${f} reaches no admin product router`);
   }
-  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !(f in TRADE_IN_RATE) && !(f in CATALOG_ONLY_STRUCTURE) && !(f in PRODUCT_DISCOUNT) && !(f in COMPOSITION_DOORS) && !OWNER_TOOLS.includes(f)), []);
+  // Smart pricing (docs/SMART_PRICING.md §3.4, §4; DECISIONS rows 278–282): the owner's supplier price
+  // catalogue and the estimator — two routers mounted only inside adminPricingRoutes, behind its cost-read
+  // door. The catalogue's modules take the engine's 400 builder (`inputInvalid`) and, for the SKUs an
+  // estimate prices, the engine's own product loader and structure (`loadProducts`, `sellableSkus`,
+  // `unitNamesOf`); none of them computes a price. The estimator router reaches its own modules under
+  // pricingEngine/estimate/ (allowed above), which price through the V2 engine and writer only.
+  const SMART_PRICING_DOORS: Readonly<Record<string, readonly string[]>> = {
+    'worker/routes/adminSupplierPrices.ts': ['../lib/pricingEngine/whatIf'],
+    'worker/lib/supplierPrices/links.ts': ['../pricingEngine/whatIf'],
+    'worker/lib/supplierPrices/lookup.ts': ['../pricingEngine/whatIf'],
+    'worker/lib/supplierPrices/matcher.ts': ['../pricingEngine/whatIf'],
+    'worker/lib/supplierPrices/store.ts': ['../pricingEngine/legacy', '../pricingEngine/load', '../pricingEngine/whatIf'],
+    'worker/lib/supplierPrices/storePage.ts': ['../pricingEngine/whatIf'],
+    'worker/lib/supplierPrices/upload.ts': ['../pricingEngine/whatIf'],
+    'worker/routes/adminPriceEstimates.ts': [
+      '../lib/pricingEngine/estimate/apply',
+      '../lib/pricingEngine/estimate/compute',
+      '../lib/pricingEngine/estimate/confirm',
+      '../lib/pricingEngine/estimate/control',
+    ],
+  };
+  for (const [f, modules] of Object.entries(SMART_PRICING_DOORS)) {
+    const src = files.find((x) => x.f === f)!.src;
+    const engine = [...src.matchAll(/from\s+['"]([^'"]*(?:\/pricingEngine\/[^'"]+|\/costToPrice|\/fxChain))['"]/g)].map((m) => m[1]).sort();
+    assert.deepEqual(engine, [...modules].sort(), f);
+    for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from\s*['"][^'"]*\/pricingEngine\/whatIf['"]/g)) {
+      assert.deepEqual(m[1]!.split(',').map((x) => x.trim()).filter(Boolean), ['inputInvalid'], `${f} takes the 400 builder and nothing else of whatIf`);
+    }
+  }
+  // ...and the two routers and the Worker's supplier-price modules are reached only through the owner
+  // pricing router, the estimator and each other — never from a customer path.
+  const SMART_OWNER = /from\s+['"][^'"]*(?:\/adminSupplierPrices|\/adminPriceEstimates|(?:\.|\/lib)\/supplierPrices\/[^'"]+)['"]/;
+  const smartReachers = files.filter(({ src }) => SMART_OWNER.test(src)).map(({ f }) => f);
+  assert.ok(smartReachers.includes('worker/routes/adminPricing.ts'), 'not vacuous: the owner pricing router mounts them');
+  for (const f of smartReachers) {
+    assert.ok(
+      f === 'worker/routes/adminPricing.ts' || f in SMART_PRICING_DOORS || f.startsWith('worker/lib/pricingEngine/estimate/'),
+      `${f} reaches the owner's supplier prices or the estimator`
+    );
+  }
+  assert.deepEqual(importers.filter((f) => !allowed(f) && !(f in DECISION6) && !(f in V2_PRODUCT_SAVE) && !(f in CLEAN_START_DOORS) && !(f in PURCHASE_RATE) && !(f in TRADE_IN_RATE) && !(f in CATALOG_ONLY_STRUCTURE) && !(f in PRODUCT_DISCOUNT) && !(f in COMPOSITION_DOORS) && !(f in SMART_PRICING_DOORS) && !OWNER_TOOLS.includes(f)), []);
 });

@@ -123,8 +123,12 @@ export const ANONYMOUS_CACHE_CONTROL = cacheControlFor(ANONYMOUS_LIFETIME);
  * still show the repeated chips.
  * 2026-10-17 (DECISIONS row 248): cards, levels and quotes carry the shop's
  * dollar prices (`*_usd_cents`) — a body cached before would keep reading the
- * dinar price divided back by a rate. */
-export const PUBLIC_PROJECTION_REVISION = 'usd-base-2026-10';
+ * dinar price divided back by a rate.
+ * 2026-11 (DECISIONS rows 278 and 281; docs/SMART_PRICING.md §5.3): cards,
+ * pages, quotes and the public API carry the estimate label (`price_estimate`,
+ * `price.estimate`) — a body cached before would show an estimated price as a
+ * confirmed one. */
+export const PUBLIC_PROJECTION_REVISION = 'price-estimate-2026-11';
 const PROJECTION_HEADER = 'X-Levonis-Public-Projection';
 
 /**

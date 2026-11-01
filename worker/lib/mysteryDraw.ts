@@ -60,9 +60,18 @@
  * `mystery_offer_secrets`; `tests/compositionSchema.test.ts` fails if that ever
  * stops being true, because the seed is a pure function of the secret and one
  * leaked admin payload would let anyone precompute every future draw.
+ *
+ * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §2.4, §8; owner question
+ * 282(h), default: excluded). A product whose price is an estimate the owner
+ * has not confirmed is never drawn: a drawn spool is never an estimate line at
+ * the checkout, and a mystery offer's value rests on its members'. The
+ * candidate query carries the label exclusion (`estimateClause`), run through
+ * `runWithEstimateClause` so a database without 0218 runs today's statement;
+ * the admin preview keeps the row and names it PRICE_ESTIMATE.
  */
 
 import { listing } from './listing';
+import { estimateClause, runWithEstimateClause } from './priceEstimateLabel';
 import { seedFrom, sequence, weightedIndex, randomSeedHex } from './farm/rng';
 import { sha256Hex } from './crypto';
 import { resolveForOrderType, type OrderType, type StockResolution, type StockTarget } from './inventory';
@@ -206,7 +215,9 @@ export type ExclusionReason =
   | 'MODE_MISMATCH'
   | 'CATALOG_REQUIRED'
   | 'FACET_REQUIRED'
-  | 'DUPLICATE_ENTRY';
+  | 'DUPLICATE_ENTRY'
+  /** Migration 0218: the product's price is an estimate the owner has not confirmed — never drawn. */
+  | 'PRICE_ESTIMATE';
 
 export interface MysteryExclusion {
   entry_id: string;
@@ -366,11 +377,22 @@ interface EntryJoinRow {
   package_width_mm: number | null;
   package_depth_mm: number | null;
   package_height_mm: number | null;
+  /** Migration 0218: 1 when the product's price is an estimate; always 0 on a database without it. */
+  price_estimate: number;
 }
+
+/**
+ * «سعر تقديري» as a column the admin preview can read: 1 for a labelled product.
+ * It is spelled with `estimateClause` itself, so the deploy-ahead retry
+ * (`withoutEstimateClause`) turns it into `CASE WHEN 1 THEN 0 …` — 0, exactly
+ * what a database without the column holds — with nothing else to keep in step.
+ */
+const ESTIMATE_COLUMN = `(CASE WHEN 1${estimateClause('p')} THEN 0 ELSE 1 END)`;
 
 /** §7.2's query, verbatim in shape. The `preview` variant keeps the excluded
  *  rows so the admin can be TOLD why an entry can never be drawn — a customer
- *  path never asks for it. */
+ *  path never asks for it. A customer path never sees a labelled product
+ *  (migration 0218: `estimateClause`); the preview names it PRICE_ESTIMATE. */
 const CANDIDATE_SQL = (preview: boolean, listedP: string) => `
   SELECT e.id AS entry_id, e.product_id, e.option_value_ids, e.color_id, e.family_id, e.weight,
          e.active AS entry_active,
@@ -378,13 +400,14 @@ const CANDIDATE_SQL = (preview: boolean, listedP: string) => `
          p.status, p.sale_types, p.composition, p.name, p.images,
          p.category_id, p.sub_category_id,
          p.net_weight_g, p.width_mm, p.depth_mm, p.height_mm,
-         p.package_weight_g, p.package_width_mm, p.package_depth_mm, p.package_height_mm
+         p.package_weight_g, p.package_width_mm, p.package_depth_mm, p.package_height_mm,
+         ${ESTIMATE_COLUMN} AS price_estimate
     FROM mystery_pool_entries e
     JOIN products p ON p.id = e.product_id
    WHERE e.pool_id = ?1
      ${preview ? '' : 'AND e.active = 1 AND e.weight > 0'}
      ${preview ? '' : `AND ${listedP}`}
-     ${preview ? '' : "AND p.composition = ''"}
+     ${preview ? '' : `AND p.composition = ''${estimateClause('p')}`}
      AND (?2 = '' OR e.family_id = ?2)
    ORDER BY e.id`;
 
@@ -483,10 +506,11 @@ export async function loadCandidates(
   // incomplete» switch holds is never drawn, and the admin preview names it
   // PRODUCT_INACTIVE like a hidden one.
   const L = await listing(db);
-  const { results } = await db
-    .prepare(CANDIDATE_SQL(preview, L.sellable('p')))
-    .bind(pool.id, family)
-    .all<EntryJoinRow>();
+  // A database without 0218 refuses the label's column: the statement runs again without it (today's), and
+  // the binding remembers that for a minute (worker/lib/priceEstimateLabel.ts).
+  const { results } = await runWithEstimateClause(db, CANDIDATE_SQL(preview, L.sellable('p')), (sql) =>
+    db.prepare(sql).bind(pool.id, family).all<EntryJoinRow>()
+  );
   const heldEntries = await L.unsellableIds(results.map((r) => String(r.product_id)));
 
   const modeById = new Map(results.map((r) => [r.product_id, r.inventory_mode]));
@@ -530,6 +554,12 @@ export async function loadCandidates(
     }
     if (!L.isSellableRow({ id: r.product_id, status: r.status }, heldEntries)) {
       drop('PRODUCT_INACTIVE');
+      continue;
+    }
+    // «سعر تقديري» (migration 0218): never drawn until the owner confirms its price. A customer read never
+    // gets here with one (the query leaves it out); the admin preview is told why.
+    if (truthy(r.price_estimate)) {
+      drop('PRICE_ESTIMATE');
       continue;
     }
     // Never a bundle or another mystery offer inside a mystery pool.

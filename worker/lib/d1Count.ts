@@ -198,7 +198,7 @@ export function scopedCountingD1(db: D1Database, opts: { limit?: number } = {}):
 }
 
 /**
- * Another module's counting view of `db` (the catalogue import's invocation counter, worker/lib/catalogImport/budget.ts)
+ * Another module's counting view of `db` (the invocation counter of worker/lib/invocationCounter.ts, which the catalogue import and the estimator use)
  * registered as a view of the binding behind `db`, so `d1Base` — and through it the event bus — treats it as that
  * binding, exactly as the two views above.
  */

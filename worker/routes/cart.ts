@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { listing, priceNotAvailable } from '../lib/listing';
-import { checkSelection, namesUnpricedChoice, selectionKey, skuPriced } from '../lib/commercialState';
+import { checkSelection, namesUnpricedChoice, selectionKey, skuEstimated, skuPriced } from '../lib/commercialState';
+import { isEstimateRow } from '../lib/priceEstimateLabel';
 import { serverMessage } from '@levonis/contracts/costRefusals';
 import { cartShippingType, typeForTransport, type ShippingType } from '../lib/shippingType';
 import {
@@ -57,6 +58,8 @@ import { couponLinesOf, productCouponFacts } from '../lib/couponLines';
 import { rateLimit } from '../lib/ratelimit';
 import { lineOrderType, saleAvailability, unusableOrderType } from './products';
 import {
+  estimateLineRefusal,
+  estimateOrderingOf,
   isComposition,
   judgeLevonisLine,
   judgeLevonisLineOrThrow,
@@ -568,9 +571,27 @@ function colourGroupValue(view: ProductRelationsView | undefined, valueIds: read
  * member prices beside the final figure; no cart or checkout screen rendered
  * any of them, and together they were the arithmetic of the line. Compare-at
  * is gone (mandate §4): the struck `regular_iqd` is the only saving shown.
+ *
+ * `opts.estimate`: the line's SKU is an estimated price (migration 0218,
+ * `skuEstimated`) — the breakdown then carries `price_estimate: true`, a fact
+ * about the figures and never a step of them; absent otherwise, so every other
+ * line is byte-identical (docs/SMART_PRICING.md §5.1, §5.3).
  */
-export function publicBreakdown(r: ResolvedPrice): CustomerLinePrice {
-  return customerLinePrice(r);
+export function publicBreakdown(r: ResolvedPrice, opts: { estimate?: boolean } = {}): CustomerLinePrice {
+  return customerLinePrice(r, opts);
+}
+
+/**
+ * «سعر تقديري» ON THE CART (docs/SMART_PRICING.md §5.3): `has_estimates: true`
+ * when any line's price is an estimate — the page's one note under the total —
+ * and absent otherwise, so every other cart answer is byte-identical. Read off
+ * the lines themselves (each carries `price_estimate`), so every answer that
+ * returns the cart's lines says it the same way.
+ */
+export function cartEstimateFlag(items: readonly unknown[]): { has_estimates?: true } {
+  return items.some((i) => !!i && typeof i === 'object' && (i as { price_estimate?: unknown }).price_estimate === true)
+    ? { has_estimates: true }
+    : {};
 }
 
 /**
@@ -1192,6 +1213,9 @@ async function loadCart(c: Context<AppContext>) {
       sel.fulfillmentType,
       sel.transportMethod
     );
+    // «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.2–5.3): this line's own SKU — the label is read
+    // off the product row the price was read with, and a SKU the owner made firm carries none. No statement.
+    const estimate = skuEstimated(doc, selectionKey(sel.optionValueIds ?? [], sel.colorId || null));
     items.push({
       id: row.cart_item_id,
       productId: row.id,
@@ -1234,7 +1258,9 @@ async function loadCart(c: Context<AppContext>) {
       unit_price_iqd: resolved.unit_subtotal_iqd,
       // The same unit in the shop's dollars (DECISIONS row 248), where it has a dollar base.
       ...(isUsdCents(resolved.unit_subtotal_usd_cents) ? { unit_price_usd_cents: resolved.unit_subtotal_usd_cents } : {}),
-      breakdown: publicBreakdown(resolved),
+      breakdown: publicBreakdown(resolved, { estimate }),
+      // «سعر تقديري»: the line's price is an estimate (its chip) — only when true, never a figure or a source.
+      ...(estimate ? { price_estimate: true as const } : {}),
       // Legacy field: the base row. `availability.stock` is the authoritative
       // figure for THIS selection. Null for a mystery-pool member — the cart
       // is a customer payload like any other (§8.2 row 18).
@@ -1459,6 +1485,8 @@ cartRoutes.get('/', async (c) => {
     // §10: the server's own answer about what this membership saved, so the
     // page states it instead of subtracting two numbers and hoping.
     membership,
+    // «سعر تقديري» (docs/SMART_PRICING.md §5.3): `has_estimates: true` when a line is an estimate — absent otherwise.
+    ...cartEstimateFlag(items),
     delivery_methods,
     delivery_tariff,
     shipping_type: shippingType,
@@ -1770,7 +1798,7 @@ async function addCompositionLine(
   const { items, tier: t, tierActive: ta } = await loadCart(c);
   // A bundle or mystery line carries no options and no colour.
   queueCartAddForMeta(c, items, [{ productId, canonical: [], colorId: '', qty }]);
-  return c.json({ success: true, items, tier: t, tierActive: ta });
+  return c.json({ success: true, items, tier: t, tierActive: ta, ...cartEstimateFlag(items) });
 }
 
 /**
@@ -2034,6 +2062,13 @@ function giftLineRefusalFor(
   if (String(row.status ?? '') !== 'active' || String(row.composition ?? '') !== '') {
     return giftRefusal(409, 'GIFT_NOT_AVAILABLE', 'This gift is no longer available.');
   }
+  // «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §6.3, §8; owner question 282(h)): a gift never rides
+  // an estimate — its value would be a price nobody confirmed, and a gift line is never an estimate line at
+  // the checkout. A gift granted before its product became an estimate is refused here, at the cart, the add
+  // door and the checkout alike (all three run this), with the hidden product's own sentence: support decides.
+  if (isEstimateRow(row)) {
+    return giftRefusal(409, 'GIFT_NOT_AVAILABLE', 'This gift is no longer available.', { errors: ['PRICE_ESTIMATE'] });
+  }
   if (sel.saleType === 'pre_order' && !sel.transportMethod) {
     return giftRefusal(400, 'TRANSPORT_REQUIRED', 'This pre-order gift has no shipping route.');
   }
@@ -2194,7 +2229,7 @@ cartRoutes.post('/gift-items', async (c) => {
       .first<{ id: string }>();
   const answer = async (alreadyInCart: boolean) => {
     const { items, tier, tierActive } = await loadCart(c);
-    return c.json({ success: true, items, tier, tierActive, ...(alreadyInCart ? { already_in_cart: true } : {}) });
+    return c.json({ success: true, items, tier, tierActive, ...cartEstimateFlag(items), ...(alreadyInCart ? { already_in_cart: true } : {}) });
   };
 
   const g = await readGift();
@@ -2452,7 +2487,7 @@ cartRoutes.post('/items', async (c) => {
   }
   queueCartAddForMeta(c, items, [{ productId, canonical, colorId, qty }]);
 
-  return c.json({ success: true, items, tier: t, tierActive: ta });
+  return c.json({ success: true, items, tier: t, tierActive: ta, ...cartEstimateFlag(items) });
 });
 
 /**
@@ -2798,7 +2833,7 @@ cartRoutes.post('/items/batch', async (c) => {
   }
   queueCartAddForMeta(c, items, judged.map((j, i) => ({ productId, canonical: j.canonical, colorId: lines[i].colorId, qty: lines[i].qty })));
 
-  return c.json({ success: true, items, tier: t, tierActive: ta, added });
+  return c.json({ success: true, items, tier: t, tierActive: ta, ...cartEstimateFlag(items), added });
 });
 
 /**
@@ -2904,7 +2939,14 @@ async function patchCompositionLine(
         ...cartChoiceStatements(c.env.DB, user.id, productId, key, identityIds, choices),
       ]);
       const cart = await loadCart(c);
-      return c.json({ success: true, items: cart.items, tier: cart.tier, tierActive: cart.tierActive, merged_into: mergedInto });
+      return c.json({
+        success: true,
+        items: cart.items,
+        tier: cart.tier,
+        tierActive: cart.tierActive,
+        ...cartEstimateFlag(cart.items),
+        merged_into: mergedInto,
+      });
     }
   }
 
@@ -2916,7 +2958,7 @@ async function patchCompositionLine(
   ]);
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
-  return c.json({ success: true, items, tier: t, tierActive: ta });
+  return c.json({ success: true, items, tier: t, tierActive: ta, ...cartEstimateFlag(items) });
 }
 
 /** The stored choices, re-checked against the components as they are TODAY. A
@@ -3029,12 +3071,15 @@ cartRoutes.patch('/items/:id', async (c) => {
   // validation (previous behavior silently accepted any selection here).
   if (!product) throw badRequest('This product no longer exists — please remove it from your cart');
 
-  const [{ tier, active: tierActive, ctx }, views, isPrinter] = await Promise.all([
+  const [{ tier, active: tierActive, ctx }, views, isPrinter, estimateOrdering] = await Promise.all([
     cartPricing(c),
     loadRelationsViews(c.env.DB, [{ id: String(existing.product_id), inventory_mode: product.inventory_mode }]),
     // Setting or changing the plan from the cart's disclosure runs the same
     // printers-only gate as the add; clearing it ('') needs no check.
     warrantyPlanId ? isPrinterProduct(c.env.DB, String(existing.product_id)) : Promise.resolve(false),
+    // «سعر تقديري» (migration 0218): the owner's ordering switch, read for a LABELLED product only — the add
+    // door's own read (worker/lib/cartAdd.ts), so the two doors cannot disagree about it.
+    estimateOrderingOf(c.env.DB, product),
   ]);
   refuseNonPrinterWarranty(isPrinter, warrantyPlanId);
   const view = views.get(String(existing.product_id));
@@ -3095,11 +3140,16 @@ cartRoutes.patch('/items/:id', async (c) => {
   // An update may also CLEAR a chosen option (an explicit empty list is the
   // new selection) — the same rule as an add.
   refuseIncompleteSelection(availability);
+  const patchType = lineOrderType(availability, fulfillmentType, transportMethod);
+  // «سعر تقديري» (docs/SMART_PRICING.md §6.1): the line update refuses as the add does — an estimated SKU by
+  // pre-order only, and nothing while the owner has paused ordering at estimates — in the add's own order.
+  const estimate = estimateLineRefusal(doc, { optionValueIds, colorId }, patchType, estimateOrdering);
+  if (estimate) throw estimate;
   // The same rule on the edit door, typed the same way: changing the quantity
   // of a pre-order must not silently re-type the line when its quota filled up,
   // and a PATCH that carries a transport with no stated type is the same row
   // the add door writes.
-  const statedPatch = unusableOrderType(availability, lineOrderType(availability, fulfillmentType, transportMethod));
+  const statedPatch = unusableOrderType(availability, patchType);
   if (statedPatch) throw badRequest(statedPatch.message, statedPatch.code);
   if (availability.mode === 'unavailable') {
     throw badRequest(
@@ -3147,7 +3197,7 @@ cartRoutes.patch('/items/:id', async (c) => {
     .run();
 
   const { items, tier: t, tierActive: ta } = await loadCart(c);
-  return c.json({ success: true, items, tier: t, tierActive: ta });
+  return c.json({ success: true, items, tier: t, tierActive: ta, ...cartEstimateFlag(items) });
 });
 
 /**
@@ -3170,7 +3220,7 @@ cartRoutes.delete('/items/:id', async (c) => {
     .bind(c.req.param('id'), user.id)
     .run();
   const { items, unavailable_lines, tier, tierActive } = await loadCart(c);
-  return c.json({ success: true, items, unavailable_lines, tier, tierActive });
+  return c.json({ success: true, items, unavailable_lines, tier, tierActive, ...cartEstimateFlag(items) });
 });
 
 // ---------------------------------------------------------------------------

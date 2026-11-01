@@ -834,3 +834,40 @@ test('a shop product sold in variants: every live combination with its own price
   );
   assert.deepEqual(attributes, { material: 'pla', technology: 'fdm', color: 'white', finish: null, dimensions_mm: { x: 100, y: 100, z: 250 }, weight_g: 180 });
 });
+
+// =========================================================================
+// «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.3)
+// =========================================================================
+
+test('`price.estimate`: true on an estimated product wherever its price is published, false on every other price — schema-valid, nothing private beside it', async () => {
+  const { raw, call, first } = await world();
+  raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${first.id}', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = '${first.id}';
+    DELETE FROM ops_guards WHERE id = 'engine-price:${first.id}';`);
+  const doc = (await (await call('/api/public/v1/openapi.json')).json()) as {
+    paths: Record<string, { get: { responses: { '200': { content: { 'application/json': { schema: Record<string, unknown> } } } } } }>;
+    components: { schemas: Record<string, Record<string, unknown>> };
+  };
+  const read = async (route: string, path: string) => {
+    const res = await call(path);
+    assert.equal(res.status, 200, path);
+    const body = (await res.json()) as { data: unknown };
+    const schema = doc.paths[route].get.responses['200'].content['application/json'].schema;
+    assert.deepEqual(validate(body, schema, doc.components.schemas).slice(0, 5), [], `${path} matches its schema`);
+    const bad: string[] = [];
+    scanKeys(body, '$', bad);
+    assert.deepEqual(bad, [], `${path} carries no forbidden key`);
+    return body.data;
+  };
+  const product = (await read('/products/{slug}', `/api/public/v1/products/${first.slug}`)) as { price: { status: string; estimate: boolean } };
+  assert.equal(product.price.status, 'priced');
+  assert.equal(product.price.estimate, true);
+  const list = (await read('/products', '/api/public/v1/products?limit=50')) as Array<{ slug: string; price: { estimate: boolean } }>;
+  assert.ok(list.length > 1);
+  for (const p of list) assert.equal(p.price.estimate, p.slug === first.slug, `${p.slug}: estimate only on the estimated product`);
+  // The schema documents it, for an agent to read.
+  const price = doc.components.schemas.Price as { properties: Record<string, { type?: string; description?: string }>; required: string[] };
+  assert.equal(price.properties.estimate.type, 'boolean');
+  assert.ok(price.required.includes('estimate'), 'always present');
+  assert.match(String(price.properties.estimate.description), /estimated pre-order price/);
+});

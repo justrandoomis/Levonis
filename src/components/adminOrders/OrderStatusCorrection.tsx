@@ -23,6 +23,7 @@ import { useState } from 'react';
 import { api, ApiError, type OrderStatus } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { apiRefusal } from '../../lib/refusalStrings';
+import { estimateRefusalText } from '../../../packages/contracts/src/priceEstimates';
 import SerialGateRefusal, { gateRefusalOf, type GateRefusal } from './serials/SerialGateRefusal';
 import type { GateMissing } from './serials/types';
 
@@ -134,9 +135,11 @@ export default function OrderStatusCorrection({
         setGate({ ...refused, to });
         return;
       }
+      // An estimate gate's refusal (docs/SMART_PRICING.md §6.4) reads in the estimate contract's words first.
+      const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
       setError(
         e instanceof ApiError
-          ? apiRefusal(e, lang === 'en' || lang === 'ckb' ? lang : 'ar', e.message)
+          ? (estimateRefusalText(e, l) ?? apiRefusal(e, l, e.message))
           : loc('تعذّر تحديث الحالة', 'Failed to update the status', 'دۆخ نوێ نەکرایەوە')
       );
     } finally {

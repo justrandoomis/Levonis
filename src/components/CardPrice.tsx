@@ -4,7 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { type ApiProduct } from '../lib/api';
 import { pairedUsd, splitMoney, useMoney } from '../CurrencyContext';
 import { memberLine } from '../lib/productCard';
-import { isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
+import { ESTIMATE_SHORT, ESTIMATE_TEXT, isEstimated, isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
 
 /**
  * The ONE price block every product card renders (home rails, /products grid,
@@ -28,6 +28,11 @@ import { isUnpriced, UNPRICED_TEXT } from '../lib/priceStatus';
  * Which branch applies is read from display_applied_tier — the server's
  * verdict, not a client guess. `display_from` marks genuinely differing
  * variant prices, so «يبدأ من» is honest, never decorative.
+ *
+ * «سعر تقديري» (docs/SMART_PRICING.md §5.3): a priced card whose price is an
+ * estimated pre-order price (`price_estimate: true`, src/lib/priceStatus.ts
+ * `isEstimated`) says so — a muted line under the price on a regular row, the
+ * second line of a compact row. The figure itself is unchanged.
  */
 export default function CardPrice({
   p,
@@ -126,6 +131,12 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
           <span className="text-zinc-500/80 text-[10.5px] line-through truncate">{money(struck, usd.struck)}</span>
         )}
       </div>
+      {/* An estimated pre-order price says so, muted, under the figure (§5.3). */}
+      {isEstimated(p) ? (
+        <p data-price-estimate className="mt-0.5 truncate text-[10px] font-semibold text-text-muted">
+          {loc(ESTIMATE_TEXT.ar, ESTIMATE_TEXT.en, ESTIMATE_TEXT.ckb)}
+        </p>
+      ) : null}
       {teasers.map((t) => (
         <div key={t.label} className="flex items-center gap-1 mt-0.5 min-w-0">
           <Star aria-hidden className="w-2.5 h-2.5 text-gold/70 shrink-0" />
@@ -144,9 +155,11 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
  *
  *   row 1   «يبدأ من» 10 muted · the amount 15/20 800 tabular · «د.ع» 10.5
  *   row 2   A LIVE OFFER'S struck before price first (docs/ux/PRODUCT-DISCOUNT.md
- *           §8.2: `display_offer_before_iqd`; the member line yields to it). Else
- *           ONE member line — the cheapest rung below what this viewer pays
- *           (src/lib/productCard.ts `memberLine`): ✧ 674,100 لأعضاء PRO.
+ *           §8.2: `display_offer_before_iqd`; the member line yields to it).
+ *           Else, on an ESTIMATED price (docs/SMART_PRICING.md §5.3), «تقديري»
+ *           — the member line yields to it too. Else ONE member line — the
+ *           cheapest rung below what this viewer pays (src/lib/productCard.ts
+ *           `memberLine`): ✧ 674,100 لأعضاء PRO.
  *           When there is no cheaper rung but the viewer's own price is below
  *           the regular one (a member), the struck regular price takes the row
  *           instead. Otherwise the row stays empty.
@@ -163,8 +176,10 @@ function CompactPrice({ p }: { p: ApiProduct }) {
   const regular = (p.display_regular_iqd ?? p.price_iqd) as number;
   const applied = p.display_applied_tier ?? 'regular';
   const offerBefore = typeof p.display_offer_before_iqd === 'number' ? p.display_offer_before_iqd : null;
-  const line = offerBefore === null ? memberLine(p) : null;
-  const struck = offerBefore ?? (!line && main < regular ? regular : null);
+  // «تقديري» takes the row after a live offer's struck price and before the member line (§5.3).
+  const estimate = offerBefore === null && isEstimated(p);
+  const line = offerBefore === null && !estimate ? memberLine(p) : null;
+  const struck = offerBefore ?? (!estimate && !line && main < regular ? regular : null);
   // The shop's dollar prices (DECISIONS row 248): the struck pair in dollars only when both exist.
   const usd = pairedUsd(p.display_price_usd_cents, offerBefore !== null ? p.display_offer_before_usd_cents : p.display_regular_usd_cents, struck !== null);
   const [amount, unit] = splitMoney(money(main, usd.price));
@@ -205,6 +220,10 @@ function CompactPrice({ p }: { p: ApiProduct }) {
             <span className="sr-only">{loc('بدل', 'instead of', 'لە جیاتی')} </span>
             <bdi dir="ltr" className="text-text-muted line-through tabular-nums">{splitMoney(money(struck, usd.struck))[0]}</bdi>
           </>
+        ) : estimate ? (
+          <span data-price-estimate className="truncate font-semibold text-text-muted">
+            {loc(ESTIMATE_SHORT.ar, ESTIMATE_SHORT.en, ESTIMATE_SHORT.ckb)}
+          </span>
         ) : null}
       </div>
     </div>

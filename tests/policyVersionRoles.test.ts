@@ -24,6 +24,10 @@
  * below proves that a profile still at privacy 3 is switched off until it
  * consents to 4.
  *
+ * AND THREE NON-CONSENT DOCUMENTS HAVE MOVED FOR THE ESTIMATED PRICE (owner,
+ * 2026-10-31; DECISIONS row 280): purchase 6 → 7, price_protection 5 → 6 and
+ * faq 6 → 7. None of them is a consent document, so nobody is asked again.
+ *
  * The version numbers are written out on purpose, not read from the
  * registry: a test that compared the registry with itself would stay green
  * the day a consent document moved.
@@ -53,12 +57,15 @@ const EFFECTIVE = '2026-10-09';
 const MOVED = { purchase: 6, faq: 5, membership: 5, price_protection: 4 } as const;
 /**
  * What each reworded document reads today: price_protection moved again, to 5,
- * for owner decision 6 (DECISIONS row 196), and faq to 6 for the Meta Pixel.
+ * for owner decision 6 (DECISIONS row 196), and faq to 6 for the Meta Pixel;
+ * then purchase 7, price_protection 6 and faq 7 for the estimated price
+ * (DECISIONS row 280).
  */
-const CURRENT = { ...MOVED, price_protection: 5, faq: 6 } as const;
+const CURRENT = { ...MOVED, purchase: 7, price_protection: 6, faq: 7 } as const;
 /** The documents that have moved since decision 7, and the day each did. */
 const META_PIXEL_EFFECTIVE = '2026-10-31';
-const EFFECTIVE_SINCE: Readonly<Record<string, string>> = { faq: META_PIXEL_EFFECTIVE };
+const ESTIMATE_EFFECTIVE = '2026-10-31';
+const EFFECTIVE_SINCE: Readonly<Record<string, string>> = { faq: META_PIXEL_EFFECTIVE, purchase: ESTIMATE_EFFECTIVE, price_protection: ESTIMATE_EFFECTIVE };
 /** The consent documents as decision 7 left them — what a customer had accepted before the Meta Pixel. */
 const CONSENT_AT_DECISION_7 = { terms: 4, privacy: 3, quick_buy: 1 } as const;
 /** The consent documents today: privacy moved to 4 for the Meta Pixel; terms and quick_buy did not move. */
@@ -103,9 +110,9 @@ test('every role reads the same new versions and the same text, in all three lan
     for (const lang of LANGS) {
       const res = await json(await get(policyApp(raw, user), `/api/policies/purchase?lang=${lang}`));
       assert.equal(res.success, true, `${role}/${lang}: ${JSON.stringify(res)}`);
-      assert.equal(res.policy.version, MOVED.purchase);
+      assert.equal(res.policy.version, CURRENT.purchase);
       assert.equal(res.policy.lang, lang, `${role}: ${lang} fell back to another language`);
-      assert.equal(res.policy.hash, LEDGER[`purchase@${MOVED.purchase}:${lang}`], `${role}/${lang}: not the ledgered text`);
+      assert.equal(res.policy.hash, LEDGER[`purchase@${CURRENT.purchase}:${lang}`], `${role}/${lang}: not the ledgered text`);
       assert.ok(String(res.policy.body).includes(NAME[lang]), `${role}/${lang}: «${NAME[lang]}» missing`);
       assert.doesNotMatch(String(res.policy.body), /علاو[ةتا]|premium/, `${role}/${lang}`);
       fingerprint.push(res.policy.hash, res.policy.body);
@@ -121,7 +128,7 @@ test('every role reads the same new versions and the same text, in all three lan
   for (const [role, fp] of seen) assert.equal(fp, reference, `${role} reads something an anonymous visitor does not`);
 });
 
-test('?version=5 still serves the archived purchase 5 after the sync writes 6 beside it — the old rows untouched', async () => {
+test('?version=5 still serves the archived purchase 5 after the sync writes the current version beside it — the old rows untouched', async () => {
   const raw = freshDb();
   resetPolicyCorpusMemo();
   // The archive as the previous deploy left it: purchase 5, in three
@@ -136,12 +143,12 @@ test('?version=5 still serves the archived purchase 5 after the sync writes 6 be
       .run(`pol_v5_${lang}`, lang, OLD_BODY[lang], LEDGER[`purchase@5:${lang}`]);
   }
 
-  // A plain read serves 6 from the code and mirrors it into the archive —
+  // A plain read serves the current version from the code and mirrors it into the archive —
   // after the response, through waitUntil, so the test waits for it.
   const current = await json(await get(policyApp(raw, null), '/api/policies/purchase?lang=en'));
-  assert.equal(current.policy.version, 6);
+  assert.equal(current.policy.version, CURRENT.purchase);
   await Promise.all(pending.splice(0));
-  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM policy_documents WHERE key = 'purchase' AND version = 6 AND status = 'published'"), 3);
+  assert.equal(count(raw, `SELECT COUNT(*) AS n FROM policy_documents WHERE key = 'purchase' AND version = ${CURRENT.purchase} AND status = 'published'`), 3);
 
   for (const lang of LANGS) {
     const old = await json(await get(policyApp(raw, { id: 'u_c', role: 'customer', email: 'c@x.co' }), `/api/policies/purchase?lang=${lang}&version=5`));

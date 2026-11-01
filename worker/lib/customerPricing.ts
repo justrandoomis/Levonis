@@ -168,6 +168,12 @@ export interface CustomerLinePrice {
   /** The struck price in dollars and the «−N٪» of the dollar pair — present only when BOTH twins exist. */
   offer_before_usd_cents?: number;
   offer_saving_percent_usd?: number | null;
+  /**
+   * «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.1): this line's price is an estimated pre-order
+   * price — present only when true, so every other line is byte-identical. A fact about the figures above,
+   * not a step of them: it carries no source, supplier price, flag or measure, and is not arithmetic.
+   */
+  price_estimate?: true;
 }
 
 /** A customer line with every dollar twin removed — for a figure that has no dollar base (a composition). */
@@ -229,7 +235,11 @@ export function offerLabelTier(r: { applied_tier?: unknown; applied_iqd?: unknow
   return tier;
 }
 
-export function customerLinePrice(r: ResolvedPrice): CustomerLinePrice {
+/**
+ * `opts.estimate`: the line's selection is an estimate (`selectionEstimated` / `skuEstimated`,
+ * worker/lib/commercialState.ts) — the caller knows the selection; the resolver's answer does not carry the label.
+ */
+export function customerLinePrice(r: ResolvedPrice, opts: { estimate?: boolean } = {}): CustomerLinePrice {
   const f = r.fulfillment as ResolvedPrice['fulfillment'] | null | undefined;
   return {
     regular_iqd: r.regular_iqd,
@@ -250,6 +260,7 @@ export function customerLinePrice(r: ResolvedPrice): CustomerLinePrice {
     errors: r.errors.filter((e) => !CUSTOMER_HIDDEN_ERRORS.has(e)),
     ...offerFigures(r.offer_before_iqd, r.applied_iqd, r.offer_before_usd_cents, r.applied_usd_cents),
     ...customerUsdTwins(r),
+    ...(opts.estimate === true ? { price_estimate: true as const } : {}),
   };
 }
 
@@ -275,7 +286,8 @@ export function offerFigures(
 /**
  * The price block of a STORED order line, as its buyer reads it back
  * (`order_items.pricing_snapshot` is never rewritten — this is applied when it
- * is served). The final figures, the gift, and the three deferred facts above.
+ * is served). The final figures, the gift, the estimate label (`price_estimate`,
+ * only on a line sold at an estimated price), and the three deferred facts above.
  */
 export function customerOrderPricing(snapshot: unknown): Record<string, unknown> | null {
   const s = rec(snapshot);
@@ -303,12 +315,21 @@ export function customerOrderPricing(snapshot: unknown): Record<string, unknown>
   }
   const gift = rec(s.gift);
   if (gift) out.gift = { gift_id: text(gift.gift_id), level: num(gift.level) ?? 0, value_iqd: num(gift.value_iqd) ?? 0 };
+  // The line was sold at an estimated price (migration 0218; docs/SMART_PRICING.md §6.3): the checkout froze
+  // `estimate: {v: <the notice version the buyer acknowledged>}` into the snapshot. Served as the label only.
+  if (isEstimateSnapshot(s.estimate)) out.price_estimate = true;
   // ---- DEFERRED to V2-7 (rendered today; see the header) ----
   if (s.pricing_basis === 'direct' || s.pricing_basis === 'preorder') out.pricing_basis = s.pricing_basis;
   const direct = rec(s.direct);
   out.direct = direct ? { surcharge_iqd: num(direct.surcharge_iqd) ?? 0, waived: direct.waived === true } : null;
   if ('transport' in s) out.transport = customerOrderTransport(s.transport);
   return out;
+}
+
+/** A stored line's `pricing_snapshot.estimate`: `{v}`, the acknowledged notice version (a positive integer). */
+function isEstimateSnapshot(v: unknown): boolean {
+  const e = rec(v);
+  return !!e && typeof e.v === 'number' && Number.isSafeInteger(e.v) && e.v > 0;
 }
 
 /** A stored line's journey: the route (rendered) and, DEFERRED to V2-7, the commission and its waiver (fee naming). */

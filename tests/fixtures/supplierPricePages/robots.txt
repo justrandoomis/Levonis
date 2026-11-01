@@ -1,0 +1,8 @@
+# A store robots.txt in the shape the import reads (scripts/bambu-import/robots.ts).
+User-agent: *
+Disallow: /cart
+Disallow: /account
+Disallow: /products/a1-mini
+Allow: /products/
+
+Sitemap: https://eu.store.bambulab.com/sitemap.xml

@@ -16,10 +16,19 @@
  * A price editor types dollars on a price-first product (Q2) and reads the
  * final dinars of a cost-first one («تسعير هذا المنتج من التكلفة للمالك فقط»).
  *
+ * «سعر تقديري» (docs/SMART_PRICING.md §3.9, §7): a stored product carries the
+ * estimate banner, a lazy chunk of its own (src/components/adminEstimates/
+ * EstimateBanner.tsx). The owner — the reader the server answers as the
+ * pricing owner, the one with cost read — gets the sources, the supplier links,
+ * «مراجعة» and «تأكيد»; it reads them only for him. Every other admin sees the
+ * state alone, from the product read's non-financial `price_estimate`
+ * (`priceEstimate`), and no request is made for him.
+ *
  * No old dinar price appears anywhere here, and no maths runs here: every
  * figure is the server's answer to the draft (useV2Pricing).
  */
-import { useMemo } from 'react';
+import { lazy, Suspense, useMemo } from 'react';
+import type { AdminProductEstimate } from '../../../../lib/api';
 import type { ProductDimensionsV2 } from '../../../../lib/productTypes';
 import { draftOf, firstLineOf, productFinalLine, withPackageMeasure, type V2Names } from './v2Model';
 import { useV2 } from './useV2Pricing';
@@ -33,12 +42,16 @@ import { firstPreorder } from './v2Model';
 import { useV2Strings } from './v2Ui';
 import PurchaseReviewCard from './PurchaseReviewCard';
 
+/** The estimate banner (owner: sources, links, review, confirm; everyone else: the state) — loaded only when shown. */
+const EstimateBanner = lazy(() => import('../../../adminEstimates/EstimateBanner'));
+
 export default function PricesSectionV2({
   modelNames,
   firstModelId,
   packageDims,
   onJump,
   productId = null,
+  priceEstimate = null,
 }: {
   modelNames: (id: string) => V2Names | null;
   /** The first active model of section ٥ (its result is the bar's), or null for an option-less product. */
@@ -47,11 +60,15 @@ export default function PricesSectionV2({
   onJump: (section: 3 | 5) => void;
   /** The stored product (null: add-product) — the owner's purchase review is read for it (D1, A.10). */
   productId?: string | null;
+  /** The product read's non-financial `price_estimate` (GET /api/admin/products-v2/:id), when the form passes it. */
+  priceEstimate?: AdminProductEstimate | null;
 }) {
   const v2 = useV2();
   const s = useV2Strings();
   const storedCost = useMemo(() => draftOf(v2?.stored ?? null).cost, [v2?.stored]);
   if (!v2 || !v2.mode) return null;
+  // The owner's banner reads its own (cost-read) routes; another admin's shows the state the form passed, or nothing.
+  const estimateBanner = productId && v2.mode === 'stored' && (v2.owner || priceEstimate?.label || priceEstimate?.state);
   const a = v2.answer;
   const d = v2.draft;
   if (!a && v2.loading) {
@@ -75,6 +92,11 @@ export default function PricesSectionV2({
 
   return (
     <div className="min-w-0" data-form="pricing-v2" data-v2-mode={v2.mode} data-v2-owner={v2.owner ? '1' : '0'} aria-busy={v2.previewing || undefined}>
+      {estimateBanner && productId ? (
+        <Suspense fallback={null}>
+          <EstimateBanner productId={productId} owner={v2.owner} state={priceEstimate} />
+        </Suspense>
+      ) : null}
       {v2.hidden ? (
         <div className="lv-alert lv-alert-info mb-3 px-3 py-2 text-[12px] leading-snug text-text-primary" data-v2-hidden>
           {a?.publishable ? s.hiddenNoteReady : s.hiddenNote}

@@ -378,3 +378,55 @@ test('through the detail route: every value of the table is in the answer exactl
     assert.equal(text.split(mark).length - 1, 1, `«${mark}» is in the detail ${text.split(mark).length - 1} times`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// «سعر تقديري» (migration 0218; docs/SMART_PRICING.md §5.1–5.3).
+//
+// The label is a boolean the PRICED card and page add (`price_estimate`, only
+// when true). The bare projection carries neither it nor the firm SKU list —
+// the card decides the label from the priced SKUs — and the catalog-only card,
+// which shows no price, never carries it. Nothing private rides with it.
+// ---------------------------------------------------------------------------
+
+test('an estimated product: a boolean label on the priced page, nothing private beside it; the bare projection carries neither label nor firm list', async () => {
+  const raw = freshDb();
+  seedLiveCatalog(raw);
+  const id = (raw.prepare("SELECT id FROM products WHERE slug = 'bambu-lab-x2d'").get() as { id: string }).id;
+  raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${id}', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = '${id}';
+    DELETE FROM ops_guards WHERE id = 'engine-price:${id}';`);
+  const app = stubApp(asD1(raw), null, (a) => a.route('/api/products', productRoutes));
+  const res = await get(app, '/api/products/bambu-lab-x2d');
+  assert.equal(res.status, 200);
+  const body = (await res.json()) as { price_status: string; price_estimate?: boolean; product: Record<string, unknown> };
+  assert.equal(body.price_status, 'priced');
+  assert.equal(body.product.price_estimate, true, 'the page card is labelled');
+  assert.equal(body.price_estimate, true, 'and its opening selection');
+  const keys = [...allKeys(body)];
+  assert.deepEqual(keys.filter((k) => k.toLowerCase().includes('cost')), [], 'no cost key at any level');
+  for (const k of ['sku_firm', 'sku_strict', 'sku_prices', 'flags_json', 'measure_basis', 'supplier_price']) assert.equal(keys.includes(k), false, `no ${k}`);
+
+  const doc = Object.assign(parseProductRow(raw.prepare('SELECT * FROM products WHERE id = ?').get(id) as Record<string, unknown>), { sku_firm: [''] });
+  assert.equal(doc.price_estimate, true, 'parsed off the row');
+  const bare = [...allKeys(projectPublic(doc))];
+  assert.equal(bare.includes('price_estimate'), false, 'the projection does not decide the label');
+  assert.equal(bare.includes('sku_firm'), false);
+});
+
+test('a labelled product that is catalog-only shows no price, so no label: the catalog-only page and card carry none', async () => {
+  const raw = freshDb();
+  seedLiveCatalog(raw);
+  const id = (raw.prepare("SELECT id FROM products WHERE slug = 'bambu-lab-x2d'").get() as { id: string }).id;
+  raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:${id}', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = '${id}';
+    DELETE FROM ops_guards WHERE id = 'engine-price:${id}';`);
+  // Never V2-published (the clean start): shown, not sold — the catalog-only page and card (DECISIONS row 240).
+  const app = stubApp(asD1(raw), null, (a) => a.route('/api/products', productRoutes), { publishV2: false });
+  for (const path of ['/api/products/bambu-lab-x2d', '/api/products']) {
+    const res = await get(app, path);
+    assert.equal(res.status, 200, path);
+    const text = await res.text();
+    assert.match(text, /"price_status":"unpriced"/, `${path}: catalog-only`);
+    assert.equal(text.includes('price_estimate'), false, `${path}: no price, no label`);
+  }
+});

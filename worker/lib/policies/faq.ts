@@ -71,10 +71,20 @@ import type { PolicyDocument } from './types';
  * events with hashed email and phone (privacy 4, articles 7.5–7.9), so 9.4
  * names both and keeps the rest as "no other". Wording only; the FAQ is
  * not a consent document, so nobody is asked to accept anything for it.
+ *
+ * VERSION 7 — WHY IT MOVED (owner, 2026-10-31; DECISIONS row 280;
+ * docs/SMART_PRICING.md §6). The archive keeps version 6 byte for byte. The
+ * new 12.12 answers the question the estimated-price mark raises — what it
+ * means, how such an item is ordered and paid, why the order waits at «تم
+ * استلام الطلب», what happens when the final price differs, the cancel that
+ * stays open, and when price protection starts — and routes it to the rules
+ * that decide it: purchase 4.11 to 4.17 (purchase 7) and price_protection 5.6
+ * and 10.12 (price_protection 6). It states no more than they do, and no
+ * figure, cost or supplier price. Nothing else moved.
  */
 export const faq: PolicyDocument = {
   key: 'faq',
-  version: 6,
+  version: 7,
   effective_at: '2026-10-31',
   title: {
     ar: 'الأسئلة الشائعة',
@@ -297,6 +307,9 @@ PRO ×2، ومن سواه ×1. ويُحسب لحظة قيد النقاط، لا 
 
 ### 12.11 لماذا حصلت على نقاط مراجعة ولم أحصل على هدية؟
 لأنهما شيئان مختلفان. نقاط المراجعة تُمنح تلقائياً للمراجعة اليدوية الصحيحة في اللحظة نفسها. أما الهدية فقرار مستقل للمتجر، لا يترتب على مجرد كتابة مراجعة، ولا تدخله المراجعة إلا إذا بلغت درجة جودة مقيسة، ثم يصدر فيه قبول أو طلب تعديل أو رفض بسبب مكتوب. المرجع: وثيقة النقاط والمراجعات، المادتان 7.5 و8.2.
+
+### 12.12 ما معنى «سعر تقديري»، وماذا يحدث إن اختلف السعر النهائي؟
+السعر التقديري هو السعر الذي يتوقعه المتجر لقطعة بالطلب المسبق قبل أن يؤكد المورّد سعرها، وتظهر بجانبه علامة «سعر تقديري». تطلب هذه القطعة عبر السلة وتدفع من المحفظة أو نقداً عند الاستلام، بعد أن تقرّ في شاشة الدفع بأنك تفهم أن سعرها قد يتغيّر. ثم يبقى طلبك في مرحلة «تم استلام الطلب» ولا يُجهَّز حتى يتأكد السعر النهائي: فإن لم يتغيّر مجموع طلبك تأكد كما هو، وإن تغيّر أُرسل إليك السعر الجديد لتوافق عليه أو ترفضه، ولا يُؤخذ منك أي مبلغ إضافي دون موافقتك. وحتى تأكيد السعر النهائي يمكنك إلغاء الطلب واسترداد كل ما دفعته، ولا تبدأ حماية السعر إلا بعد تأكيده. المرجع: وثيقة الشراء، المواد 4.11 إلى 4.17، ووثيقة حماية السعر، المادتان 5.6 و10.12.
 
 ## 13. أحكام ختامية
 
@@ -521,6 +534,9 @@ Because the wallet is not one figure: there is the settled balance, which is eve
 ### 12.11 Why did I receive review points but no gift?
 Because they are two different things. Review points are granted automatically for a valid manual review at the very moment it is saved. The gift, by contrast, is an independent decision of the Store; it does not follow from merely writing a review, a review enters it only where it reaches a measured quality score, and an approval, a request for changes or a refusal then issues upon it with a written reason. Reference: the Points and Reviews document, articles 7.5 and 8.2.
 
+### 12.12 What does "Estimated price" mean, and what happens if the final price is different?
+An estimated price is the price the Store expects for a pre-order item before the supplier confirms its price, and it is marked "Estimated price" beside the price. You order such an item through the cart and pay from the wallet or in cash on delivery, after acknowledging at checkout that you understand its price may change. Your order then stays at "Order received" and is not prepared until the final price is confirmed: if your order's total does not change, it is confirmed as it is; if it does, the new price is sent to you to approve or reject, and no additional amount is taken from you without your approval. Until the final price is confirmed you can cancel the order and get back everything you paid, and price protection starts only once it is confirmed. Reference: the Purchase document, articles 4.11 to 4.17, and the Price Protection document, articles 5.6 and 10.12.
+
 ## 13. Final provisions
 
 ### 13.1 Updating this page
@@ -743,6 +759,9 @@ PRO بە شێوەیەکی کاتی ڕاگیراوە — بەم زووانە، س
 
 ### 12.11 بۆچی خاڵی پێداچوونەوەم وەرگرت بەڵام دیارییەکم وەرنەگرت؟
 چونکە دوو شتی جیاوازن. خاڵی پێداچوونەوە بە شێوەی خۆکار بۆ پێداچوونەوەی دەستیی دروست دەبەخشرێت لە هەمان ساتی پاراستنیدا. بەڵام دیاری بڕیارێکی سەربەخۆی فرۆشگایە؛ تەنها بە نووسینی پێداچوونەوەیەک نایەت، و پێداچوونەوە تەنها کاتێک دەچێتە ناوی کە بگاتە پلەیەکی جۆرایەتی پێوراو، و پاشان پەسەندکردن یان داواکردنی گۆڕانکاری یان ڕەتکردنەوە بە هۆکارێکی نووسراو لەسەری دەردەچێت. سەرچاوە: بەڵگەنامەی خاڵ و پێداچوونەوە، ماددەکانی 7.5 و 8.2.
+
+### 12.12 «نرخی خەمڵێنراو» مانای چییە، و ئەگەر نرخی کۆتایی جیاواز بوو چی دەبێت؟
+نرخی خەمڵێنراو ئەو نرخەیە کە فرۆشگا بۆ کاڵایەکی داواکاری پێشوەختە چاوەڕێی دەکات پێش ئەوەی دابینکەر نرخەکەی پشتڕاست بکاتەوە، و نیشانەی «نرخی خەمڵێنراو» لە تەنیشتیەوە دەردەکەوێت. ئەم کاڵایە لە ڕێگەی سەبەتەوە داوا دەکەیت و لە جزدانەوە یان لە کاتی گەیاندندا پارەکەی دەدەیت، دوای ئەوەی لە شاشەی پارەداندا دان بەوەدا دەنێیت کە تێدەگەیت نرخەکەی لەوانەیە بگۆڕێت. پاشان داواکارییەکەت لە قۆناغی «داواکاری وەرگیرا»دا دەمێنێتەوە و ئامادە ناکرێت هەتا نرخی کۆتایی پشتڕاست دەکرێتەوە: ئەگەر کۆی داواکارییەکەت نەگۆڕا، وەک خۆی پشتڕاست دەکرێتەوە؛ ئەگەر گۆڕا، نرخە نوێیەکەت بۆ دەنێردرێت تا پەسەندی بکەیت یان ڕەتی بکەیتەوە، و بەبێ ڕەزامەندیی تۆ هیچ بڕە پارەیەکی زیاترت لێ وەرناگیرێت. هەتا نرخی کۆتایی پشتڕاست دەکرێتەوە دەتوانیت داواکارییەکە هەڵبوەشێنیتەوە و هەموو ئەوەی داوتە وەربگریتەوە، و پاراستنی نرخ تەنها دوای پشتڕاستکردنەوەی دەست پێدەکات. سەرچاوە: بەڵگەنامەی کڕین، ماددەکانی 4.11 تا 4.17، و بەڵگەنامەی پاراستنی نرخ، ماددەکانی 5.6 و 10.12.
 
 ## 13. حوکمە کۆتاییەکان
 

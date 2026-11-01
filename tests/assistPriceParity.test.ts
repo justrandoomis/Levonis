@@ -339,3 +339,24 @@ test('cardAvailability: a withheld count on a direct-sale card is unknown, a sta
   assert.equal(cardAvailability({ sale_types: ['pre_order'] }).state, 'preorder', 'no direct sale: pre-order is still said');
   assert.equal(cardAvailability({ sale_types: [] }).state, 'unavailable');
 });
+
+test('an estimated product (migration 0218): the assistant’s card is the grid’s — the same figure and availability, the grid card labelled', async () => {
+  const raw = seed();
+  // The pre-order-only spool made an estimate, as the V2 writer's estimate batch labels it (trigger T1).
+  raw.exec(`INSERT INTO ops_guards (id, ok) VALUES ('engine-price:p_pre', 1);
+    UPDATE products SET price_estimate = 1 WHERE id = 'p_pre';
+    DELETE FROM ops_guards WHERE id = 'engine-price:p_pre';`);
+  const db = asD1(raw);
+  for (const user of [null, prime]) {
+    const { grid, seen } = await parity(db, user);
+    const card = grid.get('p_pre')!;
+    assert.equal(card.price_status, 'priced', 'an estimate is priced');
+    assert.equal(card.price_estimate, true, 'the grid card carries the label');
+    assert.equal(seen.get('p_pre')!.price_iqd, shownPrice(card), 'the assistant quotes the figure the card prints');
+    assert.equal(seen.get('p_pre')!.availability, 'preorder');
+    assert.equal(seen.get('p_pre')!.price_estimate, true, 'the assistant card carries the grid card’s label');
+    // Every other card is unlabelled.
+    for (const [id, other] of grid) if (id !== 'p_pre') assert.equal('price_estimate' in other, false, `${id} carries no label`);
+    for (const [id, other] of seen) if (id !== 'p_pre') assert.equal('price_estimate' in other, false, `assistant ${id} carries no label`);
+  }
+});
