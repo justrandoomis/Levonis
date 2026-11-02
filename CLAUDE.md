@@ -48,6 +48,12 @@ So, before every push:
    against an older database).
 3. After a push, follow workflow 7 to green and check the live site.
 
+## Replying to customers (Messenger, Instagram, the site's support chat)
+
+Read `docs/CUSTOMER_REPLY_GUIDE.md` first: the shop's facts, the team's tone,
+ready replies to the common questions, and what the support chat still cannot
+answer. Never send a customer message without the owner approving that reply.
+
 ## Languages
 
 Every user-facing string exists in Arabic, English and Sorani Kurdish (`ckb`).

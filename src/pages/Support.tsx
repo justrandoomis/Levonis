@@ -173,7 +173,7 @@ const STRINGS = {
     tabAssistant: 'المساعد',
     tabTickets: 'تذاكري',
     greeting:
-      'مرحبًا! أنا مساعد Levonis الآلي (بدون ذكاء اصطناعي — قواعد ثابتة وبيانات حسابك الحقيقية فقط). اختر موضوعًا أو اكتب سؤالك:',
+      'مرحبًا! وياك Levo General Support، المساعد الآلي لـ Levonis (بدون ذكاء اصطناعي — قواعد ثابتة وبيانات حسابك الحقيقية فقط). اختر موضوعًا أو اكتب سؤالك:',
     inputPlaceholder: 'اكتب سؤالك...',
     send: 'إرسال',
     thinking: 'جارٍ البحث...',
@@ -273,7 +273,7 @@ const STRINGS = {
     tabAssistant: 'Assistant',
     tabTickets: 'My tickets',
     greeting:
-      'Hello! I am the LEVONIS assistant (no AI — fixed rules over your real account data only). Pick a topic or type your question:',
+      'Hello! This is Levo General Support, the LEVONIS automated assistant (no AI — fixed rules over your real account data only). Pick a topic or type your question:',
     inputPlaceholder: 'Type your question...',
     send: 'Send',
     thinking: 'Looking that up...',
@@ -360,7 +360,7 @@ const STRINGS = {
     tabAssistant: 'یاریدەدەر',
     tabTickets: 'تیکێتەکانم',
     greeting:
-      'سڵاو! من یاریدەدەری Levonisم (بەبێ زیرەکی دەستکرد — تەنها یاسا نەگۆڕەکان و داتای ڕاستەقینەی هەژمارەکەت). بابەتێک هەڵبژێرە یان پرسیارەکەت بنووسە:',
+      'سڵاو! ئەمە Levo General Supportە، یاریدەدەری ئۆتۆماتیکی Levonis (بەبێ زیرەکی دەستکرد — تەنها یاسا نەگۆڕەکان و داتای ڕاستەقینەی هەژمارەکەت). بابەتێک هەڵبژێرە یان پرسیارەکەت بنووسە:',
     inputPlaceholder: 'پرسیارەکەت بنووسە...',
     send: 'ناردن',
     thinking: 'گەڕان بەردەوامە...',

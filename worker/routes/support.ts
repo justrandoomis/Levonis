@@ -32,7 +32,7 @@ import { listing } from '../lib/listing';
 import { rowPriceIfSellable } from '../lib/commercialState';
 import { ESTIMATE_STRINGS } from '@levonis/contracts/priceEstimates';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
-import { deliversToHome, getSetting, getSettings, type CheckoutPaymentMethod, type DeliveryMethod } from '../lib/settings';
+import { deliversToHome, getSetting, getSettings, printerNoteIqdFrom, type CheckoutPaymentMethod, type DeliveryMethod } from '../lib/settings';
 import { allowedPaymentMethods } from '../lib/paymentPolicy';
 import { ensurePolicyCorpusQuietly } from '../lib/policySync';
 import {
@@ -52,6 +52,7 @@ import { notifyStoreOrderComplaint } from '../lib/merchantNotify';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../lib/types';
 import { safeParse } from '../lib/types';
+import { communityMayEnter, readCommunityGate } from '../lib/communityGate';
 import { pricingCtx, resolveProductCards } from '../lib/catalog/cardsRead';
 import { handleTurn, ownedPrinterNamed } from '../lib/assist/orchestrator';
 import { readContext, SHOWN_MAX } from '../lib/assist/context';
@@ -227,6 +228,23 @@ const INTENTS = [
    * nothing: the words are the contract's own (support.answer).
    */
   'price_estimate',
+  /**
+   * ──────────────────── what the shop's own Messenger inbox asked (2026-11-02)
+   *
+   * Thirty-nine real Messenger conversations were read for
+   * docs/CUSTOMER_REPLY_GUIDE.md. These three questions came up again and
+   * again and matched no intent here: «جديد لو مستعمل؟», «تسويلي طلب؟» and
+   * «شنو تكدرون تطبعون؟». The team's own answers are the source of each reply.
+   */
+  'product_condition',
+  'how_to_order',
+  'print_service',
+  /**
+   * «طلبت بس يريد دفع قبل التوصيل», «التوصيل 50 الف» — the printer
+   * home-delivery advance (worker/lib/printerAdvance.ts). The scorer read it
+   * as «when will it arrive»; the owner confirmed the rule on 2026-11-02.
+   */
+  'delivery_deposit',
 ] as const;
 type Intent = (typeof INTENTS)[number];
 
@@ -317,7 +335,8 @@ const LEXICON: Record<Intent, LexEntry> = {
    * it. The spaces were doing the tokenizer's job by hand.
    */
   compare_products: {
-    phrases: ['الفرق بين', 'أيهما أفضل', 'ايهما افضل', 'شنو الفرق', 'جیاوازی نێوان'],
+    // «شنو فرق بين combo وال cutting full combo» — the Messenger inbox drops the «ال» as often as it keeps it.
+    phrases: ['الفرق بين', 'أيهما أفضل', 'ايهما افضل', 'شنو الفرق', 'جیاوازی نێوان', 'فرق بين', 'شنو فرق', 'شو الفرق', 'ما الفرق'],
     stems: ['compare', 'comparison', 'vs', 'مقارنة', 'قارن', 'بەراورد'],
   },
   /**
@@ -443,8 +462,13 @@ const LEXICON: Record<Intent, LexEntry> = {
     stems: ['studio', 'slicer', 'استوديو', 'سلايسر', 'stl', 'gcode', '3mf'],
   },
   account_help: {
-    phrases: ['انشاء حساب', 'تسجيل الدخول', 'تفعيل الحساب', 'create an account', 'sign in', 'log in', 'verify my email', 'هەژمار'],
-    stems: ['account', 'register', 'signup', 'حساب', 'حسابي', 'تسجيل'],
+    phrases: [
+      'انشاء حساب', 'تسجيل الدخول', 'تفعيل الحساب', 'create an account', 'sign in', 'log in', 'verify my email', 'هەژمار',
+      // «ما يرسلي رمز» — twice in the Messenger inbox, both times somebody pressing «sign in» with no account yet.
+      'رمز التفعيل', 'رمز التحقق', 'ما يرسلي رمز', 'ما يوصلني رمز', 'ما وصلني رمز', 'ما يوصل الرمز', 'ما وصل الرمز',
+      'verification code', 'did not get the code', 'کۆدی پشتڕاستکردنەوە',
+    ],
+    stems: ['account', 'register', 'signup', 'حساب', 'حسابي', 'تسجيل', 'otp'],
   },
   cancel_order: {
     phrases: ['الغاء الطلب', 'إلغاء الطلب', 'اريد الغي طلبي', 'cancel my order', 'هەڵوەشاندنەوەی داواکاری'],
@@ -454,8 +478,15 @@ const LEXICON: Record<Intent, LexEntry> = {
     phrases: [
       'وين موقعكم', 'اين تقعون', 'عنوان المحل', 'رقم الهاتف', 'اوقات الدوام', 'متى تفتحون',
       'where are you located', 'your address', 'phone number', 'opening hours', 'ناونیشان',
+      // How the Messenger inbox actually asks it.
+      'وين مكانكم', 'ين مكانكم', 'وين مكانك', 'وين المكان', 'اين المكان', 'واين المكان', 'وين المحل', 'وين المخزن',
+      'دزلي اللوكيشن', 'ارسلي اللوكيشن', 'رقم الادارة', 'لشوكت مفتوحين', 'لشوكت تضلون', 'لشوكت اتضلون', 'متى تسدون',
+      'send the location', 'your location', 'شوێنەکەتان لە کوێیە',
     ],
-    stems: ['العنوان', 'الدوام', 'موقعكم', 'محلكم', 'فرعكم', 'رقمكم', 'هاتفكم', 'تلفونكم'],
+    stems: [
+      'العنوان', 'الدوام', 'موقعكم', 'محلكم', 'فرعكم', 'رقمكم', 'هاتفكم', 'تلفونكم',
+      'مكانكم', 'مخزنكم', 'لوكيشن', 'location', 'whatsapp', 'واتساب', 'وتساب', 'واتسئەپ', 'ناونیشانتان', 'مفتحين', 'مفتوحين',
+    ],
   },
   /**
    * PHRASES ONLY. «سعر» alone is the price question and «تقديري» alone also
@@ -469,6 +500,52 @@ const LEXICON: Record<Intent, LexEntry> = {
       'estimated price', 'estimated prices', 'price estimate',
       'نرخی خەمڵێنراو', 'نرخە خەمڵێنراوەکان',
     ],
+  },
+  /**
+   * «مستعمل ام جديد», «نسخه عالمية صح», «تجي مسلفن لو مفتوح الكارتون».
+   * No bare English `used`: "which filament is used" is not this question.
+   * No «اصلي» / `original` either: «اكو نوزل اصلي؟» is a part search
+   * (tests/assistAcceptance.test.ts, round 3), not a question about a unit.
+   */
+  product_condition: {
+    phrases: [
+      'جديد لو مستعمل', 'جديد ام مستعمل', 'مستعمل ام جديد', 'مستعمل لو جديد', 'جديد او مستعمل',
+      'نسخة عالمية', 'كبس الشركة', 'مفتوح الكارتون',
+      'new or used', 'brand new', 'used printer', 'used printers', 'second hand', 'global version', 'sealed box',
+      'نوێیە یان بەکارهاتوو', 'وەشانی جیهانی',
+    ],
+    stems: ['مستعمل', 'مسلفن', 'secondhand', 'sealed', 'بەکارهاتوو'],
+  },
+  /**
+   * «ممكن اتسويلي طلب», «دزلي رابط الموقع» — the team's answer every time:
+   * the order is placed on the site, never in the chat.
+   */
+  how_to_order: {
+    phrases: [
+      'سويلي طلب', 'تسويلي طلب', 'اتسويلي طلب', 'سجلي طلب', 'شلون اطلب', 'كيف اطلب', 'شلون اشتري', 'كيف اشتري',
+      'طريقة الطلب', 'رابط الموقع', 'دزلي الرابط',
+      'how do i order', 'how to order', 'place an order', 'order for me', 'چۆن داوا بکەم',
+    ],
+    stems: ['احجزلي', 'تحجزلي'],
+  },
+  /** «شنو الاشياء الي تكدرون على طباعتها», «تطبعولي مجسم؟» — printing a model, not buying a printer. */
+  print_service: {
+    phrases: [
+      'تكدرون تطبعون', 'شنو تطبعون', 'تكدرون على طباعتها', 'خدمة الطباعة', 'طلب طباعة', 'اطبع مجسم',
+      'print for me', 'print service', 'printing service', 'can you print', 'custom print', 'چاپی بۆ دەکەن',
+    ],
+    stems: ['تطبعون', 'تطبعوها', 'تطبعولي', 'تطبعلي', 'اطبعلي', 'طباعتها'],
+  },
+  /**
+   * No bare `deposit`: "deposit to my wallet" is the wallet. No bare «مقدم»
+   * either — «مقدم الطلب» is the person who placed it.
+   */
+  delivery_deposit: {
+    phrases: [
+      'دفع قبل التوصيل', 'ادفع قبل التوصيل', 'ليش ادفع قبل', 'ادفع مقدما', 'دفع مقدم', 'دفعة مقدمة', 'التوصيل 50 الف',
+      'pay in advance', 'advance payment', 'down payment', 'delivery deposit', 'پارەی پێشەکی',
+    ],
+    stems: ['عربون', 'العربون', 'عربونه'],
   },
 };
 
@@ -738,7 +815,7 @@ const T: Record<Locale, Record<string, string>> = {
       'سيجيبك موظف من فريق Levonis داخل تذكرة دعم — هذه هي قناة التواصل البشري المباشرة. ستراجع وتؤكد قبل إنشائها.',
     pro_priority_note: 'تذاكر أعضاء PRO الفعالين تحصل على أولوية حقيقية في قائمة الانتظار.',
     // ───────────────────────────── ما أضافته هذه الجولة
-    greeting_reply: 'هلا بيك في Levonis. شنو تحتاج؟',
+    greeting_reply: 'هلا بيك في Levonis، وياك Levo General Support. شنو تحتاج؟',
     thanks_reply: 'العفو. إذا تحتاج شي ثاني آني هنا.',
     bot_identity_reply:
       'آني المساعد الآلي لـ Levonis — برنامج، مو شخص. أجاوب من بيانات الموقع نفسه: طلباتك، أجهزتك، الأسعار، السياسات المنشورة. إذا تريد تحچي وية موظف من الفريق، اضغط الزر تحت.',
@@ -755,6 +832,10 @@ const T: Record<Locale, Record<string, string>> = {
     c_account: 'حسابي وتسجيل الدخول',
     c_cancel_order: 'إلغاء طلب',
     c_contact: 'العنوان وأوقات الدوام',
+    c_deposit: 'عربون توصيل الطابعة',
+    c_condition: 'جديد لو مستعمل؟',
+    c_how_to_order: 'شلون أطلب؟',
+    c_print_service: 'تطبعولي مجسم؟',
     choose_printer_intro: 'هاي الطابعات المتوفرة حالياً. اختار وحدة تشوف تفاصيلها، أو قارن ثنتين:',
     choose_printer_none: 'ما عندي طابعات معروضة بورقة مواصفات هسه. راجع فريقنا وينطيك الجواب المضبوط.',
     price_which: 'أي منتج تقصد؟ اكتب اسمه وأنطيك سعره الحالي.',
@@ -765,7 +846,8 @@ const T: Record<Locale, Record<string, string>> = {
     studio_reply:
       'استوديو ليفو هو السلايسر مالتنا، يشتغل من المتصفح مباشرة: تحمّل ملف STL أو 3MF، تختار طابعتك، وتطلع G-code. حسابك بالموقع نفسه يفتح بيه.',
     studio_open: 'فتح استوديو ليفو',
-    account_reply: 'من صفحة الدخول تقدر تسوي حساب جديد، تسجل دخول، أو تفعّل بريدك.',
+    account_reply:
+      'من صفحة الدخول تقدر تسوي حساب جديد، تسجل دخول، أو تفعّل بريدك. إذا ما يوصلك رمز وما عندك حساب بعد، اختار «حساب جديد» مو «تسجيل دخول».',
     account_open: 'صفحة الدخول',
     account_profile: 'إعدادات الحساب',
     cancel_order_reply:
@@ -778,7 +860,24 @@ const T: Record<Locale, Record<string, string>> = {
     offers_reply:
       'إذا عندك كود خصم، اكتبه بخانة كود الخصم بصفحة السلة أو عند الدفع، والسيرفر يتأكد منه قبل ما تدفع. نقاطك تنخصم من المبلغ عند الدفع، وأي تخفيض على منتج يظهر على بطاقة المنتج نفسها.',
     contact_reply:
-      'التواصل مع فريق Levonis يكون من داخل تذكرة دعم بالموقع — هاي القناة الرسمية وتنحفظ بيها كل الردود. ما عندي عنوان ولا رقم هاتف منشور بالموقع، وما أريد أعطيك معلومة مو مسجلة.',
+      'عنوان مخزن Levonis: {address}، ومفتوح كل الأيام وبأي وقت.\nرقم الإدارة: {phone} — إذا تريد اللوكيشن على الخريطة، راسل الإدارة على واتساب وترسلك ياه.\nوإذا تريد متابعة مكتوبة لطلب أو مشكلة، افتح تذكرة دعم بالموقع وتنحفظ بيها كل الردود.',
+    contact_whatsapp: 'مراسلة الإدارة على واتساب',
+    deposit_reply:
+      'توصيل الطابعة للبيت يحتاج دفع {amount} مقدماً من محفظتك لكل طابعة، قبل ما يتسجل الطلب. هذا المبلغ جزء من سعر الطلب نفسه، مو أجور زايدة. الاستلام من المخزن ما يحتاجه، ولا الطلب بالأقساط عبر جني.',
+    deposit_none: 'شاشة الدفع تبين إذا طلبك يحتاج دفع مقدم قبل التوصيل.',
+    product_condition_reply:
+      'كل طابعة جديدة نبيعها جديدة ومسلفنة بكرتون الشركة — تفتحها بإيدك — نسخة عالمية ومن وكيل حصراً. الطابعات المستعملة إلها قسم منفصل، وحالة كل وحدة ومدة ضمانها مكتوبة بصفحتها.',
+    used_printers_open: 'قسم الطابعات المستعملة',
+    how_to_order_reply:
+      'الطلب يكون من الموقع مباشرة، مو من المحادثة — علمود الضمان وتتبع حالة الطلب. اختار المنتج، ضيفه للسلة، وكمّل الدفع. إذا ما عندك حساب بعد، اختار «حساب جديد» مو «تسجيل دخول».',
+    printers_open: 'تصفح الطابعات',
+    print_service_reply:
+      'إذا عندك مجسم تريده ينطبع — اكسسوار، قطعة غيار، مجسم أو ديكور — انشر طلب طباعة بمجتمع ليفو: ترفع الملف أو تلصق رابطه، ويوصلك عرض من التجار اللي يكدرون يطبعوه.',
+    print_service_closed:
+      'طلبات الطباعة بمجتمع ليفو مسكّرة للصيانة هسه. إذا عندك مجسم تريده ينطبع، احچي ويا الفريق ونشوفلك.',
+    requests_open: 'طلبات الطباعة',
+    warranty_general_reply:
+      'ضمان الطابعة الجديدة 12 شهر يبدأ من تاريخ التسليم. إذا تشتري تمديد قبل إتمام الطلب يصير المجموع 24 أو 36 شهر. الطابعة المستعملة ضمانها مكتوب بصفحتها. وطلب الإرجاع يتقدم خلال 7 أيام من التسليم حسب سياسة الإرجاع. سجّل دخول حتى تشوف ضمان أجهزتك.',
     pickup_map: 'موقع الاستلام على الخريطة',
     fee_free: 'مجاناً',
     // «سعر تقديري» (docs/SMART_PRICING.md §5.4–5.5): the contract's own words, never a second copy.
@@ -883,7 +982,7 @@ const T: Record<Locale, Record<string, string>> = {
       'A LEVONIS staff member will answer you inside a support ticket — that is the direct human channel. You will review and confirm before it is created.',
     pro_priority_note: 'Tickets from active PRO members get real queue priority.',
     // ───────────────────────────── added this round
-    greeting_reply: 'Welcome to LEVONIS. What do you need?',
+    greeting_reply: 'Welcome to LEVONIS — this is Levo General Support. What do you need?',
     thanks_reply: 'Any time. I am here if you need anything else.',
     bot_identity_reply:
       'I am the LEVONIS automated assistant — a program, not a person. I answer from the site’s own data: your orders, your devices, prices and the published policies. If you want a member of the team, use the button below.',
@@ -900,6 +999,10 @@ const T: Record<Locale, Record<string, string>> = {
     c_account: 'My account and sign-in',
     c_cancel_order: 'Cancel an order',
     c_contact: 'Address and opening hours',
+    c_deposit: 'Printer delivery advance',
+    c_condition: 'New or used?',
+    c_how_to_order: 'How do I order?',
+    c_print_service: 'Can you print a model for me?',
     choose_printer_intro: 'These are the printers available now. Open one for its details, or compare two:',
     choose_printer_none: 'I have no printers with a specification sheet to show right now. Our team can answer this properly.',
     price_which: 'Which product? Type its name and I will give you its current price.',
@@ -910,7 +1013,8 @@ const T: Record<Locale, Record<string, string>> = {
     studio_reply:
       'LEVO Studio is our slicer, and it runs in the browser: load an STL or 3MF, pick your printer, get G-code. Your LEVONIS account signs you in.',
     studio_open: 'Open LEVO Studio',
-    account_reply: 'From the sign-in page you can create an account, sign in, or verify your email.',
+    account_reply:
+      'From the sign-in page you can create an account, sign in, or verify your email. If no code arrives and you have no account yet, choose “Create account”, not “Sign in”.',
     account_open: 'Sign-in page',
     account_profile: 'Account settings',
     cancel_order_reply:
@@ -923,7 +1027,24 @@ const T: Record<Locale, Record<string, string>> = {
     offers_reply:
       'If you have a discount code, type it into the promo-code box in the cart or at checkout; the server validates it before you pay. Your points come off the amount at checkout, and any discount on a product is shown on the product card itself.',
     contact_reply:
-      'You reach the LEVONIS team from inside a support ticket on the site — that is the official channel and every reply is kept in it. No shop address or phone number is published on the site, and I will not hand you a detail that is not recorded.',
+      'The LEVONIS warehouse is at {address}, and it is open every day, at any time.\nAdmin number: {phone} — for the location on a map, message the admin on WhatsApp and they will send it.\nFor a written follow-up on an order or a problem, open a support ticket on the site; every reply is kept in it.',
+    contact_whatsapp: 'Message the admin on WhatsApp',
+    deposit_reply:
+      'Home delivery of a printer needs {amount} paid in advance from your wallet for each printer, before the order is placed. That amount is part of the order’s own price, not an extra fee. Store pickup does not need it, and neither does an instalment order through Gini.',
+    deposit_none: 'The checkout screen shows whether your order needs an advance before delivery.',
+    product_condition_reply:
+      'Every new printer we sell is brand new and sealed in the maker’s box — you open it yourself — a global version, from the authorised agent only. Used printers have their own section, and each unit’s condition and warranty are written on its page.',
+    used_printers_open: 'Used printers',
+    how_to_order_reply:
+      'Orders are placed on the site itself, not in the chat — that is what carries the warranty and the order tracking. Pick the product, add it to the cart and complete checkout. If you have no account yet, choose “Create account”, not “Sign in”.',
+    printers_open: 'Browse printers',
+    print_service_reply:
+      'Have a model you want printed — an accessory, a spare part, a figure or a décor piece? Post a print request in the Levo Community: upload the file or paste its link, and the merchants who can print it send you offers.',
+    print_service_closed:
+      'Print requests in the Levo Community are closed for maintenance right now. If you have a model you want printed, talk to the team and we will look into it.',
+    requests_open: 'Print requests',
+    warranty_general_reply:
+      'A new printer carries a 12-month warranty from the delivery date. An extension bought before the order is placed makes it 24 or 36 months in total. A used printer’s warranty is written on its page. A return request is made within 7 days of delivery, under the returns policy. Sign in to see the warranty on your own devices.',
     pickup_map: 'Pickup location on the map',
     fee_free: 'Free',
     c_price_estimate: ESTIMATE_STRINGS.support.chip.en,
@@ -1026,7 +1147,7 @@ const T: Record<Locale, Record<string, string>> = {
       'کارمەندێکی Levonis لە ناو تیکێتی پشتگیریدا وەڵامت دەداتەوە — ئەمە کەناڵی مرۆیی ڕاستەوخۆیە. پێش دروستکردنی پێداچوونەوە و پشتڕاستکردنەوە دەکەیت.',
     pro_priority_note: 'تیکێتی ئەندامە چالاکەکانی PRO پێشینەیی ڕاستەقینەیان هەیە لە ڕیزەکەدا.',
     // ───────────────────────────── ئەمانە لەم خولەدا زیادکران
-    greeting_reply: 'بەخێربێیت بۆ Levonis. چی دەخوازیت؟',
+    greeting_reply: 'بەخێربێیت بۆ Levonis، ئەمە Levo General Supportە. چی دەخوازیت؟',
     thanks_reply: 'شایانی نییە. ئەگەر شتێکی تریت پێویست بوو، لێرەم.',
     bot_identity_reply:
       'من یاریدەدەری ئۆتۆماتیکی Levonisم — بەرنامەیەکم، نەک کەسێک. لە داتای ماڵپەڕەکەوە وەڵام دەدەمەوە: داواکاریەکانت، ئامێرەکانت، نرخەکان و سیاسەتە بڵاوکراوەکان. ئەگەر دەتەوێت لەگەڵ کارمەندێک قسە بکەیت، دوگمەی خوارەوە بەکاربهێنە.',
@@ -1043,6 +1164,10 @@ const T: Record<Locale, Record<string, string>> = {
     c_account: 'هەژمارەکەم و چوونەژوورەوە',
     c_cancel_order: 'هەڵوەشاندنەوەی داواکاری',
     c_contact: 'ناونیشان و کاتی کارکردن',
+    c_deposit: 'پارەی پێشەکی گەیاندنی پرینتەر',
+    c_condition: 'نوێیە یان بەکارهاتوو؟',
+    c_how_to_order: 'چۆن داوا بکەم؟',
+    c_print_service: 'مۆدێلێکم بۆ چاپ دەکەن؟',
     choose_printer_intro: 'ئەمانە ئەو پرینتەرانەن کە ئێستا بەردەستن. یەکێکیان بکەرەوە بۆ وردەکاری، یان دووانیان بەراورد بکە:',
     choose_printer_none: 'ئێستا هیچ پرینتەرێکم نییە بە پەڕەی تایبەتمەندی نیشانی بدەم. تیمەکەمان وەڵامی دروستت دەداتەوە.',
     price_which: 'کام بەرهەم؟ ناوەکەی بنووسە و نرخی ئێستای پێ دەڵێم.',
@@ -1053,7 +1178,8 @@ const T: Record<Locale, Record<string, string>> = {
     studio_reply:
       'ستوودیۆی ليڤۆ سلایسەری ئێمەیە و لە وێبگەڕدا کاردەکات: فایلی STL یان 3MF باربکە، پرینتەرەکەت هەڵبژێرە، G-code وەربگرە. هەژماری Levonisت چوونەژوورەوەت بۆ دەکات.',
     studio_open: 'کردنەوەی ستوودیۆی ليڤۆ',
-    account_reply: 'لە پەڕەی چوونەژوورەوە دەتوانیت هەژمارێکی نوێ دروست بکەیت، بچیتە ژوورەوە، یان ئیمەیڵەکەت پشتڕاست بکەیتەوە.',
+    account_reply:
+      'لە پەڕەی چوونەژوورەوە دەتوانیت هەژمارێکی نوێ دروست بکەیت، بچیتە ژوورەوە، یان ئیمەیڵەکەت پشتڕاست بکەیتەوە. ئەگەر کۆدەکە نەگەیشت و هێشتا هەژمارت نییە، «دروستکردنی هەژمار» هەڵبژێرە، نەک «چوونەژوورەوە».',
     account_open: 'پەڕەی چوونەژوورەوە',
     account_profile: 'ڕێکخستنی هەژمار',
     cancel_order_reply:
@@ -1067,7 +1193,24 @@ const T: Record<Locale, Record<string, string>> = {
     offers_reply:
       'ئەگەر کۆدی داشکاندنت هەیە، لە خانەی کۆدی داشکاندن لە سەبەتە یان لە کاتی پارەدان بینووسە، و سێرڤەر پێش پارەدان پشتڕاستی دەکاتەوە. خاڵەکانت لە کاتی پارەدان لە بڕەکە کەم دەکرێنەوە، و هەر داشکاندنێکی بەرهەم لەسەر کارتی بەرهەمەکەدا دەردەکەوێت.',
     contact_reply:
-      'پەیوەندی بە تیمی Levonisەوە لە ناو تیکێتی پشتگیری ماڵپەڕەکەدا دەکرێت — ئەمە کەناڵە فەرمییەکەیە و هەموو وەڵامێک تێیدا دەپارێزرێت. هیچ ناونیشان یان ژمارەی تەلەفۆن لە ماڵپەڕەکەدا بڵاو نەکراوەتەوە، و زانیاری تۆمارنەکراوت پێ ناڵێم.',
+      'ناونیشانی کۆگای Levonis: {address}، و هەموو ڕۆژێک و لە هەموو کاتێکدا کراوەیە.\nژمارەی بەڕێوەبەرایەتی: {phone} — بۆ شوێنەکە لەسەر نەخشە، لە واتسئەپ نامە بۆ بەڕێوەبەرایەتی بنێرە و بۆت دەنێرن.\nبۆ بەدواداچوونی نووسراو بۆ داواکارییەک یان کێشەیەک، تیکێتێکی پشتگیری لە ماڵپەڕەکە بکەرەوە؛ هەموو وەڵامێک تێیدا دەپارێزرێت.',
+    contact_whatsapp: 'نامە بۆ بەڕێوەبەرایەتی لە واتسئەپ',
+    deposit_reply:
+      'گەیاندنی پرینتەر بۆ ماڵەوە پێویستی بەوەیە {amount} بۆ هەر پرینتەرێک پێشوەختە لە جزدانەکەتەوە بدرێت، پێش ئەوەی داواکارییەکە تۆمار بکرێت. ئەم بڕە بەشێکە لە نرخی خودی داواکارییەکە، نەک کرێیەکی زیادە. وەرگرتن لە کۆگا پێویستی پێی نییە، هەروەها داواکاری بە قیست لە ڕێگەی Gini ـیشەوە.',
+    deposit_none: 'پەڕەی پارەدان پیشانی دەدات ئایا داواکارییەکەت پێش گەیاندن پێویستی بە پارەی پێشەکی هەیە.',
+    product_condition_reply:
+      'هەموو پرینتەرێکی نوێ کە دەیفرۆشین بە تەواوی نوێیە و لە کارتۆنی کۆمپانیاکەدا داخراوە — خۆت دەیکەیتەوە — وەشانی جیهانییە و تەنها لە بریکاری فەرمییەوەیە. پرینتەرە بەکارهاتووەکان بەشێکی جیایان هەیە، و دۆخ و گەرەنتی هەر یەکەیەک لە پەڕەکەیدا نووسراوە.',
+    used_printers_open: 'پرینتەرە بەکارهاتووەکان',
+    how_to_order_reply:
+      'داواکاری لە خودی ماڵپەڕەکەوە دەکرێت، نەک لە چاتەکەدا — ئەوە گەرەنتی و بەدواداچوونی داواکارییەکە لەگەڵ خۆی دەهێنێت. بەرهەمەکە هەڵبژێرە، بیخەرە سەبەتەکەوە و پارەدان تەواو بکە. ئەگەر هێشتا هەژمارت نییە، «دروستکردنی هەژمار» هەڵبژێرە، نەک «چوونەژوورەوە».',
+    printers_open: 'بینینی پرینتەرەکان',
+    print_service_reply:
+      'مۆدێلێکت هەیە دەتەوێت چاپ بکرێت — ئێکسسوارێک، پارچەیەکی یەدەگ، پەیکەرێک یان دیکۆرێک؟ داواکارییەکی چاپ لە کۆمەڵگەی ليڤۆ بڵاو بکەرەوە: فایلەکە باربکە یان بەستەرەکەی دابنێ، و ئەو بازرگانانەی دەتوانن چاپی بکەن پێشنیارت بۆ دەنێرن.',
+    print_service_closed:
+      'داواکارییەکانی چاپ لە کۆمەڵگەی ليڤۆ ئێستا بۆ چاککردنەوە داخراون. ئەگەر مۆدێلێکت هەیە دەتەوێت چاپ بکرێت، لەگەڵ تیمەکە قسە بکە و بۆت دەبینین.',
+    requests_open: 'داواکارییەکانی چاپ',
+    warranty_general_reply:
+      'پرینتەری نوێ گەرەنتی 12 مانگی هەیە لە ڕێکەوتی گەیاندنەوە. ئەگەر پێش تەواوکردنی داواکاری درێژکردنەوە بکڕیت، کۆی گشتی دەبێتە 24 یان 36 مانگ. گەرەنتی پرینتەری بەکارهاتوو لە پەڕەکەیدا نووسراوە. داوای گەڕاندنەوە لە ماوەی 7 ڕۆژ لە گەیاندنەوە پێشکەش دەکرێت، بەپێی سیاسەتی گەڕاندنەوە. بچۆ ژوورەوە بۆ بینینی گەرەنتی ئامێرەکانت.',
     pickup_map: 'شوێنی وەرگرتن لەسەر نەخشە',
     fee_free: 'بەخۆڕایی',
     c_price_estimate: ESTIMATE_STRINGS.support.chip.ckb,
@@ -1361,6 +1504,10 @@ const CHOICE_LABELS: Record<Intent, string> = {
   cancel_order: 'c_cancel_order',
   contact_info: 'c_contact',
   price_estimate: 'c_price_estimate',
+  product_condition: 'c_condition',
+  how_to_order: 'c_how_to_order',
+  print_service: 'c_print_service',
+  delivery_deposit: 'c_deposit',
 };
 
 /**
@@ -2352,17 +2499,32 @@ async function handleOffers(c: Context<AppContext>, loc: Locale): Promise<Assist
 }
 
 /**
- * «وين موقعكم» / «رقم الهاتف» / «اوقات الدوام» — ANSWERED BY SAYING WHAT WE
- * HAVE AND ADMITTING WHAT WE DO NOT.
+ * THE SHOP'S ADDRESS AND ADMIN NUMBER — GIVEN BY THE OWNER (2026-11-02).
  *
- * This repository stores no shop address, no phone number and no opening
- * hours; worker/lib/settings.ts says so in as many words, and the checkout
- * refuses to draw a map pin it was not given. The one piece of real location
- * data that exists is `map_url` on a PICKUP method — the link the owner
- * pasted into the admin — and the customer standing in front of this question
- * is usually the one who wants to collect in person, so it is offered when it
- * is configured and silently absent when it is not. Inventing the rest would
- * send somebody to a place that does not exist.
+ * Until now the assistant answered «وين موقعكم» with «no address or phone
+ * is published», while the team gave both in every Messenger chat. The owner
+ * confirmed them for the assistant: «the admin number is 07838455220 and the
+ * address is بابل - الحلة - حي الامير, chat the admin on WhatsApp to send the
+ * location» (docs/DECISIONS.md row 284, docs/CUSTOMER_REPLY_GUIDE.md §3). The
+ * number is the same one the warranty receipt prints (worker/lib/warrantyConfig.ts).
+ * The hours are the owner's too («opening hours all time»): every day, any time.
+ */
+const SHOP_ADDRESS: Readonly<Record<Locale, string>> = {
+  ar: 'بابل - الحلة - حي الامير',
+  en: 'Babil - Al Hilla - Hay Al-Amir',
+  ckb: 'بابل - حیللە - گەڕەکی ئەمیر',
+};
+const SHOP_ADMIN_PHONE = '07838455220';
+const SHOP_ADMIN_WHATSAPP = 'https://wa.me/9647838455220';
+
+/**
+ * «وين موقعكم» / «رقم الهاتف» / «دزلي اللوكيشن» — THE ADDRESS, THE ADMIN'S
+ * NUMBER, AND WHATSAPP FOR THE MAP PIN.
+ *
+ * The address and the number are the owner's (above). The pin itself is not
+ * invented here: the admin sends it on WhatsApp, and the one piece of map
+ * data the admin pasted — `map_url` on a PICKUP method — is still offered
+ * when it is configured and silently absent when it is not.
  */
 async function handleContactInfo(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
   const settings = await getSettings(c.env.DB, ['checkoutDeliveryMethods']);
@@ -2378,9 +2540,88 @@ async function handleContactInfo(c: Context<AppContext>, loc: Locale): Promise<A
   });
   return {
     intent: 'contact_info',
-    text: tr(loc, 'contact_reply'),
-    links: links.length ? links : undefined,
+    text: tr(loc, 'contact_reply').replace('{address}', SHOP_ADDRESS[loc]).replace('{phone}', SHOP_ADMIN_PHONE),
+    links: [{ label: tr(loc, 'contact_whatsapp'), to: SHOP_ADMIN_WHATSAPP, external: true }, ...links],
     cards: await policyReadMore(c, 'support', loc),
+  };
+}
+
+/**
+ * «طلبت بس يريد دفع قبل التوصيل» — THE RULE THE CHECKOUT ENFORCES, IN WORDS.
+ *
+ * The amount is read from `printerHomeDeliveryNoteIqd`, the same setting
+ * worker/lib/printerAdvance.ts charges from, through the same parser, so the
+ * chat and the checkout cannot name different figures. Per printer, home
+ * delivery only, never on a pickup or a Gini instalment order (routes/orders.ts).
+ * Cleared by the owner → the rule is off, and the chat claims nothing.
+ */
+async function handleDeliveryDeposit(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
+  const settings = await getSettings(c.env.DB, ['printerHomeDeliveryNoteIqd']);
+  const amount = printerNoteIqdFrom(settings.printerHomeDeliveryNoteIqd);
+  const wallet = { label: tr(loc, 'wallet_open'), to: '/wallet' };
+  if (amount === null) return { intent: 'delivery_deposit', text: tr(loc, 'deposit_none'), links: [wallet] };
+  return {
+    intent: 'delivery_deposit',
+    text: tr(loc, 'deposit_reply').replace('{amount}', fmtIqd(loc, amount)),
+    links: [wallet],
+  };
+}
+
+/** «مستعمل ام جديد» — the team's answer, and the used shelf for the one who wants a used unit. */
+function handleProductCondition(loc: Locale): AssistantReply {
+  return {
+    intent: 'product_condition',
+    text: tr(loc, 'product_condition_reply'),
+    links: [{ label: tr(loc, 'used_printers_open'), to: '/used-printers' }],
+  };
+}
+
+/** «تسويلي طلب؟» — never an order taken in the chat: the site carries the warranty and the tracking. */
+function handleHowToOrder(loc: Locale): AssistantReply {
+  return {
+    intent: 'how_to_order',
+    text: tr(loc, 'how_to_order_reply'),
+    links: [
+      { label: tr(loc, 'printers_open'), to: '/categories/printers' },
+      { label: tr(loc, 'account_open'), to: '/auth' },
+    ],
+  };
+}
+
+/**
+ * «شنو تكدرون تطبعون؟» — the print-request board of the Levo Community
+ * (docs/PRINT_REQUESTS.md). It sits behind the community gate, so the board
+ * is offered only to somebody the gate would let in; anybody else is told it
+ * is closed and offered the team, never sent to a maintenance card.
+ */
+async function handlePrintService(c: Context<AppContext>, user: SessionUser | null, loc: Locale): Promise<AssistantReply> {
+  const open = communityMayEnter(await readCommunityGate(c.env.DB), user);
+  if (!open) {
+    return { intent: 'print_service', text: tr(loc, 'print_service_closed'), choices: menuChoices(loc, ['human_handoff']) };
+  }
+  return {
+    intent: 'print_service',
+    text: tr(loc, 'print_service_reply'),
+    links: [{ label: tr(loc, 'requests_open'), to: '/requests' }],
+  };
+}
+
+/**
+ * «شنو الضمانات التقدموها؟» ASKED BEFORE BUYING.
+ *
+ * `warranty_status` reads the signed-in customer's own devices, so a guest
+ * used to get «sign in» — to a question about the shop's terms, asked by
+ * somebody who owns nothing yet. A guest now gets the terms the warranty and
+ * returns policies publish (12 months from delivery; 24 or 36 with an
+ * extension bought before the order; a used unit's own term; returns within
+ * 7 days), the document as a card, and the sign-in for their own devices.
+ */
+async function handleWarrantyGeneral(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
+  return {
+    intent: 'warranty_status',
+    text: tr(loc, 'warranty_general_reply'),
+    links: [{ label: tr(loc, 'sign_in'), to: '/auth' }],
+    cards: await policyReadMore(c, 'warranty', loc),
   };
 }
 
@@ -2485,6 +2726,10 @@ export function contextualChoices(loc: Locale, intent: string): AssistantChoice[
     printer_problem: ['product_search', 'human_handoff'],
     // «هل تريد التحدث مع فريقنا؟» — the answer's own question, and its one next step (§5.4).
     price_estimate: ['human_handoff'],
+    product_condition: ['warranty_status', 'choose_printer'],
+    how_to_order: ['payment_methods', 'shipping_cost'],
+    print_service: ['studio_help', 'human_handoff'],
+    delivery_deposit: ['wallet_help', 'shipping_cost'],
   };
   const next = followups[intent as Intent] ?? [];
   return menuChoices(loc, next);
@@ -2759,6 +3004,11 @@ supportRoutes.post('/assistant', async (c) => {
     }
   }
 
+  // A guest asking about the warranty is asking about the shop's terms, not their devices.
+  if (intent === 'warranty_status' && !user) {
+    return send(withFollowups(await handleWarrantyGeneral(c, loc), loc));
+  }
+
   if (ACCOUNT_INTENTS.has(intent) && !user) {
     return send(signInReply(intent, loc));
   }
@@ -2860,6 +3110,18 @@ supportRoutes.post('/assistant', async (c) => {
     case 'price_estimate':
       // Public, and the same words for everyone (§5.4); «التحدث مع الفريق» follows (`contextualChoices`).
       reply = { intent, text: tr(loc, 'price_estimate_answer') };
+      break;
+    case 'product_condition':
+      reply = handleProductCondition(loc);
+      break;
+    case 'how_to_order':
+      reply = handleHowToOrder(loc);
+      break;
+    case 'print_service':
+      reply = await handlePrintService(c, user ?? null, loc);
+      break;
+    case 'delivery_deposit':
+      reply = await handleDeliveryDeposit(c, loc);
       break;
   }
   return send(withFollowups(reply, loc));

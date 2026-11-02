@@ -388,7 +388,8 @@ test('a greeting is met with a greeting, not a fourteen-item menu’s worth of n
   for (const hello of ['هلو', 'السلام عليكم', 'hi', 'سڵاو']) {
     const reply = await ask(db, { text: hello });
     assert.equal(reply.intent, 'greeting', hello);
-    assert.equal(reply.text, 'هلا بيك في Levonis. شنو تحتاج؟');
+    // The name is the owner's (docs/DECISIONS.md row 284).
+    assert.equal(reply.text, 'هلا بيك في Levonis، وياك Levo General Support. شنو تحتاج؟');
   }
 });
 
@@ -489,6 +490,10 @@ test('all three dictionaries carry every new string', () => {
     'c_wallet', 'c_studio', 'c_account', 'c_cancel_order', 'c_contact', 'c_greeting',
     // The four topic answers that stopped quoting a legal preamble.
     'shipping_cost_reply', 'payment_methods_reply', 'offers_reply', 'contact_reply', 'pickup_map', 'fee_free',
+    // What the Messenger inbox taught it (docs/CUSTOMER_REPLY_GUIDE.md).
+    'contact_whatsapp', 'c_condition', 'c_how_to_order', 'c_print_service', 'product_condition_reply', 'used_printers_open',
+    'how_to_order_reply', 'printers_open', 'print_service_reply', 'print_service_closed', 'requests_open', 'warranty_general_reply',
+    'c_deposit', 'deposit_reply', 'deposit_none',
   ]) {
     assert.equal(
       (route.match(new RegExp(`^ {4}${key}:`, 'gm')) ?? []).length,
@@ -530,16 +535,129 @@ test('«كم اجور التوصيل» answers with the fees the checkout charge
   assert.equal(reply.cards[0].link.to, '/policies/delivery');
 });
 
-test('«وين موقعكم» says what the shop has and admits what it does not', async () => {
+test('«وين موقعكم» gives the owner’s address, the admin number and WhatsApp for the pin', async () => {
+  /**
+   * It used to say «no address or phone is published» while the team gave
+   * both in every Messenger chat. The owner confirmed them on 2026-11-02
+   * (docs/DECISIONS.md row 284), and the hours with them: «all time».
+   */
   const db = asD1(seed());
   const reply = await ask(db, { text: 'وين موقعكم' });
   assert.equal(reply.intent, 'contact_info');
-  // «وين موقعكم», «رقم الهاتف» and «اوقات الدوام» all used to return this one
-  // paragraph, which contains no address, no number and no hours.
   assert.ok(!reply.text.includes('الغرض من هذه الوثيقة'));
   assert.ok(!reply.text.includes('###'));
-  assert.match(reply.text, /تذكرة دعم/, 'the channel that actually exists');
+  assert.ok(!reply.text.includes('{address}') && !reply.text.includes('{phone}'), 'every placeholder is filled');
+  assert.match(reply.text, /بابل - الحلة - حي الامير/);
+  assert.match(reply.text, /كل الأيام وبأي وقت/, 'the owner’s hours');
+  assert.match(reply.text, /07838455220/);
+  assert.match(reply.text, /واتساب/);
+  assert.match(reply.text, /تذكرة دعم/, 'the written channel is still named');
+  assert.ok(!reply.text.includes('ما عندي عنوان'), 'the old refusal is gone');
+  const wa = reply.links.find((l: { to: string }) => l.to === 'https://wa.me/9647838455220');
+  assert.ok(wa && wa.external === true, 'WhatsApp is an external link to the admin number');
   assert.equal(reply.cards[0].link.to, '/policies/support');
+
+  for (const [locale, address] of [['en', 'Babil - Al Hilla - Hay Al-Amir'], ['ckb', 'بابل - حیللە - گەڕەکی ئەمیر']] as const) {
+    const r = (await json(await post(app(db), '/api/support/assistant', { locale, text: 'وين موقعكم' }))).reply;
+    assert.ok(r.text.includes(address), `${locale} names the address in its own language`);
+    assert.ok(r.text.includes('07838455220'));
+  }
+});
+
+// ═════════════════════ the questions the shop's Messenger inbox kept asking
+
+test('the Messenger inbox phrasings reach an answer (docs/CUSTOMER_REPLY_GUIDE.md §10)', () => {
+  for (const [message, intent] of [
+    ['مستعمل ام جديد', 'product_condition'],
+    ['نسخه عالمية صح', 'product_condition'],
+    ['تجي مسلفن لو مفتوح الكارتون', 'product_condition'],
+    ['ممكن اتسويلي طلب الطابعه', 'how_to_order'],
+    ['دزلي رابط الموقع مالتكم', 'how_to_order'],
+    ['شنو الاشياء الي تكدرون على طباعتها', 'print_service'],
+    ['تطبعولي مجسم', 'print_service'],
+    ['ين مكانكم بلظبط', 'contact_info'],
+    ['دزلي اللوكيشن', 'contact_info'],
+    ['انتو لشوكت اتضلون مفتحين', 'contact_info'],
+    ['ما يرسلي رمز التفعيل', 'account_help'],
+    ['شنو فرق بين combo وال cutting full combo', 'compare_products'],
+    ['طلبت بس يريد دفع قبل التوصيل', 'delivery_deposit'],
+    ['التوصيل 50 الف', 'delivery_deposit'],
+    ['ليش العربون', 'delivery_deposit'],
+  ] as const) {
+    assert.deepEqual(matchIntents(message).slice(0, 1), [intent], `«${message}» must read as ${intent}`);
+  }
+  // And what must NOT fire: "used" alone is not the condition question,
+  // and a wallet deposit is not the printer advance.
+  assert.ok(!matchIntents('which filament is used').includes('product_condition'));
+  assert.ok(!matchIntents('deposit to my wallet').includes('delivery_deposit'));
+});
+
+test('«يريد دفع قبل التوصيل» states the printer advance from the setting the checkout charges', async () => {
+  const raw = seed();
+  const db = asD1(raw);
+  const reply = await ask(db, { text: 'طلبت بس يريد دفع قبل التوصيل' });
+  assert.equal(reply.intent, 'delivery_deposit', 'it used to read as «when will it arrive»');
+  assert.match(reply.text, /50,000 د\.ع مقدماً/, 'the default the owner named (worker/lib/settings.ts)');
+  assert.match(reply.text, /لكل طابعة/);
+  assert.match(reply.text, /الاستلام من المخزن ما يحتاجه/);
+  assert.match(reply.text, /جني/);
+  assert.equal(reply.links[0].to, '/wallet');
+
+  // The owner changes the figure → the chat follows it; the owner clears it → the chat claims nothing.
+  raw.prepare("INSERT OR REPLACE INTO admin_settings (key, value) VALUES ('printerHomeDeliveryNoteIqd', ?)").run(JSON.stringify(75000));
+  assert.match((await ask(db, { text: 'ليش العربون' })).text, /75,000 د\.ع/);
+  raw.prepare("INSERT OR REPLACE INTO admin_settings (key, value) VALUES ('printerHomeDeliveryNoteIqd', ?)").run(JSON.stringify(null));
+  const off = await ask(db, { text: 'ليش العربون' });
+  assert.ok(!/\d{2},000/.test(off.text), 'no figure when the rule is off');
+  assert.match(off.text, /شاشة الدفع/);
+});
+
+test('«جديد لو مستعمل» says new is sealed and points to the used shelf', async () => {
+  const db = asD1(seed());
+  const reply = await ask(db, { text: 'جديد لو مستعمل' });
+  assert.equal(reply.intent, 'product_condition');
+  assert.match(reply.text, /مسلفنة/);
+  assert.match(reply.text, /نسخة عالمية/);
+  assert.match(reply.text, /المستعملة إلها قسم منفصل/, 'the site does sell used units, so it never claims otherwise');
+  assert.equal(reply.links[0].to, '/used-printers');
+});
+
+test('«تسويلي طلب» sends the order to the site, never takes it in the chat', async () => {
+  const db = asD1(seed());
+  const reply = await ask(db, { text: 'ممكن تسويلي طلب' });
+  assert.equal(reply.intent, 'how_to_order');
+  assert.match(reply.text, /من الموقع مباشرة/);
+  assert.match(reply.text, /حساب جديد/);
+  assert.deepEqual(reply.links.map((l: { to: string }) => l.to), ['/categories/printers', '/auth']);
+});
+
+test('«تطبعولي مجسم» never sends anybody to a closed community board', async () => {
+  // freshDb() has no `communityGate` row, and the gate's default is CLOSED.
+  const db = asD1(seed());
+  const reply = await ask(db, { text: 'تطبعولي مجسم' });
+  assert.equal(reply.intent, 'print_service');
+  assert.match(reply.text, /مسكّرة للصيانة/);
+  assert.ok(!(reply.links ?? []).some((l: { to: string }) => l.to === '/requests'), 'no link into the wall');
+  assert.ok(reply.choices.some((c: { intent: string }) => c.intent === 'human_handoff'), 'the team instead');
+});
+
+test('a GUEST asking about the warranty gets the published terms, not «sign in»', async () => {
+  const db = asD1(seed());
+  const guestApp = stubApp(db, null, (a) => a.route('/api/support', supportRoutes));
+  const reply = (await json(await post(guestApp, '/api/support/assistant', { locale: 'ar', text: 'شنو الضمانات التقدموها' }))).reply;
+  assert.equal(reply.intent, 'warranty_status');
+  assert.notEqual(reply.auth_required, true, 'a question about terms is not a private read');
+  assert.match(reply.text, /12 شهر/);
+  assert.match(reply.text, /24 أو 36/);
+  assert.match(reply.text, /7 أيام/);
+  assert.ok(reply.links.some((l: { to: string }) => l.to === '/auth'), 'and the way to see their own devices');
+});
+
+test('the welcome names Levo General Support in all three languages', () => {
+  const page = read('src/pages/Support.tsx');
+  const route = read('worker/routes/support.ts');
+  assert.equal((page.match(/Levo General Support/g) ?? []).length, 3, 'the opening bubble, ar / en / ckb');
+  assert.equal((route.match(/^ {4}greeting_reply: .*Levo General Support/gm) ?? []).length, 3, 'the greeting reply, ar / en / ckb');
 });
 
 test('«كود خصم» says where the box is instead of quoting the rewards preamble', async () => {
