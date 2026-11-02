@@ -36,6 +36,8 @@ import { codeOf } from './fixtures/source';
 const SORANI_ONLY = /[ڕڵێۆەڤگچپژ]/;
 const ARABIC_ONLY = /[ةىيك]/;
 const ARABIC_SCRIPT = /[؀-ۿ]/;
+/** «sign in» in the three languages: «تسجيل الدخول» / «سجّل الدخول», «چوونەژوورەوە» / «بچۆ ژوورەوە». */
+const SIGN_IN = /sign[- ]?in|تسجيل (?:ال)?دخول|سجّل الدخول|ژوورەوە/i;
 
 /** Every value of one language, functions called with sample arguments. */
 function flatten(table: Record<string, unknown>): Map<string, string> {
@@ -217,6 +219,8 @@ test('FX panel: every string exists in ar, en and ckb with the same keys; the So
   }
   for (const [key, value] of ar) assert.match(value, ARABIC_SCRIPT, `${key}: the Arabic is not Arabic script`);
   for (const [key, value] of en) assert.doesNotMatch(value, ARABIC_SCRIPT, `${key}: Arabic script in the English`);
+  // No rate act asks for a fresh sign-in (DECISIONS row 285): no string of the panel says one is needed.
+  for (const [key, value] of [...ar, ...en, ...ckb]) assert.doesNotMatch(value, SIGN_IN, `${key}: «${value}» speaks of a sign-in`);
 });
 
 test('FX panel: the plan’s own wording (§12), the attribution, and «the shop’s rate» (critique L8)', () => {
@@ -232,7 +236,6 @@ test('FX panel: the plan’s own wording (§12), the attribution, and «the shop
     ['backAuto', 'العودة إلى التلقائي', 'Back to automatic', 'گەڕانەوە بۆ خۆکار'],
     ['confirmCurrent', 'تأكيد السعر الحالي', 'Confirm the current rate', 'نرخی ئێستا پشتڕاست بکەرەوە'],
     ['guards', 'إعدادات الحماية', 'Safety settings', 'ڕێکخستنەکانی پاراستن'],
-    ['reauth', 'لحماية الأسعار، سجّل الدخول مجددًا ثم أعد المحاولة', 'To protect prices, sign in again, then retry', 'بۆ پاراستنی نرخەکان، دووبارە بچۆ ژوورەوە و پاشان هەوڵ بدەرەوە'],
     ['shipTitle', 'أسعار الشحن المركزية', 'Central shipping rates', 'نرخەکانی ناردنی ناوەندی'],
   ];
   for (const [key, ar, en, ckb] of want) {

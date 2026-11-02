@@ -103,12 +103,6 @@ export const COMMON = {
     'Something changed since you opened this; it was reloaded — review it, then try again.',
     'لەو کاتەوەی ئەمەت کردەوە شتێک گۆڕاوە؛ دووبارە بار کرایەوە — پێیدا بچۆرەوە و پاشان دووبارە هەوڵ بدەرەوە.'
   ),
-  reauth: t(
-    'لحماية الأسعار، سجّل الدخول مجددًا ثم أعد المحاولة.',
-    'To protect prices, sign in again, then retry.',
-    'بۆ پاراستنی نرخەکان، دووبارە بچۆ ژوورەوە و پاشان هەوڵ بدەرەوە.'
-  ),
-  signInAgain: t('سجّل الدخول مجددًا', 'Sign in again', 'دووبارە بچۆ ژوورەوە'),
   stop: t('أوقف', 'Stop', 'ڕایبگرە'),
   stopped: t('أُوقف.', 'Stopped.', 'ڕاگیرا.'),
   iqd: t('د.ع', 'IQD', 'دینار'),
@@ -497,7 +491,6 @@ export const CONTROL = {
     'Switching it off stops customers from ordering estimated products for now (the emergency brake). Placed orders do not change.',
     'کوژاندنەوەی بۆ ماوەیەک ڕێگە لە کڕیاران دەگرێت بەرهەمی خەمڵێنراو داوا بکەن (وەستێنەری فریاکەوتن). داواکارییە تۆمارکراوەکان ناگۆڕێن.'
   ),
-  freshSignIn: t('يحتاج كل تغيير هنا تسجيل دخول حديثًا.', 'Every change here needs a recent sign-in.', 'هەموو گۆڕانکارییەک لێرە پێویستی بە چوونەژوورەوەیەکی نوێیە.'),
 } as const;
 
 export const TYPES = {
@@ -587,9 +580,9 @@ export const LISTS = {
     'بەرهەمی نیشانەکراو کە تێبینیی کراوەیان هەیە: پێوانەی بنەڕەتی، سەرچاوەی بەراوردی ئەمریکا، نرخی نووسراو یان لە پەڕەوە، تۆماری کۆن، بڕگەی نەماو، دەستکارییەکانی تۆ، یان گۆڕانێکی گەورەی ڕاگیراو.'
   ),
   refreshIntro: t(
-    'منتجات يختلف تقديرها المعاد حسابه عن المنشور: القديم ← الجديد والنسبة، أو يضع تطبيقها قياساتك الحقيقية مكان القياسات الافتراضية دون أن يتغيّر أي سعر. احسب أولًا لتظهر التغيّرات، والتغيّر الكبير يحتاج علامتك وتسجيل دخول حديثًا. تعديلاتك تبقى.',
-    'Products whose recomputed estimate differs from the published one: old → new and the percentage — or whose apply puts your real measures in place of the default ones with no price changed. Compute first to bring the changes in; a large change needs your tick and a recent sign-in. Your edits stay.',
-    'ئەو بەرهەمانەی خەمڵاندنە دووبارە هەژمارکراوەکەیان جیاوازە لە بڵاوکراوەکە: کۆن ← نوێ و ڕێژەکە، یان جێبەجێکردنیان پێوانە ڕاستەقینەکانت دەخاتە شوێنی پێوانە بنەڕەتییەکان بێ ئەوەی هیچ نرخێک بگۆڕێت. سەرەتا هەژمار بکە بۆ دەرکەوتنی گۆڕانکارییەکان؛ گۆڕانی گەورە پێویستی بە نیشانەی تۆ و چوونەژوورەوەیەکی نوێیە. دەستکارییەکانت دەمێننەوە.'
+    'منتجات يختلف تقديرها المعاد حسابه عن المنشور: القديم ← الجديد والنسبة، أو يضع تطبيقها قياساتك الحقيقية مكان القياسات الافتراضية دون أن يتغيّر أي سعر. احسب أولًا لتظهر التغيّرات، والتغيّر الكبير يحتاج علامتك. تعديلاتك تبقى.',
+    'Products whose recomputed estimate differs from the published one: old → new and the percentage — or whose apply puts your real measures in place of the default ones with no price changed. Compute first to bring the changes in; a large change needs your tick. Your edits stay.',
+    'ئەو بەرهەمانەی خەمڵاندنە دووبارە هەژمارکراوەکەیان جیاوازە لە بڵاوکراوەکە: کۆن ← نوێ و ڕێژەکە، یان جێبەجێکردنیان پێوانە ڕاستەقینەکانت دەخاتە شوێنی پێوانە بنەڕەتییەکان بێ ئەوەی هیچ نرخێک بگۆڕێت. سەرەتا هەژمار بکە بۆ دەرکەوتنی گۆڕانکارییەکان؛ گۆڕانی گەورە پێویستی بە نیشانەی تۆیە. دەستکارییەکانت دەمێننەوە.'
   ),
   /** A refresh row whose every line keeps its published price: listed because its apply takes the real measures in (§4.9). */
   refreshMeasuresOnly: t(

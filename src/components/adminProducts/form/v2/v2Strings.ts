@@ -92,7 +92,6 @@ export interface V2Strings {
   confirm: string;
   cancel: string;
   largeTick: string;
-  largeNote: string;
   dropFlag: string;
   discountTooBig: string;
   routeBlocked: string;
@@ -150,8 +149,6 @@ export interface V2Strings {
   skuDiscount: string;
   savedPriced: string;
   savedDataOnly: string;
-  signInAgain: string;
-  reauth: string;
   from: Fill;
   inherit: string;
   pending: string;
@@ -307,7 +304,6 @@ const AR: V2Strings = {
   confirm: 'اعتمد ونشر',
   cancel: 'إلغاء — أبقِ ما كتبته',
   largeTick: 'أؤكد تغييرًا أكبر من 15%',
-  largeNote: 'التغيير الكبير يحتاج تسجيل دخول حديثًا.',
   dropFlag: 'انخفاض أكبر من 30%',
   discountTooBig: 'الخصم أكبر من ربح هذا المسار — يُباع بسعر البيع المباشر',
   routeBlocked: 'متوقف: أقل من التكلفة',
@@ -364,8 +360,6 @@ const AR: V2Strings = {
   skuDiscount: 'خصم $',
   savedPriced: 'حُفظ المنتج ونُشرت أسعاره.',
   savedDataOnly: 'حُفظت البيانات؛ لا تُنشر الأسعار حتى تكتمل.',
-  signInAgain: 'سجّل الدخول مرة أخرى',
-  reauth: 'التغيير الكبير يحتاج تسجيل دخول حديثًا. سجّل الدخول ثم أعد الحفظ.',
   from: (v) => `من ${v}`,
   inherit: 'يرث',
   pending: 'بانتظار الحساب',
@@ -490,7 +484,6 @@ const EN: V2Strings = {
   confirm: 'Confirm and publish',
   cancel: 'Cancel — keep what I typed',
   largeTick: 'I confirm a change above 15%',
-  largeNote: 'A large change needs a recent sign-in.',
   dropFlag: 'Drop above 30%',
   discountTooBig: "The discount exceeds this route's profit — it sells at the direct price",
   routeBlocked: 'Stopped: below cost',
@@ -547,8 +540,6 @@ const EN: V2Strings = {
   skuDiscount: 'Discount $',
   savedPriced: 'The product is saved and its prices are published.',
   savedDataOnly: 'The data is saved; prices are not published until they are complete.',
-  signInAgain: 'Sign in again',
-  reauth: 'A large change needs a recent sign-in. Sign in, then save again.',
   from: (v) => `from ${v}`,
   inherit: 'Inherit',
   pending: 'Waiting to compute',
@@ -673,7 +664,6 @@ const CKB: V2Strings = {
   confirm: 'پەسەندکردن و بڵاوکردنەوە',
   cancel: 'هەڵوەشاندنەوە — ئەوەی نووسیوتە بمێنێتەوە',
   largeTick: 'گۆڕانکاریی سەرووی 15% پشتڕاست دەکەمەوە',
-  largeNote: 'گۆڕانکاریی گەورە پێویستی بە چوونەژوورەوەی نوێ هەیە.',
   dropFlag: 'دابەزینی سەرووی 30%',
   discountTooBig: 'داشکاندنەکە لە قازانجی ئەم ڕێڕەوە زیاترە — بە نرخی ڕاستەوخۆ دەفرۆشرێت',
   routeBlocked: 'وەستاوە: لە تێچوو کەمترە',
@@ -730,8 +720,6 @@ const CKB: V2Strings = {
   skuDiscount: 'بڕی داشکاندن $',
   savedPriced: 'بەرهەمەکە پاشەکەوت کرا و نرخەکانی بڵاو کرانەوە.',
   savedDataOnly: 'زانیارییەکان پاشەکەوت کران؛ نرخەکان تا تەواو نەبن بڵاو ناکرێنەوە.',
-  signInAgain: 'دووبارە بچۆرە ژوورەوە',
-  reauth: 'گۆڕانکاریی گەورە پێویستی بە چوونەژوورەوەی نوێ هەیە. بچۆرە ژوورەوە و دووبارە پاشەکەوتی بکە.',
   from: (v) => `لە ${v}ەوە`,
   inherit: 'بەهای بنەڕەت',
   pending: 'چاوەڕێی ژماردنە',

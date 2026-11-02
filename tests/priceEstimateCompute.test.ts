@@ -980,15 +980,12 @@ test('the owner’s type table (version-fenced, audited, its rules held), the me
   assert.deepEqual(suggestion.body.suggestion, { key: 'hotend', count: 3, weight_g: 500, box: [200, 100, 50], cbm: '0.001' });
   assert.equal(row<Json>(w.raw, "SELECT default_weight_g FROM price_estimate_types WHERE key = 'hotend'")!.default_weight_g, null, 'nothing saved');
 
-  // The switches: «apply» needs a fresh sign-in and the published clause; «ordering» is the emergency brake.
+  // The switches: «apply» needs the published clause; «ordering» is the emergency brake. Neither asks for a
+  // fresh sign-in (DECISIONS row 285): an hour-old session pulls the brake.
   const control = await call(w.app, 'GET', `${BASE}/control`);
   assert.deepEqual([control.body.control.apply_enabled, control.body.control.ordering_enabled, control.body.policy_ready], [true, true, true]);
-  const old = await call(stubApp(asD1(w.raw), OWNER, (a) => a.route(BASE, adminPriceEstimatesRoutes), { publishV2: false, sessionAgeSeconds: 3600 }), 'PUT', `${BASE}/control`, {
-    version: control.body.control.version,
-    ordering_enabled: false,
-  });
-  assert.deepEqual([old.status, old.body.code], [401, 'REAUTH_REQUIRED']);
-  const brake = await call(w.app, 'PUT', `${BASE}/control`, { version: control.body.control.version, ordering_enabled: false });
+  const old = stubApp(asD1(w.raw), OWNER, (a) => a.route(BASE, adminPriceEstimatesRoutes), { publishV2: false, sessionAgeSeconds: 3600 });
+  const brake = await call(old, 'PUT', `${BASE}/control`, { version: control.body.control.version, ordering_enabled: false });
   assert.equal(brake.status, 200, JSON.stringify(brake.body));
   assert.deepEqual([brake.body.control.apply_enabled, brake.body.control.ordering_enabled], [true, false]);
   assert.equal(row<Json>(w.raw, 'SELECT ordering_enabled FROM price_estimate_control WHERE id = 1')!.ordering_enabled, 0);

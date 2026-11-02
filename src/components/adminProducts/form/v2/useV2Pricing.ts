@@ -54,7 +54,6 @@ export interface V2Review {
   preview: V2Answer;
   status: 'draft' | 'active';
   error: string;
-  reauth: boolean;
 }
 
 export interface V2PricingState {
@@ -106,7 +105,7 @@ export interface V2PricingState {
   /** §2.1 rule 2 (the owner's): what the product's minimum profit inherits when its own field is empty. */
   inheritedMinimumProfit?: { amount_usd: string | null; amount_iqd: number | null } | null;
   openReview: (preview: V2Answer, status: 'draft' | 'active') => void;
-  reviewError: (error: string, reauth?: boolean) => void;
+  reviewError: (error: string) => void;
   closeReview: () => void;
   /** «طبّق على الألوان المحددة»: the colours ticked in section ٥. */
   selectedColours: ReadonlySet<string>;
@@ -323,9 +322,9 @@ export function useV2Pricing(input: V2FormInput): V2PricingState {
 
   const openReview = useCallback((preview: V2Answer, status: 'draft' | 'active') => {
     setAnswer(preview);
-    setReview({ preview, status, error: '', reauth: false });
+    setReview({ preview, status, error: '' });
   }, []);
-  const reviewError = useCallback((message: string, reauth = false) => setReview((r) => (r ? { ...r, error: message, reauth } : r)), []);
+  const reviewError = useCallback((message: string) => setReview((r) => (r ? { ...r, error: message } : r)), []);
   const closeReview = useCallback(() => setReview(null), []);
   const toggleColour = useCallback(
     (id: string) =>

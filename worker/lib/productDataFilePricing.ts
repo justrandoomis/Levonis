@@ -13,8 +13,9 @@
  * for anyone else. Changes go through the SAME door as the form's save
  * (`parseProductInputs` → `effectiveWrites` → `productEngineEvaluation`), with
  * the same gates: a save that would write prices (adopt or reprice) needs the
- * hash of the preview the owner read, a large change the tick and a fresh
- * sign-in; a dinar entry needs the hash of the rate it converts at.
+ * hash of the preview the owner read, a large change the tick (no fresh
+ * sign-in: DECISIONS row 285); a dinar entry needs the hash of the rate it
+ * converts at.
  */
 import { HttpError } from './http';
 import { engineCoreInstalled } from './engineInstalled';

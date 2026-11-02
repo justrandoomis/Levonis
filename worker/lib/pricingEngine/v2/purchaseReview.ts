@@ -26,7 +26,7 @@
  *   - PREVIEW: the review's writes laid over the product's stored V2 set and
  *     evaluated by `evaluateV2Write` (cost-first: D and every route move by the
  *     new R; price-first: prices hold, the owner sees the new `below_*`).
- *   - APPLY: the normal V2 apply (hash, the 15% tick, a fresh sign-in): one
+ *   - APPLY: the normal V2 apply (hash and the 15% tick): one
  *     batch writes the inputs (`source_ref purchase:<id>`), prices, results,
  *     history and audit with idempotency `v2purchase:<review>:<hash>`, and
  *     marks the review `applied`. A purchase no longer ordered, partly or fully

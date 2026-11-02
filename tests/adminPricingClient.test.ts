@@ -344,7 +344,8 @@ test('FX-1: owner acts carry owner_version, decimals as text, and the large-chan
   // Refused once for want of the confirmation → the message offers it; a stale panel reloads.
   assert.match(parts, /code === 'PRICING_LARGE_CHANGE_CONFIRM' && !confirmLarge/);
   assert.match(parts, /if \(code === 'PRICING_CHANGED'\) onStale\(\);/);
-  assert.match(parts, /error\.code === 'REAUTH_REQUIRED'\) return s\.reauth;/);
+  // No rate act asks for a fresh sign-in (DECISIONS row 285): the panel has no REAUTH branch of its own.
+  assert.doesNotMatch(parts, /REAUTH_REQUIRED/);
   // The tracking is a choice, then «حفظ» — an arrow key never sends a request.
   assert.match(card, /onChange=\{\(id\) => setTracking\(id as Tracking\)\}/);
   // Inputs are read as people in Iraq type them and travel as text.

@@ -5,7 +5,8 @@
  *   refusals     a cost door's 401 / 403 FORBIDDEN / COST_ACCESS_DENIED /
  *                OWNER_EMAIL_UNVERIFIED; a 429 on the pricing and FX buckets
  *                (the bucket named, the 429 body unchanged); the owner's
- *                freshness refusal (REAUTH_REQUIRED)
+ *                freshness refusal (REAUTH_REQUIRED) — of an account-security
+ *                act, since no pricing act asks for one (DECISIONS row 285)
  *   guard        every FX guard-setting change: the pair, the act code and
  *                field NAMES — never a value; a non-guard change is not one
  *   context      an owner cost request from a session, network or browser not
@@ -28,6 +29,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
 import type { AppContext } from '../worker/lib/types';
 import { adminPricingRoutes } from '../worker/routes/adminPricing';
+import { adminRoutes } from '../worker/routes/admin';
 import { requireAdmin } from '../worker/lib/http';
 import { requireCostRead } from '../worker/lib/costAccess';
 import { rateLimitKey } from '../worker/lib/ratelimit';
@@ -51,7 +53,7 @@ import {
   securityEventsDoor,
   targetOf,
 } from '../worker/lib/securityEvents';
-import { OWNER, all, asD1, dbThrough, freshDb, get, json, pending, put, post, row, stubApp, type StubUser } from './fixtures/app';
+import { OWNER, all, asD1, dbThrough, freshDb, get, json, patch, pending, put, post, row, stubApp, type StubUser } from './fixtures/app';
 import { OWNER_ROW_SQL, pairOf } from './fixtures/fx';
 import { codeOf } from './fixtures/source';
 import { readFileSync } from 'node:fs';
@@ -304,16 +306,36 @@ test('a 429 on the pricing bucket: rate_limited with the bucket NAME, the 429 bo
   assert.equal(classifyRefusal({ path: '/api/admin/finance/x', status: 429, code: 'RATE_LIMITED', ownerSession: true, bucket: 'finance-read' }), null, 'another bucket is not one of these');
 });
 
-test("the owner's freshness refusal is recorded: owner_denied REAUTH_REQUIRED", async () => {
-  const { raw, app } = world({ sessionAgeSeconds: 11 * 60 });
-  const res = await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: Number(pairOf(raw, 'USD_IQD').owner_version), anomaly_threshold_pct: '4' });
+test("the owner's freshness refusal is recorded: owner_denied REAUTH_REQUIRED — widening an admin's scope; a pricing act on the same session asks none (row 285)", async () => {
+  const raw = freshDb();
+  raw.exec(OWNER_ROW_SQL);
+  raw.exec("INSERT INTO users (id,name,email,password_hash,role,admin_scope) VALUES ('usr_asst','Asst','asst@x.co','h','admin','assistant')");
+  const admin = stubApp(
+    asD1(raw),
+    OWNER,
+    (a) => {
+      a.use('/api/admin/*', securityEventsDoor);
+      a.route('/api/admin', adminRoutes);
+    },
+    { sessionAgeSeconds: 11 * 60 }
+  );
+  const res = await patch(admin, '/api/admin/users/usr_asst', { admin_scope: 'full' });
   assert.equal(res.status, 401);
   assert.equal((await json(res)).code, 'REAUTH_REQUIRED');
   await drain();
-  const [e] = events(raw, 'owner_denied');
-  assert.deepEqual([e!.code, e!.actor_id, e!.actor_class, e!.status, e!.method], ['REAUTH_REQUIRED', 'usr_owner', 'owner', 401, 'PUT']);
-  assert.equal(e!.target_id, 'USD_IQD');
-  assert.equal(events(raw, 'scope_changed').length, 0, 'nothing changed');
+  const [e, ...rest] = events(raw, 'owner_denied');
+  assert.equal(rest.length, 0);
+  assert.deepEqual([e!.code, e!.actor_id, e!.actor_class, e!.status, e!.method], ['REAUTH_REQUIRED', 'usr_owner', 'owner', 401, 'PATCH']);
+  assert.equal(e!.target_id, 'usr_asst');
+  assert.equal(row<{ admin_scope: string }>(raw, "SELECT admin_scope FROM users WHERE id = 'usr_asst'")!.admin_scope, 'assistant', 'nothing changed');
+
+  // A guard change on the same 11-minute-old session saves: no freshness refusal, the guard change recorded.
+  const { app } = world({ raw, sessionAgeSeconds: 11 * 60 });
+  const ok = await put(app, `${BASE}/rates/fx/USD_IQD/settings`, { owner_version: Number(pairOf(raw, 'USD_IQD').owner_version), anomaly_threshold_pct: '4' });
+  assert.equal(ok.status, 200);
+  await drain();
+  assert.equal(events(raw, 'owner_denied').length, 1, 'still the one refusal');
+  assert.equal(events(raw, 'scope_changed').length, 1, 'the guard change');
 });
 
 test('every FX guard-setting change is recorded: scope_changed FX_GUARD_CHANGED, the pair, the act and field NAMES — never a value', async () => {

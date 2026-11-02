@@ -75,7 +75,7 @@ export default {
             owner_version: ((await read('/api/admin/pricing/rates')).pairs as Array<{ owner_version: number }> | undefined)?.[0]?.owner_version ?? 1,
             interval_hours: 12,
           }),
-          why: 'the guard settings, mode, interval and adjustment of one pair (a fresh sign-in for any guard field)',
+          why: 'the guard settings, mode, interval and adjustment of one pair (a guard field rings the guard bell; no fresh sign-in, DECISIONS row 285)',
         },
         'PUT /rates/fx/:pair/manual': {
           cls: 'cost_write',
@@ -266,7 +266,7 @@ export default {
             version: ((await read('/api/admin/pricing/estimates/control')).control as { version?: number } | undefined)?.version ?? 1,
             ordering_enabled: true,
           }),
-          why: 'the two switches, version-fenced and after a fresh sign-in; «apply» is refused until the purchase policy carries the clause',
+          why: 'the two switches, version-fenced (no fresh sign-in, DECISIONS row 285); «apply» is refused until the purchase policy carries the clause',
         },
         'GET /estimates/types': {
           cls: 'cost_read',

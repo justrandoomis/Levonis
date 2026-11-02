@@ -13,8 +13,9 @@
  *   - «رفض والإبقاء على الحالي» (reject: remembered 24 h, never re-offered in
  *     that time, M4.2);
  *   - «أبقِ سعري الحالي يدويًا» (keep_manual: the rate in force becomes manual).
- * A decision above 15% asks for the explicit confirmation and a fresh sign-in
- * (§7.8) — said here, beside the buttons.
+ * A decision above 15% asks for the explicit confirmation (§7.8) — said here,
+ * beside the buttons — and no decision asks for a fresh sign-in (DECISIONS
+ * row 285).
  *
  * FX-5 (§7.8, §8): once a product is engine-priced, approving reprices it, so
  * the sheet reads the approval's preview (…/review/preview, nothing written)
@@ -161,7 +162,7 @@ export default function FxReviewSheet({ pair: p, engineProducts = 0, onClose, la
                 {s.keepManual}
               </Button>
             )}
-            {/* Said before the act: it turns tracking off, so it asks for a fresh sign-in (UX review #2). */}
+            {/* Said before the act: it turns tracking off (UX review #2). */}
             {p.effective_rate && (
               <p id={keepHintId} className="text-[12px] leading-relaxed text-text-muted sm:basis-full" data-fx-keep-manual-hint>
                 {s.keepManualHint}
@@ -230,7 +231,6 @@ export default function FxReviewSheet({ pair: p, engineProducts = 0, onClose, la
                   {s.previewLoading}
                 </p>
               )}
-              {preview?.fresh_sign_in && <p className="mt-2 text-[12.5px] leading-relaxed text-text-muted" data-fx-review-fresh>{s.reauth}</p>}
             </section>
           )}
           <FxMessage message={message} s={s} />

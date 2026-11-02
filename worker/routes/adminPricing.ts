@@ -75,7 +75,7 @@ import { completenessAfterWrite } from '../lib/completenessHooks';
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { HttpError, jsonObject, notFound, requireAdmin } from '../lib/http';
-import { assertCostWrite, requireCostRead, requireFreshSession } from '../lib/costAccess';
+import { assertCostWrite, requireCostRead } from '../lib/costAccess';
 import { limitByMethod, rateLimit } from '../lib/ratelimit';
 import { SESSION_CACHE_CONTROL, originOf, purgeCatalogueFromJob } from '../lib/edgePolicy';
 import { auditStatements } from '../lib/audit';
@@ -130,7 +130,6 @@ import { parseProcurementDraft } from '../lib/procurementDraft';
 import { committedPurchaseForPricing, draftForPricing, purchaseUsdIqd, purchaseUsdIqdSnapshotOf } from '../lib/pricingEngine/purchaseRead';
 import { FX_GUARD_CHANGED, recordSecurityEvent } from '../lib/securityEvents';
 import { previewRateAct, type RateMove, type RatePreview } from '../lib/pricingEngine/ratePreview';
-import { FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../lib/session';
 import { loadBatches, type BatchFilter } from '../lib/batchSnapshot';
 import { v2PublicationCounts } from '../lib/pricingEngine/v2/queue';
 import { procurementLinePricing } from '../lib/pricingEngine/v2/procurementLine';
@@ -224,18 +223,16 @@ async function ratesAnswer(c: Context<AppContext>, extra: Record<string, unknown
   return c.json({ ...ratesDto(fxKeyConfigured(c.env), model, now), ...extra });
 }
 
-/** §7.8: a move above 15% — or the owner's acts of the last 24 h above 15% — needs the explicit confirmation and a fresh sign-in. */
+/**
+ * §7.8: a move above 15% — or the owner's acts of the last 24 h above 15% — needs the explicit
+ * confirmation. Nothing more: no rate act asks for a fresh sign-in (owner decision 2026-11-02,
+ * DECISIONS row 285).
+ */
 async function largeChangeGate(c: Context<AppContext>, pair: FxPairId, move: PlannedAct['move'], confirm: boolean, now: Date): Promise<void> {
   if (!move) return;
   const lc = await largeChange(c.env.DB, pair, move.before, move.after, now);
   if (!lc.act && !lc.cumulative) return;
   if (!confirm) throw fxRefusal(409, 'PRICING_LARGE_CHANGE_CONFIRM');
-  requireFreshSession(c);
-}
-
-/** Price-moving owner acts need a fresh sign-in once any product is engine-priced (§7.8; none is in FX-1). */
-async function priceMovingGate(c: Context<AppContext>, moves: boolean): Promise<void> {
-  if (moves && (await engineProductCount(c.env.DB)) > 0) requireFreshSession(c);
 }
 
 /**
@@ -296,7 +293,7 @@ function actCost(planned: PlannedAct, rows: readonly FxPairRow[], actor: string,
 const SHIPPING_ACT_COST = 5;
 
 /** The preview as the owner reads it (allowlisted; every amount key is in FINANCIAL_FIELDS). */
-function ratePreviewDto(c: Context<AppContext>, p: RatePreview) {
+function ratePreviewDto(p: RatePreview) {
   return {
     act: { ...p.act },
     engine_products: p.engine_products,
@@ -307,8 +304,6 @@ function ratePreviewDto(c: Context<AppContext>, p: RatePreview) {
     follows: p.follows,
     large_change: p.large_change,
     drop_flag: p.drop_flag,
-    // The act will ask for a sign-in within the last ten minutes (§7.8, once a product is engine-priced): said before it.
-    fresh_sign_in: p.engine_products > 0 && sessionAgeSeconds(c) > FRESH_SESSION_SECONDS,
     preview_hash: p.preview_hash,
   };
 }
@@ -327,9 +322,9 @@ async function ratePreview(c: Context<AppContext>, move: RateMove, spent: number
  * the engine prices at carries the hash of the preview the owner read. None →
  * 409 PRICING_PREVIEW_REQUIRED; moved since (a rate, a product, the pair's
  * owner version) → 409 PRICING_PREVIEW_STALE; each returns the fresh preview.
- * A customer price moving more than 15% needs the explicit confirmation and a
- * sign-in within the last ten minutes. Answers the statements the preview read
- * (the repricing's budget is charged for them).
+ * A customer price moving more than 15% needs the explicit confirmation (and
+ * no fresh sign-in: DECISIONS row 285). Answers the statements the preview
+ * read (the repricing's budget is charged for them).
  */
 async function previewGate(c: Context<AppContext>, move: RateMove, gate: { hash: unknown; confirm: boolean }, spent: number): Promise<number> {
   if (!rateMoves(move)) return 0;
@@ -337,12 +332,9 @@ async function previewGate(c: Context<AppContext>, move: RateMove, gate: { hash:
   const { preview, statements } = await ratePreview(c, move, spent);
   if (gate.hash !== preview.preview_hash) {
     const code = typeof gate.hash === 'string' && gate.hash !== '' ? 'PRICING_PREVIEW_STALE' : 'PRICING_PREVIEW_REQUIRED';
-    throw fxRefusal(409, code, { preview: ratePreviewDto(c, preview) });
+    throw fxRefusal(409, code, { preview: ratePreviewDto(preview) });
   }
-  if (preview.large_change) {
-    if (!gate.confirm) throw fxRefusal(409, 'PRICING_LARGE_CHANGE_CONFIRM', { preview: ratePreviewDto(c, preview) });
-    requireFreshSession(c);
-  }
+  if (preview.large_change && !gate.confirm) throw fxRefusal(409, 'PRICING_LARGE_CHANGE_CONFIRM', { preview: ratePreviewDto(preview) });
   return statements + 1;
 }
 
@@ -426,13 +418,10 @@ adminPricingRoutes.put('/rates/fx/:pair/settings', async (c) => {
   const rows = await fxRows(c.env.DB);
   const planned = planSettings(pairRow(rows, pair), body, { actor: c.get('user')!.id, now });
   if (!planned) return ratesAnswer(c);
-  // §7.8: a guard setting, the mode or the interval weaken or move the guard without moving a price — always a fresh sign-in.
-  // THE ADJUSTMENT TOO, always (owner decision 5; WP-FX1A role table): it moves the effective USD
-  // rate, and with it the public displayUsdRate, by a fixed number of dinars with no market guard
-  // in between — on a stale session, up to 15% a day. Asked here, not through GUARD_FIELDS: it is
-  // not a guard setting, so it rings no guard-change notice.
-  if (planned.guard || planned.fields.includes('market_adjustment_iqd')) requireFreshSession(c);
-  await priceMovingGate(c, planned.move !== null);
+  // No fresh sign-in (owner decision 2026-11-02, DECISIONS row 285): a guard setting, the mode or the
+  // interval is written into the owner's security log and rings the guard bell (commitAct); the
+  // adjustment, which moves the effective USD rate and the public displayUsdRate, passes the
+  // large-change gate here and the preview below.
   await largeChangeGate(c, pair, planned.move, planned.confirm, now);
   // FX-5: an adjustment that moves the effective rate carries the preview the owner read (§7.8).
   const row = pairRow(rows, pair);
@@ -455,7 +444,6 @@ adminPricingRoutes.put('/rates/fx/:pair/manual', async (c) => {
   const now = new Date();
   const rows = await fxRows(c.env.DB);
   const planned = planManualSet(pairRow(rows, pair), body, { actor: c.get('user')!.id, now });
-  await priceMovingGate(c, true);
   await largeChangeGate(c, pair, planned.move, planned.confirm, now);
   const previewSpent = await previewGate(
     c,
@@ -474,8 +462,7 @@ adminPricingRoutes.post('/rates/fx/:pair/confirm', async (c) => {
   const now = new Date();
   const rows = await fxRows(c.env.DB);
   const planned = planConfirm(pairRow(rows, pair), body, { actor: c.get('user')!.id, now });
-  // «تأكيد السعر الحالي» widens what may move automatically: always a fresh sign-in (§7.8).
-  requireFreshSession(c);
+  // «تأكيد السعر الحالي» widens what may move automatically: a guard change, logged and rung (commitAct) — no fresh sign-in (DECISIONS row 285).
   await commitAct(c, planned, rows, now);
   return ratesAnswer(c);
 });
@@ -498,11 +485,9 @@ adminPricingRoutes.post('/rates/fx/:pair/review', async (c) => {
   const now = new Date();
   const rows = await fxRows(c.env.DB);
   const planned = planReview(pairRow(rows, pair), body, { actor: c.get('user')!.id, now });
-  // «أبقِ سعري الحالي يدويًا» changes the mode: a fresh sign-in, always (§7.8; FX-1 security review #2).
-  if (planned.guard) requireFreshSession(c);
+  // «أبقِ سعري الحالي يدويًا» changes the mode: a guard change, logged and rung (commitAct; FX-1 security review #2) — no fresh sign-in (DECISIONS row 285).
   let previewSpent = 0;
   if (planned.decision === 'approve') {
-    await priceMovingGate(c, true);
     await largeChangeGate(c, pair, planned.move, planned.confirm, now);
     previewSpent = await previewGate(
       c,
@@ -529,11 +514,9 @@ adminPricingRoutes.put('/rates/shipping/:profile', async (c) => {
   }
   if (!row) throw fxNotInstalled();
   if (row.version !== input.version) throw fxRefusal(409, 'PRICING_CHANGED');
-  await priceMovingGate(c, true);
   // §21: dinars per kg or per CBM; §7.8 per act (its history carries no value before FX-2's pricing_audit).
-  if (row.rate_iqd !== null && ratioExceedsPct(sumOfMoves([{ before: row.rate_iqd, after: input.rate }]), LARGE_CHANGE_PCT)) {
-    if (!input.confirm) throw fxRefusal(409, 'PRICING_LARGE_CHANGE_CONFIRM');
-    requireFreshSession(c);
+  if (row.rate_iqd !== null && ratioExceedsPct(sumOfMoves([{ before: row.rate_iqd, after: input.rate }]), LARGE_CHANGE_PCT) && !input.confirm) {
+    throw fxRefusal(409, 'PRICING_LARGE_CHANGE_CONFIRM');
   }
   // FX-5: the products on this route are repriced at the new rate — the owner read that preview first (§7.8).
   const previewSpent = await previewGate(
@@ -582,7 +565,7 @@ adminPricingRoutes.post('/rates/fx/:pair/review/preview', async (c) => {
   // Approving: the held MARKET figure at the CURRENT adjustment (M4.3) — the act's own planner.
   const planned = planReview(row, { owner_version: row.owner_version, decision: 'approve' }, { actor, now });
   const { preview } = await ratePreview(c, fxMoveOf('review', row, planned), actCost(planned, rows, actor, now));
-  return c.json({ success: true, preview: ratePreviewDto(c, preview) });
+  return c.json({ success: true, preview: ratePreviewDto(preview) });
 });
 
 adminPricingRoutes.post('/rates/fx/:pair/manual/preview', async (c) => {
@@ -605,7 +588,7 @@ adminPricingRoutes.post('/rates/fx/:pair/manual/preview', async (c) => {
     cost = planned ? actCost(planned, rows, actor, now) : 0;
   }
   const { preview } = await ratePreview(c, move, cost);
-  return c.json({ success: true, preview: ratePreviewDto(c, preview) });
+  return c.json({ success: true, preview: ratePreviewDto(preview) });
 });
 
 adminPricingRoutes.post('/rates/shipping/:profile/preview', async (c) => {
@@ -622,7 +605,7 @@ adminPricingRoutes.post('/rates/shipping/:profile/preview', async (c) => {
   }
   if (!row) throw fxNotInstalled();
   const { preview } = await ratePreview(c, { kind: 'shipping', profile: input.profile, version: row.version, before: row.rate_iqd, after: input.rate }, SHIPPING_ACT_COST);
-  return c.json({ success: true, preview: ratePreviewDto(c, preview) });
+  return c.json({ success: true, preview: ratePreviewDto(preview) });
 });
 
 // ============================================================= Inputs: the current costs and the owner's rules

@@ -13,9 +13,9 @@
  * structure and its prices land together or not at all.
  *
  *   - No price moves and no price field was sent: it saves with no sheet.
- *   - A price moves: the preview's hash, the 15% tick and a fresh sign-in
- *     (`gateV2`); without the hash 409 PRICING_PREVIEW_REQUIRED carries the
- *     V2 preview, never ENGINE_MANAGED.
+ *   - A price moves: the preview's hash and the 15% tick (`gateV2`; no
+ *     fresh sign-in, DECISIONS row 285); without the hash 409
+ *     PRICING_PREVIEW_REQUIRED carries the V2 preview, never ENGINE_MANAGED.
  *   - Incomplete: the data saves and no price moves (an existing product keeps
  *     its last good prices; a new one is born V2 and hidden); publishing it is
  *     409 PRICING_V2_PRICE_MISSING.

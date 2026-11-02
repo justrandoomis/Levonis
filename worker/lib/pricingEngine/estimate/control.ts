@@ -111,7 +111,7 @@ export function estimatePolicyInForce(today: string = new Date().toISOString().s
 /* -------------------------------------------------------------- the switches -- */
 
 /**
- * PUT /estimates/control {version, apply_enabled?, ordering_enabled?} (the route asks a fresh sign-in first).
+ * PUT /estimates/control {version, apply_enabled?, ordering_enabled?} (no fresh sign-in: DECISIONS row 285).
  * «apply» on is refused until the published purchase policy carries the clause (409 PRICE_ESTIMATE_POLICY_MISSING).
  */
 export async function setControl(db: D1Database, raw: unknown, actor: string, now: Date): Promise<EstimateControl> {

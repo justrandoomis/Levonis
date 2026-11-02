@@ -194,7 +194,7 @@ function batchRefusal(pid: string, e: unknown): ApplyOutcome | null {
 /**
  * Apply up to five reviewed estimates (§4.8). The owner's «apply» switch must be on and the purchase policy's
  * clause in force; each product must still be eligible, its preview hash current, and its large change ticked
- * with a fresh sign-in (`gateV2`).
+ * (`gateV2`; no fresh sign-in, DECISIONS row 285).
  */
 export async function applyEstimates(c: Context<AppContext>, items: readonly ApplyItem[], opts: { limit?: number } = {}): Promise<ApplyAnswer> {
   const { db, counter } = countedEstimateDb(c.env.DB);

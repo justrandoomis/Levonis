@@ -14,12 +14,14 @@
  *   - a manual rate; back to automatic; «استخدم {rate} سعرًا يدويًا» after a
  *     refresh while manual (critique L14);
  *   - the adjustment (USD only, `market_adjustment_iqd`: a FIXED number of
- *     dinars per dollar, never a percentage — owner decision 5), behind a
- *     fresh sign-in, with the sum «market + adjustment = effective» when it
- *     holds (`formula_holds`), each figure isolated left-to-right;
+ *     dinars per dollar, never a percentage — owner decision 5), with the sum
+ *     «market + adjustment = effective» when it holds (`formula_holds`), each
+ *     figure isolated left-to-right;
  *   - «تأكيد السعر الحالي», which moves the drift anchor (critique F1);
- *   - the safety settings, collapsed, behind a fresh sign-in (critique F3);
+ *   - the safety settings, collapsed (critique F3);
  *   - a held value is decided in the review sheet (FxReviewSheet).
+ * None of them asks for a fresh sign-in (DECISIONS row 285), so nothing here
+ * warns of one.
  *
  * Every figure is the server's decimal text; nothing is computed here.
  */
@@ -348,7 +350,6 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
             >
               {s.cancel}
             </Button>
-            <span className="text-[12px] text-text-muted">{s.guardsHint}</span>
           </div>
         )}
       </div>
@@ -409,12 +410,6 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
               </Button>
             )}
           </div>
-          {/* Said before the act: an adjustment moves the shop's rate, so saving it asks for a fresh sign-in. */}
-          {adjustmentInput(adjustment) !== (p.market_adjustment_iqd ?? '0') && (
-            <p className="mt-1 text-[12px] leading-relaxed text-text-muted" data-fx-adjustment-reauth>
-              {s.guardsHint}
-            </p>
-          )}
           {p.mode === 'MANUAL' && (
             <p className="mt-1 text-[12px] leading-relaxed text-text-muted" data-fx-manual-final>
               {s.manualPlusAdjustment}
@@ -455,7 +450,7 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
           </Button>
         )}
       </div>
-      {/* What it does and that it asks for a fresh sign-in — on screen, not in a tooltip a phone never shows (UX review #13). */}
+      {/* What it does — on screen, not in a tooltip a phone never shows (UX review #13). */}
       {anchorDiffers && !manualOpen && (
         <p id={confirmHintId} className="mt-1.5 text-[12px] leading-relaxed text-text-muted" data-fx-confirm-hint>
           {s.confirmCurrentHint}
@@ -499,7 +494,6 @@ export default function FxPairCard({ pair: p, rates, lang, s, onAnswer, onStale,
           <ShieldCheck aria-hidden="true" className="h-4 w-4 text-text-muted" />
           {s.guards}
         </summary>
-        <p className="mb-3 text-[12px] leading-relaxed text-text-muted">{s.guardsHint}</p>
         <div className="grid gap-3 sm:grid-cols-3">
           <Field label={s.threshold} error={guardErrors.anomaly}>
             <Input ltr inputMode="decimal" autoComplete="off" value={guards.anomaly} onChange={(e) => setGuards({ ...guards, anomaly: e.target.value })} />

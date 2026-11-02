@@ -32,7 +32,6 @@ export interface EngineSaveStrings {
   memberBeforeAfter: (tier: string, before: string, after: string) => string;
   legacyStep: string;
   codAsDirect: string;
-  reauth: string;
   incomplete: Fill;
   savedAdopted: string;
   savedRepriced: string;
@@ -73,14 +72,13 @@ const ar: EngineSaveStrings = {
   cancel: 'رجوع دون حفظ الأسعار',
   saving: 'جارٍ الحفظ…',
   largeTick: 'أؤكد التغيّر الكبير في السعر',
-  largeNote: 'تغيّر أكبر من 15٪ — أكّد، وقد يُطلب تسجيل دخول حديث',
+  largeNote: 'تغيّر أكبر من 15٪ — أكّده قبل الحفظ',
   dropFlag: 'انخفاض أكبر من 30٪ في سعر واحد على الأقل — راجعه قبل الحفظ',
   reviewPending: (rate) => `سعر صرف جديد بانتظار اعتمادك؛ تُحسب هذه الأسعار بالسعر المعتمد الحالي ${rate}`,
   routeFeeRemoved: 'رسم المسار القديم أصبح جزءًا من السعر',
   memberBeforeAfter: (tier, before, after) => `سعر عضو ${tier}: ${before} ← ${after}`,
   legacyStep: 'يرتفع السعر 1,000 د.ع بسبب تقريب الحد الأدنى المرحَّل إلى السنت',
   codAsDirect: 'الدفع عند الاستلام للطلب المسبق يدفع سعر البيع المباشر',
-  reauth: 'التغيّر الكبير يحتاج تسجيل دخول حديثًا: سجّل الدخول مجددًا ثم احفظ',
   incomplete: (list) => `تُحفظ البيانات فقط؛ ينقص: ${list}`,
   savedAdopted: 'حُفظ واعتُمد التسعير التلقائي وكُتبت الأسعار الجديدة',
   savedRepriced: 'حُفظت الأسعار الجديدة',
@@ -117,14 +115,13 @@ const en: EngineSaveStrings = {
   cancel: 'Back without saving the prices',
   saving: 'Saving…',
   largeTick: 'I confirm the large price change',
-  largeNote: 'A change above 15% — confirm; a fresh sign-in may be asked',
+  largeNote: 'A change above 15% — confirm it before saving',
   dropFlag: 'At least one price falls more than 30% — review it before saving',
   reviewPending: (rate) => `A new exchange rate awaits your approval; these prices use the current approved rate ${rate}`,
   routeFeeRemoved: 'The old route fee is now part of the price',
   memberBeforeAfter: (tier, before, after) => `${tier} member price: ${before} → ${after}`,
   legacyStep: 'The price rises by 1,000 IQD because the migrated minimum is rounded up to the cent',
   codAsDirect: 'Cash-on-delivery pre-orders pay the direct-sale price',
-  reauth: 'A large change needs a fresh sign-in: sign in again, then save',
   incomplete: (list) => `Data is saved only; missing: ${list}`,
   savedAdopted: 'Saved: automatic pricing adopted and the new prices written',
   savedRepriced: 'The new prices are saved',
@@ -161,14 +158,13 @@ const ckb: EngineSaveStrings = {
   cancel: 'گەڕانەوە بەبێ پاشەکەوتکردنی نرخەکان',
   saving: 'پاشەکەوت دەکرێت…',
   largeTick: 'گۆڕانە گەورەکەی نرخ پشتڕاست دەکەمەوە',
-  largeNote: 'گۆڕانێکی سەرووی 15٪ — پشتڕاستی بکەرەوە؛ لەوانەیە چوونەژوورەوەی نوێ داوا بکرێت',
+  largeNote: 'گۆڕانێکی سەرووی 15٪ — پێش پاشەکەوتکردن پشتڕاستی بکەرەوە',
   dropFlag: 'لانیکەم یەک نرخ زیاتر لە 30٪ دادەبەزێت — پێش پاشەکەوتکردن پێیدا بچۆرەوە',
   reviewPending: (rate) => `نرخێکی نوێی ئاڵوگۆڕ چاوەڕێی پەسەندکردنی تۆیە؛ ئەم نرخانە بە نرخی پەسەندکراوی ئێستا ${rate} هەژمار دەکرێن`,
   routeFeeRemoved: 'کرێی کۆنی ڕێگا ئێستا بەشێکە لە نرخەکە',
   memberBeforeAfter: (tier, before, after) => `نرخی ئەندامی ${tier}: ${before} ← ${after}`,
   legacyStep: 'نرخەکە 1,000 د.ع بەرز دەبێتەوە بەهۆی خڕکردنەوەی کەمترین قازانجی گواستراوە بۆ سەنت',
   codAsDirect: 'پێشداواکاریی پارەدان لە کاتی گەیاندن نرخی فرۆشتنی ڕاستەوخۆ دەدات',
-  reauth: 'گۆڕانێکی گەورە چوونەژوورەوەیەکی نوێ دەوێت: دووبارە بچۆ ژوورەوە، پاشان پاشەکەوت بکە',
   incomplete: (list) => `تەنها زانیارییەکان پاشەکەوت دەکرێن؛ کەمە: ${list}`,
   savedAdopted: 'پاشەکەوت کرا: نرخدانانی خۆکار گیرایە بەر و نرخە نوێیەکان نووسران',
   savedRepriced: 'نرخە نوێیەکان پاشەکەوت کران',

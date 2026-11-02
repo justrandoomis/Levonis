@@ -243,7 +243,7 @@ export default function ConfirmSheet({ estimate, onClose, onDone }: { estimate: 
         </div>
       ) : null}
       {hint ? <p className="text-[12px] text-danger">{hint}</p> : null}
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
     </SheetFrame>
   );
 }

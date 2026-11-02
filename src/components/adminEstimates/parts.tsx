@@ -14,7 +14,6 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import { AlertTriangle, Check, CheckCircle2, ChevronLeft, ChevronRight, Copy, ExternalLink, Info, ShieldAlert, X } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { useLanguage } from '../../LanguageContext';
-import { useOptionalAuth } from '../../AuthContext';
 import { ApiError, isAborted } from '../../lib/api';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { copyText } from '../../lib/copyText';
@@ -24,7 +23,7 @@ import { Button } from '../ui/Button';
 import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
 import { estimateRefusalText } from '../../../packages/contracts/src/priceEstimates';
 import { PRICING_FIELD_LABELS, isPricingFieldName } from '../../../packages/contracts/src/pricingFieldLabels';
-import { linkStore, safeSupplierHref, workspaceHref, type EstimateFlagEntry, type LinkSku, type SupplierLink } from './api';
+import { linkStore, safeSupplierHref, type EstimateFlagEntry, type LinkSku, type SupplierLink } from './api';
 import {
   COMMON,
   CONFIDENCE_LABELS,
@@ -66,10 +65,13 @@ export function isNotInstalled(e: unknown, listRead = false): boolean {
   return listRead && e.status === 404;
 }
 
-/** A refusal in the owner's language, by code: the estimate contract, the owner-only sentences, then the shared table. */
+/**
+ * A refusal in the owner's language, by code: the estimate contract, the owner-only sentences, then the shared
+ * table. No act here asks for a fresh sign-in (DECISIONS row 285): an older Worker's REAUTH_REQUIRED reads in
+ * the shared table's words.
+ */
 export function refusalText(e: unknown, lang: UiLang, fallback: string = say(COMMON.actionFailed, lang)): string {
   const code = errorCode(e);
-  if (code === 'REAUTH_REQUIRED') return say(COMMON.reauth, lang);
   if (code === 'PRICING_CHANGED') return say(COMMON.changed, lang);
   if (code === 'PRICE_ESTIMATES_NOT_INSTALLED') return say(COMMON.notInstalled, lang);
   // §4.9: the real measures are entered and wait on the refresh's apply, which is the cure.
@@ -79,18 +81,6 @@ export function refusalText(e: unknown, lang: UiLang, fallback: string = say(COM
   const estimate = estimateRefusalText(code, lang);
   if (estimate) return estimate;
   return apiRefusal(e, lang, fallback);
-}
-
-/** «سجّل الدخول مجددًا»: this session ends, and the sign-in page comes back to the workspace. */
-export function useSignInAgain(): () => Promise<void> {
-  const auth = useOptionalAuth();
-  return useCallback(async () => {
-    try {
-      await auth?.logout();
-    } finally {
-      window.location.assign(`/auth?next=${encodeURIComponent(workspaceHref('types'))}`);
-    }
-  }, [auth]);
 }
 
 /** A load failure: the verification card, the calm «not installed» notice, a refusal by code, or a retry. */
@@ -120,8 +110,6 @@ export function Failure({ error, lang, onRetry, listRead = true }: { error: unkn
 export interface ActMessage {
   tone: 'success' | 'warning' | 'danger';
   text: string;
-  /** The act needs a fresh sign-in: the message offers it. */
-  reauth?: boolean;
 }
 
 /**
@@ -154,7 +142,7 @@ export function useAct(lang: UiLang, onStale?: () => void) {
         if (isAborted(e)) return null;
         const code = errorCode(e);
         if (code === 'PRICING_CHANGED') onStale?.();
-        if (alive.current) setMessage({ tone: 'danger', text: refusalText(e, lang), reauth: code === 'REAUTH_REQUIRED' });
+        if (alive.current) setMessage({ tone: 'danger', text: refusalText(e, lang) });
         return null;
       } finally {
         inFlight.current = false;
@@ -166,9 +154,8 @@ export function useAct(lang: UiLang, onStale?: () => void) {
   return { busy, message, setMessage, run };
 }
 
-/** The answer to an act, beside it; a fresh sign-in is one press away. */
-export function ActNote({ message, lang }: { message: ActMessage | null; lang: UiLang }) {
-  const signInAgain = useSignInAgain();
+/** The answer to an act, beside it. */
+export function ActNote({ message }: { message: ActMessage | null }) {
   if (!message) return null;
   const Icon = message.tone === 'success' ? CheckCircle2 : message.tone === 'warning' ? AlertTriangle : ShieldAlert;
   const color = message.tone === 'success' ? 'text-success' : message.tone === 'warning' ? 'text-warning' : 'text-danger';
@@ -181,11 +168,6 @@ export function ActNote({ message, lang }: { message: ActMessage | null; lang: U
       <Icon aria-hidden="true" className={`mt-0.5 h-4 w-4 shrink-0 ${color}`} />
       <div className="min-w-0 space-y-2">
         <p className="break-words">{message.text}</p>
-        {message.reauth ? (
-          <Button size="sm" variant="secondary" onClick={signInAgain} data-estimates-reauth>
-            {say(COMMON.signInAgain, lang)}
-          </Button>
-        ) : null}
       </div>
     </div>
   );

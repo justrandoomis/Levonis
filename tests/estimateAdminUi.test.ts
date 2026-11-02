@@ -67,6 +67,7 @@ import EstimateBanner, { StaffEstimateState, sourceDates } from '../src/componen
 import EstimatesCard from '../src/components/adminEstimates/EstimatesCard';
 import { confirmGate, openFlagsOf, withNamed } from '../src/components/adminEstimates/ConfirmSheet';
 import { ApiError } from '../src/lib/api';
+import { COST_REFUSALS } from '../packages/contracts/src/costRefusals';
 import type { EstimateLine, EstimateType, StoredEstimate } from '../src/components/adminEstimates/api';
 
 const DIR = 'src/components/adminEstimates';
@@ -341,6 +342,8 @@ test('no private figure is baked into the workspace: no owner-only key is ever g
 const SORANI = /[ڕڵێۆەڤگچپژیک]/;
 const ARABIC_ONLY = /[ةىيك]/;
 const ARABIC_SCRIPT = /[؀-ۿ]/;
+/** «sign in» in the three languages: «تسجيل الدخول» / «سجّل الدخول», «چوونەژوورەوە» / «بچۆ ژوورەوە». */
+const SIGN_IN = /sign[- ]?in|تسجيل (?:ال)?دخول|سجّل الدخول|ژوورەوە/i;
 
 function leaves(v: unknown, path: string, out: Array<[string, Tri]> = []): Array<[string, Tri]> {
   if (!v || typeof v !== 'object') return out;
@@ -370,6 +373,8 @@ test('every string is in Arabic, English and real Sorani — never the Arabic co
     assert.notEqual(s.ckb, s.en, `${path}: the Sorani slot carries the English`);
     assert.equal(slots(s.ar), slots(s.en), `${path}: the slots differ`);
     assert.equal(slots(s.ckb), slots(s.en), `${path}: the slots differ`);
+    // No act of the workspace asks for a fresh sign-in (DECISIONS row 285): no string says one is needed.
+    for (const l of LANGS) assert.doesNotMatch(s[l], SIGN_IN, `${path}.${l} speaks of a sign-in «${s[l]}»`);
   }
   // The codebase's own words (C32): «بەرهەم», never «کاڵا»; the pricing tab is «نرخدانان و ناردنی بەرهەم».
   for (const [path, s] of all) assert.doesNotMatch(s.ckb, /کاڵا/, path);
@@ -731,12 +736,15 @@ test('bulk accept takes one high or medium suggestion per option and source, nev
   ]);
 });
 
-test('apply outcomes are said in the owner’s words; a stale hash, a large change and a fresh sign-in each say what to do', () => {
+test('apply outcomes are said in the owner’s words; a stale hash and a large change each say what to do — and none offers a sign-in (DECISIONS row 285)', () => {
   for (const lang of LANGS) {
     assert.equal(outcomeText({ product_id: 'p', outcome: 'applied', preview: {} as never }, lang).tone, 'success');
     assert.equal(outcomeText({ product_id: 'p', outcome: 'refused', code: 'PRICING_PREVIEW_STALE' }, lang).text, say(STRINGS.OUTCOMES.stale, lang));
     assert.equal(outcomeText({ product_id: 'p', outcome: 'refused', code: 'PRICING_LARGE_CHANGE_CONFIRM' }, lang).text, say(STRINGS.OUTCOMES.needsTick, lang));
-    assert.equal(outcomeText({ product_id: 'p', outcome: 'refused', code: 'REAUTH_REQUIRED' }, lang).reauth, true);
+    // An older Worker's REAUTH_REQUIRED reads in the shared contract's words; the workspace has no sign-in of its own.
+    const old = outcomeText({ product_id: 'p', outcome: 'refused', code: 'REAUTH_REQUIRED' }, lang);
+    assert.ok(old.text.includes(COST_REFUSALS.REAUTH_REQUIRED[lang]), old.text);
+    assert.deepEqual(Object.keys(old).sort(), ['text', 'tone']);
     const flags = outcomeText({ product_id: 'p', outcome: 'refused', code: 'PRICE_ESTIMATE_NOT_ELIGIBLE', details: { flags: ['EST_NO_PRICE'] } }, lang).text;
     assert.ok(flags.includes(FLAG_LABELS.EST_NO_PRICE[lang]), flags);
   }

@@ -5,7 +5,8 @@
  *
  *   - every key has ar, en and ckb, none empty; ckb is never the Arabic nor the
  *     English, carries a Sorani-only letter, and uses the pricing terms (never
- *     «گواستنەوە» or «کاڵا»); docs/DECISIONS.md row 183;
+ *     «گواستنەوە» or «کاڵا»); docs/DECISIONS.md row 183; none speaks of a
+ *     sign-in (no pricing act asks for a fresh one, row 285);
  *   - the notices a preview raises (held rate, the 1,000 step, COD at the
  *     direct price, a fall above 30%, the route fee folded in, member prices);
  *   - the product form: a save the server holds (409 with the preview) opens
@@ -27,6 +28,8 @@ import { samePrices, writesPrices, type EngineAdoption, type EngineAdoptionRow }
 import { ROOT } from './fixtures/d1';
 
 const SORANI_ONLY = /[ڕڵێۆەڤ]/;
+/** «sign in» in the three languages: «تسجيل الدخول» / «سجّل الدخول», «چوونەژوورەوە» / «بچۆ ژوورەوە». */
+const SIGN_IN = /sign[- ]?in|تسجيل (?:ال)?دخول|سجّل الدخول|ژوورەوە/i;
 const text = (v: unknown): string => (typeof v === 'function' ? (v as (...a: string[]) => string)('X', 'Y', 'Z') : String(v));
 const src = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 
@@ -47,6 +50,8 @@ test('every key of the writer’s screens in ar, en and real Sorani', () => {
     if (/گواستنەوە|کاڵا/.test(ckb)) problems.push(`${k}: ckb uses a word the pricing vocabulary forbids`);
     if (/[؀-ۿ]/.test(en)) problems.push(`${k}: Arabic script in the English`);
     if (/علاوة/.test(ar)) problems.push(`${k}: the retired word «علاوة»`);
+    // No pricing act asks for a fresh sign-in (DECISIONS row 285).
+    if ([ar, en, ckb].some((v) => SIGN_IN.test(v))) problems.push(`${k}: speaks of a sign-in`);
   }
   assert.deepEqual(problems, []);
 });
@@ -100,8 +105,9 @@ test('the product form (Pricing V2-4): a held save opens the ONE sheet; the conf
   assert.match(form, /v2\.openReview\(preview, status\)/);
   // The confirm is the same save with the hash the sheet showed and the 15% tick.
   assert.match(form, /void save\(r\.status, \{ confirm: \{ hash: r\.preview\.review_hash, confirmLarge \} \}\)/);
-  // A large change needs a fresh sign-in: the sheet says so and offers it.
-  assert.match(form, /e\.code === 'REAUTH_REQUIRED' && v2\.review\) \{\s*v2\.reviewError\(v2s\.reauth, true\)/);
+  // A large change needs the tick alone (DECISIONS row 285): no REAUTH branch, no sign-in in the sheet.
+  assert.doesNotMatch(form, /REAUTH_REQUIRED|signInAgain|onSignIn/);
+  assert.doesNotMatch(src('src/components/adminProducts/form/v2/ReviewSheetV2.tsx'), /reauth|onSignIn|signInAgain|largeNote/);
   assert.match(form, /<ReviewSheetV2/);
   const hook = src('src/components/adminProducts/form/v2/useV2Pricing.ts');
   // The sheet's confirm carries its hash; the preview's own hash travels only when no price moves (review 2026-10-14).

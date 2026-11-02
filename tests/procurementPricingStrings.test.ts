@@ -8,7 +8,9 @@
  *   - ckb is never the Arabic and never the English;
  *   - ckb carries a Sorani-only letter;
  *   - ckb uses the pricing terms: never «گواستنەوە» (freight) or «کاڵا» (goods),
- *     which tests/pricingIssues.test.ts keeps out of the pricing vocabulary.
+ *     which tests/pricingIssues.test.ts keeps out of the pricing vocabulary;
+ *   - no string speaks of a sign-in: no pricing act asks for a fresh one
+ *     (DECISIONS row 285).
  *
  * Run: node --import tsx --test tests/procurementPricingStrings.test.ts
  */
@@ -18,6 +20,8 @@ import { PROCUREMENT_PRICING_STRINGS } from '../src/components/adminOperations/p
 import { V2_STRINGS } from '../src/components/adminProducts/form/v2/v2Strings';
 
 const SORANI_ONLY = /[ڕڵێۆەڤ]/;
+/** «sign in» in the three languages: «تسجيل الدخول» / «سجّل الدخول», «چوونەژوورەوە» / «بچۆ ژوورەوە». */
+const SIGN_IN = /sign[- ]?in|تسجيل (?:ال)?دخول|سجّل الدخول|ژوورەوە/i;
 const text = (v: unknown): string => (typeof v === 'function' ? (v as (...a: string[]) => string)('X', 'Y', 'Z') : String(v));
 
 for (const [name, table] of [
@@ -40,6 +44,8 @@ for (const [name, table] of [
       if (!SORANI_ONLY.test(ckb)) problems.push(`${k}: no Sorani letter in «${ckb}»`);
       if (/گواستنەوە|کاڵا/.test(ckb)) problems.push(`${k}: ckb uses a word the pricing vocabulary forbids`);
       if (/[؀-ۿ]/.test(en)) problems.push(`${k}: Arabic script in the English`);
+      // No pricing act asks for a fresh sign-in (DECISIONS row 285).
+      if ([ar, en, ckb].some((v) => SIGN_IN.test(v))) problems.push(`${k}: speaks of a sign-in`);
     }
     assert.deepEqual(problems, []);
   });

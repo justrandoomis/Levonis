@@ -518,8 +518,6 @@ export interface FxRatePreview {
   large_change: boolean;
   /** A customer price drops more than 30%. */
   drop_flag: boolean;
-  /** The act will ask for a sign-in within the last ten minutes, and this session is older. */
-  fresh_sign_in: boolean;
   preview_hash: string;
 }
 

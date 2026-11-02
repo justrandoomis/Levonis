@@ -46,7 +46,7 @@ export default function EngineSaveSheet({ products, busy, error, onConfirm, onCa
   intro?: string;
   /** One line under the intro: what is already saved, and what the confirm adds. */
   note?: string;
-  /** Beside the error line: the way out of it (a fresh sign-in). */
+  /** Beside the error line: the way out of it. */
   extra?: ReactNode;
 }) {
   const { lang } = useLanguage();

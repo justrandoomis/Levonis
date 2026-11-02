@@ -152,11 +152,10 @@ export interface LargeChange {
  * private log (`idx_fx_rate_log_owner`) PLUS THE ACT BEING MADE — compared
  * with 15% (§7.8: "the sum of |change| … over the owner's acts in the last 24
  * hours … is compared with large_change_pct"). Summing only the earlier acts
- * let two acts of 14% move the rate 30% in an hour with neither the
- * confirmation nor a fresh sign-in (FX-1 correctness review C3); with the act
- * included, a stolen session moves the rate at most 15% in a day. Shipping
- * rates and the ECB pairs are held to the per-act rule only: their history
- * carries no value outside FX-2's pricing_audit.
+ * let two acts of 14% move the rate 30% in an hour without the confirmation
+ * (FX-1 correctness review C3); with the act included, no more than 15% a day
+ * moves without it. Shipping rates and the ECB pairs are held to the per-act
+ * rule only: their history carries no value outside FX-2's pricing_audit.
  */
 export async function largeChange(db: D1Database, pair: FxPairId, before: string | null, after: string | null, now: Date): Promise<LargeChange> {
   const moving = before !== null && after !== null && !sameRate(before, after);
@@ -236,7 +235,10 @@ export interface PlannedAct {
   attention: FxAttention[];
   /** The effective USD/IQD before and after, when this act moves it (the large-change rule). */
   move: { before: string | null; after: string | null } | null;
-  /** The act changes a guard setting, the mode or the interval: a fresh sign-in, always (§7.8). */
+  /**
+   * The act changes a guard setting, the mode or the interval: it is written into the owner's security
+   * log and rings the guard bell (§7.8). It no longer asks for a fresh sign-in (DECISIONS row 285).
+   */
   guard: boolean;
   /** After the commit, return this pair to automatic through the scheduler (§28). */
   backToAuto: boolean;
@@ -325,9 +327,9 @@ export function planReview(row: FxPairRow, raw: unknown, ctx: ActContext): Plann
     if (row.effective_rate === null) throw fxRefusal(409, 'FX_RATE_NOT_SET');
     const a = row.effective_rate;
     // A MODE CHANGE, whichever door it comes through: §7.8 puts `mode` among
-    // the settings that always need a fresh sign-in, and `PUT /settings
-    // {mode:'MANUAL'}` asks for one — so this does too, and rings the same
-    // guard-change notice (FX-1 security review #2).
+    // the guard settings, and `PUT /settings {mode:'MANUAL'}` is a guard
+    // change — so this is too: the same security-log entry and guard-change
+    // notice (FX-1 security review #2).
     return {
       ...act(
         row,
@@ -502,8 +504,8 @@ export function planSettings(row: FxPairRow, raw: unknown, ctx: ActContext): (Pl
         // guard keeps measuring the MARKET's move since the owner's last
         // confirmation. Setting it to the new effective rate (as before) made
         // two adjustment saves (+0.0001, then back) do what «تأكيد السعر
-        // الحالي» does — re-base the drift guard — without the fresh sign-in
-        // that act always needs (FX-1 security review #2).
+        // الحالي» does — re-base the drift guard — without that act's
+        // guard-change record and notice (FX-1 security review #2).
         const anchor = row.drift_anchor_rate !== null ? shiftedBy(row.drift_anchor_rate, row.market_adjustment_iqd, adj) : effective;
         Object.assign(set, effectiveTo(row, effective, ctx, row.effective_source ?? 'provider'), {
           drift_anchor_rate: anchor,

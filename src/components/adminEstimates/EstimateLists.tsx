@@ -17,7 +17,7 @@
  *              a price, or real measures its apply takes in where the published
  *              one is on a type default (§4.9 refuses until then; such a row
  *              says no price changes): old → new and %; a large change needs
- *              the tick and a fresh sign-in.
+ *              the tick (no fresh sign-in: DECISIONS row 285).
  *
  * Every figure is the server's (R and D in dinars, supplier amounts as
  * decimal text, the change as its percentage text); nothing is computed here.
@@ -53,7 +53,7 @@ import { dayOf, iqdText, moneyText, pctText } from './format';
 export type ListMode = 'ready' | 'estimated' | 'flags' | 'refresh';
 
 /** The outcome of one product of an apply, in the owner's words. */
-export function outcomeText(o: ApplyOutcome, lang: UiLang): { tone: 'success' | 'warning' | 'danger'; text: string; reauth?: boolean } {
+export function outcomeText(o: ApplyOutcome, lang: UiLang): { tone: 'success' | 'warning' | 'danger'; text: string } {
   if (o.outcome === 'applied') return { tone: 'success', text: say(OUTCOMES.applied, lang) };
   if (o.outcome === 'already') return { tone: 'success', text: say(OUTCOMES.already, lang) };
   if (o.code === 'PRICING_PREVIEW_STALE') return { tone: 'warning', text: say(OUTCOMES.stale, lang) };
@@ -62,7 +62,7 @@ export function outcomeText(o: ApplyOutcome, lang: UiLang): { tone: 'success' | 
     const flags = Array.isArray(o.details?.flags) ? (o.details!.flags as unknown[]).filter((f): f is string => typeof f === 'string') : [];
     if (flags.length) return { tone: 'danger', text: say(OUTCOMES.notEligible, lang, { flags: flags.map((f) => flagText(f, lang)).join(' · ') }) };
   }
-  return { tone: 'danger', text: say(OUTCOMES.refused, lang, { reason: refusalText({ code: o.code, message: '' }, lang) }), reauth: o.code === 'REAUTH_REQUIRED' };
+  return { tone: 'danger', text: say(OUTCOMES.refused, lang, { reason: refusalText({ code: o.code, message: '' }, lang) }) };
 }
 
 /** A line's codes that say where its supplier price came from (soft, §4.6). */
@@ -237,7 +237,7 @@ export default function EstimateListTab({ mode, onReview }: { mode: ListMode; on
         ) : null}
       </div>
       {progress ? <p className="text-[12px] text-text-muted" data-estimates-progress>{progress}</p> : null}
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
 
       {error ? (
         <Failure error={error} lang={lang} onRetry={() => setReload((n) => n + 1)} />
@@ -408,7 +408,7 @@ function EstimateRow({
       ) : null}
 
       {result ? (
-        <ActNote message={result} lang={lang} />
+        <ActNote message={result} />
       ) : null}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -441,7 +441,7 @@ function EstimateRow({
           </a>
         ) : null}
       </div>
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
     </li>
   );
 }

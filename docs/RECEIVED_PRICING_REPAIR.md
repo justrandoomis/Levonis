@@ -28,8 +28,9 @@ purchase costs, lots or quantities. Future drafts are not enqueued.
 
 The owner products page drains this bounded snapshot through an owner-only POST;
 the scheduled sweep also drains it within the existing invocation ceiling. All
-ordinary preview hashes, fresh-session gates and unreviewed repricing guards
-remain in place. A changed or genuinely incomplete snapshot is skipped.
+ordinary preview hashes and unreviewed repricing guards remain in place
+(pricing acts no longer ask for a fresh sign-in: DECISIONS row 285). A changed
+or genuinely incomplete snapshot is skipped.
 
 Regression coverage: `tests/receivedPricingCompleteness.test.ts` exercises real
 receipts, pricing writes, catalog flags, cart rejection, migration recovery,

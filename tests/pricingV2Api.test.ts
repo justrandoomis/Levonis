@@ -10,8 +10,9 @@
  *     charges exactly the previewed prices;
  *   - a replay of the hash answers `already`; a stale `seq` is PRICING_CHANGED;
  *     a rate moved between preview and apply is PRICING_PREVIEW_STALE;
- *   - above 15% without the tick is PRICING_LARGE_CHANGE_CONFIRM, with the
- *     tick but an old sign-in REAUTH_REQUIRED; a 30% drop is flagged;
+ *   - above 15% without the tick is PRICING_LARGE_CHANGE_CONFIRM, and with it
+ *     an hour-old sign-in saves (no fresh sign-in, DECISIONS row 285); a 30%
+ *     drop is flagged;
  *   - adding a model and switching a route on, on a V2 product, commits the
  *     structure and its prices atomically: a failure injected in the last
  *     statement leaves every table as it was; without the hash the save is
@@ -174,7 +175,7 @@ test('publishing an incomplete product is PRICING_V2_PRICE_MISSING; a draft save
   assert.equal(state.body.status.kind, 'missing');
 });
 
-test('apply: replay, stale seq, a rate moved, the 15% tick and the fresh sign-in, the 30% drop', async () => {
+test('apply: replay, stale seq, a rate moved, the 15% tick on an old sign-in, the 30% drop', async () => {
   const w = pricingWorld();
   await v2Ams(w);
   const app = v2App(w.raw);
@@ -212,20 +213,16 @@ test('apply: replay, stale seq, a rate moved, the 15% tick and the fresh sign-in
   assert.match(moved.body.details.preview.review_hash, /^[0-9a-f]{64}$/);
   applyRate(w.raw, 'USD_IQD', '1600', '2026-10-03T00:00:00.000Z');
 
-  // Above 15%: the tick, then a fresh sign-in.
+  // Above 15%: the tick — and nothing more: an hour-old sign-in saves it (DECISIONS row 285).
   const big = { points: [point('1500')] };
   const pre3 = await answer(await post(app, '/api/admin/products-v2/pricing/preview', { product_id: AMS, pricing: big }));
   assert.equal(pre3.body.large_change, true);
   const seq3 = pre3.body.seq;
-  const untick = await answer(await put(app, `/api/admin/products-v2/${AMS}/pricing`, { seq: seq3, pricing: big, preview_hash: pre3.body.review_hash }));
+  const oldSession = v2App(w.raw, OWNER_USER, 3600);
+  const untick = await answer(await put(oldSession, `/api/admin/products-v2/${AMS}/pricing`, { seq: seq3, pricing: big, preview_hash: pre3.body.review_hash }));
   assert.equal(untick.body.code, 'PRICING_LARGE_CHANGE_CONFIRM');
   assert.equal(untick.body.details.section, 3);
-  const oldSession = v2App(w.raw, OWNER_USER, 3600);
-  const reauth = await answer(await put(oldSession, `/api/admin/products-v2/${AMS}/pricing`, { seq: seq3, pricing: big, preview_hash: pre3.body.review_hash, confirm_large_change: true }));
-  assert.equal(reauth.status, 401);
-  assert.equal(reauth.body.code, 'REAUTH_REQUIRED');
-  assert.equal(reauth.body.details.section, 3);
-  const ticked = await answer(await put(app, `/api/admin/products-v2/${AMS}/pricing`, { seq: seq3, pricing: big, preview_hash: pre3.body.review_hash, confirm_large_change: true }));
+  const ticked = await answer(await put(oldSession, `/api/admin/products-v2/${AMS}/pricing`, { seq: seq3, pricing: big, preview_hash: pre3.body.review_hash, confirm_large_change: true }));
   assert.equal(ticked.status, 200, JSON.stringify(ticked.body).slice(0, 300));
 
   // A drop above 30% is flagged — and needs the same tick.

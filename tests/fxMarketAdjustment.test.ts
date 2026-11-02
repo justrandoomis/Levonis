@@ -20,7 +20,8 @@
  *   card         «market + adjustment = effective» only when it holds, in ar,
  *                en and ckb, each figure isolated left-to-right (a minus
  *                stays in front); a manual rate says the adjustment is not
- *                added; saving an adjustment says it asks for a fresh sign-in
+ *                added; saving an adjustment asks for no fresh sign-in, and
+ *                the card warns of none (DECISIONS row 285)
  *
  * Run: node --import tsx --test tests/fxMarketAdjustment.test.ts
  */
@@ -359,8 +360,8 @@ test('the card: «market + adjustment = effective» in ar, en and ckb when it ho
     assert.equal(/data-fx-manual-formula/.test(card(usdPair(), lang)), false, `${lang}: no manual sum in AUTO`);
     assert.ok(card(usdPair(), lang).includes(s.adjustment), `${lang}: the label names the fixed dinars`);
   }
-  // Saving an adjustment asks for a fresh sign-in, and the card says so before the act, beside «حفظ».
-  assert.match(codeOf('src/components/adminPricing/FxPairCard.tsx'), /data-fx-adjustment-reauth>\s*\{s\.guardsHint\}/);
+  // Saving an adjustment asks for no fresh sign-in (DECISIONS row 285): the card warns of none beside «حفظ».
+  assert.doesNotMatch(codeOf('src/components/adminPricing/FxPairCard.tsx'), /data-fx-adjustment-reauth|s\.guardsHint/);
   assert.match(FX_STRINGS.en.adjustment, /fixed IQD per USD/);
   assert.match(FX_STRINGS.en.adjustmentHint, /not a percentage/);
   assert.doesNotMatch(FX_STRINGS.ar.adjustment + FX_STRINGS.ar.adjustmentHint, /%|٪|نسبة مئوية/);

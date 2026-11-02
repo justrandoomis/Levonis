@@ -48,7 +48,6 @@ import { sha256Hex } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
 import { fence, isFenceMiss } from '../lib/operations';
 import { afterCatalogueWrite } from '../lib/edgePolicy';
-import { requireFreshSession } from '../lib/costAccess';
 import { productEngineManaged, productEngineV2, v2Managed } from '../lib/engineInstalled';
 import { engineDbRefusal } from '../lib/pricingDbRefusals';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
@@ -970,9 +969,9 @@ export function registerDataFileRoutes(routes: Hono<AppContext>, deps: DataFileD
         const code = sent ? 'PRICING_PREVIEW_STALE' : 'PRICING_PREVIEW_REQUIRED';
         throw new HttpError(409, serverMessage(code), code, { preview: fresh() });
       }
-      if (pricing.large_change) {
-        if (body.confirm_large_change !== true) throw new HttpError(409, serverMessage('PRICING_LARGE_CHANGE_CONFIRM'), 'PRICING_LARGE_CHANGE_CONFIRM', { preview: fresh() });
-        requireFreshSession(c);
+      // A large change needs the tick, and no fresh sign-in (DECISIONS row 285).
+      if (pricing.large_change && body.confirm_large_change !== true) {
+        throw new HttpError(409, serverMessage('PRICING_LARGE_CHANGE_CONFIRM'), 'PRICING_LARGE_CHANGE_CONFIRM', { preview: fresh() });
       }
     } else if (pricing?.kind === 'data' && pricing.hash && body.pricing_hash !== pricing.hash) {
       throw new HttpError(409, serverMessage('PRICING_PREVIEW_STALE'), 'PRICING_PREVIEW_STALE', { preview: fresh() });

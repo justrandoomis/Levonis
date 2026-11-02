@@ -250,7 +250,7 @@ export default function UpdatePriceSheet({ target, onClose, onSaved }: { target:
         </section>
       ) : null}
 
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
     </SheetFrame>
   );
 }

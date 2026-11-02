@@ -79,7 +79,6 @@ const PREVIEW: FxRatePreview = {
   follows: 4,
   large_change: true,
   drop_flag: false,
-  fresh_sign_in: false,
   preview_hash: 'a'.repeat(64),
 };
 
@@ -159,9 +158,9 @@ test('wiring: once a product is engine-priced, a manual rate, «استخدم …
   assert.match(sheet, /\(code === 'PRICING_PREVIEW_STALE' \|\| code === 'PRICING_PREVIEW_REQUIRED'\) && fresh\) \{\s*setPreview\(fresh\);/);
   assert.match(sheet, /disabled=\{needsTick && !confirmLarge\}/);
   assert.match(sheet, /request\.commit\(preview\.preview_hash, confirmLarge \|\| rateConfirm\)/);
-  // The fresh sign-in is said before the act, with the way through.
-  assert.match(sheet, /preview\.fresh_sign_in \?/);
-  assert.match(sheet, /data-fx-preview-sign-in/);
+  // No act asks for a fresh sign-in (DECISIONS row 285): the apply is always the button, never a sign-in in its place.
+  assert.doesNotMatch(sheet, /fresh_sign_in|data-fx-preview-sign-in|signInAgain|s\.reauth/);
+  assert.match(sheet, /data-fx-preview-apply/);
   // No browser storage, no rate computed here.
   for (const f of ['RatePreview.tsx', 'FxReviewSheet.tsx', 'ShippingRatesCard.tsx', 'FxPairCard.tsx']) {
     const src = codeOf(`${DIR}/${f}`);

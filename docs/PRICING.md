@@ -101,21 +101,22 @@ throughout, never a float.
   a committed rate) and no cache purge. Such a tick also clears a value held for review, since the market is
   back near the rate in force; that is neither a repricing nor a purge. The
   owner edits each band at `PUT /api/admin/pricing/rates/fx/:pair/settings`
-  (owner only, a fresh sign-in, 0 to 5 and below the 3% guard); the
+  (owner only, 0 to 5 and below the 3% guard); the
   `settings_change` history row keeps every changed setting as
   `settings_diff = [{field, before, after}]` (the adjustment and the bounds
   included — values live in the private log, never in `audit_log`), and the
   history sheet shows each one old → new.
 - **The owner's acts**: a change of mode (keep-as-manual included), interval,
-  threshold or bounds, a change of the adjustment, and «تأكيد السعر الحالي»,
-  need a sign-in from the last 10 minutes (a stale session: 401
-  `REAUTH_REQUIRED`, nothing written). The adjustment is not a guard setting
+  threshold or bounds, a change of the adjustment, and «تأكيد السعر الحالي»
+  ask for no fresh sign-in (owner decision 2026-11-02, DECISIONS row 285: no
+  pricing act asks for a sign-in within the last 10 minutes). A guard setting,
+  the mode, the interval and «تأكيد السعر الحالي» ring the guard-change notice
+  and enter the owner's security log. The adjustment is not a guard setting
   (it rings no guard-change notice), but it moves the effective USD/IQD — and
-  the public `displayUsdRate` — with no market guard in between, so a stale
-  session cannot use it. On USD/IQD, the owner's acts of the last 24 hours — the act
-  being made included — above 15% need the explicit confirmation and that
-  fresh sign-in too. An adjustment that would make the rate implausible is
-  refused (400 `FX_RATE_OUT_OF_BOUNDS`).
+  the public `displayUsdRate` — with no market guard in between. On USD/IQD,
+  the owner's acts of the last 24 hours — the act being made included — above
+  15% need the explicit confirmation. An adjustment that would make the rate
+  implausible is refused (400 `FX_RATE_OUT_OF_BOUNDS`).
 - **One official rate, even in the wallet** (owner 2026-10-18, DECISIONS
   row 252, overturning owner decision 9's separate 1,400): the applied
   USD/IQD the products are priced at is the rate of every wallet screen and
@@ -217,8 +218,8 @@ engine** and writes its prices in that same batch.
   `PRICING_PREVIEW_REQUIRED` carrying the six figures per model × channel; the
   same save with that `preview_hash` writes. Data or a rate that moved since
   the preview answers 409 `PRICING_PREVIEW_STALE` with the fresh preview. A
-  price moving more than 15% needs `confirm_large_change: true` and a fresh
-  sign-in (`REAUTH_REQUIRED` otherwise); a fall above 30% is flagged. An
+  price moving more than 15% needs `confirm_large_change: true` (and no fresh
+  sign-in since DECISIONS row 285); a fall above 30% is flagged. An
   incomplete manual product stores its data and keeps its manual price; an
   engine product never saves into an incomplete state
   (`PRICING_ENGINE_INCOMPLETE`).
@@ -449,15 +450,15 @@ action and `price_history.price_source = 'engine_fx'`.
   customer price → the new one per model × channel, the change, the deficit
   (new replacement cost + minimum profit − today's price, the order the run
   writes in), the 15% and 30% flags, the products the engine cannot reprice
-  (a code), how many follow on the quarter-hour sweep, whether the act will
-  ask for a fresh sign-in, and `preview_hash` — over the act, the pair's owner
+  (a code), how many follow on the quarter-hour sweep, and `preview_hash` —
+  over the act, the pair's owner
   version (or the profile's version), every rate read and each affected
   product's own evaluation hash. Once any product is engine-priced, an act
   that moves a rate (an approval, a manual rate, the adjustment, a shipping
   rate) without that hash is 409 `PRICING_PREVIEW_REQUIRED`, one read before
   something moved is 409 `PRICING_PREVIEW_STALE`, both carrying the fresh
   preview; a customer price moving more than 15% also needs
-  `confirm_large_change`, and the act a sign-in within the last ten minutes.
+  `confirm_large_change` (and no fresh sign-in since DECISIONS row 285).
   The rates panel shows the preview sheet («قبل التطبيق: ما الذي سيتغيّر»)
   before a manual rate, the adjustment or a shipping rate is applied, and the
   review sheet shows it under a held rate before «اعتماد السعر الجديد».

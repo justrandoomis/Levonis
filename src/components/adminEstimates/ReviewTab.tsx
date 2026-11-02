@@ -287,7 +287,7 @@ export function ReviewProductCard({
           {say(REVIEW.computeAgain, lang)}
         </Button>
       </div>
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
       {preview ? <PreviewSummary preview={preview} lang={lang} /> : null}
       {panel === 'settings' ? <ProductSettings productId={product.product_id} types={types} lang={lang} /> : null}
       {panel === 'lookup' ? <CatalogueLookup lang={lang} target={product} onMapped={onChanged} onStale={onStale} /> : null}
@@ -402,7 +402,7 @@ export function FocusWithoutLinks({ productId, lang, onMatched }: { productId: s
           </a>
         ) : null}
       </div>
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
       <CatalogueLookup lang={lang} />
     </div>
   );
@@ -535,7 +535,7 @@ export function ProductSettings({ productId, types, lang }: { productId: string;
       <Button size="sm" variant="primary" loading={act.busy === 'settings'} onClick={save} data-review-settings-save>
         {say(COMMON.save, lang)}
       </Button>
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
     </div>
   );
 }
@@ -593,7 +593,7 @@ export function CatalogueLookup({ lang, target, onMapped, onStale }: { lang: UiL
           {say(LINKS.search, lang)}
         </Button>
       </form>
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
       {error ? <Failure error={error} lang={lang} listRead={false} /> : null}
       {items ? (
         items.length ? (

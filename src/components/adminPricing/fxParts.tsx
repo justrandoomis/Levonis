@@ -5,12 +5,11 @@
  * server's text, formatted for reading; nothing here computes a rate.
  */
 import React, { useCallback, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, LogIn, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { Button } from '../ui/Button';
 import type { Tone } from '../ui/Badge';
 import { ApiError } from '../../lib/api';
 import { apiRefusal } from '../../lib/refusalStrings';
-import { useOptionalAuth } from '../../AuthContext';
 import type { Language } from '../../translations';
 import type { FxPairId, FxRatesAnswer, FxRefreshReport, FxStatus } from './api';
 import type { FxRefreshOutcome, FxStrings } from './fxStrings';
@@ -120,12 +119,12 @@ export function pctText(text: string | null | undefined): string {
 }
 
 /**
- * A refusal in the owner's language, by code. The fresh sign-in is said as
- * the panel says it; a stale panel (409 PRICING_CHANGED) is told it was
- * reloaded — not P1's «export the file again» (UX review #5).
+ * A refusal in the owner's language, by code. A stale panel (409
+ * PRICING_CHANGED) is told it was reloaded — not P1's «export the file again»
+ * (UX review #5). No rate act asks for a fresh sign-in (DECISIONS row 285):
+ * an older Worker's REAUTH_REQUIRED reads in the shared table's words.
  */
 export function fxRefusalText(error: unknown, lang: Language, s: FxStrings): string {
-  if (error instanceof ApiError && error.code === 'REAUTH_REQUIRED') return s.reauth;
   if (error instanceof ApiError && error.code === 'PRICING_CHANGED') return s.panelChanged;
   return apiRefusal(error, lang, s.loadFailed);
 }
@@ -135,8 +134,6 @@ export interface FxMessageState {
   text: string;
   /** A large change was refused for want of the explicit confirmation: send it again with it. */
   confirmLarge?: () => void;
-  /** The act needs a fresh sign-in: offer the way through (UX review #2). */
-  reauth?: boolean;
 }
 
 /**
@@ -165,26 +162,6 @@ export function refreshMessage(report: FxRefreshReport | undefined, s: FxStrings
   const outcomes = order.filter((o) => said.has(o) && !(o === 'unchanged' && said.size > 1));
   const warn = outcomes.some((o) => o === 'held' || o === 'failed' || o === 'unverified' || o === 'limit' || o === 'busy');
   return { tone: warn ? 'warning' : 'success', text: outcomes.map((o) => s.refreshOutcome[o]).join(' ') };
-}
-
-/** The pricing tab's own address: a fresh sign-in comes back to it. */
-export const PRICING_TAB_PATH = '/admin?tab=pricing';
-
-/**
- * «سجّل الدخول مجددًا»: sign this session out, then open the sign-in page
- * with the way back to the pricing tab (`?next=` is sanitised by Auth.tsx to
- * a same-origin path). The session must end first — the sign-in page sends a
- * signed-in visitor straight on, and only a NEW sign-in is fresh.
- */
-export function useSignInAgain(): () => Promise<void> {
-  const auth = useOptionalAuth();
-  return useCallback(async () => {
-    try {
-      await auth?.logout();
-    } finally {
-      window.location.assign(`/auth?next=${encodeURIComponent(PRICING_TAB_PATH)}`);
-    }
-  }, [auth]);
 }
 
 /**
@@ -228,7 +205,7 @@ export function useFxAct(opts: { lang: Language; s: FxStrings; onAnswer: (answer
           setMessage({ tone: 'warning', text: s.largeChange(FX_LARGE_CHANGE_PCT), confirmLarge: () => void run(key, call, describe, true) });
         } else {
           if (code === 'PRICING_CHANGED') onStale();
-          setMessage({ tone: 'danger', text: fxRefusalText(e, lang, s), reauth: code === 'REAUTH_REQUIRED' });
+          setMessage({ tone: 'danger', text: fxRefusalText(e, lang, s) });
         }
         return false;
       } finally {
@@ -244,11 +221,9 @@ export function useFxAct(opts: { lang: Language; s: FxStrings; onAnswer: (answer
 
 /**
  * The answer to an act: announced, beside the act, with the large-change
- * confirmation when it is needed — and, when the act needs a fresh sign-in,
- * the button that signs in again and comes back here (UX review #2).
+ * confirmation when it is needed.
  */
 export function FxMessage({ message, s }: { message: FxMessageState | null; s: FxStrings }) {
-  const signInAgain = useSignInAgain();
   if (!message) return null;
   const Icon = message.tone === 'success' ? CheckCircle2 : message.tone === 'warning' ? AlertTriangle : ShieldAlert;
   const color = message.tone === 'success' ? 'text-success' : message.tone === 'warning' ? 'text-warning' : 'text-danger';
@@ -264,11 +239,6 @@ export function FxMessage({ message, s }: { message: FxMessageState | null; s: F
         {message.confirmLarge && (
           <Button size="sm" variant="secondary" className="mt-2" onClick={message.confirmLarge} data-fx-confirm-large>
             {s.largeConfirm}
-          </Button>
-        )}
-        {message.reauth && (
-          <Button size="sm" variant="primary" className="mt-2" icon={<LogIn aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />} onClick={signInAgain} data-fx-sign-in-again>
-            {s.signInAgain}
           </Button>
         )}
       </div>

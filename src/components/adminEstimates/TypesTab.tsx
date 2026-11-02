@@ -3,9 +3,10 @@
  * (docs/SMART_PRICING.md §4.1, §7; owner decisions D2, D3; DECISIONS rows
  * 279–280).
  *
- *   - THE SWITCHES (`PUT /estimates/control`, a fresh sign-in): «apply» —
- *     refused until the published purchase policy carries the estimated-price
- *     clause — and «ordering», the emergency brake on estimated lines;
+ *   - THE SWITCHES (`PUT /estimates/control`; no fresh sign-in, DECISIONS
+ *     row 285): «apply» — refused until the published purchase policy carries
+ *     the estimated-price clause — and «ordering», the emergency brake on
+ *     estimated lines;
  *   - THE TYPES (`PUT /estimates/types/:key`, version-fenced, audited): the
  *     route (air only where the type allows it; filament by sea only; the EU
  *     store by land only), the US reference (EU types), the default weight and
@@ -152,8 +153,7 @@ function ControlCard({ lang }: { lang: UiLang }) {
             label={say(CONTROL.ordering, lang)}
             description={say(CONTROL.orderingDesc, lang)}
           />
-          <p className="text-[12px] text-text-muted">{say(CONTROL.freshSignIn, lang)}</p>
-          <ActNote message={act.message} lang={lang} />
+          <ActNote message={act.message} />
         </>
       )}
     </section>
@@ -444,7 +444,7 @@ function TypeCard({ type: t, lang, onSaved, onStale }: { type: EstimateType; lan
           )}
         </div>
       ) : null}
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
     </li>
   );
 }
@@ -563,7 +563,7 @@ function NewTypeCard({ lang, existing, onCreated }: { lang: UiLang; existing: re
           </div>
         </>
       )}
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
     </section>
   );
 }

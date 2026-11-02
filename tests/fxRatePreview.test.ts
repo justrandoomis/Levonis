@@ -19,8 +19,9 @@
  *   - with the hash the act commits and the cart then charges exactly the
  *     preview's new prices;
  *   - a customer price moving more than 15% needs the explicit confirmation;
- *   - a stale session is refused (401 REAUTH_REQUIRED) and the preview says so
- *     beforehand (`fresh_sign_in`);
+ *   - a session older than ten minutes acts as a fresh one: no rate act asks
+ *     for a fresh sign-in (DECISIONS row 285) and the preview carries no
+ *     `fresh_sign_in`;
  *   - no engine product: the acts answer as before, no hash needed;
  *   - every key of the preview is classified, every amount in the net.
  *
@@ -266,7 +267,7 @@ test('a central shipping rate: the preview lists the products on that route; the
   assert.equal((await json(airAct)).code, 'PRICING_PREVIEW_REQUIRED');
 });
 
-// ------------------------------------------------------------- 15%, the fresh sign-in, no engine product
+// ------------------------------------------------------------- 15%, an old session, no engine product
 
 test('a customer price moving more than 15%: the preview flags it and the act needs the explicit confirmation as well as the hash', async () => {
   const w = pricingWorld();
@@ -288,18 +289,27 @@ test('a customer price moving more than 15%: the preview flags it and the act ne
   assert.equal((await cartPrices(w))[LAND], amsLand(1900));
 });
 
-test('a session older than ten minutes: the preview says a fresh sign-in is needed; the act with the hash is 401 REAUTH_REQUIRED and writes nothing', async () => {
+test('a session older than ten minutes: the act with the hash commits — no fresh sign-in (DECISIONS row 285) — and above 15% it still needs the explicit confirmation', async () => {
   const fresh = pricingWorld();
   await adoptAms(fresh);
   const stale = pricingWorld({ raw: fresh.raw, sessionAgeSeconds: 3600 });
-  const { preview } = await json(await post(stale.app, '/api/admin/pricing/rates/fx/USD_IQD/manual/preview', { rate: '1650' }));
-  assert.equal(preview.fresh_sign_in, true);
-  assert.equal((await json(await post(fresh.app, '/api/admin/pricing/rates/fx/USD_IQD/manual/preview', { rate: '1650' }))).preview.fresh_sign_in, false);
+  // 1,600 → 1,900 (+18.75%) moves the customer price more than 15%.
+  const { preview } = await json(await post(stale.app, '/api/admin/pricing/rates/fx/USD_IQD/manual/preview', { rate: '1900' }));
+  assert.equal(preview.large_change, true);
+  assert.equal('fresh_sign_in' in preview, false, 'the preview speaks of no sign-in');
   const before = snapshot(fresh.raw);
-  const res = await put(stale.app, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: ownerVersion(fresh), rate: '1650', preview_hash: preview.preview_hash });
-  assert.equal(res.status, 401);
-  assert.equal((await json(res)).code, 'REAUTH_REQUIRED');
-  assert.deepEqual(changed(before, snapshot(fresh.raw)), []);
+  const unconfirmed = await put(stale.app, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: ownerVersion(fresh), rate: '1900', preview_hash: preview.preview_hash });
+  assert.equal((await json(unconfirmed)).code, 'PRICING_LARGE_CHANGE_CONFIRM');
+  assert.deepEqual(changed(before, snapshot(fresh.raw)), [], 'refused without the tick: nothing written');
+  const ok = await put(stale.app, '/api/admin/pricing/rates/fx/USD_IQD/manual', {
+    owner_version: ownerVersion(fresh),
+    rate: '1900',
+    preview_hash: preview.preview_hash,
+    confirm_large_change: true,
+  });
+  assert.equal(ok.status, 200, JSON.stringify(await json(ok.clone())));
+  assert.equal(pairOf(fresh.raw, 'USD_IQD').effective_rate, '1900');
+  assert.equal((await cartPrices(fresh))[LAND], amsLand(1900));
 });
 
 test('no engine-priced product: the acts need no hash (FX-1 behaviour); the preview answers an empty list', async () => {
@@ -307,7 +317,6 @@ test('no engine-priced product: the acts need no hash (FX-1 behaviour); the prev
   const { preview } = await json(await post(w.app, '/api/admin/pricing/rates/fx/USD_IQD/manual/preview', { rate: '1650' }));
   assert.equal(preview.engine_products, 0);
   assert.deepEqual(preview.rows, []);
-  assert.equal(preview.fresh_sign_in, false);
   const res = await put(w.app, '/api/admin/pricing/rates/fx/USD_IQD/manual', { owner_version: ownerVersion(w), rate: '1650' });
   assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
   const ship = await put(w.app, '/api/admin/pricing/rates/shipping/GERMANY_LAND', { version: shipVersion(w), rate_iqd: '3400' });
@@ -377,7 +386,7 @@ test('every key of the preview is classified: amounts in FINANCIAL_FIELDS, the r
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'fx.%'"), 0, 'a preview is no act');
   const non = [...keys].filter((k) => !LIST.has(k)).sort();
   assert.deepEqual(non, [
-    'act', 'affected', 'blocked', 'changed_products', 'channel', 'combo_key', 'drop_flag', 'engine_products', 'follows', 'fresh_sign_in', 'kind', 'large', 'large_change',
+    'act', 'affected', 'blocked', 'changed_products', 'channel', 'combo_key', 'drop_flag', 'engine_products', 'follows', 'kind', 'large', 'large_change',
     'model_ar', 'model_ckb', 'model_en', 'models', 'name_ar', 'name_ckb', 'name_en', 'option_id', 'pair', 'product_id', 'products', 'profile', 'rows',
   ]);
 });

@@ -7,8 +7,8 @@
  *   - ONLY the rows whose price changes, old → new (a product's first V2
  *     publication: every row is new — no old dinar price is ever shown);
  *   - no subscriber-price lines (P6);
- *   - a change above 15% needs the tick (and a fresh sign-in); a drop above 30%
- *     is flagged on its row;
+ *   - a change above 15% needs the tick (and no fresh sign-in: DECISIONS row
+ *     285); a drop above 30% is flagged on its row;
  *   - the confirm button UNDER the table; cancel closes the sheet and keeps
  *     every typed value.
  * Nothing is computed: the rows are the server's `changes`.
@@ -22,7 +22,7 @@ import { channelName, useV2Lang, useV2Strings } from './v2Ui';
 /** The rows the sheet lists: ONLY the prices that change (the server's `changes`). */
 export const reviewRowsOf = (preview: V2Answer): V2Change[] => (preview.changes ?? []).filter((c) => c.old_iqd !== c.new_iqd);
 
-/** A change above 15% (a drop above 30% is one) needs the owner's tick and a fresh sign-in. */
+/** A change above 15% (a drop above 30% is one) needs the owner's tick. */
 export const needsTickOf = (preview: V2Answer): boolean =>
   !!preview.large_change || !!preview.drop_flag || reviewRowsOf(preview).some((c) => c.large || c.drop_flag);
 
@@ -31,20 +31,16 @@ export default function ReviewSheetV2({
   busy,
   error,
   progress = null,
-  reauth,
   onConfirm,
   onCancel,
-  onSignIn,
 }: {
   preview: V2Answer;
   busy: boolean;
   error: string;
   /** While the confirmed save is still on its way (src/components/adminProducts/saveOutcome.ts): said, not an error. */
   progress?: string | null;
-  reauth: boolean;
   onConfirm: (confirmLarge: boolean) => void;
   onCancel: () => void;
-  onSignIn: () => void;
 }) {
   const s = useV2Strings();
   const lang = useV2Lang();
@@ -117,7 +113,6 @@ export default function ReviewSheetV2({
               <input type="checkbox" className="h-5 w-5 shrink-0" checked={ticked} disabled={busy} onChange={(e) => setTicked(e.target.checked)} data-v2-review-large />
               {s.largeTick}
             </label>
-            <span className="text-[12px] text-text-secondary">{s.largeNote}</span>
           </div>
         ) : null}
         {progress && !error ? (
@@ -129,11 +124,6 @@ export default function ReviewSheetV2({
           <p role="alert" className="text-[13px] text-red-400" data-v2-review-error>
             {error}
           </p>
-        ) : null}
-        {reauth ? (
-          <button type="button" className={`${btnGhost} justify-self-start`} onClick={onSignIn} data-v2-sign-in>
-            {s.signInAgain}
-          </button>
         ) : null}
       </div>
     </Modal>

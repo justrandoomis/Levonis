@@ -439,7 +439,7 @@ colour-less SKU shows a colour that follows it, and names that colour.
   - When prices change, **one** review sheet lists only the changed SKU × channel rows (old →
     new). The confirm button sits under the table.
   - There are no PRO lines (P6).
-  - A move above 15% needs the tick and a fresh sign-in (row 196). A drop above 30% is flagged.
+  - A move above 15% needs the tick (row 196; no fresh sign-in since row 285). A drop above 30% is flagged.
 - **Structure and prices commit together** in one atomic engine batch.
 - **An incomplete product saves its data.** Its store prices stay at the last good write, or
   it stays hidden if it was never priced (row 205). The chip names what is missing.

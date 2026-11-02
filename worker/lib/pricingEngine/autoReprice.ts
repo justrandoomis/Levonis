@@ -294,8 +294,8 @@ export function blockCodeOf(codes: readonly string[]): string {
 /**
  * V2: why an automatic repricing must not publish this evaluation, or null.
  *   - PRICING_V2_UNREVIEWED: the product's inputs (points, discounts, cost inputs, minimum profit) moved since
- *     its last complete, reviewed write — a data-only save that skipped the preview hash, the 15% tick and the
- *     fresh sign-in. Publishing it here would be that review's bypass; the owner opens the product instead.
+ *     its last complete, reviewed write — a data-only save that skipped the preview hash and the 15% tick.
+ *     Publishing it here would be that review's bypass; the owner opens the product instead.
  *   - PRICING_V2_LARGE_CHANGE: a change above 15% (or a drop above 30%) nobody previewed. An owner rate or
  *     shipping act carries the owner's own preview and tick of these flags (adminPricing.ts), so only the
  *     unattended triggers (the FX fetch, the sweep) hold it.

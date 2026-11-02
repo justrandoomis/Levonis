@@ -147,30 +147,28 @@ test('UX #1: on an Arabic phone every figure of the rates panel is Latin — no 
   assert.equal(roundDecimalText('0.0000004', 6), '0');
 });
 
-// ------------------------------------------------------------- #2 the fresh sign-in
+// ------------------------------------------------------------- #2 no fresh sign-in (DECISIONS row 285)
 
-test('UX #2: a fresh-sign-in refusal offers «سجّل الدخول مجددًا», which signs out and comes back to the pricing tab; the acts that need it say so first', () => {
+/** «sign in» in the three languages: «تسجيل الدخول» / «سجّل الدخول», «چوونەژوورەوە» / «بچۆ ژوورەوە». */
+const SIGN_IN = /sign[- ]?in|تسجيل (?:ال)?دخول|سجّل الدخول|ژوورەوە/i;
+
+test('UX #2, as DECISIONS row 285 leaves it: no rate act asks for a fresh sign-in — no «سجّل الدخول مجددًا» button, and no word of one before an act', () => {
   for (const lang of LANGS) {
     const s = FX_STRINGS[lang];
-    const html = render(createElement(FxMessage, { message: { tone: 'danger', text: s.reauth, reauth: true }, s }));
-    assert.match(html, /data-fx-sign-in-again/, lang);
-    assert.ok(textOf(html).includes(s.signInAgain), lang);
-    // No button on any other refusal.
-    assert.doesNotMatch(render(createElement(FxMessage, { message: { tone: 'danger', text: 'x' }, s })), /data-fx-sign-in-again/);
-  }
-  assert.equal(fxParts.PRICING_TAB_PATH, '/admin?tab=pricing');
-  const parts = codeOf(`${DIR}/fxParts.tsx`);
-  assert.match(parts, /reauth: code === 'REAUTH_REQUIRED'/);
-  assert.match(parts, /await auth\?\.logout\(\);[\s\S]{0,80}window\.location\.assign\(`\/auth\?next=\$\{encodeURIComponent\(PRICING_TAB_PATH\)\}`\)/);
-  // Said before the act: the large-change confirmation, keep-as-manual, «تأكيد السعر الحالي».
-  for (const lang of LANGS) {
-    const s = FX_STRINGS[lang];
-    assert.notEqual(s.largeChange('15'), s.reauth);
+    // An older Worker's REAUTH_REQUIRED reads in the shared contract's words, with no button of the panel's own.
+    const said = fxRefusalText(new ApiError(401, 'x', 'REAUTH_REQUIRED'), lang, s);
+    assert.equal(said, COST_REFUSALS.REAUTH_REQUIRED[lang], lang);
+    assert.doesNotMatch(render(createElement(FxMessage, { message: { tone: 'danger', text: said }, s })), /<button|data-fx-sign-in-again/, lang);
+    // Still said before the act — the large-change confirmation, keep-as-manual, «تأكيد السعر الحالي» — and none speaks of a sign-in.
     assert.ok(s.keepManualHint.length > 10 && s.confirmCurrentHint.length > 10);
+    for (const text of [s.largeChange('15'), s.keepManualHint, s.confirmCurrentHint]) assert.doesNotMatch(text, SIGN_IN, `${lang}: «${text}»`);
   }
-  assert.match(FX_STRINGS.en.largeChange('15'), /recent sign-in/);
-  assert.match(FX_STRINGS.en.keepManualHint, /recent sign-in/);
-  assert.match(FX_STRINGS.en.confirmCurrentHint, /recent sign-in/);
+  assert.equal('PRICING_TAB_PATH' in fxParts, false);
+  assert.equal('useSignInAgain' in fxParts, false);
+  assert.doesNotMatch(codeOf(`${DIR}/fxParts.tsx`), /REAUTH_REQUIRED|logout|data-fx-sign-in-again/);
+  for (const f of ['RatePreview', 'FxReviewSheet', 'FxPairCard']) {
+    assert.doesNotMatch(codeOf(`${DIR}/${f}.tsx`), /fresh_sign_in|signInAgain|s\.reauth|s\.guardsHint|REAUTH_REQUIRED/, f);
+  }
   assert.match(codeOf(`${DIR}/FxReviewSheet.tsx`), /data-fx-keep-manual-hint/);
 });
 
@@ -323,7 +321,7 @@ test('UX #12: the intro does not say «this update» (read as «Refresh now»), 
 
 // ------------------------------------------------------------- #13 what «تأكيد السعر الحالي» does
 
-test('UX #13: what «تأكيد السعر الحالي» does — and that it asks for a fresh sign-in — is on screen, not in a tooltip', () => {
+test('UX #13: what «تأكيد السعر الحالي» does is on screen, not in a tooltip', () => {
   for (const lang of LANGS) {
     const html = card(pairOf(), lang); // effective 1,675 ≠ the anchor 1,650
     assert.match(html, /data-fx-confirm-current/);

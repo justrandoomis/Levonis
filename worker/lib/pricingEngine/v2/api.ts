@@ -31,11 +31,12 @@
  * the client read must still be the stored one (PRICING_CHANGED); a price
  * change needs the preview's hash (PRICING_PREVIEW_REQUIRED / _STALE, each
  * carrying the fresh preview); a change above 15% (a drop above 30% is one)
- * needs the tick (PRICING_LARGE_CHANGE_CONFIRM) and a fresh sign-in
- * (REAUTH_REQUIRED); an incomplete evaluation saves its data only — a new
- * product is born V2 and hidden, an existing one keeps its last good prices —
- * and publishing an incomplete product is PRICING_V2_PRICE_MISSING. Every
- * refusal names its section (3 = «الأسعار», 5 = «الخيارات والألوان»).
+ * needs the tick (PRICING_LARGE_CHANGE_CONFIRM) — and no fresh sign-in (owner
+ * decision 2026-11-02, DECISIONS row 285); an incomplete evaluation saves its
+ * data only — a new product is born V2 and hidden, an existing one keeps its
+ * last good prices — and publishing an incomplete product is
+ * PRICING_V2_PRICE_MISSING. Every refusal names its section (3 = «الأسعار»,
+ * 5 = «الخيارات والألوان»).
  *
  * PRIVATE: every dollar figure, the rate, R, T, the floor and the cost inputs
  * are the owner's; nothing here logs a value.
@@ -48,7 +49,6 @@ import type { AppContext, Env } from '../../types';
 import { HttpError } from '../../http';
 import { canViewCost, canWriteCost, costRefusal, type CostSubject } from '../../costAccess';
 import { V2_STAFF_SEES_USD } from '../../adminScope';
-import { FRESH_SESSION_SECONDS, sessionAgeSeconds } from '../../session';
 import { sha256Hex } from '../../crypto';
 import { strictBody } from '../../fx/ownerActs';
 import type { PricingContext } from '../../../routes/cart';
@@ -593,11 +593,6 @@ export async function v2Replayed(db: D1Database, pid: string, hash: unknown): Pr
   return !!(await db.prepare('SELECT 1 AS hit FROM pricing_audit WHERE idempotency_key = ?').bind(v2PriceKey(pid, hash)).first<{ hit: number }>());
 }
 
-/** A fresh sign-in, as `requireFreshSession` — the refusal names the section. */
-export function requireFreshV2(c: Context<AppContext>): void {
-  if (sessionAgeSeconds(c) > FRESH_SESSION_SECONDS) throw refusal(401, 'REAUTH_REQUIRED');
-}
-
 /** What a V2 save does once its gates pass. */
 export type V2Verdict = 'already' | 'write' | 'data' | 'noop';
 
@@ -631,7 +626,7 @@ export async function gateV2(g: GateInput): Promise<V2Verdict> {
   ]);
   if (replayed) return 'already';
   if (!ev.complete) {
-    // A data-only save (no hash, no tick, no fresh sign-in) is for a product no customer sees yet. On a
+    // A data-only save (no hash, no tick) is for a product no customer sees yet. On a
     // V2-PUBLISHED product it would store an unreviewed price set that the next automatic repricing (FX-5)
     // publishes: refused, with the preview — its structure alone may still be saved.
     if (g.publishing || (v2Published(ev) && ev.drafts)) {
@@ -647,10 +642,8 @@ export async function gateV2(g: GateInput): Promise<V2Verdict> {
   if (!g.priceChange) return 'write';
   if (!isHash(g.hash)) throw refusal(409, 'PRICING_PREVIEW_REQUIRED', { preview: await g.preview() });
   if (g.hash !== ev.hash) throw refusal(409, 'PRICING_PREVIEW_STALE', { preview: await g.preview() });
-  if (ev.large_change || ev.drop_flag) {
-    if (g.confirm !== true) throw refusal(409, 'PRICING_LARGE_CHANGE_CONFIRM', { preview: await g.preview() });
-    requireFreshV2(c);
-  }
+  // The tick, and nothing more: no fresh sign-in (DECISIONS row 285).
+  if ((ev.large_change || ev.drop_flag) && g.confirm !== true) throw refusal(409, 'PRICING_LARGE_CHANGE_CONFIRM', { preview: await g.preview() });
   return 'write';
 }
 

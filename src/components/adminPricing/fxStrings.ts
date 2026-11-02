@@ -96,7 +96,7 @@ export interface FxStrings {
   approve: string;
   reject: string;
   keepManual: string;
-  /** Said before the act, beside it: keep-as-manual changes the mode, so it asks for a fresh sign-in. */
+  /** Said before the act, beside it: keep-as-manual changes the mode (it turns tracking off). */
   keepManualHint: string;
   refresh: string;
   refreshing: string;
@@ -112,7 +112,6 @@ export interface FxStrings {
   confirmCurrent: string;
   confirmCurrentHint: string;
   guards: string;
-  guardsHint: string;
   threshold: string;
   drift: string;
   minChange: string;
@@ -125,9 +124,6 @@ export interface FxStrings {
   invalidRate: string;
   invalidPct: string;
   invalidAdjustment: string;
-  reauth: string;
-  /** The way through a fresh-sign-in refusal (UX review #2). */
-  signInAgain: string;
   /** 409 PRICING_CHANGED on this panel: it already reloaded itself (UX review #5). */
   panelChanged: string;
   largeChange: One;
@@ -266,7 +262,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     approve: 'اعتماد السعر الجديد',
     reject: 'رفض والإبقاء على الحالي',
     keepManual: 'أبقِ سعري الحالي يدويًا',
-    keepManualHint: '«أبقِ سعري الحالي يدويًا» يوقف التتبع التلقائي، فيطلب تسجيل دخول حديثًا.',
+    keepManualHint: '«أبقِ سعري الحالي يدويًا» يوقف التتبع التلقائي.',
     refresh: 'تحديث الآن',
     refreshing: 'جارٍ التحديث…',
     refreshBudget: (used, limit) => `التحديثات اليوم: ${used} من ${limit}`,
@@ -288,9 +284,8 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     useObserved: (rate) => `استخدم ${rate} سعرًا يدويًا`,
     observedAt: (date) => `رُصد في ${date}`,
     confirmCurrent: 'تأكيد السعر الحالي',
-    confirmCurrentHint: 'يصبح السعر الحالي مرجع الابتعاد المسموح. يطلب تسجيل دخول حديثًا.',
+    confirmCurrentHint: 'يصبح السعر الحالي مرجع الابتعاد المسموح.',
     guards: 'إعدادات الحماية',
-    guardsHint: 'حفظ هذه الإعدادات يطلب تسجيل دخول حديثًا.',
     threshold: 'التغيّر الذي يحتاج مراجعتك (٪)',
     drift: 'الابتعاد المسموح عن آخر سعر أكّدته (٪)',
     minChange: 'تجاهل التغيّر الأصغر من (٪)',
@@ -303,10 +298,8 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     invalidRate: 'اكتب سعرًا أكبر من صفر، بنقطة للكسور.',
     invalidPct: 'اكتب نسبة مئوية صحيحة.',
     invalidAdjustment: 'اكتب عددًا من الدنانير، موجبًا أو سالبًا.',
-    reauth: 'لحماية الأسعار، سجّل الدخول مجددًا ثم أعد المحاولة',
-    signInAgain: 'سجّل الدخول مجددًا',
     panelChanged: 'تغيّرت الأسعار منذ فتحتَ اللوحة، فحدّثناها — راجعها ثم أعد المحاولة.',
-    largeChange: (pct) => `هذا تغيير كبير (أكثر من ${pct}٪). أكّده صراحةً إن كان مقصودًا؛ وسيُطلب منك تسجيل دخول حديث.`,
+    largeChange: (pct) => `هذا تغيير كبير (أكثر من ${pct}٪). أكّده صراحةً إن كان مقصودًا.`,
     largeConfirm: 'نعم، أؤكد التغيير الكبير',
     loadFailed: 'تعذّر تحميل أسعار الصرف.',
     loading: 'جارٍ تحميل أسعار الصرف…',
@@ -477,7 +470,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     approve: 'Apply the new rate',
     reject: 'Reject and keep the current rate',
     keepManual: 'Keep my current rate as manual',
-    keepManualHint: '“Keep my current rate as manual” turns automatic tracking off, so it asks for a recent sign-in.',
+    keepManualHint: '“Keep my current rate as manual” turns automatic tracking off.',
     refresh: 'Refresh now',
     refreshing: 'Refreshing…',
     refreshBudget: (used, limit) => `Refreshes today: ${used} of ${limit}`,
@@ -499,9 +492,8 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     useObserved: (rate) => `Use ${rate} as my manual rate`,
     observedAt: (date) => `Observed on ${date}`,
     confirmCurrent: 'Confirm the current rate',
-    confirmCurrentHint: 'The current rate becomes the reference for the allowed drift. Asks for a recent sign-in.',
+    confirmCurrentHint: 'The current rate becomes the reference for the allowed drift.',
     guards: 'Safety settings',
-    guardsHint: 'Saving these settings asks for a fresh sign-in.',
     threshold: 'Change that needs your review (%)',
     drift: 'Allowed drift from the last rate you confirmed (%)',
     minChange: 'Ignore changes smaller than (%)',
@@ -514,10 +506,8 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     invalidRate: 'Type a rate above zero, with a point for decimals.',
     invalidPct: 'Type a valid percentage.',
     invalidAdjustment: 'Type a number of dinars, positive or negative.',
-    reauth: 'To protect prices, sign in again, then retry',
-    signInAgain: 'Sign in again',
     panelChanged: 'The rates changed since you opened the panel, so we reloaded it — check them, then try again.',
-    largeChange: (pct) => `This is a large change (more than ${pct}%). Confirm it explicitly if you meant it; it also asks for a recent sign-in.`,
+    largeChange: (pct) => `This is a large change (more than ${pct}%). Confirm it explicitly if you meant it.`,
     largeConfirm: 'Yes, confirm the large change',
     loadFailed: 'Could not load the exchange rates.',
     loading: 'Loading the exchange rates…',
@@ -690,7 +680,7 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     approve: 'نرخە نوێیەکە جێبەجێ بکە',
     reject: 'ڕەتی بکەرەوە و نرخی ئێستا بهێڵەوە',
     keepManual: 'نرخی ئێستام وەک دەستی بهێڵەوە',
-    keepManualHint: '«نرخی ئێستام وەک دەستی بهێڵەوە» بەدواداچوونی خۆکار ڕادەگرێت، بۆیە چوونەژوورەوەیەکی نوێ دەخوازێت.',
+    keepManualHint: '«نرخی ئێستام وەک دەستی بهێڵەوە» بەدواداچوونی خۆکار ڕادەگرێت.',
     refresh: 'ئێستا نوێی بکەرەوە',
     refreshing: 'نوێ دەکرێتەوە…',
     refreshBudget: (used, limit) => `نوێکردنەوەکانی ئەمڕۆ: ${used} لە ${limit}`,
@@ -712,9 +702,8 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     useObserved: (rate) => `${rate} وەک نرخی دەستیم بەکاربهێنە`,
     observedAt: (date) => `لە ${date} بینرا`,
     confirmCurrent: 'نرخی ئێستا پشتڕاست بکەرەوە',
-    confirmCurrentHint: 'نرخی ئێستا دەبێتە سەرچاوەی دوورکەوتنەوەی ڕێگەپێدراو. چوونەژوورەوەیەکی نوێ دەخوازێت.',
+    confirmCurrentHint: 'نرخی ئێستا دەبێتە سەرچاوەی دوورکەوتنەوەی ڕێگەپێدراو.',
     guards: 'ڕێکخستنەکانی پاراستن',
-    guardsHint: 'پاشەکەوتکردنی ئەم ڕێکخستنانە چوونەژوورەوەیەکی نوێ دەخوازێت.',
     threshold: 'ئەو گۆڕانەی پێویستی بە پێداچوونەوەی تۆیە (٪)',
     drift: 'ئەو دوورکەوتنەوەیەی ڕێگەپێدراوە لە دوایین نرخێک کە پشتڕاستت کردەوە (٪)',
     minChange: 'گوێ مەدە بە گۆڕانی بچووکتر لە (٪)',
@@ -727,10 +716,8 @@ export const FX_STRINGS: Readonly<Record<Lang, FxStrings>> = {
     invalidRate: 'نرخێکی سەروو سفر بنووسە، بە خاڵ بۆ کەرتەکان.',
     invalidPct: 'ڕێژەیەکی سەدی دروست بنووسە.',
     invalidAdjustment: 'ژمارەیەک دینار بنووسە، پۆزەتیڤ یان نێگەتیڤ.',
-    reauth: 'بۆ پاراستنی نرخەکان، دووبارە بچۆ ژوورەوە و پاشان هەوڵ بدەرەوە',
-    signInAgain: 'دووبارە بچۆ ژوورەوە',
     panelChanged: 'نرخەکان لەو کاتەوەی تابلۆکەت کردەوە گۆڕاون، بۆیە نوێمان کردەوە — سەیریان بکە و پاشان دووبارە هەوڵ بدەرەوە.',
-    largeChange: (pct) => `ئەمە گۆڕانێکی گەورەیە (زیاتر لە ${pct}٪). ئەگەر مەبەستت بوو، بە ڕوونی پشتڕاستی بکەرەوە؛ چوونەژوورەوەیەکی نوێش دەخوازێت.`,
+    largeChange: (pct) => `ئەمە گۆڕانێکی گەورەیە (زیاتر لە ${pct}٪). ئەگەر مەبەستت بوو، بە ڕوونی پشتڕاستی بکەرەوە.`,
     largeConfirm: 'بەڵێ، گۆڕانە گەورەکە پشتڕاست دەکەمەوە',
     loadFailed: 'نەتوانرا نرخەکانی ئاڵوگۆڕ باربکرێن.',
     loading: 'نرخەکانی ئاڵوگۆڕ بار دەکرێن…',

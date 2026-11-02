@@ -157,7 +157,7 @@ function SnapshotRow({ snapshot: s, lang, onChanged }: { snapshot: SnapshotDto; 
           {say(SNAPSHOTS.discard, lang)}
         </Button>
       ) : null}
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
       {dialog}
     </li>
   );
@@ -335,7 +335,7 @@ function MatchCard({ lang }: { lang: UiLang }) {
         ) : null}
       </div>
       {act.busy === 'match' && count !== null ? <p className="text-[12px] text-text-muted">{say(SNAPSHOTS.matching, lang, { n: count })}</p> : null}
-      <ActNote message={act.message} lang={lang} />
+      <ActNote message={act.message} />
     </section>
   );
 }

@@ -184,7 +184,7 @@ export default function ProductForm({
   onListChanged: () => void;
 }) {
   const { dir, lang } = useLanguage();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   /**
    * PRO, PAUSED (0145): its price field and its discount rule are hidden
    * until the owner resumes it. PREMIUM has none at all any more — «حذف خيار
@@ -823,7 +823,7 @@ export default function ProductForm({
    * product — its `pricing_v2` block go in ONE request, which the server writes in ONE batch. When no
    * price moves it saves with no sheet; when prices move the server answers 409 with its preview and
    * the review sheet lists only the changed rows; its confirm resends with the preview's hash (and the
-   * 15% tick); a fresh sign-in is asked for a large change. Cancel keeps every typed value.
+   * 15% tick — no fresh sign-in, DECISIONS row 285). Cancel keeps every typed value.
    */
   const save = async (
     status: 'draft' | 'active',
@@ -977,10 +977,6 @@ export default function ProductForm({
         if (e.code === 'PRICING_PREVIEW_STALE' && confirm) v2.reviewError(text);
         return;
       }
-      if (e instanceof ApiError && e.code === 'REAUTH_REQUIRED' && v2.review) {
-        v2.reviewError(v2s.reauth, true);
-        return;
-      }
       // A refusal that names its section opens it (٣ the prices, ٥ a model or a colour).
       const section = e instanceof ApiError ? refusalSection(e.details) : null;
       if (section) {
@@ -1005,15 +1001,6 @@ export default function ProductForm({
     const r = v2.review;
     if (!r?.preview.review_hash) return;
     void save(r.status, { confirm: { hash: r.preview.review_hash, confirmLarge } });
-  };
-  /** A large change needs a NEW sign-in: the session ends first; the way back is this product's form. */
-  const signInAgain = async () => {
-    const id = productId || doc.id;
-    try {
-      await logout?.();
-    } finally {
-      window.location.assign(`/auth?next=${encodeURIComponent(id ? `/admin?tab=products&edit=${encodeURIComponent(id)}` : '/admin?tab=products')}`);
-    }
   };
 
   // THIS SCREEN OWNS ITS BOTTOM EDGE. A `position: sticky` footer can only
@@ -2121,10 +2108,8 @@ export default function ProductForm({
           busy={saving}
           error={v2.review.error}
           progress={saveProgress}
-          reauth={v2.review.reauth}
           onConfirm={confirmReview}
           onCancel={v2.closeReview}
-          onSignIn={() => void signInAgain()}
         />
       )}
 

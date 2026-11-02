@@ -14,8 +14,9 @@
  *   - a price moving more than 15% (the act then needs the explicit tick) or
  *     dropping more than 30%;
  *   - the products the engine cannot reprice (they keep their prices), and
- *     how many follow on the quarter-hour sweep «خلال 15 دقيقة»;
- *   - the act needs a sign-in within the last ten minutes: the way through.
+ *     how many follow on the quarter-hour sweep «خلال 15 دقيقة».
+ * No act here asks for a fresh sign-in (DECISIONS row 285): the apply is
+ * always the button under the preview.
  * The act carries the preview's `preview_hash`; when something moved since
  * (409 PRICING_PREVIEW_STALE / _REQUIRED), the fresh preview replaces this one
  * and the owner reads it before applying again.
@@ -24,7 +25,7 @@
  * text); nothing is computed here. No browser storage.
  */
 import React, { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { AlertTriangle, LogIn, X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import { Button } from '../ui/Button';
 import { Skeleton } from '../ui/Skeleton';
@@ -33,7 +34,7 @@ import type { Language } from '../../translations';
 import { iqdUnit } from '../../lib/money';
 import { previewOfRefusal, type FxRatePreview, type FxRatePreviewRow, type FxRatesAnswer } from './api';
 import type { FxStrings } from './fxStrings';
-import { FX_LARGE_CHANGE_PCT, FxMessage, fxRefusalText, useSignInAgain, type FxMessageState } from './fxParts';
+import { FX_LARGE_CHANGE_PCT, FxMessage, fxRefusalText, type FxMessageState } from './fxParts';
 import { signedPct } from './FxPairCard';
 import { fxCount, fxFigure } from './format';
 import { channelLabel, nameOf } from './strings';
@@ -185,7 +186,6 @@ export default function RatePreviewSheet({
 }) {
   const titleId = useId();
   const confirmId = useId();
-  const signInAgain = useSignInAgain();
   const [preview, setPreview] = useState<FxRatePreview | null>(null);
   const [message, setMessage] = useState<FxMessageState | null>(null);
   const [busy, setBusy] = useState(false);
@@ -203,7 +203,7 @@ export default function RatePreviewSheet({
         if (live) setPreview(p);
       },
       (e) => {
-        if (live) setMessage({ tone: 'danger', text: fxRefusalText(e, lang, s), reauth: e instanceof ApiError && e.code === 'REAUTH_REQUIRED' });
+        if (live) setMessage({ tone: 'danger', text: fxRefusalText(e, lang, s) });
       }
     );
     return () => {
@@ -236,7 +236,7 @@ export default function RatePreviewSheet({
           setMessage({ tone: 'warning', text: s.largeChange(FX_LARGE_CHANGE_PCT), confirmLarge: () => void apply(true) });
         } else {
           if (code === 'PRICING_CHANGED') onStale();
-          setMessage({ tone: 'danger', text: fxRefusalText(e, lang, s), reauth: code === 'REAUTH_REQUIRED' });
+          setMessage({ tone: 'danger', text: fxRefusalText(e, lang, s) });
         }
       } finally {
         inFlight.current = false;
@@ -280,24 +280,14 @@ export default function RatePreviewSheet({
                 {s.previewLargeConfirm}
               </label>
             )}
-            {preview.fresh_sign_in ? (
-              // The act asks for a sign-in within the last ten minutes: said before it, with the way through (§7.8).
-              <div className="flex flex-col gap-2 sm:flex-row-reverse sm:items-center">
-                <Button variant="primary" icon={<LogIn aria-hidden="true" className="h-4 w-4 rtl:-scale-x-100" />} onClick={() => void signInAgain()} data-fx-preview-sign-in>
-                  {s.signInAgain}
-                </Button>
-                <p className="text-[12.5px] leading-relaxed text-text-muted">{s.reauth}</p>
-              </div>
-            ) : (
-              <div className="flex flex-col gap-2 sm:flex-row-reverse">
-                <Button variant="primary" loading={busy} disabled={needsTick && !confirmLarge} onClick={() => void apply()} data-fx-preview-apply>
-                  {s.previewApply}
-                </Button>
-                <Button variant="ghost" disabled={busy} onClick={onClose}>
-                  {s.cancel}
-                </Button>
-              </div>
-            )}
+            <div className="flex flex-col gap-2 sm:flex-row-reverse">
+              <Button variant="primary" loading={busy} disabled={needsTick && !confirmLarge} onClick={() => void apply()} data-fx-preview-apply>
+                {s.previewApply}
+              </Button>
+              <Button variant="ghost" disabled={busy} onClick={onClose}>
+                {s.cancel}
+              </Button>
+            </div>
           </div>
         ) : null
       }

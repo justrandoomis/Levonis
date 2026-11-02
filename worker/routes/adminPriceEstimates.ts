@@ -13,7 +13,7 @@
  * every cost route. Every write calls assertCostWrite.
  *
  *   GET  /control                    the two switches, and whether the purchase policy carries the clause
- *   PUT  /control                    {version, apply_enabled?, ordering_enabled?} — a fresh sign-in
+ *   PUT  /control                    {version, apply_enabled?, ordering_enabled?}
  *   GET  /types                      every type with its figures (T × U below one step is warned)
  *   POST /types                      a new type key (every figure empty)
  *   PUT  /types/:key                 {version, …figures} — version-fenced, audited
@@ -34,7 +34,7 @@
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { jsonObject, notFound } from '../lib/http';
-import { assertCostWrite, requireCostRead, requireFreshSession } from '../lib/costAccess';
+import { assertCostWrite, requireCostRead } from '../lib/costAccess';
 import { SESSION_CACHE_CONTROL, afterCatalogueWrite } from '../lib/edgePolicy';
 import { priceEstimatesInstalled } from '../lib/priceEstimateLabel';
 import {
@@ -84,8 +84,7 @@ adminPriceEstimatesRoutes.get('/control', async (c) => {
 adminPriceEstimatesRoutes.put('/control', async (c) => {
   assertCostWrite(c);
   await installed(c);
-  // A switch that lets prices be published or orders taken: a fresh sign-in, as every owner act of that weight.
-  requireFreshSession(c);
+  // No fresh sign-in: no pricing act asks for one (owner decision 2026-11-02, DECISIONS row 285).
   const control = await setControl(c.env.DB, await jsonObject(c), actorOf(c), new Date());
   return c.json({ success: true, control, policy_ready: estimatePolicyInForce() });
 });

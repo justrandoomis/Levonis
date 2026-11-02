@@ -15,8 +15,9 @@
  *   - U and the China sea freight rate move what they price;
  *   - a change above 15% is HELD (PRICING_V2_LARGE_CHANGE), the price stays at
  *     the last good write, and the estimator lists it (EST_LARGE_CHANGE_HELD,
- *     the line `large`); the owner's refresh needs the tick and a fresh sign-in,
- *     and then publishes it — still labelled.
+ *     the line `large`); the owner's refresh needs the tick — on any session,
+ *     no fresh sign-in (DECISIONS row 285) — and then publishes it, still
+ *     labelled.
  *
  * Run: node --import tsx --test tests/priceEstimateFx5.test.ts
  */
@@ -134,7 +135,7 @@ test('a CNY, EUR, U or freight move reprices through FX-5 and keeps the label an
   assert.equal(all(w.raw, "SELECT 1 FROM price_history WHERE product_id = 'p_fil' AND price_source = 'engine_fx'").length > 0, true);
 });
 
-test('a change above 15% is held and flagged; the owner’s refresh needs the tick and a fresh sign-in, then publishes it, labelled', async () => {
+test('a change above 15% is held and flagged; the owner’s refresh needs the tick — and no fresh sign-in (row 285) — then publishes it, labelled', async () => {
   const w = await world();
   // CNY/USD 0.14 → 0.2: the PLA's price would move about +30% — held at its last good write.
   applyRate(w.raw, 'CNY_USD', '0.2');
@@ -155,15 +156,13 @@ test('a change above 15% is held and flagged; the owner’s refresh needs the ti
   assert.deepEqual((listed.body.products as Json[]).map((x) => x.product_id), ['p_fil']);
   assert.equal(listed.body.products[0].lines[0].large, true);
 
-  // Without the tick: refused with the preview. With it but an old sign-in: a fresh sign-in first.
-  const untick = await call(w.app, `${BASE}/apply`, { items: [{ product_id: 'p_fil', preview_hash: p.preview_hash }] });
-  assert.deepEqual([untick.body.results[0].outcome, untick.body.results[0].code], ['refused', 'PRICING_LARGE_CHANGE_CONFIRM']);
+  // Without the tick: refused with the preview. With it, an hour-old sign-in publishes it (DECISIONS row 285).
   const stale = mount(w.raw, 3600);
-  const old = await call(stale, `${BASE}/apply`, { items: [{ product_id: 'p_fil', preview_hash: p.preview_hash, confirm_large_change: true }] });
-  assert.deepEqual([old.body.results[0].outcome, old.body.results[0].code], ['refused', 'REAUTH_REQUIRED']);
+  const untick = await call(stale, `${BASE}/apply`, { items: [{ product_id: 'p_fil', preview_hash: p.preview_hash }] });
+  assert.deepEqual([untick.body.results[0].outcome, untick.body.results[0].code], ['refused', 'PRICING_LARGE_CHANGE_CONFIRM']);
   assert.deepEqual(price(w.raw, 'p_fil'), [20_500]);
 
-  const ok = await call(w.app, `${BASE}/apply`, { items: [{ product_id: 'p_fil', preview_hash: p.preview_hash, confirm_large_change: true }] });
+  const ok = await call(stale, `${BASE}/apply`, { items: [{ product_id: 'p_fil', preview_hash: p.preview_hash, confirm_large_change: true }] });
   assert.equal(ok.body.results[0].outcome, 'applied', JSON.stringify(ok.body).slice(0, 300));
   assert.deepEqual(price(w.raw, 'p_fil'), [27_000]);
   assert.equal(label(w.raw, 'p_fil'), 1);

@@ -281,7 +281,7 @@ export function previewSaved(purchaseId: string, choices: PreviewChoices & { lin
 /**
  * Apply one product (inputs and the typed minimum profits) from a saved purchase — and, when that leaves
  * the product complete, its new prices in the same batch (owner decision 8); a change above 15% needs the
- * owner's tick (`confirmLarge`) and a fresh sign-in.
+ * owner's tick (`confirmLarge`; no fresh sign-in, DECISIONS row 285).
  */
 export function applyPurchase(productId: string, purchaseId: string, previewHash: string, choices: PricingChoices, confirmLarge = false) {
   const body = pricingBody(choices);

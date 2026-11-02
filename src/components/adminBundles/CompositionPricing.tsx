@@ -79,7 +79,7 @@ export default function CompositionPricing({
           if (e.code === 'PRICING_PREVIEW_STALE' && confirm) v2.reviewError(message);
           return;
         }
-        if (v2.review) v2.reviewError(message, e instanceof ApiError && e.code === 'REAUTH_REQUIRED');
+        if (v2.review) v2.reviewError(message);
         else setError(message);
       } finally {
         setBusy(false);
@@ -105,13 +105,11 @@ export default function CompositionPricing({
           preview={v2.review.preview}
           busy={busy}
           error={v2.review.error}
-          reauth={v2.review.reauth}
           onConfirm={(confirmLarge) => {
             const hash = v2.review?.preview.review_hash;
             if (hash) void save({ hash, confirmLarge });
           }}
           onCancel={v2.closeReview}
-          onSignIn={() => window.location.assign(`/auth?next=${encodeURIComponent(`/admin?tab=bundles&edit=${productId}`)}`)}
         />
       )}
     </V2PricingProvider>
