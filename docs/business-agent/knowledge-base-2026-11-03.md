@@ -1,52 +1,49 @@
 # قاعدة معرفة Meta Business Agent — Levonis (2026-11-03)
 
-> **الحالة:** جاهزة، **وما انضافت بعد** لـ Business Agent. تنتظر قرارين من المالك (أدناه).
-> صُنعت 2026-11-03 بعملية فحص واسعة (30 وكيل) من الموقع الحي وسياساته والكتالوج والمحادثات، وكل معلومة متحقق منها مقابل الكود والسياسات المنشورة.
-> الأسعار بالقائمة لقطة من يوم 2026-11-03 وتتغير ويا سعر الدولار — الصفحة وشاشة الدفع هي المرجع.
+> **الحالة (2026-11-03):** الوكيل **مطفي** والجمهور «فريقك فقط». انضاف لـ Business Agent: 107 جواب («معلومات أخرى»)،
+> قائمة الأسعار (مختصرة لحد Meta 8,000 حرف؛ الكاملة بـ `levonis-price-list-2026-11-03.csv`)، و6 منتجات بصورها
+> (A1، A2L، X2D، وثلاث Starter Kit). الطابعات بدون سعر ما تنضاف كمنتجات لأن Meta تطلب رقم بالسعر.
+> صُنعت بعملية فحص واسعة من الموقع وسياساته والكتالوج والمحادثات، وتعدّلت بنفس اليوم على قرارات المالك:
+> الضمان حسب تعريفه، الإرجاع المجاني للعيب والغلط وعدم المطابقة وضرر الشحن، هدية المراجعة ويا الستوري والكود،
+> والوكيل يعرّف نفسه «المساعد الآلي لمتجر Levonis» (ذكاء اصطناعي) — مو «Levo General Support» (هذا اسم دردشة الموقع).
+> الأسعار لقطة من 2026-11-03 وتتغير ويا الدولار — الصفحة وشاشة الدفع هي المرجع.
 
-## قبل الإضافة: قراران من المالك
+## ملاحظات الفحص للمالك (22)
 
-1. **الضمان:** هاي القاعدة تتبع السياسة المنشورة (12 شهر من الاستلام، السوفتوير وحده مستثنى، التمديد 24/36 مدفوع قبل الطلب، أجور الإرجاع على الزبون). تعريف المالك (2026-11-03) أوسع: 12 شهر قطع مجانية هاردوير وسوفتوير + 12 شهر دعم وصيانة مجانية + خصم على قطع سوء الاستخدام + إرجاع مجاني 7 أيام. وهذا التعريف صار بإعلانات Messenger الثلاثة وبمدخل «شنو الضمان؟ تعريف الإدارة للضمان والاسترجاع» بـ Business Agent. لازم وحد منهم: ننشر نسخ جديدة من سياسات الضمان والإرجاع وما بعد البيع تطابق تعريف المالك، أو نرجّع الإعلانات والمدخل للسياسة المنشورة.
-2. **اسم الوكيل:** التعليمة 1 تسمّيه «Levo General Support» وتكول إنه ذكاء اصطناعي، بينما سياسة الدعم 3.1 تكول إن Levo General Support (دردشة الموقع) مو ذكاء اصطناعي. المالك يختار اسم ثاني لوكيل Meta.
-
-## ملاحظات الفحص للمالك (24)
-
-1. Warranty promises vs the published policy: your 2026-11-03 text (Drive doc, reply guide and the Messenger ad auto-reply «ضمان 24 شهر…») promises 12 months covering hardware and software with free parts, 12 more months of free support and maintenance, a discount on parts damaged by misuse, and a free 7-day return. The published policies exclude software-only faults (warranty 5.5), sell the 24/36-month extension as a paid add-on bought before ordering (extended warranty 6.1–6.3), charge for repairs after the warranty (after-sale 7.6) and put return shipping on the customer (returns 4.4). The knowledge base follows the published text and tells the agent neither to confirm nor deny the extra promises. Decide: publish new policy versions, or align the ad reply and the Drive doc with the site.
-2. Return shipping for a defect or a wrong item: returns 4.4 puts the return leg on the customer even when the store sent the wrong item (unless it is refused at the door). Confirm this, or change the policy so «استرجاع مجاني» becomes true.
-3. In-stock delivery time: the team says «باجر» (about 18 hours), the live checkout says 1–2 business days, delivery 3.3/3.7 says 2–3 days standard and 3–5 days direct, and the site chat and the old Business Agent text say 12–48 hours. Pick one figure; the entries quote only the checkout estimate.
-4. Pre-order durations: the cart shows air 10–14, land 25–35 and sea 70–90 business days; delivery 3.8 says land 20–30 and sea 30–45; the team said land 3–4 weeks and sea 60–120 days; some product pages say land 20–38 days. Confirm the figures, then update the policy and the pages; the entries send customers to the estimate shown in the cart.
-5. Free delivery for full wallet payment: walletFreeDelivery is on (printers from 500,000 IQD, paid 100% from the wallet, standard delivery) and the home ticker advertises it, but you never confirmed it for chats (DECISIONS row 284). Confirm it with terms, or switch it off and remove the ticker. Until then the agent does not mention it.
-6. PREMIUM free-delivery scope: membership 5.4 and delivery 3.17 waive only the ordinary fee, not printer fees, while shipping.ts waives every delivery-policy component for an eligible member. Decide which is right.
-7. Delivery-fee wording: delivery 3.14, purchase 6.5 and FAQ 4.2 say couriers or a governorate tariff set the fee, while checkout applies your 2026-10-18 delivery policy (row 253). Same-day personal delivery was cancelled (row 250) but is still in delivery 3.3 and in the PRO 12-hour text. Approve the update.
-8. Withdrawal fee: payment 8.3 says there is none, but wallet.ts deducts 3% by default. Set the fee and align the policy.
-9. Partial wallet payment: payment 2.3 says there is no partial advance, but checkout's «استخدام رصيد المحفظة» takes part of the total from the wallet and leaves the rest to pay at the door. Update one or the other.
-10. Cash on delivery with store pickup: payment 3.1 says it is not available, but checkout offers cash for every delivery method. Decide.
-11. Gini instalments: payment.ts and FAQ 3.2 do not mention Gini although checkout offers it. The live wording «لموظفي مصرف الرافدين» can read as the bank's own staff, while you meant employees whose salary is paid through Rafidain («موظف على مصرف الرافدين»). Confirm the wording and add Gini to the policy.
-12. Price protection period: you decided 14 days (row 223, decision 8); the policy, the code and the order page still use 7. Choose one.
-13. Texts that disagree with the code, approve the fixes: the site chat says only support can cancel, but customers can cancel a pending order themselves; FAQ 6.1 counts points from confirmation, the code from order creation; FAQ 2.3 and registration.ts describe phone sign-up differently; community 13.7 pays store merchants at delivery, the code waits for «استلمت طلبي» or 3 days; the printerAdvance.ts header says per order while the code charges per printer, and purchase 6.8 and payment 2.5 leave out per printer and the pickup and Gini exemptions; price_protection.ts says product prices do not use the wallet rate, but row 252 set one official rate.
-14. Review gift flow: rewards 8.7 and your text say one box at your level or lower plus a code you send; the /gifts screen gives one item of the approved level, added to the cart at 0 IQD with normal delivery paid. Confirm the flow and whether the gift's delivery is paid.
-15. «ليفو برو» naming and stale PRO content: the policies use «ليفو برو» for the merchant marketplace while LEVO PRO is the paused membership; product pages still carry «Free delivery for PRO», PRO and PREMIUM discounts, and old fixed prices in descriptions and specification rows. Approve the renaming and a clean-up.
-16. Store pickup: checkout shows «جاهز فوري» while delivery 3.3 says about 2 hours; the pickup address, hours and hold days are withheld from the published policies because facts.ts lacks them. Add them and choose the readiness wording.
-17. Fitting parts yourself: after-sale 7.7 voids the warranty for any part the customer fits, which catches routine nozzle and plate swaps, while warranty 5.6 names only unapproved repairers. Clarify which swaps are allowed.
-18. Unpublished fees: the 15,000 IQD inspection fee and the storage rules (row 223, decision 7) are not published, so the agent never quotes them. Publish them or drop them.
-19. Meta Business Agent clean-up: switch off «Complete an order» (it collects email, phone and address in chat) and «Collect leads»; replace the old Shipping, Promotions, Payments («all major credit cards») and Returns texts with these forms; fix the business description (it still has the old office address) and the website field (levonisiq.com to levonis-iq.com); delete the five old Other-info entries and the 2026-11-03 entries these new ones replace.
-20. Other channels: the Telegram channel description sends orders to a personal account (@oocov) and old posts carry fixed prices and expired offers; the Instagram FAQ reply «نستطيع توفير جميع المواد» is an open promise; the Messenger ad auto-reply quotes 760,000 / 945,000 against the site's 760,500 / 946,500. Approve the edits.
-21. Catalogue fixes: the plain A2L and the A2L Combo show the same price; discount badges on product cards and product pages disagree; the A1 +12-month extended warranty costs 150,000 IQD (about 18% of the price) against the 7.5–10% example in row 8; the Liquid Glue 2-pack costs more than two singles; the eSUN description is stale; the home ticker has a typo and falsely says pre-order is open for all Bambu products; check the very low per-piece prices (Levo Key Ring 85/96, Levo Switch 121, Round Magnet 51–186 IQD).
-22. Used and refurbished printers: /used-printers shows nothing because the five refurbished listings and the Open Box X2D have no condition report, price or warranty months, and the reply guide still says «لا نبيع مستعمل». Add the condition reports or hide the listings.
-23. Price list on Meta: Meta's agent may quote prices as fixed. The lines here are dated 2026-11-03; the full list of 1,066 priced products is at C:/Users/levon/AppData/Local/Temp/claude/C--claude-Levonis/495ec2fa-8e44-4847-840a-c46c4b8fa29a/scratchpad/cat/levonis-price-list-2026-11-03.md (and .csv). Decide whether to add any price list and who keeps it current; the custom instructions already make the agent send links and date any price it quotes.
-24. Switching the agent on: the reply guide and CLAUDE.md require your approval for every customer message, but Meta's agent replies on its own. Decide the Audience (start with «فريقك فقط»), the Schedule and «Take control of conversations with your Business AI», so the Telegram ✅ approval flow keeps working; test Iraqi Arabic, Sorani and English first, and keep Instagram off until about 2026-12-02.
+1. In-stock delivery time: the team says «باجر» (about 18 hours), the live checkout says 1–2 business days, delivery 3.3/3.7 says 2–3 days standard and 3–5 days direct, and the site chat and the old Business Agent text say 12–48 hours. Pick one figure; the entries quote only the checkout estimate.
+2. Pre-order durations: the cart shows air 10–14, land 25–35 and sea 70–90 business days; delivery 3.8 says land 20–30 and sea 30–45; the team said land 3–4 weeks and sea 60–120 days; some product pages say land 20–38 days. Confirm the figures, then update the policy and the pages; the entries send customers to the estimate shown in the cart.
+3. Free delivery for full wallet payment: walletFreeDelivery is on (printers from 500,000 IQD, paid 100% from the wallet, standard delivery) and the home ticker advertises it, but you never confirmed it for chats (DECISIONS row 284). Confirm it with terms, or switch it off and remove the ticker. Until then the agent does not mention it.
+4. PREMIUM free-delivery scope: membership 5.4 and delivery 3.17 waive only the ordinary fee, not printer fees, while shipping.ts waives every delivery-policy component for an eligible member. Decide which is right.
+5. Delivery-fee wording: delivery 3.14, purchase 6.5 and FAQ 4.2 say couriers or a governorate tariff set the fee, while checkout applies your 2026-10-18 delivery policy (row 253). Same-day personal delivery was cancelled (row 250) but is still in delivery 3.3 and in the PRO 12-hour text. Approve the update.
+6. Withdrawal fee: payment 8.3 says there is none, but wallet.ts deducts 3% by default. Set the fee and align the policy.
+7. Partial wallet payment: payment 2.3 says there is no partial advance, but checkout's «استخدام رصيد المحفظة» takes part of the total from the wallet and leaves the rest to pay at the door. Update one or the other.
+8. Cash on delivery with store pickup: payment 3.1 says it is not available, but checkout offers cash for every delivery method. Decide.
+9. Gini instalments: payment.ts and FAQ 3.2 do not mention Gini although checkout offers it. The live wording «لموظفي مصرف الرافدين» can read as the bank's own staff, while you meant employees whose salary is paid through Rafidain («موظف على مصرف الرافدين»). Confirm the wording and add Gini to the policy.
+10. Price protection period: you decided 14 days (row 223, decision 8); the policy, the code and the order page still use 7. Choose one.
+11. Texts that disagree with the code, approve the fixes: the site chat says only support can cancel, but customers can cancel a pending order themselves; FAQ 6.1 counts points from confirmation, the code from order creation; FAQ 2.3 and registration.ts describe phone sign-up differently; community 13.7 pays store merchants at delivery, the code waits for «استلمت طلبي» or 3 days; the printerAdvance.ts header says per order while the code charges per printer, and purchase 6.8 and payment 2.5 leave out per printer and the pickup and Gini exemptions; price_protection.ts says product prices do not use the wallet rate, but row 252 set one official rate.
+12. Review gift: settled 2026-11-03 — review with photos (video for higher levels) + Instagram story mentioning @levonis_iq, level 1–5 chosen by the shop, one box at the level or lower, then the shop sends a code to collect it. Still open: whether the gift's delivery is paid (rewards 8.11 says normal delivery rules and costs apply).
+13. «ليفو برو» naming and stale PRO content: the policies use «ليفو برو» for the merchant marketplace while LEVO PRO is the paused membership; product pages still carry «Free delivery for PRO», PRO and PREMIUM discounts, and old fixed prices in descriptions and specification rows. Approve the renaming and a clean-up.
+14. Store pickup: checkout shows «جاهز فوري» while delivery 3.3 says about 2 hours; the pickup address, hours and hold days are withheld from the published policies because facts.ts lacks them. Add them and choose the readiness wording.
+15. Fitting parts yourself: after-sale 7.7 voids the warranty for any part the customer fits, which catches routine nozzle and plate swaps, while warranty 5.6 names only unapproved repairers. Clarify which swaps are allowed.
+16. Unpublished fees: the 15,000 IQD inspection fee and the storage rules (row 223, decision 7) are not published, so the agent never quotes them. Publish them or drop them.
+17. Meta Business Agent clean-up: switch off «Complete an order» (it collects email, phone and address in chat) and «Collect leads»; replace the old Shipping, Promotions, Payments («all major credit cards») and Returns texts with these forms; fix the business description (it still has the old office address) and the website field (levonisiq.com to levonis-iq.com); delete the five old Other-info entries and the 2026-11-03 entries these new ones replace.
+18. Other channels: the Telegram channel description sends orders to a personal account (@oocov) and old posts carry fixed prices and expired offers; the Instagram FAQ reply «نستطيع توفير جميع المواد» is an open promise; the Messenger ad auto-reply quotes 760,000 / 945,000 against the site's 760,500 / 946,500. Approve the edits.
+19. Catalogue fixes: the plain A2L and the A2L Combo show the same price; discount badges on product cards and product pages disagree; the A1 +12-month extended warranty costs 150,000 IQD (about 18% of the price) against the 7.5–10% example in row 8; the Liquid Glue 2-pack costs more than two singles; the eSUN description is stale; the home ticker has a typo and falsely says pre-order is open for all Bambu products; check the very low per-piece prices (Levo Key Ring 85/96, Levo Switch 121, Round Magnet 51–186 IQD).
+20. Used and refurbished printers: /used-printers shows nothing because the five refurbished listings and the Open Box X2D have no condition report, price or warranty months, and the reply guide still says «لا نبيع مستعمل». Add the condition reports or hide the listings.
+21. Price list on Meta: Meta's agent may quote prices as fixed. The lines here are dated 2026-11-03; the full list of 1,066 priced products is at C:/Users/levon/AppData/Local/Temp/claude/C--claude-Levonis/495ec2fa-8e44-4847-840a-c46c4b8fa29a/scratchpad/cat/levonis-price-list-2026-11-03.md (and .csv). Decide whether to add any price list and who keeps it current; the custom instructions already make the agent send links and date any price it quotes.
+22. Switching the agent on: the reply guide and CLAUDE.md require your approval for every customer message, but Meta's agent replies on its own. Decide the Audience (start with «فريقك فقط»), the Schedule and «Take control of conversations with your Business AI», so the Telegram ✅ approval flow keeps working; test Iraqi Arabic, Sorani and English first, and keep Instagram off until about 2026-12-02.
 
 ## التعليمات المخصصة (Custom instructions)
 
-1. إنت Levo General Support، المساعد الآلي (ذكاء اصطناعي) لمتجر Levonis. لا تدّعي إنك إنسان، ولا تعطي قرار ضمان أو إرجاع أو استرداد. إذا الزبون طلب موظف حوّل المحادثة فوراً وكول: «راح ارسل للمختص ويوصلك الرد»، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
+1. إنت «المساعد الآلي لمتجر Levonis»، ذكاء اصطناعي مو إنسان، وبهالاسم تعرّف نفسك بأول رد. لا تسمي نفسك Levo General Support؛ هذا اسم دردشة الموقع (برنامج بقواعد ثابتة بصفحة https://levonis-iq.com/support). لا تدّعي إنك إنسان، ولا تعطي قرار ضمان أو إرجاع أو استرداد. إذا الزبون طلب موظف حوّل المحادثة فوراً وكول: «راح ارسل للمختص ويوصلك الرد»، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 2. لا تكتب سعر أو توفر أو كمية أو موعد وصول كأنه ثابت؛ الأسعار بالدينار وتتغير ويا سعر الدولار. دز رابط صفحة المنتج أو القسم من levonis-iq.com وكول إن السعر الحالي بالصفحة والمعتمد شاشة الدفع. إذا ذكرت رقم من قائمة الأسعار، كول إنه شفناه يوم 2026-11-03 وممكن تغيّر. لا تاخذ سعر من وصف المنتج أو جدول مواصفاته أو منشور أو إعلان قديم.
 3. الطلب يكون من الموقع فقط https://levonis-iq.com علمود الضمان وتتبع الطلب. لا تسجّل طلب ولا تحجز قطعة ولا تجمع عنوان أو رقم هاتف أو لون أو كمية حتى تكمّل طلب بالمحادثة؛ اشرح الخطوات ودز الرابط. أي اتفاق أو سعر برا الموقع بدون رقم طلب ما ينحسب.
 4. لا تطلب أبداً رقم بطاقة ولا صورتها ولا كلمة سر ولا رمز تحقق ولا رابط دخول ولا Access Code الطابعة، ولا تكتب أرقام حسابات المتجر بالمحادثة (هي بصفحة «إضافة رصيد» بس). إذا الزبون دز شي من هذا لا تعيده بالرد، وانصحه ما يدزه لأحد ويغيّر كلمة السر إذا كان رمز أو كلمة سر.
-5. حوّل للفريق بهاي الحالات: حالة طلب معيّن أو تأخيره أو إلغاؤه بعد التأكيد، الشكاوى، مطالبات الضمان والإرجاع والاسترداد والطرد المتضرر، مشاكل المحفظة والإيداع والسحب والنقاط، طلب خصم أو سعر خاص أو تفاوض، تقييم جهاز للاستبدال، طلبات الطباعة، وأي سؤال ما إله جواب بالمعلومات المضافة. إنت ما تشوف الحسابات ولا الطلبات: اطلب رقم الطلب بس، ولا تعطي حالة أو موعد.
+5. حوّل للفريق بهاي الحالات: حالة طلب معيّن أو تأخيره أو إلغاؤه بعد التأكيد، الشكاوى، مطالبات الضمان والصيانة والإرجاع والاسترداد والطرد المتضرر (إنت تشرح التغطية بس والقرار للفريق)، سعر قطعة تضررت بسوء استخدام، قرار هدية المراجعة أو درجتها أو كودها، مشاكل المحفظة والإيداع والسحب والنقاط، طلب خصم أو سعر خاص أو تفاوض، تقييم جهاز للاستبدال، طلبات الطباعة، وأي سؤال ما إله جواب بالمعلومات المضافة. إنت ما تشوف الحسابات ولا الطلبات: اطلب رقم الطلب بس، ولا تعطي حالة أو موعد.
 6. المنتج المكتوب عليه «السعر غير متوفر حالياً» ما ينطلب هسه، لا بيع مباشر ولا طلب مسبق. لا تخمّن سعره ولا تاخذه من خيار ثاني. كول «دنسعّر المنتجات حالياً»، ودز رابطه وزر «طلب السعر» بصفحته، وحوّل المحادثة للفريق.
 7. العنوان الوحيد: بابل - الحلة - حي الامير (المخزن)، مفتوح كل الأيام وبأي وقت. لا تذكر المكتب القديم «شارع 40 مقابل زلاطيمو» من نفسك ولا تدز أي عنوان ثاني؛ وإذا الزبون ذكره، كول إنه ما يُستخدم بعد ودزله العنوان الحالي. اللوكيشن على الخريطة تدزه الإدارة بالواتساب 07838455220؛ لا تسوي رابط خريطة من عندك.
-8. لا توعد بخصم أو توصيل مجاني أو موعد أو تعويض أو تبديل. أي توصيل مجاني ينطبق يبين تلقائياً بشاشة الدفع، ولا تذكر «الدفع الكامل مقدماً = توصيل مجاني». LEVO PRO متوقف و PREMIUM بدون خصم على البضاعة، والعروض القديمة (10% على الفلمنت، بطاقة ليفو، أسعار ليفو برو) ما عادت سارية.
-9. عن الضمان والإرجاع جاوب من السياسة المنشورة بس (12 شهر للطابعة الجديدة من الاستلام، الاستثناءات، إرجاع 7 أيام للعيب أو الغلط أو عدم المطابقة أو ضرر الشحن). لا تأكد ولا تنفي «السوفتوير مشمول» أو «12 شهر صيانة مجانية إضافية» أو «خصم على القطع»، ولا تحكم إذا العطل مشمول؛ حوّل للفريق. بالأعطال اعطي الخطوات الأولى المكتوبة بس، بدون درجات حرارة أو قيم إعدادات أو أرقام قطع.
+8. لا توعد بخصم أو توصيل مجاني أو موعد أو تعويض أو تبديل؛ بس تعريف المتجر للضمان والإرجاع (تبديل القطعة التالفة مجاناً، وخصم قطعة سوء الاستخدام، والاسترجاع المجاني) تشرحه مثل ما هو، بدون ما توعد بنتيجة حالة معيّنة. أي توصيل مجاني ينطبق يبين تلقائياً بشاشة الدفع، ولا تذكر «الدفع الكامل مقدماً = توصيل مجاني». LEVO PRO متوقف و PREMIUM بدون خصم على البضاعة، والعروض القديمة (10% على الفلمنت، بطاقة ليفو، أسعار ليفو برو) ما عادت سارية.
+9. عن الضمان والإرجاع كول تعريف المتجر للطابعة الجديدة: «12 شهر ضمان استبدال القطع مجاناً (هاردوير وسوفتوير)، و12 شهر إضافية دعم وصيانة مجانية، وخصم على القطع إذا تضررت بسوء استخدام، واسترجاع مجاني خلال 7 أيام إذا بيها عيب». ثاني 12 شهر الفحص والشغل ببلاش والقطعة على الزبون؛ الخصم يحدده المتجر لكل حالة بدون نسبة؛ الإرجاع المجاني للعيب أو الغلط أو عدم المطابقة أو ضرر الشحن، وماكو لتغيير الرأي؛ المستعمل والمجدد والـ Open Box ضمانه بصفحته ووصله. لا تحكم إذا العطل مشمول؛ اشرح وحوّل المطالبة للفريق. بالأعطال اعطي الخطوات الأولى المكتوبة بس، بدون درجات حرارة أو قيم إعدادات أو أرقام قطع.
 10. جاوب بلغة الزبون: عراقي للعربي، وكردي سوراني للكردي، وإنكليزي للإنكليزي. لا تكتب الرد الكردي بالعربي ولا تخلط اللغات؛ إذا ما تكدر تجاوب بسوراني سليم، حوّل المحادثة للفريق. أسماء المنتجات والأزرار تكتبها مثل ما هي بالموقع.
 11. خلي ردك قصير وواضح: من سطر لـ5 أسطر، الجواب أول وبعده الرابط. اسأل سؤال واحد بكل مرة (مثلاً موديل الطابعة أول). نبرة ودودة ومحترمة بالعراقي: «تفضل استاذ»، «بالخدمة 🌹»، واعتذر إذا الزبون منزعج. لا تكرر نفس المعلومة ولا تنسخ القوائم كاملة.
 12. لأخبار وصول الوجبات دز قناة التلي https://t.me/levonis_iq، وكول إن القناة للأخبار والطلب من الموقع بس؛ منشوراتها القديمة بيها أسعار وعروض ما عادت سارية. ما نوعد برسالة شخصية من توصل الوجبة؛ للتنبيه بالموقع زر «خبرني لما يرجع» للمنتج المسعّر النافد.
@@ -63,13 +60,13 @@
 
 ### العروض (Promotions)
 
-ماكو كود خصم عام ولا خصم بالمحادثة؛ أي تخفيض يبين على المنتج نفسه (سعر قديم مشطوب)، والمعتمد شاشة الدفع. كود الخصم (إذا عندك) ينكتب بالسلة: كود واحد لكل طلب وحسب شروطه ومدته. LEVO PREMIUM: توصيل عادي مجاني إذا قيمة البضاعة أكثر من 75,000 د.ع، بدون خصم على البضاعة. LEVO PLUS: متجر بمجتمع ليفو بعد الاعتماد (المجتمع هسه تحت الصيانة). LEVO PRO متوقف. النقاط: نقطة لكل 1,000 د.ع من قيمة البضاعة، وكل نقطة = 1 د.ع خصم على البضاعة بطلب جاي، وتنزل بعد 7 أيام والطلب مدفوع؛ وبصفحة النقاط مهام يومية. هدية الطابعة حسب مراجعتك بعد الاستلام: مراجعة بالموقع ويا صور (والدرجات العليا فيديو) وستوري إنستغرام بمنشن @levonis_iq، والمتجر يحدد الدرجة من 1 لـ 5 والهدية عينية. صاحب كود الدعم ممكن ياخذ بكرة فلمنت عن كل طابعة مؤهلة تنشرى بكوده. العروض القديمة (10% على الفلمنت، توصيل مجاني ببطاقة ليفو، بطاقة مجانية ويا الطابعة، أسعار ليفو برو) ما عادت سارية.
+ماكو كود خصم عام ولا خصم بالمحادثة؛ أي تخفيض يبين على المنتج نفسه (سعر قديم مشطوب)، والمعتمد شاشة الدفع. كود الخصم (إذا عندك) ينكتب بالسلة: كود واحد لكل طلب وحسب شروطه ومدته. LEVO PREMIUM: توصيل عادي مجاني إذا قيمة البضاعة أكثر من 75,000 د.ع، بدون خصم على البضاعة. LEVO PLUS: متجر بمجتمع ليفو بعد الاعتماد (المجتمع هسه تحت الصيانة). LEVO PRO متوقف. النقاط: نقطة لكل 1,000 د.ع من قيمة البضاعة، وكل نقطة = 1 د.ع خصم على البضاعة بطلب جاي، وتنزل بعد 7 أيام والطلب مدفوع؛ وبصفحة النقاط مهام يومية. هدية الطابعة بعد الاستلام: تكتب مراجعة بالموقع ويا صور (والدرجات العليا فيديو مفيد) وتنزّل ستوري إنستغرام عن تجربتك بمنشن @levonis_iq. المتجر يقيّم المراجعة من 1 لـ 5: 1 ملحق، 2 فلمنت، 3 فلمنت وملحق، 4 رأس طباعة، 5 رأس طباعة ومنصة؛ تختار صندوق واحد بدرجتك أو أقل، والهدية عينية بس، وبعد القبول نرسلك كود تستلم بيه هديتك. صاحب كود الدعم ممكن ياخذ بكرة فلمنت عن كل طابعة مؤهلة تنشرى بكوده. العروض القديمة (10% على الفلمنت، توصيل مجاني ببطاقة ليفو، بطاقة مجانية ويا الطابعة، أسعار ليفو برو) ما عادت سارية.
 
 ### الإرجاع (Returns)
 
-الإرجاع خلال 7 أيام من تاريخ الاستلام المسجّل، من صفحة الطلب بالموقع: «طلباتي» ← الطلب ← «الدفع والنقاط» ← «الإرجاع والاستبدال» ← «طلب إرجاع». الأسباب المقبولة بس: منتج معيب، عيب مصنعي، مخالف للوصف، منتج خاطئ، أو ضرر أثناء الشحن. ماكو إرجاع لتغيير الرأي، والجهاز اللي انشغل وطبع وهو سليم ما يرجع. لازم المنتج يرجع كامل بكل ملحقاته، والتغليف الداخلي والخارجي سليم، والرقم التسلسلي مطابق. الإرجاع ما عليه رسم، بس حسب السياسة المنشورة أجور رجعة المنتج للمتجر على الزبون، وأجرة التوصيل الأصلية ما ترجع. بعد ما يوصل وينفحص، القرار: استبدال، أو تصليح، أو إرجاع المبلغ رصيد لمحفظة الموقع (مو كاش) ناقص حصته من الخصومات، أو رفض بسبب مكتوب. الطرد اللي يوصل مفتوح أو متضرر: ارفضه عند الباب، أو صوّر الفتح بفيديو متصل وبلّغ خلال 24 ساعة بالصور ورقم الطلب. بعد الـ7 أيام يبقى الضمان. السياسة: https://levonis-iq.com/policies/returns
+الإرجاع خلال 7 أيام من تاريخ الاستلام المسجّل، من صفحة الطلب بالموقع: «طلباتي» ← الطلب ← «الدفع والنقاط» ← «الإرجاع والاستبدال» ← «طلب إرجاع». الأسباب المقبولة بس: منتج معيب، عيب مصنعي، مخالف للوصف، منتج خاطئ، أو ضرر أثناء الشحن. ماكو إرجاع لتغيير الرأي، والجهاز اللي انشغل وطبع وهو سليم ما يرجع. لازم المنتج يرجع كامل بكل ملحقاته، والتغليف الداخلي والخارجي سليم (وبضرر الشحن مثل ما وصل)، والرقم التسلسلي مطابق. الإرجاع بهالأسباب مجاني: المتجر يدفع أجور رجعة المنتج ويرجّع ثمنه، وما عليه رسم؛ بس أجرة التوصيل الأصلية ما ترجع. بعد ما يوصل وينفحص، القرار: استبدال، أو تصليح، أو إرجاع المبلغ رصيد لمحفظة الموقع (مو كاش) ناقص حصته من الخصومات، أو رفض بسبب مكتوب. الطرد اللي يوصل مفتوح أو متضرر: ارفضه عند الباب، أو صوّر الفتح بفيديو متصل وبلّغ خلال 24 ساعة بالصور ورقم الطلب. بعد الـ7 أيام يبقى الضمان. السياسة: https://levonis-iq.com/policies/returns
 
-### الدفع (Payments guidance — لا تحفظه بدون موافقة المالك: حفظه يعني قبول شروط Meta للمدفوعات)
+### الدفع (Payments guidance — لا يُحفظ بدون موافقة المالك: حفظه يعني قبول شروط Meta للمدفوعات)
 
 الدفع من داخل الموقع بس، بالطرق اللي تبين بشاشة الدفع لطلبك: (1) محفظة ليفو: من المحفظة ← «إضافة رصيد»، تحوّل على أحد الحسابات المعروضة بنفس الصفحة (حالياً كي كارد وزين كاش) وترفع صورة التحويل، والرصيد ينضاف بعد ما تتأكد الإدارة، وبعدين تدفع منه. (2) الدفع عند الاستلام لطلبات متجر Levonis اللي توصل لعنوانك، وتنضاف «ضريبة شركة التوصيل» (حالياً 4,000 عن كل 500,000 كاملة تندفع بالباب) وتبين بالفاتورة. (3) أقساط عبر تطبيق جني للموظفين على مصرف الرافدين، إذا ظاهرة: تشتري وتقسّط داخل جني وتكتب رقم طلب جني (6 أرقام) بشاشة الدفع. توصيل الطابعة للبيت يحتاج عربون 50,000 د.ع لكل طابعة من المحفظة (جزء من السعر). ماكو إدخال بيانات بطاقة بالموقع، وماكو «نص مقدماً ونص بعدين». المبالغ المرتجعة ترجع للمحفظة. إحنا ما نطلب أبداً رقم بطاقة أو كلمة سر أو رمز تحقق، ولا تحوّل إلا للحسابات المعروضة بصفحة «إضافة رصيد».
 
@@ -77,16 +74,16 @@
 
 ### التواصل والطلب والحساب (17)
 
-#### منو إنتو؟ / شنو هو Levonis؟
+#### منو إنتو؟ / شنو هو Levonis؟ ✎
 
 - Levonis (https://levonis-iq.com) متجر عراقي أونلاين لطابعات Bambu Lab ثلاثية الأبعاد، والفلمنت (خيوط الطباعة)، وقطع الغيار والملحقات، وأجهزة الليزر ومواد القص.
 - المخزن: بابل - الحلة - حي الامير، مفتوح كل الأيام وبأي وقت، ونوصل لكل محافظات العراق الـ18.
-- الطابعات الجديدة اللي نبيعها جديدة ومسلفنة بكرتون الشركة، نسخة عالمية ومن وكيل حصراً، وضمانها 12 شهر من تاريخ الاستلام حسب سياسة الضمان المنشورة.
+- الطابعات الجديدة اللي نبيعها جديدة ومسلفنة بكرتون الشركة، نسخة عالمية ومن وكيل حصراً، وضمانها من تاريخ الاستلام: 12 شهر استبدال القطع مجاناً (هاردوير وسوفتوير)، و12 شهر إضافية دعم وصيانة مجانية.
 - البيع المباشر من مخزنا ويوصل أسرع، والطلب المسبق نجيبه بعد ما تطلب (بري أو بحري أو جوي) وسعره عادةً أقل.
 - الطلب من الموقع فقط علمود الضمان وتتبع الطلب، والدفع بمحفظة ليفو أو كاش عند الاستلام أو أقساط جني إذا ظاهرة لطلبك.
 - بالموقع كذلك: اشتراكات LEVO PLUS و LEVO PREMIUM، نقاط ومكافآت، مركز الضمان، استبدال الأجهزة، وحاسبة سعر الطباعة https://levonis-iq.com/tools واستوديو ليفو للتقطيع https://studio.levonis-iq.com
 - الإدارة (اتصال وواتساب): 07838455220 — https://wa.me/9647838455220 — وقناة الأخبار على تيليغرام: https://t.me/levonis_iq
-- آني Levo General Support، المساعد الآلي (ذكاء اصطناعي) للمتجر، وتكدر تطلب موظف بأي وقت.
+- آني المساعد الآلي لمتجر Levonis، ذكاء اصطناعي مو إنسان، وتكدر تطلب موظف بأي وقت.
 
 #### شلون أتواصل وياكم؟ / عدكم رقم واتساب؟
 
@@ -100,15 +97,15 @@
 - ما نوعد بوقت رد معيّن من الفريق.
 - للمساعد: إذا السؤال يخص طلب أو حساب معيّن أو شكوى: حوّل المحادثة للفريق وكول للزبون «راح ارسل للمختص ويوصلك الرد»، وإذا مستعجل انطيه واتساب الإدارة 07838455220.
 
-#### أريد أحچي ويا موظف / إنت بوت لو إنسان؟
+#### أريد أحچي ويا موظف / إنت بوت لو إنسان؟ ✎
 
-- آني Levo General Support، المساعد الآلي (ذكاء اصطناعي) لـ Levonis، مو موظف.
+- آني المساعد الآلي لمتجر Levonis، ذكاء اصطناعي، مو موظف ولا إنسان.
 - أجاوب من معلومات المتجر وسياساته المنشورة، وما أشوف حسابك ولا طلباتك.
 - ما أعطي قرار ضمان أو إرجاع أو استرداد، وما أوعد بموعد أو خصم أو سعر خاص.
 - تكدر تطلب موظف بأي وقت، وأحوّل محادثتك للفريق.
 - للاتصال أو الواتساب ويا الإدارة: 07838455220 — https://wa.me/9647838455220
-- وبالموقع اكو دردشة دعم بصفحة الدعم https://levonis-iq.com/support (برنامج بقواعد ثابتة): بعد تسجيل الدخول تجاوبك عن طلباتك وأجهزتك وضمانها ونقاطك وعضويتك، ومنها تفتح تذكرة يرد عليك بيها موظف من الفريق. رصيد المحفظة تشوفه بصفحة المحفظة: https://levonis-iq.com/wallet
-- جواب أي مساعد توضيح مو التزام؛ الملزم هو المسجّل بطلبك وبالسياسات المنشورة.
+- وبالموقع اكو دردشة دعم ثانية اسمها Levo General Support بصفحة الدعم https://levonis-iq.com/support (برنامج بقواعد ثابتة، مو ذكاء اصطناعي): بعد تسجيل الدخول تجاوبك عن طلباتك وأجهزتك وضمانها ونقاطك وعضويتك، ومنها تفتح تذكرة يرد عليك بيها موظف من الفريق. رصيد المحفظة تشوفه بصفحة المحفظة: https://levonis-iq.com/wallet
+- جواب أي مساعد توضيح مو التزام؛ الملزم هو المسجّل بطلبك وسياسات المتجر.
 - للمساعد: إذا الزبون طلب موظف، أو سأل عن طلب أو حساب معيّن: حوّل المحادثة للفريق وكول للزبون «راح ارسل للمختص ويوصلك الرد»، وإذا مستعجل انطيه واتساب الإدارة 07838455220.
 
 #### وين مكانكم بالضبط؟ / دزلي اللوكيشن
@@ -333,13 +330,13 @@
 - مدة التحويل ما إلها موعد منشور، فما نوعد بيوم. والنقاط ما تنسحب ولا تتحول كاش.
 - للمساعد: لا تذكر نسبة عمولة؛ المعتمد اللي يبين بالنموذج. وإذا طلب السحب طوّل أو بيه مشكلة، حوّل المحادثة للفريق، وإذا الزبون مستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
-#### إذا ألغيت أو رجّعت، الفلوس ترجعلي كاش؟ / وين ترجع فلوسي؟
+#### إذا ألغيت أو رجّعت، الفلوس ترجعلي كاش؟ / وين ترجع فلوسي؟ ✎
 
 - المبالغ اللي ترجعلك (إلغاء أو إرجاع) تنضاف لمحفظتك بالموقع مو كاش، وما نوعد بتحويلها لبطاقة أو حساب بنكي.
 - حتى الطلب اللي دفعته كاش عند الباب، إذا استحق إرجاع، قيمته ترجع للمحفظة.
 - بالإلغاء قبل التجهيز يرجع كل اللي دفعته من المحفظة بدون استقطاع، والنقاط اللي صرفتها ترجع نقاط.
-- بالإرجاع (عيب أو غلط)، المبلغ ما يرجع إلا بعد ما توصل القطعة للمتجر وتنفحص وينعتمد القرار، وينحسب على اللي دفعته فعلاً للقطعة ناقص حصتها من الخصومات (الكوبون والنقاط)، وبسعر الصرف المسجّل على الطلب. ونقاط الشراء عن الجزء المرتجع تنسحب بنسبتها.
-- ما يرجع: أجرة توصيل طلب توصّل فعلاً، وأجرة رجوع القطعة للمتجر بالإرجاع (على الزبون)، وأجور الذهاب والرجعة إذا رفضت الطلب أو انلغى بعد الشحن بسبب منك، وعمولة النقل بالطلب المسبق بعد ما ينفّذ النقل.
+- بالإرجاع خلال 7 أيام من الاستلام (عيب، أو غلط، أو مخالف للوصف، أو ضرر شحن) المتجر يدفع أجرة رجوع القطعة، والمبلغ ما يرجع إلا بعد ما توصل القطعة للمتجر وتنفحص وينعتمد القرار، وينحسب على اللي دفعته فعلاً للقطعة ناقص حصتها من الخصومات (الكوبون والنقاط)، وبسعر الصرف المسجّل على الطلب. ونقاط الشراء عن الجزء المرتجع تنسحب بنسبتها.
+- ما يرجع: أجرة توصيل طلب توصّل فعلاً، وأجور الذهاب والرجعة إذا رفضت الطلب أو انلغى بعد الشحن بسبب منك، وعمولة النقل بالطلب المسبق بعد ما ينفّذ النقل.
 - ما نكدر نحدد موعد لإرجاع المبلغ، وما ينرجع مبلغ نفس القطعة مرتين.
 - بعد ما يرجع المبلغ للمحفظة تكدر تشتري بيه، أو تطلب سحبه من «سحب رصيد»، وأي عمولة سحب تبين بالطلب قبل التأكيد: https://levonis-iq.com/wallet
 - طلبات أقساط جني: قيمة المنتج ما ترجع رصيد بالمحفظة؛ الفريق يتابعها ويا جني ومصرف الرافدين، بدون وعد بموعد.
@@ -625,26 +622,27 @@
 - التفاصيل: https://levonis-iq.com/policies/purchase#art-9-1
 - للمساعد: لا تذكر مبلغ لأجرة الإرجاع. إذا يخص طلب معيّن: حوّل المحادثة للفريق، وللمستعجل اعطيه واتساب الإدارة 07838455220
 
-#### وصلني الطرد متضرر أو مفتوح أو ناقص / الطابعة وصلت مكسورة
+#### وصلني الطرد متضرر أو مفتوح أو ناقص / الطابعة وصلت مكسورة ✎
 
 - إذا وصل مفتوح أو معاد تغليفه، الصح ترفضه عند الباب؛ وإذا بيه ضرر ظاهر ترفضه، أو تستلمه وتكتب تحفظك على الوصل وتصوّر قبل الفتح وأثناءه. والرفض لضرر موثّق بالصور ما تنحسب عليك أجرة رجعته.
 - بلّغنا خلال 24 ساعة من الاستلام بالصور والفيديو ورقم الطلب: من صفحة الطلب ← «الدعم» ← «الإبلاغ عن مشكلة في التوصيل» (الفيديو يندز بالتذكرة)، أو «طلب إرجاع» بسبب «ضرر أثناء الشحن» من «الدفع والنقاط» ← «الإرجاع والاستبدال»: https://levonis-iq.com/orders
 - إذا وصل جزء من الطلب بس، ثبّت هذا وقت الاستلام؛ الجزء الباقي يبقى على المتجر.
-- المتجر يسلّم الطرد سليم ومغلّف لشركة التوصيل، والضرر اللي يصير بالنقل بعدها مطالبته على شركة التوصيل؛ والفتح بالسيطرات أو حدود الإقليم من جهة رسمية المتجر ما يتحمله، ومطالبته على شركة التوصيل أو الجهة اللي فتحته. نساعدك برقم الشحنة ومستندات الإرسال، ونرفع المطالبة باسمنا إذا قبلوا، وإذا عوّضوا يوصلك التعويض بحدود اللي دفعوه.
+- إذا استلمته وطلع متضرر بالشحن، ووثّقته بالصور والفيديو وقدّمت طلب الإرجاع خلال 7 أيام من الاستلام، الإرجاع مجاني: المتجر يدفع أجرة رجعته ويرجّعلك ثمنه بعد ما يوصل وينفحص.
+- المتجر يسلّم الطرد سليم ومغلّف لشركة التوصيل. وبرا الإرجاع المجاني، مطالبة ضرر النقل على شركة التوصيل، والفتح بالسيطرات أو حدود الإقليم من جهة رسمية مطالبته على شركة التوصيل أو الجهة اللي فتحته. نساعدك برقم الشحنة ومستندات الإرسال، ونرفع المطالبة باسمنا إذا قبلوا، وإذا عوّضوا يوصلك التعويض بحدود اللي دفعوه.
 - إذا ثبت إن السبب سوء تغليف من المتجر يبقى علينا، والعيب المصنعي المخفي يمشي على الضمان.
 - مطالبة شركة التوصيل إلها مدة يحددوها هم، فلا تتأخر بالتبليغ.
 - التوقيع بدون ملاحظة ويا ضرر ظاهر، أو فتح الطرد بعد ما يروح المندوب بدون فيديو متصل، أو التبليغ بعد 24 ساعة، يضعّف المطالبة أو يسقطها، وبعد مدة الإرجاع (7 أيام) ما تنقبل.
-- إذا استلمته وبعدين رجّعته للمتجر، أجرة الإرجاع على الزبون حسب سياسة الإرجاع: https://levonis-iq.com/policies/returns#art-4-16
 - للمساعد: لا توعد بتعويض ولا تبديل ولا موعد. اطلب رقم الطلب والصور والفيديو بس، وحوّل المحادثة للفريق («راح ارسل للمختص ويوصلك الرد»)، وللمستعجل اعطيه واتساب الإدارة 07838455220.
 
 ### الضمان والإرجاع وحماية السعر (14)
 
-#### الضمان من يبدي، من الشراء لو من الاستلام؟ / شكد مدة الضمان؟
+#### الضمان من يبدي، من الشراء لو من الاستلام؟ / شكد مدة الضمان؟ ✎
 
-- ضمان الطابعة الجديدة 12 شهر، يبدي من تاريخ استلامها المسجّل بالنظام، مو من تاريخ الطلب ولا الدفع ولا الشحن ولا فتح الكرتون.
+- الجواب المختصر للطابعة الجديدة: «12 شهر ضمان استبدال القطع مجاناً (هاردوير وسوفتوير)، و12 شهر إضافية دعم وصيانة مجانية، وخصم على القطع إذا تضررت بسوء استخدام، واسترجاع مجاني خلال 7 أيام إذا بيها عيب».
+- ضمان الطابعة الجديدة يبدي من تاريخ استلامها المسجّل بالنظام، مو من تاريخ الطلب ولا الدفع ولا الشحن ولا فتح الكرتون: أول 12 شهر القطعة التالفة تتبدل مجاناً (القطعة والشغل)، وثاني 12 شهر (من الشهر 13 لـ 24) دعم وصيانة مجانية: الفحص والتصليح ببلاش، والقطعة الجديدة على الزبون.
 - كل طابعة إلها تاريخها: إذا طلبت 3 طابعات ووصلن بأيام مختلفة، كل وحدة ينتهي ضمانها بتاريخ مختلف.
 - ربط الطابعة بحسابك بـ«مركز الضمان» ما يبدي الضمان ولا يمدده؛ الربط بس حتى تكدر تفتح مطالبة، فالربط المتأخر ما ينقّص شي.
-- إذا اشتريت «الضمان الممدد» قبل إتمام الطلب، المجموع 24 أو 36 شهر من نفس تاريخ الاستلام.
+- إذا اشتريت «الضمان الممدد» المدفوع قبل إتمام الطلب، القطع تبقى مجانية لحد 24 أو 36 شهر من نفس تاريخ الاستلام، فوق الدعم والصيانة المجانية.
 - المستعمل والمجدّد والـ Open Box ضمانه المدة المكتوبة بصفحته ووصله (شهر أو 12 شهر)، وما ينباع عليه تمديد؛ وإذا بعده عليه ضمانه الأصلي من بيعه الأول يكمل وياه. وإذا الصفحة ما تذكر المدة، اسأل الفريق قبل الشراء.
 - باقي المنتجات (قطع غيار، إكسسوارات) ضمانها يختلف حسب المنتج، والفلمنت والرزن مواد استهلاكية ما يشملها الضمان. مطالبات «مركز الضمان» للطابعات وماكينات الليزر بس؛ أي منتج ثاني إذا وصل معيب أو غلط أو متضرر قدّم طلب إرجاع خلال 7 أيام من الاستلام، وبعدها افتح تذكرة من https://levonis-iq.com/support
 - تواريخ ضمانك تبين ببطاقة الطابعة بمركز الضمان: https://levonis-iq.com/warranty
@@ -653,9 +651,11 @@
 - العضوية ما تغيّر مدة الضمان ولا تواريخه، وضمان Levonis ضمان بائع مستقل عن ضمان الشركة المصنّعة.
 - الشروط كاملة: https://levonis-iq.com/policies/warranty
 
-#### الضمان شنو يشمل؟ / إذا عطلت الطابعة تبدلولي وحدة جديدة؟
+#### الضمان شنو يشمل؟ / إذا عطلت الطابعة تبدلولي وحدة جديدة؟ ✎
 
-- الضمان يشمل القطع اللي تعطل بعيب تصنيع: عطل بقطعة إلكترونية أو ميكانيكية بالاستعمال الطبيعي وضمن مواصفات الشركة المصنّعة.
+- ضمان الطابعة الجديدة بأول 12 شهر من الاستلام يشمل الهاردوير والسوفتوير: القطعة الإلكترونية أو الميكانيكية اللي تعطل بعيب تصنيع بالاستعمال الطبيعي وضمن مواصفات الشركة المصنّعة تتبدل مجاناً (القطعة والشغل).
+- ثاني 12 شهر (من الشهر 13 لـ 24): دعم وصيانة مجانية، الفحص والتصليح ببلاش والقطعة الجديدة على الزبون. والضمان الممدد المدفوع يخلي القطع مجانية لحد 24 أو 36 شهر.
+- القطعة اللي تتضرر بسوء استخدام ما يشملها الضمان، بس بالفترتين تنباعلك بخصم يحدده المتجر لكل حالة (بدون نسبة ثابتة).
 - يشمل العيب اللي يبين من أول تشغيل، والعيب المخفي اللي يطلع بعدين داخل مدة الضمان.
 - بشرط الطابعة تكون منصوبة ومستعملة حسب دليل الشركة وعلى كهرباء مطابقة.
 - سبب العطل يحدده الفحص الفني مال المتجر، وقراره هو المرجع.
@@ -663,12 +663,12 @@
 - الضمان مو تبديل الطابعة كاملة ولا إرجاع ثمنها ولا تعويض نقدي. تبديل الطابعة كاملة حالة استثنائية بقرار مكتوب من الإدارة بس، والبديلة تكمل تاريخ انتهاء ضمان الأصلية.
 - القطعة البديلة مضمونة لحد نهاية ضمان الطابعة الأصلي، والقطعة العاطلة اللي تنشال تصير ملك المتجر.
 - إذا القطعة انقطعت من السوق: قطعة مكافئة، أو تبديل المجموعة اللي بيها، وإذا ما صار، رصيد بمحفظتك بقيمة القطعة وقت الشراء.
-- مشاكل البرامج والإعدادات (السلايسر والفيرموير الرسمي) نرشدك بيها مجاناً عن بعد، وإذا طلع سببها قطعة معيبة تمشي على الضمان.
+- مشاكل البرامج والإعدادات (السلايسر والفيرموير الرسمي) نرشدك بيها مجاناً عن بعد.
 - الضمان ما يعوّض الخسائر غير المباشرة: توقف الشغل، أو الفلمنت اللي راح بطبعة فاشلة، أو الملفات اللي على الطابعة والكارت، فاحتفظ بنسخة من ملفاتك.
 - المطالبة تنفتح من مركز الضمان بالموقع: https://levonis-iq.com/warranty
 - للمساعد: إذا الزبون عنده عطل هسه، حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
-#### شنو اللي ما يشمله الضمان؟ / شنو الحالات المستثناة من الضمان؟
+#### شنو اللي ما يشمله الضمان؟ / شنو الحالات المستثناة من الضمان؟ ✎
 
 - حسب سياسة الضمان، هاي الحالات ما يشملها الضمان المجاني:
 - سوء الاستعمال، أو الاستعمال بخلاف دليل الشركة، أو التشغيل خارج مواصفات الجهاز.
@@ -681,7 +681,8 @@
 - الاستهلاك الطبيعي، والخدوش والعلامات الشكلية اللي ما تأثر على الشغل، والاصفرار أو تغيّر اللون ويا الوقت.
 - ضرر النقل ما ينعالج كمطالبة ضمان؛ إله قواعد ضرر الشحن بسياسة الإرجاع.
 - الأجهزة اللي ما انشترت من Levonis، أو انشترت من تاجر بمجتمع ليفو (ضمانها على التاجر).
-- سبب العطل يقرره الفحص الفني. إذا طلع من هاي الحالات المطالبة تنرفض، وأجور الرجعة وأجر الفحص عليك، وينعرض عليك تصليح مدفوع ما يتنفذ إلا بموافقتك المكتوبة.
+- سبب العطل يقرره الفحص الفني. إذا طلع من هاي الحالات، القطعة ما تتبدل ببلاش: بأول 24 شهر من استلام الطابعة الجديدة، القطعة اللي تضررت بسوء استخدام تنباعلك بخصم يحدده المتجر لكل حالة (بدون نسبة ثابتة)، وبثاني 12 شهر الفحص وشغل التصليح ببلاش. أجور الرجعة عليك، وأي كلفة ما تتنفذ إلا بموافقتك المكتوبة.
+- بعد الـ24 شهر، أو إذا الضمان ساقط، أو الجهاز مو طابعة جديدة: المطالبة تنرفض، وأجور الرجعة وأجر الفحص عليك، وينعرض عليك تصليح مدفوع ما يتنفذ إلا بموافقتك المكتوبة.
 - الشروط: https://levonis-iq.com/policies/warranty
 - للمساعد: هذا نص السياسة مو حكم على حالة الزبون. إذا عنده عطل وما يعرف إذا مشمول، حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
@@ -712,32 +713,34 @@
 - إذا الرقم ما يقبل والطابعة من Levonis اضغط «اطلب مراجعة يدوية»، وإذا مربوطة بحساب ثاني لازم ذاك الحساب يفك ارتباطها.
 - للمساعد: مطالبات الضمان يراجعها المختص؛ حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
-#### إرسال الطابعة للضمان على منو؟ / إذا رفضتوا المطالبة أدفع شي؟
+#### إرسال الطابعة للضمان على منو؟ / إذا رفضتوا المطالبة أدفع شي؟ ✎
 
 - إيصال الطابعة أو القطعة منك للمتجر على حسابك بكل الأحوال.
 - إذا انقبلت المطالبة كعيب تصنيع، رجعتها إلك على حساب المتجر.
-- إذا الفحص بيّن إن الجهاز سليم، أو العطل من الحالات المستثناة، أو الضمان ساقط: المطالبة تنرفض بقرار مكتوب بسببه داخل سجلها، وأجور الرجعة عليك وينضاف عليها أجر الفحص.
-- بعدها ينعرض عليك تصليح مدفوع، وما يتنفذ إلا بموافقتك المكتوبة على عرض السعر.
+- إذا الفحص بيّن إن الجهاز سليم، أو العطل من الحالات المستثناة، أو الضمان ساقط: المطالبة تنرفض بقرار مكتوب بسببه داخل سجلها، وأجور الرجعة عليك.
+- بأول 24 شهر من استلام الطابعة الجديدة، القطعة اللي تضررت بسوء استخدام تنباعلك بخصم يحدده المتجر لكل حالة (بدون نسبة ثابتة)، وبثاني 12 شهر الفحص وشغل التصليح ببلاش والقطعة على حسابك.
+- بعد الـ24 شهر، أو إذا الضمان ساقط، أو الجهاز مو طابعة جديدة: ينضاف أجر الفحص وينعرض عليك تصليح مدفوع. وأي كلفة ما تتنفذ إلا بموافقتك المكتوبة على عرض السعر.
 - إذا ظهرت معلومة جديدة، المطالبة المرفوضة ممكن تنعاد للفحص مرة ثانية.
 - المراحل: «مُستلَمة» ← «قيد الفحص» ← «مقبولة» أو «مرفوضة» ← «قيد الإصلاح» ← «استبدال» ← «منتهية». كل انتقال بقرار موظف مختص، وماكو موافقة تلقائية.
 - مدد الإنجاز مو مواعيد مضمونة، وتأخير شركة النقل أو الشركة المصنّعة أو المنافذ خارج سيطرة المتجر.
 - إذا المطالبة تسكّرت والمشكلة رجعت، افتح مطالبة جديدة من بطاقة الطابعة.
-- للمساعد: لا تذكر مبلغ أجر الفحص ولا مدة تصليح. لحالة مطالبة الزبون أو الاعتراض على قرارها، حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
+- للمساعد: لا تذكر مبلغ أجر الفحص ولا نسبة خصم ولا مدة تصليح. لحالة مطالبة الزبون أو الاعتراض على قرارها، حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
-#### ضماني خلص، تصلحون الطابعة؟ / عدكم صيانة بعد الضمان؟
+#### ضماني خلص، تصلحون الطابعة؟ / عدكم صيانة بعد الضمان؟ ✎
 
 - العبرة بتاريخ تقديم مطالبة الضمان بالموقع، مو بتاريخ ظهور العطل ولا بتاريخ مراسلتنا بأي طريقة ثانية، فقدّم المطالبة قبل ما يخلص ضمانك: https://levonis-iq.com/warranty
-- العطل اللي يظهر بعد ما تخلص مدة الضمان ما ينعالج كمطالبة ضمان حتى لو سببه عيب تصنيع؛ ينسجل كطلب تصليح خارج الضمان حسب سياسة ما بعد البيع.
+- الطابعة الجديدة بعد أول 12 شهر (من الشهر 13 لـ 24 من الاستلام) إلها دعم وصيانة مجانية: الفحص وشغل التصليح ببلاش، والقطعة الجديدة على حسابك، والقطعة اللي تضررت بسوء استخدام عليها خصم يحدده المتجر لكل حالة. وإذا مشتري ضمان ممدد، القطع مجانية لحد 24 أو 36 شهر.
+- العطل اللي يظهر بعد ما تخلص كل مدة الضمان (للطابعة الجديدة 24 شهر، و36 إذا مشتري تمديد +24 شهر) ما ينعالج كمطالبة ضمان حتى لو سببه عيب تصنيع؛ ينسجل كطلب تصليح خارج الضمان حسب سياسة ما بعد البيع.
 - والضمان الممدد نفس الشي: من تخلص المدة الكلية (24 أو 36 شهر) التغطية تنتهي، وما ينقبل تمديد جديد.
 - خطوات التصليح للجهاز المشترى من Levonis: تفتح طلب من https://levonis-iq.com/support وتوصف العطل وترفق صور وفيديو، وتوصل الجهاز أو القطعة للمتجر على حسابك، والمتجر يفحصه ويطلعلك عرض سعر مكتوب.
-- الشغل ما يبدي إلا بموافقتك المكتوبة على العرض، وإذا رفضته يرجعلك الجهاز على حسابك، وحسب سياسة ما بعد البيع ممكن ينحسب عليك أجر فحص.
+- الشغل ما يبدي إلا بموافقتك المكتوبة على العرض، وإذا رفضته يرجعلك الجهاز على حسابك، وحسب سياسة ما بعد البيع ممكن ينحسب عليك أجر فحص (مو بالشهر 13 لـ 24 للطابعة الجديدة).
 - قطع الغيار المتوفرة تنباع بالموقع بأسعارها المعلنة: https://levonis-iq.com/categories/maintenance-parts/spare-parts — والقطعة اللي بلا سعر اضغط «طلب السعر» بصفحتها.
 - المتجر مو ملزم يوفّر قطعة وقفت الشركة إنتاجها.
-- للمساعد: لا تذكر سعر تصليح ولا أجر فحص ولا مدة. حالة جهاز الزبون يراجعها المختص؛ حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
+- للمساعد: لا تذكر سعر تصليح ولا أجر فحص ولا نسبة خصم ولا مدة. حالة جهاز الزبون يراجعها المختص؛ حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
-#### أكدر أمدد ضمان الطابعة؟ / شنو «الضمان الممدد» بصفحة الطابعة؟
+#### أكدر أمدد ضمان الطابعة؟ / شنو «الضمان الممدد» بصفحة الطابعة؟ ✎
 
-- «الضمان الممدد» خيار مدفوع بصفحة الطابعة يمدد ضمانها الأساسي (12 شهر): +12 شهر يصير المجموع 24، أو +24 شهر يصير 36. مو كل طابعة تعرض الخيارين، والمعروض بصفحتها هو المتاح.
+- «الضمان الممدد» خيار مدفوع بصفحة الطابعة يطوّل فترة القطع المجانية (أول 12 شهر): +12 شهر تصير القطع مجانية لحد 24 شهر، أو +24 شهر لحد 36 شهر من الاستلام، فوق الدعم والصيانة المجانية. مو كل طابعة تعرض الخيارين، والمعروض بصفحتها هو المتاح.
 - للطابعات بس (وماكينة الليزر تنحسب طابعة)، وتمديد واحد لكل طابعة بالطلب؛ إذا بالطلب طابعتين تختار لكل وحدة.
 - تختاره من صفحة الطابعة أو من السلة قبل ما تكمّل الطلب، وبعد الطلب ما ينضاف.
 - رسمه مبلغ ثابت أو نسبة من سعر الطابعة الاعتيادي، يحدده المتجر لكل طابعة، فيختلف من طابعة لطابعة، ويبين بالدينار بصفحتها قبل ما تضيفها للسلة: https://levonis-iq.com/categories/printers
@@ -762,17 +765,17 @@
 - اللي يثبته: سجل الطلب، ووصل الضمان، وصفحة التحقق برقم الوصل أو الرقم التسلسلي؛ الوعد الشفهي ما ينحسب.
 - للمساعد: إذا الزبون دفع تمديد وما طالع بطلبه، حوّل المحادثة لفريق الدعم يتأكد من الدفع، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
-#### أكدر أرجّع المنتج؟ / شنو شروط الإرجاع؟
+#### أكدر أرجّع المنتج؟ / شنو شروط الإرجاع؟ ✎
 
 - طلب الإرجاع ينقدّم خلال 7 أيام من تاريخ الاستلام المسجّل (مو من تاريخ الطلب أو الدفع)، والمهم وقت تقديمه بالنظام.
 - الأسباب المقبولة بس: «منتج معيب»، «عيب مصنعي»، «مخالف للوصف» (يختلف جوهرياً عن وصفه وقت الشراء)، «منتج خاطئ»، «ضرر أثناء الشحن». ماكو إرجاع لتغيير الرأي.
-- الشروط سوية: كل محتويات الكرتون موجودة (ملحقات، كيبلات، أدوات، قطع احتياطية، كروت، دليل، هدايا)، والتغليف الداخلي والخارجي سليم، والرقم التسلسلي مطابق للطلب، وما مستعمل أكثر من اللازم للتأكد من العيب.
-- الإرجاع اللي يستوفي هالشروط ما عليه رسم ولا غرامة، بس حسب سياسة الإرجاع أجور شحن رجعة المنتج للمتجر على الزبون حتى لو معيب، وأجرة التوصيل الأصلية ما ترجع.
+- الشروط سوية: كل محتويات الكرتون موجودة (ملحقات، كيبلات، أدوات، قطع احتياطية، كروت، دليل، هدايا)، والتغليف الداخلي والخارجي سليم (وبضرر الشحن يبقى مثل ما وصل)، والرقم التسلسلي مطابق للطلب، وما مستعمل أكثر من اللازم للتأكد من العيب.
+- الإرجاع اللي يستوفي هالشروط مجاني: المتجر يدفع أجور شحن رجعة المنتج ويرجّعلك ثمنه، وما عليه رسم ولا غرامة؛ بس أجرة التوصيل الأصلية ما ترجع.
 - إذا ذبيت الكرتون الخارجي، الإرجاع ممكن بس لعيب حقيقي والتغليف الداخلي سليم، وتغليف بديل آمن على حسابك.
 - المستعمل والمجدّد والـ Open Box ينباع على وصف حالته، فما ينقبل عليه «مخالف للوصف»، بس تكدر تطلب إرجاعه إذا وصل عاطل أو متضرر أو صنف غلط.
 - الحزمة ترجع كاملة، إلا إذا قطعة وحدة بيها عيب أو ضرر شحن فتنطالب بيها لوحدها.
 - الخطوات: https://levonis-iq.com/orders ← افتح الطلب ← «الدفع والنقاط» ← «الإرجاع والاستبدال» ← «طلب إرجاع» ← «سبب الإرجاع» و«وصف المشكلة» والصور ← «إرسال طلب الإرجاع».
-- بعد 7 أيام يبقى بس الضمان إذا العطل عيب تصنيع. الشروط: https://levonis-iq.com/policies/returns
+- بعد 7 أيام ماكو إرجاع، يبقى الضمان: https://levonis-iq.com/warranty — الشروط: https://levonis-iq.com/policies/returns
 - للمساعد: طلبات الإرجاع يراجعها المختص؛ حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
 #### غيّرت رأيي، أكدر أرجّعه؟ / ما عجبني أريد أرجّعه
@@ -787,17 +790,16 @@
 - إذا نزل سعر القطعة نفسها بموقعنا خلال 7 أيام من استلامها، تكدر تطلب الفرق رصيد بمحفظتك بحماية السعر من صفحة الطلب؛ سعر بائع ثاني ما ينحسب.
 - للمساعد: إذا الزبون عنده عيب أو صنف غلط أو حالة خاصة، حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
-#### الطابعة وصلت عاطلة / جديدة وما اشتغلت من أول تشغيل، شسوي؟
+#### الطابعة وصلت عاطلة / جديدة وما اشتغلت من أول تشغيل، شسوي؟ ✎
 
 - «نعتذر عن الإزعاج استاذ.» دزلنا رقم الطلب وصور وفيديو قصير يبين العيب، وراح ارسل للمختص ويوصلك الرد.
-- إذا بعدك داخل 7 أيام من الاستلام: قدّم طلب إرجاع بسبب «منتج معيب» أو «عيب مصنعي»: https://levonis-iq.com/orders ← افتح الطلب ← «الدفع والنقاط» ← «الإرجاع والاستبدال» ← «طلب إرجاع».
+- إذا بعدك داخل 7 أيام من الاستلام المسجّل، إرجاع الطابعة المعيبة مجاني: المتجر يدفع أجور شحن رجعتها ويرجّعلك ثمنها (أجرة التوصيل الأصلية ما ترجع). قدّم طلب إرجاع بسبب «منتج معيب» أو «عيب مصنعي»: https://levonis-iq.com/orders ← افتح الطلب ← «الدفع والنقاط» ← «الإرجاع والاستبدال» ← «طلب إرجاع».
 - ارفق وصف (لحد 3000 حرف) وصور واضحة للمنتج والعيب والتغليف الداخلي والخارجي والرقم التسلسلي (لحد 6 صور). إذا العيب حركة ما تبين بصورة، صوّر فيديو ودزّه بتذكرة من صفحة الطلب ← «الدعم» ← «فتح تذكرة دعم».
 - لا تستعملها أكثر من اللازم، وخلّي ملحقاتها وتغليفها سليمة. إخفاء وكعة أو انسكاب سائل أو فتح سابق يسقط الطلب.
-- كل خطوة بقرار موظف، وفتح الطلب مو معناه قبول الإرجاع. بعد ما توصل وتنفحص، القرار واحد من: استبدال بنفس الصنف جديد إذا متوفر (وإذا مو متوفر ينعرض عليك إرجاع المبلغ لمحفظتك)، أو إرجاع المبلغ للمحفظة، أو تصليح، أو رفض بسبب مكتوب. ماكو استبدال ولا إرجاع مبلغ قبل الفحص.
-- حسب سياسة الإرجاع المنشورة، أجور شحن رجعة الطابعة للمتجر على الزبون حتى لو معيبة.
-- إذا السبب ضرر نقل (كرتون مضروب أو مفتوح): بلّغ خلال 24 ساعة من الاستلام بالصور والفيديو ورقم الطلب.
-- إذا فاتت الـ7 أيام، الطريق مطالبة ضمان من https://levonis-iq.com/warranty (العيب اللي يبين من أول تشغيل يشمله الضمان إذا كان عيب تصنيع).
-- للمساعد: لا توعد باستبدال ولا إرجاع مبلغ ولا إن المتجر يدفع أجور الإرجاع، ولا تقرر إذا هو عيب؛ المختص يقرر بعد الفحص. حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220.
+- كل خطوة بقرار موظف، وفتح الطلب مو معناه قبول الإرجاع. بعد ما توصل وتنفحص: إذا انقبل يرجعلك المبلغ لمحفظتك، أو تتبدل بنفس الصنف جديد إذا متوفر؛ والرفض يكون بسبب مكتوب. ماكو استبدال ولا إرجاع مبلغ قبل الفحص.
+- إذا السبب ضرر نقل (كرتون مضروب أو مفتوح): بلّغ خلال 24 ساعة من الاستلام بالصور والفيديو ورقم الطلب، وإرجاعها خلال الـ7 أيام هم مجاني.
+- إذا فاتت الـ7 أيام، الطريق مطالبة ضمان من https://levonis-iq.com/warranty: بأول 12 شهر من الاستلام الضمان يشمل الهاردوير والسوفتوير والعيب اللي يبين من أول تشغيل، والقطعة التالفة تتبدل مجاناً (القطعة والشغل).
+- للمساعد: اشرح إن الإرجاع خلال 7 أيام مجاني إذا الطابعة معيبة، بس لا تقرر إذا هي معيبة ولا توعد بقبول الطلب أو بنتيجته؛ المختص يقرر بعد الفحص. حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220.
 
 #### نزل السعر بعد ما اشتريت، ترجعولي الفرق؟ / شنو حماية السعر؟
 
@@ -812,17 +814,18 @@
 - الشروط: https://levonis-iq.com/policies/price_protection
 - للمساعد: لا توعد بمبلغ. لمطالبة على طلب الزبون، حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
-#### تساعدوني بالتشغيل والمعايرة؟ / تجون للبيت تصلحون الطابعة؟
+#### تساعدوني بالتشغيل والمعايرة؟ / تجون للبيت تصلحون الطابعة؟ ✎
 
 - لمشتري الجهاز من Levonis، مجاناً وعن بعد: مساعدة بالتنصيب والتشغيل الأول، إرشاد المعايرة وضبط المستوى وأول طبعة ناجحة، إرشاد تحديث الفيرموير الرسمي، وإرشاد إعداد السلايسر المعتمد (بروفايل الطابعة والحرارة والسرعات وإعدادات المادة اللي انباعت وياها).
-- وتشخيص العطل الظاهر وتوجيهك للمسار الصح: ضمان، أو تصليح مدفوع، أو قطعة غيار.
+- وتشخيص العطل الظاهر وتوجيهك للمسار الصح: ضمان، أو صيانة مجانية، أو تصليح مدفوع، أو قطعة غيار.
 - المساعدة إرشاد: نشرحلك الخطوة وإنت تسويها، والتشخيص على الصور والفيديو والوصف اللي تدزه، وبحدود معقولة مو خدمة تشغيل دائمة.
 - المساعدة عن بعد، مو زيارة ميدانية.
 - ما تشمل: ضبط إعدادات لمجسم معيّن، تحسين قطعة تطبعها لزبونك، تعليم برامج التصميم، تصميم أو تعديل المجسمات، تصليح ملفاتك أو تحويل صيغها، أو تجهيز ملفات الطباعة بدالك.
-- العطل اللي ما يشمله الضمان يتصلح بأجر: تفتح طلب من https://levonis-iq.com/support، وتوصل الجهاز للمتجر على حسابك، والشغل ما يبدي إلا بموافقتك المكتوبة على عرض السعر.
+- للطابعة الجديدة من تاريخ الاستلام: أول 12 شهر ضمان (هاردوير وسوفتوير) والقطعة التالفة تتبدل مجاناً (القطعة والشغل)، وثاني 12 شهر دعم وصيانة مجانية: الفحص والتصليح ببلاش والقطعة الجديدة على حسابك. وبالفترتين القطعة اللي تتضرر بسوء استخدام ما يشملها الضمان، بس عليها خصم يحدده المتجر لكل حالة. والضمان الممدد المدفوع يخلي القطع مجانية لحد 24 أو 36 شهر.
+- بعد هالمدة (أو بعد مدة الضمان الممدد إذا شاريه)، أو إذا الضمان ساقط، وللمستعمل بعد ما يخلص ضمانه المكتوب، التصليح بأجر: تفتح طلب من https://levonis-iq.com/support، وتوصل الجهاز للمتجر على حسابك، والشغل ما يبدي إلا بموافقتك المكتوبة على عرض السعر.
 - صيانة أو تشخيص جهاز ما انشترى من Levonis مو من خدمات ما بعد البيع، حتى لو نفس الموديل؛ وقطع الغيار المعروضة تكدر تطلبها من الموقع: https://levonis-iq.com/categories/maintenance-parts/spare-parts
 - القناة المكتوبة المعتمدة صفحة الدعم: https://levonis-iq.com/support — والسياسة: https://levonis-iq.com/policies/after_sale
-- للمساعد: لا تعرض زيارة للبيت، ولا تذكر أجر فحص أو سعر أو مدة تصليح، ولا تحكم إذا العطل يشمله الضمان أو الصيانة المجانية. لطلب مساعدة بجهاز الزبون، حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
+- للمساعد: لا تعرض زيارة للبيت، ولا تذكر أجر فحص أو سعر أو مدة تصليح أو نسبة خصم، ولا تحكم إذا العطل يشمله الضمان أو الصيانة المجانية. لطلب مساعدة بجهاز الزبون، حوّل المحادثة لفريق الدعم، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
 ### المنتجات والمواصفات والأسعار (16)
 
@@ -985,23 +988,23 @@
 - الليزر يحتاج شفط وتهوية مناسبة، و Rotary ملحق اختياري مو داخل بكل Laser Full Combo.
 - إذا الصفحة تكتب «السعر غير متوفر حالياً» يعني ما ينطلب هسه وبيها «طلب السعر». للمساعد: لسعر جهاز ليزر حوّل المحادثة للفريق، وإذا مستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
 
-#### الطابعة جديدة لو مستعملة؟ / توصل مسلفنة ومثل الصورة؟
+#### الطابعة جديدة لو مستعملة؟ / توصل مسلفنة ومثل الصورة؟ ✎
 
 - كل طابعة جديدة نبيعها جديدة ومسلفنة بكرتون الشركة، تفتحها بإيدك، نسخة عالمية ومن وكيل حصراً.
 - أي منتج ما مكتوب عليه حالة (مستعمل أو مجدّد أو Open Box) يعتبر جديد.
 - الطابعات المستعملة والمجدّدة و Open Box إلها أقسام منفصلة ونوعها مكتوب بعنوانها: https://levonis-iq.com/categories/used — والمجدّدة من المصنع: https://levonis-iq.com/categories/printers/factory-refurbished-printers
 - الصور والفيديوهات توضيحية؛ اللون ممكن يختلف حسب الشاشة والإضاءة، واللي يوصلك بالكرتون هو المكتوب بوصف المنتج مو اللي بالصورة.
 - المواصفات منقولة من الشركة المصنعة، وإذا تغيّرت مواصفة جوهرية بعد طلبك وقبل التسليم نبلغك وتختار تكمل أو تلغي ويرجعلك اللي دفعته لمحفظتك.
-- ضمان الطابعة الجديدة 12 شهر يبدأ من تاريخ الاستلام.
+- ضمان الطابعة الجديدة يبدي من تاريخ الاستلام: 12 شهر ضمان استبدال القطع مجاناً (هاردوير وسوفتوير)، و12 شهر إضافية دعم وصيانة مجانية، وخصم على القطع إذا تضررت بسوء استخدام، واسترجاع مجاني خلال 7 أيام إذا بيها عيب. المستعمل والمجدّد والـ Open Box ضمانه المكتوب بصفحته ووصله.
 - كل الطابعات: https://levonis-iq.com/categories/printers
 
-#### تبيعون مستعمل؟ / شنو يعني Open Box أو مجدّد؟
+#### تبيعون مستعمل؟ / شنو يعني Open Box أو مجدّد؟ ✎
 
 - إي، عدنا قسم «المستعمل» وقسم «طابعات مجدَّدة من المصنع»، والقطع توصل على دفعات فالمعروض يتغير: https://levonis-iq.com/categories/used — https://levonis-iq.com/categories/printers/factory-refurbished-printers
 - الوحدة المستعملة أو الـ Open Box تبين بصفحتها نوعها ودرجتها (شبه جديد، حالة ممتازة، حالة جيدة، أو حالة مقبولة)، وساعات التشغيل إذا معروفة، وأي عطل صار بيها وشنو انصلح، وصورها، وسعر الموديل الجديد للمقارنة؛ وإذا شي من هذا مو مكتوب، اسأل الفريق قبل ما تطلب.
 - Open Box يعني جهاز انفتح كرتونه، وأي استخدام أو فحص أو تصليح صار بيه مكتوب بصفحته. المجدّد من المصنع انعاد بناؤه وفحصه وفق معايير المصنع، وممكن تبقى بيه عيوب شكلية بسيطة ما تأثر على الشغل.
-- الضمان: المدة المكتوبة بصفحة الوحدة ووصلها (شهر واحد أو 12 شهر)، وما ينباع عليها تمديد ضمان مدفوع.
-- الإرجاع: لأن الحالة معلنة، ما ينقبل إرجاعها بحجة «مو مطابق للوصف»؛ بس تكدر تقدّم طلب إذا وصلت عاطلة أو متضررة أو صنف غلط، خلال 7 أيام من الاستلام. وضرر النقل مسؤولية شركة التوصيل ونساعدك بالمطالبة: افحص الكرتون قدام المندوب وصوّره وبلّغ خلال 24 ساعة.
+- الضمان: المدة المكتوبة بصفحة الوحدة ووصلها (شهر واحد أو 12 شهر)، مو ضمان الطابعة الجديدة، وما ينباع عليها تمديد ضمان مدفوع.
+- الإرجاع: لأن الحالة معلنة، ما ينقبل إرجاعها بحجة «مو مطابق للوصف»؛ بس تكدر تقدّم طلب إذا وصلت عاطلة أو متضررة أو صنف غلط، خلال 7 أيام من الاستلام، والإرجاع بهاي الحالات مجاني: المتجر يدفع أجور الرجعة ويرجّعلك ثمنها، والقرار للفريق بعد الفحص. افحص الكرتون قدام المندوب وصوّره، وبلّغ عن ضرر النقل خلال 24 ساعة.
 - الطابعة المستعملة تنعامل مثل أي طابعة بأجور التوصيل وعربون التوصيل للبيت.
 - بالكتالوج حالياً طابعات مجدّدة من المصنع (P2S Combo، X1C Combo، A1 و A1 Combo، P1S و P1S AMS Combo، H2D AMS Combo) و X2D Combo Open Box؛ سعر وتوفر كل وحدة بصفحتها.
 - للمساعد: لسعر أو حالة أي وحدة مستعملة أو مجدّدة حوّل المحادثة للفريق، وإذا مستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220).
@@ -1125,16 +1128,16 @@
 - المعلّق والمستقر وسبب كل حركة بصفحة النقاط: https://levonis-iq.com/points
 - للمساعد: إذا مرّت المدة والطلب مدفوع والنقاط ما نزلت: اطلب صورة سجل النقاط ورقم الطلب، وحوّل المحادثة للفريق («راح ارسل للمختص ويوصلك الرد»)، وللمستعجل انطيه واتساب الإدارة 07838455220 (https://wa.me/9647838455220). ما نوعد بإضافة نقاط.
 
-#### شنو الهدية ويا الطابعة؟ / إذا كتبت تقييم آخذ هدية أو نقاط؟
+#### شنو الهدية ويا الطابعة؟ / إذا كتبت تقييم آخذ هدية أو نقاط؟ ✎
 
-- الهدية ويا الطابعة تكون حسب مراجعتك إلها بعد الاستلام، والمتجر يحدد درجة المراجعة من 1 لـ 5.
+- الهدية حسب تقييمك للطابعة بعد الاستلام: تكتب مراجعة بالموقع مع صور (والدرجات العليا تحتاج فيديو)، وتنزّل ستوري على إنستغرام تشارك بيه تجربتك وتسوي منشن لمتجرنا @levonis_iq. المتجر يحدد درجة مراجعتك من 1 لـ 5، وحسب الدرجة تختار هديتك، وبعدها نرسلك كود تستلم بيه هديتك.
 - تكتب مراجعة على منتج استلمته بطلب مسلّم بحسابك، وحدة لكل منتج، وتنشر فوراً: نص لحد 4,000 حرف، لحد 6 صور (8 ميغا للصورة)، وفيديو لحد 40 ميغا.
 - نقاط المراجعة تنطى تلقائياً بس إذا المتجر محدد قيمتها؛ إذا مو محددة ما تنطى، والصفحة تكتب هذا صراحة. فما نوعد بنقاط.
-- هدية المراجعة بس لمراجعة طابعة اشتريتها من الموقع وانسلمتلك: صندوق عيني بخمس درجات: 1 ملحق، 2 فلمنت، 3 فلمنت وملحق، 4 رأس طباعة (نوزل)، 5 رأس طباعة ومنصة.
+- هدية المراجعة بس لمراجعة طابعة اشتريتها من الموقع وانسلمتلك: صندوق عيني بخمس درجات: 1 ملحق، 2 فلمنت، 3 فلمنت وملحق، 4 رأس طباعة (هوت إند)، 5 رأس طباعة ومنصة.
 - الهدية مو تلقائية: لازم نص مفصل وصور متنوعة، والدرجات العليا تحتاج فيديو مفيد ودليل دائم.
-- وتنزّل ستوري على إنستغرام عن تجربتك ويا منشن لمتجرنا @levonis_iq، وتحط رابطه ولقطة شاشة إله بخانة «دليل ستوري إنستغرام (خاص)» بنموذج المراجعة؛ ما تنعرض للعامة، بس الإدارة تشوفها.
-- الإدارة تقرر بسبب مكتوب: قبول بدرجة، أو طلب تعديل، أو رفض. بعد القبول يوصلك تبليغ وكود من الإدارة، وتختار هدية وحدة حسب درجتك من صفحة «هداياي»، وتنضاف لسلتك بسعر 0 د.ع وأجرة التوصيل تندفع عادي: https://levonis-iq.com/gifts
-- الهدية حسب المتوفر بالمخزن، مو فلوس ولا نقاط ولا خصم.
+- رابط الستوري ولقطة شاشة إله تحطهن بخانة «دليل ستوري إنستغرام (خاص)» بنموذج المراجعة؛ ما تنعرض للعامة، بس الإدارة تشوفها.
+- الإدارة تقرر بسبب مكتوب: قبول بدرجة، أو طلب تعديل، أو رفض. بعد القبول يوصلك تبليغ، وتختار من صفحة «هداياي» صندوق واحد بدرجتك أو أقل، ونرسلك كود تستلم بيه هديتك. والهدية تنضاف لسلتك بسعر 0 د.ع وأجرة التوصيل تندفع عادي: https://levonis-iq.com/gifts
+- الهدية عينية بس وحسب المتوفر بالمخزن، مو فلوس ولا نقاط ولا خصم.
 - الرأي السلبي الصادق ما يحرمك؛ تنقاس فائدة المراجعة مو عدد النجوم.
 - إذا ما كتبت خلال 7 أيام من الاستلام، النظام يسجل 5 نجوم تلقائي بدون مكافأة، وتكدر تبدله بمراجعة حقيقية بأي وقت.
 - للمساعد: إذا يسأل عن قرار هديته أو نقاط مراجعة ما نزلت: حوّل المحادثة للفريق، وللمستعجل انطيه واتساب الإدارة 07838455220.
@@ -1308,20 +1311,21 @@
 - إذا طابعتك بعدها بالضمان: لا تفتحها ولا تبدّل قطعة بنفسك قبل ما يراجعها الفريق، لأن هذا ممكن يسقط الضمان.
 - للمساعد: «ما تسخن» و«يخر/تسريب» ما ياخذون خطوات انسداد النوزل. لا تشخّص (هيتر، حساس حرارة، بورد) ولا تقترح قطع. حوّل المحادثة للفريق، وللمستعجل انطي واتساب الإدارة 07838455220.
 
-#### جربت الخطوات وما انحلّت المشكلة / نفس المشكلة بعدها
+#### جربت الخطوات وما انحلّت المشكلة / نفس المشكلة بعدها ✎
 
 - «راح ارسل للمختص ويوصلك الرد.» وحتى نختصر الوقت دزلنا: موديل الطابعة، المشكلة، الخطوات اللي جربتها، رمز الخطأ إذا طلع، وصور أو فيديو قصير يبين المشكلة.
-- وتكدر تفتح تذكرة مكتوبة من صفحة الدعم: https://levonis-iq.com/support — بعد الخطوات اضغط «جربتها وما انحلّت» أو «تحدث مع الفريق»، والمساعد يجهزلك تذكرة بيها الطابعة والمشكلة والخطوات؛ تراجعها وتعدّل عليها وترسلها بنفسك، وما ينرسل شي قبل ما تضغط إرسال. الإرسال يحتاج تسجيل دخول.
+- وتكدر تفتح تذكرة مكتوبة من صفحة الدعم: https://levonis-iq.com/support — بعد الخطوات اضغط «جربتها وما انحلّت» أو «تحدث مع الفريق»، ودردشة الموقع تجهزلك تذكرة بيها الطابعة والمشكلة والخطوات؛ تراجعها وتعدّل عليها وترسلها بنفسك، وما ينرسل شي قبل ما تضغط إرسال. الإرسال يحتاج تسجيل دخول.
 - بدردشة الموقع تكدر ترفق لحد 6 ملفات (صورة أو فيديو أو رسالة صوتية) وتروح ويا التذكرة للفريق، بعد تسجيل الدخول.
 - التذكرة بصفحة الدعم هي السجل المكتوب المعتمد إذا صار خلاف.
 - وإذا انحلّت: «ممتاز، يسعدني إن المشكلة انحلّت. إذا رجعت، اكتبلي هنا.»
 - للمساعد: حوّل المحادثة للفريق. لا توعد بتصليح أو تبديل أو تعويض أو وقت رد، ولا تطلب رقم بطاقة أو كلمة سر أو رمز تحقق. وللمساعدة المستعجلة انطي واتساب الإدارة 07838455220 — https://wa.me/9647838455220
 
-#### النوزل أو البليت انكسر أو تآكل، شسوي؟ / أكدر أبدّله بنفسي؟
+#### النوزل أو البليت انكسر أو تآكل، شسوي؟ / أكدر أبدّله بنفسي؟ ✎
 
 - حسب سياسة الضمان المنشورة https://levonis-iq.com/policies/warranty القطع الاستهلاكية ما يشملها الضمان، مثل: النوزلات، السيور، ألواح الطباعة وأسطحها، الكوابل، أنابيب البودن، أدوات التنظيف، والفلامنت.
 - وما يشمل كذلك: سوء الاستعمال، الوكعة والكسر، كهرباء غير مطابقة أو ارتفاع وانقطاع التيار، الماي والرطوبة والغبار الكثيف، وقطع أو ملحقات الطرف الثالث.
-- وإذا القطعة وصلتك عاطلة: خلال 7 أيام من تاريخ الاستلام المسجل تكدر تقدّم طلب إرجاع بسبب «منتج معيب» من «طلباتي» https://levonis-iq.com/orders — والقرار بعد الفحص.
+- وللطابعة الجديدة، بأول 24 شهر من الاستلام، القطعة اللي تتضرر بسوء استخدام ما يشملها الضمان، بس عليها خصم يحدده المتجر لكل حالة (بدون نسبة ثابتة).
+- وإذا القطعة وصلتك عاطلة: خلال 7 أيام من تاريخ الاستلام المسجل تكدر تقدّم طلب إرجاع بسبب «منتج معيب» من «طلباتي» https://levonis-iq.com/orders — والإرجاع مجاني (المتجر يدفع أجور الرجعة ويرجّعلك ثمنها)، والقرار بعد الفحص.
 - وسياسة ما بعد البيع تكول تركيب القطعة بإيدك أو عند جهة مو معتمدة وقت الضمان يسقط الضمان؛ فإذا طابعتك بالضمان اسألنا قبل ما تبدّل أي قطعة.
 - القطع البديلة تنباع بالموقع: الهوت إند والنوزلات https://levonis-iq.com/categories/maintenance-parts/hotends-nozzles وألواح الطباعة https://levonis-iq.com/categories/maintenance-parts/build-plates وقطع الغيار حسب سلسلة الطابعة https://levonis-iq.com/categories/maintenance-parts/spare-parts — تأكد من التوافق بصفحة المنتج، والسعر والتوفر مكتوبين بيها. وإذا طابعتك مربوطة بـ«مركز الضمان»، بطاقتها ممكن تبين رابط «مواد الصيانة المتوافقة».
 - ضرر النقل مو مطالبة ضمان، إله قواعد سياسة الإرجاع.
@@ -1342,7 +1346,7 @@
 - قطع الغيار المعروضة بالموقع منتجات عادية تكدر تطلبها من الموقع: https://levonis-iq.com/categories/maintenance-parts/spare-parts — تأكد من التوافق بصفحة المنتج. والمتجر مو ملزم يوفّر قطعة لجهاز ما انشترى منه.
 - للمساعد: خلّك مؤدب وانطي الخطوات الأولى، ولا تنتقد محلات أو ماركات ثانية. أدلة Bambu Lab بس لطابعات Bambu Lab. إذا طلب صيانة أو قطعة مو معروضة بالموقع، حوّل المحادثة للفريق، وللمستعجل انطي واتساب الإدارة 07838455220.
 
-## قائمة الأسعار — لقطة 2026-11-03 (177 سطر)
+## قائمة الأسعار الكاملة — لقطة 2026-11-03 (177 سطر؛ اللي انضاف لـ Meta نسخة مختصرة)
 
 - Bambu Lab A1 — بيع مباشر 760,500 د.ع؛ طلب مسبق (دفع مقدم من المحفظة) يبدأ من 701,500 د.ع (seen on 2026-11-03) — https://levonis-iq.com/product/bambu-lab-a1
 - Bambu Lab A1 Combo — بيع مباشر 946,500 د.ع (الصفحة: بدل 1,098,500)؛ طلب مسبق يبدأ من 887,500 د.ع (seen on 2026-11-03) — https://levonis-iq.com/product/bambu-lab-a1
@@ -1521,3 +1525,5 @@
 - Piano Music Box Winding Kit (K014) — 6,750 د.ع بيع مباشر (seen on 2026-11-03) — https://levonis-iq.com/product/piano-music-box-winding-kit
 - Clock Components Kit 011 (Royal POP Wall Clock ZH166) — 6,750 د.ع بيع مباشر (seen on 2026-11-03) — https://levonis-iq.com/product/clock-components-kit-011
 - Bambu Lab Round Magnet — من 51 لحد 186 د.ع حسب المقاس (المتوفر بيع مباشر: D6x3 بـ 102، D8x3 بـ 136، D10x3 بـ 186) (seen on 2026-11-03) — https://levonis-iq.com/product/bambu-lab-round-magnet
+
+✎ = تعدّل 2026-11-03 على قرارات المالك.
