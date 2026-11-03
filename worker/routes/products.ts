@@ -52,6 +52,8 @@ import type { Tier, ProPricingPolicy, ResolvedPrice } from '../lib/pricing';
 import { pricingTierContext } from '../lib/entitlements';
 import { ancestryFor, degradeIfSchemaMissing, fallbackFor, pricingInputsFor } from '../lib/membershipBenefits';
 import { anonymousCached, type EdgeLifetime } from '../lib/edgePolicy';
+import { trustedOrigin } from '../lib/appOrigin';
+import { categoryRanks, onShelfNow, priceFeedCsv, type PriceFeedProduct } from '../lib/priceFeed';
 import { cardLeadPhoto } from '../lib/cardPhoto';
 import { loadProductKnowledge } from '../lib/knowledge/productKnowledge';
 import { EMPTY_TRANSLATIONS, importedSlots, loadProductTranslationMap, overlayImportedText } from '../lib/translate/memory';
@@ -2736,6 +2738,79 @@ export async function resolveVariantPricing(
 }
 
 /**
+ * WHAT THE SHELF SELLS NOW, AND AT WHICH DIRECT-SALE PRICE — for the price feed
+ * (worker/lib/priceFeed.ts), which may quote nothing else (the owner's rule for
+ * Meta Business Agent: a price only for a direct sale in stock, never a
+ * pre-order or an estimated price).
+ *
+ * The card cannot say it: `display_price_iqd` is the cheapest way to buy, and on
+ * a product sold both ways that is a pre-order route's price («يبدأ من 825,000»
+ * — the P1S by land, tests/productDiscountSurfaces.test.ts). So every SKU the
+ * rung prices on its DIRECT line (`skuLevelSelections`; the product itself when
+ * it has no option and no colour) is asked the product page's own question —
+ * could the page open on exactly this selection as a direct sale from the shelf
+ * (`firstUsableDirectSelection`: the availability engine cart and checkout
+ * enforce) — and each one that can is priced as the card prices its SKU levels
+ * (`levelPrice`: the same resolver, the viewer's tier, a live offer), with its
+ * «سعر تقديري» label (`selectionEstimated`).
+ *
+ * Batched like the listing: one wave of relations, offers and pools. `rows` are
+ * full `products` rows read VISIBLE with `sellable_now`; one that is not
+ * sellable, a composition or an active mystery-pool member (its shelf is
+ * withheld, §8.2 row 18) gets no entry.
+ */
+export async function shelfDirectPrices(
+  db: D1Database,
+  rows: Record<string, unknown>[],
+  ctx: PricingCtx
+): Promise<Map<string, Array<{ price_iqd: number; estimate: boolean }>>> {
+  const out = new Map<string, Array<{ price_iqd: number; estimate: boolean }>>();
+  const listed = rows.filter((r) => sellableNowOf(r) && String(r.composition ?? '') === '');
+  if (listed.length === 0) return out;
+  const ids = listed.map((r) => String(r.id));
+  const [views, offers, pooled] = await Promise.all([
+    loadRelationsViews(db, listed.map((r) => ({ id: String(r.id), inventory_mode: r.inventory_mode }))),
+    degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(db, ids.map((id) => subjectOf(id))), EMPTY_OFFERS()),
+    degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, ids), new Set<string>()),
+  ]);
+  const now = Date.now();
+  for (const row of listed) {
+    const id = String(row.id);
+    const view = views.get(id);
+    if (!view || pooled.has(id)) continue;
+    const doc = applyRelations(parseProductRow(row), view);
+    const offer = offers.get(offerKey(subjectOf(id)));
+    const inventory = snapshotFrom(view, {
+      stock: doc.stock,
+      reserved: Number(row.stock_reserved ?? 0),
+      low_stock_threshold: (row.low_stock_threshold as number | null) ?? null,
+    });
+    const activeGroupIds = view.has_relations
+      ? new Set(view.groups.filter((group) => group.active !== 0 && group.active !== false).map((group) => group.id))
+      : undefined;
+    const direct = skuLevelSelections(doc, view).filter((sku) => sku.transport_method === null);
+    const plain = !doc.options.some((o) => o.active !== false) && !doc.colors.some((c) => c.active !== false);
+    const candidates: Array<SkuLevelSelection | null> = direct.length ? direct : plain ? [null] : [];
+    const prices: Array<{ price_iqd: number; estimate: boolean }> = [];
+    for (const sku of candidates) {
+      const key = sku ? sku.combo_key : selectionKey([], null);
+      const opening = firstUsableDirectSelection(doc, {
+        inventory,
+        links: view.links,
+        activeGroupIds,
+        transportDefaults: ctx.transportDefaults,
+        accept: (optionValueIds, colorId) => selectionKey(optionValueIds, colorId) === key,
+      });
+      if (!opening) continue;
+      const level = levelPrice(doc, ctx, offer, sku?.option_id ?? null, sku?.color_id ?? null, now, sku ?? undefined);
+      prices.push({ price_iqd: level.unit_subtotal_iqd, estimate: selectionEstimated(doc, opening.option_value_ids, opening.color_id) });
+    }
+    out.set(id, prices);
+  }
+  return out;
+}
+
+/**
  * THE CATALOG-ONLY CARD (DECISIONS rows 239 (3) and 240): what a customer
  * receives for a product they may SEE but not BUY — no V2 price yet, or a
  * commercial completeness gap.
@@ -4922,6 +4997,68 @@ productRoutes.get('/', (c) =>
     ctxPromise.catch(() => {});
     const { body } = await listCatalogProducts(c.env.DB, c.req.query(), ctxPromise);
     return c.json({ success: true, ...body });
+  })
+);
+
+/**
+ * THE PRICE FEED FOR META BUSINESS AGENT (worker/lib/priceFeed.ts): every
+ * product the public catalogue lists by default, as one CSV the owner's Google
+ * Sheet imports (`=IMPORTDATA(…)`) and Meta re-reads twice a day. Registered
+ * before `/:slug`, which would take «price-feed.csv» for a slug.
+ *
+ * THE LISTING ITSELF, PAGE AFTER PAGE: `GET /api/products?limit=50&offset=…`
+ * as the storefront's /products reads it and «عرض المزيد» pages it — the same
+ * visibility, the same set (the shop's own products: merchants' listings are
+ * `community_products`, and the default list carries no composition) and the
+ * same cards. Then the direct-sale prices of what is on the shelf now
+ * (`shelfDirectPrices`), the one figure the feed prints.
+ *
+ * A GUEST'S PRICES FOR EVERY CALLER (`pricingCtxForUser(db, null)`), so the
+ * body is the same whoever asks, and the colo keeps a guest's copy under its
+ * own lifetime: 15 minutes fresh, 15 more served stale while it rebuilds. No
+ * catalogue write purges it; Meta reads it twice a day.
+ */
+export const PRICE_FEED_LIFETIME: EdgeLifetime = { maxAge: 300, sMaxAge: 900, staleWhileRevalidate: 900 };
+/** The listing's own page ceiling (`limit` max 50) and deepest `offset`, and how many pages are read at once. */
+const PRICE_FEED_PAGE = 50;
+const PRICE_FEED_MAX_OFFSET = 10_000;
+const PRICE_FEED_PAGES_AT_ONCE = 4;
+
+productRoutes.get('/price-feed.csv', (c) =>
+  anonymousCached(c, { lifetime: PRICE_FEED_LIFETIME }, async () => {
+    const db = c.env.DB;
+    const ctxPromise = pricingCtxForUser(db, null);
+    ctxPromise.catch(() => {});
+    const idxPromise = catalogIndexFor(db).catch(() => null);
+    const products: PriceFeedProduct[] = [];
+    const onShelf: Record<string, unknown>[] = [];
+    const seen = new Set<string>();
+    let done = false;
+    for (let start = 0; !done && start <= PRICE_FEED_MAX_OFFSET; start += PRICE_FEED_PAGE * PRICE_FEED_PAGES_AT_ONCE) {
+      const offsets = Array.from({ length: PRICE_FEED_PAGES_AT_ONCE }, (_, i) => start + i * PRICE_FEED_PAGE).filter((o) => o <= PRICE_FEED_MAX_OFFSET);
+      const pages = await Promise.all(
+        offsets.map((offset) => listCatalogProducts(db, { limit: String(PRICE_FEED_PAGE), offset: String(offset) }, ctxPromise))
+      );
+      for (const { body, rows } of pages) {
+        const cards = Array.isArray(body.products) ? (body.products as Record<string, unknown>[]) : [];
+        if (cards.length < PRICE_FEED_PAGE) done = true;
+        for (const card of cards) {
+          const id = String(card.id ?? '');
+          if (!id || seen.has(id)) continue;
+          seen.add(id);
+          const row = rows.get(id);
+          products.push({ card, name_ar: typeof row?.name_ar === 'string' ? row.name_ar : '', shelf: [] });
+          if (row && onShelfNow(card)) onShelf.push(row);
+        }
+      }
+    }
+    const [ctx, idx] = await Promise.all([ctxPromise, idxPromise]);
+    const shelf = await shelfDirectPrices(db, onShelf, ctx);
+    const csv = priceFeedCsv(
+      products.map((p) => ({ ...p, shelf: shelf.get(String(p.card.id)) ?? [] })),
+      { origin: trustedOrigin(c), categoryRanks: idx ? categoryRanks(idx.byId.values()) : new Map() }
+    );
+    return new Response(csv, { status: 200, headers: { 'Content-Type': 'text/csv; charset=utf-8' } });
   })
 );
 
