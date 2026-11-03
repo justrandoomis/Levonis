@@ -101,13 +101,22 @@ export default function InlineSaleDiscount({ productId, modelId, colorId, label,
       if (e instanceof ApiError && e.code === 'SPECIAL_OFFER_CHANGED') await load().catch(() => undefined);
     } finally { setBusy(false); }
   };
+  // Why the field is shut, and what opens it (owner report 2026-11-03: «لا أستطيع إضافة السعر بعد الخصم»):
+  // one sentence per reason the server gives (`discount.usd.reason`), never the same sentence for all of them.
+  const reason = read.usd.reason;
   const blocked = !read.published
-    ? loc('انشر أسعار المنتج أولًا؛ يُحسب الخصم من السعر المنشور.', 'Publish the product prices first; the discount is taken from the published price.', 'سەرەتا نرخەکانی بەرهەم بڵاو بکەرەوە؛ داشکاندن لە نرخی بڵاوکراوە هەژمار دەکرێت.')
+    ? loc('لا يوجد سعر منشور لهذا المنتج بعد، والخصم يُحسب من السعر المنشور. انشر أسعاره من «إعدادات التسعير» أولًا، ثم اكتب السعر بعد الخصم هنا.', 'This product has no published price yet, and the discount is taken from the published price. Publish its prices in the pricing settings first, then type the price after discount here.', 'ئەم بەرهەمە هێشتا نرخی بڵاوکراوەی نییە، و داشکاندن لە نرخی بڵاوکراوە هەژمار دەکرێت. سەرەتا لە «ڕێکخستنەکانی نرخدان» نرخەکانی بڵاو بکەرەوە، پاشان نرخی دوای داشکاندن لێرە بنووسە.')
     : otherMode
       ? loc('على هذا المنتج تخفيض بنسبة أو بالدينار. عدّله من «تخفيض السعر» في إعدادات التسعير.', 'This product has a percent or dinar sale. Edit it under Sale price in the pricing settings.', 'ئەم بەرهەمە داشکاندنی ڕێژەیی یان بە دیناری هەیە. لە «داشکاندنی نرخ» لە ڕێکخستنەکانی نرخدان دەستکاری بکە.')
-      : !read.usd.available
-        ? loc('السعر بعد الخصم بالدولار غير متاح لهذا المنتج؛ استعمل نسبة الخصم من «تخفيض السعر» في إعدادات التسعير.', 'A USD price after discount is not available for this product; use a percent under Sale price in the pricing settings.', 'نرخی دوای داشکاندن بە دۆلار بۆ ئەم بەرهەمە بەردەست نییە؛ ڕێژەی داشکاندن لە «داشکاندنی نرخ» لە ڕێکخستنەکانی نرخدان بەکاربهێنە.')
-        : '';
+      : reason === 'NOT_DIRECT'
+        ? loc('السعر بعد الخصم يُطبَّق على سعر البيع من المخزون، وهذا الخيار يُباع اليوم بالطلب المسبق فقط. بعد وصول هذه الشحنة فعّل «بيع مباشر» لهذا الخيار في «مجموعات الخيارات» من إعدادات المنتج، ثم اكتب السعر بعد الخصم هنا. ولتغيير سعر الطلب المسبق الآن عدّل «السعر النهائي بالدولار» أعلاه.', 'A price after discount applies to the in-stock price, and this option sells as pre-order only today. When this shipment arrives, turn on “Direct sale” for this option under “Option groups” in the product settings, then type the price after discount here. To change the pre-order price now, edit “Final price (USD)” above.', 'نرخی دوای داشکاندن لەسەر نرخی فرۆشتن لە کۆگا جێبەجێ دەکرێت، و ئەم هەڵبژاردەیە ئەمڕۆ تەنها بە پێشداواکاری دەفرۆشرێت. کاتێک ئەم بارە گەیشت، «Direct sale» بۆ ئەم هەڵبژاردەیە لە «Option groups»ی ڕێکخستنەکانی بەرهەم چالاک بکە، پاشان نرخی دوای داشکاندن لێرە بنووسە. بۆ گۆڕینی نرخی پێشداواکاری ئێستا، «نرخی کۆتایی بە دۆلار» لە سەرەوە دەستکاری بکە.')
+        : reason === 'MIXED_PRICES'
+          ? loc('خيارات هذا المنتج أو ألوانه بأسعار مختلفة، فلا يناسبها سعر واحد بعد الخصم. استعمل نسبة الخصم من «تخفيض السعر» في إعدادات التسعير.', 'This product’s options or colours have different prices, so one price after discount cannot fit them all. Use a percent under Sale price in the pricing settings.', 'هەڵبژاردەکان یان ڕەنگەکانی ئەم بەرهەمە نرخی جیاوازیان هەیە، بۆیە یەک نرخی دوای داشکاندن بۆ هەموویان ناگونجێت. ڕێژەی داشکاندن لە «داشکاندنی نرخ» لە ڕێکخستنەکانی نرخدان بەکاربهێنە.')
+          : reason === 'OWNER_ONLY'
+            ? loc('هذا المنتج مسعَّر من التكلفة، فسعره بعد الخصم يضعه المالك وحده.', 'This product is priced from cost, so only the owner sets its price after discount.', 'ئەم بەرهەمە لە تێچووەوە نرخی دانراوە، بۆیە تەنها خاوەن نرخی دوای داشکاندنی دادەنێت.')
+            : !read.usd.available
+              ? loc('السعر بعد الخصم بالدولار غير متاح لهذا المنتج؛ استعمل نسبة الخصم من «تخفيض السعر» في إعدادات التسعير.', 'A USD price after discount is not available for this product; use a percent under Sale price in the pricing settings.', 'نرخی دوای داشکاندن بە دۆلار بۆ ئەم بەرهەمە بەردەست نییە؛ ڕێژەی داشکاندن لە «داشکاندنی نرخ» لە ڕێکخستنەکانی نرخدان بەکاربهێنە.')
+              : '';
   const dirty = value !== null && value.trim() !== stored;
   return (
     <div className="mt-3 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] p-3" data-procurement-sale-discount>
@@ -131,7 +140,9 @@ export default function InlineSaleDiscount({ productId, modelId, colorId, label,
       <div className="mt-2 flex flex-wrap gap-2">
         {!blocked && dirty && <button type="button" className={T.btnSecondary} disabled={busy || !draft} onClick={() => void save()}>{busy ? loc('جارٍ الحفظ…', 'Saving…', 'پاشەکەوت دەکرێت…') : loc('حفظ التخفيض', 'Save sale price', 'پاشەکەوتکردنی داشکاندن')}</button>}
         {dirty && <button type="button" className={T.btnGhost} disabled={busy} onClick={() => { setValue(null); setIssues([]); }}>{loc('تراجع', 'Discard edits', 'پاشگەزبوونەوە')}</button>}
-        {(blocked || offer) && <button type="button" className={T.btnGhost} onClick={onAdvanced}>{loc('التواريخ والإعدادات الأخرى', 'Dates and other settings', 'بەروار و ڕێکخستنەکانی تر')}</button>}
+        {/* A shut field opens where it can be fixed: the product’s pricing settings, named as such. */}
+        {blocked && <button type="button" className={T.btnSecondary} onClick={onAdvanced}>{loc('فتح إعدادات التسعير', 'Open pricing settings', 'کردنەوەی ڕێکخستنەکانی نرخدان')}</button>}
+        {!blocked && offer && <button type="button" className={T.btnGhost} onClick={onAdvanced}>{loc('التواريخ والإعدادات الأخرى', 'Dates and other settings', 'بەروار و ڕێکخستنەکانی تر')}</button>}
       </div>
     </div>
   );

@@ -175,7 +175,10 @@ test('every admin but the owner receives a shipment through the cost-free receiv
   // the register or the procurement config.
   const inventory = codeOf(SCREENS.inventory);
   assert.match(inventory, /kind === 'purchase' \|\| kind === 'receive' \? \(showsCosts \? 'procurement' : 'receiving'\)/);
-  assert.match(inventory, /tab === 'receiving' && !showsCosts && /);
+  assert.match(inventory, /current === 'receiving' && !showsCosts && /);
+  // A tab named in the address (`?itab=`) never opens a cost panel before the hint proves it may.
+  assert.match(inventory, /current === 'procurement' && showsCosts && /);
+  assert.match(inventory, /current === 'reports' && showsCosts && /);
   const panel = codeOf(SCREENS.receiving);
   assert.match(panel, /`\$\{PROCUREMENT\}\/receiving`/);
   assert.match(panel, /`\$\{PROCUREMENT\}\/receiving\/\$\{encodeURIComponent\(id\)\}`/);

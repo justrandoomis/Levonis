@@ -105,16 +105,23 @@ export function Field({
   label,
   children,
   hint,
+  error,
 }: {
   label: string;
   children: React.ReactNode;
   hint?: string;
+  /**
+   * What is wrong with the field, shown under it in the danger colour (the control carries `aria-invalid`).
+   * Inside the <label>, it is read with the field’s name once — no `aria-describedby` to read it twice.
+   */
+  error?: string;
 }) {
   return (
     <label className="grid min-w-0 gap-1 text-sm">
       <span className={T.text2}>{label}</span>
       {children}
       {hint && <small className={T.text3}>{hint}</small>}
+      {error && <small className="text-[var(--ap-danger)]" data-field-error>{error}</small>}
     </label>
   );
 }
@@ -129,6 +136,8 @@ export function Input({
   decimals = 6,
   placeholder,
   inputMode,
+  id,
+  error,
 }: {
   label: string;
   value: string | number;
@@ -141,10 +150,16 @@ export function Input({
   /** A text field's placeholder (never on a number field). */
   placeholder?: string;
   inputMode?: 'numeric' | 'text';
+  /** The control’s id: the purchase wizard’s «اذهب» scrolls to it and focuses it. */
+  id?: string;
+  /** What is wrong with the value; shown under the field and announced with it. */
+  error?: string;
 }) {
+  const invalid = error ? { 'aria-invalid': true as const } : {};
   return (
-    <Field label={label} hint={hint}>
-      {type === 'number' ? <NumberInput className={T.input} value={value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value)} min={min} decimals={decimals} required={required} onValueChange={(n, ok) => onChange(!ok ? 'NaN' : n == null ? '' : String(n))} /> : <input
+    <Field label={label} hint={hint} error={error}>
+      {type === 'number' ? <NumberInput id={id} className={T.input} value={value == null || value === '' || !Number.isFinite(Number(value)) ? null : Number(value)} min={min} decimals={decimals} required={required} onValueChange={(n, ok) => onChange(!ok ? 'NaN' : n == null ? '' : String(n))} {...invalid} /> : <input
+        id={id}
         className={T.input}
         type={type}
         value={value}
@@ -154,6 +169,7 @@ export function Input({
         required={required}
         placeholder={placeholder}
         inputMode={inputMode}
+        {...invalid}
       />}
     </Field>
   );
@@ -164,16 +180,19 @@ export function Select({
   onChange,
   options,
   empty,
+  id,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
   options: Array<{ id: string; name: string }>;
   empty?: string;
+  /** The control’s id (the purchase wizard’s «اذهب» focuses it). */
+  id?: string;
 }) {
   return (
     <Field label={label}>
-      <select className={T.select} value={value} onChange={(e) => onChange(e.target.value)}>
+      <select id={id} className={T.select} value={value} onChange={(e) => onChange(e.target.value)}>
         {empty !== undefined && <option value="">{empty}</option>}
         {options.map((o) => (
           <option key={o.id} value={o.id}>

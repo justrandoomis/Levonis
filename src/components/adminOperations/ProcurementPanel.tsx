@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { privateDrafts } from '../../lib/privateDrafts';
 import StockSelection from './StockSelection';
-import PurchaseFundingFields, { newFunding, fundingValid, type FundingDraft, type PurchaseInvestor } from './PurchaseFundingFields';
+import PurchaseFundingFields, { newFunding, fundingProblems, fundingValid, type FundingDraft, type PurchaseInvestor } from './PurchaseFundingFields';
 import { estimateLineKey, purchaseEstimate, purchaseProfit } from './purchaseEstimate';
 import { changeLineCostProfile, changeLineQuantity, changePurchaseCostMode, cloneCostProfileSnapshot, packedMeasureInput, packedMeasureValid, restoreCostProfileSnapshot, restoreLineDiscounts, selectionCostDraft, type ProcurementDraftLine as DraftLine } from './procurementCostDraft';
 import { chargeDraft, chargeProblems, chargesAfterRouteChange, chargeWire, looksLikeFreight, newChargeDraft, type ChargeDraft } from './procurementCharges';
@@ -15,6 +15,7 @@ import BatchSnapshotCard from '../adminInventory/BatchSnapshotCard';
 import { extraOnStep, previewDraft, previewSaved, type PreviewChoices, type PricingPreview, type PricingSummary } from './procurementPricing';
 import { procurementPricingStrings } from './procurementPricingStrings';
 import { purchaseNameFits, purchaseNameStrings } from './purchaseName';
+import { blockersUpTo, purchaseBlockers, purchaseBlockerStrings, type PurchaseBlocker, type PurchaseLineCheck } from './purchaseBlockers';
 import { approvedRateOf, prefillRate, procurementRateStrings, rateStanding } from './procurementRate';
 import { fundingReturnEstimate, investmentReturnStrings } from '../../lib/investmentReturn';
 import { COST_REFUSALS } from '../../../packages/contracts/src/costRefusals';
@@ -233,7 +234,38 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     [draftNote, setDraftNote] = useState<{ tone: 'ok' | 'info' | 'error'; text: string } | null>(null),
     // DECISIONS row 273: a final cost typed and saved in a card stays the cost of that selection while its
     // shipment figures are unchanged (selection key to the shipment signature it was saved against).
-    [costPins, setCostPins] = useState<Record<string, string>>({});
+    [costPins, setCostPins] = useState<Record<string, string>>({}),
+    // Owner report 2026-11-03 («لا أستطيع الضغط على التالي»): once «التالي» (or a locked step) was pressed
+    // with something missing, the footer list turns into an alert and each empty field says so.
+    [attempted, setAttempted] = useState(false),
+    // «اذهب»: the field to scroll to and focus once its step is on screen (null id: the top of the wizard).
+    [focusTarget, setFocusTarget] = useState<{ id: string | null; at: number; step?: boolean } | null>(null),
+    // The one live announcement of a blocked press (the visible list is not a live region: it changes with every keystroke).
+    [announce, setAnnounce] = useState('');
+  const wizardTop = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!focusTarget) return;
+    // After the commit (the step’s fields exist); a timer, not a frame, so a page in the background still moves.
+    const frame = window.setTimeout(() => {
+      const el = focusTarget.id ? document.getElementById(focusTarget.id) : wizardTop.current;
+      if (!el) return;
+      // A field folded inside «تفاصيل» is opened first, or the focus would land on nothing visible.
+      for (let d = el.closest('details'); d; d = d.parentElement?.closest('details') ?? null) d.open = true;
+      if (el instanceof HTMLDetailsElement) el.open = true;
+      // The control itself is what is scrolled to the middle (never only its card, which can be taller than the
+      // screen); a card names the control that fixes it with `data-focus-first`, else its first enabled control.
+      // No field to go to (a step-level reason): the step’s own tab takes the focus, so it never falls to the page.
+      const control = focusTarget.id
+        ? (el.matches('input, select, textarea, button') ? el : el.querySelector<HTMLElement>('[data-focus-first]:not([disabled])') ?? el.querySelector<HTMLElement>('input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])'))
+        : focusTarget.step ? wizardTop.current?.querySelector<HTMLElement>('[aria-current="step"]') ?? null : null;
+      // «اذهب» jumps (an animation a busy or hidden page never finishes would leave the focused field off screen);
+      // a new step glides to its top, unless the reader asked for less motion.
+      const gentle = !focusTarget.id && !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      (focusTarget.id ? (control ?? el) : el).scrollIntoView({ block: focusTarget.id ? 'center' : 'start', behavior: gentle ? 'smooth' : 'auto' });
+      control?.focus({ preventScroll: true });
+    }, 0);
+    return () => window.clearTimeout(frame);
+  }, [focusTarget, step]);
   const load = useCallback(async () => {
     const [cfg, r] = await Promise.all([
       api.get<typeof config>(`${PROCUREMENT}/config`),
@@ -332,6 +364,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     setConfirmedRate('');
     setDraftNote(null);
     setCostPins({});
+    setAttempted(false);
     setEditing(true);
   };
   // The request body of a save — and of the pricing preview, which reads it with
@@ -425,7 +458,10 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const rateConfirmed = confirmedRate === rateKey;
   const approvedRate = approvedRateOf(config.approved_rates, header.currency);
   const rateReady = rateStand === 'iqd' || rateStand === 'ok' || (rateStand === 'far' && rateConfirmed);
-  const inputsValid = quantitiesValid && profileValid && Number.isFinite(header.exchange_rate) && header.exchange_rate > 0 && lines.every((l) => (l.purchase_cost_mode === 'total' ? l.source_total_amount !== '' && l.source_total_amount != null && Number.isFinite(Number(l.source_total_amount)) && Number(l.source_total_amount) >= 0 : l.source_unit_amount !== '' && l.source_unit_amount != null && Number.isFinite(Number(l.source_unit_amount)) && Number(l.source_unit_amount) >= 0));
+  // The raw supplier price of a line, as typed (a unit price, or the line’s total).
+  const lineRawValid = (l: DraftLine) => (l.purchase_cost_mode === 'total' ? l.source_total_amount !== '' && l.source_total_amount != null && Number.isFinite(Number(l.source_total_amount)) && Number(l.source_total_amount) >= 0 : l.source_unit_amount !== '' && l.source_unit_amount != null && Number.isFinite(Number(l.source_unit_amount)) && Number(l.source_unit_amount) >= 0);
+  const exchangeRateValid = Number.isFinite(header.exchange_rate) && header.exchange_rate > 0;
+  const inputsValid = quantitiesValid && profileValid && exchangeRateValid && lines.every(lineRawValid);
   const estimates = purchaseEstimate(lines, charges, header.currency === 'IQD' ? 1 : header.exchange_rate, funding.mode === 'investor' ? funding.profit_share_bps : 0, funding.incoming_indexes, header.cost_profile_id && shippingBasis ? { basis: shippingBasis, rate: header.shipping_rate_iqd ?? NaN } : undefined);
   // What the landed cost of a selection depends on: the rate, the freight, the charges and its own lines.
   const shipmentSignature = (l: Pick<Selection, 'product_id' | 'scope' | 'scope_id'>) => JSON.stringify([
@@ -462,6 +498,110 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const extrasValid = Object.values(extras).every(extraOnStep);
   const pendingInlinePrices = lines.some((line) => Object.keys(inlinePrices[inlineKey(line)] ?? {}).length > 0);
   const nameValid = purchaseNameFits(header.invoice_no);
+  // «التالي» says why it cannot move (owner report 2026-11-03): the gates below stay the decision; this
+  // list names, per item, the field each one waits for, so the footer can say it and «اذهب» can go there.
+  const bs = purchaseBlockerStrings(lang);
+  const lineChecks: PurchaseLineCheck[] = lines.map((l, i) => ({
+    label: l.label,
+    key: `purchase-line-${i}`,
+    quantity: Number.isSafeInteger(l.qty_ordered) && l.qty_ordered > 0,
+    invoiced: Number.isSafeInteger(l.invoiced_qty) && l.invoiced_qty >= 0,
+    origins: purchaseUnitsValid(l.unit_origins, l.qty_ordered),
+    raw: lineRawValid(l),
+    rawMode: l.purchase_cost_mode === 'total' ? 'total' : 'unit',
+    packed: header.cost_profile_id && shippingBasis ? packedMeasureValid(l, shippingBasis) : null,
+    pendingPrice: Object.keys(inlinePrices[inlineKey(l)] ?? {}).length > 0,
+  }));
+  const blockers = purchaseBlockers({
+    nameValid,
+    funding: fundingProblems(funding),
+    lines: lineChecks,
+    trackedOverLimit: trackedQuantity > 5000,
+    currency: header.currency,
+    exchangeRateValid,
+    freightRateValid: header.cost_profile_id ? !!shippingBasis && header.shipping_rate_iqd !== null && Number.isFinite(header.shipping_rate_iqd) && header.shipping_rate_iqd >= 0 : null,
+    basis: shippingBasis ?? null,
+    rate: rateStand,
+    rateConfirmed,
+    rateMissingText: rs.missing,
+    rateFarText: COST_REFUSALS.PURCHASE_RATE_CONFIRM_REQUIRED[lang],
+    charges: charges.map((c, j) => ({ title: c.title, problems: chargeIssues[j] ?? [] })),
+    serialsOverLimit: draftSerialCount > 50,
+    serialsNeedFinal: hasDraftSerials && header.cost_state !== 'final',
+    // Only once every input and expense is there: an empty price or amount already explains a missing total.
+    totalsValid: !inputsValid || chargeIssues.some((p) => p.length > 0) || (Number.isSafeInteger(total) && total <= 1e12 && estimates.every((e) => Number.isSafeInteger(e.total_iqd) && e.total_iqd >= 0)),
+  }, lang);
+  // The confirm’s own conditions, beyond the three steps before it.
+  const confirmOnly: PurchaseBlocker[] = [
+    ...(fundingNeedsFinalCost ? [{ id: 'funding-final', step: 2 as const, text: COST_REFUSALS.INVESTMENT_NEEDS_FINAL_COST[lang], target: 'purchase-cost-state' }] : []),
+    ...(quickReceive && header.cost_state !== 'final' ? [{ id: 'quick-final', step: 2 as const, text: loc('إضافة مخزون موجود تحتاج تكلفة نهائية: اجعل «حالة التكلفة» نهائية.', 'Adding stock on hand needs a final cost: set “Cost status” to final.', 'زیادکردنی کۆگای ئامادە تێچووی کۆتایی دەوێت: «دۆخی تێچوو» بکە بە کۆتایی.'), target: 'purchase-cost-state' }] : []),
+    ...(!extrasValid ? [{ id: 'extras', step: 3 as const, text: loc('صحّح زيادة البيع المباشر المكتوبة: بالدينار وعلى مضاعفات 1,000.', 'Fix the typed direct-sale extra: whole dinars in steps of 1,000.', 'زیادەی فرۆشتنی ڕاستەوخۆی نووسراو چاک بکە: بە دینار و بە هەنگاوی 1,000.'), target: null }] : []),
+  ];
+  // The gates themselves, unchanged: «التالي» per step, and the confirm on the review.
+  const nextBlocked = !nameValid || !fundingValid(funding) || (step > 0 && (!quantitiesValid || !originsValid)) || (step === 2 && (!costsValid || !draftSerialsValid || !rateReady || pendingInlinePrices));
+  const confirmBlocked = draftBusy || pendingInlinePrices || !draftSerialsValid || !originsValid || !costsValid || !extrasValid || !nameValid || !fundingValid(funding) || fundingNeedsFinalCost || !rateReady || (quickReceive && header.cost_state !== 'final');
+  const stepLocked = (i: number) => (i > 0 && !fundingValid(funding)) || (i > 1 && !quantitiesValid) || (i === 3 && (!costsValid || !rateReady));
+  const shownBlockers = step < 3
+    ? (nextBlocked ? blockersUpTo(blockers, step) : [])
+    : (confirmBlocked && !draftBusy ? [...blockersUpTo(blockers, 2), ...confirmOnly] : []);
+  // Everything fixed: the footer and the fields go back to their quiet state until the next press.
+  const blockerCount = shownBlockers.length;
+  useEffect(() => { if (blockerCount === 0) setAttempted(false); }, [blockerCount]);
+  /**
+   * «اذهب»: open the step that fixes it, then scroll to its field and focus it. A field already on screen (the
+   * purchase name sits above every step) is reached where it is: the wizard never jumps back to step 1 for it.
+   */
+  const reveal = (b: PurchaseBlocker) => {
+    setAttempted(true);
+    if (b.step !== step && !(b.target && document.getElementById(b.target))) setStep(b.step);
+    setFocusTarget({ id: b.target, at: Date.now(), step: !b.target });
+  };
+  /** A blocked press is said once, out loud: the heading, the first reason, and how many follow. */
+  const say = (list: readonly PurchaseBlocker[], heading: string) => {
+    const [first, ...rest] = list;
+    const text = first ? `${heading} ${first.text}${rest.length ? ` ${bs.more(rest.length)}` : ''}` : bs.generic;
+    // The same words twice in a row are announced again: a zero-width space tells the two apart.
+    setAnnounce((prev) => (prev === text ? `${text}\u200b` : text));
+  };
+  const goNext = () => {
+    if (op.busy) return;
+    if (nextBlocked) {
+      setAttempted(true);
+      const list = blockersUpTo(blockers, step);
+      say(list, bs.title);
+      if (list[0]) reveal(list[0]);
+      return;
+    }
+    setAttempted(false);
+    setStep((v) => v + 1);
+    setFocusTarget({ id: null, at: Date.now() });
+  };
+  /** A step tab: back is always open; a locked step forward lands on the first thing to fix instead. */
+  const goStep = (i: number) => {
+    if (i <= step || !stepLocked(i)) { setStep(i); setFocusTarget({ id: null, at: Date.now() }); return; }
+    setAttempted(true);
+    const list = blockers.filter((b) => b.step < i);
+    say(list, bs.title);
+    if (list[0]) reveal(list[0]);
+  };
+  const confirmPress = () => {
+    if (confirmBlocked) {
+      setAttempted(true);
+      say(shownBlockers, bs.confirmTitle);
+      if (shownBlockers[0]) reveal(shownBlockers[0]);
+      return;
+    }
+    void op.run(() => save('ordered'), loc('تم تأكيد أمر الشراء', 'Purchase confirmed', 'کڕینەکە پشتڕاست کرایەوە'));
+  };
+  // The confirm’s step-2 conditions (a final cost) are said on step 2 too, under «حالة التكلفة», not only on the
+  // review — and its fold is opened for them (opened only: choosing «نهائية» never snaps it shut under the hand).
+  const finalCostNeeded = fundingNeedsFinalCost || (quickReceive && header.cost_state !== 'final');
+  useEffect(() => {
+    if (!finalCostNeeded || step !== 2) return;
+    const fold = document.getElementById('purchase-cost-state');
+    if (fold instanceof HTMLDetailsElement) fold.open = true;
+  }, [finalCostNeeded, step]);
+  const fieldError = (show: boolean, text: string) => (attempted && show ? text : undefined);
   // The card's pricing, live: the server prices the draft as it would be saved (debounced, latest wins).
   const previewKey = !pricingProduct && editing && step >= 2 && costsValid && extrasValid && !pricingOff ? JSON.stringify([draftBody('ordered', false), choices, editId, pricingRevision]) : '';
   useEffect(() => {
@@ -589,21 +729,30 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
         <Card title={loc(editId ? 'تعديل أمر الشراء' : 'شراء جديد', editId ? 'Edit purchase' : 'New purchase', editId ? 'دەستکاریکردنی کڕین' : 'کڕینی نوێ')}>
           {/* The purchase's name, above the four steps and on every one (owner request 2026-10-10: «لا يمكن تسمية المخزون»). */}
           <div className="mb-4 grid max-w-xl gap-1" data-purchase-name>
-            <Input label={pn.label} value={header.invoice_no} onChange={(v) => update('invoice_no', v)} placeholder={pn.placeholder} hint={pn.hint} />
+            <Input id="purchase-name" label={pn.label} value={header.invoice_no} onChange={(v) => update('invoice_no', v)} placeholder={pn.placeholder} hint={pn.hint} />
             {!nameValid && <p role="alert" className="text-[13px] text-[var(--ap-danger)]">{COST_REFUSALS.PURCHASE_NAME_TOO_LONG[lang]}</p>}
           </div>
-          <ol className="inventory-stepper" aria-label={loc('خطوات الشراء', 'Purchase steps', 'هەنگاوەکانی کڕین')}>
-            {[loc('التمويل', 'Funding', 'پارەدارکردن'), loc('المنتجات', 'Products', 'بەرهەمەکان'), loc('التكاليف والشحن', 'Costs & freight', 'تێچوو و ناردن'), loc('المراجعة', 'Review', 'پێداچوونەوە')].map((label, i) => (
-              <li key={label}><button type="button" aria-current={step === i ? 'step' : undefined} disabled={(i > 0 && !fundingValid(funding)) || (i > 1 && !quantitiesValid) || (i === 3 && (!costsValid || !rateReady))} onClick={() => setStep(i)}><span>{i + 1}</span>{label}</button></li>
-            ))}
-          </ol>
+          {/* The steps are tabs the owner can always press: back is open, and a step not ready yet takes
+              them to the first thing to fix (with the reason in the footer) instead of doing nothing. */}
+          <div ref={wizardTop} className="scroll-mt-24">
+            <ol className="inventory-stepper" aria-label={loc('خطوات الشراء', 'Purchase steps', 'هەنگاوەکانی کڕین')}>
+              {[loc('التمويل', 'Funding', 'پارەدارکردن'), loc('المنتجات', 'Products', 'بەرهەمەکان'), loc('التكاليف والشحن', 'Costs & freight', 'تێچوو و ناردن'), loc('المراجعة', 'Review', 'پێداچوونەوە')].map((label, i) => {
+                const locked = i > step && stepLocked(i);
+                const fixHere = blockers.some((b) => b.step === i) || confirmOnly.some((b) => b.step === i);
+                const state = i === step ? 'current' : i < step ? (fixHere ? 'attention' : 'done') : locked ? 'locked' : 'open';
+                return (
+                  <li key={label}><button type="button" data-state={state} aria-current={step === i ? 'step' : undefined} aria-disabled={locked || undefined} onClick={() => goStep(i)}><span aria-hidden>{state === 'done' ? '✓' : state === 'attention' ? '!' : i + 1}</span>{label}</button></li>
+                );
+              })}
+            </ol>
+          </div>
           {step === 0 && <PurchaseFundingFields value={funding} onChange={setFunding} investors={config.investors} />}
           {step === 1 && <>
             <div className="inventory-fields">
               <Select label={loc('المورد', 'Supplier', 'دابینکەر')} value={header.supplier_id} onChange={(v) => update('supplier_id', v)} empty={loc('بدون مورد', 'No supplier', 'بێ دابینکەر')} options={config.suppliers.map((x) => ({ id: x.id, name: nameOf(x) }))} />
               <Input label={loc('تاريخ الشراء', 'Purchase date', 'ڕێکەوتی کڕین')} type="date" value={header.purchase_day} onChange={(v) => update('purchase_day', v)} />
             </div>
-            <div className="my-5 max-w-2xl">
+            <div className="my-5 max-w-2xl" id="purchase-add-item">
               <StockSelection value={choice} onChange={setChoice} showPurchaseReference={false} />
               <button type="button" className={`${T.btnSecondary} mt-3`} disabled={!choice} onClick={addChoice}>{loc('إضافة المنتج', 'Add item', 'زیادکردنی بەرهەم')}</button>
               {recent.length > 0 && <details><summary>{loc('منتجات استخدمتها الآن', 'Recent selections', 'ئەو بەرهەمانەی ئێستا بەکارت هێنان')}</summary><div className="flex flex-wrap gap-2">{recent.map((r) => <button key={`${r.product_id}:${r.scope}:${r.scope_id}`} type="button" className={T.btnGhost} onClick={() => setChoice(r)}>{r.label}</button>)}</div></details>}
@@ -612,9 +761,9 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             {trackedQuantity > 5000 && <p role="alert" className="py-3 text-sm text-[var(--ap-danger)]">{loc('الحد الأقصى 5000 قطعة بمرجع فردي في أمر الشراء الواحد. وزّع الكمية على أكثر من أمر شراء.', 'A purchase can hold at most 5,000 individually tracked units. Split larger quantities across purchases.', 'هەر کڕینێک زۆرترین 5000 پارچەی شوێنکەوتنکراو دەگرێت. بڕی زیاتر بەسەر چەند کڕینێکدا دابەش بکە.')}</p>}
             <div className="inventory-lines">{lines.map((l, i) => <article key={i} className="inventory-line">
               <div className="inventory-line-head">{l.image_url && <VariantImg sizes="48px" src={l.image_url} alt="" className="inventory-thumb" loading="lazy" />}<div><strong>{l.label}</strong><small>{l.sku}</small></div><button type="button" className={T.btnGhost} onClick={() => setLines((a) => [...a, { ...l, unit_origins: copyPurchaseUnits(l.unit_origins, l.qty_ordered) }])}>{loc('تكرار', 'Duplicate', 'دووبارەکردنەوە')}</button><button type="button" className={T.btnGhost} onClick={() => { setLines((a) => a.filter((_, j) => i !== j)); setFunding((f) => ({...f,incoming_indexes:f.incoming_indexes?.filter(j=>j!==i).map(j=>j>i?j-1:j)})); }}>{loc('حذف', 'Remove', 'سڕینەوە')}</button></div>
-              <Input label={loc('الكمية المطلوبة', 'Quantity ordered', 'بڕی داواکراو')} type="number" min={1} value={l.qty_ordered} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? changeLineQuantity(x, v === '' ? NaN : Number(v)) : x))} />
-              <details className="mt-2"><summary>{loc('كمية الفاتورة مختلفة؟', 'Different invoiced quantity?', 'بڕی پسوولە جیاوازە؟')}</summary><Input label={loc('كمية الفاتورة', 'Invoice quantity', 'بڕی پسوولە')} type="number" min={0} value={l.invoiced_qty} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, invoiced_qty: Number(v) } : x))} /></details>
-              <PurchaseUnitOrigins qty={l.qty_ordered} value={l.unit_origins} onChange={(unit_origins) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_origins } : x))} />
+              <Input id={`purchase-line-${i}-qty`} label={loc('الكمية المطلوبة', 'Quantity ordered', 'بڕی داواکراو')} type="number" min={1} value={l.qty_ordered} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? changeLineQuantity(x, v === '' ? NaN : Number(v)) : x))} error={fieldError(!lineChecks[i]?.quantity, bs.quantity)} />
+              <details className="mt-2"><summary>{loc('كمية الفاتورة مختلفة؟', 'Different invoiced quantity?', 'بڕی پسوولە جیاوازە؟')}</summary><Input id={`purchase-line-${i}-invoiced`} error={fieldError(!lineChecks[i]?.invoiced, bs.invoiced)} label={loc('كمية الفاتورة', 'Invoice quantity', 'بڕی پسوولە')} type="number" min={0} value={l.invoiced_qty} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, invoiced_qty: Number(v) } : x))} /></details>
+              <div id={`purchase-line-${i}-origins`} className="scroll-mt-24"><PurchaseUnitOrigins qty={l.qty_ordered} value={l.unit_origins} onChange={(unit_origins) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_origins } : x))} /></div>
             </article>)}</div>
             <details><summary>{pn.details}</summary><div className="inventory-fields mt-3">
               <Select label={loc('المستودع / الموقع', 'Warehouse / location', 'کۆگا / شوێن')} value={header.warehouse_id} onChange={(v) => update('warehouse_id', v)} empty={loc('غير محدد', 'Unassigned', 'دیاری نەکراوە')} options={config.locations.map((x) => ({ id: x.id, name: nameOf(x) }))} />
@@ -628,14 +777,14 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               <div className="inventory-fields">
                 <Select label={loc('مسار المورد والشحن', 'Supplier and shipping route', 'ڕێگای دابینکەر و ناردن')} value={header.cost_profile_id ?? ''} onChange={chooseCostProfile} empty={loc('إدخال يدوي / مستند سابق', 'Manual entry / legacy document', 'نووسینی دەستی / بەڵگەنامەی پێشوو')} options={config.cost_profiles.map((p) => ({ id: p.id, name: loc(p.name_ar, p.name_en, p.name_ckb) }))} />
                 {header.cost_profile_id ? <div className="grid gap-1 text-sm"><span className={T.text2}>{loc('عملة شراء المورد', 'Supplier currency', 'دراوی کڕین لە دابینکەر')}</span><strong className={T.text1}>{header.currency === 'EUR' ? loc('يورو (EUR)', 'Euro (EUR)', 'یۆرۆ (EUR)') : loc('يوان صيني (CNY)', 'Chinese yuan (CNY)', 'یوانی چینی (CNY)')}</strong></div> : <Select label={loc('عملة الشراء', 'Purchase currency', 'دراوی کڕین')} value={header.currency} onChange={(v) => { if (v === header.currency) return; update('currency', v); update('exchange_rate', prefillRate(config.approved_rates, v)); setLines((a) => a.map((l) => ({ ...l, source_total_amount: '', source_unit_amount: '', discounted_unit_amount: '', cost_source: 'unknown' }))); }} options={['IQD', 'USD', 'CNY', 'EUR'].map((id) => ({ id, name: id }))} />}
-                {header.currency !== 'IQD' && <Input label={header.currency === 'EUR' ? loc('سعر اليورو الواحد بالدينار العراقي', 'IQD per euro', 'نرخی یەک یۆرۆ بە دیناری عێراقی') : header.currency === 'CNY' ? loc('سعر اليوان الواحد بالدينار العراقي', 'IQD per Chinese yuan', 'نرخی یەک یوانی چینی بە دیناری عێراقی') : loc('دينار لكل وحدة عملة', 'IQD per currency unit', 'دینار بۆ هەر یەکەیەکی دراو')} type="number" min={0} decimals={6} value={header.exchange_rate} onChange={(v) => update('exchange_rate', v === '' ? NaN : Number(v))} hint={approvedRate ? rs.central(approvedRate) : undefined} />}
-                {header.cost_profile_id && <Input label={shippingBasis === 'volume' ? loc('سعر المتر المكعب CBM بالدينار العراقي', 'Freight IQD per cubic metre (CBM)', 'نرخی ناردنی هەر مەترێکی سێجا (CBM) بە دیناری عێراقی') : loc('سعر الكيلوغرام بالدينار العراقي', 'Freight IQD per kilogram', 'نرخی ناردنی هەر کیلۆگرامێک بە دیناری عێراقی')} type="number" min={0} decimals={6} value={header.shipping_rate_iqd ?? ''} onChange={(v) => update('shipping_rate_iqd', v === '' ? null : Number(v))} />}
+                {header.currency !== 'IQD' && <Input id="purchase-rate" error={fieldError(!exchangeRateValid, bs.required)} label={header.currency === 'EUR' ? loc('سعر اليورو الواحد بالدينار العراقي', 'IQD per euro', 'نرخی یەک یۆرۆ بە دیناری عێراقی') : header.currency === 'CNY' ? loc('سعر اليوان الواحد بالدينار العراقي', 'IQD per Chinese yuan', 'نرخی یەک یوانی چینی بە دیناری عێراقی') : loc('دينار لكل وحدة عملة', 'IQD per currency unit', 'دینار بۆ هەر یەکەیەکی دراو')} type="number" min={0} decimals={6} value={header.exchange_rate} onChange={(v) => update('exchange_rate', v === '' ? NaN : Number(v))} hint={approvedRate ? rs.central(approvedRate) : undefined} />}
+                {header.cost_profile_id && <Input id="purchase-freight" error={fieldError(header.shipping_rate_iqd === null || !Number.isFinite(header.shipping_rate_iqd) || header.shipping_rate_iqd < 0, bs.required)} label={shippingBasis === 'volume' ? loc('سعر المتر المكعب CBM بالدينار العراقي', 'Freight IQD per cubic metre (CBM)', 'نرخی ناردنی هەر مەترێکی سێجا (CBM) بە دیناری عێراقی') : loc('سعر الكيلوغرام بالدينار العراقي', 'Freight IQD per kilogram', 'نرخی ناردنی هەر کیلۆگرامێک بە دیناری عێراقی')} type="number" min={0} decimals={6} value={header.shipping_rate_iqd ?? ''} onChange={(v) => update('shipping_rate_iqd', v === '' ? null : Number(v))} />}
               </div>
               {rateStand === 'missing' && <p role="alert" data-purchase-rate="missing" className="mt-3 text-[13px] text-[var(--ap-danger)]">{rs.missing}</p>}
               {rateStand === 'far' && approvedRate && <div role="alert" data-purchase-rate="far" className="mt-3 rounded-[var(--ap-radius-md)] border border-[var(--ap-warning-border)] bg-[var(--ap-warning-bg)] px-3 py-2.5 text-[13px] text-[var(--ap-text-1)]">
                 <p>{rs.far(approvedRate)}</p>
                 <div className="mt-2 flex flex-wrap items-center gap-3">
-                  <label className="flex gap-2"><input type="checkbox" checked={rateConfirmed} onChange={(e) => setConfirmedRate(e.target.checked ? rateKey : '')} />{rs.confirm}</label>
+                  <label className="flex gap-2"><input id="purchase-rate-confirm" type="checkbox" checked={rateConfirmed} onChange={(e) => setConfirmedRate(e.target.checked ? rateKey : '')} />{rs.confirm}</label>
                   <button type="button" className={T.btnGhost} onClick={() => update('exchange_rate', Number(approvedRate.rate_iqd))}>{rs.useCentral}</button>
                 </div>
               </div>}
@@ -646,10 +795,10 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered} · {ps.storePrice(Number.isFinite(l.selling_price_iqd) ? money(l.selling_price_iqd) : '—')}</small></div></div>
               {header.cost_profile_id && l.procurement_shared_colors && <p className={`mb-3 text-sm ${T.text3}`}>{loc('ألوان هذا الخيار تشترك في مخزون واحد، لذلك يشملها السعر الخام المحفوظ. لفصل تكاليف الألوان، اختر مخزونًا منفصلًا لكل خيار ولون في إعدادات المنتج.', 'This option shares one stock pool across colours, so its saved raw price applies to those colours. For separate colour costs, use stock tracked by option and colour in the product settings.', 'ڕەنگەکانی ئەم هەڵبژاردەیە یەک کۆگایان هەیە، بۆیە نرخی خاوی پاشەکەوتکراو ئەوانیش دەگرێتەوە. بۆ جیاکردنەوەی تێچووی ڕەنگەکان، لە ڕێکخستنەکانی بەرهەمدا کۆگای جیا بۆ هەر هەڵبژاردە و ڕەنگێک هەڵبژێرە.')}</p>}
               <Select label={loc('طريقة إدخال الشراء الخام', 'Raw purchase input', 'شێوازی نووسینی کڕینی خاو')} value={l.purchase_cost_mode || 'unit'} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? changePurchaseCostMode(x, v as 'unit' | 'total', header.currency === 'IQD' ? 0 : 6) : x))} options={[{ id: 'total', name: loc('إجمالي سعر شراء البند الخام', 'Total raw line purchase price', 'کۆی نرخی کڕینی خاوی بەند') }, { id: 'unit', name: loc('سعر شراء القطعة الخام', 'Raw unit purchase price', 'نرخی کڕینی خاوی پارچە') }]} />
-              <div className="inventory-fields mt-3"><Input label={`${l.purchase_cost_mode === 'total' ? loc('إجمالي سعر الشراء الخام من المورد', 'Raw supplier purchase total', 'کۆی نرخی کڕینی خاو لە دابینکەر') : loc('سعر شراء القطعة الخام من المورد', 'Raw supplier unit price', 'نرخی کڕینی خاوی پارچە لە دابینکەر')} (${header.currency})`} type="number" min={0} decimals={header.currency === 'IQD' ? 0 : 6} value={l.purchase_cost_mode === 'total' ? l.source_total_amount ?? '' : l.source_unit_amount} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_conversion_inexact: false, ...(x.purchase_cost_mode === 'total' ? { source_total_amount: v === '' ? '' : Number(v), source_unit_amount: v === '' ? '' : Number(v) / x.qty_ordered } : { source_unit_amount: v === '' ? '' : Number(v), source_total_amount: v === '' ? '' : Number((Number(v) * x.qty_ordered).toFixed(6)) }) } : x))} hint={l.cost_source === 'procurement_default' ? `${loc('آخر سعر خام محفوظ لهذا الخيار والمسار، دون شحن (متوسط القطعة عند إدخال إجمالي الفاتورة)', 'Saved raw supplier price, excluding freight (unit average when entered as an invoice total)', 'دوایین نرخی خاوی پاشەکەوتکراو بۆ ئەم هەڵبژاردە و ڕێگایە، بەبێ کرێی ناردن (تێکڕای پارچە کاتێک کۆی پسوولە دەنووسرێت)')} ${l.cost_date?.slice(0, 10) || ''}` : l.cost_source === 'confirmed_purchase' || l.cost_source === 'catalogue' ? loc('قيمة المستند المحفوظة؛ راجع فصل الشحن عنها قبل التعديل', 'Saved document amount; verify whether freight is included before changing it', 'بڕی بەڵگەنامەی پاشەکەوتکراو؛ پێش دەستکاری بپشکنە ئایا کرێی ناردن لێی جیاکراوەتەوە') : loc('أدخل سعر المورد فقط، دون الشحن', 'Enter only the supplier price, excluding freight', 'تەنها نرخی دابینکەر بنووسە، بەبێ کرێی ناردن')} />
+              <div className="inventory-fields mt-3"><Input id={`purchase-line-${i}-raw`} error={fieldError(!lineChecks[i]?.raw, bs.required)} label={`${l.purchase_cost_mode === 'total' ? loc('إجمالي سعر الشراء الخام من المورد', 'Raw supplier purchase total', 'کۆی نرخی کڕینی خاو لە دابینکەر') : loc('سعر شراء القطعة الخام من المورد', 'Raw supplier unit price', 'نرخی کڕینی خاوی پارچە لە دابینکەر')} (${header.currency})`} type="number" min={0} decimals={header.currency === 'IQD' ? 0 : 6} value={l.purchase_cost_mode === 'total' ? l.source_total_amount ?? '' : l.source_unit_amount} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_conversion_inexact: false, ...(x.purchase_cost_mode === 'total' ? { source_total_amount: v === '' ? '' : Number(v), source_unit_amount: v === '' ? '' : Number(v) / x.qty_ordered } : { source_unit_amount: v === '' ? '' : Number(v), source_total_amount: v === '' ? '' : Number((Number(v) * x.qty_ordered).toFixed(6)) }) } : x))} hint={l.cost_source === 'procurement_default' ? `${loc('آخر سعر خام محفوظ لهذا الخيار والمسار، دون شحن (متوسط القطعة عند إدخال إجمالي الفاتورة)', 'Saved raw supplier price, excluding freight (unit average when entered as an invoice total)', 'دوایین نرخی خاوی پاشەکەوتکراو بۆ ئەم هەڵبژاردە و ڕێگایە، بەبێ کرێی ناردن (تێکڕای پارچە کاتێک کۆی پسوولە دەنووسرێت)')} ${l.cost_date?.slice(0, 10) || ''}` : l.cost_source === 'confirmed_purchase' || l.cost_source === 'catalogue' ? loc('قيمة المستند المحفوظة؛ راجع فصل الشحن عنها قبل التعديل', 'Saved document amount; verify whether freight is included before changing it', 'بڕی بەڵگەنامەی پاشەکەوتکراو؛ پێش دەستکاری بپشکنە ئایا کرێی ناردن لێی جیاکراوەتەوە') : loc('أدخل سعر المورد فقط، دون الشحن', 'Enter only the supplier price, excluding freight', 'تەنها نرخی دابینکەر بنووسە، بەبێ کرێی ناردن')} />
               {header.cost_profile_id && (shippingBasis === 'volume'
-                ? <Input label={loc('حجم كرتون القطعة مع التغليف بالمتر المكعب (CBM)', 'Packed carton volume per unit (CBM)', 'قەبارەی کارتۆنی پارچە لەگەڵ پاکێج بە مەتری سێجا (CBM)')} type="number" min={0} decimals={9} value={l.volume_mm3 > 0 ? l.volume_mm3 / 1_000_000_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, volume_mm3: packedMeasureInput(v, 'volume') } : x))} hint={loc('الحجم الخارجي مع التغليف؛ ليس حجم القطعة وحدها. يُحفظ لهذا الخيار عند التأكيد.', 'Outer packed volume, not the bare item. Saved for this selection on confirmation.', 'قەبارەی دەرەوە لەگەڵ پاکێج؛ نەک قەبارەی تەنها پارچەکە. لە کاتی پشتڕاستکردنەوەدا بۆ ئەم هەڵبژاردەیە پاشەکەوت دەکرێت.')} />
-                : <Input label={loc('وزن كرتون القطعة مع التغليف بالكيلوغرام', 'Packed carton weight per unit (kg)', 'کێشی کارتۆنی پارچە لەگەڵ پاکێج بە کیلۆگرام')} type="number" min={0} decimals={3} value={l.weight_g > 0 ? l.weight_g / 1_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: packedMeasureInput(v, 'weight') } : x))} hint={loc('الوزن الإجمالي مع الكرتون والتغليف؛ يُحفظ لهذا الخيار عند التأكيد.', 'Gross weight including carton and packaging. Saved for this selection on confirmation.', 'کێشی گشتی لەگەڵ کارتۆن و پاکێج؛ لە کاتی پشتڕاستکردنەوەدا بۆ ئەم هەڵبژاردەیە پاشەکەوت دەکرێت.')} />)}
+                ? <Input id={`purchase-line-${i}-packed`} error={fieldError(lineChecks[i]?.packed === false, bs.required)} label={loc('حجم كرتون القطعة مع التغليف بالمتر المكعب (CBM)', 'Packed carton volume per unit (CBM)', 'قەبارەی کارتۆنی پارچە لەگەڵ پاکێج بە مەتری سێجا (CBM)')} type="number" min={0} decimals={9} value={l.volume_mm3 > 0 ? l.volume_mm3 / 1_000_000_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, volume_mm3: packedMeasureInput(v, 'volume') } : x))} hint={loc('الحجم الخارجي مع التغليف؛ ليس حجم القطعة وحدها. يُحفظ لهذا الخيار عند التأكيد.', 'Outer packed volume, not the bare item. Saved for this selection on confirmation.', 'قەبارەی دەرەوە لەگەڵ پاکێج؛ نەک قەبارەی تەنها پارچەکە. لە کاتی پشتڕاستکردنەوەدا بۆ ئەم هەڵبژاردەیە پاشەکەوت دەکرێت.')} />
+                : <Input id={`purchase-line-${i}-packed`} error={fieldError(lineChecks[i]?.packed === false, bs.required)} label={loc('وزن كرتون القطعة مع التغليف بالكيلوغرام', 'Packed carton weight per unit (kg)', 'کێشی کارتۆنی پارچە لەگەڵ پاکێج بە کیلۆگرام')} type="number" min={0} decimals={3} value={l.weight_g > 0 ? l.weight_g / 1_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: packedMeasureInput(v, 'weight') } : x))} hint={loc('الوزن الإجمالي مع الكرتون والتغليف؛ يُحفظ لهذا الخيار عند التأكيد.', 'Gross weight including carton and packaging. Saved for this selection on confirmation.', 'کێشی گشتی لەگەڵ کارتۆن و پاکێج؛ لە کاتی پشتڕاستکردنەوەدا بۆ ئەم هەڵبژاردەیە پاشەکەوت دەکرێت.')} />)}
               </div>
               {l.unit_conversion_inexact && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{loc('إجمالي الفاتورة لا يعطي سعر قطعة دقيقًا ضمن دقة هذه العملة. أدخل سعر القطعة، أو عد إلى إجمالي الشراء لاستعادة المبلغ الأصلي.', 'The invoice total has no exact unit price at this currency’s input precision. Enter a unit price, or return to total input to restore the original amount.', 'کۆی پسوولە نرخێکی وردی پارچە نادات بەپێی وردیی ئەم دراوە. نرخی پارچە بنووسە، یان بگەڕێوە بۆ کۆی کڕین بۆ گەڕاندنەوەی بڕە ڕەسەنەکە.')}</p>}
               <PurchaseLineCosts
@@ -666,11 +815,13 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 emptyHint={header.cost_profile_id ? loc('إن دفعت مصروفًا فعليًا، أضفه من «مصاريف إضافية فعلية» أدناه.', 'If you actually paid an extra expense, add it under “Actual extra expenses” below.', 'ئەگەر خەرجییەکی زیادەت بە ڕاستی داوە، لە «خەرجیی زیادەی ڕاستەقینە» لە خوارەوە زیادی بکە.') : undefined}
               />
               <p className={`mt-2 text-xs ${T.text3}`}>{loc('إجمالي البند مع الشحن', 'Total line cost with freight', 'کۆی بەند لەگەڵ ناردن')}: {costMoney(estimates[i]?.total_iqd)} · {loc('تُقرب المجاميع إلى أقرب دينار، ومتوسط القطعة للعرض.', 'Totals round to the nearest IQD; the unit average is for display.', 'کۆکان بۆ نزیکترین دینار خڕ دەکرێنەوە، و تێکڕای پارچە تەنها بۆ پیشاندانە.')}</p>
-              <InlineProcurementPricing line={l} purchaseDraft={costsValid ? draftBody('ordered', false) : null}
-                value={inlinePrices[inlineKey(l)] ?? {}} onChange={(value) => setInlinePrice(inlineKey(l), value)} onQuote={onPriceQuote}
-                keepCost={keepsCost(l)}
-                onSaved={(saved) => { pinCost(l, saved.final_cost_usd !== undefined); setInlinePrice(inlineKey(l), {}); setPricingRevision((v) => v + 1); onChanged(); }}
-                revision={pricingRevision} summary={summaryOf(i)} onAdvanced={() => editPricing(l.product_id)} />
+              <div id={`purchase-line-${i}-pricing`} className="scroll-mt-24">
+                <InlineProcurementPricing line={l} purchaseDraft={costsValid ? draftBody('ordered', false) : null}
+                  value={inlinePrices[inlineKey(l)] ?? {}} onChange={(value) => setInlinePrice(inlineKey(l), value)} onQuote={onPriceQuote}
+                  keepCost={keepsCost(l)}
+                  onSaved={(saved) => { pinCost(l, saved.final_cost_usd !== undefined); setInlinePrice(inlineKey(l), {}); setPricingRevision((v) => v + 1); onChanged(); }}
+                  revision={pricingRevision} summary={summaryOf(i)} onAdvanced={() => editPricing(l.product_id)} />
+              </div>
               {pricingError && !pricingOff && <p role="status" className={`mt-2 text-[13px] ${T.text2}`}>{pricingError}</p>}
               {funding.mode === 'investor' && <label className="mt-3 flex gap-2 text-sm"><input type="checkbox" checked={!funding.incoming_indexes || funding.incoming_indexes.includes(i)} onChange={(e) => setFunding((f) => { const indexes = f.incoming_indexes ?? lines.map((_, j) => j); return { ...f, incoming_indexes: e.target.checked ? [...indexes, i] : indexes.filter((j) => j !== i) }; })} />{loc('مشمول بتمويل المستثمر ونسبته', 'Include in investor funding and profit share', 'لە پارەدارکردنی وەبەرهێنەر و ڕێژەکەیدا هەژمار دەکرێت')}</label>}
             </article>)}</div>
@@ -680,7 +831,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 ? loc('الشحن محسوب أعلاه من وزن الكرتون أو حجمه. أضف هنا فقط ما دفعته فعلًا لهذه الشحنة، مثل التوصيل المحلي أو الجمارك أو رسوم التحويل أو التغليف. لا تُضاف أي تكلفة تلقائيًا، ولا تُنسخ من شحنة سابقة.', 'Freight is already calculated above from packed weight or volume. Add only what you actually paid for this shipment, such as local delivery, customs, transfer fees or packaging. Nothing is added automatically or copied from an earlier shipment.', 'کرێی گواستنەوە لە سەرەوە بەپێی کێش یان قەبارەی کارتۆن حیساب کراوە. لێرە تەنها ئەوەی بە ڕاستی بۆ ئەم بارە داوتە زیاد بکە، وەک گەیاندنی ناوخۆیی، گومرگ، کرێی حەواڵە یان پاکێجکردن. هیچ تێچوویەک خۆکارانە زیاد ناکرێت و لە بارێکی پێشوو کۆپی ناکرێت.')
                 : loc('بدون مسار شحن، أدخل الشحن وأي تكلفة أخرى هنا. لكل تكلفة اسم ومبلغ فعلي.', 'Without a freight route, enter freight and any other cost here. Each cost needs a name and an actual amount.', 'بەبێ ڕێگای گواستنەوە، کرێی گواستنەوە و هەر تێچوویەکی تر لێرە بنووسە. هەر تێچوویەک ناو و بڕێکی ڕاستەقینەی دەوێت.')}</p>
               {!charges.length && <p className={`mb-3 text-sm ${T.text2}`}>{loc('لا توجد مصاريف إضافية؛ قيمتها 0 د.ع.', 'No extra expenses: 0 IQD.', 'هیچ خەرجییەکی زیادە نییە: 0 د.ع.')}</p>}
-              {charges.map((c, i) => <div key={i} className="inventory-line mb-3">
+              {charges.map((c, i) => <div key={i} id={`purchase-charge-${i}`} className="inventory-line mb-3 scroll-mt-24">
                 {c.review && <div role="alert" className="mb-3 rounded-[var(--ap-radius-md)] border border-[var(--ap-warning-border)] bg-[var(--ap-warning-bg)] px-3 py-2.5 text-[13px] text-[var(--ap-text-1)]">
                   <p>{loc('أُدخلت هذه التكلفة قبل اختيار مسار الشحن، وقد تكون الشحن نفسه المحسوب الآن من الوزن. لا تُحتسب حتى تختار.', 'This charge was entered before the freight route was chosen and may be the same freight now calculated from weight. It counts nothing until you decide.', 'ئەم تێچووە پێش هەڵبژاردنی ڕێگای گواستنەوە تۆمار کراوە و لەوانەیە هەمان کرێی گواستنەوە بێت کە ئێستا بەپێی کێش حیساب دەکرێت. تا بڕیار نەدەیت حیساب ناکرێت.')}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
@@ -689,12 +840,12 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                   </div>
                 </div>}
                 <div className="inventory-fields">
-                  <Input label={loc('اسم التكلفة', 'Charge name', 'ناوی تێچوو')} value={c.title} hint={loc('مثل: توصيل محلي، جمارك، رسوم تحويل، تغليف', 'e.g. local delivery, customs, transfer fees, packaging', 'وەک: گەیاندنی ناوخۆیی، گومرگ، کرێی حەواڵە، پاکێجکردن')} onChange={(v) => updateCharge(i, { title: v })} />
+                  <Input id={`purchase-charge-${i}-title`} label={loc('اسم التكلفة', 'Charge name', 'ناوی تێچوو')} value={c.title} hint={loc('مثل: توصيل محلي، جمارك، رسوم تحويل، تغليف', 'e.g. local delivery, customs, transfer fees, packaging', 'وەک: گەیاندنی ناوخۆیی، گومرگ، کرێی حەواڵە، پاکێجکردن')} onChange={(v) => updateCharge(i, { title: v })} />
                   <Select label={loc('تخص', 'Charged to', 'تایبەتە بە')} value={c.scope} onChange={(v) => updateCharge(i, { scope: v === 'unit' ? 'unit' : 'shipment' })} options={[{ id: 'shipment', name: loc('الشحنة كاملة', 'The whole shipment', 'هەموو بارەکە') }, { id: 'unit', name: loc('كل قطعة', 'Each piece', 'هەر پارچەیەک') }]} />
-                  <Input label={c.scope === 'unit' ? loc('المبلغ لكل قطعة بالدينار', 'Amount per piece IQD', 'بڕ بۆ هەر پارچەیەک بە دینار') : loc('المبلغ الإجمالي بالدينار', 'Total amount IQD', 'کۆی بڕ بە دینار')} type="number" min={0} decimals={0} hint={c.scope === 'unit' ? loc('يُضرب في عدد قطع كل بند تشمله.', 'Multiplied by the pieces of each item it covers.', 'لە ژمارەی پارچەکانی هەر بەندێک کە دەیگرێتەوە دەدرێت.') : loc('مبلغ واحد يوزَّع على القطع بالطريقة التي تختارها.', 'One amount, split across pieces the way you choose.', 'یەک بڕ کە بەو شێوازەی هەڵیدەبژێریت بەسەر پارچەکاندا دابەش دەکرێت.')} value={c.scope === 'unit' ? c.unit_amount_iqd : c.amount_iqd} onChange={(v) => updateCharge(i, c.scope === 'unit' ? { unit_amount_iqd: v === '' ? NaN : Number(v) } : { amount_iqd: v === '' ? NaN : Number(v) })} />
-                  {c.scope === 'shipment' && <Select label={loc('طريقة توزيعها على القطع', 'How it is split across pieces', 'شێوازی دابەشکردنی بەسەر پارچەکاندا')} value={c.basis} onChange={(v) => updateCharge(i, { basis: v as ProcurementChargeBasis })} options={[{ id: 'quantity', name: loc('حسب عدد القطع', 'By number of pieces', 'بەپێی ژمارەی پارچەکان') }, { id: 'value', name: loc('حسب قيمة الشراء الخام', 'By raw purchase value', 'بەپێی نرخی کڕینی خاو') }, { id: 'weight', name: loc('حسب وزن الكرتون', 'By packed weight', 'بەپێی کێشی کارتۆنەکە') }, { id: 'volume', name: loc('حسب حجم الكرتون', 'By packed volume', 'بەپێی قەبارەی کارتۆنەکە') }]} />}
+                  <Input id={`purchase-charge-${i}-amount`} label={c.scope === 'unit' ? loc('المبلغ لكل قطعة بالدينار', 'Amount per piece IQD', 'بڕ بۆ هەر پارچەیەک بە دینار') : loc('المبلغ الإجمالي بالدينار', 'Total amount IQD', 'کۆی بڕ بە دینار')} type="number" min={0} decimals={0} hint={c.scope === 'unit' ? loc('يُضرب في عدد قطع كل بند تشمله.', 'Multiplied by the pieces of each item it covers.', 'لە ژمارەی پارچەکانی هەر بەندێک کە دەیگرێتەوە دەدرێت.') : loc('مبلغ واحد يوزَّع على القطع بالطريقة التي تختارها.', 'One amount, split across pieces the way you choose.', 'یەک بڕ کە بەو شێوازەی هەڵیدەبژێریت بەسەر پارچەکاندا دابەش دەکرێت.')} value={c.scope === 'unit' ? c.unit_amount_iqd : c.amount_iqd} onChange={(v) => updateCharge(i, c.scope === 'unit' ? { unit_amount_iqd: v === '' ? NaN : Number(v) } : { amount_iqd: v === '' ? NaN : Number(v) })} />
+                  {c.scope === 'shipment' && <Select id={`purchase-charge-${i}-basis`} label={loc('طريقة توزيعها على القطع', 'How it is split across pieces', 'شێوازی دابەشکردنی بەسەر پارچەکاندا')} value={c.basis} onChange={(v) => updateCharge(i, { basis: v as ProcurementChargeBasis })} options={[{ id: 'quantity', name: loc('حسب عدد القطع', 'By number of pieces', 'بەپێی ژمارەی پارچەکان') }, { id: 'value', name: loc('حسب قيمة الشراء الخام', 'By raw purchase value', 'بەپێی نرخی کڕینی خاو') }, { id: 'weight', name: loc('حسب وزن الكرتون', 'By packed weight', 'بەپێی کێشی کارتۆنەکە') }, { id: 'volume', name: loc('حسب حجم الكرتون', 'By packed volume', 'بەپێی قەبارەی کارتۆنەکە') }]} />}
                 </div>
-                {lineChoices.length > 1 && <fieldset className="mt-3"><legend className={`text-sm ${T.text2}`}>{loc('البنود التي تشملها', 'Items it covers', 'ئەو بەندانەی دەیگرێتەوە')}</legend><div className="flex flex-wrap gap-3">{lineChoices.map((x) => <label key={x.key} className="flex gap-2 text-sm"><input type="checkbox" checked={!c.applies_to || c.applies_to.includes(x.key)} onChange={(e) => {
+                {lineChoices.length > 1 && <fieldset id={`purchase-charge-${i}-lines`} className="mt-3"><legend className={`text-sm ${T.text2}`}>{loc('البنود التي تشملها', 'Items it covers', 'ئەو بەندانەی دەیگرێتەوە')}</legend><div className="flex flex-wrap gap-3">{lineChoices.map((x) => <label key={x.key} className="flex gap-2 text-sm"><input type="checkbox" checked={!c.applies_to || c.applies_to.includes(x.key)} onChange={(e) => {
                   const chosen = (c.applies_to ?? lineChoices.map((y) => y.key)).filter((k) => lineKeys.includes(k) && k !== x.key);
                   if (e.target.checked) chosen.push(x.key);
                   updateCharge(i, { applies_to: lineChoices.every((y) => chosen.includes(y.key)) ? null : chosen });
@@ -715,8 +866,13 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               </div>)}
               <button type="button" className={T.btnSecondary} disabled={charges.length >= 15} onClick={() => setCharges((a) => [...a, newChargeDraft()])}>{header.cost_profile_id ? loc('إضافة مصروف إضافي', 'Add an extra expense', 'زیادکردنی خەرجییەکی زیادە') : loc('إضافة شحن أو تكلفة', 'Add freight or charge', 'زیادکردنی کرێی گواستنەوە یان تێچوو')}</button>
             </section>
-            <details className="mt-4"><summary>{loc('تكلفة تقديرية ووزن وحجم ومرفقات واستيراد', 'Estimated cost, weights, attachments and import', 'تێچووی خەمڵێنراو، کێش، قەبارە، هاوپێچ و هاوردەکردن')}</summary><div className="inventory-fields mt-3">
-              <Select label={loc('حالة التكلفة', 'Cost status', 'دۆخی تێچوو')} value={header.cost_state} onChange={(v) => update('cost_state', v)} options={[{ id: 'estimated', name: loc('تقديرية؛ الاستلام ينتظر تثبيتها', 'Estimated; receiving waits for confirmation', 'خەمڵێنراو؛ وەرگرتن چاوەڕێی جێگیرکردنی دەکات') }, { id: 'final', name: loc('نهائية ومثبتة', 'Final and confirmed', 'کۆتایی و جێگیر') }]} />
+            <details className="mt-4" id="purchase-cost-state"><summary>{loc('تكلفة تقديرية ووزن وحجم ومرفقات واستيراد', 'Estimated cost, weights, attachments and import', 'تێچووی خەمڵێنراو، کێش، قەبارە، هاوپێچ و هاوردەکردن')}</summary><div className="inventory-fields mt-3">
+              <div className="grid gap-1">
+                <Select id="purchase-cost-status" label={loc('حالة التكلفة', 'Cost status', 'دۆخی تێچوو')} value={header.cost_state} onChange={(v) => update('cost_state', v)} options={[{ id: 'estimated', name: loc('تقديرية؛ الاستلام ينتظر تثبيتها', 'Estimated; receiving waits for confirmation', 'خەمڵێنراو؛ وەرگرتن چاوەڕێی جێگیرکردنی دەکات') }, { id: 'final', name: loc('نهائية ومثبتة', 'Final and confirmed', 'کۆتایی و جێگیر') }]} />
+                {/* The confirm’s own step-2 reasons, said beside the field that fixes them (no longer only on the review). */}
+                {fundingNeedsFinalCost && <p role="status" data-purchase-final-cost className="text-[13px] text-[var(--ap-danger)]">{COST_REFUSALS.INVESTMENT_NEEDS_FINAL_COST[lang]}</p>}
+                {!fundingNeedsFinalCost && quickReceive && header.cost_state !== 'final' && <p role="status" data-purchase-final-cost className="text-[13px] text-[var(--ap-danger)]">{loc('إضافة مخزون موجود تحتاج تكلفة نهائية: اجعل «حالة التكلفة» نهائية.', 'Adding stock on hand needs a final cost: set “Cost status” to final.', 'زیادکردنی کۆگای ئامادە تێچووی کۆتایی دەوێت: «دۆخی تێچوو» بکە بە کۆتایی.')}</p>}
+              </div>
               <Input label={loc('رابط مرفق الفاتورة HTTPS', 'Invoice attachment HTTPS URL', 'بەستەری هاوپێچی پسوولە HTTPS')} value={header.attachment_url} onChange={(v) => update('attachment_url', v)} />
               <Input label={loc('مجموع الفاتورة للمطابقة (اختياري)', 'Invoice total for matching (optional)', 'کۆی پسوولە بۆ بەراوردکردن (ئارەزوومەندانە)')} type="number" value={header.invoice_total_iqd} onChange={(v) => update('invoice_total_iqd', v)} />
               <Input label={loc('ملاحظات (اختياري)', 'Notes (optional)', 'تێبینی (ئارەزوومەندانە)')} value={header.note} onChange={(v) => update('note', v)} />
@@ -753,13 +909,38 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
           {hasDraftSerials && <p role="status" className={`mt-3 text-sm ${T.text2}`}>{loc('الأرقام التسلسلية تبقى مؤقتًا في مسودة هذه الجلسة ولا تُسجّل حتى تأكيد الشراء. أكمل الكمية والتكاليف أولًا؛ تثبيت الأرقام يمنع إعادة تحريرهما لاحقًا.', 'Serials remain temporarily in this session’s draft until purchase confirmation. Finish quantities and costs first; fixing serials prevents rewriting them later.', 'ژمارەکان تا پشتڕاستکردنەوەی کڕین بە کاتی لە ڕەشنووسی ئەم دانیشتنەدا دەمێننەوە. سەرەتا بڕ و تێچوو تەواو بکە؛ جێگیرکردنی ژمارەکان گۆڕینی دواتری ئەوان ڕادەگرێت.')}</p>}
           {hasDraftSerials && header.cost_state !== 'final' && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{loc('ثبّت التكلفة النهائية قبل تأكيد شراء يحتوي على أرقام تسلسلية.', 'Set final costs before confirming a purchase with serial numbers.', 'پێش پشتڕاستکردنەوەی کڕین لەگەڵ ژمارەکان تێچووی کۆتایی جێگیر بکە.')}</p>}
           {draftSerialCount > 50 && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{loc('يمكن تسجيل 50 رقمًا تسلسليًا مع التأكيد. سجّل بقية الأرقام قطعةً قطعةً بعد حفظ الشراء.', 'Register up to 50 serials with confirmation. Add the remaining serials one unit at a time after saving the purchase.', 'لەگەڵ پشتڕاستکردنەوە تا 50 ژمارە تۆمار بکە. دوای پاشەکەوتکردنی کڕین ژمارەکانی تر یەک بە یەک زیاد بکە.')}</p>}
-          <div className="inventory-footer">
+          {/* THE DOCK (owner report 2026-11-03): the actions stay at the bottom of the screen on every step, and a
+              button that cannot act yet says why — each missing field by item, with «اذهب» to it — instead of
+              sitting grey. The gates are the same expressions as before (`nextBlocked`, `confirmBlocked`). */}
+          <div className="inventory-footer inventory-dock" data-purchase-dock>
+            {shownBlockers.length > 0 && (
+              <div className={`inventory-blockers${attempted ? ' is-alert' : ''}`} data-purchase-blockers>
+                <p className="inventory-blockers-title">{step < 3 ? bs.title : bs.confirmTitle}</p>
+                <ul>
+                  {shownBlockers.slice(0, 4).map((b) => (
+                    <li key={b.id}>
+                      <span>{b.text}</span>
+                      {(b.target || b.step !== step) && <button type="button" className={T.btnGhost} aria-label={`${bs.go}: ${b.text}`} onClick={() => reveal(b)}>{bs.go}</button>}
+                    </li>
+                  ))}
+                </ul>
+                {shownBlockers.length > 4 && <p className={`text-xs ${T.text3}`}>{bs.more(shownBlockers.length - 4)}</p>}
+              </div>
+            )}
+            {attempted && shownBlockers.length === 0 && (step < 3 ? nextBlocked : confirmBlocked && !draftBusy) && <p role="alert" className="inventory-blockers is-alert">{bs.generic}</p>}
+            <p className="sr-only" role="alert" data-purchase-announce>{announce}</p>
             {draftNote && <p id="purchase-draft-note" role={draftNote.tone === 'error' ? 'alert' : 'status'} data-purchase-draft-note={draftNote.tone} className={`basis-full text-sm ${draftNote.tone === 'error' ? 'text-[var(--ap-danger)]' : draftNote.tone === 'ok' ? 'lv-alert lv-alert-success text-text-primary' : T.text2}`}>{draftNote.text}</p>}
-            {pendingInlinePrices && <p role="status" className={`text-sm ${T.text2}`}>{loc('احفظ تعديلات التكلفة والربح وسعر الزبون داخل بطاقة المنتج قبل المتابعة.', 'Save the cost, profit and customer price edits in the product card before continuing.', 'پێش بەردەوامبوون، دەستکارییەکانی تێچوو، قازانج و نرخی کڕیار لە کارتی بەرهەم پاشەکەوت بکە.')}</p>}
-            {step > 0 && <button type="button" className={T.btnSecondary} onClick={() => setStep((v) => v - 1)}>{loc('رجوع', 'Back', 'گەڕانەوە')}</button>}
-            {step < 3 ? <button type="button" className={T.btnPrimary} disabled={op.busy || !nameValid || !fundingValid(funding) || (step > 0 && (!quantitiesValid || !originsValid)) || (step === 2 && (!costsValid || !draftSerialsValid || !rateReady || pendingInlinePrices))} onClick={() => setStep((v) => v + 1)}>{loc('التالي', 'Continue', 'بەردەوامبە')}</button> : <button type="button" className={T.btnPrimary} disabled={op.busy || draftBusy || pendingInlinePrices || !draftSerialsValid || !originsValid || !costsValid || !extrasValid || !nameValid || !fundingValid(funding) || fundingNeedsFinalCost || !rateReady || (quickReceive && header.cost_state !== 'final')} onClick={() => op.run(() => save('ordered'), loc('تم تأكيد أمر الشراء', 'Purchase confirmed', 'کڕینەکە پشتڕاست کرایەوە'))}>{(quickReceive ? loc('تأكيد وإضافة المخزون', 'Confirm and receive stock', 'پشتڕاستکردنەوە و زیادکردنی کۆگا') : loc('تأكيد الشراء القادم', 'Confirm incoming purchase', 'پشتڕاستکردنەوەی کڕینی چاوەڕوانکراو'))}</button>}
-            <button type="button" className={T.btnSecondary} disabled={op.busy || draftBusy || !nameValid} aria-describedby={draftNote ? 'purchase-draft-note' : undefined} onClick={() => void saveDraft()} data-purchase-save-draft>{draftBusy ? loc('جارٍ حفظ المسودة…', 'Saving draft…', 'ڕەشنووس پاشەکەوت دەکرێت…') : loc('حفظ مسودة', 'Save draft', 'پاشەکەوتکردنی ڕەشنووس')}</button>
-            <button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => setEditing(false)}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</button>
+            <div className="inventory-dock-row">
+              <p className="inventory-dock-total"><span>{loc('المجموع', 'Total', 'کۆ')}</span> <strong><bdi dir="ltr">{money(costsValid ? total : null)}</bdi></strong></p>
+              <div className="inventory-dock-actions">
+                {step > 0 && <button type="button" className={T.btnSecondary} onClick={() => { setStep((v) => v - 1); setFocusTarget({ id: null, at: Date.now() }); }}>{loc('رجوع', 'Back', 'گەڕانەوە')}</button>}
+                {step < 3
+                  ? <button type="button" className={T.btnPrimary} disabled={op.busy} aria-disabled={nextBlocked || undefined} onClick={goNext}>{loc('التالي', 'Continue', 'بەردەوامبە')}</button>
+                  : <button type="button" className={T.btnPrimary} disabled={op.busy || draftBusy} aria-disabled={confirmBlocked || undefined} onClick={confirmPress}>{(quickReceive ? loc('تأكيد وإضافة المخزون', 'Confirm and receive stock', 'پشتڕاستکردنەوە و زیادکردنی کۆگا') : loc('تأكيد الشراء القادم', 'Confirm incoming purchase', 'پشتڕاستکردنەوەی کڕینی چاوەڕوانکراو'))}</button>}
+                <button type="button" className={T.btnSecondary} disabled={op.busy || draftBusy || !nameValid} aria-describedby={draftNote ? 'purchase-draft-note' : undefined} onClick={() => void saveDraft()} data-purchase-save-draft>{draftBusy ? loc('جارٍ حفظ المسودة…', 'Saving draft…', 'ڕەشنووس پاشەکەوت دەکرێت…') : loc('حفظ مسودة', 'Save draft', 'پاشەکەوتکردنی ڕەشنووس')}</button>
+                <button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => setEditing(false)}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</button>
+              </div>
+            </div>
           </div>
         </Card>
       )}

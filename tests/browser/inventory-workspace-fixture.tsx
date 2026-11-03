@@ -1,6 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { LanguageProvider } from '../../src/LanguageContext';
+import { AuthContext } from '../../src/AuthContext';
 import AdminInventory from '../../src/components/adminInventory/AdminInventory';
 import InvestorPanel from '../../src/components/financePeople/InvestorPanel';
 import '../../src/index.css';
@@ -58,4 +59,12 @@ class Catch extends React.Component<{ children: React.ReactNode }, { error: stri
   static getDerivedStateFromError(e: unknown) { return { error: String(e) }; }
   render() { return this.state.error ? <p data-fixture-error>{this.state.error}</p> : this.props.children; }
 }
-createRoot(document.getElementById('root')!).render(<React.StrictMode><LanguageProvider><div style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}><Catch>{params.get('panel') === 'investors' ? <InvestorPanel /> : <AdminInventory />}</Catch></div></LanguageProvider></React.StrictMode>);
+// AdminInventory reads the session's cost hint (`can_view_cost`): the owner by default, a full admin with `?viewer=staff`.
+const session = {
+  isAuthenticated: true,
+  isLoaded: true,
+  user: { id: 'owner', email: 'owner@example.test', name: 'Owner', is_admin: true, is_owner: params.get('viewer') !== 'staff', can_view_cost: params.get('viewer') !== 'staff' },
+  login: async () => {}, loginWithGoogle: async () => ({ adopted: false }), register: async () => {}, refreshUser: async () => {},
+  adoptSession: async () => ({ adopted: false }), logout: async () => {},
+} as unknown as React.ContextType<typeof AuthContext>;
+createRoot(document.getElementById('root')!).render(<React.StrictMode><LanguageProvider><AuthContext.Provider value={session}><div style={{ maxWidth: 1100, margin: '0 auto', padding: 16 }}><Catch>{params.get('panel') === 'investors' ? <InvestorPanel /> : <AdminInventory />}</Catch></div></AuthContext.Provider></LanguageProvider></React.StrictMode>);

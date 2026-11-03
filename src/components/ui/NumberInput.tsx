@@ -147,7 +147,8 @@ export function NumberInput({
   const id = idProp ?? field?.id ?? `number-${auto}`;
   const ownErrorId = problem && !field?.invalid ? `${id}-problem` : undefined;
   const describedBy = [rest['aria-describedby'], field?.describedBy, ownErrorId].filter(Boolean).join(' ') || undefined;
-  const invalid = !!problem || !!field?.invalid;
+  // A verdict from the caller (`aria-invalid`, e.g. a required value the form is waiting for) counts too.
+  const invalid = !!problem || !!field?.invalid || rest['aria-invalid'] === true || rest['aria-invalid'] === 'true';
   const stepper = kind === 'quantity';
 
   const input = (

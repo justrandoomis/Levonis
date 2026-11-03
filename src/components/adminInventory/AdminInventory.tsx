@@ -40,7 +40,7 @@
  * COLUMNS rather than printing a wall of dashes that advertises what is behind
  * them. The summary strip does the same.
  */
-import React, { useCallback, useEffect, useMemo, useState, lazy, Suspense } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { ArrowLeftRight, Boxes, CalendarClock, ClipboardCheck, Layers, PackagePlus, RefreshCw, Truck } from 'lucide-react';
 import * as T from '../adminProducts/theme';
 import '../adminProducts/theme.css';
@@ -60,15 +60,38 @@ const StockOperationsPanel=lazy(()=>import('../adminOperations/StockOperationsPa
 const InventoryLotPanel=lazy(()=>import('./InventoryLotPanel'));
 
 type Tab = 'stock' | 'incoming' | 'movements' | 'suppliers' | 'procurement' | 'receiving' | 'operations' | 'reports';
+const TABS: readonly Tab[] = ['stock', 'procurement', 'receiving', 'operations', 'movements', 'reports', 'suppliers', 'incoming'];
+
+/** The tab the address names (`?itab=`), so a reload or a shared link reopens it (owner request 2026-11-03). */
+function initialTab(): Tab {
+  try {
+    const t = new URLSearchParams(window.location.search).get('itab') ?? '';
+    return (TABS as readonly string[]).includes(t) ? (t as Tab) : 'stock';
+  } catch {
+    return 'stock';
+  }
+}
 
 export default function AdminInventory() {
   const { dir, loc, latin } = useLoc();
   const count = useCount();
   const s = useMemo(() => inventoryStrings(loc), [loc]);
   const { user } = useAuth();
-  const [tab, setTab] = useState<Tab>('stock');
+  const [tab, setTab] = useState<Tab>(initialTab);
+  // The address follows the tab (replace, never push: the admin’s own back button stays the admin’s).
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('itab') === tab) return;
+      url.searchParams.set('itab', tab);
+      window.history.replaceState(window.history.state, '', url);
+    } catch { /* an address that cannot be rewritten keeps the tab in memory only */ }
+  }, [tab]);
   const [overview, setOverview] = useState<InventoryOverview | null>(null);
   const [notice, setNotice] = useState<NoticeState | null>(null);
+  // The overview’s last answer failed: an owner cost tab named in the address stops waiting for it (closing
+  // the error notice must not bring back «جارٍ التحميل…» for ever).
+  const [overviewFailed, setOverviewFailed] = useState(false);
   const [action, setAction] = useState<{ kind: 'purchase' | 'receive' | 'count' | 'transfer'; key: number } | null>(null);
   const begin = (kind: 'purchase' | 'receive' | 'count' | 'transfer') => {
     setAction((old) => ({ kind, key: (old?.key ?? 0) + 1 }));
@@ -78,9 +101,11 @@ export default function AdminInventory() {
   };
 
   const loadOverview = useCallback(async () => {
+    setOverviewFailed(false);
     try {
       setOverview(await fetchInventoryOverview());
     } catch (e) {
+      setOverviewFailed(true);
       setNotice({ tone: 'error', text: errMsg(e, s.common.failed, s.common.failed, latin) });
     }
   }, [s, latin]);
@@ -92,16 +117,38 @@ export default function AdminInventory() {
   // `=== true` too, so a session without it never opens the cost tabs.
   const showsCosts = user?.can_view_cost === true && overview !== null && 'inventory_value_iqd' in overview;
 
-  const tabs: { id: Tab; label: string }[] = [
+  // The daily work first (stock, purchases, counts), the records after, the legacy list last.
+  const incoming = overview?.incoming_purchases ?? 0;
+  const tabs: { id: Tab; label: string; count?: number; legacy?: boolean }[] = [
     { id: 'stock', label: s.tabs.stock },
-    ...(showsCosts ? [{ id: 'procurement' as const, label: loc('أوامر الشراء والشحنات', 'Purchase orders and shipments', 'داواکاریی کڕین و بارەکان') }] : []),
-    ...(showsCosts ? [{ id: 'reports' as const, label: loc('تقارير ودفعات المخزون', 'Inventory reports and lots', 'ڕاپۆرت و کۆمەڵەکانی کۆگا') }] : []),
-    ...(!showsCosts ? [{ id: 'receiving' as const, label: loc('استلام الشحنات', 'Receive shipments', 'وەرگرتنی بارەکان') }] : []),
+    ...(showsCosts ? [{ id: 'procurement' as const, label: loc('أوامر الشراء والشحنات', 'Purchase orders and shipments', 'داواکاریی کڕین و بارەکان'), count: incoming }] : []),
+    ...(!showsCosts ? [{ id: 'receiving' as const, label: loc('استلام الشحنات', 'Receive shipments', 'وەرگرتنی بارەکان'), count: incoming }] : []),
     { id: 'operations', label: loc('الجرد والمستودعات', 'Counts and warehouses', 'ژماردن و کۆگاکان') },
-    { id: 'incoming', label: loc('المشتريات المنفردة السابقة', 'Legacy individual purchases', 'کڕینە تاکە کۆنەکان') },
     { id: 'movements', label: s.tabs.movements },
+    ...(showsCosts ? [{ id: 'reports' as const, label: loc('تقارير ودفعات المخزون', 'Inventory reports and lots', 'ڕاپۆرت و کۆمەڵەکانی کۆگا') }] : []),
     { id: 'suppliers', label: s.tabs.suppliers },
+    { id: 'incoming', label: loc('المشتريات المنفردة السابقة', 'Legacy individual purchases', 'کڕینە تاکە کۆنەکان'), legacy: true },
   ];
+  // A tab the address names but this admin cannot open falls back to the stock; the owner’s cost tabs wait
+  // for the overview that proves they may open (never a cost panel before `showsCosts`).
+  const available = tabs.some((x) => x.id === tab);
+  const waiting = !available && overview === null && !overviewFailed && user?.can_view_cost === true && (tab === 'procurement' || tab === 'reports');
+  const current: Tab = available || waiting ? tab : 'stock';
+  const tabRefs = useRef<Partial<Record<Tab, HTMLButtonElement | null>>>({});
+  /** Arrow keys move along the row (mirrored in Arabic and Kurdish), Home and End jump to its ends. */
+  const onTabKey = (e: React.KeyboardEvent<HTMLButtonElement>, i: number) => {
+    // Alt/⌘/Ctrl with an arrow is the browser’s (history, text): only the bare keys move along the row.
+    if (e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const forward = dir === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
+    const back = dir === 'rtl' ? 'ArrowRight' : 'ArrowLeft';
+    const j = e.key === forward ? (i + 1) % tabs.length : e.key === back ? (i - 1 + tabs.length) % tabs.length : e.key === 'Home' ? 0 : e.key === 'End' ? tabs.length - 1 : -1;
+    if (j < 0) return;
+    e.preventDefault();
+    const next = tabs[j]!.id;
+    setTab(next);
+    tabRefs.current[next]?.focus();
+  };
+  const pendingLabel = (n: number) => loc(`المشتريات القادمة: ${count(n)}`, `Incoming purchases: ${count(n)}`, `کڕینە چاوەڕوانکراوەکان: ${count(n)}`);
 
   return (
     <div className={`${T.AP} inventory-workspace`} dir={dir}>
@@ -181,38 +228,48 @@ export default function AdminInventory() {
       )}
 
       {/* ------------------------------------------------- 2. THE TABS
-          ONE ROW THAT SCROLLS, not three that wrap: at 390px seven chips
-          wrapped into three rows and pushed the content a screen down. The
-          row bleeds to the gutter (-mx-4 px-4) so a chip is cut at the screen
-          edge, which is the cue that it scrolls; py-1 leaves the pressed
-          chip's inset room. */}
-      <div className="mb-5 flex gap-1.5 overflow-x-auto hide-scrollbar -mx-4 px-4 py-1" role="tablist">
-        {tabs.map((x) => (
+          ONE ROW THAT SCROLLS, not rows that wrap: at 390px the tabs wrapped
+          into three rows and pushed the content a screen down. Real tabs now
+          (owner request 2026-11-03, «حسّن نظام التبويبات»): one selected tab
+          with an underline, a roving focus the arrow keys move, a count where
+          a number waits for the owner, the address keeping the open tab, and
+          the legacy list last. */}
+      <div className="inventory-tabs hide-scrollbar" role="tablist" aria-label={loc('أقسام المخزون', 'Inventory sections', 'بەشەکانی کۆگا')}>
+        {tabs.map((x, i) => (
           <button
             key={x.id}
+            ref={(el) => { tabRefs.current[x.id] = el; }}
             type="button"
             role="tab"
-            aria-selected={tab === x.id}
-            aria-current={tab === x.id ? 'page' : undefined}
-            className={`${T.chip} shrink-0`}
-            aria-pressed={tab === x.id}
+            id={`inventory-tab-${x.id}`}
+            aria-selected={current === x.id}
+            aria-controls="inventory-tab-panel"
+            aria-describedby={x.count ? `inventory-tab-${x.id}-count` : undefined}
+            tabIndex={current === x.id ? 0 : -1}
+            className="inventory-tab"
+            data-legacy={x.legacy || undefined}
             onClick={() => setTab(x.id)}
+            onKeyDown={(e) => onTabKey(e, i)}
           >
-            {x.id === 'incoming' && <PackagePlus size={13} />}
             {x.label}
+            {x.count ? <span className="inventory-tab-count" aria-hidden>{count(x.count)}</span> : null}
           </button>
         ))}
       </div>
+      {tabs.map((x) => x.count ? <span key={x.id} id={`inventory-tab-${x.id}-count`} className="sr-only">{pendingLabel(x.count)}</span> : null)}
 
       {/* ------------------------------------------------ 3. THE PANEL */}
-      {tab === 'stock' && <StockTab s={s} onChanged={loadOverview} />}
-      {tab === 'incoming' && <IncomingTab s={s} onChanged={loadOverview} onNewPurchase={showsCosts ? () => begin('purchase') : undefined} />}
-      {tab === 'movements' && <MovementsTab s={s} />}
-      {tab === 'suppliers' && <SuppliersTab s={s} />}
-      {tab === 'procurement' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><ProcurementPanel key={action?.key} initialAction={action?.kind === 'purchase' ? 'purchase' : action?.kind === 'receive' ? 'receive' : undefined} onChanged={loadOverview} /></Suspense>}
-      {tab === 'receiving' && !showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><PurchaseReceivePanel key={action?.key} onChanged={loadOverview} /></Suspense>}
-      {tab === 'operations' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><StockOperationsPanel key={action?.key} initialTab={action?.kind === 'count' ? 'counts' : action?.kind === 'transfer' ? 'locations' : undefined} onChanged={loadOverview} /></Suspense>}
-      {tab === 'reports' && showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><InventoryLotPanel onChanged={loadOverview} onOperations={() => { setAction(null); setTab('operations'); }} /></Suspense>}
+      <div id="inventory-tab-panel" role="tabpanel" aria-labelledby={`inventory-tab-${current}`} tabIndex={0} className="inventory-tab-panel">
+        {waiting && <p role="status" className={T.text3}>{loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')}</p>}
+        {current === 'stock' && <StockTab s={s} onChanged={loadOverview} />}
+        {current === 'incoming' && <IncomingTab s={s} onChanged={loadOverview} onNewPurchase={showsCosts ? () => begin('purchase') : undefined} />}
+        {current === 'movements' && <MovementsTab s={s} />}
+        {current === 'suppliers' && <SuppliersTab s={s} />}
+        {current === 'procurement' && showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><ProcurementPanel key={action?.key} initialAction={action?.kind === 'purchase' ? 'purchase' : action?.kind === 'receive' ? 'receive' : undefined} onChanged={loadOverview} /></Suspense>}
+        {current === 'receiving' && !showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><PurchaseReceivePanel key={action?.key} onChanged={loadOverview} /></Suspense>}
+        {current === 'operations' && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><StockOperationsPanel key={action?.key} initialTab={action?.kind === 'count' ? 'counts' : action?.kind === 'transfer' ? 'locations' : undefined} onChanged={loadOverview} /></Suspense>}
+        {current === 'reports' && showsCosts && <Suspense fallback={<p role="status">{loc('جارٍ التحميل…','Loading…','بارکردن…')}</p>}><InventoryLotPanel onChanged={loadOverview} onOperations={() => { setAction(null); setTab('operations'); }} /></Suspense>}
+      </div>
     </div>
   );
 }
