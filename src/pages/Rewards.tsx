@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { ChevronLeft, Bell, PlayCircle, Check, Star, ShoppingBag, ShieldAlert, Sparkles } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
@@ -157,11 +157,23 @@ export default function Rewards() {
     loadRewards();
   }, [authLoaded, isAuthenticated, loadRewards]);
 
-  // A notification links to /points#coupons or #competitions: once the hub has drawn, go there.
+  /**
+   * A link to a section — /points#coupons from a notification, or a reward tile
+   * on the home page — lands on it once BOTH loads have drawn what stands above
+   * it (the multiplier card waits for /api/rewards), and only once per arrival:
+   * the reload after a swap or an entry must not pull the reader back up. The
+   * app's own scroll reset leaves a hash navigation alone (App.tsx).
+   */
+  const { hash, key: arrival } = useLocation();
+  const landedFor = useRef('');
   useEffect(() => {
-    const id = window.location.hash.slice(1);
-    if (hub.data && id) document.getElementById(id)?.scrollIntoView({ block: 'start' });
-  }, [hub.data]);
+    const id = hash.slice(1);
+    if (!id || !hub.data || (!data && !loadError) || landedFor.current === arrival) return;
+    const target = document.getElementById(id);
+    if (!target) return;
+    landedFor.current = arrival;
+    target.scrollIntoView({ block: 'start' });
+  }, [hash, arrival, hub.data, data, loadError]);
 
   /** After a swap or an entry the balance, the history and the hub all moved. */
   const refreshAll = useCallback(async () => {

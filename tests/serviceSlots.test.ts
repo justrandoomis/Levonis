@@ -65,7 +65,15 @@ function mainAppRoutes(): Set<string> {
   return paths;
 }
 
-test('the eleven service slots name the objects the owner uploaded, in the owner’s order', () => {
+/**
+ * The rewards programme's three doors (owner, 2026-11-04 — DECISIONS row 288)
+ * came after the artwork upload and have none: their default is empty, which
+ * draws the line icon. Named here so that a NEW slot cannot quietly ship with
+ * no default — the empty ones are exactly these.
+ */
+const NO_ARTWORK_YET = ['service-coupons', 'service-points-shop', 'service-competitions'];
+
+test('the service slots name the objects the owner uploaded, in the owner’s order', () => {
   // Transcribed from a live listing of `UiUx/MainPage/`, not from the brand's
   // or the service's own spelling. R2 keys are byte-exact: `LevoStudio.webp`
   // written `Levostudio.webp` is a 404 and a broken tile on the first screen.
@@ -80,6 +88,9 @@ test('the eleven service slots name the objects the owner uploaded, in the owner
       ['service-tradein', 'Replace.webp'],
       ['service-used', 'Used.webp'],
       ['service-rewards', 'Reward.webp'],
+      ['service-coupons', ''],
+      ['service-points-shop', ''],
+      ['service-competitions', ''],
       ['service-warranty', 'Warranty.webp'],
       ['service-community', 'Community.webp'],
       ['service-support', 'Support.webp'],
@@ -87,11 +98,29 @@ test('the eleven service slots name the objects the owner uploaded, in the owner
   );
 });
 
+test('the reward doors open their own section of /points', () => {
+  // Each lands on a section the rewards page always draws for a signed-in
+  // customer (src/components/rewards/RewardsHub.tsx), under that exact id.
+  const hub = read('src/components/rewards/RewardsHub.tsx');
+  for (const slot of SERVICE_SLOTS.filter((s) => NO_ARTWORK_YET.includes(s.slot))) {
+    const [path, id] = (slot.link ?? '').split('#');
+    assert.equal(path, '/points', `${slot.slot} leaves the rewards page`);
+    assert.ok(id, `${slot.slot} names no section`);
+    assert.match(hub, new RegExp(`<SectionTitle id="${id}"`), `${slot.slot} points at #${id}, which the rewards page does not draw`);
+  }
+  // …and the page goes there once it has loaded, not before.
+  assert.match(read('src/pages/Rewards.tsx'), /getElementById\(id\)/);
+});
+
 test('every service icon is a real object name an anonymous visitor may fetch', () => {
   // The services rail is on the first screen a signed-out visitor sees. An
   // icon that needs a session is not a private asset, it is a broken one.
   const seen = new Set<string>();
   for (const slot of SERVICE_SLOTS) {
+    if (NO_ARTWORK_YET.includes(slot.slot)) {
+      assert.equal(slot.defaultObject, '', `${slot.slot} names a file nobody uploaded`);
+      continue;
+    }
     assert.ok(slot.defaultObject, `${slot.slot} has no default object`);
     assert.ok(isSiteMediaObject(slot.defaultObject), `${slot.defaultObject} is not a valid object name`);
     assert.ok(!seen.has(slot.defaultObject), `${slot.defaultObject} is claimed by two slots`);
@@ -299,11 +328,11 @@ test('the two new pages exist, are routed, and state their own empty cases', () 
   assert.match(trade, /القيمة النهائية بعد فحص الجهاز في المتجر، ولن تزيد على هذا العرض/);
 });
 
-test('resolve gives every service slot a url and its link', () => {
+test('resolve gives every service slot its url — none for a reward door, which has no artwork yet — and its link', () => {
   const resolved = resolveSiteMedia({});
   for (const slot of SERVICE_SLOTS) {
     const entry = resolved.find((m) => m.slot === slot.slot)!;
-    assert.equal(entry.url, `/files/${siteMediaKey(slot.defaultObject)}`);
+    assert.equal(entry.url, NO_ARTWORK_YET.includes(slot.slot) ? '' : `/files/${siteMediaKey(slot.defaultObject)}`);
     assert.equal(entry.link, slot.link);
     assert.equal(entry.custom, false);
   }

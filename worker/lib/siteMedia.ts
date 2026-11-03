@@ -104,7 +104,9 @@ export const BRAND_SLOTS: readonly SiteMediaSlot[] = [
 ] as const;
 
 /**
- * ONE SLOT PER CARD ON THE HOME SERVICES RAIL — ELEVEN, IN THE OWNER'S ORDER.
+ * ONE SLOT PER CARD ON THE HOME SERVICES RAIL — FOURTEEN, IN THE OWNER'S ORDER:
+ * the eleven he uploaded artwork for, and the rewards programme's three doors
+ * he added on 2026-11-04 (DECISIONS row 288), which have none yet.
  *
  * WHY THESE NOW CARRY A DEFAULT AND A LINK, WHEN THEY CARRIED NEITHER.
  *
@@ -174,6 +176,17 @@ export const SERVICE_SLOTS: readonly SiteMediaSlot[] = [
   { slot: 'service-tradein', group: 'service', label: 'استبدل القديمة بجديدة', defaultObject: 'Replace.webp', link: '/trade-in' },
   { slot: 'service-used', group: 'service', label: 'مستعمل ومجدّد و Open Box', defaultObject: 'Used.webp', link: '/used-printers' },
   { slot: 'service-rewards', group: 'service', label: 'النقاط والمكافآت', defaultObject: 'Reward.webp', link: '/points' },
+  /**
+   * THE REWARDS PROGRAMME'S THREE DOORS (owner, 2026-11-04 — DECISIONS row
+   * 288): each is a section of /points, and the page scrolls to the `#id`. No
+   * artwork was uploaded for them, so the default is EMPTY — "draw the line
+   * icon", the convention above and the banner slots' — rather than a file
+   * name the bucket does not hold (unlike `service-community`, nobody named
+   * one). An upload under the slot still lights it up like any other.
+   */
+  { slot: 'service-coupons', group: 'service', label: 'كوبوناتي', defaultObject: '', link: '/points#coupons' },
+  { slot: 'service-points-shop', group: 'service', label: 'استبدل نقاطك', defaultObject: '', link: '/points#shop' },
+  { slot: 'service-competitions', group: 'service', label: 'المسابقات', defaultObject: '', link: '/points#competitions' },
   { slot: 'service-warranty', group: 'service', label: 'الضمان والصيانة', defaultObject: 'Warranty.webp', link: '/warranty' },
   { slot: 'service-community', group: 'service', label: 'المجتمع', defaultObject: 'Community.webp', link: '/community' },
   { slot: 'service-support', group: 'service', label: 'الدعم', defaultObject: 'Support.webp', link: '/support' },

@@ -71,9 +71,16 @@ test('resolve marks defaults and uploads apart, and gives every slot a url or an
   // fallback, but it is now the storefront's onError latch that falls back to
   // it — a missing object in R2 — and no longer an empty url here. Pinning the
   // seeded url is what stops a "reset to default" quietly blanking a card.
+  // The rewards programme's three doors (DECISIONS row 288) came after the
+  // upload and have no artwork: their url is empty (the line icon, «No image»
+  // in the admin list) — and they are the ONLY empty ones.
   for (const s of SERVICE_SLOTS) {
-    assert.equal(fresh.find((m) => m.slot === s.slot)!.url, `/files/${MAIN_PAGE_PREFIX}${s.defaultObject}`);
+    assert.equal(fresh.find((m) => m.slot === s.slot)!.url, s.defaultObject ? `/files/${MAIN_PAGE_PREFIX}${s.defaultObject}` : '');
   }
+  assert.deepEqual(
+    SERVICE_SLOTS.filter((s) => !s.defaultObject).map((s) => s.slot),
+    ['service-coupons', 'service-points-shop', 'service-competitions']
+  );
 
   const edited = resolveSiteMedia({ 'brand-bambulab': 'brand-bambulab-ab12cd.webp' });
   const replaced = edited.find((m) => m.slot === 'brand-bambulab')!;
@@ -132,8 +139,10 @@ test('service slot ids match the ids ServicesGrid already renders', () => {
     SERVICE_SLOTS.map((s) => s.slot),
     [
       'service-studio', 'service-compare', 'service-tools', 'service-bundles', 'service-mystery',
-      'service-tradein', 'service-used', 'service-rewards', 'service-warranty', 'service-community',
-      'service-support',
+      'service-tradein', 'service-used', 'service-rewards',
+      // DECISIONS row 288: the rewards programme's three doors, beside the rewards tile.
+      'service-coupons', 'service-points-shop', 'service-competitions',
+      'service-warranty', 'service-community', 'service-support',
     ]
   );
 });

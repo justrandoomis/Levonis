@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   Layers, ShieldCheck, Wrench, Package, Users, Gift, Scale,
-  Shuffle, Repeat, PackageOpen, LifeBuoy,
+  Shuffle, Repeat, PackageOpen, LifeBuoy, Ticket, Coins, Trophy,
 } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { STUDIO_URL } from '../../translations';
@@ -10,7 +10,7 @@ import SectionHead from './v2/SectionHead';
 import { useCommunityAccess } from '../../pages/community/access';
 
 /**
- * What LEVONIS does besides sell boxes — eleven compact tiles, the last
+ * What LEVONIS does besides sell boxes — fourteen compact tiles, the last
  * section of the home page.
  *
  * EVERY CARD POINTS AT A PAGE THAT EXISTS. This is a storefront promise, so
@@ -24,7 +24,9 @@ import { useCommunityAccess } from '../../pages/community/access';
  *
  * THE ORDER IS THE OWNER'S, not this file's — and it is the order of the
  * homepage-v2 brief: «الضمان · Trade-in · مقارنة الطابعات · الأدوات · استوديو
- * ليفو · المكافآت», then the rest of the shop's real services.
+ * ليفو · المكافآت», then the rest of the shop's real services. The rewards
+ * programme's three doors — «كوبوناتي», «استبدل نقاطك», «المسابقات» — follow
+ * the rewards tile at the owner's request (2026-11-04, DECISIONS row 288).
  *
  * HOMEPAGE V2: A QUIET GRID OF LIGHT TILES AT THE END OF THE PAGE. The owner
  * moved services below the community and asked for «very clean compact grid
@@ -89,6 +91,12 @@ export default function ServicesGrid() {
     { id: 'tools', to: '/tools', title: t('svcToolsTitle'), icon: Wrench },
     // The Studio card is drawn just before this one — see `studio` below.
     { id: 'rewards', to: '/points', title: t('svcRewardsTitle'), icon: Gift },
+    // Each opens its own section of /points (DECISIONS rows 287 and 288). Every
+    // section is drawn for a signed-in customer — an empty one says so — and the
+    // page scrolls to the #id once it has loaded. A guest lands on the sign-in card.
+    { id: 'coupons', to: '/points#coupons', title: loc('كوبوناتي', 'My coupons', 'کۆپۆنەکانم'), icon: Ticket },
+    { id: 'points-shop', to: '/points#shop', title: loc('استبدل نقاطك', 'Spend points', 'خاڵەکانت خەرج بکە'), icon: Coins },
+    { id: 'competitions', to: '/points#competitions', title: loc('المسابقات', 'Competitions', 'پێشبڕکێکان'), icon: Trophy },
     { id: 'bundles', to: '/bundles', title: t('svcBundlesTitle'), icon: Package },
     // The mystery filament is a FILTER on the bundles page, not a page of its
     // own — Bundles.tsx reads `kind` out of the query string and pre-selects
