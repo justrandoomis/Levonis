@@ -32,6 +32,8 @@ import { Toaster } from '../components/ui/Toast';
 // downloaded.
 const OrdersBoard = React.lazy(() => import('../components/adminOrders/OrdersBoard'));
 const AdminCoupons = React.lazy(() => import('../components/adminCoupons/AdminCoupons'));
+// «المكافآت» (0220): the rewards programme's terms, its coupons and its competitions.
+const AdminRewards = React.lazy(() => import('../components/adminRewards/AdminRewards'));
 const AdminDelivery = React.lazy(() => import('../components/adminDelivery/AdminDelivery'));
 const AdminCommunity = React.lazy(() => import('../components/adminCommunity/AdminCommunity'));
 const AdminProducts = React.lazy(() => import('../components/AdminProducts'));
@@ -194,6 +196,7 @@ type AdminTab =
   | 'price_reports'
   | 'membership_benefits'
   | 'coupons'
+  | 'rewards'
   | 'delivery'
   | 'community'
   | 'printer_farm'
@@ -212,7 +215,7 @@ type AdminTab =
  * `?tab=offers` is «فتح في العروض الخاصة» on the product form's «تخفيض السعر»
  * card (docs/ux/PRODUCT-DISCOUNT.md §6.4).
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'print_cloud', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security', 'delivery_pricing'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'print_cloud', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security', 'delivery_pricing', 'rewards'];
 
 function initialAdminTab(): AdminTab {
   try {
@@ -343,6 +346,7 @@ export default function Admin() {
     { id: 'memberships', icon: Crown, label: loc('الأعضاء والدعم', 'Members & support', 'ئەندامان و پشتگیری'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
     { id: 'membership_benefits', icon: BadgePercent, label: loc('مزايا العضوية', 'Membership benefits', 'سوودەکانی ئەندامێتی'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
     { id: 'coupons', icon: Ticket, label: loc('أكواد الخصم', 'Promo codes', 'کۆدەکانی داشکاندن'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
+    { id: 'rewards', icon: Gift, label: loc('المكافآت', 'Rewards', 'خەڵاتەکان'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
     { id: 'offers', icon: PercentIcon, label: loc('العروض الخاصة', 'Special offers', 'ئۆفەرە تایبەتەکان'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
     { id: 'ads', icon: Megaphone, label: loc('الإعلانات والنصوص', 'Ads & texts', 'ڕیکلام و دەقەکان'), ...section('growth', 'العضويات والتسويق', 'Growth', 'گەشەکردن') },
     ...(canUseStudio
@@ -521,6 +525,7 @@ export default function Admin() {
         {activeTab === 'membership_benefits' && <AdminBenefits />}
 
         {activeTab === 'coupons' && <AdminCoupons dir={dir} />}
+        {activeTab === 'rewards' && <AdminRewards />}
 
         {activeTab === 'delivery' && <AdminDelivery dir={dir} />}
 

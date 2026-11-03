@@ -81,6 +81,9 @@ const EXPECTED_OWNER: Record<string, string> = {
   '/api/admin/import': 'CATALOG',
   '/api/admin/chats': 'CORE',
   '/api/admin/wallet-adjust': 'LEDGER',
+  // 0220 — the rewards programme: the customer's hub under /api/rewards, and Admin → Rewards (DECISIONS row 287).
+  '/api/rewards/program': 'LEDGER',
+  '/api/admin/rewards': 'LEDGER',
   '/api/admin/products': 'CATALOG',
   '/api/memberships': 'SUBSCRIPTIONS',
   '/api/telegram': 'IDENTITY',

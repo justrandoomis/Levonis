@@ -136,8 +136,16 @@ export default function PromoCodeField({
   lang,
   onApplied,
   showLabel = true,
+  initialCode = '',
 }: {
   lang: string;
+  /**
+   * A code to show in the box, ready to apply — the cart passes the remembered
+   * one, so a reward coupon sent from /points («استخدمه الآن») is visible
+   * there instead of looking lost. Nothing is applied until the customer asks;
+   * the checkout re-validates whatever arrives.
+   */
+  initialCode?: string;
   // The formatter used to be a PROP, passed down from whichever page hosted
   // this field. It is a context now (src/CurrencyContext.tsx), so the field
   // follows the customer's chosen currency wherever it is mounted and no
@@ -154,7 +162,7 @@ export default function PromoCodeField({
 }) {
   const { money } = useMoney();
   const s = STRINGS[(lang as keyof typeof STRINGS) in STRINGS ? (lang as keyof typeof STRINGS) : 'ar'];
-  const [input, setInput] = useState('');
+  const [input, setInput] = useState(initialCode);
   const [applied, setApplied] = useState<CheckResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');

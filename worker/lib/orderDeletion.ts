@@ -90,6 +90,10 @@ export const ORDER_HISTORY_TABLES = [
   'serial_assignments',
   'order_item_inventory_unit_assignments',
   'order_preorder_unit_origins',
+  // 0220: a printer's reward coupons name the order that earned them. Only a
+  // walked-back-then-cancelled order can reach here, and its cancel already
+  // withdrew them (trg_orders_reward_coupons_withdrawn): unlinked, never deleted.
+  'reward_grants',
 ] as const;
 
 async function columnsOf(db: OrderDeletionDb, table: string): Promise<Set<string>> {
@@ -243,7 +247,7 @@ export async function deleteCancelledOrder(
     if (!columns.has('order_id')) continue;
     const clears = ['"order_id" = NULL'];
     let where = '"order_id" = ?1';
-    if ((table === 'reviews' || table === 'gift_entitlements' || table === 'serial_assignments' || table === 'order_item_inventory_unit_assignments' || table === 'order_preorder_unit_origins') && columns.has('order_item_id')) {
+    if ((table === 'reviews' || table === 'gift_entitlements' || table === 'serial_assignments' || table === 'order_item_inventory_unit_assignments' || table === 'order_preorder_unit_origins' || table === 'reward_grants') && columns.has('order_item_id')) {
       clears.push('"order_item_id" = NULL');
       where += ' OR "order_item_id" IN (SELECT id FROM order_items WHERE order_id = ?1)';
     }

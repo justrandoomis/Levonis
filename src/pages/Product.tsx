@@ -224,8 +224,15 @@ const QuickBuyActivationSheet = React.lazy(loadQuickBuySheet);
 /** Reviews and eligibility are below the purchase panel; start them near the scroll viewport. */
 function ProductReviews({ productId }: { productId: string }) {
   const target = useRef<HTMLDivElement>(null);
-  const [ready, setReady] = useState(false);
+  // «اكتب مراجعتك» on the rewards page (/points) links here with #reviews: the
+  // section opens at once and is brought into view instead of waiting for a scroll.
+  const asked = typeof window !== 'undefined' && window.location.hash === '#reviews';
+  const [ready, setReady] = useState(asked);
   useEffect(() => {
+    if (asked) {
+      target.current?.scrollIntoView({ block: 'start' });
+      return;
+    }
     if (!target.current || typeof IntersectionObserver === 'undefined') {
       setReady(true);
       return;
@@ -238,9 +245,9 @@ function ProductReviews({ productId }: { productId: string }) {
     }, { root: document.getElementById('main-scroll-container'), rootMargin: '500px', threshold: 0 });
     observer.observe(target.current);
     return () => observer.disconnect();
-  }, []);
+  }, [asked]);
   const placeholder = <div aria-hidden="true" className="mt-8 h-32" />;
-  return <div ref={target}>{ready ? <ChunkBoundary compact><React.Suspense fallback={placeholder}><ReviewSection productId={productId} /></React.Suspense></ChunkBoundary> : placeholder}</div>;
+  return <div ref={target} id="reviews" className="scroll-mt-20">{ready ?<ChunkBoundary compact><React.Suspense fallback={placeholder}><ReviewSection productId={productId} /></React.Suspense></ChunkBoundary> : placeholder}</div>;
 }
 
 /**

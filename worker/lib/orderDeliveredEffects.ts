@@ -48,6 +48,7 @@ import { awardOrderPoints } from './pointsOps';
 import { onOrderDelivered } from './membershipOps';
 import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
 import { completeTradeInsForOrder } from './tradeInStock';
+import { issuePrinterRewards } from './rewards/coupons';
 
 export interface DeliveredEffectsResult {
   deviceUnits: CreateUnitsResult | null;
@@ -131,6 +132,16 @@ export async function runOrderDeliveredEffects(
     await awardOrderPoints(env, orderId);
   } catch (e) {
     console.error('points award failed for order', orderId, e instanceof Error ? e.message : String(e));
+  }
+
+  // The rewards programme (0220, DECISIONS row 286): per printer unit, a
+  // free-delivery coupon and a filament coupon, valid seven days from now.
+  // Idempotent per unit (`reward_grants.source_ref`), so a re-delivery issues
+  // nothing twice; the quarter-hour sweep retries one that failed here.
+  try {
+    await issuePrinterRewards(env, orderId);
+  } catch (e) {
+    console.error('reward coupons not issued for order', orderId, e instanceof Error ? e.message : String(e));
   }
 
   // Referral 9.1 milestone and the support-code gift: delivered_at-based

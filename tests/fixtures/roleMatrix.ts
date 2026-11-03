@@ -111,6 +111,8 @@ import { chatRoutes } from '../../worker/routes/chats';
 import { authRoutes } from '../../worker/routes/auth';
 import { addressRoutes } from '../../worker/routes/addresses';
 import { rewardRoutes } from '../../worker/routes/rewards';
+import { rewardProgramRoutes } from '../../worker/routes/rewardsProgram';
+import { adminRewardsRoutes } from '../../worker/routes/adminRewards';
 import { subscriptionRoutes } from '../../worker/routes/subscription';
 import { communityRoutes } from '../../worker/routes/community';
 import { communityPostRoutes } from '../../worker/routes/communityPosts';
@@ -201,6 +203,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/auth', authRoutes as Router],
   ['/api/addresses', addressRoutes as Router],
   ['/api/rewards', rewardRoutes as Router],
+  ['/api/rewards/program', rewardProgramRoutes as Router],
   ['/api/subscription', subscriptionRoutes as Router],
   ['/api/community', communityRoutes as Router],
   ['/api/community', communityPostRoutes as Router],
@@ -249,6 +252,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/admin/investment-finance', adminInvestmentFinanceRoutes as Router],
   ['/api/finance-earnings', financeEarningsRoutes as Router],
   ['/api/admin/membership-benefits', adminMembershipBenefitRoutes as Router],
+  ['/api/admin/rewards', adminRewardsRoutes as Router],
   ['/api/warranty', warrantyPublicRoutes as Router],
   ['/api/admin/warranties', warrantyAdminRoutes as Router],
   ['/api/admin/community', adminCommunityRoutes as Router],

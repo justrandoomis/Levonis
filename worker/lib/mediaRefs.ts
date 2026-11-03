@@ -401,6 +401,9 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
 
   // ---- the community's projects and posts (0153) --------------------------
   { table: 'community_post_media', column: 'media_key', kind: 'text', why: "a project's picture or video, the author's own public media" },
+  // 0220 — a competition entry's photo: the entrant's own public post media
+  // (users/<uid>/posts/…), uploaded through purpose=post.
+  { table: 'reward_competition_entries', column: 'media_key', kind: 'text', why: "a competition entry's photo, the entrant's own public post media (0220)" },
 
   // ---- printing ----------------------------------------------------------
   { table: 'community_request_files', column: 'file_key', kind: 'text', why: 'the uploaded 3D model or drawing' },
@@ -679,6 +682,10 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'coupons.fulfillment_types': 'enum words',
   'coupons.transport_methods': 'enum words',
   'coupons.delivery_methods': 'enum words',
+  // 0220 — the rewards programme.
+  'coupons.product_ids': "product ids (the 'products' scope's list)",
+  'reward_grants.terms': 'the coupon terms as issued: kind, percent, ceiling, scope and product ids',
+  'reward_competitions.prize_points': 'points per place, numbers only',
   'community_products.delivery_methods': 'enum words',
   'products.shipping_methods': 'enum words',
   'products.payment_options': 'enum words',

@@ -259,6 +259,7 @@ export const ROUTES: readonly RouteRule[] = [
   { prefix: '/api/wallet', hosts: 'root', owner: 'LEDGER', flipPhase: 8, requires: 'auth', rateClass: 'money', note: 'wallet read on storefront checkout' },
   { prefix: '/api/rewards', hosts: 'root', owner: 'LEDGER', flipPhase: 8, requires: 'auth', rateClass: 'user' },
   { prefix: '/api/admin/wallet', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin:full', rateClass: 'admin-write', note: 'covers /api/admin/wallet-requests, /api/admin/wallet/credit and /api/admin/wallet-adjust' },
+  { prefix: '/api/admin/rewards', hosts: 'main', owner: 'LEDGER', flipPhase: 8, requires: 'admin', rateClass: 'admin-write', note: 'the rewards programme (0220): its terms, the reward coupons issued and the competitions — Loyalty owns the tables' },
 
   // -------------------------------------------- subscriptions and referrals
   { prefix: '/api/memberships/referral', hosts: 'root', owner: 'REFERRALS', flipPhase: 6, requires: 'auth', rateClass: 'user' },

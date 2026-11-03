@@ -49,8 +49,13 @@
  * WHICH LINES, and HOW MUCH.
  */
 
-/** 'global' matches everything; the rest name a target the line must sit in. */
-export type CouponScope = 'global' | 'category' | 'sub_category' | 'product' | 'brand' | 'bundle';
+/**
+ * 'global' matches everything; the rest name a target the line must sit in.
+ * 'products' names a LIST of products (`product_ids`) — the rewards
+ * programme's filament coupon, «on the filaments the owner selected»
+ * (migration 0220). An empty list names nothing: the scope fails closed.
+ */
+export type CouponScope = 'global' | 'category' | 'sub_category' | 'product' | 'products' | 'brand' | 'bundle';
 export type CouponKind = 'fixed_iqd' | 'percent';
 export type CapScope = 'per_unit' | 'per_order';
 export type AppliesTo = 'merchandise' | 'delivery' | 'both';
@@ -60,6 +65,12 @@ export interface CouponRule {
   category_id: string | null;
   sub_category_id: string | null;
   product_id: string | null;
+  /**
+   * The 'products' scope's list (0220). Read by no other scope. Optional so
+   * every rule written before it stays a valid rule; absent or empty means a
+   * 'products' coupon names no line at all.
+   */
+  product_ids?: readonly string[];
   brand_id: string | null;
   bundle_product_id: string | null;
   /** The MODEL (a product_option_values id) — "A1 Combo", not "A1". */
@@ -139,6 +150,8 @@ export function scopeNamesLine(rule: CouponRule, line: CouponLine): boolean {
   switch (rule.scope) {
     case 'product':
       return !!rule.product_id && rule.product_id === line.product_id;
+    case 'products':
+      return !!line.product_id && (rule.product_ids ?? []).includes(line.product_id);
     case 'brand':
       return !!rule.brand_id && rule.brand_id === line.brand_id;
     case 'bundle':

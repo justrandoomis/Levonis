@@ -209,7 +209,14 @@ export type NotificationKind =
    * low, a buyback decided (worker/lib/printCloud/notify.ts). The Sorani text
    * rides in `meta.title_ckb` / `meta.body_ckb` like the grouped kinds.
    */
-  | 'print_cloud';
+  | 'print_cloud'
+  /**
+   * «المكافآت» (0220, docs/DECISIONS.md row 286): a printer's reward coupons
+   * were issued, reward coupons are about to end, a competition was won or
+   * cancelled (worker/lib/rewards/strings.ts). The Sorani rides in
+   * `meta.title_ckb` / `meta.body_ckb`.
+   */
+  | 'reward';
 
 export interface NotificationInput {
   userId: string;
@@ -247,6 +254,8 @@ export interface NotificationInput {
     | 'price_protection'
     // 0215 — a Print Cloud order, job, shipment, inventory balance or buyback ('print_cloud').
     | 'print_cloud_order' | 'print_cloud_job' | 'print_cloud_shipment' | 'print_cloud_inventory' | 'print_cloud_buyback'
+    // 0220 — a reward coupon's grant, a competition ('reward').
+    | 'reward_grant' | 'competition'
     | '';
   entity_id?: string;
   meta?: Record<string, unknown>;

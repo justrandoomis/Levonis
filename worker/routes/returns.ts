@@ -109,6 +109,7 @@ import {
 import { PRICE_PROTECTION_NOTICES, PRICE_PROTECTION_REASON_CODES } from '../../packages/contracts/src/priceProtection';
 import { estimateServerMessage } from '../../packages/contracts/src/priceEstimates';
 import { notifyCustomer } from '../lib/customerNotify';
+import { revokeRewardsForReturn } from '../lib/rewards/coupons';
 import type { EmailLang } from '../lib/emailTemplates';
 
 const WINDOW_MS = 7 * 86_400_000;
@@ -1167,6 +1168,14 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         portionIqd: merchandisePortion,
         sourceRef: id,
       }) as unknown as Record<string, unknown>;
+
+      // 0220: a returned printer's reward coupons that are still unused go off
+      // with it — never one the customer already spent (idempotent per case).
+      try {
+        await revokeRewardsForReturn(c.env, { caseId: id, orderItemId: kase.order_item_id, qty: kase.qty });
+      } catch (e) {
+        console.error('reward coupons not withdrawn for return', id, e instanceof Error ? e.message : String(e));
+      }
     }
   }
 

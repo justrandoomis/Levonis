@@ -52,6 +52,8 @@ import { orderRoutes } from './routes/orders';
 import { addressRoutes } from './routes/addresses';
 import { walletRoutes } from './routes/wallet';
 import { rewardRoutes } from './routes/rewards';
+import { rewardProgramRoutes } from './routes/rewardsProgram';
+import { adminRewardsRoutes } from './routes/adminRewards';
 import { subscriptionRoutes } from './routes/subscription';
 import { investRoutes } from './routes/invest';
 import { communityRoutes } from './routes/community';
@@ -479,6 +481,8 @@ app.route('/api/admin/trade-in', adminTradeInRoutes);
 app.route('/api/addresses', addressRoutes);
 app.route('/api/wallet', walletRoutes);
 app.route('/api/rewards', rewardRoutes);
+// The rewards hub (0220): reward coupons, printer ratings, the points shop and competitions.
+app.route('/api/rewards/program', rewardProgramRoutes);
 app.route('/api/subscription', subscriptionRoutes);
 app.route('/api/invest', investRoutes);
 app.route('/api/community', communityRoutes);
@@ -592,6 +596,8 @@ app.route('/api/admin/investment-finance', adminInvestmentFinanceRoutes);
 app.route('/api/finance-earnings', financeEarningsRoutes);
 // Every commercial value PRO and PREMIUM shopping benefits are made of (§6).
 app.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
+// Admin → Rewards (0220): the programme's terms, the reward coupons issued and the competitions.
+app.route('/api/admin/rewards', adminRewardsRoutes);
 // The issued warranty document: public verification by receipt number or by
 // the serial on the device, and the admin side that issues and prints it.
 app.route('/api/warranty', warrantyPublicRoutes);

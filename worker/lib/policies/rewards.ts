@@ -96,11 +96,32 @@ import type { PolicyDocument } from './types';
  *     (0145): article 6.6 names PRO ×2 alone, says PREMIUM earns the base, and
  *     keeps what was already earned at ×1.5; 6.7's example no longer names a
  *     tier.
+ *
+ * VERSION 5 — WHY IT MOVED (owner, 2026-11-03; migration 0220; DECISIONS row
+ * 286). The archive keeps version 4 byte for byte.
+ *   * REWARD COUPONS AND THE POINTS SHOP — new chapter 14. Per printer
+ *     delivered: a free-delivery coupon and a filament coupon (the owner's
+ *     15%, at most 25,000 IQD, on the filaments they select), personal, single
+ *     use, valid seven days; one coupon per order (row 223 #5); withdrawn with
+ *     the order or the returned printer, never taken back from an order that
+ *     spent it. The points shop sells the same coupons for points.
+ *     worker/lib/rewards/coupons.ts is every sentence of it.
+ *   * COMPETITIONS — new chapter 15: free or paid in points, winners chosen by
+ *     the Levonis team after the close, never by lot (row 25 stays open),
+ *     entry points returned on a cancel or a refused entry
+ *     (worker/lib/rewards/competitions.ts).
+ *   * A DELIVERY WAIVER FROM A REWARD COUPON — article 10.4 said a waiver comes
+ *     only from a membership; it now names the reward coupon of chapter 14 too.
+ *   * THE INSTAGRAM STORY — new article 8.13: the owner confirmed on
+ *     2026-11-03 that the review gift also asks for a story mentioning
+ *     @levonis_iq (docs/CUSTOMER_REPLY_GUIDE.md §5). The rewards page says so,
+ *     so the policy has to.
+ *   * The final provisions move from chapter 14 to chapter 16, unchanged.
  */
 export const rewards: PolicyDocument = {
   key: 'rewards',
-  version: 4,
-  effective_at: '2026-09-27',
+  version: 5,
+  effective_at: '2026-11-03',
   title: {
     ar: 'سياسة النقاط والمراجعات والهدايا والإحالات',
     en: 'Points, Reviews, Gifts and Referrals Policy',
@@ -383,6 +404,9 @@ export const rewards: PolicyDocument = {
 ### 8.12 المراجعات المولَّدة آلياً
 المراجعة التي يولدها النظام لا تُمنح مكافأة بأي حال، ولا تدخل قائمة الهدايا.
 
+### 8.13 قصة إنستغرام
+يُطلب لهدية المراجعة كذلك أن ينشر صاحبها قصة (ستوري) على إنستغرام يشارك فيها تجربته ويشير فيها إلى حساب المتجر ⁦@levonis_iq⁩، وأن يرفق رابطها أو لقطة شاشة منها في خانة الدليل في نموذج المراجعة. ويبقى هذا الدليل خاصاً لا يراه إلا المتجر.
+
 ## 9. التقييم التلقائي بعد سبعة أيام
 
 ### 9.1 ما هو
@@ -409,7 +433,7 @@ export const rewards: PolicyDocument = {
 لا تُقبل إحالة الشخص لنفسه ولا الإحالة عبر حساب ثانٍ يفتحه المحيل. وتُعامل معاملة تعدد الحسابات وفق وثيقة التسجيل.
 
 ### 10.4 الحساب المُحال لا ينال شيئاً
-لا ينال الحساب المُحال، ولا من استعمل رمز دعم في طلبه، أي منفعة من أي نوع بسبب الإحالة أو الرمز: لا إعفاء من أجرة التوصيل، ولا خصم، ولا نقاط، ولا عضوية. ورمز الدعم رمز دعم فحسب، لا أثر له على سعر الطلب. والإعفاء من أجرة التوصيل لا يأتي إلا من عضوية فعّالة وفق وثيقة العضويات.
+لا ينال الحساب المُحال، ولا من استعمل رمز دعم في طلبه، أي منفعة من أي نوع بسبب الإحالة أو الرمز: لا إعفاء من أجرة التوصيل، ولا خصم، ولا نقاط، ولا عضوية. ورمز الدعم رمز دعم فحسب، لا أثر له على سعر الطلب. والإعفاء من أجرة التوصيل لا يأتي إلا من عضوية فعّالة وفق وثيقة العضويات، أو من كوبون مكافأة وفق الفصل الرابع عشر.
 
 ### 10.5 برنامج الطابعة: ما يناله المحيل
 يُقيَّد للمحيل استحقاق معلّق عند تسجيل تسليم الطلب المؤهل، وتُحدَّد أهليته بسبعة أيام من تاريخ التسليم المسجل.
@@ -522,24 +546,91 @@ export const rewards: PolicyDocument = {
 ### 13.8 عدم الإخلال
 إجراءات هذا الفصل لا تخل بحق المتجر في المطالبة بما لحقه من ضرر وفق القانون.
 
-## 14. أحكام ختامية
+## 14. كوبونات المكافأة ومتجر النقاط
 
-### 14.1 التعديل
+### 14.1 كوبونات الطابعة
+عن كل طابعة يُسجَّل تسليمها للزبون من متجر Levonis الرسمي يُصدر المتجر باسم صاحب الحساب كوبونين: كوبون توصيل مجاني، وكوبون خصم على خيط الطباعة (الفلامنت) الذي يختاره المتجر. ويُحسب ذلك لكل طابعة على حدة، فمن استلم طابعتين نال أربعة كوبونات. والطابعة كل منتج مصنَّف في أقسام الطابعات في المتجر.
+
+### 14.2 ما لا يُنشئ كوبونات
+لا يُنشئ كوبوناتٍ ما وصل هديةً، ولا طلبٌ من متجر في مجتمع ليفو، ولا طلبٌ لم يُسجَّل تسليمه. ولا تُصدر كوبونات عن طابعة سُلِّمت قبل بدء العمل بهذا الفصل.
+
+### 14.3 الصلاحية
+يصلح كوبون المكافأة سبعة أيام كاملة من لحظة إصداره، ما لم يعلن المتجر مدة أخرى قبل إصداره. وتُعرض نهاية صلاحية كل كوبون معه في صفحة المكافآت، ولا يُقبل بعدها.
+
+### 14.4 كوبون التوصيل المجاني
+يُسقط أجرة التوصيل كاملة عن طلب واحد، ولا يخصم شيئاً من ثمن المنتجات. ولا يُستهلك في طلب كان توصيله مجانياً أصلاً، ولا في طلب يُستلم من المخزن.
+
+### 14.5 كوبون الفلامنت
+يخصم النسبة المعلنة معه من ثمن خيط الطباعة الذي يسمّيه الكوبون وحده، بحد أقصى معلن للطلب الواحد، ولا يمس سائر المنتجات ولا التوصيل. ولا يُطبَّق على قطعة عليها عرض أو خصم آخر. وتُثبَّت نسبته وحده الأقصى وقائمة الخيط المشمول لحظة إصداره.
+
+### 14.6 كوبون واحد لكل طلب
+لا يُقبل في الطلب الواحد إلا كوبون واحد، فيُستعمل كل كوبون مكافأة في طلب مستقل. والكوبون شخصي لصاحب الحساب، لا يُنقل ولا يُستعمل من حساب آخر، ويُستعمل مرة واحدة.
+
+### 14.7 إلغاء الطلب الذي استُعمل فيه الكوبون
+إذا أُلغي قبل التسليم طلبٌ استُعمل فيه كوبون مكافأة عاد الكوبون إلى صاحبه ما دامت صلاحيته قائمة. ولا تُمدَّد صلاحيته بسبب الإلغاء.
+
+### 14.8 سحب الكوبونات
+إذا أُلغي الطلب الذي أنشأ الكوبونات، أو أُرجعت الطابعة واستُرد ثمنها، سُحب من كوبوناتها ما لم يُستعمل بعد. والكوبون الذي استُعمل في طلب لا يُسحب من ذلك الطلب.
+
+### 14.9 متجر النقاط
+للزبون أن يستبدل نقاطه المستقرة بكوبون توصيل مجاني أو بكوبون فلامنت، بالسعر المعلن بالنقاط في صفحة المكافآت. وتُخصم النقاط لحظة الاستبدال، ويسري على الكوبون ما يسري على كوبونات الطابعة. ولا يحوز الزبون في وقت واحد أكثر من كوبون واحد غير مستعمل من كل نوع استبدله بالنقاط.
+
+### 14.10 لا عودة للنقاط المستبدلة
+النقاط التي استُبدلت بكوبون لا تعود إذا انتهت صلاحيته دون استعمال.
+
+### 14.11 الكوبون ليس مالاً
+كوبون المكافأة ليس مالاً ولا رصيداً، ولا يُستبدل بنقد ولا بنقاط، ولا يُعوَّض عنه إذا انتهت صلاحيته.
+
+### 14.12 تعديل البرنامج
+للمتجر أن يعدّل للمستقبل نسب الكوبونات وحدودها وقائمة الخيط المشمول وأسعار متجر النقاط، أو أن يوقف البرنامج. وما صدر من كوبونات قبل التعديل يبقى على شروطه.
+
+## 15. المسابقات
+
+### 15.1 الإعلان
+يُعلن المتجر كل مسابقة في صفحة المكافآت بعنوانها ووصفها وشروطها ومدتها وجوائزها وطريقة الاشتراك فيها، بالعربية والإنكليزية والكردية.
+
+### 15.2 الاشتراك
+يكون الاشتراك مجانياً، أو بعدد من النقاط يُعلن مع المسابقة ويُخصم لحظة الاشتراك. ولكل حساب اشتراك واحد في المسابقة الواحدة. ويجوز أن تُقصر مسابقة على من استلم طابعة من المتجر.
+
+### 15.3 المشاركة
+يرسل المشترك ما تطلبه المسابقة: إجابة مكتوبة، أو صورة، أو كليهما. ويجب أن تكون المشاركة من عمله هو، والصورة لشيء طبعه أو صوّره بنفسه.
+
+### 15.4 اختيار الفائزين
+يختار فريق Levonis الفائزين بعد انتهاء مدة المسابقة وفق المعايير المعلنة فيها. ولا تُحدَّد النتيجة بالقرعة ولا بالحظ.
+
+### 15.5 الجوائز
+تُضاف جوائز النقاط إلى رصيد الفائز لحظة إعلان النتيجة. وتُسلَّم الجوائز العينية وفق ما يعلنه المتجر، وتسري عليها أحكام التوصيل المعتادة.
+
+### 15.6 إلغاء المسابقة
+للمتجر أن يلغي مسابقة قبل إعلان نتيجتها، وتُعاد عندئذ نقاط الاشتراك كاملة إلى أصحابها.
+
+### 15.7 رفض المشاركة
+للمتجر أن يرفض مشاركة تخالف شروط المسابقة أو أحكام الفصل الثالث عشر، وتُعاد نقاط اشتراكها إلى صاحبها.
+
+### 15.8 عرض الفائزين
+يُعرض في صفحة المكافآت اسم الفائز مختصراً ومركزه وجائزته ومشاركته الفائزة.
+
+### 15.9 ما ليست عليه المسابقة
+المسابقة ليست قرعة ولا رهاناً، ولا تُستبدل جوائزها بنقد.
+
+## 16. أحكام ختامية
+
+### 16.1 التعديل
 للمتجر تعديل هذه الوثيقة بإصدار نسخة جديدة برقم وتاريخ نفاذ، ولا يسري التعديل بأثر رجعي على واقعة تمت قبل نفاذه.
 
-### 14.2 الأولوية عند التعارض
+### 16.2 الأولوية عند التعارض
 إذا تعارض نص هذه الوثيقة مع وعد شفهي أو رسالة من موظف أو منشور تسويقي أو صورة في إعلان، فنص هذه الوثيقة هو المعتمد.
 
-### 14.3 حجية السجلات
+### 16.3 حجية السجلات
 سجلات المتجر الإلكترونية هي المرجع في إثبات المنح والصرف والعكس ومواعيدها.
 
-### 14.4 استقلال البنود
+### 16.4 استقلال البنود
 بطلان بند لا يمس صحة سائر البنود.
 
-### 14.5 القانون والاختصاص
+### 16.5 القانون والاختصاص
 تحكم هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، والاختصاص بالنزاع ل{{COMPETENT_COURT}}.
 
-### 14.6 التواصل
+### 16.6 التواصل
 قناة التواصل المعتمدة في شأن هذه الوثيقة: {{LEVONIS_SUPPORT_CONTACT}}، في أوقات {{LEVONIS_SUPPORT_HOURS}}.`,
 
     en: `## 1. Preamble, Scope and Definitions
@@ -818,6 +909,9 @@ The gift is delivered as the administration determines, and the ordinary deliver
 ### 8.12 Automatically generated reviews
 A review generated by the system is granted no reward in any case and does not enter the gift queue.
 
+### 8.13 The Instagram story
+The review gift also asks its author to post an Instagram story sharing their experience and mentioning the Store's account @levonis_iq, and to attach its link or a screenshot of it in the evidence field of the review form. That evidence stays private and is seen by the Store alone.
+
 ## 9. The automatic rating after seven days
 
 ### 9.1 What it is
@@ -844,7 +938,7 @@ A referral is not attributed to another referrer after it has been recorded, is 
 A referral by a person to themselves is not accepted, nor is a referral through a second account opened by the referrer. It is treated as multiple accounts under the Registration document.
 
 ### 10.4 The referred account receives nothing
-The referred account, and anyone who uses a support code on an order, receives no benefit of any kind because of the referral or the code: no delivery waiver, no discount, no points and no membership. A support code is a support code only, and it has no effect on the price of the order. A waiver of the delivery charge comes only from an active membership, under the Memberships document.
+The referred account, and anyone who uses a support code on an order, receives no benefit of any kind because of the referral or the code: no delivery waiver, no discount, no points and no membership. A support code is a support code only, and it has no effect on the price of the order. A waiver of the delivery charge comes only from an active membership, under the Memberships document, or from a reward coupon under chapter 14.
 
 ### 10.5 The printer programme: what the referrer receives
 A pending entitlement is recorded for the referrer when the delivery of the qualifying order is recorded, and its eligibility is set at seven days from the recorded delivery date.
@@ -957,24 +1051,91 @@ The Store relies in proving abuse on its own records: the award record, the wall
 ### 13.8 Without prejudice
 The measures in this chapter are without prejudice to the Store's right to claim the damage it has suffered under the law.
 
-## 14. Final provisions
+## 14. Reward coupons and the points shop
 
-### 14.1 Amendment
+### 14.1 Printer coupons
+For every printer recorded as delivered to a customer by the official Levonis store, the Store issues two coupons in the account holder's name: a free-delivery coupon, and a discount coupon on the print filament the Store selects. This is counted per printer: a customer who receives two printers receives four coupons. A printer is any product classified under the Store's printer sections.
+
+### 14.2 What creates no coupons
+No coupons are created by a printer received as a gift, by an order from a store in the Levo Community, or by an order whose delivery has not been recorded. No coupons are issued for a printer delivered before this chapter took effect.
+
+### 14.3 Validity
+A reward coupon is valid for seven full days from the moment it is issued, unless the Store announces another period before it is issued. The end of each coupon's validity is shown with it on the Rewards page, and it is not accepted after that.
+
+### 14.4 The free-delivery coupon
+It waives the whole delivery charge of one order and takes nothing off the price of the products. It is not used up on an order whose delivery was free already, nor on an order collected from the warehouse.
+
+### 14.5 The filament coupon
+It takes the percentage announced with it off the price of the print filament the coupon names, and that alone, up to an announced ceiling per order; it does not touch other products or delivery. It does not apply to an item that carries an offer or another discount. Its percentage, its ceiling and the list of filament it covers are fixed when it is issued.
+
+### 14.6 One coupon per order
+An order accepts one coupon only, so each reward coupon is used on an order of its own. The coupon is personal to the account holder: it is not transferable, cannot be used from another account, and is used once.
+
+### 14.7 Cancelling the order that used the coupon
+If an order on which a reward coupon was used is cancelled before delivery, the coupon returns to its holder for as long as it remains valid. Its validity is not extended because of the cancellation.
+
+### 14.8 Withdrawing coupons
+If the order that created the coupons is cancelled, or the printer is returned and refunded, the coupons from it that have not yet been used are withdrawn. A coupon already used on an order is not taken back from that order.
+
+### 14.9 The points shop
+A customer may exchange settled points for a free-delivery coupon or a filament coupon, at the price in points announced on the Rewards page. The points are deducted at the moment of the exchange, and the coupon is subject to everything that applies to printer coupons. A customer holds no more than one unused coupon of each kind bought with points at any one time.
+
+### 14.10 Exchanged points do not return
+Points exchanged for a coupon do not return if the coupon expires unused.
+
+### 14.11 A coupon is not money
+A reward coupon is not money and not a balance; it cannot be exchanged for cash or for points, and no compensation is given when it expires.
+
+### 14.12 Changing the programme
+The Store may change, for the future, the coupons' percentages and ceilings, the list of filament covered and the prices of the points shop, or stop the programme. Coupons issued before a change keep their terms.
+
+## 15. Competitions
+
+### 15.1 Announcement
+The Store announces every competition on the Rewards page with its title, description, conditions, period, prizes and the way to enter, in Arabic, English and Kurdish.
+
+### 15.2 Entry
+Entry is free, or costs a number of points announced with the competition and deducted at the moment of entry. Each account enters a competition once. A competition may be limited to customers who received a printer from the Store.
+
+### 15.3 The entry
+The entrant sends what the competition asks for: a written answer, a photo, or both. The entry must be the entrant's own work, and the photo of something they printed or photographed themselves.
+
+### 15.4 Choosing the winners
+The Levonis team chooses the winners after the competition ends, by the criteria announced in it. The result is never decided by lot or by chance.
+
+### 15.5 Prizes
+Prizes in points are added to the winner's balance when the result is announced. Prizes in kind are handed over as the Store announces, and the ordinary delivery provisions apply to them.
+
+### 15.6 Cancelling a competition
+The Store may cancel a competition before its result is announced, in which case the entry points are returned in full to their owners.
+
+### 15.7 Refusing an entry
+The Store may refuse an entry that breaks the competition's conditions or the provisions of chapter 13, and its entry points are returned to its owner.
+
+### 15.8 Showing the winners
+The Rewards page shows each winner's shortened name, place, prize and winning entry.
+
+### 15.9 What a competition is not
+A competition is neither a lottery nor a wager, and its prizes are not exchanged for cash.
+
+## 16. Final provisions
+
+### 16.1 Amendment
 The Store may amend this document by issuing a new version with a number and an effective date; an amendment does not apply retroactively to an event completed before it took effect.
 
-### 14.2 Priority in case of conflict
+### 16.2 Priority in case of conflict
 Where the text of this document conflicts with an oral promise, a message from a member of staff, a marketing publication or an image in an advertisement, the text of this document governs.
 
-### 14.3 The authority of the records
+### 16.3 The authority of the records
 The Store's electronic records are the reference in proving awards, redemptions, reversals and their timing.
 
-### 14.4 Severability
+### 16.4 Severability
 The invalidity of one provision does not affect the validity of the remaining provisions.
 
-### 14.5 Governing law and jurisdiction
+### 16.5 Governing law and jurisdiction
 This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction over disputes.
 
-### 14.6 Contact
+### 16.6 Contact
 The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONTACT}}, during {{LEVONIS_SUPPORT_HOURS}}.`,
 
     ckb: `## 1. پێشەکی و بوار و پێناسەکان
@@ -1253,6 +1414,9 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ### 8.12 پێداچوونەوە خۆکارە دروستکراوەکان
 ئەو پێداچوونەوەیەی سیستەمەکە دروستی دەکات بە هیچ شێوەیەک پاداشتی پێ نابەخشرێت و ناچێتە ناو ڕیزی دیارییەکان.
 
+### 8.13 ستۆریی ئینستاگرام
+دیاری پێداچوونەوە هەروەها داوا لە خاوەنەکەی دەکات ستۆرییەک لە ئینستاگرام بڵاو بکاتەوە کە ئەزموونەکەی تێدا باس بکات و هەژماری فرۆشگا ⁦@levonis_iq⁩ منشن بکات، و بەستەرەکەی یان وێنەیەکی شاشەی لێی لە خانەی بەڵگەی فۆرمی پێداچوونەوەکەدا هاوپێچ بکات. ئەو بەڵگەیە تایبەت دەمێنێتەوە و تەنها فرۆشگا دەیبینێت.
+
 ## 9. پلەدانی خۆکار دوای حەوت ڕۆژ
 
 ### 9.1 چییە
@@ -1279,7 +1443,7 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ناردنی کەسێک بۆ خۆی وەرناگیرێت، نە ناردن لە ڕێگەی هەژمارێکی دووەمەوە کە نێرەرەکە دەیکاتەوە. وەک هەژماری فرە مامەڵەی لەگەڵ دەکرێت بەپێی بەڵگەنامەی تۆمارکردن.
 
 ### 10.4 هەژماری نێردراو هیچ وەرناگرێت
-هەژماری نێردراو، و هەر کەسێک کۆدی پشتگیری لە داواکارییەکەیدا بەکار بهێنێت، بەهۆی ناردن یان کۆدەکەوە هیچ سوودێک وەرناگرێت: نە بێبەشکردن لە تێچووی گەیاندن، نە داشکاندن، نە خاڵ، نە ئەندامێتی. کۆدی پشتگیری تەنها کۆدی پشتگیرییە و هیچ کاریگەرییەکی لەسەر نرخی داواکارییەکە نییە. بێبەشکردن لە تێچووی گەیاندن تەنها لە ئەندامێتییەکی چالاکەوە دێت، بەپێی بەڵگەنامەی ئەندامێتییەکان.
+هەژماری نێردراو، و هەر کەسێک کۆدی پشتگیری لە داواکارییەکەیدا بەکار بهێنێت، بەهۆی ناردن یان کۆدەکەوە هیچ سوودێک وەرناگرێت: نە بێبەشکردن لە تێچووی گەیاندن، نە داشکاندن، نە خاڵ، نە ئەندامێتی. کۆدی پشتگیری تەنها کۆدی پشتگیرییە و هیچ کاریگەرییەکی لەسەر نرخی داواکارییەکە نییە. بێبەشکردن لە تێچووی گەیاندن تەنها لە ئەندامێتییەکی چالاکەوە دێت، بەپێی بەڵگەنامەی ئەندامێتییەکان، یان لە کۆپۆنێکی پاداشتەوە بەپێی بەشی چواردەیەم.
 
 ### 10.5 پرۆگرامی چاپکەر: ئەوەی نێرەر وەریدەگرێت
 شایستەییەکی هەڵپەسێردراو بۆ نێرەر تۆمار دەکرێت کاتێک گەیاندنی داواکارییە شایستەکە تۆمار دەکرێت، و شایستەییەکەی بە حەوت ڕۆژ لە بەرواری گەیاندنی تۆمارکراوەوە دیاری دەکرێت.
@@ -1392,24 +1556,91 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ### 13.8 بەبێ زیان
 ڕێوشوێنەکانی ئەم بەشە زیان بە مافی فرۆشگا ناگەیەنن بۆ داواکردنی ئەو زیانەی بەرکەوتووە بەپێی یاسا.
 
-## 14. حوکمە کۆتاییەکان
+## 14. کۆپۆنەکانی پاداشت و فرۆشگای خاڵ
 
-### 14.1 گۆڕانکاری
+### 14.1 کۆپۆنەکانی چاپکەر
+بۆ هەر چاپکەرێک کە گەیاندنی بۆ کڕیار لە فرۆشگای فەرمی Levonis ەوە تۆمار کرابێت، فرۆشگا دوو کۆپۆن بە ناوی خاوەنی هەژمارەکە دەردەکات: کۆپۆنێکی گەیاندنی بەخۆڕایی، و کۆپۆنێکی داشکاندن لەسەر ئەو دەزووی چاپەی (فیلامێنت) کە فرۆشگا هەڵیدەبژێرێت. ئەمە بۆ هەر چاپکەرێک جیا دەژمێردرێت: کەسێک کە دوو چاپکەر وەربگرێت چوار کۆپۆن وەردەگرێت. چاپکەر هەر بەرهەمێکە کە لە بەشەکانی چاپکەری فرۆشگادا پۆلێن کرابێت.
+
+### 14.2 ئەوەی کۆپۆن دروست ناکات
+چاپکەرێک کە وەک دیاری گەیشتبێت، داواکارییەک لە فرۆشگایەکی کۆمەڵگەی لێڤۆ، و داواکارییەک کە گەیاندنەکەی تۆمار نەکرابێت، هیچ کۆپۆنێک دروست ناکەن. بۆ چاپکەرێک کە پێش دەستپێکردنی کارکردن بەم بەشە گەیەنرابێت هیچ کۆپۆنێک دەرناچێت.
+
+### 14.3 ماوەی بەکارهێنان
+کۆپۆنی پاداشت حەوت ڕۆژی تەواو لە ساتی دەرچوونییەوە بەکاردێت، مەگەر فرۆشگا پێش دەرکردنی ماوەیەکی تر ڕابگەیەنێت. کۆتایی ماوەی هەر کۆپۆنێک لەگەڵیدا لە پەڕەی پاداشتەکاندا پیشان دەدرێت، و دوای ئەوە وەرناگیرێت.
+
+### 14.4 کۆپۆنی گەیاندنی بەخۆڕایی
+هەموو تێچووی گەیاندنی یەک داواکاری لادەبات و هیچ لە نرخی بەرهەمەکان کەم ناکاتەوە. لە داواکارییەکدا کە گەیاندنەکەی پێشتر بەخۆڕایی بووبێت، یان لە داواکارییەکدا کە لە کۆگا وەردەگیرێت، بەکارنابرێت.
+
+### 14.5 کۆپۆنی دەزووی چاپ
+ئەو ڕێژەیەی لەگەڵیدا ڕاگەیەنراوە تەنها لە نرخی ئەو دەزووی چاپەی کە کۆپۆنەکە ناوی دەبات کەم دەکاتەوە، تا سنوورێکی ڕاگەیەنراو بۆ هەر داواکارییەک، و دەست لە بەرهەمەکانی تر و گەیاندن نادات. لەسەر پارچەیەک کە ئۆفەر یان داشکاندنێکی تری لەسەرە جێبەجێ نابێت. ڕێژە و سنوور و لیستی ئەو دەزووەی دەیگرێتەوە لە کاتی دەرچووندا جێگیر دەکرێن.
+
+### 14.6 یەک کۆپۆن بۆ هەر داواکارییەک
+داواکاری تەنها یەک کۆپۆن وەردەگرێت، بۆیە هەر کۆپۆنێکی پاداشت لە داواکارییەکی جیادا بەکاردێت. کۆپۆنەکە تایبەتە بە خاوەنی هەژمارەکە: ناگوازرێتەوە، لە هەژمارێکی ترەوە بەکارنایەت، و یەک جار بەکاردێت.
+
+### 14.7 هەڵوەشاندنەوەی ئەو داواکارییەی کۆپۆنەکەی تێدا بەکارهاتووە
+ئەگەر داواکارییەک کە کۆپۆنێکی پاداشتی تێدا بەکارهاتووە پێش گەیاندن هەڵبوەشێتەوە، کۆپۆنەکە دەگەڕێتەوە بۆ خاوەنەکەی تا ئەو کاتەی ماوەکەی ماوە. ماوەکەی بەهۆی هەڵوەشاندنەوەکەوە درێژ ناکرێتەوە.
+
+### 14.8 کشاندنەوەی کۆپۆنەکان
+ئەگەر ئەو داواکارییەی کۆپۆنەکانی دروست کردووە هەڵبوەشێتەوە، یان چاپکەرەکە بگەڕێنرێتەوە و نرخەکەی بدرێتەوە، ئەو کۆپۆنانەی لێیەوە هاتوون و هێشتا بەکارنەهاتوون دەکشێنرێنەوە. کۆپۆنێک کە لە داواکارییەکدا بەکارهاتووە لەو داواکارییە ناسەندرێتەوە.
+
+### 14.9 فرۆشگای خاڵ
+کڕیار دەتوانێت خاڵە جێگیرەکانی بە کۆپۆنێکی گەیاندنی بەخۆڕایی یان کۆپۆنێکی دەزووی چاپ بگۆڕێتەوە، بەو نرخە بە خاڵەی لە پەڕەی پاداشتەکاندا ڕاگەیەنراوە. خاڵەکان لە ساتی گۆڕینەوەدا کەم دەکرێنەوە، و هەرچی بەسەر کۆپۆنەکانی چاپکەردا جێبەجێ دەبێت بەسەر ئەم کۆپۆنەشدا جێبەجێ دەبێت. کڕیار لە یەک کاتدا زیاتر لە یەک کۆپۆنی بەکارنەهاتوو لە هەر جۆرێک کە بە خاڵ گۆڕیبێتییەوە ناگرێت.
+
+### 14.10 خاڵی گۆڕدراو ناگەڕێتەوە
+ئەو خاڵانەی بە کۆپۆن گۆڕدراون ناگەڕێنەوە ئەگەر ماوەی کۆپۆنەکە بەبێ بەکارهێنان کۆتایی بێت.
+
+### 14.11 کۆپۆن پارە نییە
+کۆپۆنی پاداشت نە پارەیە و نە باڵانس؛ بە پارە یان بە خاڵ ناگۆڕدرێتەوە، و کاتێک ماوەکەی کۆتایی دێت هیچ قەرەبوویەک نادرێت.
+
+### 14.12 گۆڕینی بەرنامەکە
+فرۆشگا دەتوانێت بۆ داهاتوو ڕێژە و سنووری کۆپۆنەکان و لیستی ئەو دەزووەی دەیانگرێتەوە و نرخەکانی فرۆشگای خاڵ بگۆڕێت، یان بەرنامەکە ڕابگرێت. ئەو کۆپۆنانەی پێش گۆڕانکارییەکە دەرچوون مەرجەکانی خۆیان دەپارێزن.
+
+## 15. پێشبڕکێکان
+
+### 15.1 ڕاگەیاندن
+فرۆشگا هەر پێشبڕکێیەک لە پەڕەی پاداشتەکاندا ڕادەگەیەنێت بە ناونیشان و وەسف و مەرج و ماوە و خەڵات و شێوازی بەشداریکردنییەوە، بە عەرەبی و ئینگلیزی و کوردی.
+
+### 15.2 بەشداریکردن
+بەشداریکردن بەخۆڕاییە، یان بە ژمارەیەک خاڵە کە لەگەڵ پێشبڕکێکەدا ڕادەگەیەنرێت و لە ساتی بەشداریکردندا کەم دەکرێتەوە. هەر هەژمارێک یەک جار لە هەر پێشبڕکێیەکدا بەشداری دەکات. دەکرێت پێشبڕکێیەک تەنها بۆ ئەوانە بێت کە چاپکەرێکیان لە فرۆشگاوە وەرگرتووە.
+
+### 15.3 بەشدارییەکە
+بەشداربوو ئەوەی پێشبڕکێکە داوای دەکات دەینێرێت: وەڵامێکی نووسراو، یان وێنەیەک، یان هەردووکیان. بەشدارییەکە دەبێت کاری خۆی بێت، و وێنەکە هی شتێک بێت کە خۆی چاپی کردبێت یان وێنەی گرتبێت.
+
+### 15.4 هەڵبژاردنی براوەکان
+تیمی Levonis دوای کۆتاییهاتنی ماوەی پێشبڕکێکە، بەپێی ئەو پێوەرانەی تێیدا ڕاگەیەنراون، براوەکان هەڵدەبژێرێت. ئەنجامەکە هەرگیز بە تیروپشک یان بەخت دیاری ناکرێت.
+
+### 15.5 خەڵاتەکان
+خەڵاتی خاڵ لە ساتی ڕاگەیاندنی ئەنجامەکەدا دەخرێتە سەر باڵانسی براوە. خەڵاتی ماددی بەو شێوەیەی فرۆشگا ڕایدەگەیەنێت دەدرێت، و حوکمە ئاساییەکانی گەیاندنی بەسەردا جێبەجێ دەبێت.
+
+### 15.6 هەڵوەشاندنەوەی پێشبڕکێ
+فرۆشگا دەتوانێت پێشبڕکێیەک پێش ڕاگەیاندنی ئەنجامەکەی هەڵبوەشێنێتەوە، و لەو کاتەدا خاڵەکانی بەشداریکردن بە تەواوی بۆ خاوەنەکانیان دەگەڕێنرێنەوە.
+
+### 15.7 ڕەتکردنەوەی بەشداری
+فرۆشگا دەتوانێت بەشدارییەک ڕەت بکاتەوە کە پێچەوانەی مەرجەکانی پێشبڕکێکە یان حوکمەکانی بەشی سێزدەیەم بێت، و خاڵەکانی بەشداریکردنەکەی بۆ خاوەنەکەی دەگەڕێنرێنەوە.
+
+### 15.8 پیشاندانی براوەکان
+پەڕەی پاداشتەکان ناوی کورتکراوەی هەر براوەیەک و پلە و خەڵات و بەشدارییە براوەکەی پیشان دەدات.
+
+### 15.9 پێشبڕکێ چی نییە
+پێشبڕکێ نە تیروپشکە و نە گرەو، و خەڵاتەکانی بە پارە ناگۆڕدرێنەوە.
+
+## 16. حوکمە کۆتاییەکان
+
+### 16.1 گۆڕانکاری
 فرۆشگا دەتوانێت ئەم بەڵگەنامەیە بگۆڕێت بە دەرکردنی وەشانێکی نوێ بە ژمارە و بەرواری کارپێکردن؛ گۆڕانکاری بە کاریگەری دواکەوتوو لەسەر ڕووداوێک جێبەجێ نابێت کە پێش کارپێکردنی تەواو بووە.
 
-### 14.2 پێشینە لە کاتی ناکۆکیدا
+### 16.2 پێشینە لە کاتی ناکۆکیدا
 کاتێک دەقی ئەم بەڵگەنامەیە لەگەڵ بەڵێنێکی زارەکی یان نامەیەکی کارمەند یان بڵاوکراوەیەکی بازرگانی یان وێنەیەک لە ڕیکلامدا ناکۆک بێت، دەقی ئەم بەڵگەنامەیە بنەمایە.
 
-### 14.3 کاریگەری تۆمارەکان
+### 16.3 کاریگەری تۆمارەکان
 تۆمارە ئەلیکترۆنییەکانی فرۆشگا سەرچاوەن لە سەلماندنی بەخشین و خەرجکردن و گەڕاندنەوە و کاتەکانیان.
 
-### 14.4 سەربەخۆیی بڕگەکان
+### 16.4 سەربەخۆیی بڕگەکان
 پووچی بڕگەیەک کاریگەری لەسەر دروستی بڕگەکانی تر نییە.
 
-### 14.5 یاسا و دەسەڵاتی دادوەری
+### 16.5 یاسا و دەسەڵاتی دادوەری
 ئەم بەڵگەنامەیە بە {{GOVERNING_LAW_JURISDICTION}} ڕێک دەخرێت، و {{COMPETENT_COURT}} دەسەڵاتی هەیە لەسەر ناکۆکییەکان.
 
-### 14.6 پەیوەندی
+### 16.6 پەیوەندی
 کەناڵی پەیوەندی پەسەندکراو سەبارەت بەم بەڵگەنامەیە: {{LEVONIS_SUPPORT_CONTACT}}، لە کاتەکانی {{LEVONIS_SUPPORT_HOURS}}.`,
   },
 };

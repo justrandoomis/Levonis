@@ -3966,11 +3966,20 @@ adminRoutes.patch('/orders/:id', async (c) => {
  * longer count, so «الاستخدام» agrees with what the next buyer is told.
  */
 adminRoutes.get('/coupons', async (c) => {
-  const { results } = await c.env.DB.prepare(
-    `SELECT c.*,
-            (SELECT COUNT(*) FROM coupon_redemptions r WHERE r.coupon_id = c.id AND r.state = 'active') AS redeemed
-       FROM coupons c ORDER BY c.created_at DESC LIMIT 200`
-  ).all<Record<string, unknown>>();
+  // THE REWARD COUPONS ARE NOT PROMO CODES (0220): one personal pair per
+  // printer delivered would bury the owner's codes in a week. They are listed,
+  // and managed, in Admin → Rewards (worker/routes/adminRewards.ts). A
+  // database before 0220 has no such coupon, and is read without the filter.
+  const list = (filter: string) =>
+    c.env.DB.prepare(
+      `SELECT c.*,
+              (SELECT COUNT(*) FROM coupon_redemptions r WHERE r.coupon_id = c.id AND r.state = 'active') AS redeemed
+         FROM coupons c ${filter} ORDER BY c.created_at DESC LIMIT 200`
+    ).all<Record<string, unknown>>();
+  const { results } = await list('WHERE c.reward_grant_id IS NULL').catch((e: unknown) => {
+    if (isSchemaMissing(e)) return list('');
+    throw e;
+  });
   return c.json({ success: true, coupons: results ?? [] });
 });
 
@@ -4048,8 +4057,11 @@ adminRoutes.post('/coupons', requireMoneyAuthority('coupon_issue'), async (c) =>
  * (a value above the approval, a new end date, more uses) nor retires it (a
  * request awaiting payment with no live credit).
  */
-function refuseTradeInCoupon(row: { trade_in_id?: string | null } | null): void {
+function refuseTradeInCoupon(row: { trade_in_id?: string | null; reward_grant_id?: string | null } | null): void {
   if (row?.trade_in_id) throw new HttpError(409, moneyAuthorityMessage('TRADE_IN_COUPON_MANAGED'), 'TRADE_IN_COUPON_MANAGED');
+  // A reward coupon (0220) carries the programme's terms as they were when it
+  // was issued; Admin → Rewards withdraws or extends it, never this editor.
+  if (row?.reward_grant_id) throw new HttpError(409, 'This coupon is a reward coupon — manage it in Admin → Rewards.', 'REWARD_COUPON_MANAGED');
 }
 
 adminRoutes.patch('/coupons/:id', requireMoneyAuthority('coupon_issue'), async (c) => {

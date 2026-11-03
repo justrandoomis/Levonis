@@ -12,6 +12,7 @@ import { EmptyState } from '../components/ui/AsyncStates';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { Overlay } from '../components/ui/Overlay';
 import Spinner from '../components/ui/Spinner';
+import { Competitions, PendingPoints, PointsShop, RatePrinter, RewardCoupons, RewardsNav, useRewardsHub } from '../components/rewards/RewardsHub';
 
 /**
  * THE POINTS & MISSIONS PAGE.
@@ -132,6 +133,8 @@ export default function Rewards() {
   const [adWait, setAdWait] = useState(0);
 
   const videoTriggerRef = useRef<HTMLButtonElement>(null);
+  /** The rewards hub (0220): coupons, printer ratings, the points shop, competitions. */
+  const hub = useRewardsHub(authLoaded && isAuthenticated);
 
   const loadRewards = useCallback(async () => {
     try {
@@ -153,6 +156,17 @@ export default function Rewards() {
     if (!authLoaded || !isAuthenticated) return;
     loadRewards();
   }, [authLoaded, isAuthenticated, loadRewards]);
+
+  // A notification links to /points#coupons or #competitions: once the hub has drawn, go there.
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (hub.data && id) document.getElementById(id)?.scrollIntoView({ block: 'start' });
+  }, [hub.data]);
+
+  /** After a swap or an entry the balance, the history and the hub all moved. */
+  const refreshAll = useCallback(async () => {
+    await Promise.all([hub.reload(), loadRewards(), refreshWallet()]);
+  }, [hub, loadRewards, refreshWallet]);
 
   // The ad countdown. It is a courtesy, not a gate: the server refuses an
   // early claim on its own `started_at` whatever this number says.
@@ -318,6 +332,23 @@ export default function Rewards() {
   };
 
   /**
+   * A LEDGER MOVEMENT IN THE READER'S LANGUAGE. Its note is the server's
+   * English record (worker/lib/pointsOps.ts, worker/routes/reviews.ts,
+   * worker/lib/rewards/*); the movements a customer meets most are named here,
+   * and anything else keeps the record as written.
+   */
+  const ledgerLabel = (note: string): string => {
+    if (/^Purchase points/.test(note)) return loc('نقاط الشراء', 'Purchase points', 'خاڵی کڕین');
+    if (/^Points reversal/.test(note)) return loc('نقاط طلب أُلغي أو أُرجع', 'Points of a cancelled or returned order', 'خاڵی داواکارییەکی هەڵوەشاوە یان گەڕێنراوە');
+    if (/^Valid manual review/.test(note)) return loc('نقاط مراجعة', 'Review points', 'خاڵی هەڵسەنگاندن');
+    if (/^Points shop/.test(note)) return loc('كوبون من متجر النقاط', 'A coupon from the points shop', 'کۆپۆنێک لە فرۆشگای خاڵ');
+    if (/^Competition prize/.test(note)) return loc('جائزة مسابقة', 'Competition prize', 'خەڵاتی پێشبڕکێ');
+    if (/^Competition entry not accepted|^Competition cancelled/.test(note)) return loc('استرداد اشتراك مسابقة', 'Competition entry refunded', 'گەڕاندنەوەی بەشداریکردنی پێشبڕکێ');
+    if (/^Competition entry/.test(note)) return loc('الاشتراك في مسابقة', 'Competition entry', 'بەشداریکردن لە پێشبڕکێ');
+    return note;
+  };
+
+  /**
    * When a history line happened. A dated mission shows its Baghdad day, which
    * is the period it was earned for; everything else shows the instant the
    * server recorded. `day` is never rendered on its own, because for the
@@ -373,7 +404,7 @@ export default function Rewards() {
         >
           <ChevronLeft aria-hidden="true" className="w-6 h-6 rtl:rotate-180" strokeWidth={2.5} />
         </button>
-        <h1 className="text-[17px] font-bold text-center flex-1">{loc('النقاط والمهام', 'Points & Missions', 'خاڵ و ئەرکەکان')}</h1>
+        <h1 className="text-[17px] font-bold text-center flex-1">{loc('المكافآت والنقاط', 'Rewards & Points', 'خەڵات و خاڵەکان')}</h1>
         {/* Registers this page's own character anchor, so the shell stops
             reserving a separate landing strip above this header. */}
         <MotionCharacterHome kind="top-header" compact />
@@ -440,6 +471,8 @@ export default function Rewards() {
               </div>
             </div>
 
+            <PendingPoints hub={hub.data} />
+
             {/*
               THE MULTIPLIER, STATED. The owner's brief: a PRO must see that
               they earned double, not just a bigger number with no explanation.
@@ -491,6 +524,9 @@ export default function Rewards() {
                 )}
               </div>
             )}
+
+            <RewardsNav hub={hub.data} />
+            <RewardCoupons hub={hub.data} />
 
             {/* Check-in card: the screen's one focal card, a single raised slab.
                 It was a notebook page — a rotated under-layer, binder holes and
@@ -590,9 +626,13 @@ export default function Rewards() {
             </div>
             )}
 
+            <RatePrinter hub={hub.data} />
+            <PointsShop hub={hub.data} onChanged={refreshAll} />
+            <Competitions hub={hub.data} onChanged={refreshAll} />
+
             {/* Missions */}
             <div className="mt-8 mb-8">
-              <h2 className="text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('اجمع النقاط', 'Earn Points', 'خاڵ کۆبکەرەوە')}</h2>
+              <h2 id="missions" className="scroll-mt-20 text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('اجمع النقاط', 'Earn Points', 'خاڵ کۆبکەرەوە')}</h2>
               <div className="space-y-3 px-1">
                 {!data && !loadError && (
                   <div className="flex justify-center py-6">
@@ -778,7 +818,7 @@ export default function Rewards() {
                       <div>
                         <h4 className="text-text-primary font-bold text-[14px]">
                           {/* A ledger movement has no mission; it carries its own wording. */}
-                          {missionLabel[h.mission] ?? (h.note || h.mission)}
+                          {missionLabel[h.mission] ?? (h.note ? ledgerLabel(h.note) : h.mission)}
                           {h.streak_day ? ` · ${loc(`يوم ${h.streak_day}`, `day ${h.streak_day}`, `ڕۆژی ${h.streak_day}`)}` : ''}
                         </h4>
                         <span className="text-text-secondary font-medium text-[12px]">

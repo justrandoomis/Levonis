@@ -17,7 +17,7 @@ import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { LINE_QTY_MAX, clampQuantity, quantityLimit } from '../../packages/pricing/src/quantity';
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
-import PromoCodeField from '../components/PromoCodeField';
+import PromoCodeField, { readStoredPromo } from '../components/PromoCodeField';
 import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
 import BundleContents from '../components/bundles/BundleContents';
@@ -2457,7 +2457,7 @@ export default function Cart() {
               {/* The engine behind this has existed since migration 0002; the
                   box was disabled because nothing could create a code and
                   nothing could type one. Both halves exist now. */}
-              <PromoCodeField lang={lang} />
+              <PromoCodeField lang={lang} initialCode={readStoredPromo()} />
             </div>
           )}
         </div>

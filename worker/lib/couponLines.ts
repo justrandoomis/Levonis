@@ -31,7 +31,7 @@ import { safeParse } from './types';
 
 type Row = Record<string, unknown>;
 
-const SCOPES: readonly CouponScope[] = ['global', 'category', 'sub_category', 'product', 'brand', 'bundle'];
+const SCOPES: readonly CouponScope[] = ['global', 'category', 'sub_category', 'product', 'products', 'brand', 'bundle'];
 const APPLIES: readonly AppliesTo[] = ['merchandise', 'delivery', 'both'];
 
 const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v : null);
@@ -60,6 +60,9 @@ export function couponRuleOf(row: Row): CouponRule {
     category_id: text(row.category_id),
     sub_category_id: text(row.sub_category_id),
     product_id: text(row.product_id),
+    // 0220's list scope. A row (or a database) without the column reads '[]',
+    // so a 'products' coupon there names nothing and is refused.
+    product_ids: list(row.product_ids),
     brand_id: text(row.brand_id),
     bundle_product_id: text(row.bundle_product_id),
     option_value_id: text(row.option_value_id),

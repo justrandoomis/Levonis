@@ -215,6 +215,10 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'wallet_transactions', 'wallet_holds', 'wallet_adjustments', 'ledger_balances', 'ledger_idempotency', 'wallet_withdrawals',
     'wallet_deposit_meta', 'wallet_review_requests', 'wallet_rate_rebase', 'wallet_rate_rebase_entries', 'admin_tg_identities', 'bnpl_accounts', 'bnpl_ledger', 'points_accruals',
     'points_reservations', 'points_awards', 'reward_claims', 'browse_sessions', 'mission_streaks', 'ticket_ledger', 'game_sessions',
+    // 0220 — THE REWARDS PROGRAMME (Loyalty): the reward coupons a printer
+    // earns or points buy, and the owner's competitions. Points are spent and
+    // won in `wallet_transactions` beside them, so they stay with the journal.
+    'reward_grants', 'reward_competitions', 'reward_competition_entries',
     // 0095 — THE OPERATING-EXPENSE LEDGER: «تكاليف اخرى ... خاصه في لوحه الادمن».
     // Rent, salaries, advertising, customs. They belong to no product and no
     // order, which is exactly why they are not Commerce's: an expense row has

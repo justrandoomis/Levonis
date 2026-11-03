@@ -21,6 +21,7 @@ import { resolveOrderExpiry } from './orderExpiry';
 import type { SupportGiftReconciliation } from './membershipOps';
 import { sweepBnplOverdue, type BnplOverdueReport } from './bnpl';
 import { sweepAutomaticReviews, type AutomaticReviewSweepReport } from './reviewAutoSweep';
+import { runRewardSweep, type RewardSweepReport } from './rewards/sweep';
 import { runCommunitySweeps } from './communityRequests';
 import { sweepMerchantApplicationRetention } from './merchantApproval';
 import { drainMatchQueue } from './printMatchingStore';
@@ -149,6 +150,12 @@ export interface DurableJobsReport {
   bnpl_overdue: BnplOverdueReport;
   /** Seven-day system ratings; these never create reward records. */
   automatic_reviews: AutomaticReviewSweepReport;
+  /**
+   * The rewards programme (0220): printer coupons whose issue failed at
+   * delivery, retried; the 24-hour reminder for reward coupons still unused
+   * (worker/lib/rewards/sweep.ts).
+   */
+  reward_coupons: RewardSweepReport;
   /**
    * «خبرني لما يرجع» — the back-in-stock sweep (0092). This is the ONLY thing
    * that answers a customer's standing restock request: availability rises
@@ -312,6 +319,7 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
     serial_returns: { scanned: 0, closed: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
     automatic_reviews: { scanned: 0, created: 0, skipped: 0 },
+    reward_coupons: { installed: true, catch_up: { scanned: 0, issued: 0, errors: 0 }, reminders: { coupons: 0, customers: 0 } },
     stock_alerts: { scanned: 0, matched: 0, notified: 0, dead: 0, deferred: 0 },
     stock_alert_prune: { deleted: 0, bound_hit: false },
     outbox_final: { sent: 0, failed: 0 },
@@ -630,6 +638,11 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
   //     seven days without a customer review. It never enters reward logic.
   await step('automatic_reviews', async () => {
     report.automatic_reviews = await sweepAutomaticReviews(env.DB, nowIso, 200);
+  });
+  // 14a. The rewards programme (0220): a printer's coupons the delivery hook could not issue, and the
+  //      24-hour reminder for unused reward coupons. Bounded (5 orders, 25 coupons) and idempotent.
+  await step('reward_coupons', async () => {
+    report.reward_coupons = await runRewardSweep(env, nowIso);
   });
   // 14b. A merchant badge earned by a completed order (audit 04 #24).
   await step('merchant_badges', async () => { await refreshStaleMerchantBadges(env.DB); });

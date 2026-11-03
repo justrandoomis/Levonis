@@ -803,6 +803,8 @@ export const NOT_LIBRARY_HOLDERS: Readonly<Record<string, string>> = {
     ].map((k) => [k, PRIVATE])
   ),
   ...Object.fromEntries(['users.avatar_key', 'users.profile_json', 'reviews.media', 'merchant_reviews.images'].map((k) => [k, PERSON])),
+  // 0220: a competition entry's photo is the entrant's own users/<uid>/posts/… upload (ownedEntryPhoto refuses any other key).
+  'reward_competition_entries.media_key': PERSON,
   ...Object.fromEntries(
     ['merchant_store_icons.icon192_key', 'merchant_store_icons.icon512_key', 'merchant_store_icons.maskable512_key',
       'merchant_store_icons.apple180_key', 'merchant_store_icons.favicon32_key'].map((k) => [k, 'an icon rendition under its own store-icons/ prefix, cut from the logo'])
