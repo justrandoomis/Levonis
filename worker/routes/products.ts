@@ -53,7 +53,7 @@ import { pricingTierContext } from '../lib/entitlements';
 import { ancestryFor, degradeIfSchemaMissing, fallbackFor, pricingInputsFor } from '../lib/membershipBenefits';
 import { anonymousCached, type EdgeLifetime } from '../lib/edgePolicy';
 import { trustedOrigin } from '../lib/appOrigin';
-import { categoryRanks, onShelfNow, priceFeedCsv, type PriceFeedProduct } from '../lib/priceFeed';
+import { categoryRanks, onShelfNow, priceFeedCsv, type PriceFeedProduct, type ShelfPrice } from '../lib/priceFeed';
 import { cardLeadPhoto } from '../lib/cardPhoto';
 import { loadProductKnowledge } from '../lib/knowledge/productKnowledge';
 import { EMPTY_TRANSLATIONS, importedSlots, loadProductTranslationMap, overlayImportedText } from '../lib/translate/memory';
@@ -2763,8 +2763,8 @@ export async function shelfDirectPrices(
   db: D1Database,
   rows: Record<string, unknown>[],
   ctx: PricingCtx
-): Promise<Map<string, Array<{ price_iqd: number; estimate: boolean }>>> {
-  const out = new Map<string, Array<{ price_iqd: number; estimate: boolean }>>();
+): Promise<Map<string, ShelfPrice[]>> {
+  const out = new Map<string, ShelfPrice[]>();
   const listed = rows.filter((r) => sellableNowOf(r) && String(r.composition ?? '') === '');
   if (listed.length === 0) return out;
   const ids = listed.map((r) => String(r.id));
@@ -2791,7 +2791,7 @@ export async function shelfDirectPrices(
     const direct = skuLevelSelections(doc, view).filter((sku) => sku.transport_method === null);
     const plain = !doc.options.some((o) => o.active !== false) && !doc.colors.some((c) => c.active !== false);
     const candidates: Array<SkuLevelSelection | null> = direct.length ? direct : plain ? [null] : [];
-    const prices: Array<{ price_iqd: number; estimate: boolean }> = [];
+    const prices: ShelfPrice[] = [];
     for (const sku of candidates) {
       const key = sku ? sku.combo_key : selectionKey([], null);
       const opening = firstUsableDirectSelection(doc, {
@@ -2803,7 +2803,17 @@ export async function shelfDirectPrices(
       });
       if (!opening) continue;
       const level = levelPrice(doc, ctx, offer, sku?.option_id ?? null, sku?.color_id ?? null, now, sku ?? undefined);
-      prices.push({ price_iqd: level.unit_subtotal_iqd, estimate: selectionEstimated(doc, opening.option_value_ids, opening.color_id) });
+      // A live offer's struck price is the LADDER price before the window (`offer_before_iqd`, paired
+      // with `applied_iqd`); the window keeps the line's fees — the direct-sale premium — unchanged
+      // (worker/lib/offers.ts `applyOfferToResolved`: unit_subtotal = applied + fees). So the struck
+      // price of the figure printed here is the struck ladder price plus those same fees.
+      const fees = Math.max(0, level.unit_subtotal_iqd - level.applied_iqd);
+      const before = typeof level.offer_before_iqd === 'number' ? level.offer_before_iqd + fees : null;
+      prices.push({
+        price_iqd: level.unit_subtotal_iqd,
+        estimate: selectionEstimated(doc, opening.option_value_ids, opening.color_id),
+        ...(before !== null && before > level.unit_subtotal_iqd ? { before_iqd: before } : {}),
+      });
     }
     out.set(id, prices);
   }

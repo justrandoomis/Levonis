@@ -46,12 +46,43 @@ const IN_STOCK = PRICE_FEED_STATUS.in_stock;
 const PRE_ORDER = PRICE_FEED_STATUS.pre_order;
 const NOT_PRICED = PRICE_FEED_STATUS.not_priced;
 
-test('the header row is the owner’s six columns, the body is UTF-8 without a BOM, lines end CRLF', () => {
-  assert.deepEqual(PRICE_FEED_HEADER, ['الاسم', 'Name', 'الحالة', 'Status', 'السعر (د.ع)', 'الرابط']);
+test('the header row is the owner’s seven columns, the body is UTF-8 without a BOM, lines end CRLF', () => {
+  assert.deepEqual(PRICE_FEED_HEADER, ['الاسم', 'Name', 'الحالة', 'Status', 'السعر (د.ع)', 'السعر قبل الخصم (د.ع)', 'الرابط']);
   const csv = priceFeedCsv([product(card('a1', { direct_stock_available: 3 }), [{ price_iqd: 760_500, estimate: false }], 'طابعة A1')], OPTS);
   assert.equal(csv.charCodeAt(0), 'ا'.charCodeAt(0), 'no BOM before the header');
   assert.ok(!csv.includes('﻿'));
-  assert.equal(csv, 'الاسم,Name,الحالة,Status,السعر (د.ع),الرابط\r\nطابعة A1,Name a1,متوفر الآن (بيع مباشر),In stock,"760,500",https://levonis-iq.com/product/a1\r\n');
+  assert.equal(csv, 'الاسم,Name,الحالة,Status,السعر (د.ع),السعر قبل الخصم (د.ع),الرابط\r\nطابعة A1,Name a1,متوفر الآن (بيع مباشر),In stock,"760,500",,https://levonis-iq.com/product/a1\r\n');
+});
+
+test('during a sale (owner, 2026-11-04): «السعر قبل الخصم» is the struck price of the very selection the figure is — and only then', () => {
+  const sale = (shelf: PriceFeedProduct['shelf']) => priceFeedRows([product(card('a1', { direct_stock_available: 5 }), shelf)], OPTS)[1];
+  // One selection on offer: the price and its struck price.
+  assert.deepEqual(sale([{ price_iqd: 699_000, estimate: false, before_iqd: 760_500 }]).slice(4, 6), ['699,000', '760,500']);
+  // Two on offer: «يبدأ من» the cheaper one, and THAT selection's struck price.
+  assert.deepEqual(
+    sale([{ price_iqd: 885_000, estimate: false, before_iqd: 946_500 }, { price_iqd: 699_000, estimate: false, before_iqd: 760_500 }]).slice(4, 6),
+    ['يبدأ من 699,000', '760,500']
+  );
+  // The cheapest selection is not on offer, a dearer one is: no struck price beside a figure that was never lowered.
+  assert.deepEqual(sale([{ price_iqd: 699_000, estimate: false }, { price_iqd: 885_000, estimate: false, before_iqd: 946_500 }]).slice(4, 6), ['يبدأ من 699,000', '']);
+  // Two selections at the same figure, two struck prices: the smaller saving (never more than the site shows).
+  assert.deepEqual(
+    sale([{ price_iqd: 699_000, estimate: false, before_iqd: 800_000 }, { price_iqd: 699_000, estimate: false, before_iqd: 760_500 }]).slice(4, 6),
+    ['699,000', '760,500']
+  );
+  // A struck price not above the figure, or on an estimated selection, is never printed.
+  assert.deepEqual(sale([{ price_iqd: 699_000, estimate: false, before_iqd: 699_000 }]).slice(4, 6), ['699,000', '']);
+  assert.deepEqual(sale([{ price_iqd: 650_000, estimate: true, before_iqd: 760_500 }, { price_iqd: 699_000, estimate: false }]).slice(4, 6), ['يبدأ من 699,000', '']);
+  assert.deepEqual(priceFeedVerdict(product(card('a1', { direct_stock_available: 5 }), [{ price_iqd: 699_000, estimate: false, before_iqd: 760_500 }])), {
+    status: 'in_stock',
+    price: { iqd: 699_000, from: false, before_iqd: 760_500 },
+  });
+  // A pre-order or a product with no price never carries one, whatever its shelf says.
+  const pre = card('h2d', { sale_types: ['pre_order'] });
+  delete pre.direct_stock_available;
+  const preRow = priceFeedRows([product(pre, [{ price_iqd: 699_000, estimate: false, before_iqd: 760_500 }])], OPTS)[1];
+  assert.deepEqual(preRow.slice(3, 6), ['Pre-order', '', '']);
+  assert.doesNotMatch(priceFeedCsv([product(pre, [{ price_iqd: 699_000, estimate: false, before_iqd: 760_500 }])], OPTS), /760,500|699,000/);
 });
 
 test('in stock now as a direct sale: «متوفر الآن (بيع مباشر)», "In stock", the shelf’s firm direct price — «يبدأ من» only when the shelf differs', () => {
@@ -121,7 +152,7 @@ test('RFC 4180: a comma, a quote or a line break is quoted and its quotes double
   const c = card('x1-carbon', { name: 'Bambu "X1", Carbon\nCombo', direct_stock_available: 1 });
   const csv = priceFeedCsv([product(c, [{ price_iqd: 1_250_000, estimate: false }], 'بامبو، "X1"')], OPTS);
   const line = csv.split('\r\n')[1];
-  assert.equal(line, `"بامبو، ""X1""","Bambu ""X1"", Carbon Combo",${IN_STOCK.ar},In stock,"1,250,000",${ORIGIN}/product/x1-carbon`);
+  assert.equal(line, `"بامبو، ""X1""","Bambu ""X1"", Carbon Combo",${IN_STOCK.ar},In stock,"1,250,000",,${ORIGIN}/product/x1-carbon`);
   assert.equal(csv.split('\r\n').length, 3, 'one record per line: the header, the product, the final CRLF');
   // A name a spreadsheet would run as a formula keeps its text (the defusing every CSV here gets).
   const formula = priceFeedRows([product(card('f', { name: '=HYPERLINK("x")' }))], OPTS)[1];
@@ -131,7 +162,7 @@ test('RFC 4180: a comma, a quote or a line break is quoted and its quotes double
 
 test('names: the Arabic column falls back to the English name and the English to the Arabic; links are /product/<slug>', () => {
   const rows = priceFeedRows([product(card('only-en', { name: 'A1 mini' })), product(card('only-ar', { name: '' }), [], 'فلامنت')], { origin: `${ORIGIN}/`, categoryRanks: new Map() });
-  const bySlug = new Map(rows.slice(1).map((r) => [r[5], r]));
+  const bySlug = new Map(rows.slice(1).map((r) => [r[6], r]));
   assert.deepEqual(bySlug.get(`${ORIGIN}/product/only-en`)!.slice(0, 2), ['A1 mini', 'A1 mini']);
   assert.deepEqual(bySlug.get(`${ORIGIN}/product/only-ar`)!.slice(0, 2), ['فلامنت', 'فلامنت']);
   // A card without a slug has no page to link: it is left out.

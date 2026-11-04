@@ -53,15 +53,15 @@ test('the feed is the default listing as CSV: in stock at the shelf’s DIRECT p
   // The P1S: both models on the shelf, priced as the product page quotes a direct sale.
   const [p1s, combo] = [await directQuote(w, SLUG, M1), await directQuote(w, SLUG, M2)];
   assert.deepEqual([p1s, combo], [900_000, 1_125_000]);
-  assert.equal(byLink.get(SLUG), `طابعة بامبو,Bambu Lab ${SLUG},متوفر الآن (بيع مباشر),In stock,"يبدأ من ${grouped(p1s)}",http://localhost/product/${SLUG}`);
+  assert.equal(byLink.get(SLUG), `طابعة بامبو,Bambu Lab ${SLUG},متوفر الآن (بيع مباشر),In stock,"يبدأ من ${grouped(p1s)}",,http://localhost/product/${SLUG}`);
   // The cost-first AMS: one model on the shelf, one price — no «يبدأ من».
   const ams = await directQuote(w, COST_SLUG, COST_M);
   assert.match(byLink.get(COST_SLUG)!, new RegExp(`,In stock,"${grouped(ams)}",`));
   // Colour-only, both colours on the shelf: the direct prices, the dearer colour making it «from».
   assert.match(byLink.get('slug-p_colours')!, /,In stock,"يبدأ من 900,000",/);
   // Pre-order only: the agent's sentence, no price. Never priced: «السعر غير متوفر حالياً».
-  assert.equal(byLink.get('slug-p_preonly'), 'منتج,Product p_preonly,طلب مسبق — نكدر نوفره لك، والإدارة تبلغك بالسعر والموعد,Pre-order,,http://localhost/product/slug-p_preonly');
-  assert.equal(byLink.get('slug-p_unpriced'), 'منتج,Product p_unpriced,السعر غير متوفر حالياً,Not priced,,http://localhost/product/slug-p_unpriced');
+  assert.equal(byLink.get('slug-p_preonly'), 'منتج,Product p_preonly,طلب مسبق — نكدر نوفره لك، والإدارة تبلغك بالسعر والموعد,Pre-order,,,http://localhost/product/slug-p_preonly');
+  assert.equal(byLink.get('slug-p_unpriced'), 'منتج,Product p_unpriced,السعر غير متوفر حالياً,Not priced,,,http://localhost/product/slug-p_unpriced');
   // The default listing carries no composition, and neither does the feed.
   assert.equal(byLink.has('a-bundle'), false);
   // No pre-order figure anywhere: 825,000 is the P1S's, the colours' and the pre-order product's land price.
@@ -74,10 +74,32 @@ test('a direct sale sold out with pre-order open is a pre-order; a signed-in cal
   const w = await discountWorld();
   w.raw.exec(`UPDATE product_option_values SET stock = 0 WHERE product_id = 'p_p1s'`);
   const guest = await feed(w);
-  assert.equal(guest.byLink.get(SLUG), `طابعة بامبو,Bambu Lab ${SLUG},طلب مسبق — نكدر نوفره لك، والإدارة تبلغك بالسعر والموعد,Pre-order,,http://localhost/product/${SLUG}`);
+  assert.equal(guest.byLink.get(SLUG), `طابعة بامبو,Bambu Lab ${SLUG},طلب مسبق — نكدر نوفره لك، والإدارة تبلغك بالسعر والموعد,Pre-order,,,http://localhost/product/${SLUG}`);
   assert.doesNotMatch(guest.text, /900,000|825,000/);
   // A guest's prices for every caller: the buyer's answer is the guest's, and it leaves `private, no-store`.
   const buyer = await feed(w, w.buyer);
   assert.equal(buyer.text, guest.text);
   assert.equal(buyer.res.headers.get('cache-control'), 'private, no-store');
+});
+
+test('during a live offer (Black Friday, owner 2026-11-04): the sale price and «السعر قبل الخصم» are the product page’s own figures', async () => {
+  const w = await discountWorld();
+  // A dollar sale on both P1S models, saved through the admin offers door (the P1S $500 → 750,000 direct).
+  const saved = await w.saveOffer(w.owner, { offer_price_mode: 'fixed_usd', offer_usd_prices: [{ model_id: M1, usd: '500' }, { model_id: M2, usd: '640' }] });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body).slice(0, 300));
+  // What the product page quotes a guest for the cheaper model as a direct sale: the sale price, and its struck price.
+  const q = await w.call(w.guest, 'POST', `/api/products/${SLUG}/quote`, { qty: 1, optionId: M1, fulfillmentType: 'direct_sale' });
+  assert.equal(q.status, 200, JSON.stringify(q.body).slice(0, 300));
+  const quote = q.body.quote as { unit_subtotal_iqd: number; applied_iqd: number; offer_before_iqd: number };
+  assert.ok(quote.offer_before_iqd > quote.applied_iqd, 'the offer lowered the page’s price');
+  const struck = quote.offer_before_iqd + (quote.unit_subtotal_iqd - quote.applied_iqd);
+  assert.deepEqual([quote.unit_subtotal_iqd, struck], [750_000, 900_000]);
+
+  const { text, byLink } = await feed(w);
+  assert.equal(
+    byLink.get(SLUG),
+    `طابعة بامبو,Bambu Lab ${SLUG},متوفر الآن (بيع مباشر),In stock,"يبدأ من ${grouped(quote.unit_subtotal_iqd)}","${grouped(struck)}",http://localhost/product/${SLUG}`
+  );
+  // Still never the pre-order «from» or a land price.
+  assert.doesNotMatch(text, /825,000|1,050,000/);
 });

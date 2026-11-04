@@ -24,6 +24,11 @@
  * never written: the one figure this file prints is a firm direct-sale price of
  * a selection on the shelf now.
  *
+ * DURING A SALE (owner, 2026-11-04, for Black Friday): «السعر قبل الخصم» carries
+ * the struck price of that same selection when a live offer lowered it — the
+ * product page's own struck figure, on the same footing as the price beside it —
+ * so the agent can say «بـ 699,000 بدل 760,500». Empty otherwise.
+ *
  * AVAILABILITY IS THE STOREFRONT CARD'S OWN RULE (`cardAvailability`,
  * packages/catalog), read off the card `GET /api/products` serialized — the same
  * `direct_stock_available` the card's «متوفر» line reads.
@@ -44,6 +49,11 @@ export type PriceFeedStatus = 'in_stock' | 'pre_order' | 'not_priced';
 export interface ShelfPrice {
   price_iqd: number;
   estimate: boolean;
+  /**
+   * A live offer lowered it: the struck price on the same footing as `price_iqd` (the offer's struck
+   * ladder price plus the selection's unchanged direct-sale fees), present only when above `price_iqd`.
+   */
+  before_iqd?: number;
 }
 
 export interface PriceFeedProduct {
@@ -55,7 +65,7 @@ export interface PriceFeedProduct {
   shelf: readonly ShelfPrice[];
 }
 
-export const PRICE_FEED_HEADER: readonly string[] = ['الاسم', 'Name', 'الحالة', 'Status', 'السعر (د.ع)', 'الرابط'];
+export const PRICE_FEED_HEADER: readonly string[] = ['الاسم', 'Name', 'الحالة', 'Status', 'السعر (د.ع)', 'السعر قبل الخصم (د.ع)', 'الرابط'];
 
 export const PRICE_FEED_STATUS: Readonly<Record<PriceFeedStatus, { ar: string; en: string }>> = {
   in_stock: { ar: 'متوفر الآن (بيع مباشر)', en: 'In stock' },
@@ -78,16 +88,29 @@ export function onShelfNow(card: Record<string, unknown>): boolean {
 /** One product's status, and the figure it may carry (in stock only). */
 export function priceFeedVerdict(p: Pick<PriceFeedProduct, 'card' | 'shelf'>): {
   status: PriceFeedStatus;
-  price: { iqd: number; from: boolean } | null;
+  /** `before_iqd`: the struck price of the selection the figure is (a live offer lowered it), else null. */
+  price: { iqd: number; from: boolean; before_iqd: number | null } | null;
 } {
   // Catalog-only (DECISIONS row 240): the site shows «السعر غير متوفر حالياً» and claims no stock.
   if (p.card.price_status !== 'priced') return { status: 'not_priced', price: null };
   const state = cardAvailability(p.card).state;
   if (state === 'available') {
-    const firm = p.shelf.filter((s) => !s.estimate && positive(s.price_iqd)).map((s) => s.price_iqd);
+    const firm = p.shelf.filter((s) => !s.estimate && positive(s.price_iqd));
     if (firm.length === 0) return { status: 'not_priced', price: null };
-    const low = Math.min(...firm);
-    return { status: 'in_stock', price: { iqd: low, from: p.shelf.some((s) => positive(s.price_iqd) && s.price_iqd !== low) } };
+    const low = Math.min(...firm.map((s) => s.price_iqd));
+    // The struck price belongs to the selection the printed figure is: among the firm selections at
+    // that figure, the smallest struck price above it (never a saving larger than one shown on the site).
+    const struck = firm
+      .filter((s) => s.price_iqd === low && typeof s.before_iqd === 'number' && positive(s.before_iqd) && s.before_iqd > low)
+      .map((s) => s.before_iqd as number);
+    return {
+      status: 'in_stock',
+      price: {
+        iqd: low,
+        from: p.shelf.some((s) => positive(s.price_iqd) && s.price_iqd !== low),
+        before_iqd: struck.length ? Math.min(...struck) : null,
+      },
+    };
   }
   return state === 'preorder' ? { status: 'pre_order', price: null } : { status: 'not_priced', price: null };
 }
@@ -189,7 +212,8 @@ export function priceFeedRows(products: readonly PriceFeedProduct[], opts: Price
     ...rows.map((r) => {
       const words = PRICE_FEED_STATUS[r.verdict.status];
       const price = r.verdict.price ? `${r.verdict.price.from ? FROM_PREFIX : ''}${groupedIqd(r.verdict.price.iqd)}` : '';
-      return [r.ar, r.en, words.ar, words.en, price, `${origin}/product/${encodeURIComponent(r.slug)}`];
+      const before = r.verdict.price && r.verdict.price.before_iqd !== null ? groupedIqd(r.verdict.price.before_iqd) : '';
+      return [r.ar, r.en, words.ar, words.en, price, before, `${origin}/product/${encodeURIComponent(r.slug)}`];
     }),
   ];
 }
