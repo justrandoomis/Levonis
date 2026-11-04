@@ -134,4 +134,14 @@ test('a live window that refuses a guest the product leaves no price: members on
   const placed = await limited.placeOrder('cash');
   assert.equal(placed.status, 200, JSON.stringify(placed.body).slice(0, 300));
   assert.equal((await feed(limited)).byLink.get(SLUG), NOT_PRICED_LINE);
+  // Switched off after it sold out, the window still refuses every buyer (the checkout counts the product's
+  // active redemptions against max_global whatever the window's state), so the feed still quotes nothing.
+  // If the checkout ever stops counting a window that is not live, this pair of assertions changes together.
+  limited.raw.exec(`UPDATE offer_windows SET active = 0 WHERE subject_type = 'product' AND subject_id = '${PID}'`);
+  const again = await limited.addToCart({ productId: PID, optionId: M1, optionValueIds: [M1], qty: 1, fulfillmentType: 'direct_sale' });
+  assert.equal(again.status, 200, JSON.stringify(again.body).slice(0, 300));
+  const refused = await limited.placeOrder('cash');
+  assert.equal(refused.status, 400, JSON.stringify(refused.body).slice(0, 300));
+  assert.match(JSON.stringify(refused.body), /GLOBAL_LIMIT_REACHED/);
+  assert.equal((await feed(limited)).byLink.get(SLUG), NOT_PRICED_LINE);
 });

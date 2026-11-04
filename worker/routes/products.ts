@@ -141,7 +141,7 @@ import {
 } from '../lib/bundleCart';
 import { publicMysteryBlock, resolveMysteryLines, type MysteryContext } from '../lib/mysteryLine';
 import { activePoolProductIds } from '../lib/mysteryDraw';
-import { applyOfferToResolved, loadOffers, OFFER_NOT_SUSPENDED_SQL, offerEligible, offerKey, offerLimitAdvice, scheduleState, subjectOf, type OfferView } from '../lib/offers';
+import { applyOfferToResolved, loadOffers, OFFER_NOT_SUSPENDED_SQL, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { offerSavingPercent } from '../lib/offerUsd';
 import { isPrinterProduct } from '../lib/printerIdentity';
 import { skuLevelResolveInput, skuLevelSelections, skuPreorderTwins, type SkuLevelSelection } from '../lib/skuLevels';
@@ -2774,17 +2774,18 @@ export async function shelfDirectPrices(
     degradeIfSchemaMissing('mystery pools (migration 0061)', () => activePoolProductIds(db, ids), new Set<string>()),
   ]);
   const now = Date.now();
+  const usedUp = await usedUpOfferLimits(db, ids, offers);
   for (const row of listed) {
     const id = String(row.id);
     const view = views.get(id);
     if (!view || pooled.has(id)) continue;
     const doc = applyRelations(parseProductRow(row), view);
     const offer = offers.get(offerKey(subjectOf(id)));
-    // A LIVE WINDOW THAT BLOCKS THE PURCHASE ITSELF sells nothing to the feed's reader, whatever the shelf
-    // holds: members only, for a guest (add to cart and the checkout answer MEMBERSHIP_REQUIRED —
-    // worker/lib/cartAdd.ts, worker/routes/orders.ts), or its quantity used up (the checkout's
-    // OFFER_GLOBAL_LIMIT trigger refuses while the window is live; `offerLimitAdvice` is its read).
-    if (await liveWindowBlocksPurchase(db, id, offer, ctx, now)) {
+    // AN OFFER THAT REFUSES THE PURCHASE ITSELF sells nothing to the feed's reader, whatever the shelf holds:
+    // a live members-only window, for a guest (add to cart and the checkout answer MEMBERSHIP_REQUIRED —
+    // worker/lib/cartAdd.ts, worker/routes/orders.ts), or a saved window whose global quantity is used up
+    // (`usedUpOfferLimits`: the checkout refuses GLOBAL_LIMIT_REACHED in every state of that window).
+    if (membersOnlyForReader(offer, ctx, now) || usedUp.has(id)) {
       out.set(id, []);
       continue;
     }
@@ -2831,16 +2832,47 @@ export async function shelfDirectPrices(
 }
 
 /**
- * Does a live offer window refuse THIS reader the product altogether? Members only and the reader may not
- * take it (`offerEligible`), or its global quantity is used up (`offerLimitAdvice`, the read of the
- * checkout's own trigger). An upcoming, ended, suspended or inactive window blocks nothing.
+ * A live, active, members-only window this reader may not take — exactly when add to cart and the checkout
+ * answer MEMBERSHIP_REQUIRED (`offerEligible` says so only for such a window).
  */
-async function liveWindowBlocksPurchase(db: D1Database, id: string, offer: OfferView | undefined, ctx: PricingCtx, now: number): Promise<boolean> {
-  const window = offer?.window ?? null;
-  if (!offer || !window || !window.active || scheduleState(window.starts_at, window.ends_at, now) !== 'live') return false;
-  if (offerEligible(ctx.tierStatus, offer, now).reason === 'MEMBERSHIP_REQUIRED') return true;
-  if (offer.limits?.max_global === null || offer.limits?.max_global === undefined) return false;
-  return !(await offerLimitAdvice(db, subjectOf(id), '', 1)).ok;
+function membersOnlyForReader(offer: OfferView | undefined, ctx: PricingCtx, now: number): boolean {
+  return !!offer?.window && offerEligible(ctx.tierStatus, offer, now).reason === 'MEMBERSHIP_REQUIRED';
+}
+
+/**
+ * The products whose saved offer window carries a global quantity limit that is used up. The checkout
+ * refuses them GLOBAL_LIMIT_REACHED whatever the window's state — during the sale, before it opens and
+ * after it ends — because it writes a redemption for any order of a product with a saved window
+ * (worker/routes/orders.ts) and the 0065 trigger counts every ACTIVE redemption of the product against
+ * `max_global`. One grouped read, the cap taken from the window already loaded; a failing read hides
+ * nothing, so the feed stays up.
+ */
+async function usedUpOfferLimits(db: D1Database, ids: readonly string[], offers: ReadonlyMap<string, OfferView>): Promise<Set<string>> {
+  const capOf = (id: string) => {
+    const offer = offers.get(offerKey(subjectOf(id)));
+    const cap = offer?.window ? offer.limits?.max_global : null;
+    return typeof cap === 'number' ? cap : null;
+  };
+  const capped = ids.filter((id) => capOf(id) !== null);
+  const out = new Set<string>();
+  for (let i = 0; i < capped.length; i += 90) {
+    const part = capped.slice(i, i + 90);
+    try {
+      const rows = await db
+        .prepare(
+          `SELECT subject_id, COALESCE(SUM(qty), 0) AS n FROM offer_redemptions
+            WHERE subject_type = 'product' AND state = 'active' AND subject_id IN (${part.map(() => '?').join(',')})
+            GROUP BY subject_id`
+        )
+        .bind(...part)
+        .all<{ subject_id: string; n: number }>();
+      const used = new Map((rows.results ?? []).map((r) => [String(r.subject_id), Number(r.n) || 0]));
+      for (const id of part) if ((used.get(id) ?? 0) + 1 > (capOf(id) as number)) out.add(id);
+    } catch {
+      // The same counts the checkout reads; on a failed read the products keep their prices.
+    }
+  }
+  return out;
 }
 
 /**
