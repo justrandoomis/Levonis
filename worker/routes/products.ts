@@ -141,7 +141,7 @@ import {
 } from '../lib/bundleCart';
 import { publicMysteryBlock, resolveMysteryLines, type MysteryContext } from '../lib/mysteryLine';
 import { activePoolProductIds } from '../lib/mysteryDraw';
-import { applyOfferToResolved, loadOffers, OFFER_NOT_SUSPENDED_SQL, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
+import { applyOfferToResolved, loadOffers, OFFER_NOT_SUSPENDED_SQL, offerEligible, offerKey, offerLimitAdvice, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { offerSavingPercent } from '../lib/offerUsd';
 import { isPrinterProduct } from '../lib/printerIdentity';
 import { skuLevelResolveInput, skuLevelSelections, skuPreorderTwins, type SkuLevelSelection } from '../lib/skuLevels';
@@ -2780,6 +2780,14 @@ export async function shelfDirectPrices(
     if (!view || pooled.has(id)) continue;
     const doc = applyRelations(parseProductRow(row), view);
     const offer = offers.get(offerKey(subjectOf(id)));
+    // A LIVE WINDOW THAT BLOCKS THE PURCHASE ITSELF sells nothing to the feed's reader, whatever the shelf
+    // holds: members only, for a guest (add to cart and the checkout answer MEMBERSHIP_REQUIRED —
+    // worker/lib/cartAdd.ts, worker/routes/orders.ts), or its quantity used up (the checkout's
+    // OFFER_GLOBAL_LIMIT trigger refuses while the window is live; `offerLimitAdvice` is its read).
+    if (await liveWindowBlocksPurchase(db, id, offer, ctx, now)) {
+      out.set(id, []);
+      continue;
+    }
     const inventory = snapshotFrom(view, {
       stock: doc.stock,
       reserved: Number(row.stock_reserved ?? 0),
@@ -2803,21 +2811,36 @@ export async function shelfDirectPrices(
       });
       if (!opening) continue;
       const level = levelPrice(doc, ctx, offer, sku?.option_id ?? null, sku?.color_id ?? null, now, sku ?? undefined);
-      // A live offer's struck price is the LADDER price before the window (`offer_before_iqd`, paired
-      // with `applied_iqd`); the window keeps the line's fees — the direct-sale premium — unchanged
-      // (worker/lib/offers.ts `applyOfferToResolved`: unit_subtotal = applied + fees). So the struck
-      // price of the figure printed here is the struck ladder price plus those same fees.
-      const fees = Math.max(0, level.unit_subtotal_iqd - level.applied_iqd);
-      const before = typeof level.offer_before_iqd === 'number' ? level.offer_before_iqd + fees : null;
+      // A live offer's struck price is exactly what the product page strikes: `offer_before_iqd` as it is
+      // (src/pages/Product.tsx, `OfferSaving`). It is paired with `applied_iqd`, so it is printed only where
+      // the figure IS the applied price — a line with a fee on top (none can be sold today: Pricing V2
+      // retired the direct premium) gets no struck price rather than one the page never shows.
+      const before =
+        typeof level.offer_before_iqd === 'number' && level.unit_subtotal_iqd === level.applied_iqd && level.offer_before_iqd > level.unit_subtotal_iqd
+          ? level.offer_before_iqd
+          : null;
       prices.push({
         price_iqd: level.unit_subtotal_iqd,
         estimate: selectionEstimated(doc, opening.option_value_ids, opening.color_id),
-        ...(before !== null && before > level.unit_subtotal_iqd ? { before_iqd: before } : {}),
+        ...(before !== null ? { before_iqd: before } : {}),
       });
     }
     out.set(id, prices);
   }
   return out;
+}
+
+/**
+ * Does a live offer window refuse THIS reader the product altogether? Members only and the reader may not
+ * take it (`offerEligible`), or its global quantity is used up (`offerLimitAdvice`, the read of the
+ * checkout's own trigger). An upcoming, ended, suspended or inactive window blocks nothing.
+ */
+async function liveWindowBlocksPurchase(db: D1Database, id: string, offer: OfferView | undefined, ctx: PricingCtx, now: number): Promise<boolean> {
+  const window = offer?.window ?? null;
+  if (!offer || !window || !window.active || scheduleState(window.starts_at, window.ends_at, now) !== 'live') return false;
+  if (offerEligible(ctx.tierStatus, offer, now).reason === 'MEMBERSHIP_REQUIRED') return true;
+  if (offer.limits?.max_global === null || offer.limits?.max_global === undefined) return false;
+  return !(await offerLimitAdvice(db, subjectOf(id), '', 1)).ok;
 }
 
 /**

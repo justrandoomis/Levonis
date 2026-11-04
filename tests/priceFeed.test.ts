@@ -70,6 +70,15 @@ test('during a sale (owner, 2026-11-04): «السعر قبل الخصم» is the
     sale([{ price_iqd: 699_000, estimate: false, before_iqd: 800_000 }, { price_iqd: 699_000, estimate: false, before_iqd: 760_500 }]).slice(4, 6),
     ['699,000', '760,500']
   );
+  // The same figure, one selection struck and one sold at it undiscounted (the P1S at 900,000, the Combo cut to
+  // 900,000 from 1,125,000): the product's price did not drop, so nothing is struck.
+  assert.deepEqual(sale([{ price_iqd: 900_000, estimate: false }, { price_iqd: 900_000, estimate: false, before_iqd: 1_125_000 }]).slice(4, 6), ['900,000', '']);
+  // A sale that takes a dearer model below the cheapest one: «يبدأ من» the new low, struck against the OLD low
+  // (900,000), never against the dearer model's own struck price (1,125,000) — the card's «over the same levels».
+  assert.deepEqual(
+    sale([{ price_iqd: 900_000, estimate: false }, { price_iqd: 840_000, estimate: false, before_iqd: 1_125_000 }]).slice(4, 6),
+    ['يبدأ من 840,000', '900,000']
+  );
   // A struck price not above the figure, or on an estimated selection, is never printed.
   assert.deepEqual(sale([{ price_iqd: 699_000, estimate: false, before_iqd: 699_000 }]).slice(4, 6), ['699,000', '']);
   assert.deepEqual(sale([{ price_iqd: 650_000, estimate: true, before_iqd: 760_500 }, { price_iqd: 699_000, estimate: false }]).slice(4, 6), ['يبدأ من 699,000', '']);

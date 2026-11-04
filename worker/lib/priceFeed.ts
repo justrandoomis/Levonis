@@ -24,10 +24,13 @@
  * never written: the one figure this file prints is a firm direct-sale price of
  * a selection on the shelf now.
  *
- * DURING A SALE (owner, 2026-11-04, for Black Friday): «السعر قبل الخصم» carries
- * the struck price of that same selection when a live offer lowered it — the
- * product page's own struck figure, on the same footing as the price beside it —
- * so the agent can say «بـ 699,000 بدل 760,500». Empty otherwise.
+ * DURING A SALE (owner, 2026-11-04, for Black Friday): «السعر قبل الخصم» is the
+ * lowest price the shelf's firm selections had before the sale, beside the lowest
+ * they have now, when the sale lowered it — the listing card's struck «from» rule,
+ * each selection's struck price being the product page's own — so the agent can
+ * say «بـ 699,000 بدل 760,500». Empty otherwise. A live window that refuses a
+ * guest the product (members only, or its quantity used up) leaves no shelf
+ * price at all: the product reads «السعر غير متوفر حالياً».
  *
  * AVAILABILITY IS THE STOREFRONT CARD'S OWN RULE (`cardAvailability`,
  * packages/catalog), read off the card `GET /api/products` serialized — the same
@@ -49,10 +52,7 @@ export type PriceFeedStatus = 'in_stock' | 'pre_order' | 'not_priced';
 export interface ShelfPrice {
   price_iqd: number;
   estimate: boolean;
-  /**
-   * A live offer lowered it: the struck price on the same footing as `price_iqd` (the offer's struck
-   * ladder price plus the selection's unchanged direct-sale fees), present only when above `price_iqd`.
-   */
+  /** A live offer lowered it: the struck price the product page shows for it, present only when above `price_iqd`. */
   before_iqd?: number;
 }
 
@@ -98,17 +98,18 @@ export function priceFeedVerdict(p: Pick<PriceFeedProduct, 'card' | 'shelf'>): {
     const firm = p.shelf.filter((s) => !s.estimate && positive(s.price_iqd));
     if (firm.length === 0) return { status: 'not_priced', price: null };
     const low = Math.min(...firm.map((s) => s.price_iqd));
-    // The struck price belongs to the selection the printed figure is: among the firm selections at
-    // that figure, the smallest struck price above it (never a saving larger than one shown on the site).
-    const struck = firm
-      .filter((s) => s.price_iqd === low && typeof s.before_iqd === 'number' && positive(s.before_iqd) && s.before_iqd > low)
-      .map((s) => s.before_iqd as number);
+    // THE STRIKE'S BASIS, the listing card's own rule (products.ts `publicWithDisplayPrice`, "over the SAME
+    // levels"): the lowest price the same firm selections had BEFORE the sale, beside the lowest they have
+    // now, and only when the sale lowered it. A selection with no struck price counts at its own figure, so
+    // a figure one selection sells at undiscounted is never struck, and «يبدأ من» is never paired with
+    // another selection's dearer struck price.
+    const preSaleLow = Math.min(...firm.map((s) => (typeof s.before_iqd === 'number' && positive(s.before_iqd) && s.before_iqd > s.price_iqd ? s.before_iqd : s.price_iqd)));
     return {
       status: 'in_stock',
       price: {
         iqd: low,
         from: p.shelf.some((s) => positive(s.price_iqd) && s.price_iqd !== low),
-        before_iqd: struck.length ? Math.min(...struck) : null,
+        before_iqd: preSaleLow > low ? preSaleLow : null,
       },
     };
   }

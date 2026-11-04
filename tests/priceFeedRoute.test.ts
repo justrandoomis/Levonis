@@ -14,7 +14,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from './fixtures/app';
-import { COST_M, COST_SLUG, M1, M2, SLUG, discountWorld, seedShapes, type DiscountWorld } from './fixtures/productDiscount';
+import { COST_M, COST_SLUG, M1, M2, PID, SLUG, discountWorld, seedShapes, type DiscountWorld } from './fixtures/productDiscount';
 import { PRICE_FEED_HEADER } from '../worker/lib/priceFeed';
 import { cacheControlFor } from '../worker/lib/edgePolicy';
 import { PRICE_FEED_LIFETIME } from '../worker/routes/products';
@@ -91,15 +91,47 @@ test('during a live offer (Black Friday, owner 2026-11-04): the sale price and �
   const q = await w.call(w.guest, 'POST', `/api/products/${SLUG}/quote`, { qty: 1, optionId: M1, fulfillmentType: 'direct_sale' });
   assert.equal(q.status, 200, JSON.stringify(q.body).slice(0, 300));
   const quote = q.body.quote as { unit_subtotal_iqd: number; applied_iqd: number; offer_before_iqd: number };
-  assert.ok(quote.offer_before_iqd > quote.applied_iqd, 'the offer lowered the page’s price');
-  const struck = quote.offer_before_iqd + (quote.unit_subtotal_iqd - quote.applied_iqd);
-  assert.deepEqual([quote.unit_subtotal_iqd, struck], [750_000, 900_000]);
+  assert.deepEqual([quote.unit_subtotal_iqd, quote.offer_before_iqd], [750_000, 900_000], 'the page strikes 900,000 beside 750,000');
 
   const { text, byLink } = await feed(w);
   assert.equal(
     byLink.get(SLUG),
-    `طابعة بامبو,Bambu Lab ${SLUG},متوفر الآن (بيع مباشر),In stock,"يبدأ من ${grouped(quote.unit_subtotal_iqd)}","${grouped(struck)}",http://localhost/product/${SLUG}`
+    `طابعة بامبو,Bambu Lab ${SLUG},متوفر الآن (بيع مباشر),In stock,"يبدأ من ${grouped(quote.unit_subtotal_iqd)}","${grouped(quote.offer_before_iqd)}",http://localhost/product/${SLUG}`
   );
   // Still never the pre-order «from» or a land price.
   assert.doesNotMatch(text, /825,000|1,050,000/);
+});
+
+test('a sale on one model only: no struck price where the product did not get cheaper; «يبدأ من» struck against the old low', async () => {
+  // The Combo cut to $600 = 900,000, the P1S's own undiscounted price: the product's price did not drop.
+  const even = await discountWorld();
+  assert.equal((await even.saveOffer(even.owner, { offer_price_mode: 'fixed_usd', offer_usd_prices: [{ model_id: M2, usd: '600' }] })).status, 200);
+  const p1sQuote = await even.call(even.guest, 'POST', `/api/products/${SLUG}/quote`, { qty: 1, optionId: M1, fulfillmentType: 'direct_sale' });
+  assert.equal(p1sQuote.body.quote.offer_before_iqd ?? null, null, 'the page opens on the P1S, which shows no strike');
+  assert.match((await feed(even)).byLink.get(SLUG)!, /,In stock,"900,000",,http/);
+  // The Combo cut to $560 = 840,000, below the P1S: «يبدأ من 840,000» struck against 900,000, the old low.
+  const below = await discountWorld();
+  assert.equal((await below.saveOffer(below.owner, { offer_price_mode: 'fixed_usd', offer_usd_prices: [{ model_id: M2, usd: '560' }] })).status, 200);
+  assert.match((await feed(below)).byLink.get(SLUG)!, /,In stock,"يبدأ من 840,000","900,000",http/);
+});
+
+test('a live window that refuses a guest the product leaves no price: members only, or its quantity used up', async () => {
+  const NOT_PRICED_LINE = `طابعة بامبو,Bambu Lab ${SLUG},السعر غير متوفر حالياً,Not priced,,,http://localhost/product/${SLUG}`;
+  // Members only: a guest's add to cart answers MEMBERSHIP_REQUIRED, so the feed quotes nothing.
+  const members = await discountWorld();
+  const gated = await members.saveOffer(members.owner, { offer_price_mode: 'fixed_usd', offer_usd_prices: [{ model_id: M1, usd: '500' }], required_tiers: ['pro'] });
+  assert.equal(gated.status, 200, JSON.stringify(gated.body).slice(0, 300));
+  const membersFeed = await feed(members);
+  assert.equal(membersFeed.byLink.get(SLUG), NOT_PRICED_LINE);
+  assert.doesNotMatch(membersFeed.text, /750,000|900,000/);
+  // A sale of one unit, sold: the checkout refuses everyone while the window is live (OFFER_GLOBAL_LIMIT).
+  const limited = await discountWorld();
+  const one = await limited.saveOffer(limited.owner, { offer_price_mode: 'fixed_usd', offer_usd_prices: [{ model_id: M1, usd: '500' }], max_global: 1 });
+  assert.equal(one.status, 200, JSON.stringify(one.body).slice(0, 300));
+  assert.match((await feed(limited)).byLink.get(SLUG)!, /,In stock,"يبدأ من 750,000","900,000",http/, 'the sale is quoted while a unit is left');
+  const add = await limited.addToCart({ productId: PID, optionId: M1, optionValueIds: [M1], qty: 1, fulfillmentType: 'direct_sale' });
+  assert.equal(add.status, 200, JSON.stringify(add.body).slice(0, 300));
+  const placed = await limited.placeOrder('cash');
+  assert.equal(placed.status, 200, JSON.stringify(placed.body).slice(0, 300));
+  assert.equal((await feed(limited)).byLink.get(SLUG), NOT_PRICED_LINE);
 });
