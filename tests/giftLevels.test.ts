@@ -145,6 +145,11 @@ test('a level item is a real product fully pinned; anything less is refused with
   assert.equal(soldOut.available, false);
   assert.equal(soldOut.reason, 'OUT_OF_STOCK');
 
+  // The editor lists a level's items by sort, then created_at, then a random id (gifts.ts). On Windows the
+  // clock moves in ~15.6 ms steps, so two items added within one step share created_at and their order fell
+  // to the random ids — the assertion at the end failed under load. Waiting past one step keeps it the
+  // order they were added in, which is what the owner sees when he adds them by hand.
+  await new Promise((r) => setTimeout(r, 20));
   const item = await addLevelItem(a.admin, 3, { ...NOZZLE_04_RED, qty: 2 });
   assert.equal(item.level, 3);
   assert.equal(item.product_id, 'p_nozzle');
@@ -160,6 +165,7 @@ test('a level item is a real product fully pinned; anything less is refused with
   assert.equal(stored.stock, 0, 'a product item never carries a private stock count (D6)');
   assert.equal(stored.option_value_ids, '["v_04"]');
 
+  await new Promise((r) => setTimeout(r, 20));
   const pre = await addLevelItem(a.admin, 3, PLATE_AIR);
   assert.equal(pre.sale_type, 'pre_order');
   assert.equal(pre.transport_method, 'air');

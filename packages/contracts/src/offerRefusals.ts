@@ -83,11 +83,14 @@ export const OFFER_DISCOUNT_WARNINGS = {
     en: 'some models are not reduced because their price after the discount is not below the current one — they sell at their price, with no strikethrough',
     ckb: 'هەندێک مۆدێل داناشکێن چونکە نرخی دوای داشکاندنیان لە ئێستا کەمتر نییە — بە نرخی خۆیان دەفرۆشرێن، بێ هێڵ بەسەرداهاتن',
   },
-  // The OWNER's answer only (D6): an editor's answer never carries a cost signal.
+  // The OWNER's answer only (D6): an editor's answer never carries a cost signal. It is raised when any
+  // model or route is below its cost OR below the minimum profit (offers.ts), so it names both: the owner
+  // read «تحت تكلفته» on a deal that was only under his minimum profit (2026-11-05). Each row's own chip
+  // («تحت التكلفة» / «تحت الحد الأدنى للربح») says which one it is.
   OFFER_BELOW_COST: {
-    ar: 'هذا الخصم يبيع موديلًا أو مسارًا تحت تكلفته — محفوظ ومعروض للزبائن',
-    en: 'this sale sells a model or route below its cost — saved and on sale',
-    ckb: 'ئەم داشکاندنە مۆدێلێک یان ڕێڕەوێک لە خوار تێچووەکەی دەفرۆشێت — پاشەکەوت کراوە و بۆ کڕیاران دیارە',
+    ar: 'هذا الخصم يبيع موديلًا أو مسارًا تحت تكلفته أو تحت الحد الأدنى للربح — محفوظ ومعروض للزبائن',
+    en: 'this sale sells a model or route below its cost or below the minimum profit — saved and on sale',
+    ckb: 'ئەم داشکاندنە مۆدێلێک یان ڕێڕەوێک لە خوار تێچووەکەی یان لە خوار کەمترین قازانج دەفرۆشێت — پاشەکەوت کراوە و بۆ کڕیاران دیارە',
   },
 } as const satisfies Record<string, OfferSentence>;
 
