@@ -38,17 +38,43 @@ export default function CardPrice({
   p,
   compact = false,
   density = 'regular',
+  saving = null,
+  occasion = null,
 }: {
   p: ApiProduct;
   /** Smaller type for list rows (search suggestions, bundle tiles). */
   compact?: boolean;
   /** 'compact' is the compact product card's price block (see CompactPrice). */
   density?: 'regular' | 'compact';
+  /**
+   * A sale with an occasion (DECISIONS row 294): its «−N٪» and the sentence a screen reader hears, printed
+   * beside the struck price — the photograph carries the occasion's ribbon alone (ProductCard).
+   */
+  saving?: CardSaving | null;
+  /** That sale's occasion, after its «−N٪»: its sentence — and on a list row its name (ProductCard `OccasionWords`). */
+  occasion?: React.ReactNode;
 }) {
   // A priced card always carries its display price; one that does not is never drawn as 0.
   if (isUnpriced(p) || (p.display_price_iqd ?? p.price_iqd) == null) return <UnpricedPrice rows={density === 'compact'} />;
-  if (density === 'compact') return <CompactPrice p={p} />;
-  return <RegularPrice p={p} compact={compact} />;
+  if (density === 'compact') return <CompactPrice p={p} saving={saving} occasion={occasion} />;
+  return <RegularPrice p={p} compact={compact} saving={saving} occasion={occasion} />;
+}
+
+export interface CardSaving {
+  text: string;
+  sr: string;
+}
+
+/** «−17٪» beside a struck price, in the sale's green (the product page's saving pill), with its sentence. */
+function SavingText({ saving }: { saving: CardSaving }) {
+  return (
+    <>
+      <bdi dir="ltr" aria-hidden data-card-saving className="shrink-0 font-bold text-success tabular-nums">
+        {saving.text}
+      </bdi>
+      <span className="sr-only">{saving.sr}</span>
+    </>
+  );
 }
 
 /**
@@ -66,7 +92,7 @@ function UnpricedPrice({ rows }: { rows: boolean }) {
   );
 }
 
-function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
+function RegularPrice({ p, compact, saving, occasion }: { p: ApiProduct; compact: boolean; saving: CardSaving | null; occasion: React.ReactNode }) {
   const { money } = useMoney();
   const { loc } = useLanguage();
 
@@ -130,6 +156,12 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
         {struck !== null && (
           <span className="text-zinc-500/80 text-[10.5px] line-through truncate">{money(struck, usd.struck)}</span>
         )}
+        {struck !== null && saving ? (
+          <span className="text-[10.5px]">
+            <SavingText saving={saving} />
+          </span>
+        ) : null}
+        {struck !== null ? occasion : null}
       </div>
       {/* An estimated pre-order price says so, muted, under the figure (§5.3). */}
       {isEstimated(p) ? (
@@ -155,7 +187,12 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
  *
  *   row 1   «يبدأ من» 10 muted · the amount 15/20 800 tabular · «د.ع» 10.5
  *   row 2   A LIVE OFFER'S struck before price first (docs/ux/PRODUCT-DISCOUNT.md
- *           §8.2: `display_offer_before_iqd`; the member line yields to it).
+ *           §8.2: `display_offer_before_iqd`; the member line yields to it) —
+ *           and, for a sale with an occasion, its «−N٪» beside it in the
+ *           sale's green (`saving`, DECISIONS row 294: the photo wears the
+ *           occasion's ribbon alone), then the occasion (`occasion`: its
+ *           sentence; a list row, whose photo wears the wordless flag,
+ *           its name too — «· بلاك فرايدي», truncated before the price is).
  *           Else, on an ESTIMATED price (docs/SMART_PRICING.md §5.3), «تقديري»
  *           — the member line yields to it too. Else ONE member line — the
  *           cheapest rung below what this viewer pays (src/lib/productCard.ts
@@ -168,7 +205,7 @@ function RegularPrice({ p, compact }: { p: ApiProduct; compact: boolean }) {
  * gold for PRIME and PLUS, the foreground for everyone else. Same fields,
  * same server verdict — nothing here computes a price.
  */
-function CompactPrice({ p }: { p: ApiProduct }) {
+function CompactPrice({ p, saving, occasion }: { p: ApiProduct; saving: CardSaving | null; occasion: React.ReactNode }) {
   const { money } = useMoney();
   const { loc } = useLanguage();
 
@@ -219,6 +256,10 @@ function CompactPrice({ p }: { p: ApiProduct }) {
             {/* «بدل» — instead of; its own Sorani (F6). */}
             <span className="sr-only">{loc('بدل', 'instead of', 'لە جیاتی')} </span>
             <bdi dir="ltr" className="text-text-muted line-through tabular-nums">{splitMoney(money(struck, usd.struck))[0]}</bdi>
+            {/* An occasion's «−N٪» (DECISIONS row 294): beside the price it was taken from, not on the photo —
+                then the occasion itself (its sentence; on a list row, its name). */}
+            {offerBefore !== null && saving ? <SavingText saving={saving} /> : null}
+            {offerBefore !== null ? occasion : null}
           </>
         ) : estimate ? (
           <span data-price-estimate className="truncate font-semibold text-text-muted">

@@ -10,14 +10,17 @@ import type { OccasionDraft } from './productDiscountWire';
 /**
  * «المناسبة» — WHICH OCCASION A SALE IS FOR (DECISIONS row 294; docs/ux/PRODUCT-DISCOUNT.md §16.3).
  *
- * The owner names the sale's occasion from a compact grid — every preset drawn in its OWN design, exactly
- * as a shopper will see it on the photograph — or types his own name («اسم آخر»: Arabic required, English
- * and Sorani optional). It is saved with the discount, through the same door and the same stamp
- * (productDiscountWire.ts `occasionBodyOf`); the card and the «العروض الخاصة» tab both mount it.
+ * The owner names the sale's occasion from a compact grid — every preset beside its ribbon in miniature,
+ * the corner band in its own colours a shopper will see on the photograph — or types his own name («اسم
+ * آخر»: Arabic required, English and Sorani optional), previewed on the real card ribbon in all three
+ * languages at once: the generic words where he left a language empty, and an ellipsis where a name is
+ * longer than the band holds (about a dozen letters; the hint says so). It is saved with the discount,
+ * through the same door and the same stamp (productDiscountWire.ts `occasionBodyOf`); the card and the
+ * «العروض الخاصة» tab both mount it.
  *
  * A radiogroup of pressable tiles (the card's Segmented recipe: flush at rest, pressed into a well when
  * on, with a check as the one secondary cue). Each tile's name is the occasion's name in the reader's
- * language; the tag inside is decoration.
+ * language; the swatch beside it is decoration.
  */
 export default function OccasionPicker({
   value,
@@ -93,9 +96,16 @@ export default function OccasionPicker({
             </V2Field>
           </Grid>
           <p className="text-[11px] text-text-muted">{s.occasionNameHint}</p>
+          {/* The owner's name on the real card ribbon, as each language's shopper will read it — the generic
+              words where a language is empty, an ellipsis where a name is longer than the band — on a tile
+              the size and shape of the home rail's card (the band is laid from the corner, as on any card). */}
           {value.ar.trim() ? (
-            <div className="flex min-w-0" data-occasion-custom-preview>
-              <OccasionTag badge="custom" name={{ ar: value.ar, en: value.en, ckb: value.ckb }} lang={lang} size="picker" />
+            <div aria-hidden className="flex flex-wrap gap-2" data-occasion-custom-preview>
+              {(['ar', 'en', 'ckb'] as const).map((l) => (
+                <div key={l} lang={l} dir={l === 'en' ? 'ltr' : 'rtl'} className="relative aspect-[6/5] w-[148px] overflow-hidden rounded-lg bg-surface-selected shadow-well">
+                  <OccasionTag badge="custom" name={{ ar: value.ar, en: value.en, ckb: value.ckb }} lang={l} size="card" />
+                </div>
+              ))}
             </div>
           ) : null}
         </div>

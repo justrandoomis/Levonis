@@ -139,7 +139,7 @@ const AR: DiscountStrings = {
   occasionNameAr: 'الاسم بالعربية',
   occasionNameEn: 'بالإنجليزية (اختياري)',
   occasionNameCkb: 'بالكردية (اختياري)',
-  occasionNameHint: 'حتى 32 حرفًا. اللغة التي تُترك فارغة تُظهر «عرض خاص» بتلك اللغة.',
+  occasionNameHint: 'حتى 32 حرفًا، يظهر منها على شريط البطاقة نحو 14 حرفًا وينتهي الأطول بـ«…». اللغة التي تُترك فارغة تُظهر «عرض خاص» بتلك اللغة.',
   occasionOneSale: 'للمنتج تخفيض واحد في كل مرة: حفظ تخفيض بمناسبة جديدة يستبدل التخفيض الحالي.',
 };
 
@@ -207,7 +207,7 @@ const EN: DiscountStrings = {
   occasionNameAr: 'Name in Arabic',
   occasionNameEn: 'In English (optional)',
   occasionNameCkb: 'In Sorani (optional)',
-  occasionNameHint: 'Up to 32 characters. A language left empty shows "Special deal" in that language.',
+  occasionNameHint: 'Up to 32 characters; about 14 fit on the ribbon of a card, and a longer name ends in "…". A language left empty shows "Special deal" in that language.',
   occasionOneSale: 'A product has one sale at a time: saving a sale for a new occasion replaces the current one.',
 };
 
@@ -275,7 +275,7 @@ const CKB: DiscountStrings = {
   occasionNameAr: 'ناو بە عەرەبی',
   occasionNameEn: 'بە ئینگلیزی (ئارەزوومەندانە)',
   occasionNameCkb: 'بە کوردی (ئارەزوومەندانە)',
-  occasionNameHint: 'تا 32 پیت. ئەو زمانەی بە بەتاڵی دەمێنێتەوە «ئۆفەری تایبەت» بەو زمانە پیشان دەدات.',
+  occasionNameHint: 'تا 32 پیت؛ نزیکەی 14 پیتی لەسەر نیشانەی کارتەکە دەردەکەوێت و ناوی درێژتر بە «…» کۆتایی دێت. ئەو زمانەی بە بەتاڵی دەمێنێتەوە «ئۆفەری تایبەت» بەو زمانە پیشان دەدات.',
   occasionOneSale: 'بەرهەم لە یەک کاتدا یەک داشکاندنی هەیە: پاشەکەوتکردنی داشکاندنێک بۆ بۆنەیەکی نوێ داشکاندنی ئێستا دەگۆڕێت.',
 };
 

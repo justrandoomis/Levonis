@@ -63,7 +63,11 @@ export const OFFER_OCCASION_KEYS: readonly OfferOccasionKey[] = [...OFFER_OCCASI
 /** The column's CHECK (migration 0224): a key the database accepts, known to this code or not. */
 export const OCCASION_KEY_SHAPE = /^[a-z0-9_]{2,32}$/;
 
-/** The longest custom name, in characters, in each language: a tag on a 360 px phone's card holds about this. */
+/**
+ * The longest custom name the door accepts, in characters, in each language. A card's ribbon (and the
+ * gallery's, its scale) shows about 14 of them whole and ends a longer name in an ellipsis
+ * (src/components/ui/OccasionTag.tsx `room`); the owner's picker previews it in all three languages and says so.
+ */
 export const OCCASION_NAME_MAX = 32;
 
 /**

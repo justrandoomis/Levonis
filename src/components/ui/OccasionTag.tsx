@@ -1,115 +1,155 @@
-import {
-  BadgePercent,
-  Flower2,
-  Gauge,
-  Gift,
-  LampCeiling,
-  Moon,
-  MoonStar,
-  MousePointerClick,
-  PencilLine,
-  ShoppingBag,
-  Snowflake,
-  Sparkles,
-  Sun,
-  Tag,
-  TreePine,
-  Zap,
-  type LucideIcon,
-} from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { occasionWords, type OccasionLang, type OccasionName, type OfferOccasionKey } from '../../../packages/contracts/src/offerOccasions';
 
 /**
- * THE SALE'S OCCASION, IN ITS OWN DESIGN (DECISIONS row 294; docs/ux/PRODUCT-DISCOUNT.md §16).
+ * THE SALE'S OCCASION AS AN OBLIQUE CORNER RIBBON (DECISIONS row 294; docs/ux/PRODUCT-DISCOUNT.md §16).
  *
- * The owner: «any of them have special design and clean ui ux for know this is dicount for this special
- * deal». One tag per occasion, each recognisable at a glance — a fill, an ink, an edge and a mark (a
- * lucide glyph, bare or on a medallion) of its own: Black Friday onyx with a gold edge, White Friday snow
- * with gold, Cyber Monday deep violet with cyan, 11.11 crimson and 12.12 flame, Ramadan night blue with a
- * gold lantern, Eid al-Fitr deep green with a gold crescent, Eid al-Adha deeper green with a crescent and
- * star on a gold medallion, Christmas deep green with a snow tree on a red medallion, back to school
- * yellow with a pencil, summer orange with a sun, winter ice with a snowflake, spring petal with a green
- * flower, the flash deal amber with a bolt, the hyper deal vivid violet, and the owner's own name a
- * neutral silver tag. Two tags that share an edge never share a fill's look (tests/offerOccasionCard.test.ts
- * holds their fills apart).
+ * The owner, of the first design (a pill stacked over the «−N٪» chip, the sale's clock across the photo):
+ * «very bad design . the label on product should be only on top left corner sloping < oblique > . no need
+ * for big button or date. the goal is modern and clean design < clay morphism style >».
  *
- * ONE DESIGN IN BOTH THEMES. The tag is a dark island (`data-theme="dark"`, the generator's own
- * mechanism — scripts/theme-tokens.mjs): every palette shade and named tone inside it reads its
- * designed value whatever the page's theme, so a Ramadan tag is the same night blue on cream as on
- * black. Only fixed tokens and the palette shades the shop already uses; flat and opaque like the
- * «−17٪» chip under it (OfferBadge.tsx) — no blur, no shadow, no arbitrary radius, no zinc. The ink
- * reads at 4.5:1 or more on its fill and every glyph at 3:1 on what is under it, and each tag stands
- * off a dark photograph, a white one and every tray by its fill or its edge
- * (tests/offerOccasionCard.test.ts computes all of it).
+ * So an occasion is ONE SLIM BAND AT 45° across the photograph's top corner — top-left in Arabic and
+ * Sorani, where the owner asked for it; top-right in English, where top-left holds the compare toggle —
+ * cut by the photograph's own rounded edge (its tray clips it), carrying the occasion's name and nothing
+ * else: no glyph, no date, no outline. Each occasion keeps its colours: a fill, an ink and, for most, a
+ * hairline trim along both long edges — Black Friday onyx trimmed in gold, White Friday snow in antique
+ * gold, Cyber Monday indigo in cyan, Ramadan night blue and both Eids green in gold (al-Fitr the brighter
+ * green, al-Adha deep teal), Christmas deep green in red, the flash deal amber in onyx, back to school
+ * yellow and winter ice in navy, summer orange in burnt orange, spring petal in leaf green; 11.11 crimson,
+ * 12.12 flame, the hyper deal magenta and the owner's own name in silver are a solid fill. Wherever it
+ * lands — a black studio photograph, a white one, either theme's gallery — a band stands off what is under
+ * it by its fill, its trim or its clay edges.
  *
- * FIVE CLASSES FOR SIXTEEN DESIGNS. Each design is five design tokens handed to the tag as custom
- * properties (`--occ-fill`, `--occ-ink`, `--occ-edge`, `--occ-medal`, `--occ-glyph`, the Spinner's
- * `--lv-delay` pattern), read by the same five classes: one utility per colour per design would have
- * added some thirty rules to the stylesheet every visitor downloads (tests/bundleBudget.test.ts holds
- * it at 60 KB). Each token is written as its custom property's name without the dashes
- * (`color-violet-950` for `--color-violet-950`): the theme generator still counts the shade it reads
- * (scripts/theme-tokens.mjs), while Tailwind does not copy each one into the `:root` block — the island
- * declares them all, and the three fixed colours (snow, onyx, gold-fill) are every page's anyway.
+ * THE NAME SITS IN THE BAND, WHOLE. Arabic and Sorani reach far above and below their line — the hamza of
+ * «الأضحى» 0.86 em up, the dots of «فرايدي» and the v under «ڕەمەزان» nearly half an em down — so each band is
+ * as thick as that ink plus its two trims, and an Arabic or Sorani name's baseline sits 0.19 em under the
+ * band's centre (`lift` raises it there from where Cairo's tall ascent would put it), which centres every
+ * preset's ink between the trims. An English name keeps Cairo's own baseline, about 0.37 em under the centre,
+ * which centres its capitals. Its line box is taller than the band, so no mark is ever cut off. Along the
+ * band, every preset keeps at least 5 px of fill between its ink and the photograph's cut edge, at the ink's
+ * top corner where the band is shortest (`room`; all measured: tests/fixtures/occasionTagWidths.json).
  *
- * The words come from the shared contract (packages/contracts/src/offerOccasions.ts); the visible name
- * is hidden from a screen reader, which hears the sentence instead («تخفيض بلاك فرايدي»). A key this
- * build does not know renders nothing.
+ * CLAY, AND INFORMATION (DECISIONS rows 207 and 209). A label is information, and information is not raised:
+ * the band rests ON the photograph. One edge treatment per band: a trimmed band's edges are its trims; a
+ * solid band's are its own clay bevel — a lit rim along the edge that faces the light, a pressed base along
+ * the other, the fill's own colour lifted and pressed (`BEVEL`, the house's `.lv-button-primary` recipe for a
+ * solid fill in both themes). Under both, one small soft contact shadow in the PAGE's clay ink (warm on
+ * cream, black in dark: `--clay-ambient`, read outside the dark island), offset straight down the screen
+ * whichever way the band turns — no sideways cast flipping with the language (row 207). Solid; no blur
+ * behind it, no gloss, no glyph, no radius of its own.
+ *
+ * ONE DESIGN IN BOTH THEMES. The band's fill is a dark island (`data-theme="dark"`, scripts/theme-tokens.mjs):
+ * every palette shade inside it reads its designed value whatever the page's theme. The colours ride on it
+ * as three custom properties (`--occ-fill`, `--occ-ink`, `--occ-edge`) read by three classes the
+ * stylesheet already carries, and the geometry (where the band crosses the corner, its length and angle),
+ * its type and its cast are the elements' own style: the public stylesheet has no byte to spare
+ * (tests/bundleBudget.test.ts), and the ribbon adds no rule to it at all. Each token is written as its
+ * custom property's name without the dashes (`color-violet-950`), so the theme generator counts the shade
+ * and Tailwind copies none into `:root`.
+ *
+ * THE WORDS, AND A SCREEN READER. On a card the band on the photograph is decoration (`aria-hidden`): the
+ * sentence a screen reader hears («تخفيض بلاك فرايدي») is inside the card's link, beside its price (`sr`,
+ * src/components/home/ProductCard.tsx), so it is part of the product the link names. On the product page the
+ * band carries its own sentence. A longer custom name ends in an ellipsis. A key this build does not know
+ * renders nothing (and a card then wears an ordinary sale's chip and clock: ProductCard `drawnOccasion`).
+ *
+ * A LIST ROW'S 96 px PHOTOGRAPH IS TOO SMALL FOR A NAME: the longest names would need a band across most of
+ * it. There the ribbon is a short FLAG — the same band in the same colours across the same corner, no words
+ * (`list`) — and the row names the occasion in its price line, beside the «−N٪» (`name`).
+ *
+ * In a chip or a picker tile (`picker`) the ribbon is drawn in miniature — the same band across a small
+ * tray's corner — beside the name in the chip's own type.
  */
 
 export interface OccasionTheme {
-  /** The tag's fill, its ink and its edge — each a colour token by its property's name (`color-onyx`). */
+  /** The band's fill and its ink — each a colour token by its property's name (`color-onyx`). */
   fill: string;
   ink: string;
-  edge: string;
-  /** The mark: a medallion's fill (null: the bare glyph on the tag's fill) and the glyph's ink. */
-  medal: string | null;
-  glyph: string;
-  icon: LucideIcon;
+  /** A hairline along both long edges of the band, or none (a solid fill, edged by its own clay bevel). */
+  trim: string | null;
 }
 
 export const OCCASION_THEMES: Readonly<Record<OfferOccasionKey, OccasionTheme>> = {
-  black_friday: { fill: 'color-onyx', ink: 'color-snow', edge: 'color-gold-fill', medal: 'color-gold-fill', glyph: 'color-onyx', icon: Tag },
-  white_friday: { fill: 'color-snow', ink: 'color-yellow-900', edge: 'color-yellow-900', medal: 'color-gold-fill', glyph: 'color-onyx', icon: Sparkles },
-  cyber_monday: { fill: 'color-violet-950', ink: 'color-cyan-300', edge: 'color-cyan-500', medal: 'color-cyan-300', glyph: 'color-violet-950', icon: MousePointerClick },
-  singles_day: { fill: 'color-crimson', ink: 'color-snow', edge: 'color-flame', medal: 'color-snow', glyph: 'color-crimson', icon: ShoppingBag },
-  double_twelve: { fill: 'color-flame', ink: 'color-onyx', edge: 'color-crimson', medal: 'color-onyx', glyph: 'color-flame', icon: Gift },
-  flash_deal: { fill: 'color-amber-400', ink: 'color-onyx', edge: 'color-onyx', medal: 'color-onyx', glyph: 'color-amber-400', icon: Zap },
-  hyper_deal: { fill: 'color-violet-700', ink: 'color-snow', edge: 'color-fuchsia-500', medal: 'color-fuchsia-500', glyph: 'color-onyx', icon: Gauge },
-  ramadan: { fill: 'color-sky-900', ink: 'color-amber-100', edge: 'color-gold-fill', medal: null, glyph: 'color-gold-fill', icon: LampCeiling },
-  eid_al_fitr: { fill: 'color-emerald-900', ink: 'color-amber-100', edge: 'color-gold-fill', medal: null, glyph: 'color-gold-fill', icon: Moon },
-  eid_al_adha: { fill: 'color-teal-950', ink: 'color-amber-100', edge: 'color-gold-fill', medal: 'color-gold-fill', glyph: 'color-teal-950', icon: MoonStar },
-  christmas: { fill: 'color-emerald-950', ink: 'color-snow', edge: 'color-red-500', medal: 'color-red-500', glyph: 'color-snow', icon: TreePine },
-  back_to_school: { fill: 'color-yellow-300', ink: 'color-sky-900', edge: 'color-sky-900', medal: null, glyph: 'color-sky-900', icon: PencilLine },
-  summer: { fill: 'color-orange-500', ink: 'color-onyx', edge: 'color-orange-900', medal: 'color-yellow-300', glyph: 'color-orange-900', icon: Sun },
-  winter: { fill: 'color-sky-100', ink: 'color-sky-900', edge: 'color-sky-900', medal: 'color-sky-900', glyph: 'color-sky-100', icon: Snowflake },
-  spring: { fill: 'color-petal', ink: 'color-emerald-900', edge: 'color-emerald-700', medal: null, glyph: 'color-emerald-700', icon: Flower2 },
-  custom: { fill: 'color-slate-400', ink: 'color-onyx', edge: 'color-onyx', medal: null, glyph: 'color-onyx', icon: BadgePercent },
+  black_friday: { fill: 'color-onyx', ink: 'color-gold-fill', trim: 'color-gold-fill' },
+  white_friday: { fill: 'color-snow', ink: 'color-yellow-900', trim: 'color-yellow-900' },
+  cyber_monday: { fill: 'color-violet-950', ink: 'color-cyan-300', trim: 'color-cyan-500' },
+  singles_day: { fill: 'color-crimson', ink: 'color-snow', trim: null },
+  double_twelve: { fill: 'color-flame', ink: 'color-onyx', trim: null },
+  flash_deal: { fill: 'color-amber-400', ink: 'color-onyx', trim: 'color-onyx' },
+  hyper_deal: { fill: 'color-fuchsia-500', ink: 'color-onyx', trim: null },
+  ramadan: { fill: 'color-sky-900', ink: 'color-amber-100', trim: 'color-gold-fill' },
+  eid_al_fitr: { fill: 'color-emerald-700', ink: 'color-amber-100', trim: 'color-gold-fill' },
+  eid_al_adha: { fill: 'color-teal-950', ink: 'color-amber-100', trim: 'color-gold-fill' },
+  christmas: { fill: 'color-red-900', ink: 'color-snow', trim: 'color-emerald-500' },
+  back_to_school: { fill: 'color-yellow-300', ink: 'color-blue-700', trim: 'color-blue-700' },
+  summer: { fill: 'color-orange-400', ink: 'color-onyx', trim: 'color-orange-900' },
+  winter: { fill: 'color-sky-200', ink: 'color-sky-900', trim: 'color-sky-900' },
+  spring: { fill: 'color-petal', ink: 'color-emerald-900', trim: 'color-emerald-700' },
+  custom: { fill: 'color-slate-400', ink: 'color-onyx', trim: null },
 };
 
-/** A design as the five custom properties its tag reads. */
+/** A design as the three custom properties its band reads (no trim: the edge is the fill, and `BEVEL` draws it). */
 const paint = (t: OccasionTheme): CSSProperties =>
   ({
     '--occ-fill': `var(--${t.fill})`,
     '--occ-ink': `var(--${t.ink})`,
-    '--occ-edge': `var(--${t.edge})`,
-    '--occ-medal': t.medal ? `var(--${t.medal})` : 'transparent',
-    '--occ-glyph': `var(--${t.glyph})`,
+    '--occ-edge': `var(--${t.trim ?? t.fill})`,
   }) as CSSProperties;
 
 /**
- * THE SIZES. `card`: on a card's photograph (and beside a list row's price), 20 px tall, stacked above the
- * «−N٪» chip — semibold on a 12 px medallion, so every preset's name fits the narrowest card (the home
- * rail's 148 px) with room to spare in all three languages (measured: tests/fixtures/occasionTagWidths.json).
- * `page`: the product page's gallery. `picker`: the owner's grid in the discount card.
+ * A SOLID BAND'S CLAY EDGES: its two long borders, translucent over its own fill (a background reaches under
+ * its border) — the fill lifted toward white along the edge that faces the light, pressed toward black along
+ * the other. Fixed, like `.lv-button-primary`'s rim and base: the band is the same in both themes.
  */
-export const OCCASION_TAG_SIZES = {
-  card: { tag: 'gap-0.5 ps-0.5 pe-0.75 py-px text-[10px] leading-4 font-semibold', mark: 'size-3', icon: 'size-2.5' },
-  picker: { tag: 'gap-1 px-1.5 py-0.5 text-[11px] leading-4 font-bold', mark: 'size-4', icon: 'size-3' },
-  page: { tag: 'gap-1.5 px-2 py-1 text-[13px] leading-5 font-bold', mark: 'size-5', icon: 'size-3.5' },
+export const BEVEL = { rim: 'rgb(255 255 255 / 0.28)', base: 'rgb(0 0 0 / 0.3)' } as const;
+
+/**
+ * THE RIBBONS, in px. The band's centre line meets the photograph's top edge and its side edge `reach` from
+ * the corner; the band is `band` thick (its two 1 px edges included) and long enough to run past both edges,
+ * where the tray cuts it. `type` is the name's size and `lift` the space under an Arabic or Sorani name that
+ * raises its baseline to 0.19 em under the band's centre (an English one needs none); `room` the longest name
+ * the band shows whole (a longer one ends in an ellipsis). The card's band holds every preset whole in all
+ * three languages on the narrowest photograph (a 320 px phone's two-across grid, 129 px), 5 px clear of both
+ * cut edges; the gallery's is the card's at the gallery's scale; a list row's 96 px photograph wears the
+ * FLAG — no words, so no `room`.
+ */
+export const OCCASION_RIBBONS = {
+  card: { reach: 62, band: 16, type: 9.5, lift: 3.5, room: 64 },
+  list: { reach: 32, band: 12, type: 0, lift: 0, room: 0 },
+  page: { reach: 82, band: 21, type: 13, lift: 5, room: 88 },
 } as const;
 
-export type OccasionTagSize = keyof typeof OCCASION_TAG_SIZES;
+export type OccasionRibbonSize = keyof typeof OCCASION_RIBBONS;
+
+/**
+ * Where the band lies: centred on the corner's diagonal at `reach / 2` from both edges, turned 45° — up to
+ * the right across the top-left corner (Arabic, Sorani), down to the right across the top-right one
+ * (English). Its contact shadow is offset (∓1, 1) in the band's own turned frame: √2 px straight down the
+ * screen, in both directions.
+ */
+export function ribbonGeometry(size: OccasionRibbonSize, rtl: boolean): CSSProperties {
+  const { reach, band } = OCCASION_RIBBONS[size];
+  const length = Math.ceil(reach * Math.SQRT2 + band + 4);
+  return {
+    top: reach / 2 - band / 2,
+    [rtl ? 'left' : 'right']: reach / 2 - length / 2,
+    width: length,
+    height: band,
+    transform: `rotate(${rtl ? -45 : 45}deg)`,
+    boxShadow: `${rtl ? -1 : 1}px 1px 2px var(--clay-ambient)`,
+  };
+}
+
+/** The miniature: the same band across a 20 × 16 tray's corner, in flat stops (the trim, the fill, the trim). */
+const swatch = (rtl: boolean) =>
+  `linear-gradient(${rtl ? 135 : 225}deg, transparent 0 14%, var(--occ-edge) 14% 19%, var(--occ-fill) 19% 50%, var(--occ-edge) 50% 55%, transparent 55%)`;
+
+/**
+ * `card` / `list` / `page`: the ribbon on a photograph (its tray is `relative` and clips it); `picker`: the
+ * miniature beside the name; `name`: the name beside a list row's price, with its sentence; `sr`: the
+ * sentence alone, inside a grid card's link.
+ */
+export type OccasionTagSize = OccasionRibbonSize | 'picker' | 'name' | 'sr';
 
 export interface OccasionTagProps {
   /** The offer block's key (`offer.badge`). */
@@ -121,40 +161,74 @@ export interface OccasionTagProps {
   className?: string;
 }
 
-export default function OccasionTag({ badge, name, lang, size = 'card', className = '' }: OccasionTagProps) {
+export default function OccasionTag({ badge, name, lang, size = 'card', className }: OccasionTagProps) {
   const words = occasionWords(badge, name ?? null, lang);
   if (!words) return null;
   const theme = OCCASION_THEMES[words.key];
-  const Icon = theme.icon;
-  const sz = OCCASION_TAG_SIZES[size];
-  const mark = (
-    <span aria-hidden className={`grid shrink-0 place-items-center rounded-sm bg-[var(--occ-medal)] text-[var(--occ-glyph)] ${sz.mark}`}>
-      <Icon className={sz.icon} strokeWidth={2.5} />
-    </span>
-  );
+  const rtl = lang !== 'en';
+  const extra = className ? ` ${className}` : '';
+  if (size === 'sr') {
+    return (
+      <span data-occasion={words.key} data-occasion-size={size} className={`sr-only${extra}`}>
+        {words.sr}
+      </span>
+    );
+  }
+  if (size === 'name') {
+    return (
+      <span data-occasion={words.key} data-occasion-size={size} className={`min-w-0 truncate font-bold${extra}`}>
+        <span aria-hidden>· {words.name}</span>
+        <span className="sr-only">{words.sr}</span>
+      </span>
+    );
+  }
+  if (size === 'picker') {
+    return (
+      <span data-occasion={words.key} data-occasion-size={size} className={`inline-flex min-w-0 items-center gap-1.5${extra}`}>
+        <span aria-hidden className="relative h-4 w-5 shrink-0 overflow-hidden rounded bg-border-subtle">
+          <span data-theme="dark" className="absolute inset-0" style={{ ...paint(theme), backgroundImage: swatch(rtl) }} />
+        </span>
+        <span className="min-w-0 truncate">{words.name}</span>
+      </span>
+    );
+  }
+  const r = OCCASION_RIBBONS[size];
+  const page = size === 'page';
   return (
     <span
+      aria-hidden={page ? undefined : true}
       data-occasion={words.key}
       data-occasion-size={size}
-      data-theme="dark"
-      style={paint(theme)}
-      className={`inline-flex min-w-0 max-w-full items-center rounded-md border border-[var(--occ-edge)] bg-[var(--occ-fill)] ${sz.tag} ${className}`}
+      className={`pointer-events-none absolute z-[1]${extra}`}
+      style={ribbonGeometry(size, rtl)}
     >
-      {mark}
       {/* The ink sits on the name, never on the island: an island's own `color` is its theme's text
-          (src/index.css `[data-theme='dark']:not(html)`, outside every layer), which no utility on
-          the island itself can override — the White Friday name read snow on snow. */}
-      <span aria-hidden className="min-w-0 truncate text-[var(--occ-ink)]">
-        {words.name}
+          (src/index.css `[data-theme='dark']:not(html)`, outside every layer), which no utility on the
+          island itself can override — the White Friday name read snow on snow. */}
+      <span
+        data-theme="dark"
+        dir={rtl ? 'rtl' : 'ltr'}
+        className="flex h-full items-center justify-center border-y border-[var(--occ-edge)] bg-[var(--occ-fill)] font-bold"
+        style={{
+          ...paint(theme),
+          ...(theme.trim ? null : { borderTopColor: BEVEL.rim, borderBottomColor: BEVEL.base }),
+          ...(r.room ? { fontSize: r.type, lineHeight: 2, ...(rtl ? { paddingBottom: r.lift } : null) } : null),
+        }}
+      >
+        {r.room ? (
+          <span aria-hidden className="truncate text-[var(--occ-ink)]" style={{ maxWidth: r.room }}>
+            {words.name}
+          </span>
+        ) : null}
       </span>
-      <span className="sr-only">{words.sr}</span>
+      {page ? <span className="sr-only">{words.sr}</span> : null}
     </span>
   );
 }
 
 /**
- * «سعر بلاك فرايدي» — the product page's label beside a sale price its occasion set (§16.4). `fallback` (the
- * page's own «سعر العرض») when this build does not know the key.
+ * «سعر بلاك فرايدي» — the product page's label beside a sale price its occasion set (§16.4), in the page's
+ * quiet label type. `fallback` (the page's own «سعر العرض») when this build does not know the key.
  */
 export function OccasionPriceLabel({
   badge,

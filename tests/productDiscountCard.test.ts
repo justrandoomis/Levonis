@@ -279,12 +279,14 @@ test('the save body: the row as loaded (tiers, limits, locked_preview, PLUS) unt
   assert.deepEqual(draftFrom(offer(), read()).occasion, { badge: '', ar: '', en: '', ckb: '' });
 });
 
-test('the occasion picker: every preset in its own design, «اسم آخر» with three names, the rule said', () => {
+test('the occasion picker: every preset beside its ribbon’s swatch, «اسم آخر» with three names previewed on the real ribbon, the rule said', () => {
   const html = view({ draft: { ...draftFrom(offer({ badge: 'ramadan' }), read()) } });
   assert.match(html, /data-occasion-picker/);
   for (const key of ['black_friday', 'white_friday', 'cyber_monday', 'singles_day', 'double_twelve', 'flash_deal', 'hyper_deal', 'ramadan', 'eid_al_fitr', 'eid_al_adha', 'christmas', 'back_to_school', 'summer', 'winter', 'spring']) {
-    assert.match(html, new RegExp(`data-occasion-option="${key}"[^>]*>[\\s\\S]*?data-occasion="${key}"`), `${key} is drawn in its own design`);
+    // The tile: the ribbon in miniature (the corner band in the occasion's colours) beside its name — never the old pill.
+    assert.match(html, new RegExp(`data-occasion-option="${key}"[^>]*>[\\s\\S]*?data-occasion="${key}" data-occasion-size="picker"[\\s\\S]*?linear-gradient\\(135deg`), `${key}: its swatch`);
   }
+  assert.doesNotMatch(html, /data-occasion-size="(card|page)"/, 'no ribbon until «اسم آخر» is previewed');
   assert.match(html, /role="radio" aria-checked="true"[^>]*aria-label="عروض رمضان"/, 'the stored occasion is the checked one');
   assert.match(html, /data-occasion-option=""[\s\S]*?بلا مناسبة/);
   assert.match(html, /data-occasion-option="custom"[\s\S]*?اسم آخر/);
@@ -293,7 +295,21 @@ test('the occasion picker: every preset in its own design, «اسم آخر» wit
   const own = view({ draft: { ...draftFrom(offer(), read()), occasion: { badge: 'custom', ar: 'عيد الحب', en: '', ckb: '' } } });
   assert.match(own, /data-occasion-custom/);
   assert.match(own, /lang="ar"[^>]*maxLength="32"|maxLength="32"[^>]*lang="ar"/i);
-  assert.match(own, /data-occasion-custom-preview[\s\S]*?عيد الحب/, 'the custom name previewed in its tag');
+  // The owner's name on the real card ribbon in all three languages at once — on tiles the size of the rail's
+  // 148 px card, each in its own language and direction: his Arabic, and the generic words where he left English
+  // and Sorani empty (what those shoppers will read), so a name too long for the band shows its ellipsis here.
+  const preview = /<div aria-hidden="true" class="flex flex-wrap gap-2" data-occasion-custom-preview="true">([\s\S]*)/.exec(own)?.[1];
+  assert.ok(preview, 'the preview');
+  for (const [l, dir, name] of [['ar', 'rtl', 'عيد الحب'], ['en', 'ltr', 'Special deal'], ['ckb', 'rtl', 'ئۆفەری تایبەت']] as const) {
+    const at = preview!.indexOf(`<div lang="${l}" dir="${dir}" class="relative aspect-[6/5] w-[148px] overflow-hidden rounded-lg bg-surface-selected shadow-well"><span aria-hidden="true" data-occasion="custom" data-occasion-size="card"`);
+    assert.ok(at >= 0, `${l}: its tile`);
+    assert.match(preview!.slice(at), new RegExp(`^[^]*?>${name}</span>`), `${l}: «${name}» on the ribbon`);
+  }
+  assert.equal((preview!.match(/data-occasion-size="card"/g) ?? []).length, 3, 'three tiles, one per language');
+  // The hint says how much of a name a card shows, in all three languages.
+  assert.match(own, /حتى 32 حرفًا، يظهر منها على شريط البطاقة نحو 14 حرفًا/);
+  assert.match(view({ draft: { ...draftFrom(offer(), read()), occasion: { badge: 'custom', ar: 'عيد الحب', en: '', ckb: '' } } }, 'en'), /about 14 fit on the ribbon of a card/);
+  assert.match(view({ draft: { ...draftFrom(offer(), read()), occasion: { badge: 'custom', ar: 'عيد الحب', en: '', ckb: '' } } }, 'ckb'), /نزیکەی 14 پیتی لەسەر نیشانەی کارتەکە دەردەکەوێت/);
   // English is English, Sorani is Sorani: the picker names each occasion in the reader's language.
   assert.match(view({ draft: { ...draftFrom(offer({ badge: 'ramadan' }), read()) } }, 'en'), /aria-label="Ramadan Deal"/);
   assert.match(view({ draft: { ...draftFrom(offer({ badge: 'ramadan' }), read()) } }, 'ckb'), /aria-label="ئۆفەری ڕەمەزان"/);
@@ -415,12 +431,12 @@ test('the offers tab and the occasion (DECISIONS row 294): its chip on a row, it
   assert.equal(offerSaveBody(row(), null, none).expected_updated_at, '2026-11-05T10:00:00.000Z', 'the stamp it read');
   assert.equal(offerSaveBody(row({ offer_id: '' }), null, none).expected_updated_at, null, 'it saw no row');
   assert.deepEqual([occasionEditable(row()), occasionEditable(bundle)], [true, false], 'the picker is an ordinary product’s');
-  // The row's chip, in the occasion's own design; nothing for a row without one.
+  // The row's chip: the ribbon's swatch beside the occasion's name; nothing for a row without one.
   const chip = (r: Row, lang: 'ar' | 'en' | 'ckb' = 'ar') => {
     LANG = lang;
     return renderToStaticMarkup(createElement(LanguageProvider, null, createElement(OfferOccasionChip, { row: r, lang })));
   };
-  assert.match(chip(row({ badge: 'black_friday' })), /data-offer-occasion[\s\S]*data-occasion="black_friday" data-occasion-size="card"[\s\S]*>بلاك فرايدي</);
+  assert.match(chip(row({ badge: 'black_friday' })), /data-offer-occasion[\s\S]*data-occasion="black_friday" data-occasion-size="picker"[\s\S]*>بلاك فرايدي</);
   assert.match(chip(row({ badge: 'black_friday' }), 'ckb'), />بلاک فرایدەی</);
   assert.match(chip(row({ badge: 'custom', badge_text: { ar: 'عيد الحب' } })), />عيد الحب</);
   assert.equal(chip(row()), '');

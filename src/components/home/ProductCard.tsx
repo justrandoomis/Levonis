@@ -17,18 +17,21 @@ import { cardHref, cardKnowledgeLine, cardName, compareTypeOf, type CardProduct 
 import { isUnpriced } from '../../lib/priceStatus';
 import { shownSavingPercent, useOptionalMoney } from '../../CurrencyContext';
 
+/** A live offer's percent, as the card prints it: the server's percent of its two numbers — in dollars, of the dollar pair (DECISIONS row 248). */
+function useSavingPercent(p: ApiProduct): number | null {
+  const converted = useOptionalMoney()?.converted === true;
+  return shownSavingPercent(converted, p.display_offer_saving_percent, p.display_offer_saving_percent_usd);
+}
+
 /**
- * THE PHOTO BADGE (docs/ux/PRODUCT-DISCOUNT.md §8.2): a live offer's «−17٪» (the server's percent of the
- * two numbers the card prints) when it has one, else today's SALE when the viewer's own price is below
- * the regular one. Nothing when neither. `className` places it: in its corner alone, or in the stack
- * under the sale's occasion (`SaleBadge`).
+ * THE PHOTO BADGE (docs/ux/PRODUCT-DISCOUNT.md §8.2): a live offer's «−17٪» when it has one, else today's
+ * SALE when the viewer's own price is below the regular one. Nothing when neither. A sale with an occasion
+ * wears its ribbon instead, and its «−17٪» moves into the price line (`SaleBadge`).
  */
 function SaleChip({ p, hasSale, className = '' }: { p: ApiProduct; hasSale: boolean; className?: string }) {
   const { lang } = useLanguage();
   const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
-  // In dollars, the percent of the dollar pair the card prints (DECISIONS row 248).
-  const converted = useOptionalMoney()?.converted === true;
-  const n = shownSavingPercent(converted, p.display_offer_saving_percent, p.display_offer_saving_percent_usd);
+  const n = useSavingPercent(p);
   if (n !== null) {
     return (
       <OfferBadge className={className}>
@@ -61,48 +64,87 @@ function SaleChip({ p, hasSale, className = '' }: { p: ApiProduct; hasSale: bool
 }
 
 /**
- * THE OCCASION'S TAG IS ITS OWN CHUNK (DECISIONS row 294): its sixteen designs, glyphs and words reach a
+ * THE OCCASION'S RIBBON IS ITS OWN CHUNK (DECISIONS row 294): its sixteen designs and their words reach a
  * visitor only when a card on screen names an occasion — most of the year none does, and the home rail and
- * every listing then download none of it. Until it lands, its place is held at its height (`TAG_PLACE`, the
- * card tag's 20 px), so nothing under it moves; a chunk that does not arrive draws nothing and the «−N٪»
- * chip stays, as on any sale (the bottom nav's own pattern for a decorative chunk).
+ * every listing then download none of it. Until it lands the corner is bare: the ribbon lies over the
+ * photograph, so nothing moves when it arrives, and a chunk that does not arrive draws nothing — the sale's
+ * «−N٪» is in the price line already (the bottom nav's own pattern for a decorative chunk).
  */
 const OccasionTag = React.lazy<React.ComponentType<OccasionTagProps>>(() =>
   import('../ui/OccasionTag').catch(() => ({ default: () => null }))
 );
-const TAG_PLACE = <span aria-hidden className="block h-5" />;
+
+type CardOffer = NonNullable<ApiProduct['offer']>;
 
 /**
- * THE PHOTO'S TOP-END CORNER (DECISIONS row 294): the sale's OCCASION — «بلاك فرايدي», «رمضان», the
- * owner's own name, each in its own design (src/components/ui/OccasionTag.tsx) — stacked ABOVE the
- * unchanged «−N٪» chip. Top-left in Arabic and Sorani, where the owner asked for it; top-right in English,
- * where top-left holds the compare toggle. The tag is drawn only when this card's own sale lowered the
- * price it prints (`occasionOnCard`: `price_source: 'offer'`, the rule of its strike): never before the
- * sale starts, after it ends, or for a viewer a members-only sale does not cover — the server names no
- * occasion then anyway.
- *
- * The stack stops 2.875 rem short of the photograph's start: the compare toggle's 30 px disc ends 32 px
- * into it (`start-1.5` on the card, the photograph `mx-1` inside it), so the tag keeps 6 px clear of the
- * disc, and a name too long for what is left is truncated, never drawn over it.
- *
- * A LIST ROW'S 96 px PHOTOGRAPH KEEPS ITS CHIP ALONE, where it always was: it has room for no name, and a
- * tag above the chip pushes the chip down under the offer's clock, which fills that photograph's lower
- * half. The row names the occasion in its own design beside the price instead (`CompactCard`).
+ * ONLY AN OCCASION THIS BUILD DRAWS (DECISIONS row 294). A phone still running an older copy of the app may
+ * read a key a newer Worker added: the ribbon would draw nothing for it, and a card that took its chip and its
+ * clock off for a ribbon would be left with a bare photograph. So such a sale is an ordinary sale here — its
+ * chip, its clock. The keys are listed here, not imported: the contract's module carries every occasion's
+ * words, which belong to the ribbon's own chunk (tests/offerOccasionCard.test.ts holds this list equal to
+ * `OFFER_OCCASION_KEYS`). A custom occasion needs its Arabic name, which the Worker only sends readable
+ * (`occasionOf`). The product page needs no such check: its ribbon is lazy and its label falls back.
  */
-function SaleBadge({ p, hasSale, layout = 'grid' }: { p: ApiProduct; hasSale: boolean; layout?: 'grid' | 'list' }) {
+export const DRAWN_OCCASIONS: ReadonlySet<string> = new Set(
+  'black_friday white_friday cyber_monday singles_day double_twelve flash_deal hyper_deal ramadan eid_al_fitr eid_al_adha christmas back_to_school summer winter spring custom'.split(' ')
+);
+
+/** The card's occasion: `occasionOnCard`'s (the rule of its strike), when this build draws it — else none. */
+function drawnOccasion(offer: ApiProduct['offer']): CardOffer | null {
+  const o = occasionOnCard(offer);
+  const own = o?.badge !== 'custom' || (typeof o.badge_text?.ar === 'string' && o.badge_text.ar.trim() !== '');
+  return o?.badge && DRAWN_OCCASIONS.has(o.badge) && own ? o : null;
+}
+
+/**
+ * THE PHOTO'S CORNER (DECISIONS row 294). A sale with an OCCASION — «بلاك فرايدي», «رمضان», the owner's own
+ * name — wears it as ONE oblique ribbon across the photograph's top-left corner (src/components/ui/OccasionTag.tsx;
+ * top-right in English, where top-left holds the compare toggle) and nothing else. The owner, of the pill
+ * stacked over the «−N٪» chip with the clock across the photo: «the label on product should be only on top
+ * left corner sloping … no need for big button or date». So the card draws no clock for it, and its «−N٪»
+ * stands in the price line beside the struck price (`CardPrice` `saving`). The ribbon is drawn only while
+ * this card's own sale lowers the price it prints (`drawnOccasion`: `price_source: 'offer'`, the rule of its
+ * strike, and an occasion this build draws): never before the sale starts, after it ends, or for a viewer a
+ * members-only sale does not cover — the server names no occasion then anyway.
+ *
+ * A list row's 96 px photograph wears the ribbon's FLAG — the same band, the same colours, the same corner,
+ * no words: a name there would need a band across most of the photograph — and the row names the occasion
+ * beside its «−N٪» (`OccasionWords`). Either way the band on the photograph is decoration; what a screen
+ * reader hears is inside the card's link.
+ *
+ * A sale WITHOUT an occasion is exactly as it was: the «−N٪» chip in the photo's top-end corner, its clock.
+ */
+function SaleBadge({ p, hasSale, occasion, list = false }: { p: ApiProduct; hasSale: boolean; occasion: CardOffer | null; list?: boolean }) {
   const { lang } = useLanguage();
-  const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
-  const occasion = layout === 'grid' ? occasionOnCard(p.offer) : null;
-  // No occasion (or a list row's photograph): the chip alone in its corner, exactly as before.
   if (!occasion) return <SaleChip p={p} hasSale={hasSale} className="absolute top-2 end-2" />;
   return (
-    <span data-photo-badges className="absolute top-2 end-2 flex max-w-[calc(100%-2.875rem)] flex-col items-end gap-1">
-      <React.Suspense fallback={TAG_PLACE}>
-        <OccasionTag badge={occasion.badge} name={occasion.badge_text} lang={l} size="card" />
-      </React.Suspense>
-      <SaleChip p={p} hasSale={hasSale} />
-    </span>
+    <React.Suspense fallback={null}>
+      <OccasionTag badge={occasion.badge} name={occasion.badge_text} lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'} size={list ? 'list' : 'card'} />
+    </React.Suspense>
   );
+}
+
+/**
+ * THE OCCASION INSIDE THE CARD'S LINK, beside the price line's «−N٪»: the sentence a screen reader hears
+ * («تخفيض بلاك فرايدي») as part of the product the link names — and, on a list row, whose photograph wears
+ * the wordless flag, the occasion's name itself («· بلاك فرايدي»). From the ribbon's own chunk.
+ */
+function OccasionWords({ occasion, shown }: { occasion: CardOffer; shown: boolean }) {
+  const { lang } = useLanguage();
+  return (
+    <React.Suspense fallback={null}>
+      <OccasionTag badge={occasion.badge} name={occasion.badge_text} lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'} size={shown ? 'name' : 'sr'} />
+    </React.Suspense>
+  );
+}
+
+/** An occasion card's «−N٪» for its price line: the chip's own number and words, or none. */
+function useCardSaving(p: ApiProduct, occasion: CardOffer | null): { text: string; sr: string } | null {
+  const { lang } = useLanguage();
+  const n = useSavingPercent(p);
+  if (!occasion || n === null) return null;
+  const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+  return { text: offerPercentText(n, l), sr: offerPercentSr(n, l) };
 }
 
 /** The lock's words — the bundle tile's (src/components/bundles/BundleTile.tsx). */
@@ -277,13 +319,14 @@ function CompactCard({
     priced &&
     displayPrice != null &&
     ((regularPrice != null && displayPrice < regularPrice) || (typeof p.display_offer_before_iqd === 'number' && displayPrice < p.display_offer_before_iqd));
-  const clock = priced ? offerClock(p) : null;
+  /** The sale's occasion (DECISIONS row 294): its ribbon on the photo, its «−N٪» in the price line, no clock. */
+  const occasion = priced ? drawnOccasion(p.offer) : null;
+  const saving = useCardSaving(p, occasion);
+  const clock = priced && !occasion ? offerClock(p) : null;
   const type = compareToggle ? compareTypeOf(p) : null;
   const condition = p.condition?.kind ? conditionKindLabel(p.condition.kind, lang) : '';
   const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
   const line = cardKnowledgeLine(p, l);
-  /** The sale's occasion a LIST row names beside its price (its photograph keeps the chip alone): the photo badge's own rule. */
-  const listOccasion = list && priced ? occasionOnCard(p.offer) : null;
 
   return (
     <div
@@ -305,7 +348,7 @@ function CompactCard({
           fallbackClassName="text-snow/35"
           imgClassName="object-[50%_4%]"
         />
-        {priced && <SaleBadge p={p} hasSale={hasSale} layout={layout} />}
+        {priced && <SaleBadge p={p} hasSale={hasSale} occasion={occasion} list={list} />}
         {/* A scheduled special offer (§12, §13.2): decoration only — the API
             refuses an expired offer, and the price is already the offer's. */}
         {/* The clock names zinc on its own spans (Countdown): on this onyx pill they read snow in either theme. */}
@@ -355,17 +398,8 @@ function CompactCard({
             </>
           ) : null}
         </p>
-        {/* A LIST ROW NAMES THE OCCASION HERE (DECISIONS row 294), its 96 px photograph having room for no
-            name: the tag in its own design — and its sentence, inside the card's link — above the price. */}
-        {listOccasion ? (
-          <span className="mt-1 flex min-w-0" data-card-occasion>
-            <React.Suspense fallback={TAG_PLACE}>
-              <OccasionTag badge={listOccasion.badge} name={listOccasion.badge_text} lang={l} size="card" />
-            </React.Suspense>
-          </span>
-        ) : null}
         <div className="mt-1.5" data-motion-price>
-          <CardPrice p={p} density="compact" />
+          <CardPrice p={p} density="compact" saving={saving} occasion={occasion ? <OccasionWords occasion={occasion} shown={list} /> : null} />
         </div>
         <AvailabilityLine product={p} className="mt-auto pt-[7px]" />
       </Link>
@@ -394,7 +428,10 @@ function RegularCard({ p, widthClass, href }: { p: ApiProduct; widthClass: strin
     priced &&
     displayPrice != null &&
     ((regularPrice != null && displayPrice < regularPrice) || (typeof p.display_offer_before_iqd === 'number' && displayPrice < p.display_offer_before_iqd));
-  const clock = priced ? offerClock(p) : null;
+  // The compact card's rule (DECISIONS row 294): an occasion's ribbon, its «−N٪» by the price, no clock.
+  const occasion = priced ? drawnOccasion(p.offer) : null;
+  const saving = useCardSaving(p, occasion);
+  const clock = priced && !occasion ? offerClock(p) : null;
 
   return (
     <Link
@@ -410,7 +447,7 @@ function RegularCard({ p, widthClass, href }: { p: ApiProduct; widthClass: strin
           sizes="160px"
           className="w-full h-full"
         />
-        {priced && <SaleBadge p={p} hasSale={hasSale} />}
+        {priced && <SaleBadge p={p} hasSale={hasSale} occasion={occasion} />}
         {clock && (
           <span className="absolute bottom-2 start-2 rounded-sm bg-onyx/80 px-1.5 py-0.5">
             <Countdown target={clock.target} kind={clock.kind} className="text-[10px] !text-snow [&_*]:text-snow" />
@@ -422,7 +459,7 @@ function RegularCard({ p, widthClass, href }: { p: ApiProduct; widthClass: strin
           {name}
         </h3>
         <div className="mt-auto pt-2">
-          <CardPrice p={p} />
+          <CardPrice p={p} saving={saving} occasion={occasion ? <OccasionWords occasion={occasion} shown={false} /> : null} />
         </div>
       </div>
       <DirectStockEdge product={p} />

@@ -356,12 +356,12 @@ export function offerSaveBody(editing: OfferRow, usdDraft: string | null, occasi
   };
 }
 
-/** A list row's occasion, in its own design (DECISIONS row 294); nothing for a row without one. */
+/** A list row's occasion: its ribbon in miniature beside its name (DECISIONS row 294); nothing for a row without one. */
 export function OfferOccasionChip({ row, lang }: { row: Pick<OfferRow, 'badge' | 'badge_text'>; lang: TabLang }) {
   if (!row.badge) return null;
   return (
-    <span className="flex min-w-0 max-w-[45%]" data-offer-occasion>
-      <OccasionTag badge={row.badge} name={row.badge_text} lang={lang} size="card" />
+    <span className="flex min-w-0 max-w-[45%] text-[11px] font-bold text-text-secondary" data-offer-occasion>
+      <OccasionTag badge={row.badge} name={row.badge_text} lang={lang} size="picker" />
     </span>
   );
 }

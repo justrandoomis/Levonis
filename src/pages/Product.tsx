@@ -5392,16 +5392,15 @@ export default function Product() {
                   fallbackClassName="text-text-muted"
                 />
                 {galleryColourChip}
-                {/* The sale's occasion at the photo's top-end (DECISIONS row 294): top-left in Arabic and
-                    Sorani, as on the card. Decoration over the photo — a failed chunk draws nothing. */}
+                {/* The sale's occasion (DECISIONS row 294): the card's oblique ribbon at the gallery's scale,
+                    across its top-left corner (top-right in English), cut by the gallery's own rounded edge.
+                    Decoration over the photo — a failed chunk draws nothing. */}
                 {pageOccasion ? (
-                  <span data-gallery-occasion className="pointer-events-none absolute top-3 end-3 z-[1] flex max-w-[calc(100%-1.5rem)]">
-                    <ChunkBoundary compact renderFallback={() => null}>
-                      <React.Suspense fallback={null}>
-                        <OccasionTag badge={pageOccasion.badge} name={pageOccasion.badge_text} lang={occasionLang} size="page" />
-                      </React.Suspense>
-                    </ChunkBoundary>
-                  </span>
+                  <ChunkBoundary compact renderFallback={() => null}>
+                    <React.Suspense fallback={null}>
+                      <OccasionTag badge={pageOccasion.badge} name={pageOccasion.badge_text} lang={occasionLang} size="page" />
+                    </React.Suspense>
+                  </ChunkBoundary>
                 ) : null}
                 {activeMedia?.url ? (
                   /* The house round button: a 44px target around a 36px
