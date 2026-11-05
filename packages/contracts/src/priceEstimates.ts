@@ -529,8 +529,12 @@ export const ESTIMATE_SOFT_FLAGS = [
   'EST_SUPPLIER_OUT_OF_STOCK',
 ] as const;
 
-/** Information only. */
-export const ESTIMATE_INFO_FLAGS = ['EST_OWNER_EDITED', 'EST_LARGE_CHANGE_HELD'] as const;
+/**
+ * Information only. EST_CEILING_SHARED (DECISIONS row 291, SMART_PRICING §4.11): too many options for a profit rule
+ * each under the type's profit ceiling, so some share a dearer profit of their group — above their own ceiling
+ * price (a dollar charm price, or under $5 a house price), never above today's price.
+ */
+export const ESTIMATE_INFO_FLAGS = ['EST_OWNER_EDITED', 'EST_LARGE_CHANGE_HELD', 'EST_CEILING_SHARED'] as const;
 
 export type EstimateFlag =
   | (typeof ESTIMATE_BLOCKING_FLAGS)[number]

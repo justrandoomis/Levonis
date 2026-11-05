@@ -541,6 +541,19 @@ export const TYPES = {
   nameInvalid: t('اكتب الاسم بالأسماء الثلاثة (حتى 80 حرفًا).', 'Write all three names (up to 80 characters).', 'هەر سێ ناوەکە بنووسە (تا 80 پیت).'),
   create: t('أنشئ النوع', 'Create the type', 'جۆرەکە دروست بکە'),
   created: t('أُنشئ النوع؛ اكتب أرقامه الآن.', 'The type is created; type its figures now.', 'جۆرەکە دروست کرا؛ ئێستا ژمارەکانی بنووسە.'),
+  // The profit ceiling (migration 0222, DECISIONS row 291): the most an option earns, a share of its own cost, 0–100.
+  profitCap: t('سقف الربح (٪ من التكلفة، 0–100)', 'Profit ceiling (% of cost, 0–100)', 'بەرزترین ڕێژەی قازانج (٪ی تێچوو، 0–100)'),
+  // No figure in the words (invariant I8): the grid is the shop's, named, never spelled out here.
+  profitCapHint: t(
+    'أقصى ما يربحه الخيار نسبةً من تكلفته. يصبح سعره أعلى سعر بالدولار على شبكة أسعار المتجر لا يتجاوز سعر اليوم ولا تكلفته مضافًا إليها هذه النسبة؛ أما القطعة الرخيصة، حيث خطوات الشبكة أوسع من اللازم، فتأخذ بدلًا منه أعلى سعر من أسعار المتجر المعتادة بالدينار ضمن الحدّين نفسيهما. وحيث لا يُبقي أيٌّ منها فوق التكلفة هامشًا آمنًا، يأخذ أدنى سعر يُبقيه، ولا يتجاوز سعر اليوم أبدًا. فارغ: قاعدة اليوم.',
+    'The most an option earns, as a share of its own cost. Its price becomes the highest dollar price on the shop’s price grid at or under both today’s price and its cost plus this share; a cheap item, where the grid’s steps are too wide, takes the highest of the shop’s usual dinar prices there instead. Where none there keeps a safe margin over its cost, it takes the lowest that does, never above today’s price. Empty: today’s rule.',
+    'زۆرترین قازانجی هەڵبژاردەیەک، وەک ڕێژەیەک لە تێچووی خۆی. نرخەکەی دەبێتە بەرزترین نرخی دۆلار لەسەر تۆڕی نرخەکانی فرۆشگا کە لە نرخی ئەمڕۆ و لە تێچووەکەی لەگەڵ ئەم ڕێژەیە زیاتر نەبێت؛ بەڵام بەرهەمی هەرزان، کە هەنگاوەکانی تۆڕەکە بۆی زۆر فراوانن، لە جیاتی ئەوە بەرزترین نرخی ئاسایی فرۆشگا بە دینار لە ژێر هەمان سنووردا وەردەگرێت. ئەگەر هیچ کامێکیان قازانجێکی پێویست لە سەرووی تێچووەکەیەوە نەهێڵێتەوە، نزمترین نرخ وەردەگرێت کە دەیهێڵێتەوە، و هەرگیز لە نرخی ئەمڕۆ زیاتر نابێت. بەتاڵ: یاسای ئەمڕۆ.'
+  ),
+  profitCapInvalid: t(
+    'نسبة من 0 إلى 100، بمنزلتين عشريتين على الأكثر، والفاصلة العشرية نقطة.',
+    'A percentage from 0 to 100, with at most two decimals and a point for decimals.',
+    'ڕێژەیەک لە 0 تا 100، بە زۆرترین دوو ژمارەی دوای خاڵ، و بۆ کەرت خاڵ.'
+  ),
 } as const;
 
 export const TYPE_WARNINGS: Readonly<Record<string, Tri>> = {
@@ -623,6 +636,8 @@ export const LISTS = {
   },
   review: t('راجعه', 'Review it', 'پێیدا بچۆرەوە'),
   lines: t('الخيارات', 'Options', 'هەڵبژاردەکان'),
+  /** Ticks «أؤكد هذا التغيّر الكبير» on every row of the page that has one; each product is still applied on its own preview. */
+  confirmLargeAll: t('علّم كل التغييرات الكبيرة في هذه الصفحة', 'Tick every large change on this page', 'هەموو گۆڕانە گەورەکانی ئەم پەڕەیە نیشانە بکە'),
 } as const;
 
 export const ESTIMATE_STATE_LABELS: Readonly<Record<'candidate' | 'estimated' | 'confirmed' | 'paused', Tri>> = {
@@ -813,6 +828,11 @@ export const FLAG_LABELS: Readonly<Record<EstimateFlag, Tri>> = {
   EST_SUPPLIER_OUT_OF_STOCK: t('نفد عند المورّد', 'Out of stock at the supplier', 'لای دابینکەر نەماوە'),
   EST_OWNER_EDITED: t('عدّلتَ حقولًا كتبها التقدير — تبقى تعديلاتك', 'You edited fields the estimate wrote — your edits stay', 'ئەو خانانەت گۆڕی کە خەمڵاندنەکە نووسیبوونی — دەستکارییەکانت دەمێننەوە'),
   EST_LARGE_CHANGE_HELD: t('تغيّر كبير محتجز في إعادة التسعير التلقائية', 'A large change is held by automatic repricing', 'گۆڕانێکی گەورە لە نوێکردنەوەی خۆکاری نرخدا ڕاگیراوە'),
+  EST_CEILING_SHARED: t(
+    'خيارات أكثر من أن تأخذ كلٌّ منها قاعدة: بعضها مسعَّر فوق سعره تحت السقف، ولا يتجاوز سعر اليوم',
+    'Too many options for a rule each: some are priced above their own ceiling price, never above today’s price',
+    'هەڵبژاردەکان زۆرترن لەوەی هەریەکەیان یاسای خۆی هەبێت: هەندێکیان لە سەرووی نرخی خۆیانەوە لە ژێر بەرزترین ڕێژەی قازانجدا نرخیان بۆ دانراوە، و هەرگیز لە نرخی ئەمڕۆ زیاتر نییە'
+  ),
 };
 
 export const FLAG_CLASS_LABELS: Readonly<Record<'blocking' | 'hard' | 'soft' | 'info', Tri>> = {

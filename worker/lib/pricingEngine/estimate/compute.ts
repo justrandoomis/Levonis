@@ -24,7 +24,12 @@
  *      (./merge.ts, packages/pricing/src/estimateInputs.ts);
  *   5. evaluates that wire with the engine itself, at the rates of
  *      `loadPricingRates` only: `desiredFor` → `evaluateDesired` →
- *      `evaluateV2Write` → `priceProductV2` (invariants I1, I8);
+ *      `evaluateV2Write` → `priceProductV2` (invariants I1, I8) — and, when
+ *      the type carries a profit ceiling (§4.11, DECISIONS row 291), plans
+ *      each SKU's minimum profit at its dollar charm price (from $5 up; the
+ *      plain house price under it) from the costs that evaluation priced (the
+ *      product as it sells with no ceiling) and, when the planned wire
+ *      differs, evaluates that wire once more;
  *   6. answers the flags (§4.6, codes only), the lines per SKU × route and the
  *      preview hash the apply must carry.
  *
@@ -52,13 +57,13 @@ import { pendingReviewsOf } from '../v2/firstWrite';
 import { draftLoadedOf, pinV2PriceFields } from '../v2/draft';
 import type { V2Evaluation } from '../v2/evaluate';
 import type { V2Desired } from '../v2/api';
-import { canonicalManualCbm, parseAppliedWire, planEstimateInputs, type EstimatePlan } from '@levonis/pricing/estimateInputs';
+import { canonicalManualCbm, parseAppliedWire, planEstimateInputs, planEstimateProfits, withEstimateProfits, type EstimatePlan } from '@levonis/pricing/estimateInputs';
 import { MAX_BOX_MM } from '@levonis/pricing/costToPrice';
 import { isSkuChannel, type PreorderRoute } from '@levonis/pricing/skuChannel';
 import { ESTIMATE_HARD_FLAGS, ESTIMATE_SOFT_FLAGS } from '@levonis/contracts/priceEstimates';
 import { classifyProducts, type ClassifyResult } from './classify';
 import { loadControl, loadTypes } from './control';
-import { estimateSkusOf, planInputOf, typeInputsOf, wireBodyOf, withEstimateRefs } from './merge';
+import { estimateSkusOf, planInputOf, profitInputOf, routeFiguresOf, typeInputsOf, wireBodyOf, withEstimateRefs } from './merge';
 import {
   ESTIMATE_COMPUTE_PAGE,
   ESTIMATE_INVOCATION_LIMIT,
@@ -344,7 +349,7 @@ export async function prepareEstimate(db: D1Database, pid: string, page: Estimat
           { today: at.slice(0, 10) }
         )
       ).get(pid) ?? new Map<string, SkuSupplierPrice>();
-    const plan = planEstimateInputs(planInputOf(read, skus, typeInputsOf(type, routing.route), prices, estimate?.applied_wire_json ?? null));
+    let plan = planEstimateInputs(planInputOf(read, skus, typeInputsOf(type, routing.route), prices, estimate?.applied_wire_json ?? null));
     base.plan = plan;
     for (const f of plan.flags) addFlag(flags, f.code, f);
     // What the catalogue says of a SKU it cannot price (a suggestion to review, a key gone from the capture).
@@ -355,10 +360,41 @@ export async function prepareEstimate(db: D1Database, pid: string, page: Estimat
 
     // 5. The engine itself prices the wire (nothing is written).
     if (!plan.blocked_by.includes('EST_TOO_MANY_SCOPES')) {
-      const wire = parseV2Wire(wireBodyOf(plan));
-      const desired = withEstimateRefs(desiredFor(read, wire, { viewer: 'owner', env: cx.env, user: cx.user, now: at }), plan);
+      const desiredOf = (p: EstimatePlan) => withEstimateRefs(desiredFor(read, parseV2Wire(wireBodyOf(p)), { viewer: 'owner', env: cx.env, user: cx.user, now: at }), p);
+      const profitInput = profitInputOf(read, skus, type, estimate?.applied_wire_json ?? null);
+      // 5a. The first evaluation prices the product as it sells with NO ceiling: every SKU the estimator prices at
+      // the type's T, the ceiling's own option, colour and SKU rules of the last apply back to inherit (the profit
+      // planner with no P). Only so does each of those SKUs show its cost R: a ceiling rule keeps one rounding step
+      // over the cost it was planned on, yet a cost that has since crossed 1,000 IQD from under it (where the step is a
+      // dinar) or a fall of U can still leave it short and close the route (V2_ROUTE_BELOW_COST) — and a SKU with no R
+      // could never be priced again. With no ceiling rule recorded this is the plan itself — today's evaluation.
+      const first = withEstimateProfits(plan, planEstimateProfits({ ...profitInput, profit_cap_pct: null }));
+      let desired = desiredOf(first);
+      let ev = await evaluateDesired(read, desired);
+      // 5b. The profit ceiling (§4.11, DECISIONS row 291): each SKU at its dollar charm price from $5 up (under it the
+      // plain house price), at or under today's price and its own cost R plus the type's share, with a margin of one
+      // rounding step over R (`charmTarget`) — R, the owner's differences on top of it and his own fixed dollar prices
+      // as that evaluation priced them. Only a type with a ceiling, or a product whose last apply wrote ceiling rules,
+      // is planned again; when the planned wire differs from the first one, the engine prices it a second time and
+      // THAT evaluation is the preview, its lines and its hash. No exact representation fitting the wire takes one
+      // profit per group, or the first wire itself (EST_CEILING_SHARED, information); no cost to price from keeps
+      // the first wire and its evaluation, which blocks. Pure CPU, no statement: apply re-prepares through this same
+      // code, so its hash is the one the owner reviewed.
+      const figures = routeFiguresOf(ev, routing.route);
+      const profits = planEstimateProfits({ ...profitInput, costs: figures.costs, differences: figures.differences, fixed: figures.fixed });
+      if (profits.kind !== 'none') {
+        const capped = withEstimateProfits(plan, profits);
+        // The plan's own flags are in already; adding them again changes nothing (combo keys and fields merge).
+        for (const f of capped.flags) addFlag(flags, f.code, f);
+        const moved = JSON.stringify(capped.wire.cost.minimum_profit ?? null) !== JSON.stringify(first.wire.cost.minimum_profit ?? null);
+        plan = capped;
+        base.plan = plan;
+        if (moved && !plan.blocked_by.includes('EST_TOO_MANY_SCOPES')) {
+          desired = desiredOf(plan);
+          ev = await evaluateDesired(read, desired);
+        }
+      }
       base.desired = desired;
-      const ev = await evaluateDesired(read, desired);
       base.ev = ev;
       if (!ev.complete) for (const code of ev.codes) addFlag(flags, code);
       // A blocked route is written OFF by an accepted preview: for an estimate (one route) it is never accepted.

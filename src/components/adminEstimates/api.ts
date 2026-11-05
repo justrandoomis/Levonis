@@ -398,6 +398,11 @@ export interface EstimateType {
   updated_by: string;
   updated_at: string;
   warnings: string[];
+  /**
+   * The profit ceiling, a percentage of cost from 0 to 100 as decimal text (migration 0222, DECISIONS row 291): null
+   * is no ceiling. Absent when the server's database has no such column yet — the editor then offers no field for it.
+   */
+  profit_cap_pct?: string | null;
 }
 
 /** PUT /types/:key: the version read and the fields the owner changed (null clears a figure). */
@@ -418,6 +423,7 @@ export type TypeUpdateBody = { version: number } & Partial<
     | 'name_ar'
     | 'name_en'
     | 'name_ckb'
+    | 'profit_cap_pct'
   >
 >;
 

@@ -55,6 +55,18 @@
  *    entry that is not itself an absolute (a cleared field, a difference): a
  *    sibling's price is never inferred for it.
  *
+ * 4. THE PROFIT CEILING (`planEstimateProfits`, §4.11, DECISIONS row 291):
+ *    when the type carries a ceiling P (0–100% of cost), each SKU sells at
+ *    the highest dollar charm price ($x.99) of at least $5 at or under both
+ *    today's price and its cost plus P% whose profit keeps one rounding step
+ *    over the cost — under $5 at the highest plain house price there that
+ *    keeps it (`charmTarget`, ./charmPrice.ts) — written as fixed USD rules
+ *    at the least specific exact scope (past the wire's 60 rows, one profit
+ *    per group: the dearest, under $5 the cheapest that keeps every margin;
+ *    EST_CEILING_SHARED, information); an owner's rule at any scope wins. The costs, the owner's differences and the USD rate it needs
+ *    arrive as DATA from the engine's own first evaluation (compute.ts): this
+ *    file still reads no rate.
+ *
  * Fail closed: a SKU with no usable price (EST_NO_PRICE), a type with no
  * minimum profit or with no default where a SKU needs one
  * (EST_TYPE_INCOMPLETE), more input entries than the form takes, 61
@@ -83,6 +95,10 @@ import {
 import { ROUTE_PROFILE, SHIPPING_PROFILES, type PreorderRoute, type ShippingProfile } from './skuChannel';
 import { canonicalUsdRuleAmount } from './ruleResolution';
 import type { PhysicalDimensionOverrides } from './physicalDimensions';
+// The profit ceiling (§4.11): the dollar charm price of each SKU, and the engine's own rule walk to verify what it writes.
+import { resolveRuleAt, type PricingRuleRow, type PricingRuleState } from './ruleResolution';
+import { skuComboKey } from './skuChannel';
+import { charmTarget, priceAtProfit, type CharmBasis } from './charmPrice';
 
 /* ----------------------------------------------------------------- limits -- */
 
@@ -138,7 +154,9 @@ export type EstimateInputFlagCode =
   | 'EST_US_REFERENCE'
   | 'EST_MANUAL_PRICE'
   | 'EST_STORE_PAGE_PRICE'
-  | 'EST_OWNER_EDITED';
+  | 'EST_OWNER_EDITED'
+  // Information (§4.11): too many options for one rule each — some share a dearer profit of their group.
+  | 'EST_CEILING_SHARED';
 export const ESTIMATE_INPUT_BLOCKING: readonly EstimateInputFlagCode[] = ['EST_NO_PRICE', 'EST_TYPE_INCOMPLETE', 'EST_TOO_MANY_SCOPES', 'EST_STRUCTURE_OWNER'];
 
 /** The flag a catalogue source carries when a SKU is priced from it. */
@@ -222,6 +240,8 @@ export interface EstimateTypeInputs {
   default_cbm: string | null;
   additional_cost_iqd: number | null;
   min_profit_usd: string | null;
+  /** The type's profit ceiling, 0–100% of cost (0222); absent or null is no ceiling: today's rule (§4.11). */
+  profit_cap_pct?: string | null;
 }
 
 /** The scope ids the form accepts for this product (`formScopeIds`); left out, the SKUs' own ids. */
@@ -248,10 +268,13 @@ export interface EstimateWireInput {
   additional_cost_iqd?: number | null;
 }
 
-/** The V2 pricing block the estimate sends (`parseV2Wire`): the product's minimum profit as USD text. */
+/**
+ * The V2 pricing block the estimate sends (`parseV2Wire`): the product's minimum profit as USD text — or, under
+ * the profit cap (§4.11), the form's rule rows when a scope rule moves.
+ */
 export interface EstimateWire {
   method: 'cost';
-  cost: { inputs: EstimateWireInput[]; minimum_profit?: string };
+  cost: { inputs: EstimateWireInput[]; minimum_profit?: string | EstimateProfitRow[] };
 }
 
 /* ---------------------------------------------------------- applied wire -- */
@@ -277,6 +300,8 @@ export interface AppliedWire {
   v: typeof APPLIED_WIRE_VERSION;
   inputs: AppliedField[];
   minimum_profit: { amount_usd: string; source: EstimateValueSource } | null;
+  /** The option, colour and SKU rules the profit cap wrote (§4.11); absent when none, so older records read as before. */
+  minimum_profit_scopes?: AppliedProfitScope[];
 }
 
 /* ------------------------------------------------------------------ plan -- */
@@ -626,10 +651,13 @@ export function parseAppliedWire(raw: unknown): AppliedWire | null {
   }
   const mp = d.minimum_profit as { amount_usd?: unknown; source?: unknown } | null | undefined;
   const amount = mp && typeof mp === 'object' ? canonicalUsdRuleAmount(mp.amount_usd) : null;
+  const scopes = parseProfitScopes((doc as { minimum_profit_scopes?: unknown }).minimum_profit_scopes);
   return {
     v: APPLIED_WIRE_VERSION,
     inputs: inputs.sort(byField),
     minimum_profit: amount && isValueSource(mp?.source) ? { amount_usd: amount, source: mp!.source } : null,
+    // Only when the profit cap wrote a scope rule: a record without one reads exactly as before (§4.11).
+    ...(scopes.length ? { minimum_profit_scopes: scopes } : {}),
   };
 }
 
@@ -641,6 +669,10 @@ export function serializeAppliedWire(wire: AppliedWire): string {
     v: APPLIED_WIRE_VERSION,
     inputs: [...wire.inputs].sort(byField).map((f) => ({ scope: f.scope, scope_id: f.scope === 'base' ? '' : f.scope_id, field: f.field, value: f.value, source: f.source })),
     minimum_profit: wire.minimum_profit ? { amount_usd: wire.minimum_profit.amount_usd, source: wire.minimum_profit.source } : null,
+    // Emitted only when non-empty, so every record written before the profit cap stays byte for byte (§4.11).
+    ...(wire.minimum_profit_scopes?.length
+      ? { minimum_profit_scopes: [...wire.minimum_profit_scopes].sort(byProfitScope).map((f) => ({ scope: f.scope, scope_id: f.scope_id, amount_usd: f.amount_usd, source: f.source })) }
+      : {}),
   });
 }
 
@@ -1445,5 +1477,664 @@ export function planEstimateInputs(input: EstimatePlanInput): EstimatePlan {
     flags: flagList,
     blocked_by: ESTIMATE_INPUT_BLOCKING.filter((c) => flags.has(c)),
     owner_held: ownerHeld.sort((a, b) => byScope(a, b) || (a.field < b.field ? -1 : a.field > b.field ? 1 : 0)),
+  };
+}
+
+/* ------------------------------------------------------ the profit ceiling -- */
+
+/*
+ * THE PROFIT CEILING (owner decisions 2026-11-05, DECISIONS row 291; docs/SMART_PRICING.md §4.11).
+ *
+ * The owner found the estimated prices too dear — one type's fixed minimum profit made a 3,862 IQD part sell at
+ * 14,250 — and then ruled: «dont make 25% on all product . it called the smart pricing so priced from 0% to 25% or
+ * 30 or 35 or even 50 and 100», «we want cheap price so we need to become cheapest iraqi supplier», «still nor
+ * cheapest enough . more cheaper» (he chose ceilings of 3–10% per type), and «make the price for product be like
+ * that 9.99$ , 19.99$ 24.99$ and ect …». A type may carry a profit ceiling P, 0 to 100% of cost
+ * (`price_estimate_types.profit_cap_pct`), and each SKU then sells, from $5 up (`CHARM_MIN_USD`), at the highest
+ * DOLLAR CHARM PRICE c ($x.99, the owner's grid) whose dinar price is at or under both today's price, rp(R + T × U),
+ * and its cost plus P%, R × (1 + P/100), and whose profit over R keeps one rounding step (one dinar at or under 1,000
+ * IQD) — so the route floor, rp(R), is cleared now and after any later rise of R or U, which FX-5 follows with T_sku
+ * kept in dollars — else the lowest charm price that keeps it; under $5 (the grid's $0.50 step too coarse for the
+ * cheapest prices) at the highest plain HOUSE PRICE D — 250 IQD steps, whole dinars at or under 1,000 — under the same
+ * ceiling with the same margin, else the lowest that keeps it:
+ *
+ *     T_sku = floor6(c − R ÷ U)            in USD, so the engine's dollar price is c and its dinar price rp(c × U)
+ *     T_sku = floor6((D − R) ÷ U)          under $5: the dinar price D, its dollar display D's own figure
+ *
+ * (`charmTarget`, ./charmPrice.ts, which holds the grid, the threshold, the choice and its exceptions: nothing goes
+ * up while today's price clears the floor, and a price equal to today's keeps T; an owner's positive option or colour
+ * difference Δ stays on top: T_sku = floor6(c − R ÷ U − Δ), or floor6((D − R) ÷ U − Δ)). At U = 1,600 the same 15 CNY
+ * part (R = 3,659.5) sells at 4,000 IQD ($2.50) under a 10% ceiling. A SKU whose price is the owner's own fixed
+ * dollar price (a «سعر خاص $» on it or its model) keeps T: the ceiling leaves it alone.
+ *
+ * The ceiling lives in the estimator and reaches the engine as ordinary FIXED USD `target_profit` rules, so the
+ * engine's own rules hold as they were: no percentage is stored in a rule, D − R ≥ T_sku is still asserted on
+ * every write, and FX-5 never re-derives a ceiling — it keeps T_sku in dollars between applies; only the owner's
+ * reviewed compute and apply move it (282(b)).
+ *
+ * THE LEAST SPECIFIC EXACT SCOPE, as the supplier compaction picks one (§4.4): one product rule when every SKU the
+ * estimator prices takes the same profit (every single-SKU product); otherwise the product rule stays T and the
+ * SKUs whose profit differs from it get rules on the values of ONE option group — two option rules of different
+ * groups would tie, and a tie takes the maximum — else on their colours, else one per SKU. Each candidate is
+ * resolved SKU by SKU with the engine's own `resolveRuleAt` over the rules as the write would leave them, and the
+ * first exact one wins.
+ *
+ * NONE EXACT FITS THE WIRE (60 rows, or every candidate refused): ONE PROFIT PER GROUP — one product rule, the values
+ * of one option group, or the colours. Each rule is the highest profit among the SKUs it reaches, so every one sells
+ * at or above its own price's profit (some dollar prices leave the grid) — but where every SKU it reaches sells under
+ * $5 at its plain house price it is the CHEAPEST of their profits, the highest at which none sells above its own
+ * house price, whenever each keeps its margin there (a house price leaves no slack under the next step: the dearest
+ * would lift the others a whole 250 IQD step), else the least that keeps each at or above its own price with its
+ * margin. Never above T (today's price); every SKU whose profit is not its own keeps its margin at the price it
+ * resolves to. The representation adding the least profit above the SKUs' own wins, then the one taking the least
+ * under their own prices; the SKUs above their own are flagged EST_CEILING_SHARED (information). Not
+ * even that fits: the product as it sells with no ceiling — today's rule at today's U, the very plan compute's first
+ * evaluation priced — flagged the same, never blocked: a product today's rule prices is never held back.
+ *
+ * EACH SKU'S COST R comes from compute's first evaluation, which prices the product as it sells with NO ceiling:
+ * this planner with no P (every SKU the estimator prices at T, the ceiling's own scope rules of the last apply back
+ * to inherit). Priced with those rules still in force, a SKU whose cost moved past its rounding step since its last
+ * apply could close its own route (the rule then no longer clears it: V2_ROUTE_BELOW_COST), leave no R, and never
+ * be priced again.
+ *
+ * OWNER RULES WIN (§4.5). Estimator and owner rules look alike in `pricing_rules`; only the record tells them
+ * apart, by value (`applied_wire_json.minimum_profit_scopes`, beside the product's `minimum_profit`). A SKU an
+ * owner's option, colour or SKU rule reaches — or one whose ceiling rule the owner cleared — is the owner's: no
+ * estimator rule at those levels ever reaches it (at the same level it would tie, more specific it would
+ * override); only the product rule does, which the owner's rule shadows. An owner's product rule means no profit
+ * amount is written at all, and the ceiling's own scope rules go back to inherit, so his rule decides every SKU as
+ * it did before the ceiling (the rollback of a ceiling the same way).
+ */
+
+/** At most this many minimum-profit rows one wire takes (`MAX_RULES_PER_WRITE`, worker/lib/pricingEngine/ownerRules.ts). */
+export const MAX_ESTIMATE_PROFIT_ROWS = 60;
+/** A profit ceiling is a percentage of cost from 0 to this much (the 0222 CHECK). */
+export const MAX_PROFIT_CAP_PCT = 100;
+/** …with at most this many decimals. */
+export const PROFIT_CAP_DECIMALS = 2;
+
+/** A profit ceiling as the 0222 column takes it, canonical ('0', '6', '37.5', '100'), or null: no sign, no exponent, no comma. */
+export function canonicalProfitCapPct(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const m = /^([0-9]+)(?:\.([0-9]+))?$/.exec(raw.trim());
+  if (!m) return null;
+  const int = m[1]!.replace(/^0+(?=[0-9])/, '');
+  const fraction = (m[2] ?? '').replace(/0+$/, '');
+  if (int.length > 3 || fraction.length > PROFIT_CAP_DECIMALS) return null;
+  if (Number(int) > MAX_PROFIT_CAP_PCT || (Number(int) === MAX_PROFIT_CAP_PCT && fraction)) return null;
+  return fraction ? `${int}.${fraction}` : int;
+}
+
+/**
+ * ONE SKU'S MINIMUM PROFIT UNDER THE CEILING, canonical USD text: the type's T itself when today's price stays,
+ * else floor6(c − R ÷ U − Δ⁺) for its dollar charm price c from $5 up, floor6((D − R) ÷ U − Δ⁺) for its house price D
+ * under it — see `charmTarget`. R is the engine's exact replacement cost on the SKU's route (`replacement_exact`), U
+ * the USD/IQD the price is computed at, Δ the SKU's option and colour differences as the engine adds them
+ * (`deltas_usd`, signed; absent: none). Null when a figure does not read: nothing is guessed.
+ */
+export function ceilingProfitUsd(minProfitUsd: unknown, ceilingPct: unknown, costExact: unknown, usdIqd: unknown, differenceUsd?: unknown): string | null {
+  return ceilingTargetOf(minProfitUsd, ceilingPct, costExact, usdIqd, differenceUsd)?.amount_usd ?? null;
+}
+
+/** `ceilingProfitUsd` with how the price was chosen (`charmTarget`'s basis) and that price, IQD. */
+function ceilingTargetOf(
+  minProfitUsd: unknown,
+  ceilingPct: unknown,
+  costExact: unknown,
+  usdIqd: unknown,
+  differenceUsd?: unknown
+): { amount_usd: string; basis: CharmBasis; price_iqd: number } | null {
+  const t = canonicalUsdRuleAmount(minProfitUsd);
+  const p = canonicalProfitCapPct(ceilingPct);
+  if (t === null || p === null || typeof costExact !== 'string' || typeof usdIqd !== 'string') return null;
+  if (differenceUsd !== undefined && differenceUsd !== null && typeof differenceUsd !== 'string') return null;
+  const target = charmTarget({ cost_iqd: costExact, usd_iqd: usdIqd, min_profit_usd: t, ceiling_pct: p, difference_usd: differenceUsd ?? null });
+  if (!target) return null;
+  // Today's price keeps the type's T as the type spells it, so its rule is byte for byte the one it replaces.
+  const amount = target.basis === 'today' ? t : canonicalUsdRuleAmount(target.amount_usd);
+  return amount === null ? null : { amount_usd: amount, basis: target.basis, price_iqd: target.price_iqd };
+}
+
+/** The levels a minimum-profit rule below the product's sits at (`pricing_rules.scope`). */
+export type ProfitScope = 'option' | 'color' | 'sku';
+const PROFIT_SCOPE_RANK: Readonly<Record<ProfitScope, number>> = { option: 0, color: 1, sku: 2 };
+const isProfitScope = (v: unknown): v is ProfitScope => v === 'option' || v === 'color' || v === 'sku';
+const profitKey = (scope: string, scopeId: string) => `${scope}\u0000${scopeId}`;
+
+function byProfitScope(a: { scope: ProfitScope; scope_id: string }, b: { scope: ProfitScope; scope_id: string }): number {
+  return PROFIT_SCOPE_RANK[a.scope] - PROFIT_SCOPE_RANK[b.scope] || (a.scope_id < b.scope_id ? -1 : a.scope_id > b.scope_id ? 1 : 0);
+}
+
+/** One `target_profit` rule of the product as stored (`read.stored.rules`), at any scope; scopes other than these four are ignored. */
+export interface EstimateProfitRule {
+  scope: string;
+  scope_id: string;
+  state: string;
+  amount_usd?: string | null;
+  amount_iqd?: number | null;
+}
+
+/** One row of the form's `cost.minimum_profit` (v2/api.ts `minimumProfitRules`): `amount_usd` null is INHERIT. */
+export interface EstimateProfitRow {
+  kind: 'target_profit';
+  scope: 'product' | ProfitScope;
+  scope_id?: string;
+  amount_usd: string | null;
+}
+
+/** One rule the profit cap wrote below the product (`applied_wire_json.minimum_profit_scopes`). */
+export interface AppliedProfitScope {
+  scope: ProfitScope;
+  scope_id: string;
+  amount_usd: string;
+  source: EstimateValueSource;
+}
+
+/** The record's scope rules, read defensively: an entry that does not parse is dropped, so its rule reads as the owner's and is kept. */
+function parseProfitScopes(raw: unknown): AppliedProfitScope[] {
+  const out: AppliedProfitScope[] = [];
+  const seen = new Set<string>();
+  for (const entry of Array.isArray(raw) ? raw : []) {
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    const amount = typeof e.amount_usd === 'string' ? canonicalUsdRuleAmount(e.amount_usd) : null;
+    if (!isProfitScope(e.scope) || typeof e.scope_id !== 'string' || !e.scope_id || !amount || !isValueSource(e.source)) continue;
+    const k = profitKey(e.scope, e.scope_id);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push({ scope: e.scope, scope_id: e.scope_id, amount_usd: amount, source: e.source });
+  }
+  return out.sort(byProfitScope);
+}
+
+/** A stored rule's value as the merge compares it — step 4's reading: null when absent or INHERIT. */
+function profitRuleValue(rule: EstimateProfitRule | null | undefined): string | null {
+  if (!rule || rule.state === 'INHERIT') return null;
+  if (rule.state === 'ACTIVE' && rule.amount_usd != null) return canonicalUsdRuleAmount(rule.amount_usd) ?? `raw:${rule.amount_usd}`;
+  if (rule.state === 'ACTIVE' && rule.amount_iqd != null) return `iqd:${rule.amount_iqd}`;
+  return `state:${rule.state}`;
+}
+
+/** The product the verification's rule rows name (they are this product's alone). */
+const PROFIT_RULE_PRODUCT = 'product';
+
+/** The product's rules as an apply of these rows leaves them, as the engine's resolver reads rules. */
+function profitRulesAfter(rules: readonly EstimateProfitRule[], rows: readonly EstimateProfitRow[]): PricingRuleRow[] {
+  const at = new Map<string, PricingRuleRow>();
+  const put = (id: string, scope: 'product' | ProfitScope, scopeId: string, state: string, usd: string | null, iqd: number | null) =>
+    at.set(profitKey(scope, scopeId), {
+      id,
+      kind: 'target_profit',
+      scope,
+      catalog_id: null,
+      product_id: PROFIT_RULE_PRODUCT,
+      scope_id: scopeId,
+      state: state as PricingRuleState,
+      amount_usd: usd,
+      amount_iqd: iqd,
+      version: 1,
+    });
+  rules.forEach((r, i) => {
+    if (r.scope === 'product') put(`stored:${i}`, 'product', '', r.state, r.amount_usd ?? null, r.amount_iqd ?? null);
+    else if (isProfitScope(r.scope) && r.scope_id) put(`stored:${i}`, r.scope, r.scope_id, r.state, r.amount_usd ?? null, r.amount_iqd ?? null);
+  });
+  for (const w of rows) {
+    const scopeId = w.scope === 'product' ? '' : (w.scope_id ?? '');
+    put(`written:${profitKey(w.scope, scopeId)}`, w.scope, scopeId, w.amount_usd === null ? 'INHERIT' : 'ACTIVE', w.amount_usd, null);
+  }
+  return [...at.values()];
+}
+
+export interface EstimateProfitInput {
+  skus: readonly EstimateSku[];
+  /** Each SKU's exact replacement cost R on its route (`replacement_exact`), from the engine's own first evaluation. */
+  costs: ReadonlyMap<string, string> | Readonly<Record<string, string | null | undefined>>;
+  /** U, the USD/IQD the engine prices at (exact text). */
+  usd_iqd: string | null;
+  /** The type's T and its profit ceiling P, 0–100% of cost (null or absent: no ceiling). */
+  min_profit_usd: string | null;
+  profit_cap_pct?: string | null;
+  /** Every stored `target_profit` rule of the product, at any scope. */
+  rules: readonly EstimateProfitRule[];
+  /** The stored `applied_wire_json` (text or parsed); null before the first apply. */
+  applied?: unknown;
+  /** Option value id → its group id; an absent value belongs to the one implicit group ''. */
+  option_groups?: ReadonlyMap<string, string> | Readonly<Record<string, string>>;
+  /** The scope ids a rule may name (the ids `desiredFor` checks); left out, the SKUs' own. */
+  scopes?: EstimateScopeIds;
+  /**
+   * Each SKU's option and colour differences Σ ± (USD, signed; `deltas_usd`) as that same evaluation priced them;
+   * absent: none. The engine adds a positive sum on top of R + T × U, so the ceiling's price counts it (§4.11).
+   */
+  differences?: ReadonlyMap<string, string> | Readonly<Record<string, string | null | undefined>>;
+  /**
+   * The SKUs whose price is the owner's own fixed dollar price — a «سعر خاص $» on the SKU or its model (the
+   * evaluation's anchor `sku_fixed` / `model_fixed`): the minimum profit is only their floor, so they keep T.
+   */
+  fixed?: Iterable<string>;
+}
+
+export interface EstimateProfitTarget {
+  combo_key: string;
+  amount_usd: string;
+  /** Not the type's T: the ceiling's price (a charm price from $5 up, the house price under it) decides this SKU's profit. */
+  capped: boolean;
+}
+
+/** The information flag of a representation dearer than the ceiling's own prices (§4.11): never blocking. */
+export const CEILING_SHARED_FLAG = 'EST_CEILING_SHARED';
+
+export interface EstimateProfitPlan {
+  /**
+   * `none`      no cap and no rule the cap ever wrote: the estimate is today's, byte for byte;
+   * `owner`     the product's own minimum profit is the owner's (or its type has none): no profit amount is
+   *             written; the cap's own scope rules go back to inherit (`rows`), so his product rule decides every
+   *             SKU as it did before the cap (none with a type that has no T: blocked, nothing moves);
+   * `unpriced`  a SKU the estimator prices has no cost even at the type's T, or U is missing — the evaluation is
+   *             incomplete or blocked: nothing is capped from a guess;
+   * `planned`   the representation below — exact, or (none exact fitting the wire) one profit per group, its SKUs
+   *             above their own flagged EST_CEILING_SHARED;
+   * `uncapped`  not even that fits: the product as it sells with no ceiling (today's rule at today's U), flagged
+   *             EST_CEILING_SHARED — information, never blocking;
+   * `too_many`  not even the product with no ceiling can be written: EST_TOO_MANY_SCOPES (blocking).
+   * `unpriced`, `uncapped` and `too_many` plan no ceiling: their rows and record are the product as it sells with no
+   * ceiling (this planner with no P, the plan compute's first evaluation priced), or the plan's own when that cannot
+   * be written.
+   */
+  kind: 'none' | 'owner' | 'unpriced' | 'planned' | 'uncapped' | 'too_many';
+  /** Where the capped profits are written: the product rule alone, one option group, the colours, or each SKU. */
+  level: 'product' | 'option' | 'color' | 'sku' | null;
+  group_id: string | null;
+  /** The product rule's amount (planned only). */
+  product_usd: string | null;
+  /** Each SKU the estimator prices (the owner's left out), with its minimum profit. */
+  targets: EstimateProfitTarget[];
+  /** The SKUs an owner's rule holds (combo keys). */
+  held: string[];
+  /** The wire's rows: the product's first when it moves, then each scope's (null clears). Empty: nothing moves. */
+  rows: EstimateProfitRow[];
+  /** The record's product rule after an apply (planned, or the uncapped plan nothing planned falls back to); undefined keeps the plan's. */
+  minimum_profit: AppliedWire['minimum_profit'] | undefined;
+  /** The record's scope rules after an apply: the cap's, and every one the owner holds or the wire cannot name. */
+  scopes: AppliedProfitScope[];
+  flags: EstimateFlag[];
+  owner_held: Array<{ scope: ProfitScope; scope_id: string; field: typeof MINIMUM_PROFIT_FIELD }>;
+}
+
+/**
+ * THE MINIMUM PROFIT OF EVERY SKU UNDER THE CEILING, AS RULES (see the section header): each SKU's target, the least
+ * specific exact representation, merged rule by rule against the record — the estimator's rewritten or cleared,
+ * the owner's kept (EST_OWNER_EDITED, field names only) — as the wire's rows and the record an apply stores.
+ */
+export function planEstimateProfits(input: EstimateProfitInput): EstimateProfitPlan {
+  const applied = parseAppliedWire(input.applied);
+  const records = applied?.minimum_profit_scopes ?? [];
+  const cap = input.profit_cap_pct === null || input.profit_cap_pct === undefined ? null : canonicalProfitCapPct(input.profit_cap_pct);
+  const out: EstimateProfitPlan = { kind: 'none', level: null, group_id: null, product_usd: null, targets: [], held: [], rows: [], minimum_profit: undefined, scopes: records, flags: [], owner_held: [] };
+  if (cap === null && !records.length) return out;
+
+  const { skus } = input;
+  const comboOf = (s: EstimateSku) => skuComboKey({ option_value_ids: s.option_value_ids, color_id: s.color_id });
+  const reaches = (scope: ProfitScope, scopeId: string, s: EstimateSku): boolean =>
+    scope === 'option' ? s.option_value_ids.includes(scopeId) : scope === 'color' ? s.color_id === scopeId : comboOf(s) === scopeId;
+
+  // 1. Who holds each rule below the product (§4.5's reading, rule by rule).
+  const stored = new Map<string, EstimateProfitRule & { scope: ProfitScope }>();
+  for (const r of input.rules) if (isProfitScope(r.scope) && r.scope_id) stored.set(profitKey(r.scope, r.scope_id), r as EstimateProfitRule & { scope: ProfitScope });
+  const recorded = new Map(records.map((f) => [profitKey(f.scope, f.scope_id), f] as const));
+  const holderOf = (k: string): 'estimator' | 'owner' | 'cleared' | 'empty' => {
+    const value = profitRuleValue(stored.get(k));
+    const record = recorded.get(k);
+    if (record) return value === record.amount_usd ? 'estimator' : value === null ? 'cleared' : 'owner';
+    return value === null ? 'empty' : 'owner';
+  };
+  // The owner's SKUs: an owner's live rule reaches them (it decides before the product's: `shadowed`), or the owner
+  // cleared the cap's rule that reached them (they fall to the product's rule, which then never carries a cap).
+  const held = new Set<string>();
+  const shadowed = new Set<string>();
+  let ownerEdited = false;
+  for (const k of uniqueSorted([...stored.keys(), ...recorded.keys()])) {
+    const holder = holderOf(k);
+    if (holder === 'estimator' || holder === 'empty') continue;
+    const at = (recorded.get(k) ?? stored.get(k))!;
+    if (recorded.has(k)) ownerEdited = true;
+    else out.owner_held.push({ scope: at.scope, scope_id: at.scope_id, field: MINIMUM_PROFIT_FIELD });
+    for (const s of skus) {
+      if (!reaches(at.scope, at.scope_id, s)) continue;
+      held.add(s.combo_key);
+      if (holder === 'owner') shadowed.add(s.combo_key);
+    }
+  }
+  out.held = uniqueSorted(held);
+  out.owner_held.sort(byProfitScope);
+  if (ownerEdited) out.flags.push({ code: 'EST_OWNER_EDITED', fields: [MINIMUM_PROFIT_FIELD] });
+  // The ids a rule may name on this product: a rule at any other id would be refused by the wire's parser.
+  const fromSkus = {
+    option: new Set(skus.flatMap((s) => s.option_value_ids.filter(Boolean))),
+    color: new Set(skus.map((s) => s.color_id).filter((c): c is string => !!c)),
+    sku: new Set(skus.map(comboOf).filter(Boolean)),
+  };
+  const sets: Record<ProfitScope, Set<string>> = {
+    option: input.scopes?.option ? new Set(input.scopes.option) : fromSkus.option,
+    color: input.scopes?.color ? new Set(input.scopes.color) : fromSkus.color,
+    sku: input.scopes?.sku ? new Set(input.scopes.sku) : fromSkus.sku,
+  };
+  const tooMany: EstimateFlag = { code: 'EST_TOO_MANY_SCOPES', fields: [MINIMUM_PROFIT_FIELD] };
+
+  // 2. The product's own rule: the estimator's or empty exactly as step 4 of `planEstimateInputs` reads it. A type
+  //    with no minimum profit (EST_TYPE_INCOMPLETE, blocking) writes nothing and carries the record's rules.
+  const typeProfit = canonicalUsdRuleAmount(input.min_profit_usd);
+  const productValue = profitRuleValue(input.rules.find((r) => r.scope === 'product'));
+  const productRecord = applied?.minimum_profit ?? null;
+  const productOurs = productRecord ? productValue === productRecord.amount_usd : productValue === null;
+  if (typeProfit === null) return { ...out, kind: 'owner' };
+  if (!productOurs) {
+    // The owner's own product rule: no profit amount is written, and it decides every SKU as it did before the cap.
+    // So the cap's own option, colour and SKU rules — which would still decide their SKUs before his rule, and which
+    // the product form does not draw — go back to inherit and leave the record; his own rules, a rule he cleared and
+    // one the wire can no longer name are kept as they are.
+    const back = records.filter((f) => holderOf(profitKey(f.scope, f.scope_id)) === 'estimator' && sets[f.scope].has(f.scope_id));
+    if (back.length > MAX_ESTIMATE_PROFIT_ROWS) return { ...out, kind: 'too_many', flags: [...out.flags, tooMany] };
+    return {
+      ...out,
+      kind: 'owner',
+      rows: back.map((f) => ({ kind: 'target_profit' as const, scope: f.scope, scope_id: f.scope_id, amount_usd: null })),
+      scopes: records.filter((f) => !back.includes(f)),
+    };
+  }
+
+  // Nothing planned — a SKU with no cost to cap from, or no representation the wire takes: the product is priced as
+  // it sells with no cap (this planner with no P: every SKU the estimator prices at T, the cap's own scope rules back
+  // to inherit) — the very plan compute's first evaluation priced, so that evaluation stands and blocks it. When even
+  // that cannot be written, the plan's own wire and the record's rules are kept.
+  const unplanned = (kind: 'unpriced' | 'too_many', flags: EstimateFlag[]): EstimateProfitPlan => {
+    const uncapped = cap === null ? null : planEstimateProfits({ ...input, profit_cap_pct: null });
+    const back = uncapped?.kind === 'planned' ? uncapped : null;
+    return { ...out, kind, flags, ...(back ? { rows: back.rows, minimum_profit: back.minimum_profit, scopes: back.scopes } : {}) };
+  };
+
+  // 3. Each SKU the estimator prices, its target: T, or under the ceiling its own price's profit — a dollar charm price
+  //    from $5 up, the house price under it (`charmTarget`, its own differences counted) — T for a SKU the owner prices
+  //    himself in dollars, whose minimum profit is only its floor (the ceiling leaves his price alone).
+  const free = skus.filter((s) => !held.has(s.combo_key));
+  const fixed = new Set(input.fixed ?? []);
+  const targets = new Map<string, string>();
+  // The SKUs priced under $5 at their plain house price (`charmTarget`'s `plain`), with that price: the only ones a
+  // shared rule may price under their own price (step 6).
+  const plainPrice = new Map<string, number>();
+  for (const s of free) {
+    if (cap === null || fixed.has(s.combo_key)) {
+      targets.set(s.combo_key, typeProfit);
+      continue;
+    }
+    const x = ceilingTargetOf(typeProfit, cap, lookup<string>(input.costs, s.combo_key), input.usd_iqd, lookup<string>(input.differences, s.combo_key));
+    if (x === null) return unplanned('unpriced', out.flags);
+    targets.set(s.combo_key, x.amount_usd);
+    if (x.basis === 'plain') plainPrice.set(s.combo_key, x.price_iqd);
+  }
+  out.targets = free.map((s) => ({ combo_key: s.combo_key, amount_usd: targets.get(s.combo_key)!, capped: targets.get(s.combo_key) !== typeProfit }));
+
+  // 4. The candidates, least specific first.
+  interface Candidate {
+    level: Exclude<EstimateProfitPlan['level'], null>;
+    group_id: string | null;
+    product: string;
+    wanted: Map<string, AppliedProfitScope>;
+  }
+  const candidates: Candidate[] = [];
+  const amounts = uniqueSorted(targets.values());
+  const clearedOnly = [...held].some((k) => !shadowed.has(k));
+  // The option groups of the SKUs the estimator prices, in relation order (the model's first), and a SKU's one value in each.
+  const groupOf = (id: string): string => lookup<string>(input.option_groups, id) ?? '';
+  const valueIn = (g: string) => (s: EstimateSku): string | null => {
+    const values = s.option_value_ids.filter((id) => id && groupOf(id) === g);
+    return values.length === 1 ? values[0]! : null;
+  };
+  const groupsOf = (list: readonly EstimateSku[]): string[] => {
+    const out: string[] = [];
+    for (const s of list) for (const id of s.option_value_ids.filter(Boolean)) if (!out.includes(groupOf(id))) out.push(groupOf(id));
+    return out;
+  };
+  if (amounts.length <= 1 && (!amounts.length || amounts[0] === typeProfit || !clearedOnly)) {
+    candidates.push({ level: 'product', group_id: null, product: amounts[0] ?? typeProfit, wanted: new Map() });
+  } else {
+    const capped = free.filter((s) => targets.get(s.combo_key) !== typeProfit);
+    // One rule per id, each the profit of every capped SKU it names — or no such candidate.
+    const by = (scope: ProfitScope, idOf: (s: EstimateSku) => string | null): Map<string, AppliedProfitScope> | null => {
+      const wanted = new Map<string, AppliedProfitScope>();
+      for (const s of capped) {
+        const id = idOf(s);
+        if (!id) return null;
+        const amount = targets.get(s.combo_key)!;
+        const k = profitKey(scope, id);
+        const seen = wanted.get(k);
+        if (seen && seen.amount_usd !== amount) return null;
+        wanted.set(k, { scope, scope_id: id, amount_usd: amount, source: 'type_default' });
+      }
+      return wanted;
+    };
+    // ONE option group, in relation order (the model's first), fewest rules first.
+    const options = groupsOf(capped)
+      .flatMap((g, order) => {
+        const wanted = by('option', valueIn(g));
+        return wanted ? [{ g, order, wanted }] : [];
+      })
+      .sort((a, b) => a.wanted.size - b.wanted.size || a.order - b.order);
+    for (const o of options) candidates.push({ level: 'option', group_id: o.g, product: typeProfit, wanted: o.wanted });
+    const colours = by('color', (s) => s.color_id);
+    if (colours) candidates.push({ level: 'color', group_id: null, product: typeProfit, wanted: colours });
+    const own = by('sku', (s) => comboOf(s) || null);
+    if (own) candidates.push({ level: 'sku', group_id: null, product: typeProfit, wanted: own });
+  }
+
+  // 5. The first candidate that merges, fits the wire and resolves every SKU exactly.
+  const merge = (c: Candidate, accept: (s: EstimateSku, amount: string) => boolean): { rows: EstimateProfitRow[]; records: AppliedProfitScope[]; amounts: Map<string, string> } | null => {
+    for (const w of c.wanted.values()) {
+      // Never at a scope the wire may not name or the owner holds, never reaching a SKU the owner holds.
+      if (!sets[w.scope].has(w.scope_id)) return null;
+      const holder = holderOf(profitKey(w.scope, w.scope_id));
+      if (holder === 'owner' || holder === 'cleared') return null;
+      if (skus.some((s) => held.has(s.combo_key) && reaches(w.scope, w.scope_id, s))) return null;
+    }
+    const scopeRows: Array<EstimateProfitRow & { scope: ProfitScope; scope_id: string }> = [];
+    const next: AppliedProfitScope[] = [];
+    for (const k of uniqueSorted([...recorded.keys(), ...c.wanted.keys()])) {
+      const want = c.wanted.get(k);
+      const record = recorded.get(k);
+      const holder = holderOf(k);
+      if (want) {
+        if (!(holder === 'estimator' && record!.amount_usd === want.amount_usd)) scopeRows.push({ kind: 'target_profit', scope: want.scope, scope_id: want.scope_id, amount_usd: want.amount_usd });
+        next.push(want);
+      } else if (holder === 'estimator' && sets[record!.scope].has(record!.scope_id)) {
+        // The cap's own rule, no longer wanted: back to inherit.
+        scopeRows.push({ kind: 'target_profit', scope: record!.scope, scope_id: record!.scope_id, amount_usd: null });
+      } else if (record) {
+        // The owner's (changed or cleared), or at a scope the product no longer offers: kept, never cleared through the wire.
+        next.push(record);
+      }
+    }
+    const rows: EstimateProfitRow[] = [...(productValue === c.product ? [] : [{ kind: 'target_profit' as const, scope: 'product' as const, amount_usd: c.product }]), ...scopeRows.sort(byProfitScope)];
+    if (rows.length > MAX_ESTIMATE_PROFIT_ROWS) return null;
+    // Every SKU the estimator prices resolves, through the engine's own walk over the rules as the write leaves
+    // them, to a profit the candidate accepts — no tie, nothing else deciding.
+    const rules = profitRulesAfter(input.rules, rows);
+    const resolved = new Map<string, string>();
+    for (const s of free) {
+      const r = resolveRuleAt(rules, 'target_profit', { product_id: PROFIT_RULE_PRODUCT, option_value_ids: s.option_value_ids, color_id: s.color_id, ancestry: [] }, { usdIqdRate: input.usd_iqd });
+      const amount = r.status === 'active' && !r.tie ? r.amount_usd : null;
+      if (typeof amount !== 'string' || !accept(s, amount)) return null;
+      resolved.set(s.combo_key, amount);
+    }
+    return { rows, records: next.sort(byProfitScope), amounts: resolved };
+  };
+  const planned = (c: Candidate, merged: NonNullable<ReturnType<typeof merge>>): EstimateProfitPlan => ({
+    ...out,
+    kind: 'planned',
+    level: c.level,
+    group_id: c.group_id,
+    product_usd: c.product,
+    rows: merged.rows,
+    minimum_profit: { amount_usd: c.product, source: 'type_default' },
+    scopes: merged.records,
+  });
+  for (const c of candidates) {
+    const merged = merge(c, (s, amount) => amount === targets.get(s.combo_key));
+    if (merged) return planned(c, merged);
+  }
+  if (cap === null) return unplanned('too_many', [...out.flags, tooMany]);
+
+  // 6. None exact fits the wire: ONE PROFIT PER GROUP (§4.11) — one product rule, the values of one option group, or
+  //    the colours (a value whose SKUs would all take T, or one reaching an owner's SKU, gets no rule: its SKUs fall
+  //    to the product's T). Each rule is the DEAREST target among the SKUs it reaches, so every one sells at or above
+  //    its own price's profit (its dollar price may leave the grid) — except where every SKU it reaches sells under $5
+  //    at its plain house price: there it is the CHEAPEST of their targets, the highest profit at which none sells
+  //    above its own house price, whenever each still keeps its margin there (a dearer one would lift a house price
+  //    that leaves no slack under the next step a whole step), else the least profit that keeps each at or above its
+  //    own house price with its margin (a group across 1,000 IQD). No SKU resolves above T, today's price (above it only
+  //    where its own target already is), none from $5 up under its own target, and each whose profit is not its own
+  //    keeps its margin at the price it resolves to (today's price excepted). The candidate adding the least profit
+  //    above the SKUs' own wins, then the one taking the least under their own prices, then the fewest rows, then the
+  //    least specific. EST_CEILING_SHARED names the SKUs above their own.
+  const micro = (usd: string): bigint => {
+    const [whole, fraction = ''] = usd.split('.');
+    return BigInt(whole!) * 1_000_000n + BigInt(`${fraction}000000`.slice(0, 6));
+  };
+  const usdOf = (m: bigint): string => canonicalUsdRuleAmount(`${m / 1_000_000n}.${(m % 1_000_000n).toString().padStart(6, '0')}`)!;
+  const typeMicro = micro(typeProfit);
+  const own = (s: EstimateSku): bigint => micro(targets.get(s.combo_key)!);
+  // The engine's price at a profit, and whether its margin holds there — the SKU's own R and differences.
+  const at = (s: EstimateSku, m: bigint) =>
+    priceAtProfit({ cost_iqd: lookup<string>(input.costs, s.combo_key) ?? '', usd_iqd: input.usd_iqd ?? '', difference_usd: lookup<string>(input.differences, s.combo_key) }, usdOf(m));
+  const within = (s: EstimateSku, amount: string): boolean => {
+    const a = micro(amount);
+    const least = own(s);
+    if (a === least) return true;
+    // Never above today's price (above it only where its own target already is); from $5 up never under its own.
+    if (a > (least > typeMicro ? least : typeMicro) || (a < least && !plainPrice.has(s.combo_key))) return false;
+    // Today's price itself, or any other profit whose margin holds at the price it resolves to.
+    return (a === typeMicro && a > least) || at(s, a)?.keeps === true;
+  };
+  // The least profit at which a SKU priced under $5 still sells at its own house price with its margin: every profit
+  // from it to its own target does (one price, a margin that grows with the profit), every lower one does not.
+  const leastAtOwn = (s: EstimateSku): bigint => {
+    const price = plainPrice.get(s.combo_key)!;
+    let lo = 1n;
+    let hi = own(s);
+    while (lo < hi) {
+      const mid = (lo + hi) / 2n;
+      const x = at(s, mid);
+      if (x !== null && x.price_iqd === price && x.keeps) hi = mid;
+      else lo = mid + 1n;
+    }
+    return hi;
+  };
+  // One group's profit: the dearest of its SKUs' own. Under $5 (every SKU it reaches at its plain house price) the
+  // cheapest — none above its own price — when every one keeps its margin there; else the least that keeps every one
+  // at or above its own price, when every one keeps its margin there; else the dearest.
+  const groupMicro = (list: readonly EstimateSku[]): bigint => {
+    const owns = list.map(own);
+    const dearest = owns.reduce((a, b) => (a > b ? a : b));
+    if (!list.every((s) => plainPrice.has(s.combo_key))) return dearest;
+    const cheapest = owns.reduce((a, b) => (a < b ? a : b));
+    if (list.every((s) => own(s) === cheapest || at(s, cheapest)?.keeps === true)) return cheapest;
+    const least = list.map(leastAtOwn).reduce((a, b) => (a > b ? a : b));
+    return list.every((s) => least <= own(s) || at(s, least)?.keeps === true) ? least : dearest;
+  };
+  const sharedBy = (scope: ProfitScope, idOf: (s: EstimateSku) => string | null): Map<string, AppliedProfitScope> => {
+    const members = new Map<string, EstimateSku[]>();
+    for (const s of free) {
+      const id = idOf(s);
+      if (id) members.set(id, [...(members.get(id) ?? []), s]);
+    }
+    const wanted = new Map<string, AppliedProfitScope>();
+    for (const [id, list] of members) {
+      const m = groupMicro(list);
+      if (m === typeMicro || skus.some((x) => held.has(x.combo_key) && reaches(scope, id, x))) continue;
+      wanted.set(profitKey(scope, id), { scope, scope_id: id, amount_usd: usdOf(m), source: 'type_default' });
+    }
+    return wanted;
+  };
+  const shared: Candidate[] = [];
+  if (!clearedOnly && free.length) shared.push({ level: 'product', group_id: null, product: usdOf(groupMicro(free)), wanted: new Map() });
+  for (const g of groupsOf(free)) shared.push({ level: 'option', group_id: g, product: typeProfit, wanted: sharedBy('option', valueIn(g)) });
+  shared.push({ level: 'color', group_id: null, product: typeProfit, wanted: sharedBy('color', (s) => s.color_id) });
+  let best: { c: Candidate; merged: NonNullable<ReturnType<typeof merge>>; over: bigint; under: number } | null = null;
+  for (const c of shared) {
+    const merged = merge(c, within);
+    if (!merged) continue;
+    // The profit added above the SKUs' own (USD millionths), then the dinars taken under their own prices (under $5).
+    let over = 0n;
+    let under = 0;
+    for (const s of free) {
+      const a = micro(merged.amounts.get(s.combo_key)!);
+      if (a > own(s)) over += a - own(s);
+      else if (a < own(s)) under += plainPrice.get(s.combo_key)! - at(s, a)!.price_iqd;
+    }
+    const better = !best || over < best.over || (over === best.over && (under < best.under || (under === best.under && merged.rows.length < best.merged.rows.length)));
+    if (better) best = { c, merged, over, under };
+  }
+  if (best) {
+    const { amounts: resolved } = best.merged;
+    const above = free.filter((s) => micro(resolved.get(s.combo_key)!) > own(s)).map((s) => s.combo_key);
+    return {
+      ...planned(best.c, best.merged),
+      targets: free.map((s) => ({ combo_key: s.combo_key, amount_usd: resolved.get(s.combo_key)!, capped: resolved.get(s.combo_key) !== typeProfit })),
+      flags: above.length ? [...out.flags, { code: CEILING_SHARED_FLAG, combo_keys: uniqueSorted(above) }] : out.flags,
+    };
+  }
+
+  // 7. Not even that fits: the product as it sells with no ceiling — today's rule at today's U, the very plan compute's
+  //    first evaluation priced — flagged the same, never blocked. Only when even that cannot be written: blocked.
+  const uncapped = planEstimateProfits({ ...input, profit_cap_pct: null });
+  if (uncapped.kind === 'planned' || uncapped.kind === 'none') {
+    return {
+      ...out,
+      kind: 'uncapped',
+      targets: free.map((s) => ({ combo_key: s.combo_key, amount_usd: typeProfit, capped: false })),
+      flags: [...out.flags, { code: CEILING_SHARED_FLAG, combo_keys: uniqueSorted(free.filter((s) => targets.get(s.combo_key) !== typeProfit).map((s) => s.combo_key)) }],
+      ...(uncapped.kind === 'planned' ? { rows: uncapped.rows, minimum_profit: uncapped.minimum_profit, scopes: uncapped.scopes } : {}),
+    };
+  }
+  return unplanned('too_many', [...out.flags, tooMany]);
+}
+
+/**
+ * The plan with its minimum profit as the profit cap planned it (§4.11): the wire's rows, the record's product
+ * and scope rules, the flags. `none` returns the plan as it is; every other kind carries the record's scope rules
+ * that are still in force into what an apply stores, so the estimator never forgets a rule it wrote.
+ */
+export function withEstimateProfits(plan: EstimatePlan, profits: EstimateProfitPlan): EstimatePlan {
+  if (profits.kind === 'none') return plan;
+  const applied: AppliedWire = {
+    v: APPLIED_WIRE_VERSION,
+    inputs: plan.applied.inputs,
+    minimum_profit: profits.minimum_profit !== undefined ? profits.minimum_profit : plan.applied.minimum_profit,
+    ...(profits.scopes.length ? { minimum_profit_scopes: profits.scopes } : {}),
+  };
+  const applied_json = serializeAppliedWire(applied);
+  // The product's row alone travels as the form's text, exactly as before the cap; scope rows as the form's rows.
+  // A plan sends exactly its rows (none: the store already holds it); any other kind replaces the plan's minimum
+  // profit only with rows of its own — the cap's rules back to inherit, or the uncapped plan nothing planned keeps.
+  const only = profits.rows.length === 1 && profits.rows[0]!.scope === 'product' ? profits.rows[0]!.amount_usd : null;
+  const rows = only !== null ? only : profits.rows;
+  const minimumProfit = profits.rows.length ? rows : profits.kind === 'planned' ? undefined : plan.wire.cost.minimum_profit;
+  const wire: EstimateWire = { method: 'cost', cost: { inputs: plan.wire.cost.inputs, ...(minimumProfit !== undefined ? { minimum_profit: minimumProfit } : {}) } };
+  const flags = new Map<string, EstimateFlag>(plan.flags.map((f) => [f.code, { ...f }]));
+  const add = (f: EstimateFlag) => {
+    const at = flags.get(f.code) ?? { code: f.code };
+    if (f.combo_keys?.length) at.combo_keys = uniqueSorted([...(at.combo_keys ?? []), ...f.combo_keys]);
+    if (f.fields?.length) at.fields = uniqueSorted([...(at.fields ?? []), ...f.fields]);
+    flags.set(f.code, at);
+  };
+  for (const f of profits.flags) add(f);
+  if (applied_json.length > MAX_APPLIED_WIRE_LENGTH) add({ code: 'EST_TOO_MANY_SCOPES' });
+  return {
+    ...plan,
+    wire,
+    applied,
+    applied_json,
+    flags: [...flags.values()].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0)),
+    blocked_by: ESTIMATE_INPUT_BLOCKING.filter((c) => flags.has(c)),
+    owner_held: [...plan.owner_held, ...profits.owner_held].sort((a, b) => byScope(a, b) || (a.field < b.field ? -1 : a.field > b.field ? 1 : 0)),
   };
 }

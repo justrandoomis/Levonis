@@ -99,6 +99,11 @@ export interface EstimateTypeRow {
   version: number;
   updated_by: string;
   updated_at: string;
+  /**
+   * The profit ceiling, a percentage of cost from 0 to 100 (0222, DECISIONS row 291): null is no ceiling (today's
+   * rule). ABSENT on a database without 0222 (deploy-ahead): no ceiling, and the type editor offers no field for it.
+   */
+  profit_cap_pct?: string | null;
 }
 
 /** `product_price_estimates` (0218): one product's estimate bookkeeping. */
@@ -158,6 +163,8 @@ export function typeRowOf(r: Record<string, unknown>): EstimateTypeRow | null {
     version: intOrNull(r.version) ?? 1,
     updated_by: String(r.updated_by ?? ''),
     updated_at: String(r.updated_at ?? ''),
+    // `SELECT *` on a database without 0222 has no such key: the type then carries none (no cap, no field).
+    ...(Object.prototype.hasOwnProperty.call(r, 'profit_cap_pct') ? { profit_cap_pct: textOrNull(r.profit_cap_pct) } : {}),
   };
 }
 

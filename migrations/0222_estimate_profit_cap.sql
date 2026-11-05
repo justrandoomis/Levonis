@@ -1,0 +1,46 @@
+-- ============================================================================
+-- 0222 — THE PROFIT CEILING OF AN ESTIMATED PRICE (owner, 2026-11-05;
+-- docs/DECISIONS.md row 291; docs/SMART_PRICING.md §4.11).
+--
+-- The owner's words: «re calculator of price f all  سعر تقديري to products
+-- because they are become very expensive», then «dont make 25% on all
+-- product . it called the smart pricing so priced from 0% to 25% or 30 or 35
+-- or even 50 and 100», «do from 0 to 100 you choose what you want, but we want
+-- cheap price so we need to become cheapest iraqi supplier», «still nor
+-- cheapest enough . more cheaper» (he chose ceilings of 3–10% per type), and
+-- «make the price for product be like that 9.99$ , 19.99$ 24.99$ and ect …».
+--
+-- One nullable column on the owner's per-type table: `profit_cap_pct`, the
+-- type's PROFIT CEILING, a percentage of cost from 0 to 100. Each SKU then
+-- sells, from $5 up, at the highest dollar charm price ($x.99) at or under
+-- both today's price and its replacement cost plus this share whose profit
+-- keeps one rounding step over the cost, so its route stays open after any
+-- later rate move — under $5 at the highest plain house price there that
+-- keeps it (packages/pricing/src/charmPrice.ts). The estimator turns
+-- it into ordinary fixed USD `target_profit` rules when the owner computes and
+-- applies (worker/lib/pricingEngine/estimate/compute.ts), no percentage ever
+-- reaches `pricing_rules`, and FX-5 never re-derives one.
+--
+-- NULL is no ceiling: today's prices exactly. There is NO SEED — nothing is
+-- hard-coded (invariant I8). The owner types the figure per type in «الأنواع
+-- والمفاتيح» after the deploy.
+--
+-- DEC(profit_cap_pct, 2): digits, at most one '.', at most two decimals, never
+-- a trailing '.', 0 <= P <= 100. The writer stores the canonical text ('0',
+-- '6', '37.5', '100'), the CHECK is the backstop.
+--
+-- ADDITIVE ONLY: one nullable column. The import-guard triggers of 0218
+-- (`trg_import_guard_price_estimate_types_*`) already refuse an UPDATE of this
+-- table inside an import batch, the new column included.
+--
+-- NOT RE-RUNNABLE BY DESIGN: SQLite has no ADD COLUMN IF NOT EXISTS. D1 applies
+-- a file once, and scripts/migrate-check.mjs --twice proves the column is there.
+--
+-- DEPLOY-AHEAD (CLAUDE.md rule 2): every reader tolerates the column's absence.
+-- `loadTypes` reads `SELECT *`, so an older database answers a type without the
+-- key (no ceiling, today's prices). The type editor's write names the column
+-- in a statement of its own, sent only when the owner sends a ceiling, and a
+-- database without it answers 503 PRICE_ESTIMATES_NOT_INSTALLED instead of a
+-- 500. An older Worker on this database ignores the column.
+-- ============================================================================
+ALTER TABLE price_estimate_types ADD COLUMN profit_cap_pct TEXT CHECK (profit_cap_pct IS NULL OR (profit_cap_pct GLOB '[0-9]*' AND profit_cap_pct NOT GLOB '*[^0-9.]*' AND profit_cap_pct NOT GLOB '*.*.*' AND profit_cap_pct NOT GLOB '*.' AND profit_cap_pct NOT GLOB '*.???*' AND length(profit_cap_pct) <= 6 AND CAST(profit_cap_pct AS REAL) >= 0 AND CAST(profit_cap_pct AS REAL) <= 100));

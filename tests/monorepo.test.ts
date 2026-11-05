@@ -81,6 +81,9 @@ const PURE_PACKAGE_IMPORTS: Record<string, readonly string[]> = {
   'packages/pricing/src/priceRounding.ts': ['@levonis/contracts/procurementCost'],
   // The shop's dollar price in whole cents (DECISIONS row 248): the same exact arithmetic, nothing else.
   'packages/pricing/src/usdCents.ts': ['@levonis/contracts/procurementCost'],
+  // The dollar charm price of an estimated SKU under its type's profit ceiling (DECISIONS row 291):
+  // floor6(c − R ÷ U) and the engine's own rounding of it, with the same exact arithmetic: the same edge, one module.
+  'packages/pricing/src/charmPrice.ts': ['@levonis/contracts/procurementCost'],
 };
 
 test('the pricing engine maths declares its one contracts dependency', () => {

@@ -10,10 +10,14 @@
  *     type allows it, filament by sea only, the EU store by land only — the
  *     0218 CHECKs and trigger T5 hold the same rules), the US reference, the
  *     default package weight and box or CBM, the extra cost in IQD, the minimum
- *     profit in USD and the staleness days. Every figure is the owner's: the
- *     seed holds none and nothing here invents one (invariant I8). Each edit is
- *     version-fenced and audited in `pricing_audit` (0181's vocabulary:
- *     entity 'rule', action 'rule_set', entity_key 'estimate_type:<key>');
+ *     profit in USD, the profit ceiling as a percentage of cost from 0 to 100
+ *     (0222, DECISIONS row 291; written in a statement of its own, so a
+ *     database without the column refuses only a ceiling) and the staleness
+ *     days. Every figure is the
+ *     owner's: the seed holds none and nothing here invents one (invariant
+ *     I8). Each edit is version-fenced and audited in `pricing_audit` (0181's
+ *     vocabulary: entity 'rule', action 'rule_set', entity_key
+ *     'estimate_type:<key>');
  *   - the measure suggestion: the median of the REAL package measures of the
  *     products of a type — offered, never saved without the owner's click.
  *
@@ -29,7 +33,7 @@ import { inputInvalid } from '../whatIf';
 import { pricingAuditStatement } from '../store';
 import { loadPricingRates } from '../rates';
 import { canonicalUsdRuleAmount } from '@levonis/pricing/ruleResolution';
-import { canonicalManualCbm } from '@levonis/pricing/estimateInputs';
+import { canonicalManualCbm, canonicalProfitCapPct } from '@levonis/pricing/estimateInputs';
 import { PRICE_ROUNDING_STEP_IQD } from '@levonis/pricing/priceRounding';
 import { serverMessage } from '@levonis/contracts/costRefusals';
 import { ESTIMATE_REFUSALS, estimateServerMessage, type EstimateRefusalCode } from '@levonis/contracts/priceEstimates';
@@ -181,6 +185,14 @@ function profitText(v: unknown): string | null {
   return amount;
 }
 
+/** A profit ceiling as the 0222 column takes it (a percentage of cost, 0 ≤ P ≤ 100, two decimals), canonical, or null. */
+function capText(v: unknown): string | null {
+  if (v === null) return null;
+  const cap = typeof v === 'string' ? canonicalProfitCapPct(v.trim()) : null;
+  if (cap === null) throw inputInvalid('profit_cap_pct');
+  return cap;
+}
+
 /** A default CBM as the 0218 column takes it (DEC 12), canonical, or null. */
 function cbmText(v: unknown): string | null {
   if (v === null) return null;
@@ -215,6 +227,7 @@ const EDITABLE = [
   'name_ar',
   'name_en',
   'name_ckb',
+  'profit_cap_pct',
 ] as const;
 type Editable = (typeof EDITABLE)[number];
 
@@ -243,6 +256,7 @@ function typeAfter(stored: EstimateTypeRow, body: Record<string, unknown>): Esti
   if (has('default_cbm')) next.default_cbm = cbmText(body.default_cbm);
   if (has('additional_cost_iqd')) next.additional_cost_iqd = whole(body.additional_cost_iqd, 'additional_cost_iqd', 0, MAX_EXTRA);
   if (has('min_profit_usd')) next.min_profit_usd = profitText(body.min_profit_usd);
+  if (has('profit_cap_pct')) next.profit_cap_pct = capText(body.profit_cap_pct);
   if (has('stale_after_days')) next.stale_after_days = whole(body.stale_after_days, 'stale_after_days', 1, 365) ?? stored.stale_after_days;
   for (const k of ['name_ar', 'name_en', 'name_ckb'] as const) if (has(k)) next[k] = nameText(body[k], k);
   // DECISIONS row 183: a Sorani slot never carries a copy of the Arabic.
@@ -262,6 +276,8 @@ const figuresOf = (t: EstimateTypeRow) => ({
   additional_cost_iqd: t.additional_cost_iqd,
   min_profit_usd: t.min_profit_usd,
   stale_after_days: t.stale_after_days,
+  // Only where the database holds the column (0222): an older one has no cap to audit.
+  ...(t.profit_cap_pct !== undefined ? { profit_cap_pct: t.profit_cap_pct } : {}),
 });
 
 /**
@@ -281,7 +297,10 @@ export function profitBelowRouteFloor(minProfitUsd: string | null, usdIqd: strin
 }
 
 export interface TypeAnswer extends EstimateTypeRow {
-  /** T × U is below one rounding step: the route would close (§4.3). */
+  /**
+   * T × U is below one rounding step: the route would close (§4.3). The profit ceiling carries no warning: its
+   * planner never prices a SKU under the lowest price its route allows (§4.11).
+   */
   warnings: string[];
 }
 
@@ -301,6 +320,11 @@ export async function updateType(db: D1Database, key: string, raw: unknown, acto
   const next = typeAfter(stored, body);
   const at = now.toISOString();
   const changed = EDITABLE.filter((k) => Object.prototype.hasOwnProperty.call(body, k) && body[k] !== undefined);
+  // The profit cap (0222) is written by a statement of its own, laid only when the owner sends one: the row's
+  // UPDATE below names no 0222 column, so every other edit works on a database without it (deploy-ahead), where a
+  // cap is refused as not installed — never a 500, never half-written.
+  const capSent = changed.includes('profit_cap_pct');
+  if (capSent && stored.profit_cap_pct === undefined) throw estimateRefusal('PRICE_ESTIMATES_NOT_INSTALLED', { field: 'profit_cap_pct' });
   const audit = await auditStatements(db, actor, 'price_estimate.type_set', key, { key, fields: changed });
   try {
     await db.batch([
@@ -333,6 +357,7 @@ export async function updateType(db: D1Database, key: string, raw: unknown, acto
           at,
           key
         ),
+      ...(capSent ? [db.prepare('UPDATE price_estimate_types SET profit_cap_pct = ? WHERE key = ?').bind(next.profit_cap_pct ?? null, key)] : []),
       pricingAuditStatement(db, {
         entity: 'rule',
         entity_key: `estimate_type:${key}`,
@@ -347,10 +372,25 @@ export async function updateType(db: D1Database, key: string, raw: unknown, acto
     ]);
   } catch (e) {
     if (isFenceMiss(e)) throw pricingChanged();
-    if (/CHECK constraint failed/i.test(e instanceof Error ? e.message : String(e))) throw estimateRefusal('PRICE_ESTIMATE_TYPE_RULE');
+    const msg = e instanceof Error ? e.message : String(e);
+    // The column went missing between the read and the write (a database restored behind 0222): not installed.
+    if (/no such column: profit_cap_pct|has no column named profit_cap_pct/i.test(msg)) throw estimateRefusal('PRICE_ESTIMATES_NOT_INSTALLED', { field: 'profit_cap_pct' });
+    if (/CHECK constraint failed/i.test(msg)) throw estimateRefusal('PRICE_ESTIMATE_TYPE_RULE');
     throw e;
   }
   return { ...next, version: version + 1, updated_by: actor, updated_at: at };
+}
+
+/**
+ * Does this database hold 0222's profit cap column? A new type then answers it (null: no cap) as `GET /types` does,
+ * and its create audit records it; an older database answers no key, which the editor reads as not installed.
+ */
+async function profitCapInstalled(db: D1Database): Promise<boolean> {
+  return db
+    .prepare("SELECT 1 AS x FROM pragma_table_info('price_estimate_types') WHERE name = 'profit_cap_pct'")
+    .first()
+    .then((r) => !!r)
+    .catch(() => false);
 }
 
 /**
@@ -387,6 +427,8 @@ export async function createType(db: D1Database, raw: unknown, actor: string, no
   };
   if (t.name_ckb === t.name_ar) throw inputInvalid('name_ckb');
   checkTypeRules(t);
+  // The profit cap (0222): the column takes its NULL default; answered and audited only where the database has it.
+  if (await profitCapInstalled(db)) t.profit_cap_pct = null;
   const audit = await auditStatements(db, actor, 'price_estimate.type_created', t.key, { key: t.key, sourcing: t.sourcing, route: t.route });
   try {
     await db.batch([

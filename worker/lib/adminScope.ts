@@ -808,6 +808,8 @@ export const FINANCIAL_FIELDS = [
   'min_profit_usd',
   'applied_wire_json',
   'type_source',
+  // -- The per-type profit cap, a percentage of cost (migration 0222, DECISIONS row 291): the owner's figure.
+  'profit_cap_pct',
   // -- §4.9: the estimate confirmation's live gate on a product's measures and the owner's statement of real
   // -- ones (the type's default weight and box, owner-only like the type's figures; DECISIONS row 292).
   'confirm_gate',

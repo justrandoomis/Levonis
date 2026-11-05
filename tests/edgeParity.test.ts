@@ -89,6 +89,8 @@ const SMART_PRICING_PRIVATE = [
   'snapshot_price_basis', 'units_per_offer', 'match_confidence', 'match_method', 'match_reasons', 'estimate_flags', 'measure_basis',
   'measure_source', 'est_cost_iqd', 'est_price_iqd', 'default_weight_g', 'default_length_mm', 'default_width_mm', 'default_height_mm',
   'default_cbm', 'min_profit_usd', 'applied_wire_json', 'type_source',
+  // The per-type profit cap (migration 0222, DECISIONS row 291).
+  'profit_cap_pct',
   // The owner's own supplier links (§3.10, DECISIONS row 293; migration 0223).
   'supplier_links',
 ];

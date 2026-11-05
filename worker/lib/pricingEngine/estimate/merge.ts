@@ -17,20 +17,30 @@
  * A catalogue price reaches the planner as decimal text in its own currency,
  * exactly as captured or typed; nothing here converts, rounds or infers one
  * (invariants I1, I8).
+ *
+ * The profit ceiling (§4.11, DECISIONS row 291) reads what the engine's first
+ * evaluation priced — each SKU's exact cost R, the owner's option and colour
+ * differences on top of it and whether its price is his own fixed dollar price
+ * (`routeFiguresOf`), and the USD rate U, the very U its dollar charm prices are
+ * counted in — and every stored minimum-profit rule of the product
+ * (`profitInputOf`).
  */
 import type { V2Desired, V2Read } from '../v2/api';
+import type { V2Evaluation } from '../v2/evaluate';
 import { sellableSkus } from '../legacy';
-import { formScopeIds } from '../productInputs';
+import { formOptionIds, formScopeIds } from '../productInputs';
 import { packagesOf, ruleAt } from '../store';
 import type { SkuSupplierPrice } from '../../supplierPrices/store';
 import {
   type EstimatePlan,
   type EstimatePlanInput,
+  type EstimateProfitInput,
+  type EstimateScopeIds,
   type EstimateSku,
   type EstimateSupplierPrice,
   type EstimateTypeInputs,
 } from '@levonis/pricing/estimateInputs';
-import type { PreorderRoute } from '@levonis/pricing/skuChannel';
+import { channelOfRoute, type PreorderRoute } from '@levonis/pricing/skuChannel';
 import type { EstimateTypeRow } from './types';
 
 /** The flags a catalogue price carries onto the SKU it prices (the rest are decided elsewhere). */
@@ -72,6 +82,7 @@ export function typeInputsOf(type: EstimateTypeRow, route: PreorderRoute): Estim
     default_cbm: type.default_cbm,
     additional_cost_iqd: type.additional_cost_iqd,
     min_profit_usd: type.min_profit_usd,
+    profit_cap_pct: type.profit_cap_pct ?? null,
   };
 }
 
@@ -100,6 +111,72 @@ export function planInputOf(
     product_rule: rule ? { state: rule.state, amount_usd: rule.amount_usd ?? null, amount_iqd: rule.amount_iqd ?? null } : null,
     applied,
     scopes: { option: ids.option, ...(ids.color ? { color: ids.color } : {}), ...(ids.sku ? { sku: ids.sku } : {}) },
+  };
+}
+
+/**
+ * The ids a minimum-profit rule may name on this product — the very sets `desiredFor` hands `parseRuleWrites`
+ * (v2/api.ts `scopeIdsOf`): the active models, every colour of the document, every sellable SKU but the product
+ * itself. A rule at any other id would be refused there (fail closed: a blocking flag). `skus` are the sellable
+ * SKUs already read (`estimateSkusOf`: the same `sellableSkus` grid), so the grid is not walked twice.
+ */
+export function ruleScopeIdsOf(read: Pick<V2Read, 'loaded'>, skus: readonly Pick<EstimateSku, 'combo_key'>[]): EstimateScopeIds {
+  return {
+    option: formOptionIds(read.loaded),
+    color: new Set(read.loaded.doc.colors.map((c) => c.id)),
+    sku: new Set(skus.map((s) => s.combo_key).filter((k) => k !== '')),
+  };
+}
+
+/** What the profit ceiling reads of each SKU from one evaluation, on the estimate's route (`routeFiguresOf`). */
+export interface RouteFigures {
+  /** R: the exact replacement cost (`replacement_exact`); none where the route did not price (blocked, a cost missing). */
+  costs: Map<string, string>;
+  /** Σ option ± + colour ± the price adds (`deltas_usd`, signed USD); only the SKUs that carry one. */
+  differences: Map<string, string>;
+  /** The SKUs priced from the owner's own fixed dollar price (anchor `sku_fixed` / `model_fixed`), not from R + T. */
+  fixed: Set<string>;
+}
+
+/**
+ * Each SKU's figures on the estimate's route as an evaluation priced them — none of them depends on the profit: its
+ * exact replacement cost R, the owner's option and colour differences the price adds on top (`deltas_usd`), and
+ * whether its price is the owner's own fixed dollar price rather than R plus the minimum profit (`anchor`).
+ */
+export function routeFiguresOf(ev: Pick<V2Evaluation, 'result'> | null, route: PreorderRoute): RouteFigures {
+  const channel = channelOfRoute(route);
+  const out: RouteFigures = { costs: new Map(), differences: new Map(), fixed: new Set() };
+  for (const s of ev?.result?.skus ?? []) {
+    const c = s.channels.find((x) => x.channel === channel);
+    if (!c) continue;
+    if (c.replacement) out.costs.set(s.combo_key, c.replacement.replacement_exact);
+    if (c.deltas_usd && !/^-?0+(?:\.0+)?$/.test(c.deltas_usd)) out.differences.set(s.combo_key, c.deltas_usd);
+    if (c.anchor !== 'cost') out.fixed.add(s.combo_key);
+  }
+  return out;
+}
+
+/**
+ * What the profit ceiling reads for one product (§4.11, DECISIONS row 291): U as the engine prices at it (the central
+ * USD rate `loadPricingRates` read — no FX import, tests/pricingCurrencyRoles; the dollar charm price c lands on the
+ * engine's own `usd_ceil6` only at this very U); the type's T and its ceiling P; every stored
+ * minimum-profit rule of the product, at any scope; the record; the scope ids a rule may name. Each SKU's cost R,
+ * differences and fixed price are laid on afterwards (`routeFiguresOf`), from compute's first evaluation.
+ */
+export function profitInputOf(read: V2Read, skus: readonly EstimateSku[], type: EstimateTypeRow, applied: string | null): EstimateProfitInput {
+  const pid = read.loaded.id;
+  return {
+    skus,
+    costs: new Map<string, string>(),
+    usd_iqd: read.rates?.central.fx.USD?.rate ?? null,
+    min_profit_usd: type.min_profit_usd,
+    profit_cap_pct: type.profit_cap_pct ?? null,
+    rules: read.stored.rules
+      .filter((r) => r.kind === 'target_profit' && r.product_id === pid)
+      .map((r) => ({ scope: r.scope, scope_id: r.scope_id, state: r.state, amount_usd: r.amount_usd ?? null, amount_iqd: r.amount_iqd ?? null })),
+    applied,
+    option_groups: new Map((read.loaded.view?.values ?? []).map((v) => [v.id, v.group_id] as const)),
+    scopes: ruleScopeIdsOf(read, skus),
   };
 }
 

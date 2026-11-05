@@ -63,7 +63,7 @@ export const EXPECTED_MIGRATION = '0223_product_supplier_links.sql';
  * the numbering has gaps, which is exactly why the count has to be its own
  * constant rather than something derived from the name.
  */
-export const EXPECTED_MIGRATION_COUNT = 213;
+export const EXPECTED_MIGRATION_COUNT = 214;
 
 /**
  * The leading number of a migration filename, or null when it has none.

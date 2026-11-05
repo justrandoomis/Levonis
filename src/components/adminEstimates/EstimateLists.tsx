@@ -17,7 +17,10 @@
  *              a price, or real measures its apply takes in where the published
  *              one is on a type default (§4.9 refuses until then; such a row
  *              says no price changes): old → new and %; a large change needs
- *              the tick (no fresh sign-in: DECISIONS row 285).
+ *              the tick (no fresh sign-in: DECISIONS row 285) — in Ready and
+ *              Refresh one box ticks every large change of the page (the
+ *              profit cap's re-pricing, DECISIONS row 291), each product still
+ *              applied on its own preview hash.
  *
  * Every figure is the server's (R and D in dinars, supplier amounts as
  * decimal text, the change as its percentage text); nothing is computed here.
@@ -96,6 +99,14 @@ export function rowFlags(r: Pick<StoredEstimate, 'flags' | 'lines'>, mode: ListM
 export const refreshKeepsPrices = (lines: readonly Pick<EstimateLine, 'est_price_iqd' | 'published_price_iqd'>[]): boolean =>
   lines.length > 0 && lines.every((l) => l.est_price_iqd === l.published_price_iqd);
 
+/**
+ * The rows of a page whose preview carries a large change (above the 15% / 30% gate): what «علّم كل التغييرات
+ * الكبيرة في هذه الصفحة» ticks at once — the owner re-prices about a thousand products under the profit cap (DECISIONS
+ * row 291). Ticking only says «confirm_large_change» for each; every product is still applied on its own preview hash.
+ */
+export const largeChangeIds = (rows: readonly Pick<StoredEstimate, 'product_id' | 'lines'>[]): string[] =>
+  rows.filter((r) => r.lines.some((l) => l.large)).map((r) => r.product_id);
+
 /** A fresh preview (a stale apply's) laid over the stored row, so the next apply carries the fresh hash. */
 function withPreview(row: StoredEstimate, p: EstimatePreview): StoredEstimate {
   return { ...row, state: p.state, label: p.label, type: p.type, flags: p.flags, preview_hash: p.preview_hash, computed_at: p.computed_at, lines: p.lines, version: p.version };
@@ -142,6 +153,7 @@ export default function EstimateListTab({ mode, onReview }: { mode: ListMode; on
   const rows = useMemo(() => data?.products ?? [], [data]);
   const applicable = useMemo(() => rows.filter((r) => !!r.preview_hash && (r.state === 'candidate' || r.state === 'estimated')), [rows]);
   const canApply = mode === 'ready' || mode === 'refresh';
+  const largeIds = useMemo(() => largeChangeIds(applicable), [applicable]);
 
   /** «احسب الكل»: every page of compute, until the end or «أوقف». Nothing is published. */
   const computeAll = () =>
@@ -258,6 +270,24 @@ export default function EstimateListTab({ mode, onReview }: { mode: ListMode; on
               indeterminate={applicable.some((r) => selected.has(r.product_id))}
               onChange={(v) => setSelected(v ? new Set(applicable.map((r) => r.product_id)) : new Set())}
               label={say(COMMON.selectAll, lang)}
+            />
+          ) : null}
+          {canApply && largeIds.length ? (
+            <Checkbox
+              checked={largeIds.every((id) => large.has(id))}
+              indeterminate={largeIds.some((id) => large.has(id))}
+              onChange={(v) =>
+                setLarge((s) => {
+                  const next = new Set(s);
+                  for (const id of largeIds) {
+                    if (v) next.add(id);
+                    else next.delete(id);
+                  }
+                  return next;
+                })
+              }
+              label={say(LISTS.confirmLargeAll, lang)}
+              data-estimates-large-all
             />
           ) : null}
           <ul className="space-y-3">

@@ -61,6 +61,7 @@ import { ProductLinksCard } from '../src/components/adminEstimates/LinksTab';
 import { bulkAcceptable } from '../src/components/adminEstimates/ReviewTab';
 import { allowedRoutes, typeUpdateOf } from '../src/components/adminEstimates/TypesTab';
 import { outcomeText, refreshKeepsPrices, rowFlags } from '../src/components/adminEstimates/EstimateLists';
+import { largeChangeIds } from '../src/components/adminEstimates/EstimateLists';
 import { readWorkspaceAddress } from '../src/components/adminEstimates/EstimateWorkspace';
 import { prepareFailureText } from '../src/components/adminEstimates/SnapshotsTab';
 import EstimateBanner, { StaffEstimateState, sourceDates } from '../src/components/adminEstimates/EstimateBanner';
@@ -1144,4 +1145,103 @@ test('the confirmation’s ways in: the product form reads the product again kee
   assert.equal(productDimensionsHref('p_1'), '/admin?tab=products&edit=p_1&section=4');
   assert.equal(productEditorHref('p_1'), '/admin?tab=products&edit=p_1&section=3');
   assert.equal(productDimensionsHref('bad id'), null);
+});
+
+// ---------------------------------------------------------------- the profit cap (migration 0222, DECISIONS row 291)
+
+test('the type editor’s profit ceiling (0–100): sent as typed text only when changed, an emptied one as null, 0 a ceiling too, a comma or a figure past the grammar refused — and never offered by an older server', () => {
+  const t: EstimateType = {
+    key: 'spare_part',
+    name_ar: 'قطع غيار',
+    name_en: 'Spare parts',
+    name_ckb: 'پارچەی یەدەگ',
+    sourcing: 'CHINA_CNY',
+    route: 'sea',
+    allow_air: true,
+    us_reference_allowed: false,
+    default_weight_g: null,
+    default_length_mm: null,
+    default_width_mm: null,
+    default_height_mm: null,
+    default_cbm: null,
+    additional_cost_iqd: null,
+    min_profit_usd: '6',
+    stale_after_days: 60,
+    version: 4,
+    updated_by: '',
+    updated_at: '',
+    warnings: [],
+    profit_cap_pct: null,
+  };
+  const base = { route: 'sea' as const, allow_air: true, us_reference_allowed: false, weight: '', length: '', width: '', height: '', cbm: '', additional: '', minProfit: '6', staleDays: '60', name_ar: t.name_ar, name_en: t.name_en, name_ckb: t.name_ckb, profitCap: '' };
+  assert.equal(typeUpdateOf(t, base, 'en').body, null, 'nothing changed: nothing sent');
+  // The owner's own ceilings of 2026-11-05 run from 3 to 10 (Arabic-Indic digits read as he types them).
+  const set = typeUpdateOf(t, { ...base, profitCap: '١٠' }, 'en');
+  assert.deepEqual(set.errors, {});
+  assert.deepEqual(set.body, { version: 4, profit_cap_pct: '10' });
+  assert.equal(typeof set.body!.profit_cap_pct, 'string', 'a percentage travels as text');
+  assert.deepEqual(typeUpdateOf(t, { ...base, profitCap: '3' }, 'en').body, { version: 4, profit_cap_pct: '3' });
+  assert.deepEqual(typeUpdateOf(t, { ...base, profitCap: '37.5' }, 'en').body, { version: 4, profit_cap_pct: '37.5' });
+  assert.deepEqual(typeUpdateOf(t, { ...base, profitCap: '100' }, 'en').body, { version: 4, profit_cap_pct: '100' });
+  assert.deepEqual(typeUpdateOf(t, { ...base, profitCap: '0' }, 'en').body, { version: 4, profit_cap_pct: '0' }, '0 is a ceiling: the lowest price each route allows');
+  assert.equal(typeUpdateOf({ ...t, profit_cap_pct: '10' }, { ...base, profitCap: '10' }, 'en').body, null, 'unchanged: nothing sent');
+  assert.equal(typeUpdateOf({ ...t, profit_cap_pct: '0' }, { ...base, profitCap: '0' }, 'en').body, null, 'unchanged 0: nothing sent');
+  assert.deepEqual(typeUpdateOf({ ...t, profit_cap_pct: '10' }, { ...base, profitCap: '' }, 'en').body, { version: 4, profit_cap_pct: null }, 'emptied: no ceiling');
+  for (const bad of ['25,5', '37.123', '100.01', '101', '1000', '-5', '25%']) {
+    const r = typeUpdateOf(t, { ...base, profitCap: bad }, 'ar');
+    assert.equal(r.body, null, bad);
+    assert.equal(r.errors.profitCap, say(STRINGS.TYPES.profitCapInvalid, 'ar'), bad);
+  }
+  // Every other decimal field still refuses 0 (the server's grammar for them is above 0).
+  assert.equal(typeUpdateOf(t, { ...base, minProfit: '0' }, 'en').errors.minProfit, say(STRINGS.TYPES.decimalInvalid, 'en'));
+  // An older server answers no cap key: the field is not offered and nothing about it is ever sent.
+  const { profit_cap_pct: _absent, ...older } = t;
+  assert.equal(typeUpdateOf(older, { ...base, profitCap: '25' }, 'en').body, null);
+  assert.deepEqual(typeUpdateOf(older, { ...base, profitCap: '25,5', minProfit: '7' }, 'en'), { body: { version: 4, min_profit_usd: '7' }, errors: {} });
+
+  // Drawn beside the minimum profit, only when the type carries the key, with its words and its hint.
+  const code = codeOf(`${DIR}/TypesTab.tsx`);
+  assert.match(code, /\{t\.profit_cap_pct !== undefined \? \(\s*<Field label=\{say\(TYPES\.profitCap, lang\)\} hint=\{say\(TYPES\.profitCapHint, lang\)\} error=\{errors\.profitCap\}>/);
+  assert.match(code, /\{t\.profit_cap_pct !== undefined \? <Fact label=\{say\(TYPES\.profitCap, lang\)\}>/);
+  assert.ok(code.indexOf('data-type-min-profit') < code.indexOf('data-type-profit-cap'), 'next to the minimum profit');
+  // No warning for the ceiling: its planner never prices under a route's floor (the first version's «below a quarter
+  // of the cost» warning is gone, words and all).
+  assert.deepEqual(Object.keys(STRINGS.TYPE_WARNINGS), ['MIN_PROFIT_BELOW_ROUTE_FLOOR']);
+  // The hint names the shop's price grid, today's price as the top, the shop's usual dinar prices a cheap item takes
+  // instead (the grid's steps too wide for it) and the safe margin that lifts a price where none under the share
+  // keeps it, in the three languages — in WORDS: no price is typed into the workspace's words (invariant I8), and the
+  // hint is held to that by name, since its group (TYPES) carries grammar limits («0–100», «2 to 40 letters») that
+  // the general scan above skips.
+  for (const [lang, grid, today, cheap, margin] of [
+    ['ar', /شبكة أسعار المتجر/, /سعر اليوم/, /أسعار المتجر المعتادة بالدينار/, /هامشًا آمنًا/],
+    ['en', /price grid/, /today’s price/, /usual dinar prices/, /safe margin/],
+    ['ckb', /تۆڕی نرخەکانی فرۆشگا/, /نرخی ئەمڕۆ/, /نرخی ئاسایی فرۆشگا بە دینار/, /قازانجێکی پێویست/],
+  ] as const) {
+    const hint = say(STRINGS.TYPES.profitCapHint, lang);
+    for (const words of [grid, today, cheap, margin]) assert.match(hint, words, `${lang}: ${words}`);
+    assert.doesNotMatch(hint, /\d/, `${lang}: no figure in the hint`);
+  }
+});
+
+test('«علّم كل التغييرات الكبيرة في هذه الصفحة»: one box ticks every large change the page can apply — each product still applied on its own preview hash', () => {
+  const line = (large: boolean): EstimateLine => ({
+    combo_key: '', channel: 'pre_order_sea', source: 'tmall_cn', supplier_amount: '15', supplier_currency: 'CNY', measure_source: 'product', flags: [], est_cost_iqd: 3862, est_price_iqd: 5000, published_price_iqd: 14250, change_pct: '-64.91', large,
+  });
+  assert.deepEqual(
+    largeChangeIds([
+      { product_id: 'p_a', lines: [line(false), line(true)] },
+      { product_id: 'p_b', lines: [line(false)] },
+      { product_id: 'p_c', lines: [line(true)] },
+      { product_id: 'p_d', lines: [] },
+    ]),
+    ['p_a', 'p_c']
+  );
+  const code = codeOf(`${DIR}/EstimateLists.tsx`);
+  // Over the rows an apply may take (a hash, an applicable state), in «جاهز للتطبيق» and «التحديث» only.
+  assert.match(code, /const largeIds = useMemo\(\(\) => largeChangeIds\(applicable\), \[applicable\]\);/);
+  assert.match(code, /\{canApply && largeIds\.length \? \(\s*<Checkbox/);
+  assert.match(code, /label=\{say\(LISTS\.confirmLargeAll, lang\)\}/);
+  // It only ticks: the items are still built one per product, each carrying that product's own reviewed hash.
+  assert.match(code, /\.map\(\(r\) => \(\{ product_id: r\.product_id, preview_hash: r\.preview_hash!, \.\.\.\(large\.has\(r\.product_id\) \? \{ confirm_large_change: true \} : \{\}\) \}\)\);/);
+  for (const lang of LANGS) assert.notEqual(say(STRINGS.LISTS.confirmLargeAll, lang), say(STRINGS.LISTS.confirmLarge, lang), lang);
 });

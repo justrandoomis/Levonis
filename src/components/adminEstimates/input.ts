@@ -37,11 +37,12 @@ function withoutGroupCommas(s: string): string | null {
 
 /**
  * A positive decimal as TEXT in the server's grammar (digits, at most one
- * point, never a trailing point, > 0), canonical: leading zeros dropped and
- * trailing fraction zeros kept as typed. `max` decimals and `maxLength`
- * characters, else null. Empty input is `''`.
+ * point, never a trailing point, > 0 — or ≥ 0 with `allowZero`, for a figure
+ * whose grammar takes 0, the profit ceiling's), canonical: leading zeros
+ * dropped and trailing fraction zeros kept as typed. `max` decimals and
+ * `maxLength` characters, else null. Empty input is `''`.
  */
-export function decimalText(raw: string, opts: { maxDecimals?: number; maxLength?: number } = {}): string | '' | null {
+export function decimalText(raw: string, opts: { maxDecimals?: number; maxLength?: number; allowZero?: boolean } = {}): string | '' | null {
   const s0 = latinDigits(raw);
   if (s0 === '') return '';
   const s = withoutGroupCommas(s0);
@@ -52,7 +53,7 @@ export function decimalText(raw: string, opts: { maxDecimals?: number; maxLength
   const frac = m[2] ?? '';
   if (opts.maxDecimals !== undefined && frac.length > opts.maxDecimals) return null;
   const text = frac ? `${int}.${frac}` : int;
-  if (!/[1-9]/.test(text)) return null;
+  if (!opts.allowZero && !/[1-9]/.test(text)) return null;
   if (text.length > (opts.maxLength ?? 24)) return null;
   return text;
 }

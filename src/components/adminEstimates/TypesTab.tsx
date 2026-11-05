@@ -10,13 +10,16 @@
  *   - THE TYPES (`PUT /estimates/types/:key`, version-fenced, audited): the
  *     route (air only where the type allows it; filament by sea only; the EU
  *     store by land only), the US reference (EU types), the default weight and
- *     box or CBM, the extra cost in IQD, the minimum profit in USD and the
+ *     box or CBM, the extra cost in IQD, the minimum profit in USD, the profit
+ *     ceiling as a percentage of cost from 0 to 100 (migration 0222, DECISIONS
+ *     row 291: offered only when the server's type carries it) and the
  *     staleness days. Every figure is empty until the owner types it; nothing
  *     here proposes one except «اقترح من الكتالوج», the median of the real
  *     package measures, which is never saved without his press;
  *   - A NEW TYPE (`POST /estimates/types`), its three names (the Sorani never
  *     a copy of the Arabic).
- * The warning «below one rounding step» is the server's (T × U, §4.3).
+ * The warning «below one rounding step» is the server's (T × U, §4.3). The
+ * profit ceiling has none: its planner never goes under a route's floor.
  * Decimals travel as text; nothing is computed here.
  */
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -175,9 +178,19 @@ interface TypeDraft {
   name_ar: string;
   name_en: string;
   name_ckb: string;
+  /** The profit ceiling as typed (a percentage of cost, 0 to 100); used only when the server's type carries one. */
+  profitCap?: string;
 }
 
 const text = (n: number | null): string => (n === null ? '' : String(n));
+
+/** The 0222 grammar of a profit ceiling, said before the server says it: at most two decimals, from 0 to a hundred. */
+const PROFIT_CAP_DECIMALS = 2;
+const PROFIT_CAP_MAX = 100;
+const withinProfitCap = (v: string): boolean => {
+  const [int = '', fraction = ''] = v.split('.');
+  return Number(int) < PROFIT_CAP_MAX || (Number(int) === PROFIT_CAP_MAX && !/[1-9]/.test(fraction));
+};
 
 function draftOf(t: EstimateType): TypeDraft {
   return {
@@ -195,10 +208,11 @@ function draftOf(t: EstimateType): TypeDraft {
     name_ar: t.name_ar,
     name_en: t.name_en,
     name_ckb: t.name_ckb,
+    profitCap: t.profit_cap_pct ?? '',
   };
 }
 
-type DraftErrors = Partial<Record<'weight' | 'box' | 'cbm' | 'additional' | 'minProfit' | 'staleDays' | 'names', string>>;
+type DraftErrors = Partial<Record<'weight' | 'box' | 'cbm' | 'additional' | 'minProfit' | 'staleDays' | 'names' | 'profitCap', string>>;
 
 /**
  * The PUT body of a draft against its stored type: only the fields the owner
@@ -233,6 +247,14 @@ export function typeUpdateOf(t: EstimateType, d: TypeDraft, lang: UiLang): { bod
   const cbm = decimal(d.cbm, 9, 12, 'cbm');
   const additional = whole(d.additional, 0, 1_000_000_000, 'additional');
   const minProfit = decimal(d.minProfit, 6, 13, 'minProfit');
+  // The profit ceiling: only when the server's type carries the column (an older database offers none). 0 is a
+  // ceiling too — the lowest price each route allows.
+  let profitCap: string | null | undefined;
+  if (t.profit_cap_pct !== undefined) {
+    const v = decimalText(d.profitCap ?? '', { maxDecimals: PROFIT_CAP_DECIMALS, maxLength: 6, allowZero: true });
+    if (v === null || (v !== '' && !withinProfitCap(v))) errors.profitCap = say(TYPES.profitCapInvalid, lang);
+    else profitCap = v === '' ? null : v;
+  }
   const stale = wholeNumber(d.staleDays, 1, 365);
   if (stale === null || stale === '') errors.staleDays = say(TYPES.wholeInvalid, lang);
   const names = { name_ar: d.name_ar.trim(), name_en: d.name_en.trim(), name_ckb: d.name_ckb.trim() };
@@ -251,6 +273,7 @@ export function typeUpdateOf(t: EstimateType, d: TypeDraft, lang: UiLang): { bod
   if (cbm !== undefined && cbm !== t.default_cbm) body.default_cbm = cbm;
   if (additional !== undefined && additional !== t.additional_cost_iqd) body.additional_cost_iqd = additional;
   if (minProfit !== undefined && minProfit !== t.min_profit_usd) body.min_profit_usd = minProfit;
+  if (profitCap !== undefined && profitCap !== (t.profit_cap_pct ?? null)) body.profit_cap_pct = profitCap;
   if (typeof stale === 'number' && stale !== t.stale_after_days) body.stale_after_days = stale;
   for (const k of ['name_ar', 'name_en', 'name_ckb'] as const) if (names[k] !== t[k]) body[k] = names[k];
   return { body: Object.keys(body).length > 1 ? body : null, errors };
@@ -337,6 +360,7 @@ function TypeCard({ type: t, lang, onSaved, onStale }: { type: EstimateType; lan
           <Fact label={say(TYPES.defaultCbm, lang)}>{figure(t.default_cbm ? groupDecimal(t.default_cbm) : '')}</Fact>
           <Fact label={say(TYPES.additional, lang)}>{figure(t.additional_cost_iqd === null ? '' : iqdText(t.additional_cost_iqd, lang))}</Fact>
           <Fact label={say(TYPES.minProfit, lang)}>{figure(t.min_profit_usd ? `$${groupDecimal(t.min_profit_usd)}` : '')}</Fact>
+          {t.profit_cap_pct !== undefined ? <Fact label={say(TYPES.profitCap, lang)}>{figure(t.profit_cap_pct ? groupDecimal(t.profit_cap_pct) : '')}</Fact> : null}
           <Fact label={say(TYPES.staleDays, lang)}>{figure(String(t.stale_after_days))}</Fact>
         </dl>
       ) : (
@@ -384,6 +408,11 @@ function TypeCard({ type: t, lang, onSaved, onStale }: { type: EstimateType; lan
             <Field label={say(TYPES.minProfit, lang)} error={errors.minProfit}>
               <Input ltr inputMode="decimal" value={draft.minProfit} onChange={(e) => set('minProfit', e.target.value)} data-type-min-profit />
             </Field>
+            {t.profit_cap_pct !== undefined ? (
+              <Field label={say(TYPES.profitCap, lang)} hint={say(TYPES.profitCapHint, lang)} error={errors.profitCap}>
+                <Input ltr inputMode="decimal" value={draft.profitCap ?? ''} onChange={(e) => set('profitCap', e.target.value)} data-type-profit-cap />
+              </Field>
+            ) : null}
             <Field label={say(TYPES.staleDays, lang)} error={errors.staleDays}>
               <Input ltr inputMode="numeric" value={draft.staleDays} onChange={(e) => set('staleDays', e.target.value)} />
             </Field>
