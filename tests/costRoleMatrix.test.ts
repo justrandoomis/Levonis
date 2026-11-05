@@ -236,6 +236,7 @@ test('«التسعير التقديري» (docs/SMART_PRICING.md §3.4, §4.8): 
     '/api/admin/pricing/supplier-prices/lookup',
     '/api/admin/pricing/supplier-prices/links',
     '/api/admin/pricing/supplier-prices/links/p_a1',
+    '/api/admin/pricing/supplier-prices/owner-links/p_a1',
     '/api/admin/pricing/estimates/control',
     '/api/admin/pricing/estimates/types',
     '/api/admin/pricing/estimates/types/p_a1/suggest',
@@ -286,10 +287,12 @@ const EST = {
   cost: 7_311_470,
   estimate: 7_399_000,
   hash: '3c'.repeat(32),
+  // The owner's own supplier link of the costly product (§3.10, migration 0223): its host.
+  ownerHost: 'owner-link-7311.example',
 } as const;
 /** The costly product's one sellable SKU (tests/fixtures/costlyProduct.ts: model v_a1 in black). */
 const RM_SKU = 'o:v_a1|c:c_blk';
-const EST_TEXTS: readonly string[] = [EST.snapshot, EST.handle, EST.variant, EST.price, EST.typed, EST.profit, String(EST.extra), String(EST.weight), String(EST.cost), String(EST.estimate)];
+const EST_TEXTS: readonly string[] = [EST.snapshot, EST.handle, EST.variant, EST.price, EST.typed, EST.profit, String(EST.extra), String(EST.weight), String(EST.cost), String(EST.estimate), EST.ownerHost];
 /** The tables those values live in, and the label: what a refused write must leave as it found it. */
 const ESTIMATE_TABLES = [
   'supplier_price_snapshots',
@@ -304,6 +307,7 @@ const ESTIMATE_TABLES = [
   'price_estimate_lines',
   'price_estimate_firm_skus',
   'pricing_audit',
+  'product_supplier_links',
 ] as const;
 
 function seedEstimates(raw: DatabaseSync): DatabaseSync {
@@ -327,6 +331,8 @@ function seedEstimates(raw: DatabaseSync): DatabaseSync {
       VALUES ('p_a1', 'printer', 'owner', 'candidate', 'type_default', '${EST.hash}', '${at}', 'usr_owner', '${at}');
     INSERT INTO price_estimate_lines (product_id, combo_key, channel, price_source, supplier_amount, supplier_currency, measure_source, est_cost_iqd, est_price_iqd, computed_at)
       VALUES ('p_a1', '${RM_SKU}', 'pre_order_land', 'typed', '${EST.typed}', 'EUR', 'type_default', ${EST.cost}, ${EST.estimate}, '${at}');
+    INSERT INTO product_supplier_links (id, product_id, combo_key, url, host, label, supplier_name, note, created_by, created_at, updated_by, updated_at)
+      VALUES ('psl_rm_sentinel', 'p_a1', '${RM_SKU}', 'https://${EST.ownerHost}/a1', '${EST.ownerHost}', 'A1 black', 'RM supplier', '', 'usr_owner', '${at}', 'usr_owner', '${at}');
   `);
   return raw;
 }
@@ -348,6 +354,7 @@ const ESTIMATE_READS: ReadonlyArray<readonly [path: string, owner: readonly stri
   ['/api/admin/pricing/supplier-prices/lookup?q=rm-sentinel-a1', [EST.handle, EST.variant, EST.price]],
   ['/api/admin/pricing/supplier-prices/links', [EST.handle, EST.variant, EST.price, EST.typed]],
   ['/api/admin/pricing/supplier-prices/links/p_a1', [EST.handle, EST.variant, EST.price, EST.typed]],
+  ['/api/admin/pricing/supplier-prices/owner-links/p_a1', [EST.handle, EST.variant, EST.price, EST.typed, EST.ownerHost]],
   ['/api/admin/pricing/estimates/control', []],
   ['/api/admin/pricing/estimates/types', [EST.profit, String(EST.extra), String(EST.weight)]],
   ['/api/admin/pricing/estimates/types/printer/suggest', []],
@@ -364,6 +371,7 @@ const ESTIMATE_WRITES: ReadonlyArray<readonly [method: string, path: string, bod
   ['POST', '/api/admin/pricing/supplier-prices/match', { product_ids: ['p_a1'] }],
   ['PUT', '/api/admin/pricing/supplier-prices/matches/p_a1', { version: '1.1.2026-10-31T09:00:00.000Z', skus: [{ combo_key: RM_SKU, source: 'bambu_eu', item_key: EST.handle, sku_key: null }] }],
   ['PUT', '/api/admin/pricing/supplier-prices/manual/p_a1', { version: '1.1.2026-10-31T09:00:00.000Z', skus: [{ combo_key: RM_SKU, amount: null }] }],
+  ['PUT', '/api/admin/pricing/supplier-prices/owner-links/p_a1', { version: '1.1.2026-10-31T09:00:00.000Z', upsert: [{ combo_key: RM_SKU, url: 'https://detail.tmall.com/item.htm?id=1' }], remove: ['psl_rm_sentinel'] }],
   ['POST', '/api/admin/pricing/supplier-prices/read-store-page', { url: `https://eu.store.bambulab.com/products/${EST.handle}?id=${EST.variant}`, save: { product_id: 'p_a1', combo_keys: [RM_SKU] } }],
   ['PUT', '/api/admin/pricing/estimates/control', { version: 1, ordering_enabled: false }],
   ['POST', '/api/admin/pricing/estimates/types', { key: 'measuring_tool', name_ar: 'أدوات القياس', name_en: 'Measuring tools', name_ckb: 'ئامرازەکانی پێوان', sourcing: 'CHINA_CNY', route: 'sea' }],

@@ -161,6 +161,12 @@ to **Catalog** ownership — the writer is the act of pricing a catalogue
 product — and `order_price_estimates` (each estimated order line and its
 settlement, recorded in the checkout batch) to **Commerce**.
 
+Migration 0223 (the owner's own supplier links, `docs/SMART_PRICING.md`
+§3.10; DECISIONS row 293) adds `product_supplier_links` to **Catalog**
+ownership: the addresses the owner keeps for a product at any supplier site,
+written beside the supplier catalogue by the same owner-only router and read
+by no customer or staff route.
+
 ### 2.2 Column-level ownership on the rows several services write
 
 One writer service per table; other domains issue commands. Column groups keep their semantic owner, but only the table owner executes SQL.

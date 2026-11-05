@@ -258,6 +258,20 @@ export default {
           cls: 'cost_read',
           why: 'one product’s supplier ids, links, captured prices and the owner’s own prices (the product form’s banner reads it)',
         },
+        // The owner's own supplier links (§3.10, DECISIONS row 293; migration 0223).
+        'GET /supplier-prices/owner-links/:product_id': {
+          cls: 'cost_read',
+          why: 'the owner’s own supplier addresses, labels, supplier names and notes of a product, beside its matched supplier links and prices',
+        },
+        'PUT /supplier-prices/owner-links/:product_id': {
+          cls: 'cost_write',
+          // The panel’s round trip: the links token the owner read, sent back with a Tmall link for the costly SKU.
+          body: async (read: Read) => ({
+            version: ((await read('/api/admin/pricing/supplier-prices/owner-links/p_a1')).product as { versions?: { links?: string } } | undefined)?.versions?.links ?? '0.0.',
+            upsert: [{ combo_key: RM_SKU, url: 'https://detail.tmall.com/item.htm?id=1' }],
+          }),
+          why: 'adds, edits or removes the owner’s own supplier links of a product (version-fenced; writes no price and no match)',
+        },
         // «التسعير التقديري» — the estimator (§4, §7, worker/routes/adminPriceEstimates.ts).
         'GET /estimates/control': { cls: 'cost_read', why: 'the owner’s two switches (apply, ordering) and whether the purchase policy carries the estimate clause' },
         'PUT /estimates/control': {

@@ -111,6 +111,8 @@ export const LATE_PROTECTED_TABLES: readonly LateProtectedTable[] = [
   { table: 'price_estimate_lines', guardedBy: '0218_price_estimates.sql' },
   { table: 'price_estimate_firm_skus', guardedBy: '0218_price_estimates.sql' },
   { table: 'order_price_estimates', guardedBy: '0218_price_estimates.sql' },
+  // Migration 0223 (docs/SMART_PRICING.md §3.10, DECISIONS row 293): the owner's own supplier links.
+  { table: 'product_supplier_links', guardedBy: '0223_product_supplier_links.sql' },
 ];
 
 /**

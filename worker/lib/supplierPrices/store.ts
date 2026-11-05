@@ -43,6 +43,7 @@ import {
   SupplierPriceFormatError,
   isSupplierPriceText,
   supplierPriceText,
+  unitPriceOf,
   type SupplierCurrency,
   type SupplierSource,
 } from '@levonis/catalog/supplierPrices/format';
@@ -121,24 +122,11 @@ export async function currentSnapshots(db: D1Database): Promise<Map<SupplierSour
 
 // ---------------------------------------------------------------- exact unit price
 
-/**
- * The price of one unit of an offer of `units` (the owner's division of a pack):
- * ceil(price / units) at four decimals, computed exactly (BigInt rationals), so a
- * cost is never understated. `units` 1 answers the price as it is.
- */
-export function unitPriceOf(price: string, units: number): string {
-  if (!isSupplierPriceText(price)) throw new Error('SUPPLIER_PRICE_INVARIANT: not a decimal price');
-  if (!Number.isSafeInteger(units) || units < 1 || units > 1000) throw new Error('SUPPLIER_PRICE_INVARIANT: units out of range');
-  if (units === 1) return price;
-  const [whole = '', frac = ''] = price.split('.');
-  const scaled = BigInt(`${whole}${frac}`) * 10_000n;
-  const den = 10n ** BigInt(frac.length) * BigInt(units);
-  const q = (scaled + den - 1n) / den;
-  const digits = q.toString().padStart(5, '0');
-  const int = digits.slice(0, -4).replace(/^0+(?=\d)/, '');
-  const dec = digits.slice(-4).replace(/0+$/, '');
-  return dec ? `${int}.${dec}` : int;
-}
+// The price of one unit of an offer of `units` (the owner's division of a pack): ceil(price / units)
+// at four decimals, exactly. It lives in the pure half (packages/catalog/src/supplierPrices/format.ts)
+// so the owner's supplier-links strip divides a pack exactly as the estimate does; re-exported here
+// for this module's own readers.
+export { unitPriceOf };
 
 // ---------------------------------------------------------------- the Levonis SKUs
 

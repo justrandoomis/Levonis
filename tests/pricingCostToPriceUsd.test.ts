@@ -484,6 +484,8 @@ test('the storefront never recomputes: only the owner pricing router, the engine
     'worker/lib/supplierPrices/store.ts': ['../pricingEngine/legacy', '../pricingEngine/load', '../pricingEngine/whatIf'],
     'worker/lib/supplierPrices/storePage.ts': ['../pricingEngine/whatIf'],
     'worker/lib/supplierPrices/upload.ts': ['../pricingEngine/whatIf'],
+    // The owner's own supplier links (§3.10): the 400 builder, and the names of a key's options and colour.
+    'worker/lib/supplierPrices/ownerLinks.ts': ['../pricingEngine/legacy', '../pricingEngine/whatIf'],
     'worker/routes/adminPriceEstimates.ts': [
       '../lib/pricingEngine/estimate/apply',
       '../lib/pricingEngine/estimate/compute',

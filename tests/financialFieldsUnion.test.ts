@@ -153,6 +153,9 @@ const AREAS: Record<string, readonly string[]> = {
     'store_cap_iqd', 'resale_iqd', 'costs_iqd', 'trade_in_margin_iqd', 'expected_margin_iqd', 'cost_basis_iqd', 'ref_price_usd',
     'trade_in_valuation', 'trade_in_params', 'q_bp',
   ],
+  // The owner's own supplier links of a product (docs/SMART_PRICING.md §3.10, DECISIONS row 293; migration
+  // 0223): every address, host, label, supplier name and note, answered under this one key.
+  SUPPLIER_LINKS: ['supplier_links'],
 };
 
 /**

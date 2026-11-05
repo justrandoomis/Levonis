@@ -157,6 +157,7 @@ Data ownership below: "owner" = the signed-in account (server-enforced),
 | Printer purchase gift (PLUS grant) | `printerGiftConfig` | 🔶 disabled until owner decision #5 |
 | Coupons + redemption in the checkout batch | `/api/orders` | ⚙️ (API-tested; no admin UI for creating coupons yet) |
 | Community selling gated to active PLUS/PRO | `worker/routes/community.ts` | ✅ |
+| The owner's own supplier links per product (any https site; the whole product, a model, a colour or one SKU; owner-only, never fetched, no price written) in the product form, the purchase wizard and pre-order lines of an order (DECISIONS row 293, `docs/SMART_PRICING.md` §3.10, migration 0223) | `/api/admin/pricing/supplier-prices/owner-links/:product_id`, `src/components/adminEstimates/SupplierLinksPanel.tsx` | ⚙️ (API and UI tests; browser pass pending) |
 
 ## Cross-cutting fixes
 

@@ -666,3 +666,85 @@ export function workspaceHref(tab: WorkspaceTab, productId?: string | null): str
   if (productId && isEstimateProductId(productId)) p.set('product', productId);
   return `/admin?${p.toString()}`;
 }
+
+// ---------------------------------------------------------------- the owner's own links (§3.10, DECISIONS row 293)
+
+export type OwnerLinkSource = 'tmall_cn' | 'bambu_eu' | 'bambu_us' | 'other';
+
+/** One of the owner's own links (worker/lib/supplierPrices/ownerLinks.ts `OwnerLink`). */
+export interface OwnerLink {
+  id: string;
+  /** '' the whole product, 'o:…' a model or option, 'c:…' a colour, or one exact SKU. */
+  combo_key: string;
+  labels: { ar: string; en: string; ckb: string };
+  /** As the server stored it; drawn as a link only through `safeOwnerLinkHref`. */
+  url: string;
+  host: string;
+  source: OwnerLinkSource;
+  item_key: string | null;
+  sku_key: string | null;
+  label: string;
+  supplier_name: string;
+  note: string;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type OwnerLinkChoiceKind = 'product' | 'option' | 'colour' | 'sku';
+
+/** A key a link may be saved for: the product, a model or option, a colour, or one SKU. */
+export interface OwnerLinkChoice {
+  combo_key: string;
+  kind: OwnerLinkChoiceKind;
+  labels: { ar: string; en: string; ckb: string };
+}
+
+export interface OwnerLinksProduct extends ProductLinks {
+  versions: LinkVersions & { links: string };
+  supplier_links: OwnerLink[];
+  choices: OwnerLinkChoice[];
+}
+
+export interface OwnerLinksAnswer {
+  /** Links can be saved on this server (migration 0223). */
+  installed: boolean;
+  /** The key the read is about: a new link starts on it. */
+  scope_key: string;
+  product: OwnerLinksProduct;
+}
+
+/** The SKUs a read is about: an order line's exact SKU, or a purchase line's stock row (none: the whole product). */
+export type OwnerLinksScope = { combo_key: string } | { scope: 'base' | 'option' | 'color' | 'variant'; scope_id: string };
+
+export function fetchOwnerLinks(productId: string, scope?: OwnerLinksScope | null, opts?: RequestOptions): Promise<OwnerLinksAnswer> {
+  const p = new URLSearchParams();
+  if (scope) {
+    if ('combo_key' in scope) p.set('combo_key', scope.combo_key);
+    else {
+      p.set('scope', scope.scope);
+      if (scope.scope !== 'base') p.set('scope_id', scope.scope_id);
+    }
+  }
+  const qs = p.toString() ? `?${p.toString()}` : '';
+  return api.get<OwnerLinksAnswer>(`${SUPPLIER_PRICES_API}/owner-links/${enc(productId)}${qs}`, opts);
+}
+
+/** A link added (no `id`) or edited. */
+export interface OwnerLinkEntry {
+  id?: string;
+  combo_key: string;
+  url: string;
+  label: string;
+  supplier_name: string;
+  note: string;
+}
+
+export interface OwnerLinksSaved {
+  saved: { added: number; updated: number; removed: number };
+}
+
+/** Adds, edits and removes his links, fenced on the `versions.links` token he read. */
+export function saveOwnerLinks(productId: string, body: { version: string; upsert?: OwnerLinkEntry[]; remove?: string[] }): Promise<OwnerLinksSaved> {
+  return api.put<OwnerLinksSaved>(`${SUPPLIER_PRICES_API}/owner-links/${enc(productId)}`, body);
+}

@@ -283,7 +283,9 @@ test('customer channels carry final numbers, never the arithmetic of a price, fo
  * owner-only 0218 table. A line sold at an estimate is read back with its label.
  */
 const ESTIMATE_PRIVATE = { decimals: ['173.37', '419.83', '58.91', '4.73', '18.861'], numbers: [7731, 67891, 676767, 686868, 3731, 2917, 1733] };
-const ESTIMATE_WORDS = ['TMALL-TITLE-SECRET-7E', 'SUPPLIER-ITEM-7E', 'supplier-secret-7e.example', 'EST_DEFAULT_WEIGHT', 'EST_US_REFERENCE', 'tmall_cn', 'type_default'];
+const ESTIMATE_WORDS = ['TMALL-TITLE-SECRET-7E', 'SUPPLIER-ITEM-7E', 'supplier-secret-7e.example', 'EST_DEFAULT_WEIGHT', 'EST_US_REFERENCE', 'tmall_cn', 'type_default',
+  // The owner's own supplier link (§3.10, migration 0223): its host, label, supplier name and note.
+  'owner-link-secret-7e.example', 'OWNER-LINK-LABEL-7E', 'OWNER-LINK-SUPPLIER-7E', 'OWNER-LINK-NOTE-7E'];
 
 function seedEstimate(raw: ReturnType<typeof seededCopy>, pid: string): void {
   const now = '2026-11-01T00:00:00.000Z';
@@ -306,6 +308,8 @@ function seedEstimate(raw: ReturnType<typeof seededCopy>, pid: string): void {
       VALUES ('${pid}', 'printer', 'supplier_category', 'estimated', 'type_default', '["EST_DEFAULT_WEIGHT"]', '${now}', 'usr_owner', '{"supplier_cost_amount":"419.83","source":"tmall_cn"}', '${now}');
     INSERT INTO price_estimate_lines (product_id, combo_key, channel, price_source, supplier_amount, supplier_currency, measure_source, est_cost_iqd, est_price_iqd, computed_at)
       VALUES ('${pid}', '', 'pre_order_sea', 'tmall_cn', '173.37', 'CNY', 'type_default', 676767, 686868, '${now}');
+    INSERT INTO product_supplier_links (id, product_id, combo_key, url, host, label, supplier_name, note, created_by, created_at, updated_by, updated_at)
+      VALUES ('psl_7e', '${pid}', '', 'https://owner-link-secret-7e.example/item', 'owner-link-secret-7e.example', 'OWNER-LINK-LABEL-7E', 'OWNER-LINK-SUPPLIER-7E', 'OWNER-LINK-NOTE-7E', 'usr_owner', '${now}', 'usr_owner', '${now}');
   `);
 }
 

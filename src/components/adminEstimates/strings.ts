@@ -27,6 +27,7 @@ import {
 } from '../../../packages/contracts/src/priceEstimates';
 import { isPricingIssueCode, pricingIssueLabel } from '../../../packages/contracts/src/pricingIssues';
 import type { SupplierPriceFormatReason } from '../../../packages/catalog/src/supplierPrices/format';
+import type { OwnerLinkError } from '../../../packages/catalog/src/supplierPrices/ownerLink';
 
 export type UiLang = 'ar' | 'en' | 'ckb';
 
@@ -873,3 +874,112 @@ export function flagText(code: string, lang: UiLang): string {
 
 /** A match reason CODE in the owner's words (the code itself when unknown). */
 export const reasonText = (code: string, lang: UiLang): string => REASON_LABELS[code]?.[lang] ?? code;
+
+// ---------------------------------------------------------------- «روابط المورّد» of one product: his own links (§3.10, row 293)
+
+/**
+ * The owner's own supplier links (src/components/adminEstimates/SupplierLinksPanel.tsx,
+ * OwnerLinkSheet.tsx): in the product form, the purchase wizard and a pre-order line of an order.
+ */
+export const OWNER_LINKS = {
+  title: t('روابط المورّد', 'Supplier links', 'بەستەرەکانی دابینکەر'),
+  intro: t(
+    'احفظ رابط هذا المنتج عند أي مورّد — للمنتج كله أو لموديل أو لون أو خيار محدد — لتتابع سعره، أو تطلبه لطلب مسبق، أو تشتريه مجددًا للمخزون. تراها أنت فقط، ولا يكتب الرابط سعرًا.',
+    'Save this product’s link at any supplier — for the whole product, a model, a colour or one exact option — to follow its price, order it for a pre-order, or buy it again for stock. Only you see them, and a link writes no price.',
+    'بەستەری ئەم بەرهەمە لای هەر دابینکەرێک پاشەکەوت بکە — بۆ هەموو بەرهەمەکە، مۆدێلێک، ڕەنگێک یان هەڵبژاردەیەکی دیاریکراو — بۆ بەدواداچوونی نرخەکەی، داواکردنی بۆ پێشداواکاری، یان دووبارە کڕینی بۆ کۆگا. تەنها خۆت دەیانبینیت، و بەستەر هیچ نرخێک نانووسێت.'
+  ),
+  yours: t('روابطك', 'Your links', 'بەستەرەکانی خۆت'),
+  // The matched Tmall / EU / US facts and his own typed or store-page prices, as the Links tab lists them.
+  matched: t('روابط المطابقة وأسعارك', 'Matched links and your prices', 'بەستەرە هاوتاکان و نرخەکانی خۆت'),
+  none: t('لا روابط لهذا المنتج بعد.', 'No links for this product yet.', 'هێشتا هیچ بەستەرێک بۆ ئەم بەرهەمە نییە.'),
+  add: t('أضف رابطًا', 'Add a link', 'بەستەرێک زیاد بکە'),
+  addTitle: t('رابط مورّد جديد', 'A new supplier link', 'بەستەرێکی نوێی دابینکەر'),
+  edit: t('عدّل', 'Edit', 'دەستکاری بکە'),
+  // Each row's buttons are named by their link, so a screen reader tells one row's from the next; the visible word is kept in the name.
+  editNamed: t('عدّل الرابط «{name}»', 'Edit the link “{name}”', 'بەستەری «{name}» دەستکاری بکە'),
+  editTitle: t('عدّل رابط المورّد', 'Edit the supplier link', 'دەستکاریی بەستەری دابینکەر بکە'),
+  remove: t('احذف', 'Remove', 'لاببە'),
+  removeNamed: t('احذف الرابط «{name}»', 'Remove the link “{name}”', 'بەستەری «{name}» لاببە'),
+  removeAsk: t('حذف هذا الرابط؟', 'Remove this link?', 'ئەم بەستەرە لاببرێت؟'),
+  removeBody: t('يُحذف الرابط وحده؛ لا يتغير أي سعر أو طلب.', 'Only the link is removed; no price or order changes.', 'تەنها بەستەرەکە لادەبرێت؛ هیچ نرخ و داواکارییەک ناگۆڕێت.'),
+  removed: t('حُذف الرابط.', 'The link is removed.', 'بەستەرەکە لابرا.'),
+  saved: t('حُفظ الرابط.', 'The link is saved.', 'بەستەرەکە پاشەکەوت کرا.'),
+  save: t('احفظ الرابط', 'Save the link', 'بەستەرەکە پاشەکەوت بکە'),
+  url: t('الرابط', 'Link', 'بەستەر'),
+  urlHint: t(
+    'الصق الرابط كما نسخته؛ يُقبل https فقط، ولا يفتحه الخادم أبدًا.',
+    'Paste the link as you copied it; only https is accepted, and the server never opens it.',
+    'بەستەرەکە وەک کۆپیت کردووە دابنێ؛ تەنها https وەردەگیرێت، و ڕاژەکار هەرگیز نایکاتەوە.'
+  ),
+  urlSaved: t('سيُحفظ هكذا:', 'It will be saved as:', 'بەم شێوەیە پاشەکەوت دەکرێت:'),
+  duplicate: t('هذا الرابط محفوظ مسبقًا لهذا الخيار.', 'This link is already saved for this option.', 'ئەم بەستەرە پێشتر بۆ ئەم هەڵبژاردەیە پاشەکەوت کراوە.'),
+  limit: t(
+    'بلغت الحد: {n} رابطًا لكل منتج. احذف رابطًا قديمًا أولًا.',
+    'Limit reached: {n} links per product. Remove an old link first.',
+    'گەیشتیتە سنوور: {n} بەستەر بۆ هەر بەرهەمێک. سەرەتا بەستەرێکی کۆن لاببە.'
+  ),
+  name: t('اسم الرابط', 'Link name', 'ناوی بەستەر'),
+  namePlaceholder: t('مثال: متجر Bambu الرسمي على Tmall', 'e.g. Bambu’s official Tmall store', 'نموونە: فرۆشگای فەرمیی Bambu لە Tmall'),
+  supplier: t('المورّد', 'Supplier', 'دابینکەر'),
+  supplierName: t('المورّد: {name}', 'Supplier: {name}', 'دابینکەر: {name}'),
+  note: t('ملاحظة', 'Note', 'تێبینی'),
+  textInvalid: t('النص طويل جدًا أو فيه رمز غير مقبول.', 'The text is too long or holds a character that is not accepted.', 'دەقەکە زۆر درێژە یان پیتێکی وەرنەگیراوی تێدایە.'),
+  appliesTo: t('لأيّ خيار؟', 'For which option?', 'بۆ کام هەڵبژاردە؟'),
+  keyGone: t('هذا الخيار لم يعد في المنتج؛ اختر غيره.', 'This option is no longer in the product; choose another.', 'ئەم هەڵبژاردەیە چیتر لە بەرهەمەکەدا نییە؛ یەکێکی تر هەڵبژێرە.'),
+  appliesLabel: t('لـ {name}', 'For {name}', 'بۆ {name}'),
+  appliesWhole: t('للمنتج كله', 'For the whole product', 'بۆ هەموو بەرهەمەکە'),
+  kindProduct: t('المنتج كله', 'The whole product', 'هەموو بەرهەمەکە'),
+  kindOption: t('موديل أو خيار', 'A model or option', 'مۆدێل یان هەڵبژاردە'),
+  kindColour: t('لون', 'A colour', 'ڕەنگ'),
+  kindSku: t('خيار ولون محددان', 'One exact option and colour', 'هەڵبژاردە و ڕەنگێکی دیاریکراو'),
+  added: t('أُضيف {date}', 'Added {date}', 'زیادکراوە لە {date}'),
+  edited: t('عُدّل {date}', 'Edited {date}', 'دەستکاریکراوە لە {date}'),
+  unsafe: t(
+    'لا يُفتح: العنوان المحفوظ ليس رابط https صالحًا.',
+    'Not opened: the saved address is not a valid https link.',
+    'ناکرێتەوە: ناونیشانی پاشەکەوتکراو بەستەرێکی https ی دروست نییە.'
+  ),
+  notInstalled: t(
+    'حفظ روابطك غير متاح بعد على هذا الخادم؛ يظهر هنا حين يُفعَّل.',
+    'Saving your links is not available on this server yet; it appears here once switched on.',
+    'پاشەکەوتکردنی بەستەرەکانی خۆت هێشتا لەم ڕاژەکارە بەردەست نییە؛ کاتێک چالاک کرا لێرە دەردەکەوێت.'
+  ),
+  orderFrom: t('اطلبها من المورّد', 'Order it from the supplier', 'لە دابینکەر داوای بکە'),
+  buyAgain: t('اشترِ مجددًا من المورّد', 'Buy again from the supplier', 'دووبارە لە دابینکەر بیکڕە'),
+  lastPrice: t('آخر سعر معروف عند المورّد', 'Last known supplier price', 'دوایین نرخی زانراوی دابینکەر'),
+  showAll: t('كل الروابط ({n})', 'All links ({n})', 'هەموو بەستەرەکان ({n})'),
+  showLess: t('أخفِ القائمة', 'Hide the list', 'لیستەکە بشارەوە'),
+  // The sheet opens from the card and from a strip alike: it names the workspace section (TAB_LABELS.links), not this card.
+  sheetNote: t(
+    'الرابط لا يكتب سعرًا ولا يصير مطابقة مؤكدة؛ سجّل السعر من «تحديث السعر» في قسم «روابط المورّد» من التسعير التقديري.',
+    'A link writes no price and never becomes a confirmed match; record a price with “Update the price” in the “Supplier links” section of estimated pricing.',
+    'بەستەر هیچ نرخێک نانووسێت و نابێتە هاوتای پشتڕاستکراو؛ نرخ لە «نوێکردنەوەی نرخ» لە بەشی «بەستەرەکانی دابینکەر»ی نرخدانانی خەمڵێنراو تۆمار بکە.'
+  ),
+} as const;
+
+/** Why the shared parser refused an address (packages/catalog/src/supplierPrices/ownerLink.ts), said beside the field. */
+export const OWNER_LINK_ERROR_TEXT: Readonly<Record<OwnerLinkError, Tri>> = {
+  empty: t('الصق الرابط أولًا.', 'Paste the link first.', 'سەرەتا بەستەرەکە دابنێ.'),
+  not_url: t(
+    'هذا ليس رابطًا صالحًا: لا مسافة فيه ولا رمز مخفي.',
+    'This is not a valid link: no space and no hidden character.',
+    'ئەمە بەستەرێکی دروست نییە: نابێت بۆشایی یان پیتی شاراوەی تێدا بێت.'
+  ),
+  not_https: t('يُقبل رابط https فقط.', 'Only an https link is accepted.', 'تەنها بەستەری https وەردەگیرێت.'),
+  credentials: t(
+    'لا يُقبل رابط يحمل اسم مستخدم أو كلمة مرور.',
+    'A link carrying a user name or password is not accepted.',
+    'بەستەرێک کە ناوی بەکارهێنەر یان وشەی نهێنی تێدایە وەرناگیرێت.'
+  ),
+  port: t('لا يُقبل رابط فيه رقم منفذ.', 'A link with a port number is not accepted.', 'بەستەرێک کە ژمارەی پۆرتی تێدایە وەرناگیرێت.'),
+  host: t(
+    'الموقع في الرابط غير مقبول: يلزم اسم موقع، لا عنوان IP ولا localhost.',
+    'The site in the link is not accepted: it needs a site name, not an IP address or localhost.',
+    'ماڵپەڕەکەی ناو بەستەرەکە وەرناگیرێت: ناوی ماڵپەڕ پێویستە، نەک ناونیشانی IP یان localhost.'
+  ),
+  too_long: t(
+    'الرابط أطول من {n} حرف؛ احذف ما بعد علامة «?» ثم جرّبه.',
+    'The link is longer than {n} characters; remove what follows the “?” and try it.',
+    'بەستەرەکە لە {n} پیت درێژترە؛ ئەوەی دوای «?» لاببە و تاقیی بکەرەوە.'
+  ),
+};

@@ -26,14 +26,19 @@
  *                                    (on sale: the regular price saved, the sale price answered)
  *   GET  /links?q=&source=&cursor=   the supplier links of every linked product, 25 a page
  *   GET  /links/:product_id          one product's supplier links
+ *   GET  /owner-links/:product_id[?combo_key= | ?scope=&scope_id=]
+ *                                    the owner's own links (§3.10) beside the matched links of
+ *                                    the same SKUs, and the keys a new one may be saved for
+ *   PUT  /owner-links/:product_id    adds, edits and removes his links (version-fenced; no price)
  *
  * Owner-only data (invariant I6): nothing here reaches a customer or another
  * admin. Every answer is `private, no-store`.
  *
  * DEPLOY-AHEAD (§2.4): on a database without 0218 every route answers 503
- * PRICE_ESTIMATES_NOT_INSTALLED (probed once per binding) — except the two
+ * PRICE_ESTIMATES_NOT_INSTALLED (probed once per binding) — except the three
  * links reads, which answer an empty list (the product form's banner reads
- * them and simply shows none).
+ * them and simply shows none). Without 0223 the owner-links read answers
+ * `installed: false` and its write 503 SUPPLIER_LINKS_NOT_INSTALLED.
  */
 import { Hono, type Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -60,6 +65,7 @@ import { REVIEW_STATES, decideMatches, reviewPageIds, runMatchPage, type ReviewS
 import { lookupCatalogue, parseSupplierQuery } from '../lib/supplierPrices/lookup';
 import { chosenOffer, readStorePage, storableCurrency, storePageTarget, storePageUnreadable } from '../lib/supplierPrices/storePage';
 import { linksPage, productLinkViews, productLinks } from '../lib/supplierPrices/links';
+import { ownerLinksFilter, ownerLinksView, setOwnerLinks } from '../lib/supplierPrices/ownerLinks';
 
 export const adminSupplierPricesRoutes = new Hono<AppContext>();
 
@@ -252,4 +258,19 @@ adminSupplierPricesRoutes.get('/links/:product_id', async (c) => {
   // The tokens, even with no link yet: «تحديث السعر» opens the manual entry on any product.
   const versions = products[0]?.versions ?? (await versionTokens(c.env.DB, [pid])).get(pid)!;
   return c.json({ success: true, products, next_cursor: null, versions });
+});
+
+// ------------------------------------------------------------- the owner's own links (§3.10, DECISIONS row 293)
+
+// A read, like the two above: never 503 (installed: false on an older database), 404 for no such product.
+adminSupplierPricesRoutes.get('/owner-links/:product_id', async (c) => {
+  const filter = ownerLinksFilter({ combo_key: c.req.query('combo_key'), scope: c.req.query('scope'), scope_id: c.req.query('scope_id') });
+  return c.json({ success: true, ...(await ownerLinksView(c.env.DB, c.req.param('product_id'), filter)) });
+});
+
+adminSupplierPricesRoutes.put('/owner-links/:product_id', async (c) => {
+  assertCostWrite(c);
+  await installed(c);
+  const saved = await setOwnerLinks(c.env.DB, c.req.param('product_id'), await jsonObject(c), actorOf(c), new Date());
+  return c.json({ success: true, saved });
 });

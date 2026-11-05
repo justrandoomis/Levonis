@@ -45,6 +45,8 @@ import PurchaseReviewCard from './PurchaseReviewCard';
 
 /** The estimate banner (owner: sources, links, review, confirm; everyone else: the state) — loaded only when shown. */
 const EstimateBanner = lazy(() => import('../../../adminEstimates/EstimateBanner'));
+/** The owner's own supplier links of the product (docs/SMART_PRICING.md §3.10, DECISIONS row 293) — his chunk, loaded for him alone. */
+const SupplierLinksPanel = lazy(() => import('../../../adminEstimates/SupplierLinksPanel'));
 
 export default function PricesSectionV2({
   modelNames,
@@ -112,6 +114,12 @@ export default function PricesSectionV2({
             onOpenCost={onOpenCost}
             revision={v2.stored?.seq ? `${v2.stored.seq.inputs_seq}:${v2.stored.seq.write_seq}` : ''}
           />
+        </Suspense>
+      ) : null}
+      {/* «روابط المورّد»: the owner's own links of a stored product, beside the matched ones — never another admin's. */}
+      {v2.owner && productId && v2.mode === 'stored' ? (
+        <Suspense fallback={null}>
+          <SupplierLinksPanel productId={productId} variant="card" context="product" />
         </Suspense>
       ) : null}
       {v2.hidden ? (

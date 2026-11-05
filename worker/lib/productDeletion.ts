@@ -220,6 +220,10 @@ export const OWNED_TABLES: OwnedTable[] = [
   { table: 'price_estimate_lines', by: { column: 'product_id' } },
   { table: 'price_estimate_firm_skus', by: { column: 'product_id' } },
   { table: 'product_price_estimates', by: { column: 'product_id' } },
+  // 0223 (docs/SMART_PRICING.md §3.10): the owner's own supplier links of the product — addresses at
+  // other sites, worthless without the product (the FK cascades too). Never a media column: an external
+  // URL is not ours to delete.
+  { table: 'product_supplier_links', by: { column: 'product_id' } },
   // 0192: the owner's private component reference for a Combo / device (trade-in B.4 rules 2–4) —
   // worthless without the product it values.
   { table: 'trade_in_component_refs', by: { column: 'product_id' } },
@@ -1084,6 +1088,8 @@ const ENGINE_PRIVATE_TABLES: ReadonlySet<string> = new Set([
   'pricing_v2_purchase_reviews', 'pricing_received_recovery',
   // 0218: the owner's supplier matches, typed prices and estimate bookkeeping (supplier data, invariant I6).
   'supplier_price_matches', 'supplier_price_manual', 'product_price_estimates', 'price_estimate_lines',
+  // 0223: the owner's own supplier links — whether a product had any is supplier data too.
+  'product_supplier_links',
 ]);
 
 /**

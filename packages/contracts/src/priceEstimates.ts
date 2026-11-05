@@ -426,6 +426,18 @@ export const ESTIMATE_REFUSALS = {
     en: "This route does not fit the product's type: filament travels by sea only, EU-store items by land only, and air only where the type allows it.",
     ckb: 'ئەم ڕێگایە لەگەڵ جۆری بەرهەمەکە ناگونجێت: فیلامێنت تەنها بە ڕێگای دەریایی دەنێردرێت، بەرهەمەکانی فرۆشگای ئەوروپا تەنها بە ڕێگای وشکانی، و ڕێگای ئاسمانی تەنها بۆ ئەو جۆرانەی ڕێگەی پێدەدەن.',
   },
+  /**
+   * Saving the owner's own supplier links on a database without migration 0223
+   * (docs/SMART_PRICING.md §3.10, DECISIONS row 293). Nothing was saved; the
+   * read still answers, with the matched links and `installed: false`.
+   */
+  SUPPLIER_LINKS_NOT_INSTALLED: {
+    status: 503,
+    audience: 'owner',
+    ar: 'حفظ روابط المورّد لم يُجهَّز بعد على قاعدة البيانات هذه؛ لم يُحفظ شيء، حاول بعد قليل.',
+    en: 'Saving supplier links is not set up on this database yet; nothing was saved, try again shortly.',
+    ckb: 'پاشەکەوتکردنی بەستەرەکانی دابینکەر هێشتا لەم بنکەدراوەیە ڕێکنەخراوە؛ هیچ شتێک پاشەکەوت نەکرا، کەمێکی تر هەوڵ بدەرەوە.',
+  },
 } as const satisfies Record<string, EstimateRefusal>;
 
 export type EstimateRefusalCode = keyof typeof ESTIMATE_REFUSALS;

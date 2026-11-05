@@ -27,6 +27,9 @@ import type { ApprovedProcurementRate } from '../../../packages/contracts/src/pr
 import '../adminInventory/inventory-workspace.css';
 const ProductPricingForm = lazy(() => import('../adminProducts/ProductForm'));
 const InvestorContractForm = lazy(() => import('../financePeople/InvestorPanel').then((m) => ({ default: m.InvestorContractForm })));
+// The owner's own supplier links of a line's stock row (docs/SMART_PRICING.md §3.10): his chunk, loaded for him alone.
+const SupplierLinksPanel = lazy(() => import('../adminEstimates/SupplierLinksPanel'));
+import { useOptionalAuth } from '../../AuthContext';
 import {
   api,
   Card,
@@ -154,6 +157,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const { loc } = useLabels(),
     op = useOperation();
   const { lang } = useLanguage();
+  // The supplier links strip reads an owner-only route: the server's own hint, fail closed (=== true).
+  const ownerCost = useOptionalAuth()?.user?.can_view_cost === true;
   const ps = procurementPricingStrings(lang);
   const pn = purchaseNameStrings(lang);
   const rs = procurementRateStrings(lang);
@@ -793,6 +798,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             </section>
             <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}>
               <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered} · {ps.storePrice(Number.isFinite(l.selling_price_iqd) ? money(l.selling_price_iqd) : '—')}</small></div></div>
+              {/* Where to buy it, beside the raw price he types: never a blocker, never inside the dock. */}
+              {ownerCost && l.product_id && <div className="mb-3 min-w-0" data-purchase-supplier-links={i}><Suspense fallback={null}><SupplierLinksPanel productId={l.product_id} scope={{ scope: l.scope, scope_id: l.scope_id }} variant="strip" context="purchase" /></Suspense></div>}
               {header.cost_profile_id && l.procurement_shared_colors && <p className={`mb-3 text-sm ${T.text3}`}>{loc('ألوان هذا الخيار تشترك في مخزون واحد، لذلك يشملها السعر الخام المحفوظ. لفصل تكاليف الألوان، اختر مخزونًا منفصلًا لكل خيار ولون في إعدادات المنتج.', 'This option shares one stock pool across colours, so its saved raw price applies to those colours. For separate colour costs, use stock tracked by option and colour in the product settings.', 'ڕەنگەکانی ئەم هەڵبژاردەیە یەک کۆگایان هەیە، بۆیە نرخی خاوی پاشەکەوتکراو ئەوانیش دەگرێتەوە. بۆ جیاکردنەوەی تێچووی ڕەنگەکان، لە ڕێکخستنەکانی بەرهەمدا کۆگای جیا بۆ هەر هەڵبژاردە و ڕەنگێک هەڵبژێرە.')}</p>}
               <Select label={loc('طريقة إدخال الشراء الخام', 'Raw purchase input', 'شێوازی نووسینی کڕینی خاو')} value={l.purchase_cost_mode || 'unit'} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? changePurchaseCostMode(x, v as 'unit' | 'total', header.currency === 'IQD' ? 0 : 6) : x))} options={[{ id: 'total', name: loc('إجمالي سعر شراء البند الخام', 'Total raw line purchase price', 'کۆی نرخی کڕینی خاوی بەند') }, { id: 'unit', name: loc('سعر شراء القطعة الخام', 'Raw unit purchase price', 'نرخی کڕینی خاوی پارچە') }]} />
               <div className="inventory-fields mt-3"><Input id={`purchase-line-${i}-raw`} error={fieldError(!lineChecks[i]?.raw, bs.required)} label={`${l.purchase_cost_mode === 'total' ? loc('إجمالي سعر الشراء الخام من المورد', 'Raw supplier purchase total', 'کۆی نرخی کڕینی خاو لە دابینکەر') : loc('سعر شراء القطعة الخام من المورد', 'Raw supplier unit price', 'نرخی کڕینی خاوی پارچە لە دابینکەر')} (${header.currency})`} type="number" min={0} decimals={header.currency === 'IQD' ? 0 : 6} value={l.purchase_cost_mode === 'total' ? l.source_total_amount ?? '' : l.source_unit_amount} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_conversion_inexact: false, ...(x.purchase_cost_mode === 'total' ? { source_total_amount: v === '' ? '' : Number(v), source_unit_amount: v === '' ? '' : Number(v) / x.qty_ordered } : { source_unit_amount: v === '' ? '' : Number(v), source_total_amount: v === '' ? '' : Number((Number(v) * x.qty_ordered).toFixed(6)) }) } : x))} hint={l.cost_source === 'procurement_default' ? `${loc('آخر سعر خام محفوظ لهذا الخيار والمسار، دون شحن (متوسط القطعة عند إدخال إجمالي الفاتورة)', 'Saved raw supplier price, excluding freight (unit average when entered as an invoice total)', 'دوایین نرخی خاوی پاشەکەوتکراو بۆ ئەم هەڵبژاردە و ڕێگایە، بەبێ کرێی ناردن (تێکڕای پارچە کاتێک کۆی پسوولە دەنووسرێت)')} ${l.cost_date?.slice(0, 10) || ''}` : l.cost_source === 'confirmed_purchase' || l.cost_source === 'catalogue' ? loc('قيمة المستند المحفوظة؛ راجع فصل الشحن عنها قبل التعديل', 'Saved document amount; verify whether freight is included before changing it', 'بڕی بەڵگەنامەی پاشەکەوتکراو؛ پێش دەستکاری بپشکنە ئایا کرێی ناردن لێی جیاکراوەتەوە') : loc('أدخل سعر المورد فقط، دون الشحن', 'Enter only the supplier price, excluding freight', 'تەنها نرخی دابینکەر بنووسە، بەبێ کرێی ناردن')} />
@@ -1029,6 +1036,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
           {selected.lines.some((line) => line.unit_origins?.some((unit) => unit.serial_norm)) && <p className={`mb-3 text-sm ${T.text3}`}>{loc('الأرقام التسلسلية مثبتة لهذه القطع؛ لا يمكن إعادة تحرير الكميات والتكاليف. يمكنك تعديل اسم الشراء وطلب المورد والتتبع.', 'These units have fixed serials, so quantities and costs cannot be rewritten. The purchase name, supplier order and tracking remain editable.', 'ئەم پارچانە ژمارەی جێگیریان هەیە؛ بڕ و تێچوو ناگۆڕدرێن. ناوی کڕین، داواکاری دابینکەر و شوێنکەوتن هێشتا دەگۆڕدرێن.')}</p>}
           <div className="inventory-lines">{selected.lines.map((l) => <article className="inventory-line" key={l.line_id}>
             <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('المطلوب / المستلم', 'Ordered / received', 'داواکراو / وەرگیراو')}: {l.qty_ordered} / {l.qty_received}</small></div></div>
+            {/* A saved line: where to buy it again («when i need to future buy on inventory»), read-only here. */}
+            {ownerCost && l.product_id && <div className="mb-3 min-w-0" data-purchase-supplier-links={l.line_id}><Suspense fallback={null}><SupplierLinksPanel productId={l.product_id} scope={{ scope: l.scope, scope_id: l.scope_id }} variant="strip" context="purchase" readOnly /></Suspense></div>}
             <PurchaseLineCosts
               label={l.label}
               qty={l.qty_ordered}

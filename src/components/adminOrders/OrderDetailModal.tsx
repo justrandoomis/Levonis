@@ -31,6 +31,8 @@ import VariantImg from '../ui/VariantImg';
 
 // The §16 serial / warranty page, opened from a linked slot's serial.
 const SerialDetail = React.lazy(() => import('../adminWarranty/serial/SerialDetail'));
+// The owner's own supplier links of a pre-order line (docs/SMART_PRICING.md §3.10): his chunk, never a staff member's.
+const SupplierLinksPanel = React.lazy(() => import('../adminEstimates/SupplierLinksPanel'));
 
 /**
  * The order read since migration 0218 (worker/routes/admin.ts): true while a
@@ -62,6 +64,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const [showBreakdown, setShowBreakdown] = useState(false);
   const { user } = useAuth();
   const viewerOwner = !!user?.is_owner;
+  // The supplier links of a pre-order line are the owner's alone: the server's own hint, fail closed (=== true).
+  const ownerCost = user?.can_view_cost === true;
   // «Scan Serial» (0178): the slots live in the order detail and are patched
   // in place by each link, so the blocker, the chips and the slots agree.
   const [serials, setSerials] = useState<OrderSerials | null>(null);
@@ -644,6 +648,16 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           guessed split, or today's product names, can cause
                           the wrong item to be packed. */}
                       {it.variant && <div className="w-full min-w-0"><PackingSelection value={it.variant} /></div>}
+                      {/* «اطلبها من المورّد»: the owner's supplier links of the exact SKU a pre-order line bought —
+                          its own chunk and route, never drawn for staff, and never inside the price panels any
+                          admin reads (EstimateConfirmPanel, PriceAdjustPanel, PreorderOriginsPanel). */}
+                      {ownerCost && detail.shipping_type !== 'direct' && it.product_id && !it.is_gift && !it.bundle && (
+                        <div className="w-full min-w-0" data-order-item-supplier-links={it.id}>
+                          <React.Suspense fallback={null}>
+                            <SupplierLinksPanel productId={it.product_id} scope={it.selection ? { order_selection: it.selection } : null} variant="strip" context="order" />
+                          </React.Suspense>
+                        </div>
+                      )}
                       {/* THE BOX, AS THE PERSON PACKING IT SEES IT
                           (docs/BUNDLES_MYSTERY.md §6.3). A bundle's parts are
                           grouped UNDER their parent rather than listed as N

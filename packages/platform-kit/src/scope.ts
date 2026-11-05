@@ -567,6 +567,10 @@ export const FINANCIAL_FIELDS = [
   // -- ones (the type's default weight and box, owner-only like the type's figures; DECISIONS row 292).
   'confirm_gate',
   'real_measures',
+  // -- The owner's own supplier links (docs/SMART_PRICING.md §3.10; DECISIONS row 293; migration 0223):
+  // -- every address, host, label, supplier name and note he saved for a product, answered whole
+  // -- under this one key.
+  'supplier_links',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

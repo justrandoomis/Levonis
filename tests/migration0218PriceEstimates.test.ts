@@ -244,12 +244,14 @@ const TWELVE = [
   'price_estimate_firm_skus', 'order_price_estimates',
 ];
 
-test('the twelve tables exist, the late-protected list names exactly them, and the label columns read their defaults', () => {
+test('the twelve tables exist, the late-protected list names exactly them as 0218’s, and the label columns read their defaults', () => {
   const db = freshDb();
   const tables = new Set((db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as Array<{ name: string }>).map((r) => r.name));
   for (const t of TWELVE) assert.ok(tables.has(t), `${t} is missing`);
-  assert.deepEqual(LATE_PROTECTED_TABLES.map((t) => t.table).sort(), [...TWELVE].sort());
-  for (const t of LATE_PROTECTED_TABLES) assert.equal(t.guardedBy, FILE);
+  // 0218's entries name exactly its twelve tables; a later migration's own entry names that migration
+  // (0223: the owner's own supplier links, tests/migration0223SupplierLinks.test.ts).
+  assert.deepEqual(LATE_PROTECTED_TABLES.filter((t) => t.guardedBy === FILE).map((t) => t.table).sort(), [...TWELVE].sort());
+  for (const t of LATE_PROTECTED_TABLES) assert.ok(t.guardedBy >= FILE, `${t.table} is guarded by ${t.guardedBy}, older than ${FILE}`);
   const col = (table: string, name: string) =>
     (db.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string; notnull: number; dflt_value: unknown }>).find((c) => c.name === name)!;
   assert.deepEqual({ ...col('products', 'price_estimate') }, { ...col('products', 'price_estimate'), notnull: 1, dflt_value: '0' });

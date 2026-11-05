@@ -1152,6 +1152,9 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'price_estimate_lines.flags_json': 'estimate flag codes; no media',
   'price_estimate_firm_skus.combo_key': "a canonical SKU combo key ('' for the product); no media",
   'order_price_estimates.combo_key': "a canonical SKU combo key ('' for the product); no media",
+  // -- The owner's own supplier links (0223): an address at the supplier's site, never ours to keep or delete.
+  'product_supplier_links.combo_key': "a canonical SKU combo key or a canonical subset of one ('' for the product); no media",
+  'product_supplier_links.url': "the owner's supplier page URL (https, any host), never an R2 key; no media",
 };
 
 /**

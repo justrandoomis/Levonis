@@ -200,7 +200,11 @@ test('the workspace is lazy and owner-mounted: a card in «التسعير وال
   // Nobody else reaches into the workspace, statically or lazily.
   const allowed = new Map([
     ['src/components/adminPricing/AdminPricing.tsx', ['EstimateWorkspace', 'EstimatesCard']],
-    ['src/components/adminProducts/form/v2/PricesSectionV2.tsx', ['EstimateBanner']],
+    // The owner's own supplier links (§3.10, DECISIONS row 293): one lazy chunk, three owner-gated hosts
+    // (tests/supplierLinksUi.test.ts pins each gate).
+    ['src/components/adminProducts/form/v2/PricesSectionV2.tsx', ['EstimateBanner', 'SupplierLinksPanel']],
+    ['src/components/adminOperations/ProcurementPanel.tsx', ['SupplierLinksPanel']],
+    ['src/components/adminOrders/OrderDetailModal.tsx', ['SupplierLinksPanel']],
   ]);
   for (const file of srcFiles(join(ROOT, 'src'))) {
     if (file.startsWith(DIR)) continue;
@@ -296,6 +300,7 @@ test('every call goes to /api/admin/pricing — each one a route the owner route
     'GET /supplier-prices/links/:p',
     'GET /supplier-prices/lookup',
     'GET /supplier-prices/matches',
+    'GET /supplier-prices/owner-links/:p',
     'GET /supplier-prices/snapshots',
     'POST /estimates/apply',
     'POST /estimates/compute',
@@ -312,6 +317,7 @@ test('every call goes to /api/admin/pricing — each one a route the owner route
     'PUT /estimates/types/:p',
     'PUT /supplier-prices/manual/:p',
     'PUT /supplier-prices/matches/:p',
+    'PUT /supplier-prices/owner-links/:p',
   ]);
   const served = serverRoutes();
   for (const c of calls) assert.ok(served.has(c), `${c} is not a route of the owner routers`);

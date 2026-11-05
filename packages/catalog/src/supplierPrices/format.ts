@@ -230,6 +230,28 @@ export function supplierPriceText(value: unknown, path = '$'): string {
   return fail(path, 'wrong_type');
 }
 
+/**
+ * The price of one unit of an offer of `units` (the owner's division of a pack,
+ * `units_per_offer`, EST_UNITS_DIVIDED): ceil(price / units) at four decimals,
+ * computed exactly (BigInt rationals), so a cost is never understated. `units`
+ * 1 answers the price as it is. It lives in this pure half so the estimate
+ * (worker/lib/supplierPrices/store.ts) and the owner's screens divide a pack
+ * the same way.
+ */
+export function unitPriceOf(price: string, units: number): string {
+  if (!isSupplierPriceText(price)) throw new Error('SUPPLIER_PRICE_INVARIANT: not a decimal price');
+  if (!Number.isSafeInteger(units) || units < 1 || units > 1000) throw new Error('SUPPLIER_PRICE_INVARIANT: units out of range');
+  if (units === 1) return price;
+  const [whole = '', frac = ''] = price.split('.');
+  const scaled = BigInt(`${whole}${frac}`) * 10_000n;
+  const den = 10n ** BigInt(frac.length) * BigInt(units);
+  const q = (scaled + den - 1n) / den;
+  const digits = q.toString().padStart(5, '0');
+  const int = digits.slice(0, -4).replace(/^0+(?=\d)/, '');
+  const dec = digits.slice(-4).replace(/0+$/, '');
+  return dec ? `${int}.${dec}` : int;
+}
+
 /** The hosts a source's pages may be served from (a redirect to another store is refused). */
 export function supplierHostAllowed(source: SupplierSource, host: string): boolean {
   switch (source) {

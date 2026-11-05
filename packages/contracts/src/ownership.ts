@@ -117,6 +117,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'supplier_price_snapshots', 'supplier_price_items', 'supplier_price_skus', 'supplier_price_keys',
     'supplier_price_matches', 'supplier_price_manual', 'price_estimate_types', 'price_estimate_control',
     'product_price_estimates', 'price_estimate_lines', 'price_estimate_firm_skus',
+    // 0223 (docs/SMART_PRICING.md §3.10; DECISIONS row 293): the owner's own supplier links of a
+    // product — written beside the supplier catalogue, by the same owner-only router.
+    'product_supplier_links',
     // 0184 (owner brief 2026-10-10) — each catalogue product's verdict against
     // the one central list of required fields, and the owner's «hide
     // incomplete» hold. Derived from the product row and its pricing data, and

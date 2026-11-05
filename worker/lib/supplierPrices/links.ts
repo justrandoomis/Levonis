@@ -46,6 +46,7 @@ import {
   isSupplierCurrency,
   isSupplierSource,
   loadProductSkus,
+  type ProductSkus,
   type SupplierCurrency,
   type SupplierSource,
 } from './store';
@@ -134,6 +135,8 @@ export interface ViewOptions {
   manual: boolean;
   /** Only this source's matches. */
   source?: SupplierSource | null;
+  /** The products as the caller already loaded them (`loadProductSkus`), so they are not read twice. */
+  loaded?: ReadonlyMap<string, ProductSkus>;
 }
 
 /**
@@ -190,7 +193,7 @@ export async function productLinkViews(db: D1Database, ids: readonly string[], o
     throw e;
   }
   const [matchRes, manualRes, matchTokens, manualTokens] = answers;
-  const products = await loadProductSkus(db, unique);
+  const products = opts.loaded && unique.every((id) => opts.loaded!.has(id)) ? opts.loaded : await loadProductSkus(db, unique);
 
   const linksBy = new Map<string, SupplierLink[]>();
   const add = (pid: string, combo: string, l: SupplierLink) => {

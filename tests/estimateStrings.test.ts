@@ -86,6 +86,8 @@ const STAFF_REFUSALS = ['PRICE_ESTIMATE_UNCONFIRMED', 'PRICE_ESTIMATE_REOPEN_REF
 const OWNER_REFUSALS = [
   'PRICE_ESTIMATES_NOT_INSTALLED', 'PRICE_ESTIMATES_DISABLED', 'PRICE_ESTIMATE_POLICY_MISSING', 'PRICE_ESTIMATE_NOT_ELIGIBLE',
   'PRICE_ESTIMATE_DEFAULT_MEASURES', 'PRICE_ESTIMATE_FLAGS_OPEN', 'PRICE_ESTIMATE_TYPE_RULE', 'PRICE_ESTIMATE_STORE_PAGE_UNREADABLE',
+  // The owner's own supplier links on a database without 0223 (§3.10, DECISIONS row 293).
+  'SUPPLIER_LINKS_NOT_INSTALLED',
 ];
 
 test('every key of the design and every refusal is there, in ar, en and ckb, trimmed and non-empty', () => {
@@ -222,6 +224,8 @@ test('the statuses and audiences are the design’s', () => {
     PRICE_ESTIMATE_TYPE_RULE: 409,
     // §3.6: the owner's one-page store read answered no price (refused, challenged or no offers).
     PRICE_ESTIMATE_STORE_PAGE_UNREADABLE: 502,
+    // §3.10: saving the owner's own supplier links on a database without 0223.
+    SUPPLIER_LINKS_NOT_INSTALLED: 503,
   });
   for (const c of CUSTOMER_REFUSALS) assert.equal(ESTIMATE_REFUSALS[c as keyof typeof ESTIMATE_REFUSALS].audience, 'customer', c);
   for (const c of STAFF_REFUSALS) assert.equal(ESTIMATE_REFUSALS[c as keyof typeof ESTIMATE_REFUSALS].audience, 'staff', c);
