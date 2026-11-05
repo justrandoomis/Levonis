@@ -1,7 +1,7 @@
 /**
  * Services V2, S-P0a — the trade-in figure a draft may ask for (G11), the
  * copy that promised published rules (G22), and Sorani on the trade-in,
- * points and services screens (row 183).
+ * points, services and rewards-area screens (row 183).
  *
  * G11. A trade-in estimate is a function of the answers, so a door that prices
  * any answers on demand gives back the owner's valuation rules one toggled
@@ -18,7 +18,7 @@
  */
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { COPY } from '../src/components/tradeIn/copy';
 import ts from 'typescript';
 import type { DatabaseSync } from 'node:sqlite';
@@ -251,9 +251,16 @@ const SORANI_SCREENS = [
   'src/components/tradeIn/model.ts',
   'src/pages/Rewards.tsx',
   'src/components/home/ServicesGrid.tsx',
+  // «المكافآت», the rewards area (DECISIONS row 290): every file of it, listed
+  // from the folder. Its words live in its own table, held by
+  // tests/rewardsCopy.test.ts; a loc() call here is held as these are.
+  'src/pages/RewardsArea.tsx',
+  ...readdirSync('src/components/rewards')
+    .filter((name) => /\.tsx?$/.test(name))
+    .map((name) => `src/components/rewards/${name}`),
 ];
 
-test('Sorani: every string on the trade-in, /points and services screens has a third, Sorani argument that is not the Arabic', () => {
+test('Sorani: every string on the trade-in, /points, services and rewards-area screens has a third, Sorani argument that is not the Arabic', () => {
   const missing: string[] = [];
   const copied: string[] = [];
   let written = 0;
@@ -277,7 +284,7 @@ test('Sorani: every string on the trade-in, /points and services screens has a t
   }
   assert.deepEqual(missing, [], `calls without Sorani: ${missing.join(', ')}`);
   assert.deepEqual(copied, [], `Sorani copied from the Arabic: ${copied.join(', ')}`);
-  assert.ok(written >= 230, `the written Sorani strings (${written}) cover the trade-in screens, /points and the services grid`);
+  assert.ok(written >= 230, `the written Sorani strings (${written}) cover the trade-in screens, /points, the services grid and the rewards area`);
 });
 
 test('Sorani: the engine labels, photo hints and the seeded checklists carry their own Sorani', () => {

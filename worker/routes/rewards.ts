@@ -83,6 +83,7 @@ import {
   readRewardHistory,
   readStreak,
 } from '../lib/pointsTasks';
+import { readPendingPoints } from '../lib/rewards/pending';
 
 export const rewardRoutes = new Hono<AppContext>();
 rewardRoutes.use('*', requireAuth);
@@ -166,7 +167,7 @@ rewardRoutes.get('/', async (c) => {
   const yesterday = baghdadDay(-1, nowMs);
   const nowSecs = Math.floor(nowMs / 1000);
 
-  const [balances, claims, adVideoUrl, browse, tierStatus, streak, history, taskCfg, pointsRule] = await Promise.all([
+  const [balances, claims, adVideoUrl, browse, tierStatus, streak, history, taskCfg, pointsRule, pending] = await Promise.all([
     getBalances(c.env.DB, user.id),
     c.env.DB.prepare(
       `SELECT mission, day, state, started_at, required_seconds, points
@@ -184,6 +185,7 @@ rewardRoutes.get('/', async (c) => {
     readRewardHistory(c.env.DB, user.id, 20),
     getRewardTaskConfig(c.env),
     getPointsRuleConfig(c.env),
+    readPendingPoints(c.env.DB, user.id),
   ]);
 
   const multiplierX100 = rewardMultiplierX100(tierStatus);
@@ -235,6 +237,8 @@ rewardRoutes.get('/', async (c) => {
     streak: streak.current,
     checked_in_today: streak.todayDay !== null,
     point_balance: balances.points,
+    /** Purchase points not spendable yet (policy arts. 3.7 and 12.6), shown under the balance. */
+    pending_points: pending,
     checkin: {
       next_day: streak.nextDay,
       ...money(checkinBasePoints(streak.nextDay)),

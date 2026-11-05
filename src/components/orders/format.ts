@@ -54,6 +54,20 @@ export function formatDate(iso: string | null | undefined, lang: string): string
   return new Intl.DateTimeFormat(dateLocale(lang), { year: 'numeric', month: 'short', day: 'numeric' }).format(d);
 }
 
+/**
+ * «14 تشرين الثاني» / «14 Nov» / «14ی تشرینی دووەم» — the day and month with
+ * no year, for a date in the reader's current year (the rewards area's
+ * `nearDate` decides when). The same locales as `formatDate`, and Sorani is
+ * written by hand from `CKB_MONTHS` for the same reason.
+ */
+export function formatDayMonth(iso: string | null | undefined, lang: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  if (lang === 'ckb') return `${d.getDate()}ی ${CKB_MONTHS[d.getMonth()]}`;
+  return new Intl.DateTimeFormat(dateLocale(lang), { day: 'numeric', month: 'short' }).format(d);
+}
+
 export function formatDateTime(iso: string | null | undefined, lang: string): string {
   if (!iso) return '';
   const d = new Date(iso);

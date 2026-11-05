@@ -61,6 +61,12 @@ export interface ConfirmDialogProps extends ConfirmOptions {
   busy?: boolean;
   /** Why the last attempt failed, shown inside the dialog. */
   error?: React.ReactNode;
+  /**
+   * There is nothing left to confirm (a refusal changed what was asked; `error`
+   * says why): the confirm button is off and Cancel is the way on. Not `busy`,
+   * which spins as if something were still happening.
+   */
+  confirmDisabled?: boolean;
   testId?: string;
 }
 
@@ -75,6 +81,7 @@ export function ConfirmDialog({
   onCancel,
   busy = false,
   error,
+  confirmDisabled = false,
   testId,
 }: ConfirmDialogProps) {
   const { loc } = useLanguage();
@@ -85,6 +92,14 @@ export function ConfirmDialog({
   const confirmRef = useRef<HTMLButtonElement | null>(null);
   const [working, setWorking] = useState(false);
   const locked = busy || working;
+
+  // A confirm turned off while it held focus drops that focus on the floor (a
+  // disabled button cannot keep it): Cancel, the one way on, takes it.
+  useEffect(() => {
+    if (!open || !confirmDisabled || locked) return;
+    const at = document.activeElement;
+    if (!at || at === document.body || at === confirmRef.current) cancelRef.current?.focus({ preventScroll: true });
+  }, [open, confirmDisabled, locked]);
 
   const confirm = () => {
     const result = onConfirm();
@@ -147,6 +162,7 @@ export function ConfirmDialog({
             ref={confirmRef}
             variant={destructive ? 'danger' : 'primary'}
             loading={locked}
+            disabled={confirmDisabled}
             onClick={confirm}
             className="sm:min-w-24"
             data-confirm-action

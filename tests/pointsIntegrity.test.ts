@@ -570,6 +570,27 @@ test('the history tells the truth: the Baghdad day it credited AND the instant i
   assert.ok(Date.parse(h.awarded_at) > 0, 'and when it actually happened');
 });
 
+test('the points page states the points still on the way (policy art. 12.6) — pending only, with the first release day', async () => {
+  const raw = seed();
+  raw.exec(`
+    INSERT INTO orders
+      (id,user_id,status,stage,shipping_type,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
+       subtotal_iqd,shipping_iqd,points_discount_iqd,wallet_applied_iqd,wallet_applied_usd_cents,
+       exchange_rate,total_iqd,due_on_delivery_iqd,idempotency_key)
+    VALUES
+      ('O1','u1','delivered','received','direct','{}','standard','{}','wallet',71000,5000,0,0,0,1400,71000,0,'idem-O1'),
+      ('O2','u1','delivered','received','direct','{}','standard','{}','wallet',30000,5000,0,0,0,1400,30000,0,'idem-O2'),
+      ('O3','u1','delivered','received','direct','{}','standard','{}','wallet',99000,5000,0,0,0,1400,99000,0,'idem-O3');
+    INSERT INTO points_accruals (id,source_ref,order_id,user_id,kind,points,eligible_iqd,iqd_per_point,rule_version,state,purchase_at,available_at,reason)
+    VALUES
+      ('pa1','order:O1:accrual','O1','u1','purchase',71,71000,1000,'v1','pending','2026-11-01T00:00:00.000Z','2026-11-08T00:00:00.000Z','purchase'),
+      ('pa2','order:O2:accrual','O2','u1','purchase',30,30000,1000,'v1','pending','2026-11-02T00:00:00.000Z','2026-11-09T00:00:00.000Z','purchase'),
+      ('pa3','order:O3:accrual','O3','u1','purchase',999,999000,1000,'v1','released','2026-10-01T00:00:00.000Z','2026-10-08T00:00:00.000Z','purchase');
+  `);
+  const body = await json(await get(appFor(asD1(raw)), '/api/rewards'));
+  assert.deepEqual(body.pending_points, { points: 101, next_available_at: '2026-11-08T00:00:00.000Z' }, 'what is still pending, never what was released');
+});
+
 // ===========================================================================
 // 8. TASKS THE SERVER TIMES — "Watch Ad"
 // ===========================================================================

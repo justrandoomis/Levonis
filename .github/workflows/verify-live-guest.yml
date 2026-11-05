@@ -36,7 +36,7 @@ jobs:
           # of its own paths, so a 200 here means the route exists and the app
           # is reachable; which component renders is asserted by the browser
           # suite (scripts/e2e-guest.mjs) at build time.
-          for p in / /products /bundles /community /requests /chats /subscription /points /tools /games /leaderboards /games/printer-farm /policies /support; do
+          for p in / /products /bundles /community /requests /chats /subscription /points /rewards /tools /games /leaderboards /games/printer-farm /policies /support; do
             code=$(curl -s -o /tmp/page.html -w '%{http_code}' --max-time 25 "$APEX$p" || echo 000)
             if [ "$code" = "200" ]; then
               echo "  ok   $p answers 200 to a guest"

@@ -491,9 +491,11 @@ export default function Profile() {
                 <span className="text-gold font-bold text-[9px] whitespace-nowrap">{loc('مركز الأعضاء', 'Member Center', 'ناوەندی ئەندامان')}</span>
                 <span className="text-[8px] text-text-muted whitespace-nowrap">{loc('استكشف المزايا', 'Explore benefits', 'سوودەکان ببینە')}</span>
               </button>
-              <button type="button" onClick={() => navigate('/points')} className="flex flex-col items-center justify-center shrink-0 min-h-[44px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg px-1">
+              {/* «المكافآت» opens the rewards area (DECISIONS row 290); the
+                  points stat below and «تسجيل الدخول اليومي» stay on /points. */}
+              <button type="button" onClick={() => navigate('/rewards')} className="flex flex-col items-center justify-center shrink-0 min-h-[44px] hover:opacity-80 active:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-lg px-1">
                 <span className="text-gold font-bold text-[9px] whitespace-nowrap">{loc('المكافآت', 'Rewards', 'خەڵاتەکان')}</span>
-                <span className="text-[8px] text-text-muted whitespace-nowrap">{loc('اكسب النقاط', 'Earn points', 'خاڵ بەدەست بهێنە')}</span>
+                <span className="text-[8px] text-text-muted whitespace-nowrap">{loc('كوبونات ومسابقات', 'Coupons & contests', 'کۆپۆن و پێشبڕکێ')}</span>
               </button>
             </div>
           </div>
@@ -708,7 +710,7 @@ export default function Profile() {
               { icon: Coins, label: loc('مزرعة الطباعة', 'Printer Farm', 'کێڵگەی چاپکەر'), to: '/games/printer-farm', soon: true },
               { icon: Zap, label: loc('تسجيل الدخول اليومي', 'Daily Sign-in', 'چوونەژوورەوەی ڕۆژانە'), to: '/points', soon: false },
               { icon: Gamepad2, label: loc('الالعاب', 'Games', 'یارییەکان'), to: '/games', soon: true },
-              { icon: Star, label: loc('المكافآت', 'Rewards', 'خەڵاتەکان'), to: '/points', soon: false },
+              { icon: Star, label: loc('المكافآت', 'Rewards', 'خەڵاتەکان'), to: '/rewards', soon: false },
             ].map((game, i) => (
               <button
                 key={i}

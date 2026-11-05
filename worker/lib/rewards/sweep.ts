@@ -133,7 +133,7 @@ async function remind(db: D1Database, nowIso: string, report: RewardSweepReport)
         title_en: text.title.en,
         body_ar: text.body.ar,
         body_en: text.body.en,
-        link: '/points#coupons',
+        link: '/rewards/coupons',
         entity_type: 'reward_grant',
         entity_id: g.ids[0],
         meta: { title_ckb: text.title.ckb, body_ckb: text.body.ckb, grants: g.ids },

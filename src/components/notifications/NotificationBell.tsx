@@ -25,7 +25,7 @@ import { appReturnUrl } from '../auth/storeReturn';
 import { useLanguage } from '../../LanguageContext';
 import { ApiError } from '../../lib/api';
 import { Anchored, Sheet } from '../ui/Overlay';
-import { listNotifications, markRead, unreadCount, type NotificationRow } from '../../lib/notifications';
+import { listNotifications, markRead, noticeDestination, unreadCount, type NotificationRow } from '../../lib/notifications';
 
 /**
  * THE BELL — the app's first in-app inbox.
@@ -386,7 +386,9 @@ function NotificationBellSession() {
       // through the allowlisted builder, never followed as an apex path.
       const cloud = n.kind === 'print_cloud' ? appReturnUrl('cloud', mainSite, n.link) : null;
       if (cloud) window.location.assign(cloud);
-      else navigate(n.link);
+      // A rewards notice stored before the rewards had pages of their own
+      // opens its page now (noticeDestination); every other link is as stored.
+      else navigate(noticeDestination(n));
     },
     [close, navigate, refreshCount, mainSite]
   );

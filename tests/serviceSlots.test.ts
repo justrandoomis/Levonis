@@ -26,6 +26,7 @@ import { readFileSync } from 'node:fs';
 import { SERVICE_SLOTS, isSiteMediaObject, siteMediaKey, resolveSiteMedia } from '../worker/lib/siteMedia';
 import { isAnonymousPublicMediaKey, isSafeMediaKey } from '../worker/lib/mediaStorage';
 import { STUDIO_URL } from '../src/translations';
+import { sectionOf } from '../src/components/rewards/model';
 
 const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
@@ -98,18 +99,24 @@ test('the service slots name the objects the owner uploaded, in the owner’s or
   );
 });
 
-test('the reward doors open their own section of /points', () => {
-  // Each lands on a section the rewards page always draws for a signed-in
-  // customer (src/components/rewards/RewardsHub.tsx), under that exact id.
-  const hub = read('src/components/rewards/RewardsHub.tsx');
-  for (const slot of SERVICE_SLOTS.filter((s) => NO_ARTWORK_YET.includes(s.slot))) {
-    const [path, id] = (slot.link ?? '').split('#');
-    assert.equal(path, '/points', `${slot.slot} leaves the rewards page`);
-    assert.ok(id, `${slot.slot} names no section`);
-    assert.match(hub, new RegExp(`<SectionTitle id="${id}"`), `${slot.slot} points at #${id}, which the rewards page does not draw`);
+test('the reward doors open their own page of the rewards area', () => {
+  // DECISIONS row 290: «النقاط والمكافآت» opens the hub, and each of row 288's
+  // three doors its own page of the area — never a #section of a longer page,
+  // which is what let one growing section bury the others. The address alone
+  // says which page shows (sectionOf, the area's own reading of it), so a
+  // guest signing in comes back to the same page.
+  const doors = new Map([
+    ['service-rewards', ['/rewards', 'home']],
+    ['service-coupons', ['/rewards/coupons', 'coupons']],
+    ['service-points-shop', ['/rewards/shop', 'shop']],
+    ['service-competitions', ['/rewards/competitions', 'competitions']],
+  ]);
+  for (const [slot, [link, section]] of doors) {
+    const found = SERVICE_SLOTS.find((s) => s.slot === slot)?.link ?? '';
+    assert.equal(found, link, `${slot} leaves its page of the rewards area`);
+    assert.ok(!found.includes('#'), `${slot} names a section of a page again`);
+    assert.equal(sectionOf(found).section, section, `${slot} lands on the wrong page of the area`);
   }
-  // …and the page goes there once it has loaded, not before.
-  assert.match(read('src/pages/Rewards.tsx'), /getElementById\(id\)/);
 });
 
 test('every service icon is a real object name an anonymous visitor may fetch', () => {

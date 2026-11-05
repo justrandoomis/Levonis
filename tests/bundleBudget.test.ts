@@ -325,6 +325,9 @@ test('the split really happened: every page and panel §10 names has a chunk of 
     // here so a regression that re-eagers either one fails loudly.
     'Bundles', 'BundleDetail',
     'Chat', 'Chats', 'Warranty', 'WarrantyVerify', 'LegacyInvestmentRedirect', 'Tools', 'Rewards', 'Referrals',
+    // «المكافآت» (DECISIONS row 290): the hub, its pages and the competitions
+    // are one lazy chunk of their own, never prefetched (an account surface).
+    'RewardsArea',
     // The page for an unknown address (clay polish batch 2): lazy, so the
     // entry carries only its import line.
     'NotFound',

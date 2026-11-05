@@ -90,13 +90,15 @@ export default function ServicesGrid() {
     { id: 'compare', to: '/compare', title: t('svcCompareTitle'), icon: Scale },
     { id: 'tools', to: '/tools', title: t('svcToolsTitle'), icon: Wrench },
     // The Studio card is drawn just before this one — see `studio` below.
-    { id: 'rewards', to: '/points', title: t('svcRewardsTitle'), icon: Gift },
-    // Each opens its own section of /points (DECISIONS rows 287 and 288). Every
-    // section is drawn for a signed-in customer — an empty one says so — and the
-    // page scrolls to the #id once it has loaded. A guest lands on the sign-in card.
-    { id: 'coupons', to: '/points#coupons', title: loc('كوبوناتي', 'My coupons', 'کۆپۆنەکانم'), icon: Ticket },
-    { id: 'points-shop', to: '/points#shop', title: loc('استبدل نقاطك', 'Spend points', 'خاڵەکانت خەرج بکە'), icon: Coins },
-    { id: 'competitions', to: '/points#competitions', title: loc('المسابقات', 'Competitions', 'پێشبڕکێکان'), icon: Trophy },
+    // «النقاط والمكافآت» opens the rewards hub, which leads with the points
+    // (owner, 2026-11-05 — DECISIONS row 290); the hub's balance opens /points.
+    { id: 'rewards', to: '/rewards', title: t('svcRewardsTitle'), icon: Gift },
+    // Each opens its own page of the rewards area (DECISIONS rows 287, 288 and
+    // 290), never a section of a longer one. A signed-in customer always gets
+    // the page — an empty one says so — and a guest gets that page's sign-in state.
+    { id: 'coupons', to: '/rewards/coupons', title: loc('كوبوناتي', 'My coupons', 'کۆپۆنەکانم'), icon: Ticket },
+    { id: 'points-shop', to: '/rewards/shop', title: loc('استبدل نقاطك', 'Spend points', 'خاڵەکانت خەرج بکە'), icon: Coins },
+    { id: 'competitions', to: '/rewards/competitions', title: loc('المسابقات', 'Competitions', 'پێشبڕکێکان'), icon: Trophy },
     { id: 'bundles', to: '/bundles', title: t('svcBundlesTitle'), icon: Package },
     // The mystery filament is a FILTER on the bundles page, not a page of its
     // own — Bundles.tsx reads `kind` out of the query string and pre-selects

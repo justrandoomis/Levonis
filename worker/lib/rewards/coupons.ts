@@ -50,7 +50,7 @@ import {
   type RewardCouponKind,
   type RewardProgramConfig,
 } from './config';
-import { rewardNotice } from './strings';
+import { rewardNotice, type Trilingual } from './strings';
 
 export const DAY_MS = 86_400_000;
 
@@ -324,7 +324,7 @@ async function issue(env: Env, orderId: string, nowIso: string): Promise<IssueRe
       title_en: text.title.en,
       body_ar: text.body.ar,
       body_en: text.body.en,
-      link: '/points#coupons',
+      link: '/rewards/coupons',
       entity_type: 'order',
       entity_id: orderId,
       meta: { title_ckb: text.title.ckb, body_ckb: text.body.ckb, order_id: orderId, expires_at: expiresAt },
@@ -496,6 +496,133 @@ export async function listUserRewardCoupons(db: D1Database, userId: string, nowI
   return (results ?? []).map(grantView);
 }
 
+/**
+ * How many reward coupons this customer has, live and past, by the same state
+ * the list derives (GRANT_STATE_SQL) — so the page can say «the latest 40 of
+ * 52» when the list stops short.
+ */
+export async function couponCounts(db: D1Database, userId: string, nowIso = new Date().toISOString()): Promise<{ active: number; past: number }> {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(CASE WHEN state = 'active' THEN 1 ELSE 0 END), 0) AS active,
+              COALESCE(SUM(CASE WHEN state = 'active' THEN 0 ELSE 1 END), 0) AS past
+         FROM (SELECT ${GRANT_STATE_SQL('?2')} AS state
+                 FROM reward_grants g LEFT JOIN coupons c ON c.id = g.coupon_id
+                WHERE g.user_id = ?1)`
+    )
+    .bind(userId, nowIso)
+    .first<{ active: number; past: number }>();
+  return { active: Math.max(0, Number(row?.active) || 0), past: Math.max(0, Number(row?.past) || 0) };
+}
+
+// ------------------------------------------------------------- what a coupon is for
+
+export interface CatalogSection {
+  id: string;
+  slug: string;
+  /** The storefront's own address for the section. */
+  path: string;
+  name: Trilingual;
+}
+
+/** One storefront section, with its address: /categories/<parent>/<child>, or /categories/<top>. Null when it is gone. */
+export async function catalogSection(db: D1Database, id: string): Promise<CatalogSection | null> {
+  const s = await db
+    .prepare(
+      `SELECT c.id, c.slug, c.name_ar, c.name_en, c.name_ckb, p.slug AS parent_slug
+         FROM catalogs c LEFT JOIN catalogs p ON p.id = c.parent_id WHERE c.id = ?`
+    )
+    .bind(id)
+    .first<{ id: string; slug: string; name_ar: string; name_en: string; name_ckb: string; parent_slug: string | null }>();
+  return s
+    ? {
+        id: s.id,
+        slug: s.slug,
+        path: s.parent_slug ? `/categories/${encodeURIComponent(s.parent_slug)}/${encodeURIComponent(s.slug)}` : `/categories/${encodeURIComponent(s.slug)}`,
+        name: { ar: s.name_ar, en: s.name_en || s.name_ar, ckb: s.name_ckb || s.name_en || s.name_ar },
+      }
+    : null;
+}
+
+export interface CouponTargetProduct {
+  id: string;
+  slug: string;
+  name: Trilingual;
+  /** The first of the product's images, or ''. */
+  image: string;
+}
+
+export interface CouponTargets {
+  /** The first MAX_TARGET_NAMES of the coupon's own products still on sale, in its own order. */
+  products: CouponTargetProduct[];
+  /** All of the coupon's own products still on sale. */
+  products_total: number;
+  /** A section-wide coupon's section. */
+  section: CatalogSection | null;
+}
+
+export const MAX_TARGET_NAMES = 20;
+
+/**
+ * WHAT EACH LIVE FILAMENT COUPON CAN BE SPENT ON, from the coupon's OWN frozen
+ * terms (DECISIONS row 290) — never from today's settings: a coupon issued
+ * while the owner had ticked A still covers A after A is unticked and B is
+ * ticked, because that is what its row says and what the checkout honours.
+ *
+ *   scope 'products'  its own product list, the products still on sale only,
+ *                     the first MAX_TARGET_NAMES named and all of them counted;
+ *   scope 'category'  its section, with the storefront's address for it.
+ *
+ * Only an ACTIVE filament coupon has targets; the caller answers null for the
+ * rest. ONE products read over the union of every such coupon's own ids, and
+ * one section read per distinct section.
+ */
+export async function couponTargets(db: D1Database, coupons: readonly RewardCouponView[]): Promise<Map<string, CouponTargets>> {
+  const out = new Map<string, CouponTargets>();
+  const live = coupons.filter((c) => c.kind === 'filament_discount' && c.state === 'active');
+  if (!live.length) return out;
+
+  const ids = [...new Set(live.flatMap((c) => (c.scope === 'products' ? c.product_ids : [])))];
+  const sectionIds = [...new Set(live.flatMap((c) => (c.scope === 'category' && c.category_id ? [c.category_id] : [])))];
+  const [rows, sectionList] = await Promise.all([
+    ids.length
+      ? db
+          .prepare('SELECT id, slug, name, name_ar, name_ku, images, status FROM products WHERE id IN (SELECT value FROM json_each(?1))')
+          .bind(JSON.stringify(ids))
+          .all<{ id: string; slug: string | null; name: string | null; name_ar: string | null; name_ku: string | null; images: string | null; status: string | null }>()
+          .then((r) => r.results ?? [])
+      : Promise.resolve([]),
+    Promise.all(sectionIds.map(async (id) => [id, await catalogSection(db, id)] as const)),
+  ]);
+  const sections = new Map(sectionList);
+  const products = new Map<string, CouponTargetProduct & { status: string }>();
+  for (const p of rows) {
+    const images = safeParse<unknown>(p.images ?? '[]', []);
+    const name = String(p.name ?? '');
+    products.set(String(p.id), {
+      id: String(p.id),
+      slug: String(p.slug ?? ''),
+      name: { ar: p.name_ar || name, en: name, ckb: p.name_ku || name },
+      image: Array.isArray(images) && typeof images[0] === 'string' ? images[0] : '',
+      status: String(p.status ?? ''),
+    });
+  }
+
+  for (const c of live) {
+    if (c.scope === 'category' && c.category_id) {
+      out.set(c.id, { products: [], products_total: 0, section: sections.get(c.category_id) ?? null });
+      continue;
+    }
+    const own = c.scope === 'products' ? [...new Set(c.product_ids)] : [];
+    const onSale = own.flatMap((id) => {
+      const p = products.get(id);
+      return p && p.status === 'active' ? [{ id: p.id, slug: p.slug, name: p.name, image: p.image }] : [];
+    });
+    out.set(c.id, { products: onSale.slice(0, MAX_TARGET_NAMES), products_total: onSale.length, section: null });
+  }
+  return out;
+}
+
 // ------------------------------------------------------------- points shop
 
 export class RewardShopError extends Error {
@@ -505,11 +632,34 @@ export class RewardShopError extends Error {
   }
 }
 
-/** The live shop coupon of this kind the customer still holds, if any. */
-const HOLDING_SQL = `SELECT 1 FROM reward_grants h JOIN coupons hc ON hc.id = h.coupon_id
-   WHERE h.user_id = ?U AND h.kind = ?K AND h.source = 'points_shop' AND h.revoked_at IS NULL
+/**
+ * HOLDING (policy 14.9): a coupon bought from the points shop that is still
+ * live and unused — not withdrawn, switched on, inside its dates, not spent on
+ * an order. ONE predicate for the shop's own guard (a second purchase of the
+ * kind is refused while one is held) and for the shop's display of it
+ * (`shopHoldings`), so the page can never say «you may» where the swap says
+ * «you may not». `h` is the reward_grants row, `hc` its coupon; `?N` is now,
+ * which each caller renumbers.
+ */
+export const HOLDING_WHERE = `h.source = 'points_shop' AND h.revoked_at IS NULL
      AND hc.active = 1 AND hc.ends_at > ?N
      AND NOT EXISTS (SELECT 1 FROM coupon_redemptions hr WHERE hr.coupon_id = h.coupon_id AND hr.state = 'active')`;
+
+/** The live shop coupon of this kind the customer still holds, if any. */
+const HOLDING_SQL = `SELECT 1 FROM reward_grants h JOIN coupons hc ON hc.id = h.coupon_id
+   WHERE h.user_id = ?U AND h.kind = ?K AND ${HOLDING_WHERE}`;
+
+/** The kinds of shop coupon this customer holds right now (see HOLDING_WHERE). */
+export async function shopHoldings(db: D1Database, userId: string, nowIso = new Date().toISOString()): Promise<Set<RewardCouponKind>> {
+  const { results } = await db
+    .prepare(
+      `SELECT DISTINCT h.kind FROM reward_grants h JOIN coupons hc ON hc.id = h.coupon_id
+        WHERE h.user_id = ?1 AND ${HOLDING_WHERE.replace('?N', '?2')}`
+    )
+    .bind(userId, nowIso)
+    .all<{ kind: RewardCouponKind }>();
+  return new Set((results ?? []).map((r) => r.kind));
+}
 
 /**
  * Swaps points for a reward coupon, in ONE batch:

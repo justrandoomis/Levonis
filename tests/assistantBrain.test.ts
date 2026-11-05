@@ -494,6 +494,8 @@ test('all three dictionaries carry every new string', () => {
     'contact_whatsapp', 'c_condition', 'c_how_to_order', 'c_print_service', 'product_condition_reply', 'used_printers_open',
     'how_to_order_reply', 'printers_open', 'print_service_reply', 'print_service_closed', 'requests_open', 'warranty_general_reply',
     'c_deposit', 'deposit_reply', 'deposit_none',
+    // The rewards area's own page for the codes a customer holds (DECISIONS row 290).
+    'coupons_link',
   ]) {
     assert.equal(
       (route.match(new RegExp(`^ {4}${key}:`, 'gm')) ?? []).length,
@@ -667,6 +669,32 @@ test('«كود خصم» says where the box is instead of quoting the rewards pre
   assert.ok(!reply.text.includes('الغرض من هذه الوثيقة'));
   assert.match(reply.text, /كود الخصم/);
   assert.equal(reply.cards[0].link.to, '/policies/rewards');
+  // And the page that lists the codes the customer DOES hold (DECISIONS row 290).
+  assert.equal(reply.links[0].to, '/rewards/coupons');
+  assert.equal(reply.links[0].label, 'كوبوناتي');
+});
+
+test('«نقاطي» still opens the points page: only the coupon answer moved to «كوبوناتي» (DECISIONS row 290)', async () => {
+  const route = read('worker/routes/support.ts');
+  const body = (name: string) => {
+    const start = route.indexOf(`async function ${name}(`);
+    assert.ok(start >= 0, `${name} is gone`);
+    return route.slice(start, route.indexOf('\n}\n', start));
+  };
+  assert.match(body('handlePoints'), /\{ label: tr\(loc, 'points_link'\), to: '\/points' \}/);
+  assert.match(body('handleOffers'), /\{ label: tr\(loc, 'coupons_link'\), to: '\/rewards\/coupons' \}/);
+  // The link says where it goes: the points page, not «points & rewards».
+  assert.deepEqual(
+    [...route.matchAll(/^ {4}points_link: '([^']+)',$/gm)].map((m) => m[1]),
+    ['صفحة النقاط', 'Points page', 'پەڕەی خاڵەکان']
+  );
+  assert.deepEqual(
+    [...route.matchAll(/^ {4}coupons_link: '([^']+)',$/gm)].map((m) => m[1]),
+    ['كوبوناتي', 'My coupons', 'کۆپۆنەکانم']
+  );
+  const reply = await ask(asD1(seed()), { intent: 'points_balance' });
+  assert.equal(reply.intent, 'points_balance');
+  assert.deepEqual([reply.links[0].label, reply.links[0].to], ['صفحة النقاط', '/points']);
 });
 
 test('«اكو تقسيط» is answered with the instalment service the shop really sells', async () => {

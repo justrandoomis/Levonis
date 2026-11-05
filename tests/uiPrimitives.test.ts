@@ -165,6 +165,9 @@ test('ConfirmDialog is an alertdialog that names the action, says the consequenc
   assert.match(dialog, /initialFocus=\{destructive \? cancelRef : confirmRef\}/, 'Enter out of habit never deletes');
   assert.match(dialog, /variant=\{destructive \? 'danger' : 'primary'\}/);
   assert.match(dialog, /dismissOnEscape=\{!locked\}/, 'a running action cannot be escaped half way');
+  // Nothing left to confirm: the confirm is off (not busy), and Cancel takes the focus it held.
+  assert.match(dialog, /disabled=\{confirmDisabled\}/);
+  assert.match(dialog, /at === confirmRef\.current\) cancelRef\.current\?\.focus\(\{ preventScroll: true \}\);/);
   assert.match(dialog, /export function useConfirm\(\): \[\(options: ConfirmOptions\) => Promise<boolean>, React\.ReactElement\]/);
   assert.match(dialog, /useEffect\(\(\) => \(\) => resolver\.current\?\.\(false\), \[\]\);/, 'an unmounted asker is answered "no"');
 });

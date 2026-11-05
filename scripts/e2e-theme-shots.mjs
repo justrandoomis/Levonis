@@ -19,7 +19,8 @@
  * DATA. Catalogue reads are the live shop's PUBLIC read-only GETs (the same
  * rule as scripts/e2e-home-v2-shots.mjs): only GET, only /api/* and /files/*,
  * no cookie. Everything a signed-in screen needs is answered here from small
- * fixed data (a customer, an admin with a short order board), and anything
+ * fixed data (a customer and their rewards, an admin with a short order
+ * board), and anything
  * else that is not a GET is refused locally — the script cannot write
  * anything anywhere. The merchant workspace is the existing fixture
  * (tests/browser/merchant-workspace.html), which mounts src/App with its own
@@ -139,6 +140,119 @@ const ORDERS = {
   options: { type: { all: 4, prepare: 3, direct: 4, preorder_air: 0, preorder_sea: 0, preorder_land: 0 }, status: { any: 4, pending: 1, confirmed: 1, processing: 1, shipped: 1, delivered: 0, cancelled: 0 } },
 };
 
+/**
+ * «المكافآت» (DECISIONS row 290): one customer's rewards, so each page of the
+ * area is photographed in its real states — a coupon in its last hours (the
+ * live clock), a filament coupon naming its products, a printer to rate, an
+ * open competition with places left, one being judged, a result this customer
+ * won — instead of the 401 an anonymous upstream read would answer. A
+ * competition's words are the owner's, so they are written in each language.
+ */
+const SERVER_NOW = new Date(now).toISOString();
+const inHours = (h) => new Date(now + h * 3_600_000).toISOString();
+const tri = (ar, en, ckb) => ({ ar, en, ckb });
+const sameTri = (name) => tri(name, name, name);
+const COMPETITION = (id, phase, title, over = {}) => ({
+  id, phase, title,
+  description: tri(
+    'أرسل صورة لأجمل مجسّم طبعته، واكتب كيف طبعته وبأي فلامنت.\nيختار فريق Levonis الفائزين بعد الإغلاق.',
+    'Send a photo of the best model you printed, and say how you printed it and with which filament.\nThe Levonis team chooses the winners after it closes.',
+    'وێنەی جوانترین مۆدێلێک بنێرە کە چاپت کردووە، و بنووسە چۆن و بە کام فیلامێنت چاپت کرد.\nتیمی Levonis دوای داخستن براوەکان هەڵدەبژێرێت.'
+  ),
+  prize: tri('بكرة فلامنت هدية لكل فائز', 'A filament spool for every winner', 'بکرەیەک فیلامێنت بۆ هەر براوەیەک'),
+  entry_mode: 'free', entry_points: 0, submission: 'photo_text', eligibility: 'everyone', prize_points: [5000, 2000, 1000],
+  max_entries: null, starts_at: inHours(-24 * 3), ends_at: inHours(24 * 6), entries_count: 37, eligible: true,
+  my_entry: null, winners: [], results_at: null, gate: { can_enter: true, blocked_by: null, points_short: 0, spots_left: null },
+  ...over,
+});
+const ENTRY = (state, over = {}) => ({
+  id: `e_${state}`, state, place: null, prize_points: 0, entry_points: 0, media_url: null, created_at: inHours(-24 * 2),
+  answer: 'طبعته على A1 mini بفلامنت PLA Matte، بطبقة 0.12 مم.',
+  ...over,
+});
+const REWARDS_COMPETITIONS = [
+  COMPETITION('cmp_theme_open', 'open', tri('أجمل مجسّم مطبوع لهذا الشهر', 'The best print of the month', 'جوانترین چاپی ئەم مانگە')),
+  COMPETITION('cmp_theme_fee', 'open', tri('سؤال الأسبوع: أي فلامنت للطباعة الخارجية؟', 'Question of the week: which filament for outdoor prints?', 'پرسیاری هەفتە: کام فیلامێنت بۆ چاپی دەرەوە؟'), {
+    entry_mode: 'points', entry_points: 500, submission: 'text', max_entries: 50, entries_count: 47, ends_at: inHours(5),
+    gate: { can_enter: true, blocked_by: null, points_short: 0, spots_left: 3 },
+  }),
+  COMPETITION('cmp_theme_soon', 'upcoming', tri('تحدي الطباعة السريعة', 'The speed-printing challenge', 'پێشبڕکێی چاپی خێرا'), {
+    eligibility: 'printer_owners', eligible: false, starts_at: inHours(24 * 3), ends_at: inHours(24 * 10), entries_count: 0,
+    gate: { can_enter: false, blocked_by: 'upcoming', points_short: 0, spots_left: null },
+  }),
+  COMPETITION('cmp_theme_judging', 'closed', tri('أفضل تعديل لطابعتك', 'The best upgrade to your printer', 'باشترین گۆڕانکاری لە چاپکەرەکەت'), {
+    starts_at: inHours(-24 * 20), ends_at: inHours(-24 * 2), my_entry: ENTRY('entered'),
+    gate: { can_enter: false, blocked_by: 'entered', points_short: 0, spots_left: null },
+  }),
+];
+const REWARDS_RESULTS = [
+  COMPETITION('cmp_theme_won', 'finished', tri('أجمل مجسّم لشهر تشرين الأول', 'The best print of October', 'جوانترین چاپی مانگی تشرینی یەکەم'), {
+    starts_at: inHours(-24 * 40), ends_at: inHours(-24 * 12), results_at: inHours(-24 * 8), entries_count: 52,
+    my_entry: ENTRY('winner', { place: 2, prize_points: 2000 }),
+    gate: { can_enter: false, blocked_by: 'entered', points_short: 0, spots_left: null },
+    winners: [
+      { place: 1, name: 'Sara B.', prize_points: 5000, answer: 'طبعتها على P1S بفلامنت PLA Silk، وأخذت 9 ساعات.', media_url: null },
+      { place: 2, name: 'علي ح.', prize_points: 2000, answer: 'طبعته على A1 mini بفلامنت PLA Matte، بطبقة 0.12 مم.', media_url: null },
+      { place: 3, name: 'Omar O.', prize_points: 1000, answer: '', media_url: null },
+      { place: 4, name: 'Zainab K.', prize_points: 0, answer: '', media_url: null },
+    ],
+  }),
+];
+const COUPON = (over) => ({
+  source: 'printer', state: 'active', percent: 100, max_discount_iqd: null, scope: 'global', category_id: null, product_ids: [],
+  issued_at: inHours(-24 * 6), order_id: 'LV-2411', points_spent: 0, used_on_order_id: null, revoke_reason: '', targets: null,
+  ...over,
+});
+const REWARDS_HUB = () => ({
+  success: true, installed: true, server_time: SERVER_NOW, point_balance: 12450,
+  pending_points: { points: 300, next_available_at: inHours(24 * 3) },
+  program: {
+    enabled: true, valid_days: 7, free_shipping: { enabled: true },
+    filament: { enabled: true, percent: 15, max_discount_iqd: 25000, products: [], section: null },
+  },
+  coupons: [
+    COUPON({ id: 'g_theme_ship', kind: 'free_shipping', code: 'RWS7K2M9P4QX', expires_at: inHours(5) }),
+    COUPON({
+      id: 'g_theme_filament', kind: 'filament_discount', source: 'points_shop', code: 'RWF8D3K2Q9XP', percent: 15, max_discount_iqd: 25000,
+      scope: 'products', product_ids: ['p1', 'p2', 'p3', 'p4'], issued_at: inHours(-24), expires_at: inHours(24 * 4), order_id: null, points_spent: 8000,
+      targets: {
+        products: ['Bambu PLA Basic', 'Bambu PETG HF', 'Bambu PLA Matte', 'Bambu ABS'].map((n, i) => ({ id: `p${i + 1}`, slug: `theme-filament-${i + 1}`, name: sameTri(n), image: '' })),
+        products_total: 4,
+        section: null,
+      },
+    }),
+    COUPON({ id: 'g_theme_used', kind: 'free_shipping', state: 'used', code: 'RWS2Q8M4K7ZD', issued_at: inHours(-24 * 30), expires_at: inHours(-24 * 23), used_on_order_id: 'LV-2405' }),
+    COUPON({
+      id: 'g_theme_expired', kind: 'filament_discount', state: 'expired', code: 'RWF5T9W3H2LC', percent: 15, max_discount_iqd: 25000,
+      scope: 'category', category_id: 'cat_materials_fdm', issued_at: inHours(-24 * 30), expires_at: inHours(-24 * 23),
+    }),
+  ],
+  coupon_counts: { active: 2, past: 2 },
+  printers: [
+    { order_id: 'LV-2411', product_id: 'pr1', slug: 'theme-a1-mini', name: sameTri('Bambu Lab A1 mini'), image: '', delivered_at: inHours(-24 * 5), state: 'to_rate', stars: null, reward_level: null },
+    { order_id: 'LV-2399', product_id: 'pr2', slug: 'theme-p1s', name: sameTri('Bambu Lab P1S'), image: '', delivered_at: inHours(-24 * 40), state: 'reward_pending', stars: 5, reward_level: null },
+  ],
+  // No owner words for the levels: the page names them in its own words.
+  rating: { gift_levels: [1, 2, 3, 4, 5].map((level) => ({ level, name: tri('', '', ''), description: tri('', '', ''), active: true })), review_points: 500, no_level_points: 1000 },
+  shop: [
+    { kind: 'free_shipping', points: 5000, affordable: true, holding: false, points_short: 0 },
+    { kind: 'filament_discount', points: 8000, affordable: true, holding: true, points_short: 0 },
+  ],
+  competitions: REWARDS_COMPETITIONS,
+  competition_counts: { open: 2, upcoming: 1, closed: 1, open_to_enter: 2 },
+});
+/** GET /api/rewards/program/competitions?view=current|results[&mine=1]: one page, no cursor. */
+const REWARDS_LIST = (query) => {
+  const view = query.get('view') === 'results' ? 'results' : 'current';
+  const mine = view === 'results' && query.get('mine') === '1';
+  return {
+    success: true, installed: true, server_time: SERVER_NOW, point_balance: 12450, view, mine,
+    counts: { current: REWARDS_COMPETITIONS.length, results: REWARDS_RESULTS.length },
+    competitions: view === 'results' ? REWARDS_RESULTS.filter((c) => !mine || c.my_entry) : REWARDS_COMPETITIONS,
+    next_cursor: null,
+  };
+};
+
 // ------------------------------------------------------------ the pages
 const SPA = [
   { name: 'home', path: '/', wait: '[data-home-section="latest"]', full: true },
@@ -161,6 +275,14 @@ const SPA = [
   { name: 'printer-finder', path: '/printer-finder' },
   { name: 'tools', path: '/tools' },
   { name: 'rewards', path: '/points', as: 'customer' },
+  // «المكافآت» (DECISIONS row 290), from the fixtures above: the hub, its
+  // pages, and one competition (two columns and the sticky card at 1280 px).
+  { name: 'rewards-hub', path: '/rewards', as: 'customer', wait: '[data-testid="rewards-area"] nav' },
+  { name: 'rewards-coupons', path: '/rewards/coupons', as: 'customer', wait: '[data-testid="reward-coupon"]' },
+  { name: 'rewards-shop', path: '/rewards/shop', as: 'customer', wait: '[data-testid="shop-item"]' },
+  { name: 'rewards-rate', path: '/rewards/rate', as: 'customer', wait: '[data-testid="rewards-area"] ol' },
+  { name: 'rewards-competitions', path: '/rewards/competitions', as: 'customer', wait: '[data-competition-link]' },
+  { name: 'rewards-competition', path: '/rewards/competitions/cmp_theme_open', as: 'customer', wait: '#competition-title' },
   { name: 'games', path: '/games', as: 'customer' },
   { name: 'subscription', path: '/subscription' },
   { name: 'auth', path: '/auth', settle: 4000 },
@@ -246,6 +368,16 @@ async function wire(page, as, lang) {
     if (as && p === '/api/orders') return json({ success: true, orders: [], total: 0 });
     if (as && p === '/api/cart') return json({ success: true, items: [], cart: { items: [] } });
     if (req.method() !== 'GET') return json({ success: false, error: 'READ_ONLY_SHOTS' }, 403);
+    // «المكافآت»: the customer's own rewards, from the fixtures (a guest is never asked for them).
+    if (as && p === '/api/rewards/program') return json(REWARDS_HUB());
+    if (as && p === '/api/rewards/program/competitions') return json(REWARDS_LIST(url.searchParams));
+    if (as && p.startsWith('/api/rewards/program/competitions/')) {
+      const id = decodeURIComponent(p.slice('/api/rewards/program/competitions/'.length));
+      const competition = [...REWARDS_COMPETITIONS, ...REWARDS_RESULTS].find((c) => c.id === id);
+      return competition
+        ? json({ success: true, server_time: SERVER_NOW, point_balance: 12450, competition })
+        : json({ success: false, error: 'NOT_FOUND', code: 'NOT_FOUND' }, 404);
+    }
     // Anything else: the live shop's anonymous answer (a private route says 401, and the screen shows its own state).
     const r = await upstream(p + url.search);
     return route.fulfill({ status: r.status, contentType: r.type.includes('json') ? 'application/json' : r.type, body: r.body });

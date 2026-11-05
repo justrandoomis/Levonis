@@ -31,6 +31,8 @@ test('private pages — and any page not listed — are never reported (Meta rec
     '/community/saved', '/community/following', '/community/projects/new', '/community/projects/p_1/edit',
     '/requests', '/requests/r_1', '/requests/new/x', '/games', '/support', '/store-checkout', '/a-route-added-later',
     '/trade-in', // the customer's own devices; ?request= / ?draft= carry their request ids
+    // «المكافآت» (DECISIONS row 290): the customer's own coupons, points and entries.
+    '/rewards', '/rewards/coupons', '/rewards/shop', '/rewards/rate', '/rewards/competitions', '/rewards/competitions/cmp_1',
   ]) assert.ok(!isMetaPixelPath(path), path);
 });
 

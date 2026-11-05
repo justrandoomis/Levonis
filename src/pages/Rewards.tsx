@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { ChevronLeft, Bell, PlayCircle, Check, Star, ShoppingBag, ShieldAlert, Sparkles } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { ChevronLeft, Bell, PlayCircle, Check, Star, ShoppingBag, ShieldAlert, Sparkles, Clock } from 'lucide-react';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useWallet } from '../WalletContext';
 import { useAuth } from '../AuthContext';
 import { useLanguage } from '../LanguageContext';
@@ -8,11 +8,11 @@ import { useSignInPrompt } from '../lib/guest';
 import { api, ApiError } from '../lib/api';
 import { refusalLang, refusalText } from '../lib/refusalStrings';
 import { formatFigure } from '../lib/localeNumber';
+import { formatDate } from '../components/orders/format';
 import { EmptyState } from '../components/ui/AsyncStates';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
 import { Overlay } from '../components/ui/Overlay';
 import Spinner from '../components/ui/Spinner';
-import { Competitions, PendingPoints, PointsShop, RatePrinter, RewardCoupons, RewardsNav, useRewardsHub } from '../components/rewards/RewardsHub';
 
 /**
  * THE POINTS & MISSIONS PAGE.
@@ -103,6 +103,8 @@ interface RewardsData {
   };
   /** How points are earned, from the server (0146). Absent on an older server. */
   earning?: { iqd_per_point: number; checkin_top_rung: number };
+  /** Purchase points not spendable yet (policy art. 12.6). Absent on an older server. */
+  pending_points?: { points: number; next_available_at: string | null };
   history: HistoryRow[];
   is_pro: boolean;
 }
@@ -115,7 +117,31 @@ interface AwardReply {
   streak?: number;
 }
 
+/** Where each section of the old combined page lives now. */
+const MOVED_SECTIONS: Record<string, string> = {
+  coupons: '/rewards/coupons',
+  shop: '/rewards/shop',
+  rate: '/rewards/rate',
+  competitions: '/rewards/competitions',
+};
+
+/**
+ * THE REWARDS MOVED TO THEIR OWN PAGES (DECISIONS row 290). Notifications
+ * already sent link to /points#coupons and /points#competitions, and the home
+ * tiles of row 288 to #shop: those addresses keep working by forwarding them
+ * BEFORE the points page mounts — no flash of it and no wasted GET
+ * /api/rewards — replacing this entry so Back does not bounce through it. Any
+ * other hash (#missions among them) stays here. Own keys only, so «#constructor»
+ * is just a hash.
+ */
 export default function Rewards() {
+  const { hash } = useLocation();
+  const section = hash.slice(1);
+  const to = Object.prototype.hasOwnProperty.call(MOVED_SECTIONS, section) ? MOVED_SECTIONS[section] : undefined;
+  return to ? <Navigate to={to} replace /> : <PointsPage />;
+}
+
+function PointsPage() {
   const navigate = useNavigate();
   const { pointBalance, refreshWallet } = useWallet();
   const { isAuthenticated, isLoaded: authLoaded } = useAuth();
@@ -133,8 +159,6 @@ export default function Rewards() {
   const [adWait, setAdWait] = useState(0);
 
   const videoTriggerRef = useRef<HTMLButtonElement>(null);
-  /** The rewards hub (0220): coupons, printer ratings, the points shop, competitions. */
-  const hub = useRewardsHub(authLoaded && isAuthenticated);
 
   const loadRewards = useCallback(async () => {
     try {
@@ -156,29 +180,6 @@ export default function Rewards() {
     if (!authLoaded || !isAuthenticated) return;
     loadRewards();
   }, [authLoaded, isAuthenticated, loadRewards]);
-
-  /**
-   * A link to a section — /points#coupons from a notification, or a reward tile
-   * on the home page — lands on it once BOTH loads have drawn what stands above
-   * it (the multiplier card waits for /api/rewards), and only once per arrival:
-   * the reload after a swap or an entry must not pull the reader back up. The
-   * app's own scroll reset leaves a hash navigation alone (App.tsx).
-   */
-  const { hash, key: arrival } = useLocation();
-  const landedFor = useRef('');
-  useEffect(() => {
-    const id = hash.slice(1);
-    if (!id || !hub.data || (!data && !loadError) || landedFor.current === arrival) return;
-    const target = document.getElementById(id);
-    if (!target) return;
-    landedFor.current = arrival;
-    target.scrollIntoView({ block: 'start' });
-  }, [hash, arrival, hub.data, data, loadError]);
-
-  /** After a swap or an entry the balance, the history and the hub all moved. */
-  const refreshAll = useCallback(async () => {
-    await Promise.all([hub.reload(), loadRewards(), refreshWallet()]);
-  }, [hub, loadRewards, refreshWallet]);
 
   // The ad countdown. It is a courtesy, not a gate: the server refuses an
   // early claim on its own `started_at` whatever this number says.
@@ -361,6 +362,27 @@ export default function Rewards() {
   };
 
   /**
+   * «X points on the way» (policy arts. 3.7 and 12.6): pending purchase points,
+   * not spendable yet. The noun agrees with its count («نقطة واحدة»,
+   * «نقطتان», «3 نقاط», «11 نقطة»; '1 point'), and one point has no «first».
+   */
+  const pendingText = (p: { points: number; next_available_at: string | null }): string => {
+    const n = formatFigure(p.points, lang);
+    const when = p.next_available_at ? formatDate(p.next_available_at, lang) : '';
+    if (p.points === 1) {
+      return when
+        ? loc(`نقطة واحدة في الطريق — تصير قابلة للصرف في ${when}`, `${n} point on the way — it becomes spendable on ${when}`, `${n} خاڵ لە ڕێگادایە — لە ${when} دەتوانرێت خەرج بکرێت`)
+        : loc('نقطة واحدة في الطريق', `${n} point on the way`, `${n} خاڵ لە ڕێگادایە`);
+    }
+    const tail = p.points % 100;
+    const ar = p.points === 2 ? 'نقطتان' : tail >= 3 && tail <= 10 ? `${n} نقاط` : `${n} نقطة`;
+    const first = p.points === 2 ? 'أولاهما تصير قابلة للصرف' : 'أولها يصير قابلًا للصرف';
+    return when
+      ? loc(`${ar} في الطريق — ${first} في ${when}`, `${n} points on the way — the first become spendable on ${when}`, `${n} خاڵ لە ڕێگادان — یەکەمیان لە ${when} دەتوانرێت خەرج بکرێت`)
+      : loc(`${ar} في الطريق`, `${n} points on the way`, `${n} خاڵ لە ڕێگادان`);
+  };
+
+  /**
    * When a history line happened. A dated mission shows its Baghdad day, which
    * is the period it was earned for; everything else shows the instant the
    * server recorded. `day` is never rendered on its own, because for the
@@ -416,7 +438,7 @@ export default function Rewards() {
         >
           <ChevronLeft aria-hidden="true" className="w-6 h-6 rtl:rotate-180" strokeWidth={2.5} />
         </button>
-        <h1 className="text-[17px] font-bold text-center flex-1">{loc('المكافآت والنقاط', 'Rewards & Points', 'خەڵات و خاڵەکان')}</h1>
+        <h1 className="text-[17px] font-bold text-center flex-1">{loc('النقاط والمهام', 'Points & Missions', 'خاڵ و ئەرکەکان')}</h1>
         {/* Registers this page's own character anchor, so the shell stops
             reserving a separate landing strip above this header. */}
         <MotionCharacterHome kind="top-header" compact />
@@ -483,7 +505,12 @@ export default function Rewards() {
               </div>
             </div>
 
-            <PendingPoints hub={hub.data} />
+            {data?.pending_points && data.pending_points.points > 0 && (
+              <p className="text-text-secondary text-[12px] -mt-4 mb-6 flex items-center gap-1.5">
+                <Clock aria-hidden="true" className="w-3.5 h-3.5 shrink-0" />
+                {pendingText(data.pending_points)}
+              </p>
+            )}
 
             {/*
               THE MULTIPLIER, STATED. The owner's brief: a PRO must see that
@@ -536,9 +563,6 @@ export default function Rewards() {
                 )}
               </div>
             )}
-
-            <RewardsNav hub={hub.data} />
-            <RewardCoupons hub={hub.data} />
 
             {/* Check-in card: the screen's one focal card, a single raised slab.
                 It was a notebook page — a rotated under-layer, binder holes and
@@ -638,13 +662,9 @@ export default function Rewards() {
             </div>
             )}
 
-            <RatePrinter hub={hub.data} />
-            <PointsShop hub={hub.data} onChanged={refreshAll} />
-            <Competitions hub={hub.data} onChanged={refreshAll} />
-
             {/* Missions */}
             <div className="mt-8 mb-8">
-              <h2 id="missions" className="scroll-mt-20 text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('اجمع النقاط', 'Earn Points', 'خاڵ کۆبکەرەوە')}</h2>
+              <h2 className="text-[17px] font-bold mb-4 px-1 text-text-primary">{loc('اجمع النقاط', 'Earn Points', 'خاڵ کۆبکەرەوە')}</h2>
               <div className="space-y-3 px-1">
                 {!data && !loadError && (
                   <div className="flex justify-center py-6">

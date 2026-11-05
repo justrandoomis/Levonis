@@ -35,7 +35,20 @@ const TWO_ARG_LOC = /\bloc\(\s*(['"`])(?:(?!\1)[^\\]|\\.)*\1\s*,\s*(['"`])(?:(?!
 /** Every three-string `loc('ar', 'en', 'ckb')` call, with its arguments. */
 const THREE_ARG_LOC = /\bloc\(\s*(['"`])((?:(?!\1)[^\\]|\\.)*)\1\s*,\s*(['"`])((?:(?!\3)[^\\]|\\.)*)\3\s*,\s*(['"`])((?:(?!\5)[^\\]|\\.)*)\5\s*\)/g;
 
-const SORANI_SCREENS = ['src/pages/Rewards.tsx', 'src/pages/Cart.tsx', 'src/pages/Profile.tsx', 'src/pages/Orders.tsx', 'src/pages/NotFound.tsx'];
+const SORANI_SCREENS = [
+  'src/pages/Rewards.tsx',
+  'src/pages/Cart.tsx',
+  'src/pages/Profile.tsx',
+  'src/pages/Orders.tsx',
+  'src/pages/NotFound.tsx',
+  // «المكافآت», the rewards area (DECISIONS row 290): every file of it, listed
+  // from the folder so a new screen is held to the same rule the day it lands.
+  // Its words live in copy.ts (tests/rewardsCopy.test.ts); a loc() here is held too.
+  'src/pages/RewardsArea.tsx',
+  ...readdirSync(join(ROOT, 'src/components/rewards'))
+    .filter((name) => /\.tsx?$/.test(name))
+    .map((name) => `src/components/rewards/${name}`),
+];
 
 test('the customer screens of this batch carry no two-argument loc() — Sorani is written, never the Arabic fallback', () => {
   for (const file of SORANI_SCREENS) {

@@ -3,19 +3,30 @@
  * missions of worker/routes/rewards.ts (owner, 2026-11-03; migration 0220;
  * docs/DECISIONS.md row 286). Mounted at /api/rewards/program.
  *
- *   GET  /                          the hub: my reward coupons, the printers I
- *                                   can rate and what rating earns, the points
- *                                   shop, the competitions, my pending points
+ *   GET  /                          the hub: my reward coupons (each live
+ *                                   filament one with what it covers) and how
+ *                                   many I hold, the printers I can rate and
+ *                                   what rating earns, the points shop, the
+ *                                   competitions and how many are open to me,
+ *                                   my pending points
+ *   GET  /competitions              the competitions page (DECISIONS row 290):
+ *                                   ?view=current, or ?view=results[&mine=1]&cursor=…
+ *   GET  /competitions/:id          one competition's own page
  *   POST /shop/:kind                swap points for a reward coupon
  *   POST /competitions/:id/enter    enter a competition
  *
  * EVERY FIGURE IS THE SERVER'S. The shop route reads no body at all: which
  * coupon is the path, and what it costs, how long it lasts and what it takes
  * off are the programme's settings (worker/lib/rewards/config.ts). The only
- * body read here is a competition entry's own answer and photo.
+ * body read here is a competition entry's own answer and photo. The page
+ * decides nothing either: whether a competition can be entered and why not
+ * (`gate`), what a swap is short of, whether a shop coupon is held and what a
+ * review outside the gift levels earns all come from here.
  *
  * DEPLOY-AHEAD (CLAUDE.md rule 2): on a database before 0220 the hub answers
- * `installed: false` with empty lists, never an error page.
+ * `installed: false` with empty lists and zero counts, the competitions page
+ * answers empty lists, and one competition is not found (404, as an unknown id
+ * is) — the statuses a migrated database gives, never an error page.
  */
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -24,10 +35,27 @@ import { rateLimit } from '../lib/ratelimit';
 import { getBalances } from '../lib/wallet';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 import { safeParse } from '../lib/types';
-import { getReviewPointsValue } from './reviews';
-import { FILAMENT_SECTION_ID, REWARD_COUPON_KINDS, getRewardConfig } from '../lib/rewards/config';
-import { RewardShopError, buyShopCoupon, listUserRewardCoupons } from '../lib/rewards/coupons';
-import { enterCompetition, listCompetitionsForUser } from '../lib/rewards/competitions';
+import { getReviewPointsValue, noLevelReviewPoints } from './reviews';
+import { FILAMENT_SECTION_ID, REWARD_COUPON_KINDS, getRewardConfig, type RewardCouponKind } from '../lib/rewards/config';
+import {
+  RewardShopError,
+  buyShopCoupon,
+  catalogSection,
+  couponCounts,
+  couponTargets,
+  listUserRewardCoupons,
+  shopHoldings,
+} from '../lib/rewards/coupons';
+import {
+  competitionCounts,
+  competitionForCustomer,
+  competitionWindowCounts,
+  enterCompetition,
+  listCompetitionsForUser,
+  listCompetitionsPage,
+  withGates,
+} from '../lib/rewards/competitions';
+import { readPendingPoints } from '../lib/rewards/pending';
 
 export const rewardProgramRoutes = new Hono<AppContext>();
 rewardProgramRoutes.use('*', requireAuth);
@@ -128,7 +156,11 @@ async function giftLevels(db: D1Database) {
   }));
 }
 
-/** The filaments a filament coupon names, for the page to list. */
+/**
+ * The filaments the programme's CURRENT settings name. Kept for one release
+ * for the pages still open on the old stacked /points; each coupon now carries
+ * its own frozen `targets` (couponTargets).
+ */
 async function filamentTargets(db: D1Database, productIds: string[]) {
   if (productIds.length) {
     const { results } = await db
@@ -144,25 +176,7 @@ async function filamentTargets(db: D1Database, productIds: string[]) {
       section: null,
     };
   }
-  const s = await db
-    .prepare(
-      `SELECT c.id, c.slug, c.name_ar, c.name_en, c.name_ckb, p.slug AS parent_slug
-         FROM catalogs c LEFT JOIN catalogs p ON p.id = c.parent_id WHERE c.id = ?`
-    )
-    .bind(FILAMENT_SECTION_ID)
-    .first<{ id: string; slug: string; name_ar: string; name_en: string; name_ckb: string; parent_slug: string | null }>();
-  return {
-    products: [],
-    section: s
-      ? {
-          id: s.id,
-          slug: s.slug,
-          // The storefront's own address for a section: /categories/<parent>/<child>, or /categories/<top>.
-          path: s.parent_slug ? `/categories/${encodeURIComponent(s.parent_slug)}/${encodeURIComponent(s.slug)}` : `/categories/${encodeURIComponent(s.slug)}`,
-          name: { ar: s.name_ar, en: s.name_en || s.name_ar, ckb: s.name_ckb || s.name_en || s.name_ar },
-        }
-      : null,
-  };
+  return { products: [], section: await catalogSection(db, FILAMENT_SECTION_ID) };
 }
 
 rewardProgramRoutes.get('/', async (c) => {
@@ -180,30 +194,29 @@ rewardProgramRoutes.get('/', async (c) => {
     throw e;
   };
 
-  const [balances, pending, coupons, printers, levels, reviewPoints, filament, competitions] = await Promise.all([
-    getBalances(db, user.id),
-    db
-      .prepare(
-        `SELECT COALESCE(SUM(points), 0) AS points,
-                MIN(CASE WHEN kind = 'purchase' THEN available_at END) AS next_available_at
-           FROM points_accruals WHERE user_id = ? AND state = 'pending'`
-      )
-      .bind(user.id)
-      .first<{ points: number; next_available_at: string | null }>(),
-    listUserRewardCoupons(db, user.id, nowIso).catch(missing([] as Awaited<ReturnType<typeof listUserRewardCoupons>>)),
-    printersToRate(db, user.id).catch(tolerate([] as Awaited<ReturnType<typeof printersToRate>>)),
-    giftLevels(db).catch(tolerate([] as Awaited<ReturnType<typeof giftLevels>>)),
-    getReviewPointsValue(db).catch(() => null),
-    filamentTargets(db, config.filament.product_ids),
-    listCompetitionsForUser(db, user.id, nowIso).catch(missing([] as Awaited<ReturnType<typeof listCompetitionsForUser>>)),
-  ]);
+  const [balances, pending, coupons, printers, levels, reviewPoints, filament, competitions, couponTotals, windowCounts, holdings] =
+    await Promise.all([
+      getBalances(db, user.id),
+      readPendingPoints(db, user.id),
+      listUserRewardCoupons(db, user.id, nowIso).catch(missing([] as Awaited<ReturnType<typeof listUserRewardCoupons>>)),
+      printersToRate(db, user.id).catch(tolerate([] as Awaited<ReturnType<typeof printersToRate>>)),
+      giftLevels(db).catch(tolerate([] as Awaited<ReturnType<typeof giftLevels>>)),
+      getReviewPointsValue(db).catch(() => null),
+      filamentTargets(db, config.filament.product_ids),
+      listCompetitionsForUser(db, user.id, nowIso).catch(missing([] as Awaited<ReturnType<typeof listCompetitionsForUser>>)),
+      couponCounts(db, user.id, nowIso).catch(missing({ active: 0, past: 0 })),
+      competitionWindowCounts(db, user.id, nowIso).catch(missing({ open: 0, upcoming: 0, closed: 0, open_to_enter: 0 })),
+      shopHoldings(db, user.id, nowIso).catch(tolerate(new Set<RewardCouponKind>())),
+    ]);
+  // What each live filament coupon can be spent on, from its own frozen terms (none before 0220: no coupons).
+  const targets = await couponTargets(db, coupons);
 
   return c.json({
     success: true,
     installed,
     server_time: nowIso,
     point_balance: balances.points,
-    pending_points: { points: Math.max(0, Number(pending?.points) || 0), next_available_at: pending?.next_available_at ?? null },
+    pending_points: pending,
     program: {
       enabled: config.enabled,
       valid_days: config.valid_days,
@@ -215,16 +228,84 @@ rewardProgramRoutes.get('/', async (c) => {
         ...filament,
       },
     },
-    coupons,
+    coupons: coupons.map((x) => ({ ...x, targets: targets.get(x.id) ?? null })),
+    // Counted over every grant, so the page can say how many the 40-row list leaves out.
+    coupon_counts: couponTotals,
     printers,
-    rating: { gift_levels: levels, review_points: reviewPoints },
-    shop: REWARD_COUPON_KINDS.filter((k) => config.shop[k].enabled && config.shop[k].points !== null).map((k) => ({
-      kind: k,
-      points: config.shop[k].points as number,
-      affordable: balances.points >= (config.shop[k].points as number),
-    })),
-    competitions,
+    rating: { gift_levels: levels, review_points: reviewPoints, no_level_points: noLevelReviewPoints(reviewPoints) },
+    shop: REWARD_COUPON_KINDS.filter((k) => config.shop[k].enabled && config.shop[k].points !== null).map((k) => {
+      const price = config.shop[k].points as number;
+      return {
+        kind: k,
+        points: price,
+        affordable: balances.points >= price,
+        // The swap's own one-each guard, read the same way (HOLDING_WHERE).
+        holding: holdings.has(k),
+        points_short: Math.max(0, price - balances.points),
+      };
+    }),
+    competitions: withGates(competitions, balances.points),
+    competition_counts: windowCounts,
   });
+});
+
+/**
+ * THE COMPETITIONS PAGE. `current` (open, upcoming, awaiting the verdict) and
+ * `results` (finished, newest first, a page at a time) are separate lists, so
+ * neither grows into the other; `results&mine=1` is only the ones this customer
+ * entered (finished or cancelled). `counts` stays the two global tabs either
+ * way. Before 0220 every list is empty with installed:false.
+ */
+rewardProgramRoutes.get('/competitions', async (c) => {
+  const user = c.get('user')!;
+  const db = c.env.DB;
+  const nowIso = new Date().toISOString();
+  const view = c.req.query('view') === 'results' ? 'results' : 'current';
+  const mine = view === 'results' && c.req.query('mine') === '1';
+  let installed = true;
+  const missing = <T>(fallback: T) => (e: unknown): T => {
+    if (isSchemaMissing(e)) {
+      installed = false;
+      return fallback;
+    }
+    throw e;
+  };
+  const [balances, page, counts] = await Promise.all([
+    getBalances(db, user.id),
+    listCompetitionsPage(db, user.id, view, c.req.query('cursor') ?? null, nowIso, { mine }).catch(
+      missing({ competitions: [], next_cursor: null } as Awaited<ReturnType<typeof listCompetitionsPage>>)
+    ),
+    competitionCounts(db).catch(missing({ current: 0, results: 0 })),
+  ]);
+  return c.json({
+    success: true,
+    installed,
+    server_time: nowIso,
+    point_balance: balances.points,
+    view,
+    mine,
+    counts,
+    competitions: withGates(page.competitions, balances.points),
+    next_cursor: page.next_cursor,
+  });
+});
+
+/** One competition — the address a «you won» or «your points came back» notice opens. */
+rewardProgramRoutes.get('/competitions/:id', async (c) => {
+  const user = c.get('user')!;
+  const id = c.req.param('id') ?? '';
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw notFound('Competition not found');
+  const nowIso = new Date().toISOString();
+  const [balances, competition] = await Promise.all([
+    getBalances(c.env.DB, user.id),
+    // Before 0220 there is no competition to find: the same 404 as an unknown id.
+    competitionForCustomer(c.env.DB, user.id, id, nowIso).catch((e: unknown) => {
+      if (isSchemaMissing(e)) return null;
+      throw e;
+    }),
+  ]);
+  if (!competition) throw notFound('Competition not found');
+  return c.json({ success: true, server_time: nowIso, point_balance: balances.points, competition: withGates([competition], balances.points)[0] });
 });
 
 rewardProgramRoutes.post('/shop/:kind', async (c) => {

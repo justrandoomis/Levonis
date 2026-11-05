@@ -28,7 +28,9 @@ Data ownership below: "owner" = the signed-in account (server-enforced),
 | `/edit-profile`, `/settings`, `/addresses` | signed-in | ✅ (addresses) / ⚙️ |
 | `/wallet` | signed-in | ⚙️ (API flows ✅) |
 | `/subscription` | signed-in | ⚙️ |
-| `/points` (Rewards) | signed-in | ⚙️ (check-in API ✅) |
+| `/points` (Points & missions; `#coupons`/`#shop`/`#rate`/`#competitions` forward to `/rewards/*`) | signed-in | ⚙️ (check-in API ✅) |
+| `/rewards` (Rewards hub), `/rewards/coupons`, `/rewards/shop`, `/rewards/rate` — DECISIONS row 290 | public (each page shows a guest its own sign-in; no fetch) | ⚙️ (API ✅: tests/rewardsCoupons, tests/rewardsCompetitions) |
+| `/rewards/competitions` (current / results, «my entries»), `/rewards/competitions/:id` (entry sheet) | public (sign-in state for a guest; entering needs an account) | ⚙️ (API ✅: tests/rewardsCompetitions) |
 | `/community`, `/community/store/:id`, `/followed-stores` | public / signed-in | ⚙️ |
 | `/chats`, `/chat/:id` | signed-in, participants only | ⚙️ |
 | `/invest` | investor/admin only (was: any signed-in user) | ⚙️ |

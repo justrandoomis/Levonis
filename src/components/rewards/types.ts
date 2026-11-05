@@ -2,6 +2,10 @@
  * GET /api/rewards/program — the rewards hub, exactly as
  * worker/routes/rewardsProgram.ts answers it (migration 0220). The page draws
  * these and decides nothing: every figure, window and state is the server's.
+ *
+ * The rewards-area additions (spec §9.4: gates, coupon targets, holdings, the
+ * hub's counts, the competitions list and detail) are all OPTIONAL fields, so
+ * an older server's answer still type-checks and still renders.
  */
 export interface Tri {
   ar: string;
@@ -28,6 +32,20 @@ export interface RewardCoupon {
   points_spent: number;
   used_on_order_id: string | null;
   revoke_reason: string;
+  /** What a live filament coupon covers; null for free delivery and every past coupon; absent from an older server. */
+  targets?: CouponTargets | null;
+}
+
+/**
+ * The products a filament coupon was issued for (its OWN frozen `product_ids`
+ * that are still on sale), or the catalogue section of a category-scoped one.
+ */
+export interface CouponTargets {
+  /** At most 20, in the coupon's own order. */
+  products: Array<{ id: string; slug: string; name: Tri; image: string }>;
+  /** Every live product of the coupon, beyond the 20 named. */
+  products_total: number;
+  section: { id: string; slug: string; path: string; name: Tri } | null;
 }
 
 export interface PrinterToRate {
@@ -53,6 +71,10 @@ export interface ShopItem {
   kind: RewardKind;
   points: number;
   affordable: boolean;
+  /** An unused, live coupon of this kind bought with points is already held (one of each at a time). */
+  holding?: boolean;
+  /** How many more points this coupon needs; 0 when affordable. */
+  points_short?: number;
 }
 
 export interface CompetitionEntry {
@@ -84,6 +106,22 @@ export interface Competition {
   eligible: boolean;
   my_entry: CompetitionEntry | null;
   winners: Array<{ place: number; name: string; prize_points: number; answer: string; media_url: string | null }>;
+  /** When the results were announced (finished only); null otherwise. */
+  results_at?: string | null;
+  /** Whether this customer can enter now, and if not, why — the server's decision. */
+  gate?: CompetitionGate;
+}
+
+/** Why this customer cannot enter now, in the server's order of checks (worker `gateOf`). */
+export type GateBlock = 'entered' | 'upcoming' | 'closed' | 'not_eligible' | 'full' | 'insufficient_points';
+
+export interface CompetitionGate {
+  can_enter: boolean;
+  blocked_by: GateBlock | null;
+  /** The points still missing when `blocked_by` is 'insufficient_points', else 0. */
+  points_short: number;
+  /** Places left under `max_entries`; null when the competition is uncapped. */
+  spots_left: number | null;
 }
 
 export interface RewardsHubData {
@@ -104,8 +142,39 @@ export interface RewardsHubData {
     };
   };
   coupons: RewardCoupon[];
+  /** Every coupon of this customer by state, beyond the 40 listed. */
+  coupon_counts?: { active: number; past: number };
   printers: PrinterToRate[];
-  rating: { gift_levels: GiftLevel[]; review_points: number | null };
+  rating: {
+    gift_levels: GiftLevel[];
+    review_points: number | null;
+    /** The least a valid review below the gift levels earns (before the member multiplier); null when unconfigured. */
+    no_level_points?: number | null;
+  };
   shop: ShopItem[];
   competitions: Competition[];
+  /** Published competitions by window, at the server's now; `open_to_enter` is open, not entered, eligible and below the cap. */
+  competition_counts?: { open: number; upcoming: number; closed: number; open_to_enter: number };
+}
+
+/** GET /api/rewards/program/competitions?view=current|results[&mine=1][&cursor=…] */
+export interface CompetitionsPage {
+  success: true;
+  installed: boolean;
+  server_time: string;
+  point_balance: number;
+  view: 'current' | 'results';
+  /** Echoed: true only for view=results&mine=1. */
+  mine?: boolean;
+  counts: { current: number; results: number };
+  competitions: Competition[];
+  next_cursor: string | null;
+}
+
+/** GET /api/rewards/program/competitions/:id */
+export interface CompetitionDetailResponse {
+  success: true;
+  server_time: string;
+  point_balance: number;
+  competition: Competition;
 }

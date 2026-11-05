@@ -37,6 +37,10 @@ const OPEN = [
   { path: '/chats', name: 'the support entries' },
   { path: '/subscription', name: 'the membership plans' },
   { path: '/points', name: 'the points programme' },
+  // «المكافآت» (DECISIONS row 290): each page shows a guest its own sign-in
+  // state in place, without a fetch and without bouncing to /auth.
+  { path: '/rewards', name: 'the rewards area' },
+  { path: '/rewards/competitions', name: 'the competitions' },
   { path: '/tools', name: 'the tools' },
   { path: '/games', name: 'the games' },
   { path: '/leaderboards', name: 'the leaderboards' },

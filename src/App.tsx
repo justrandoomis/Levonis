@@ -98,6 +98,7 @@ const Chat = React.lazy(() => import('./pages/Chat'));
 const Tools = React.lazy(() => import('./pages/Tools'));
 const Wallet = React.lazy(() => import('./pages/Wallet'));
 const Rewards = React.lazy(() => import('./pages/Rewards'));
+const RewardsArea = React.lazy(() => import('./pages/RewardsArea'));
 const Referrals = React.lazy(() => import('./pages/Referrals'));
 /**
  * THE BUNDLES SURFACE IS ITS OWN CHUNK (docs/BUNDLES_MYSTERY.md §14).
@@ -841,7 +842,7 @@ function AppContent() {
   const shellHasToaster =
     pathForShell === '/admin' || pathForShell.startsWith('/admin/') ||
     ((pathForShell === '/merchant' || pathForShell.startsWith('/merchant/')) && !isMerchantStart);
-  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/chat', '/model-viewer', '/merchant', '/printer-finder'].some(p => pathForShell === p || pathForShell.startsWith(p + '/')) && !isMerchantStart;
+  const isFullScreenRoute = ['/admin', '/invest', '/admin/invest', '/auth', '/points', '/rewards', '/settings', '/addresses', '/checkout', '/store-checkout', '/games', '/leaderboards', '/support', '/chat', '/model-viewer', '/merchant', '/printer-finder'].some(p => pathForShell === p || pathForShell.startsWith(p + '/')) && !isMerchantStart;
 
   if (isFullScreenRoute) {
     return (
@@ -862,12 +863,24 @@ function AppContent() {
 
             <Route path="/auth" element={<Auth />} />
             {/* OPEN TO GUESTS. The points page is how someone finds out the
-                programme exists; it already skips its own fetch and shows a
-                sign-in panel when there is nobody to fetch for. (The second
-                <Routes> block below also declares /points unguarded, but that
-                line is unreachable — /points is a full-screen route and is
-                always served from here.) */}
+                programme exists; it skips its own fetch and shows a sign-in
+                panel when there is nobody to fetch for. It is declared here
+                only: /points is a full-screen route, so the main block below
+                never sees it. Its old #coupons, #shop, #rate and #competitions
+                addresses forward to the rewards area. */}
             <Route path="/points" element={<Rewards />} />
+            {/* «المكافآت», THE REWARDS AREA (DECISIONS row 290), OPEN TO
+                GUESTS: each page shows its own sign-in state. All seven render
+                the same element, so React Router keeps ONE RewardsArea across
+                them — its reads, its pages and its scroll memory survive moving
+                between sections. The splat is the area's own NotFound. */}
+            <Route path="/rewards" element={<RewardsArea />} />
+            <Route path="/rewards/coupons" element={<RewardsArea />} />
+            <Route path="/rewards/shop" element={<RewardsArea />} />
+            <Route path="/rewards/rate" element={<RewardsArea />} />
+            <Route path="/rewards/competitions" element={<RewardsArea />} />
+            <Route path="/rewards/competitions/:id" element={<RewardsArea />} />
+            <Route path="/rewards/*" element={<RewardsArea />} />
             <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
             <Route path="/addresses" element={<ProtectedRoute><Addresses /></ProtectedRoute>} />
             <Route path="/checkout" element={<ProtectedRoute><Checkout /></ProtectedRoute>} />

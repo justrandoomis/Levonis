@@ -175,18 +175,24 @@ export const SERVICE_SLOTS: readonly SiteMediaSlot[] = [
   { slot: 'service-mystery', group: 'service', label: 'الفلامنت العشوائي', defaultObject: 'Randoms.webp', link: '/bundles?kind=mystery' },
   { slot: 'service-tradein', group: 'service', label: 'استبدل القديمة بجديدة', defaultObject: 'Replace.webp', link: '/trade-in' },
   { slot: 'service-used', group: 'service', label: 'مستعمل ومجدّد و Open Box', defaultObject: 'Used.webp', link: '/used-printers' },
-  { slot: 'service-rewards', group: 'service', label: 'النقاط والمكافآت', defaultObject: 'Reward.webp', link: '/points' },
+  /**
+   * «النقاط والمكافآت» opens the rewards hub, which leads with the points
+   * (owner, 2026-11-05 — DECISIONS row 290); the hub's balance opens /points.
+   */
+  { slot: 'service-rewards', group: 'service', label: 'النقاط والمكافآت', defaultObject: 'Reward.webp', link: '/rewards' },
   /**
    * THE REWARDS PROGRAMME'S THREE DOORS (owner, 2026-11-04 — DECISIONS row
-   * 288): each is a section of /points, and the page scrolls to the `#id`. No
-   * artwork was uploaded for them, so the default is EMPTY — "draw the line
-   * icon", the convention above and the banner slots' — rather than a file
-   * name the bucket does not hold (unlike `service-community`, nobody named
-   * one). An upload under the slot still lights it up like any other.
+   * 288; row 290 gave each a page of its own): each opens its page of the
+   * rewards area, never a section of a longer one, and a guest gets that
+   * page's sign-in state. No artwork was uploaded for them, so the default is
+   * EMPTY — "draw the line icon", the convention above and the banner slots'
+   * — rather than a file name the bucket does not hold (unlike
+   * `service-community`, nobody named one). An upload under the slot still
+   * lights it up like any other.
    */
-  { slot: 'service-coupons', group: 'service', label: 'كوبوناتي', defaultObject: '', link: '/points#coupons' },
-  { slot: 'service-points-shop', group: 'service', label: 'استبدل نقاطك', defaultObject: '', link: '/points#shop' },
-  { slot: 'service-competitions', group: 'service', label: 'المسابقات', defaultObject: '', link: '/points#competitions' },
+  { slot: 'service-coupons', group: 'service', label: 'كوبوناتي', defaultObject: '', link: '/rewards/coupons' },
+  { slot: 'service-points-shop', group: 'service', label: 'استبدل نقاطك', defaultObject: '', link: '/rewards/shop' },
+  { slot: 'service-competitions', group: 'service', label: 'المسابقات', defaultObject: '', link: '/rewards/competitions' },
   { slot: 'service-warranty', group: 'service', label: 'الضمان والصيانة', defaultObject: 'Warranty.webp', link: '/warranty' },
   { slot: 'service-community', group: 'service', label: 'المجتمع', defaultObject: 'Community.webp', link: '/community' },
   { slot: 'service-support', group: 'service', label: 'الدعم', defaultObject: 'Support.webp', link: '/support' },

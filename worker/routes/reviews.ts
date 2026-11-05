@@ -128,6 +128,18 @@ export async function getReviewPointsValue(db: D1Database): Promise<number | nul
 }
 
 /**
+ * WHAT A VALID REVIEW OUTSIDE THE GIFT LEVELS EARNS: twice the configured base
+ * review points — the long-standing fallback rule for a valid manual review,
+ * written once. The award path below pays it, and the rewards area states it
+ * (GET /api/rewards/program `rating.no_level_points`). The member's
+ * subscription multiplier applies on top when it is paid, so the page says «at
+ * least». Null while review points are not configured: nothing is invented.
+ */
+export function noLevelReviewPoints(reviewPoints: number | null): number | null {
+  return reviewPoints === null ? null : reviewPoints * 2;
+}
+
+/**
  * THE REVIEW AWARD, AT THE REVIEWER'S SUBSCRIPTION MULTIPLIER.
  *
  * The owner's rule covers four surfaces — signing in, earning from tasks,
@@ -469,12 +481,13 @@ reviewRoutes.post('/', requireAuth, async (c) => {
     // A valid manual review outside the gift levels gets exactly twice the
     // existing configured base review points. Missing configuration stays
     // honest (zero); no value is invented in code.
-    const basePoints = await getReviewPointsValue(c.env.DB);
-    if (basePoints !== null) {
-      // `* 2` is the long-standing fallback rule for a valid manual review;
-      // the SUBSCRIPTION multiplier then applies on top of it, because the
-      // owner's rule is about who the member is, not what they did.
-      const { points, multiplierX100 } = await reviewAward(c.env.DB, user.id, basePoints * 2);
+    const fallbackPoints = noLevelReviewPoints(await getReviewPointsValue(c.env.DB));
+    if (fallbackPoints !== null) {
+      // Twice the base (`noLevelReviewPoints`) is the long-standing fallback
+      // rule for a valid manual review; the SUBSCRIPTION multiplier then
+      // applies on top of it, because the owner's rule is about who the
+      // member is, not what they did.
+      const { points, multiplierX100 } = await reviewAward(c.env.DB, user.id, fallbackPoints);
       const sourceRef = `review-fallback:${reviewId}`;
       statements.push(
         c.env.DB.prepare('INSERT INTO points_awards (source_ref, user_id, points, created_at) VALUES (?, ?, ?, ?)')
@@ -608,12 +621,13 @@ reviewRoutes.put('/:id', requireAuth, async (c) => {
       input.evidence ? JSON.stringify(input.evidence) : '', JSON.stringify(facts),
       JSON.stringify(quality), now, existing.reward_id
     ));
-    const basePoints = await getReviewPointsValue(c.env.DB);
-    if (basePoints !== null) {
-      // `* 2` is the long-standing fallback rule for a valid manual review;
-      // the SUBSCRIPTION multiplier then applies on top of it, because the
-      // owner's rule is about who the member is, not what they did.
-      const { points, multiplierX100 } = await reviewAward(c.env.DB, user.id, basePoints * 2);
+    const fallbackPoints = noLevelReviewPoints(await getReviewPointsValue(c.env.DB));
+    if (fallbackPoints !== null) {
+      // Twice the base (`noLevelReviewPoints`) is the long-standing fallback
+      // rule for a valid manual review; the SUBSCRIPTION multiplier then
+      // applies on top of it, because the owner's rule is about who the
+      // member is, not what they did.
+      const { points, multiplierX100 } = await reviewAward(c.env.DB, user.id, fallbackPoints);
       const sourceRef = `review-fallback:${id}`;
       statements.push(
         c.env.DB.prepare('INSERT INTO points_awards (source_ref, user_id, points, created_at) VALUES (?, ?, ?, ?)')

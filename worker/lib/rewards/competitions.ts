@@ -278,6 +278,57 @@ export interface CompetitionView {
   eligible: boolean;
   my_entry: EntryView | null;
   winners: WinnerView[];
+  /** When the winners were announced: `finished_at` once finished, else null. */
+  results_at: string | null;
+}
+
+/**
+ * WHY THIS CUSTOMER CAN OR CANNOT ENTER, AS THE PAGE SAYS IT (DECISIONS row
+ * 290). The rewards area draws its button and its reason from this and does no
+ * arithmetic of its own: what is short, how many places are left. It decides
+ * nothing either — `enterCompetition` re-reads every one of these inside its
+ * own batch and stays the authority.
+ */
+export type GateBlock = 'entered' | 'upcoming' | 'closed' | 'not_eligible' | 'full' | 'insufficient_points';
+
+export interface CompetitionGate {
+  can_enter: boolean;
+  blocked_by: GateBlock | null;
+  /** The fee less the balance when the fee is what blocks, else 0. */
+  points_short: number;
+  /** Places left under the cap, never below 0; null when there is no cap. */
+  spots_left: number | null;
+}
+
+type GateFacts = Pick<CompetitionView, 'phase' | 'eligible' | 'my_entry' | 'max_entries' | 'entries_count' | 'entry_mode' | 'entry_points'>;
+
+/**
+ * Pure. Checked in the order the page explains it: an entry already made, then
+ * the window, then who may enter, then the cap, then the fee.
+ */
+export function gateOf(v: GateFacts, balance: number): CompetitionGate {
+  const spots_left = v.max_entries === null ? null : Math.max(0, v.max_entries - v.entries_count);
+  // The fee exactly as enterCompetition charges it.
+  const fee = v.entry_mode === 'points' ? Math.max(0, Number(v.entry_points) || 0) : 0;
+  const points = Number(balance) || 0;
+  let blocked_by: GateBlock | null = null;
+  if (v.my_entry) blocked_by = 'entered';
+  else if (v.phase === 'upcoming') blocked_by = 'upcoming';
+  else if (v.phase !== 'open') blocked_by = 'closed';
+  else if (!v.eligible) blocked_by = 'not_eligible';
+  else if (spots_left === 0) blocked_by = 'full';
+  else if (points < fee) blocked_by = 'insufficient_points';
+  return {
+    can_enter: blocked_by === null,
+    blocked_by,
+    points_short: blocked_by === 'insufficient_points' ? fee - points : 0,
+    spots_left,
+  };
+}
+
+/** Every view with its gate, against the customer's spendable balance. */
+export function withGates<T extends CompetitionView>(views: T[], balance: number): Array<T & { gate: CompetitionGate }> {
+  return views.map((v) => ({ ...v, gate: gateOf(v, balance) }));
 }
 
 const mediaUrl = (key: string | null | undefined) => (key ? `/files/${key}` : null);
@@ -316,6 +367,7 @@ function competitionView(
     ends_at: r.ends_at,
     phase: phaseOf(r, nowMs),
     ...extra,
+    results_at: r.state === 'finished' ? (r.finished_at ?? null) : null,
   };
 }
 
@@ -364,7 +416,18 @@ export async function listCompetitionsForUser(db: D1Database, userId: string, no
     )
     .bind(since)
     .all<CompetitionRow & { entries_count: number }>();
-  const rows = results ?? [];
+  return forCustomer(db, userId, results ?? [], nowMs);
+}
+
+const ENTRIES_COUNT_SQL = `(SELECT COUNT(*) FROM reward_competition_entries e WHERE e.competition_id = c.id AND e.state IN ('entered', 'winner')) AS entries_count`;
+
+/** Each row with this customer's own entry, whether they may enter, and — once finished — its winners. */
+async function forCustomer(
+  db: D1Database,
+  userId: string,
+  rows: Array<CompetitionRow & { entries_count: number }>,
+  nowMs: number
+): Promise<CompetitionView[]> {
   if (!rows.length) return [];
   const ids = rows.map((r) => r.id);
   const [mine, winners, owner] = await Promise.all([
@@ -384,6 +447,180 @@ export async function listCompetitionsForUser(db: D1Database, userId: string, no
       winners: winners.get(r.id) ?? [],
     })
   );
+}
+
+// ----------------------------------------------------- the competitions page
+
+/**
+ * THE COMPETITIONS PAGE (DECISIONS row 290) — two lists, so that a year of
+ * results never pushes a live competition down:
+ *
+ *   current   every published competition: open first (the soonest to close
+ *             first), then upcoming (the soonest to open), then closed and
+ *             waiting for the team's verdict. Never more than a few at once;
+ *             capped at CURRENT_MAX all the same.
+ *   results   every finished one, newest first, RESULTS_PAGE at a time with a
+ *             cursor — no 60-day horizon, unlike the rewards hub's preview.
+ *             With `mine` («مشاركاتي فقط»): only the ones THIS customer
+ *             entered that ended for good — finished, or cancelled with their
+ *             points back — newest first by the moment they ended, paged the
+ *             same way. Never another customer's.
+ *
+ * Drafts never; a cancelled competition only to someone who entered it: on its
+ * own page (competitionForCustomer) and in their own results.
+ */
+export type CompetitionList = 'current' | 'results';
+export const CURRENT_MAX = 50;
+export const RESULTS_PAGE = 20;
+
+/** `<finished_at>|<id>` — the last result a page showed (with `mine`, the moment it finished or was cancelled). */
+const CURSOR = /^(\d{4}-\d{2}-\d{2}T[\d:.]+Z)\|([A-Za-z0-9_-]{1,64})$/;
+
+export function parseResultsCursor(raw: string | null | undefined): { finishedAt: string; id: string } | null {
+  if (!raw) return null;
+  const m = CURSOR.exec(raw);
+  if (!m) throw badRequest('That page of results does not exist', 'BAD_CURSOR');
+  return { finishedAt: m[1], id: m[2] };
+}
+
+export async function listCompetitionsPage(
+  db: D1Database,
+  userId: string,
+  list: CompetitionList,
+  cursor: string | null,
+  nowIso = new Date().toISOString(),
+  opts: { mine?: boolean } = {}
+): Promise<{ competitions: CompetitionView[]; next_cursor: string | null }> {
+  const nowMs = Date.parse(nowIso);
+  if (list === 'current') {
+    const { results } = await db
+      .prepare(
+        `SELECT c.*, ${ENTRIES_COUNT_SQL}
+           FROM reward_competitions c
+          WHERE c.state = 'published'
+          ORDER BY CASE WHEN c.starts_at <= ?1 AND c.ends_at > ?1 THEN 0 WHEN c.starts_at > ?1 THEN 1 ELSE 2 END,
+                   CASE WHEN c.starts_at > ?1 THEN c.starts_at ELSE c.ends_at END ASC,
+                   c.id
+          LIMIT ${CURRENT_MAX}`
+      )
+      .bind(nowIso)
+      .all<CompetitionRow & { entries_count: number }>();
+    return { competitions: await forCustomer(db, userId, results ?? [], nowMs), next_cursor: null };
+  }
+  const after = parseResultsCursor(cursor);
+  // With `mine`, the moment each one ended for good: its announcement, or its cancellation.
+  const ended = 'COALESCE(c.finished_at, c.cancelled_at)';
+  const statement = opts.mine
+    ? db
+        .prepare(
+          `SELECT c.*, ${ENTRIES_COUNT_SQL}
+             FROM reward_competitions c
+             JOIN reward_competition_entries me ON me.competition_id = c.id AND me.user_id = ?3
+            WHERE c.state IN ('finished', 'cancelled') AND ${ended} IS NOT NULL
+              AND (?1 IS NULL OR ${ended} < ?1 OR (${ended} = ?1 AND c.id < ?2))
+            ORDER BY ${ended} DESC, c.id DESC
+            LIMIT ${RESULTS_PAGE + 1}`
+        )
+        .bind(after?.finishedAt ?? null, after?.id ?? '', userId)
+    : db
+        .prepare(
+          `SELECT c.*, ${ENTRIES_COUNT_SQL}
+             FROM reward_competitions c
+            WHERE c.state = 'finished' AND c.finished_at IS NOT NULL
+              AND (?1 IS NULL OR c.finished_at < ?1 OR (c.finished_at = ?1 AND c.id < ?2))
+            ORDER BY c.finished_at DESC, c.id DESC
+            LIMIT ${RESULTS_PAGE + 1}`
+        )
+        .bind(after?.finishedAt ?? null, after?.id ?? '');
+  const { results } = await statement.all<CompetitionRow & { entries_count: number }>();
+  const rows = results ?? [];
+  const page = rows.slice(0, RESULTS_PAGE);
+  const last = page[page.length - 1];
+  // The ordering instant of the last row shown (a finished row always has finished_at).
+  const lastAt = last ? (last.finished_at ?? last.cancelled_at) : null;
+  return {
+    competitions: await forCustomer(db, userId, page, nowMs),
+    next_cursor: rows.length > RESULTS_PAGE && lastAt ? `${lastAt}|${last.id}` : null,
+  };
+}
+
+/** How many each list holds, for the page's two tabs. */
+export async function competitionCounts(db: D1Database): Promise<{ current: number; results: number }> {
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(CASE WHEN state = 'published' THEN 1 ELSE 0 END), 0) AS current,
+              COALESCE(SUM(CASE WHEN state = 'finished' THEN 1 ELSE 0 END), 0) AS results
+         FROM reward_competitions`
+    )
+    .first<{ current: number; results: number }>();
+  return { current: Math.min(CURRENT_MAX, Number(row?.current) || 0), results: Number(row?.results) || 0 };
+}
+
+export interface CompetitionWindowCounts {
+  open: number;
+  upcoming: number;
+  closed: number;
+  /** Open, not entered by this customer, theirs to enter, and below the cap. */
+  open_to_enter: number;
+}
+
+/**
+ * THE HUB'S COMPETITIONS DOOR (DECISIONS row 290): the published competitions
+ * by window against the server's clock — open, upcoming, closed awaiting the
+ * verdict — and how many open ones this customer could still enter. Counted,
+ * never read off the hub's 20-row preview, so the door is right however many
+ * there are. The fee is not part of «could enter»: a customer short of points
+ * is still invited, and the competition's own page says what they lack.
+ *
+ * One aggregate. A printer owners' competition counts only for a customer who
+ * owns a delivered printer, and that is asked only when one is open to them.
+ */
+export async function competitionWindowCounts(db: D1Database, userId: string, nowIso = new Date().toISOString()): Promise<CompetitionWindowCounts> {
+  // The windows exactly as phaseOf reads them.
+  const open = 'c.starts_at <= ?2 AND c.ends_at > ?2';
+  const enterable = `${open}
+           AND NOT EXISTS (SELECT 1 FROM reward_competition_entries me WHERE me.competition_id = c.id AND me.user_id = ?1)
+           AND (c.max_entries IS NULL
+                OR (SELECT COUNT(*) FROM reward_competition_entries x
+                     WHERE x.competition_id = c.id AND x.state IN ('entered', 'winner')) < c.max_entries)`;
+  const row = await db
+    .prepare(
+      `SELECT COALESCE(SUM(CASE WHEN ${open} THEN 1 ELSE 0 END), 0) AS open,
+              COALESCE(SUM(CASE WHEN c.starts_at > ?2 THEN 1 ELSE 0 END), 0) AS upcoming,
+              COALESCE(SUM(CASE WHEN c.starts_at <= ?2 AND c.ends_at <= ?2 THEN 1 ELSE 0 END), 0) AS closed,
+              COALESCE(SUM(CASE WHEN c.eligibility = 'everyone' AND ${enterable} THEN 1 ELSE 0 END), 0) AS open_to_enter_everyone,
+              COALESCE(SUM(CASE WHEN c.eligibility = 'printer_owners' AND ${enterable} THEN 1 ELSE 0 END), 0) AS open_to_enter_owners
+         FROM reward_competitions c
+        WHERE c.state = 'published'`
+    )
+    .bind(userId, nowIso)
+    .first<{ open: number; upcoming: number; closed: number; open_to_enter_everyone: number; open_to_enter_owners: number }>();
+  const n = (v: unknown) => Math.max(0, Number(v) || 0);
+  const owners = n(row?.open_to_enter_owners);
+  const ownsPrinter = owners > 0 ? await ownsDeliveredPrinter(db, userId) : false;
+  return {
+    open: n(row?.open),
+    upcoming: n(row?.upcoming),
+    closed: n(row?.closed),
+    open_to_enter: n(row?.open_to_enter_everyone) + (ownsPrinter ? owners : 0),
+  };
+}
+
+/**
+ * ONE COMPETITION'S PAGE — what a notification («you won», «your points came
+ * back») links to. Published and finished ones are anyone's to read; a draft
+ * is nobody's; a cancelled one only its entrants', who were refunded and are
+ * owed the reason. Null means «not found» for this customer.
+ */
+export async function competitionForCustomer(db: D1Database, userId: string, id: string, nowIso = new Date().toISOString()): Promise<CompetitionView | null> {
+  const row = await db
+    .prepare(`SELECT c.*, ${ENTRIES_COUNT_SQL} FROM reward_competitions c WHERE c.id = ?1 AND c.state IN ('published', 'finished', 'cancelled')`)
+    .bind(id)
+    .first<CompetitionRow & { entries_count: number }>();
+  if (!row) return null;
+  const [view] = await forCustomer(db, userId, [row], Date.parse(nowIso));
+  if (row.state === 'cancelled' && !view.my_entry) return null;
+  return view;
 }
 
 // --------------------------------------------------------------- entering
@@ -476,7 +713,7 @@ export async function enterCompetition(
 
 // --------------------------------------------------------------- admin
 
-export interface AdminCompetitionView extends Omit<CompetitionView, 'eligible' | 'my_entry' | 'winners'> {
+export interface AdminCompetitionView extends Omit<CompetitionView, 'eligible' | 'my_entry' | 'winners' | 'results_at'> {
   state: CompetitionState;
   created_at: string;
   published_at: string | null;
@@ -651,7 +888,8 @@ async function tell(
           title_en: n.text.title.en,
           body_ar: n.text.body.ar,
           body_en: n.text.body.en,
-          link: '/points#competitions',
+          // Its own page (DECISIONS row 290): the result, the prize or the refund, and the winners.
+          link: `/rewards/competitions/${encodeURIComponent(n.competitionId)}`,
           entity_type: 'competition',
           entity_id: n.competitionId,
           meta: { title_ckb: n.text.title.ckb, body_ckb: n.text.body.ckb, ...n.meta },

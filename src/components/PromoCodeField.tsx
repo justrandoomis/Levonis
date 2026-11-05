@@ -141,9 +141,10 @@ export default function PromoCodeField({
   lang: string;
   /**
    * A code to show in the box, ready to apply — the cart passes the remembered
-   * one, so a reward coupon sent from /points («استخدمه الآن») is visible
-   * there instead of looking lost. Nothing is applied until the customer asks;
-   * the checkout re-validates whatever arrives.
+   * one, so a reward coupon sent from the rewards area («استخدمه الآن» on
+   * /rewards, «كوبوناتي» or the points shop) is visible there instead of
+   * looking lost. Nothing is applied until the customer asks; the checkout
+   * re-validates whatever arrives.
    */
   initialCode?: string;
   // The formatter used to be a PROP, passed down from whichever page hosted

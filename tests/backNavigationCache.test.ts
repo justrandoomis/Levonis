@@ -24,7 +24,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -172,6 +172,14 @@ test('the money pages are deliberately NOT cached', () => {
     'src/pages/Orders.tsx',
     'src/pages/OrderDetail.tsx',
     'src/pages/Product.tsx',
+    // «المكافآت» (DECISIONS row 290): points, coupons and paid entries, read
+    // fresh for the signed-in customer only — every file of the area, its
+    // reads (useRewardsData.ts) included, listed from the folder so a new
+    // screen is covered the day it lands.
+    'src/pages/RewardsArea.tsx',
+    ...readdirSync(join(ROOT, 'src/components/rewards'))
+      .filter((name) => /\.tsx?$/.test(name))
+      .map((name) => `src/components/rewards/${name}`),
   ]) {
     assert.ok(!read(file).includes('pageCache'), `${file} must not paint money from a snapshot`);
   }

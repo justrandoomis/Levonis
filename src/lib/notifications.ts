@@ -67,6 +67,32 @@ export interface NotificationRow {
   created_at: string;
 }
 
+/**
+ * WHERE A STORED NOTICE OPENS (DECISIONS row 290). A notice is written once
+ * (`INSERT OR IGNORE`), so the link of one already sent never changes — and
+ * the rewards moved off /points into pages of their own. A stored «🏆» or
+ * refund notice still says /points#competitions, but it names its competition
+ * (`entity_type` 'competition', `entity_id` its id), so it opens that
+ * competition's own page; a stored coupon notice opens «كوبوناتي». Anything
+ * else is the link as stored. /points forwards the same hashes on its own
+ * (src/pages/Rewards.tsx); this saves the detour and is the only way to the
+ * exact competition. The id is checked as the server mints it before it goes
+ * into a path, and only a string is: the column is nullable, and
+ * `/regex/.test(null)` reads "null".
+ */
+export function noticeDestination(n: Pick<NotificationRow, 'link' | 'entity_type' | 'entity_id'>): string {
+  if (
+    n.link === '/points#competitions' &&
+    n.entity_type === 'competition' &&
+    typeof n.entity_id === 'string' &&
+    /^[A-Za-z0-9_-]{1,64}$/.test(n.entity_id)
+  ) {
+    return `/rewards/competitions/${encodeURIComponent(n.entity_id)}`;
+  }
+  if (n.link === '/points#coupons') return '/rewards/coupons';
+  return n.link;
+}
+
 export interface NotificationPage {
   /** The account's unread total — the WHOLE inbox, not this page. */
   unread: number;

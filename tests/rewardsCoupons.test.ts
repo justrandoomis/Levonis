@@ -117,7 +117,7 @@ test('a delivered printer order earns one free-delivery and one filament coupon 
   const notes = all<{ kind: string; event_key: string; meta: string; link: string }>(raw, "SELECT * FROM user_notifications WHERE user_id = 'buyer' AND kind = 'reward'");
   assert.equal(notes.length, 1, 'one notice for the order, not one per coupon');
   assert.equal(notes[0].event_key, `reward:printer:${orderId}`);
-  assert.equal(notes[0].link, '/points#coupons');
+  assert.equal(notes[0].link, '/rewards/coupons');
   const meta = JSON.parse(notes[0].meta);
   assert.ok(meta.title_ckb && meta.body_ckb, 'the Sorani rides in meta');
   assert.notEqual(meta.body_ckb, row<{ body_ar: string }>(raw, "SELECT body_ar FROM user_notifications WHERE user_id = 'buyer' AND kind = 'reward'")!.body_ar);
@@ -260,9 +260,10 @@ test('the 24-hour reminder: one notice per customer for coupons still unused, ne
   raw.prepare('UPDATE reward_grants SET expires_at = ? WHERE order_id = ?').run(soon, orderId);
   const first = await runRewardSweep(envOf(raw));
   assert.deepEqual(first.reminders, { coupons: 2, customers: 1 });
-  const notes = all<{ event_key: string; meta: string }>(raw, "SELECT event_key, meta FROM user_notifications WHERE user_id = 'buyer' AND event_key LIKE 'reward:expiring:%'");
+  const notes = all<{ event_key: string; meta: string; link: string }>(raw, "SELECT event_key, meta, link FROM user_notifications WHERE user_id = 'buyer' AND event_key LIKE 'reward:expiring:%'");
   assert.equal(notes.length, 1);
   assert.ok(JSON.parse(notes[0].meta).body_ckb);
+  assert.equal(notes[0].link, '/rewards/coupons', 'the reminder opens «كوبوناتي» itself (DECISIONS row 290)');
   const second = await runRewardSweep(envOf(raw));
   assert.deepEqual(second.reminders, { coupons: 0, customers: 0 }, 'reminded once');
   assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM reward_grants WHERE reminded_at IS NULL AND order_id = ?', orderId), 0);
@@ -362,6 +363,57 @@ test('the points shop: a coupon for points in one batch; not enough points or a 
   assert.equal((await json(off)).code, 'REWARD_SHOP_UNAVAILABLE');
 });
 
+test('the shop says what the swap would: held while a bought coupon is live and unused, free again once used or expired; short by the price less the balance', async () => {
+  const raw = world();
+  raw.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES (?, ?)').run(
+    REWARD_CONFIG_KEY,
+    JSON.stringify({ shop: { free_shipping: { enabled: true, points: 3000 }, filament_discount: { enabled: true, points: 4000 } } })
+  );
+  const app = rewardsApp(raw);
+  const hub = async () => json(await get(app, '/api/rewards/program'));
+  const shopOf = async () => {
+    const h = await hub();
+    return { balance: h.point_balance as number, counts: h.coupon_counts, ...Object.fromEntries(h.shop.map((s: J) => [s.kind, s])) } as J;
+  };
+  const deposit = (id: string, n: number) =>
+    raw.prepare("INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status) VALUES (?,'buyer','deposit','POINT',?,'approved')").run(id, n);
+
+  let shop = await shopOf();
+  assert.equal(shop.balance, 0);
+  assert.deepEqual(shop.free_shipping, { kind: 'free_shipping', points: 3000, affordable: false, holding: false, points_short: 3000 });
+  assert.deepEqual(shop.filament_discount, { kind: 'filament_discount', points: 4000, affordable: false, holding: false, points_short: 4000 });
+
+  deposit('pts_1', 5000);
+  shop = await shopOf();
+  assert.deepEqual([shop.free_shipping.affordable, shop.free_shipping.points_short, shop.filament_discount.points_short], [true, 0, 0]);
+  const bought = await json(await post(app, '/api/rewards/program/shop/free_shipping'));
+  assert.equal(bought.success, true, JSON.stringify(bought));
+  shop = await shopOf();
+  assert.deepEqual(shop.free_shipping, { kind: 'free_shipping', points: 3000, affordable: false, holding: true, points_short: 1000 }, '2,000 left of 5,000');
+  assert.deepEqual(shop.filament_discount, { kind: 'filament_discount', points: 4000, affordable: false, holding: false, points_short: 2000 }, 'one held per kind, not per shop');
+  assert.deepEqual(shop.counts, { active: 1, past: 0 });
+  deposit('pts_2', 4000);
+  assert.equal((await json(await post(app, '/api/rewards/program/shop/free_shipping'))).code, 'REWARD_SHOP_HOLDING', 'the swap refuses what the page calls held');
+
+  // Used on an order: no longer held, and the swap agrees.
+  const a = apps(raw);
+  paidLine(raw, 'ci_other', 'p_tool', { qty: 1, fulfillmentType: 'direct_sale' });
+  await placeOrder(a.buyer, { couponCode: bought.coupon.code });
+  shop = await shopOf();
+  assert.equal(shop.free_shipping.holding, false);
+  assert.deepEqual(shop.counts, { active: 0, past: 1 });
+  const again = await json(await post(app, '/api/rewards/program/shop/free_shipping'));
+  assert.equal(again.success, true, JSON.stringify(again));
+  assert.equal((await shopOf()).free_shipping.holding, true);
+
+  // Expired unused: no longer held either.
+  raw.prepare('UPDATE coupons SET ends_at = ? WHERE code = ?').run(new Date(Date.now() - 60_000).toISOString(), again.coupon.code);
+  shop = await shopOf();
+  assert.equal(shop.free_shipping.holding, false);
+  assert.deepEqual(shop.counts, { active: 0, past: 2 });
+  assert.equal((await json(await post(app, '/api/rewards/program/shop/free_shipping'))).success, true, 'and the swap sells one again');
+});
+
 // ------------------------------------------------------------------ the hub and the admin
 
 test('GET /api/rewards/program: my coupons, the printer to rate, pending points and the programme’s terms', async () => {
@@ -377,6 +429,73 @@ test('GET /api/rewards/program: my coupons, the printer to rate, pending points 
   assert.equal(hub.program.filament.section.id, 'cat_materials_fdm');
   assert.deepEqual(hub.shop, [], 'no price set: no shop');
   assert.ok(hub.pending_points.points >= 0);
+
+  // DECISIONS row 290: what the rewards area reads instead of working it out.
+  assert.deepEqual(hub.coupon_counts, { active: 2, past: 0 });
+  const ship = hub.coupons.find((c: J) => c.kind === 'free_shipping');
+  const fil = hub.coupons.find((c: J) => c.kind === 'filament_discount');
+  assert.equal(ship.targets, null, 'free delivery goes on any order: nothing to choose');
+  assert.deepEqual([fil.targets.products, fil.targets.products_total], [[], 0], 'nothing ticked: a section-wide coupon');
+  const section = row<{ slug: string }>(raw, "SELECT slug FROM catalogs WHERE id = 'cat_materials_fdm'")!;
+  assert.equal(fil.targets.section.id, 'cat_materials_fdm', 'its section, from its own category_id');
+  assert.equal(fil.targets.section.slug, section.slug);
+  assert.ok(fil.targets.section.path.startsWith('/categories/') && fil.targets.section.path.endsWith(`/${encodeURIComponent(section.slug)}`));
+  assert.deepEqual(fil.targets.section, hub.program.filament.section, 'the same section read the programme states');
+  assert.equal(hub.rating.no_level_points, null, 'review points not configured: nothing invented');
+
+  raw.prepare("INSERT OR REPLACE INTO admin_settings (key, value) VALUES ('reviewPointsConfig', ?)").run(JSON.stringify({ enabled: true, points: 500 }));
+  raw.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES (?, ?)').run(
+    REWARD_CONFIG_KEY,
+    JSON.stringify({ shop: { free_shipping: { enabled: true, points: 3000 }, filament_discount: { enabled: false, points: null } } })
+  );
+  raw.exec("INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status) VALUES ('pts_hub','buyer','deposit','POINT',1200,'approved')");
+  const priced = await json(await get(rewardsApp(raw), '/api/rewards/program'));
+  assert.equal(priced.point_balance, 1200);
+  assert.equal(priced.rating.review_points, 500);
+  assert.equal(priced.rating.no_level_points, 1000, 'twice the base: the award path’s own rule (noLevelReviewPoints)');
+  assert.deepEqual(priced.shop, [{ kind: 'free_shipping', points: 3000, affordable: false, holding: false, points_short: 1800 }]);
+});
+
+test('a filament coupon names what IT covers, frozen when issued: its products still on sale, twenty by name, all of them counted', async () => {
+  const raw = world();
+  const add = raw.prepare(
+    `INSERT INTO products (id,slug,name,name_ar,name_ku,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images,inventory_mode,category_id)
+     VALUES (?,?,?,?,?,15000,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]',?,'BASE','cat_materials_fdm')`
+  );
+  const spools = Array.from({ length: 23 }, (_, i) => `p_spool_${String(i).padStart(2, '0')}`);
+  spools.forEach((id, i) => add.run(id, `spool-${i}`, `Spool ${i}`, `بكرة ${i}`, `بکرە ${i}`, JSON.stringify([`/files/products/${id}.webp`, '/files/products/second.webp'])));
+  const setFilaments = (product_ids: string[]) =>
+    raw.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES (?, ?)').run(
+      REWARD_CONFIG_KEY,
+      JSON.stringify({ free_shipping: { enabled: false }, filament: { enabled: true, percent: 15, max_discount_iqd: 25000, product_ids } })
+    );
+
+  // A: the owner ticks the nozzle cleaner and the 23 spools, and a printer is delivered.
+  setFilaments(['p_plain', ...spools]);
+  await deliveredPrinterOrder(raw, 1);
+  // B: the owner unticks them all and ticks the scraper; two of the coupon’s own products leave the shop.
+  setFilaments(['p_tool']);
+  raw.prepare("UPDATE products SET status = 'draft' WHERE id IN (?, ?)").run(spools[0], spools[5]);
+
+  const hub = await json(await get(rewardsApp(raw), '/api/rewards/program'));
+  assert.equal(hub.success, true, JSON.stringify(hub));
+  assert.equal(hub.coupons.length, 1, 'free delivery switched off: the filament coupon alone');
+  const fil = hub.coupons[0];
+  assert.equal(fil.scope, 'products');
+  const onSale = ['p_plain', ...spools].filter((id) => id !== spools[0] && id !== spools[5]);
+  assert.equal(fil.targets.products_total, 22, 'every product of its own list still on sale, counted');
+  assert.deepEqual(fil.targets.products.map((p: J) => p.id), onSale.slice(0, 20), 'in its own order, the first twenty by name');
+  assert.equal(fil.targets.section, null);
+  assert.deepEqual(fil.targets.products[0], { id: 'p_plain', slug: 'nozzle-cleaner', name: { ar: 'منظف فوهات', en: 'Nozzle cleaner', ckb: 'پاککەرەوەی نۆزڵ' }, image: '' });
+  assert.deepEqual(fil.targets.products[1], { id: spools[1], slug: 'spool-1', name: { ar: 'بكرة 1', en: 'Spool 1', ckb: 'بکرە 1' }, image: `/files/products/${spools[1]}.webp` }, 'the first image');
+  assert.ok(!fil.targets.products.some((p: J) => p.id === 'p_tool'), 'today’s ticks never widen an issued coupon');
+  assert.deepEqual(hub.program.filament.products.map((p: J) => p.id), ['p_tool'], 'while the programme itself has moved on');
+
+  // A past coupon is spent on nothing: no targets.
+  raw.prepare('UPDATE coupons SET ends_at = ? WHERE id = ?').run(new Date(Date.now() - 60_000).toISOString(), row<{ coupon_id: string }>(raw, 'SELECT coupon_id FROM reward_grants')!.coupon_id);
+  const later = await json(await get(rewardsApp(raw), '/api/rewards/program'));
+  assert.deepEqual([later.coupons[0].state, later.coupons[0].targets], ['expired', null]);
+  assert.deepEqual(later.coupon_counts, { active: 0, past: 1 });
 });
 
 test('the admin: the promo-code list leaves reward coupons out, the code editor refuses them, Admin → Rewards lists and withdraws them', async () => {

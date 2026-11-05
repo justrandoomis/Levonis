@@ -785,7 +785,8 @@ const T: Record<Locale, Record<string, string>> = {
     w_not_delivered: 'لم يُسلَّم بعد — يبدأ الضمان عند التسليم',
     warranty_link: 'صفحة الضمان',
     points_line: 'رصيدك {points} نقطة. كل نقطة = 1 د.ع عند الدفع.',
-    points_link: 'صفحة النقاط والمكافآت',
+    points_link: 'صفحة النقاط',
+    coupons_link: 'كوبوناتي',
     member_none: 'لا توجد عضوية فعالة في حسابك. اطّلع على الخطط في صفحة الاشتراك.',
     member_active: 'عضوية {tier} فعالة حتى {date}.',
     member_pending_launch: 'عضوية {tier} مدفوعة ومحجوزة بالكامل؛ تبدأ مدتها عند الإطلاق المعلن.',
@@ -953,7 +954,8 @@ const T: Record<Locale, Record<string, string>> = {
     w_not_delivered: 'Not delivered yet — coverage starts at delivery',
     warranty_link: 'Warranty page',
     points_line: 'Your balance is {points} points. 1 point = 1 IQD at checkout.',
-    points_link: 'Points & rewards',
+    points_link: 'Points page',
+    coupons_link: 'My coupons',
     member_none: 'You have no active membership. See the plans on the Subscription page.',
     member_active: 'Your {tier} membership is active until {date}.',
     member_pending_launch: 'Your {tier} membership is paid and fully reserved; its term starts at the announced launch.',
@@ -1118,7 +1120,8 @@ const T: Record<Locale, Record<string, string>> = {
     w_not_delivered: 'هێشتا نەگەیەنراوە — گەرەنتی لە کاتی گەیاندنەوە دەست پێدەکات',
     warranty_link: 'پەڕەی گەرەنتی',
     points_line: 'باڵانسەکەت {points} خاڵە. هەر خاڵێک = 1 د.ع لە کاتی پارەدان.',
-    points_link: 'پەڕەی خاڵ و خەڵات',
+    points_link: 'پەڕەی خاڵەکان',
+    coupons_link: 'کۆپۆنەکانم',
     member_none: 'هیچ ئەندامێتییەکی چالاکت نییە. پلانەکان لە پەڕەی بەشداری ببینە.',
     member_active: 'ئەندامێتی {tier} چالاکە تا {date}.',
     member_pending_launch: 'ئەندامێتی {tier} پارەی دراوە و بە تەواوی حجزکراوە؛ ماوەکەی لە کاتی دەستپێکی ڕاگەیەنراودا دەست پێدەکات.',
@@ -2487,13 +2490,15 @@ async function handlePaymentMethods(c: Context<AppContext>, loc: Locale): Promis
  * per-tier and per-user limits, and reciting the table in a public chat would
  * hand every visitor a code that was cut for one membership. What a customer
  * asking this needs is where to type the one they were given, and that the
- * server checks it before any money moves.
+ * server checks it before any money moves — and the one page that lists the
+ * codes they DO hold, «كوبوناتي» in the rewards area (DECISIONS row 290),
+ * which asks a guest to sign in on the page itself.
  */
 async function handleOffers(c: Context<AppContext>, loc: Locale): Promise<AssistantReply> {
   return {
     intent: 'offers_help',
     text: tr(loc, 'offers_reply'),
-    links: [{ label: tr(loc, 'points_link'), to: '/points' }],
+    links: [{ label: tr(loc, 'coupons_link'), to: '/rewards/coupons' }],
     cards: await policyReadMore(c, 'rewards', loc),
   };
 }

@@ -224,8 +224,8 @@ const QuickBuyActivationSheet = React.lazy(loadQuickBuySheet);
 /** Reviews and eligibility are below the purchase panel; start them near the scroll viewport. */
 function ProductReviews({ productId }: { productId: string }) {
   const target = useRef<HTMLDivElement>(null);
-  // «اكتب مراجعتك» on the rewards page (/points) links here with #reviews: the
-  // section opens at once and is brought into view instead of waiting for a scroll.
+  // «اكتب مراجعتك» in the rewards area (/rewards, «قيّم طابعتك») links here with #reviews:
+  // the section opens at once and is brought into view instead of waiting for a scroll.
   const asked = typeof window !== 'undefined' && window.location.hash === '#reviews';
   const [ready, setReady] = useState(asked);
   useEffect(() => {
