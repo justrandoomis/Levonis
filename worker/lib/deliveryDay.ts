@@ -222,7 +222,7 @@ export interface DayLabel {
 }
 
 /** Sunday-first, matching `Date.prototype.getUTCDay()`. */
-const WEEKDAYS: Record<DeliveryDayLang, string[]> = {
+export const WEEKDAYS: Record<DeliveryDayLang, string[]> = {
   ar: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'],
   en: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'],
   ckb: ['یەکشەممە', 'دووشەممە', 'سێشەممە', 'چوارشەممە', 'پێنجشەممە', 'هەینی', 'شەممە'],

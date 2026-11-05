@@ -32,6 +32,18 @@
  * guest the product (members only, or its quantity used up) leaves no shelf
  * price at all: the product reads «السعر غير متوفر حالياً».
  *
+ * THE SALE'S OCCASION AND END (owner, 2026-11-05; DECISIONS row 296), the last
+ * two columns, so the agent can say «عرض بلاك فرايدي … لحد الجمعة»: «المناسبة»
+ * is the occasion the owner named the sale by (a preset's Arabic name,
+ * «بلاك فرايدي», or his own Arabic name for a custom one — DECISIONS row 294)
+ * and «ينتهي العرض» is the window's end in Baghdad time
+ * (worker/lib/offerEndText.ts). Both come from the window that lowered the
+ * price, and both are written ONLY where «السعر قبل الخصم» is: a sale that does
+ * not lower the product's figure, one not yet started or over, a pre-order or a
+ * product without a price says no occasion and no end. A sale with no occasion
+ * leaves «المناسبة» empty; one with no end leaves «ينتهي العرض» empty. New
+ * columns go at the END: a reader of the first seven keeps its places.
+ *
  * AVAILABILITY IS THE STOREFRONT CARD'S OWN RULE (`cardAvailability`,
  * packages/catalog), read off the card `GET /api/products` serialized — the same
  * `direct_stock_available` the card's «متوفر» line reads.
@@ -44,9 +56,19 @@
  * Pure: no I/O.
  */
 import { cardAvailability } from '@levonis/catalog/availability';
+import { occasionWords, type OccasionName } from '@levonis/contracts/offerOccasions';
 import { toCsv } from './importCsv';
+import { offerEndText } from './offerEndText';
 
 export type PriceFeedStatus = 'in_stock' | 'pre_order' | 'not_priced';
+
+/** The live window that lowered a selection's price: what the owner named it by, and when it ends. */
+export interface ShelfSale {
+  /** `occasionOf(window)` (worker/lib/offers.ts): the key, and the owner's own name for 'custom'; null = none. */
+  occasion: { badge: string; badge_text?: OccasionName } | null;
+  /** The window's end, an ISO instant; null = no end. */
+  ends_at: string | null;
+}
 
 /** One selection the shelf sells now as a direct sale: its direct-sale price, and whether that price is an estimate. */
 export interface ShelfPrice {
@@ -54,6 +76,12 @@ export interface ShelfPrice {
   estimate: boolean;
   /** A live offer lowered it: the struck price the product page shows for it, present only when above `price_iqd`. */
   before_iqd?: number;
+  /**
+   * The window that lowered it. Only beside `before_iqd`: the route (`shelfDirectPrices`) hands it with every
+   * struck price, a struck price comes only from the product's one window, and the feed names an occasion
+   * or an end only beside a strike — so a shelf without it prints the strike alone.
+   */
+  sale?: ShelfSale;
 }
 
 export interface PriceFeedProduct {
@@ -65,7 +93,17 @@ export interface PriceFeedProduct {
   shelf: readonly ShelfPrice[];
 }
 
-export const PRICE_FEED_HEADER: readonly string[] = ['الاسم', 'Name', 'الحالة', 'Status', 'السعر (د.ع)', 'السعر قبل الخصم (د.ع)', 'الرابط'];
+export const PRICE_FEED_HEADER: readonly string[] = [
+  'الاسم',
+  'Name',
+  'الحالة',
+  'Status',
+  'السعر (د.ع)',
+  'السعر قبل الخصم (د.ع)',
+  'الرابط',
+  'المناسبة',
+  'ينتهي العرض',
+];
 
 export const PRICE_FEED_STATUS: Readonly<Record<PriceFeedStatus, { ar: string; en: string }>> = {
   in_stock: { ar: 'متوفر الآن (بيع مباشر)', en: 'In stock' },
@@ -88,8 +126,12 @@ export function onShelfNow(card: Record<string, unknown>): boolean {
 /** One product's status, and the figure it may carry (in stock only). */
 export function priceFeedVerdict(p: Pick<PriceFeedProduct, 'card' | 'shelf'>): {
   status: PriceFeedStatus;
-  /** `before_iqd`: the struck price of the selection the figure is (a live offer lowered it), else null. */
-  price: { iqd: number; from: boolean; before_iqd: number | null } | null;
+  /**
+   * `before_iqd`: the struck price of the selection the figure is (a live offer lowered it), else null.
+   * `sale`: the window that lowered that figure, as the figure's selection carries it — never without
+   * `before_iqd` (null when there is no strike, or the shelf names no window).
+   */
+  price: { iqd: number; from: boolean; before_iqd: number | null; sale: ShelfSale | null } | null;
 } {
   // Catalog-only (DECISIONS row 240): the site shows «السعر غير متوفر حالياً» and claims no stock.
   if (p.card.price_status !== 'priced') return { status: 'not_priced', price: null };
@@ -103,13 +145,21 @@ export function priceFeedVerdict(p: Pick<PriceFeedProduct, 'card' | 'shelf'>): {
     // now, and only when the sale lowered it. A selection with no struck price counts at its own figure, so
     // a figure one selection sells at undiscounted is never struck, and «يبدأ من» is never paired with
     // another selection's dearer struck price.
-    const preSaleLow = Math.min(...firm.map((s) => (typeof s.before_iqd === 'number' && positive(s.before_iqd) && s.before_iqd > s.price_iqd ? s.before_iqd : s.price_iqd)));
+    const struck = (s: ShelfPrice): s is ShelfPrice & { before_iqd: number } =>
+      typeof s.before_iqd === 'number' && positive(s.before_iqd) && s.before_iqd > s.price_iqd;
+    const preSaleLow = Math.min(...firm.map((s) => (struck(s) ? s.before_iqd : s.price_iqd)));
+    const before = preSaleLow > low ? preSaleLow : null;
+    // THE SALE NAMED BESIDE THE STRIKE: the window that lowered the figure itself. With a strike, every
+    // selection AT the figure is struck (an unstruck one would hold the old low down to the figure), and
+    // a product has one window (`offer_windows`' key), so the figure's selection names it.
+    const figure = before === null ? undefined : firm.find((s) => s.price_iqd === low && struck(s));
     return {
       status: 'in_stock',
       price: {
         iqd: low,
         from: p.shelf.some((s) => positive(s.price_iqd) && s.price_iqd !== low),
-        before_iqd: preSaleLow > low ? preSaleLow : null,
+        before_iqd: before,
+        sale: figure?.sale ?? null,
       },
     };
   }
@@ -214,9 +264,32 @@ export function priceFeedRows(products: readonly PriceFeedProduct[], opts: Price
       const words = PRICE_FEED_STATUS[r.verdict.status];
       const price = r.verdict.price ? `${r.verdict.price.from ? FROM_PREFIX : ''}${groupedIqd(r.verdict.price.iqd)}` : '';
       const before = r.verdict.price && r.verdict.price.before_iqd !== null ? groupedIqd(r.verdict.price.before_iqd) : '';
-      return [r.ar, r.en, words.ar, words.en, price, before, `${origin}/product/${encodeURIComponent(r.slug)}`];
+      // Only beside a strike (`priceFeedVerdict` sets `sale` exactly with `before_iqd`).
+      const sale = before ? (r.verdict.price?.sale ?? null) : null;
+      return [
+        r.ar,
+        r.en,
+        words.ar,
+        words.en,
+        price,
+        before,
+        `${origin}/product/${encodeURIComponent(r.slug)}`,
+        sale ? occasionAr(sale) : '',
+        sale ? offerEndText(sale.ends_at, 'ar') : '',
+      ];
     }),
   ];
+}
+
+/**
+ * «المناسبة»: the Arabic name of the occasion the owner named the sale by — a preset's own («بلاك فرايدي»,
+ * «عروض رمضان»), or his own Arabic name for 'custom' — through the occasion table's one reader
+ * (`occasionWords`, packages/contracts/src/offerOccasions.ts). '' for a sale with none, or with a key this
+ * code does not know.
+ */
+function occasionAr(sale: ShelfSale): string {
+  const o = sale.occasion;
+  return o ? oneLine(occasionWords(o.badge, o.badge_text ?? null, 'ar')?.name ?? '') : '';
 }
 
 /**

@@ -54,7 +54,7 @@ import { pricingTierContext } from '../lib/entitlements';
 import { ancestryFor, degradeIfSchemaMissing, fallbackFor, pricingInputsFor } from '../lib/membershipBenefits';
 import { anonymousCached, type EdgeLifetime } from '../lib/edgePolicy';
 import { trustedOrigin } from '../lib/appOrigin';
-import { categoryRanks, onShelfNow, priceFeedCsv, type PriceFeedProduct, type ShelfPrice } from '../lib/priceFeed';
+import { categoryRanks, onShelfNow, priceFeedCsv, type PriceFeedProduct, type ShelfPrice, type ShelfSale } from '../lib/priceFeed';
 import { cardLeadPhoto } from '../lib/cardPhoto';
 import { loadProductKnowledge } from '../lib/knowledge/productKnowledge';
 import { EMPTY_TRANSLATIONS, importedSlots, loadProductTranslationMap, overlayImportedText } from '../lib/translate/memory';
@@ -2824,12 +2824,23 @@ export async function shelfDirectPrices(
       prices.push({
         price_iqd: level.unit_subtotal_iqd,
         estimate: selectionEstimated(doc, opening.option_value_ids, opening.color_id),
-        ...(before !== null ? { before_iqd: before } : {}),
+        ...(before !== null ? { before_iqd: before, ...saleOf(offer) } : {}),
       });
     }
     out.set(id, prices);
   }
   return out;
+}
+
+/**
+ * THE WINDOW BEHIND A STRUCK PRICE, for the feed's «المناسبة» and «ينتهي العرض» (DECISIONS row 296): the
+ * occasion it is named by (`occasionOf`, the same allow-list the product page's offer block reads — the key,
+ * and the owner's name for 'custom') and its end. Asked only where the window lowered the price, so it is
+ * the live window this reader may take; on a database before 0224 the window has no occasion.
+ */
+function saleOf(offer: OfferView | undefined): { sale?: ShelfSale } {
+  const w = offer?.window;
+  return w ? { sale: { occasion: occasionOf(w), ends_at: w.ends_at ?? null } } : {};
 }
 
 /**
