@@ -22,7 +22,7 @@ import { ChevronDown, Tag } from 'lucide-react';
 import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Badge';
 import type { AdminProductEstimate } from '../../lib/api';
-import { fetchEstimate, fetchProductLinks, workspaceHref, type ProductLinks, type StoredEstimate } from './api';
+import { fetchEstimate, fetchProductLinks, workspaceHref, type ProductLinks, type RealMeasures, type StoredEstimate } from './api';
 import { Ltr, SupplierLinkRow, errorCode, skuName, useUiLang } from './parts';
 import ConfirmSheet from './ConfirmSheet';
 import { BANNER, ESTIMATE_STATE_LABELS, SOURCE_LABELS, say, type UiLang } from './strings';
@@ -34,12 +34,32 @@ export interface EstimateBannerProps {
   owner: boolean;
   /** The product read's non-financial state, when the form passes it (every admin may read it). */
   state?: AdminProductEstimate | null;
+  /**
+   * The confirmation stated the shown measures real (§4.9 step 0): it wrote the product's package, so the form reads
+   * the product again. Handed the values stated (the package holds them now).
+   */
+  onProductChanged?: (stated: RealMeasures) => void;
+  /** The form's own «الأبعاد والوزن» (section ٤) and its cost card's weight (section ٣), for the confirmation's «ليست صحيحة؟». */
+  onOpenDimensions?: () => void;
+  onOpenCost?: () => void;
+  /** Read again when this changes: the pricing form's stored answer (a save may write real measures there). */
+  revision?: string;
 }
 
-export default function EstimateBanner({ productId, owner, state = null }: EstimateBannerProps) {
+export default function EstimateBanner({ productId, owner, state = null, onProductChanged, onOpenDimensions, onOpenCost, revision = '' }: EstimateBannerProps) {
   const { lang, dir } = useUiLang();
   if (!owner) return <StaffEstimateState state={state} lang={lang} dir={dir} />;
-  return <OwnerEstimateBanner productId={productId} lang={lang} dir={dir} />;
+  return (
+    <OwnerEstimateBanner
+      productId={productId}
+      lang={lang}
+      dir={dir}
+      revision={revision}
+      onProductChanged={onProductChanged}
+      onOpenDimensions={onOpenDimensions}
+      onOpenCost={onOpenCost}
+    />
+  );
 }
 
 /** What every other admin may know: whether customers see the label, and where the owner holds the estimate. */
@@ -62,7 +82,15 @@ export function sourceDates(estimate: StoredEstimate | null, links: ProductLinks
   });
 }
 
-function OwnerEstimateBanner({ productId, lang, dir }: { productId: string; lang: UiLang; dir: 'rtl' | 'ltr' }) {
+function OwnerEstimateBanner({
+  productId,
+  lang,
+  dir,
+  revision,
+  onProductChanged,
+  onOpenDimensions,
+  onOpenCost,
+}: { productId: string; lang: UiLang; dir: 'rtl' | 'ltr'; revision: string } & Pick<EstimateBannerProps, 'onProductChanged' | 'onOpenDimensions' | 'onOpenCost'>) {
   const [estimate, setEstimate] = useState<StoredEstimate | null>(null);
   const [links, setLinks] = useState<ProductLinks | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -90,12 +118,14 @@ function OwnerEstimateBanner({ productId, lang, dir }: { productId: string; lang
       })
       .catch(() => undefined);
     return () => ac.abort();
-  }, [productId, reload]);
+  }, [productId, reload, revision]);
 
   const done = useCallback(() => {
     setConfirming(false);
     setReload((n) => n + 1);
   }, []);
+  // The sheet moved the server's state (a compute, a stale version): the banner's chips are read again too.
+  const stale = useCallback(() => setReload((n) => n + 1), []);
   const dates = useMemo(() => sourceDates(estimate, links), [estimate, links]);
   const factCount = useMemo(() => (links?.skus ?? []).reduce((n, s) => n + s.supplier_prices.length, 0), [links]);
 
@@ -172,7 +202,15 @@ function OwnerEstimateBanner({ productId, lang, dir }: { productId: string; lang
           </a>
         </div>
       ) : null}
-      <ConfirmSheet estimate={confirming ? estimate : null} onClose={() => setConfirming(false)} onDone={done} />
+      <ConfirmSheet
+        estimate={confirming ? estimate : null}
+        onClose={() => setConfirming(false)}
+        onDone={done}
+        onStale={stale}
+        onProductChanged={onProductChanged}
+        onOpenDimensions={onOpenDimensions}
+        onOpenCost={onOpenCost}
+      />
     </section>
   );
 }

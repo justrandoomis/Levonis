@@ -187,7 +187,8 @@ export function DimensionsSection({
         </Grid>
       </div>
 
-      <div>
+      {/* The product's own box (not a model's override) is where the estimate confirmation sends the owner (§4.9). */}
+      <div data-package-measures={collapsible ? undefined : ''}>
         <h4 className="mb-2.5 text-[13px] font-bold text-white">
           صندوق الشحن <span className="text-text-muted font-medium">/ The shipping box</span>
         </h4>

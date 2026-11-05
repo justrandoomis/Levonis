@@ -30,6 +30,7 @@
 import { lazy, Suspense, useMemo } from 'react';
 import type { AdminProductEstimate } from '../../../../lib/api';
 import type { ProductDimensionsV2 } from '../../../../lib/productTypes';
+import type { StatedPackage } from '../../types';
 import { draftOf, firstLineOf, productFinalLine, withPackageMeasure, type V2Names } from './v2Model';
 import { useV2 } from './useV2Pricing';
 import MethodToggle from './MethodToggle';
@@ -52,6 +53,9 @@ export default function PricesSectionV2({
   onJump,
   productId = null,
   priceEstimate = null,
+  onProductChanged,
+  onOpenDimensions,
+  onOpenCost,
 }: {
   modelNames: (id: string) => V2Names | null;
   /** The first active model of section ٥ (its result is the bar's), or null for an option-less product. */
@@ -62,6 +66,11 @@ export default function PricesSectionV2({
   productId?: string | null;
   /** The product read's non-financial `price_estimate` (GET /api/admin/products-v2/:id), when the form passes it. */
   priceEstimate?: AdminProductEstimate | null;
+  /** The estimate's confirmation wrote the product's package (the owner's statement of real measures, the values handed here): read it again. */
+  onProductChanged?: (stated: StatedPackage) => void;
+  /** The confirmation's way to «الأبعاد والوزن» (section ٤) and to the cost card's weight. */
+  onOpenDimensions?: () => void;
+  onOpenCost?: () => void;
 }) {
   const v2 = useV2();
   const s = useV2Strings();
@@ -94,7 +103,15 @@ export default function PricesSectionV2({
     <div className="min-w-0" data-form="pricing-v2" data-v2-mode={v2.mode} data-v2-owner={v2.owner ? '1' : '0'} aria-busy={v2.previewing || undefined}>
       {estimateBanner && productId ? (
         <Suspense fallback={null}>
-          <EstimateBanner productId={productId} owner={v2.owner} state={priceEstimate} />
+          <EstimateBanner
+            productId={productId}
+            owner={v2.owner}
+            state={priceEstimate}
+            onProductChanged={onProductChanged}
+            onOpenDimensions={onOpenDimensions}
+            onOpenCost={onOpenCost}
+            revision={v2.stored?.seq ? `${v2.stored.seq.inputs_seq}:${v2.stored.seq.write_seq}` : ''}
+          />
         </Suspense>
       ) : null}
       {v2.hidden ? (

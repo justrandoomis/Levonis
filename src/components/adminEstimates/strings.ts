@@ -670,10 +670,11 @@ export const CONFIRM = {
   acceptTitle: t('ملاحظات تحتاج قبولك صراحةً', 'Flags that need your explicit acceptance', 'ئەو تێبینییانەی پێویستیان بە پەسەندکردنی ڕوونی تۆیە'),
   accept: t('أقبل: {flag}', 'I accept: {flag}', 'پەسەندی دەکەم: {flag}'),
   acceptAllFirst: t('اقبل كل ملاحظة مفتوحة أولًا.', 'Accept every open flag first.', 'سەرەتا هەموو تێبینییەکی کراوە پەسەند بکە.'),
+  /** The statement on offer (§4.9 step 0): the type's defaults price the options confirmed, shown below with the tick. */
   hardOpen: t(
-    'قياسات افتراضية: أدخل الوزن والصندوق الحقيقيين في نموذج المنتج أولًا، ثم احسب من جديد.',
-    'Default measures: enter the real weight and box in the product form first, then compute again.',
-    'پێوانەی بنەڕەتی: سەرەتا کێش و سندوقی ڕاستەقینە لە فۆرمی بەرهەمەکەدا بنووسە، پاشان دووبارە هەژمار بکەرەوە.'
+    'قياسات افتراضية: السعر محسوب من قياسات النوع الافتراضية أدناه. أكّد أنها صحيحة لهذا المنتج، أو أدخل الحقيقية.',
+    'Default measures: the price is computed from the type’s default measures below. Confirm they are correct for this product, or enter the real ones.',
+    'پێوانەی بنەڕەتی: نرخەکە لە پێوانە بنەڕەتییەکانی جۆرەکەوە هەژمار کراوە (لە خوارەوە). پشتڕاستی بکەرەوە کە بۆ ئەم بەرهەمە دروستن، یان ڕاستەقینەکان بنووسە.'
   ),
   /** PRICE_ESTIMATE_DEFAULT_MEASURES with `waiting_on_apply`: the real measures are entered, the refresh's apply takes them in. */
   applyFirst: t(
@@ -684,6 +685,75 @@ export const CONFIRM = {
   submit: t('أكّد السعر', 'Confirm the price', 'نرخەکە پشتڕاست بکەرەوە'),
   doneWhole: t('رُفع الوسم عن المنتج.', 'The label is removed from the product.', 'نیشانەکە لە بەرهەمەکە لابرا.'),
   doneSkus: t('ثُبّت سعر {n} من الخيارات؛ يبقى الوسم للباقي.', '{n} options are now firm; the label stays for the others.', 'نرخی {n} هەڵبژاردە جێگیر کرا؛ نیشانەکە بۆ ئەوانی تر دەمێنێتەوە.'),
+  // The owner's statement of real measures (§4.9 step 0; DECISIONS row 292).
+  measuresTitle: t('القياسات التي يُحسب منها السعر الآن', 'The measures the price is computed from now', 'ئەو پێوانانەی ئێستا نرخەکەیان پێ هەژمار دەکرێت'),
+  weight: t('الوزن', 'Weight', 'کێش'),
+  box: t('الصندوق', 'Box', 'سندوقەکە'),
+  kg: t('كغ', 'kg', 'کیلۆ'),
+  cm: t('سم', 'cm', 'سانتیمەتر'),
+  fromType: t(
+    'هذه قياسات النوع الافتراضية، لا قياسات هذا المنتج.',
+    'These are the type’s default measures, not this product’s own.',
+    'ئەمانە پێوانە بنەڕەتییەکانی جۆرەکەن، نەک پێوانەکانی ئەم بەرهەمە خۆی.'
+  ),
+  attest: t('هذه القياسات صحيحة لهذا المنتج', 'These measures are correct for this product', 'ئەم پێوانانە بۆ ئەم بەرهەمە دروستن'),
+  attestHint: t(
+    'تُحفظ في «الأبعاد والوزن» قياساتٍ حقيقيةً للمنتج، ويراها الزبون تحت «العبوة». لا يتغيّر أي سعر.',
+    'They are saved in “Dimensions & weight” as the product’s real measures, and customers see them under “Package”. No price changes.',
+    'وەک پێوانە ڕاستەقینەکانی بەرهەمەکە لە «قەبارە و کێش» پاشەکەوت دەکرێن و کڕیار لە ژێر «پاکەت» دەیانبینێت. هیچ نرخێک ناگۆڕێت.'
+  ),
+  attestFirst: t(
+    'حدّد «هذه القياسات صحيحة لهذا المنتج» أولًا، أو أدخل القياسات الحقيقية.',
+    'Tick “These measures are correct for this product” first, or enter the real measures.',
+    'سەرەتا «ئەم پێوانانە بۆ ئەم بەرهەمە دروستن» دیاری بکە، یان پێوانە ڕاستەقینەکان بنووسە.'
+  ),
+  notThese: t('ليست صحيحة؟ أدخل الحقيقية', 'Not correct? Enter the real ones', 'دروست نین؟ ڕاستەقینەکان بنووسە'),
+  enterInCost: t(
+    'اكتب الوزن والصندوق الحقيقيين في «التكلفة — للمالك فقط» واحفظ، ثم أكّد السعر.',
+    'Type the real weight and box in “Cost — owner only” and save, then confirm the price.',
+    'کێش و سندوقی ڕاستەقینە لە «تێچوو — تەنها بۆ خاوەن» بنووسە و پاشەکەوتی بکە، پاشان نرخەکە پشتڕاست بکەرەوە.'
+  ),
+  typeCbm: t(
+    'يُسعَّر هذا المنتج بالحجم الافتراضي لنوعه، لا بصندوق: اكتب الصندوق الحقيقي في «الأبعاد والوزن»، ثم احسب من جديد وطبّق التحديث.',
+    'This product is priced from its type’s default volume, not from a box: enter the real box in “Dimensions & weight”, then compute again and apply the refresh.',
+    'ئەم بەرهەمە بە قەبارەی بنەڕەتی جۆرەکەی نرخی بۆ دانراوە، نەک بە سندوق: سندوقی ڕاستەقینە لە «قەبارە و کێش» بنووسە، پاشان دووبارە هەژمار بکەرەوە و نوێکردنەوەکە جێبەجێ بکە.'
+  ),
+  packageDiffers: t(
+    'في «الأبعاد والوزن» قياسات غير التي يُحسب منها السعر: احسب من جديد وطبّق التحديث ليأخذها السعر، ثم أكّد.',
+    '“Dimensions & weight” holds other measures than the ones the price is computed from: compute again and apply the refresh so the price takes them, then confirm.',
+    'لە «قەبارە و کێش» پێوانەی جیاواز هەن لەوانەی نرخەکەیان پێ هەژمار دەکرێت: دووبارە هەژمار بکەرەوە و نوێکردنەوەکە جێبەجێ بکە تا نرخەکە وەریانبگرێت، پاشان پشتڕاستی بکەرەوە.'
+  ),
+  packagePartial: t(
+    'صندوق «الأبعاد والوزن» ناقص: أكمل أبعاده الثلاثة أو امسحها واحفظ المنتج، ثم ارجع هنا.',
+    'The box in “Dimensions & weight” is incomplete: fill in all three sides or clear them and save the product, then come back here.',
+    'سندوقەکەی «قەبارە و کێش» ناتەواوە: هەر سێ لاکەی پڕ بکەرەوە یان بیانسڕەوە و بەرهەمەکە پاشەکەوت بکە، پاشان بگەڕێوە ئێرە.'
+  ),
+  /** The type's default weight is lighter than the product's own net weight: it cannot be stated real (§4.9 step 0). */
+  belowNet: t(
+    'وزن المنتج الصافي في «الأبعاد والوزن» أثقل من وزن النوع الافتراضي، فلا يصح هذا الوزن لهذا المنتج: اكتب الوزن الحقيقي مع التغليف في «التكلفة — للمالك فقط» واحفظ، أو صحّح الوزن الصافي.',
+    'The product’s net weight in “Dimensions & weight” is heavier than the type’s default weight, so that weight cannot be this product’s: type the real packed weight in “Cost — owner only” and save, or correct the net weight.',
+    'کێشی پوختی بەرهەمەکە لە «قەبارە و کێش» لە کێشی بنەڕەتیی جۆرەکە قورسترە، بۆیە ئەو کێشە بۆ ئەم بەرهەمە دروست نییە: کێشی ڕاستەقینە لەگەڵ پاکەت لە «تێچوو — تەنها بۆ خاوەن» بنووسە و پاشەکەوتی بکە، یان کێشی پوخت ڕاست بکەرەوە.'
+  ),
+  /** An older server, or a live read that failed: the hold is read from the latest lines, and the server judges the press. */
+  hardLines: t(
+    'حسب آخر حساب، السعر محسوب من وزن أو صندوق افتراضي. «أكّد السعر» يتحقق من القياسات الآن؛ وإن رُفض فأدخل الحقيقية في «التكلفة» أو «الأبعاد والوزن».',
+    'By the latest compute, the price is computed from a default weight or box. “Confirm the price” checks the measures now; if it is refused, enter the real ones in “Cost” or “Dimensions & weight”.',
+    'بەپێی کۆتا هەژمارکردن، نرخەکە لە کێش یان سندوقێکی بنەڕەتییەوە هەژمار کراوە. «نرخەکە پشتڕاست بکەرەوە» ئێستا پێوانەکان دەپشکنێت؛ ئەگەر ڕەت کرایەوە، ڕاستەقینەکان لە «تێچوو» یان «قەبارە و کێش» بنووسە.'
+  ),
+  skuDefault: t('قياسات افتراضية', 'Default measures', 'پێوانەی بنەڕەتی'),
+  openDimensions: t('افتح «الأبعاد والوزن»', 'Open “Dimensions & weight”', '«قەبارە و کێش» بکەرەوە'),
+  openCost: t('افتح «التكلفة»', 'Open “Cost”', '«تێچوو» بکەرەوە'),
+  openRefresh: t('افتح «التحديث»', 'Open “Refresh”', '«نوێکردنەوە» بکەرەوە'),
+  doneAttested: t(
+    'حُفظت القياسات قياساتٍ حقيقية ورُفع الوسم عن المنتج.',
+    'The measures are saved as real ones and the label is removed from the product.',
+    'پێوانەکان وەک پێوانەی ڕاستەقینە پاشەکەوت کران و نیشانەکە لە بەرهەمەکە لابرا.'
+  ),
+  doneAttestedSkus: t(
+    'حُفظت القياسات حقيقيةً وثُبّت سعر {n} من الخيارات؛ يبقى الوسم للباقي.',
+    'The measures are saved as real ones and {n} options are now firm; the label stays for the others.',
+    'پێوانەکان وەک ڕاستەقینە پاشەکەوت کران و نرخی {n} هەڵبژاردە جێگیر کرا؛ نیشانەکە بۆ ئەوانی تر دەمێنێتەوە.'
+  ),
 } as const;
 
 // ---------------------------------------------------------------- the product form's banner (§7)

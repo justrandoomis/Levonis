@@ -808,6 +808,10 @@ export const FINANCIAL_FIELDS = [
   'min_profit_usd',
   'applied_wire_json',
   'type_source',
+  // -- §4.9: the estimate confirmation's live gate on a product's measures and the owner's statement of real
+  // -- ones (the type's default weight and box, owner-only like the type's figures; DECISIONS row 292).
+  'confirm_gate',
+  'real_measures',
 ] as const;
 
 type AnyRecord = Record<string, unknown>;

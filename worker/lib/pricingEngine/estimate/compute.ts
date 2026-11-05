@@ -451,8 +451,11 @@ function fullPreview(p: Omit<PreparedEstimate, 'preview'>, flags: Map<string, Pl
 const PRODUCT_FLAGS_MAX = 4000;
 const LINE_FLAGS_MAX = 2000;
 
-/** A line's flag codes within its column (CHECK ≤ 2,000 characters): the first codes that fit. */
-function lineFlags(codes: readonly string[]): string[] {
+/**
+ * A line's flag codes within its column (CHECK ≤ 2,000 characters): the first codes that fit. The owner's statement
+ * of real measures rewrites lines through it too (./confirm.ts), so they are what the next compute writes.
+ */
+export function lineFlags(codes: readonly string[]): string[] {
   const out: string[] = [];
   for (const c of codes) {
     if (JSON.stringify([...out, c]).length > LINE_FLAGS_MAX) break;
@@ -772,6 +775,9 @@ const LINE_SHOWN: readonly string[] = [...HARD_CODES, ...CATALOGUE_NOW_FLAGS];
  * product level (`typeCbmHidesBox`) and so the SKU's CBM (no level above decides it, `boxDecidedAbove`), only a SKU
  * on its colour's or model's own package. With no line, or once an owner's pricing row was written after those
  * lines (`stale`), the row's stand. Read only here: confirm judges the row, the store and the catalogue itself.
+ * A CONFIRMED row has no default measure left (§4.9 step 1 proved it when it was confirmed): a default-measure entry
+ * still stored there — a product confirmed before the confirmation dropped them from the row — is never shown, so
+ * no confirmed product shows «وزن افتراضي».
  */
 export function shownFlags(
   state: ProductEstimateRow['state'],
@@ -779,6 +785,7 @@ export function shownFlags(
   lines: readonly Pick<EstimateLine, 'combo_key' | 'flags' | 'measure_source'>[],
   store: ShownStore = {}
 ): StoredFlag[] {
+  if (state === 'confirmed') return flags.filter((f) => !HARD_CODES.includes(f.code));
   if (state !== 'estimated' && state !== 'paused') return [...flags];
   /** The measure sources that show this SKU's measure of `code` real in the store. */
   const proof = (code: string, comboKey: string) =>

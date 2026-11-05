@@ -701,6 +701,192 @@ export function lineMeasureSource(weight: EstimateMeasureSource, cbm: EstimateMe
   return MEASURE_WEAKNESS.indexOf(weight) <= MEASURE_WEAKNESS.indexOf(cbm) ? weight : cbm;
 }
 
+/* -------------------------------------- the owner's statement of real measures -- */
+
+/**
+ * `product_price_estimates.measure_basis` of SKUs' measure sources, as an apply states it: '' when no SKU has
+ * both measures, 'real' when none of those is on a type default, 'type_default' when all are, else 'mixed'.
+ */
+export function measureBasisOf(sources: ReadonlyArray<{ weight: EstimateMeasureSource; cbm: EstimateMeasureSource }>): '' | 'real' | 'type_default' | 'mixed' {
+  const measured = sources.filter((s) => s.weight !== 'none' && s.cbm !== 'none');
+  const defaulted = measured.filter((s) => s.weight === 'type_default' || s.cbm === 'type_default').length;
+  return !measured.length ? '' : defaulted === 0 ? 'real' : defaulted === measured.length ? 'type_default' : 'mixed';
+}
+
+/**
+ * The base field each of a SKU's defaulted measures resolves from (§4.9's "defaulted", `skuMeasureSources`):
+ * the weight from `shipping_weight_g`; the CBM from the type's box, or from the type's CBM written as
+ * `manual_cbm` — which decides its level before any box (LD6), so no box can be stated in its place. Null
+ * where the measure is not on a type default.
+ */
+export function skuDefaultedFields(
+  rows: readonly Partial<EstimateInputRow>[],
+  sku: EstimateSku,
+  applied: AppliedWire | null
+): { weight: 'shipping_weight_g' | null; cbm: 'shipping_box' | 'manual_cbm' | null } {
+  const m = skuMeasureSources(rows, sku, applied);
+  const base = rowAt(rows, 'base', '', 'MANUAL_OVERRIDE');
+  return {
+    weight: m.weight === 'type_default' ? 'shipping_weight_g' : null,
+    // A type-default CBM resolves at the base row: from its manual CBM when one is there, else from its box.
+    cbm: m.cbm === 'type_default' ? (base?.manual_cbm != null ? 'manual_cbm' : 'shipping_box') : null,
+  };
+}
+
+/** What the owner states real (§4.9 step 0): the values the estimate is priced from, exactly as he was shown them. */
+export interface StatedMeasures {
+  weight_g?: number;
+  /** [L, W, H] in mm, as the pricing form's box. */
+  box_mm?: readonly [number, number, number];
+}
+
+/** Why a statement is not taken: `changed` — what the owner saw is no longer the store; the others are said to him. */
+export type MeasureStatementRefusal = 'changed' | 'type_cbm' | 'package_differs' | 'package_partial' | 'below_net';
+
+export type MeasureStatement =
+  | {
+      ok: true;
+      /** The record with the stated fields re-sourced to the product's package, as the next apply records them. */
+      applied: AppliedWire;
+      /** The package values to write, only where the package is empty ([L, W, H] → depth, width, height). */
+      package: { weight_g: number | null; box: [number, number, number] | null };
+      fields: EstimateInputField[];
+    }
+  | { ok: false; reason: MeasureStatementRefusal };
+
+/** An empty package value, as the conditional write reads it (`COALESCE(column, 0) <= 0`). */
+const emptyPackageValue = (v: unknown) => v === null || v === undefined || (typeof v === 'number' && v <= 0);
+
+/**
+ * THE OWNER'S STATEMENT THAT THE MEASURES SHOWN ARE THIS PRODUCT'S REAL ONES (§4.9 step 0; DECISIONS row 292).
+ * Each stated value must be a base field the last apply recorded as the type's default and the store still holds
+ * (the estimator's, §4.5), equal to what the owner states: the weight with no pricing weight deciding the level
+ * before it, the box with no manual CBM there (a type's CBM decides before any box, LD6: `type_cbm`). The product's
+ * own package must be empty there or hold the very value (`package_differs`; one or two box axes typed:
+ * `package_partial`), and a stated weight is never lighter than the product's own net weight (`below_net`: the
+ * form's «الصندوق أخف من محتواه» — the type's weight does not fit this product, whatever is ticked). Taken, the
+ * stated fields are re-recorded as the product's package — what the next apply records when the package equals
+ * the stored base values (`mergeFields`) — and the package values to write are the empty ones. Pure: the stored
+ * row, the package and the price are the caller's to write and fence; no price moves, since the base row is
+ * unchanged and V2 never reads the product-level package.
+ */
+export function attestBaseMeasures(
+  rows: readonly Partial<EstimateInputRow>[],
+  applied: AppliedWire | null,
+  dims: PhysicalDimensionOverrides | null | undefined,
+  sent: StatedMeasures
+): MeasureStatement {
+  const base = rowAt(rows, 'base', '', 'MANUAL_OVERRIDE');
+  const recordOf = (field: EstimateInputField) => applied?.inputs.find((f) => f.scope === 'base' && f.field === field) ?? null;
+  /** A base record of the type's default that the store still holds (never the owner's value, §4.5). */
+  const held = (field: EstimateInputField) => {
+    const r = recordOf(field);
+    return r && r.source === 'type_default' && fieldState(base, field, r).kind === 'estimator' ? r : null;
+  };
+  const fields: EstimateInputField[] = [];
+  if (sent.weight_g !== undefined) {
+    const r = held('shipping_weight_g');
+    if (!r || base?.pricing_weight_g != null || r.value !== sent.weight_g) return { ok: false, reason: 'changed' };
+    fields.push('shipping_weight_g');
+  }
+  if (sent.box_mm !== undefined) {
+    if (base?.manual_cbm != null) return { ok: false, reason: held('manual_cbm') ? 'type_cbm' : 'changed' };
+    const r = held('shipping_box');
+    if (!r || appliedKey('shipping_box', r.value) !== boxKey(sent.box_mm)) return { ok: false, reason: 'changed' };
+    fields.push('shipping_box');
+  }
+  if (!applied || !fields.length) return { ok: false, reason: 'changed' };
+
+  let weight: number | null = null;
+  if (sent.weight_g !== undefined) {
+    const v = dims?.package_weight_g;
+    if (emptyPackageValue(v)) weight = sent.weight_g;
+    else if (validWeight(v) !== sent.weight_g) return { ok: false, reason: 'package_differs' };
+    // Packed, the product weighs at least itself: a lighter weight would publish a contradiction under «العبوة».
+    const net = validWeight(dims?.net_weight_g);
+    if (net !== null && sent.weight_g < net) return { ok: false, reason: 'below_net' };
+  }
+  let box: [number, number, number] | null = null;
+  if (sent.box_mm !== undefined) {
+    const axes = [dims?.package_depth_mm, dims?.package_width_mm, dims?.package_height_mm];
+    const typed = axes.filter((v) => !emptyPackageValue(v)).length;
+    if (typed === 0) box = [sent.box_mm[0], sent.box_mm[1], sent.box_mm[2]];
+    else if (typed < 3) return { ok: false, reason: 'package_partial' };
+    else {
+      const pkg = validBox(axes[0], axes[1], axes[2]);
+      if (!pkg || boxKey(pkg) !== boxKey(sent.box_mm)) return { ok: false, reason: 'package_differs' };
+    }
+  }
+  const next: AppliedWire = {
+    ...applied,
+    inputs: applied.inputs.map((f) => (f.scope === 'base' && fields.includes(f.field) ? { ...f, source: 'product_package' as const } : f)),
+  };
+  return { ok: true, applied: next, package: { weight_g: weight, box }, fields };
+}
+
+/** What the confirmation can be asked of the measures now (§4.9; `GET /estimates/products/:id` `confirm_gate`). */
+export interface MeasureGate {
+  /** The SKUs a type default prices now (§4.9 step 1 refuses them), in key order. */
+  defaulted: string[];
+  /** The statement on offer — the base values those SKUs are priced from — and the SKUs it makes real; null when none can. */
+  stated: { weight_g: number | null; box_mm: [number, number, number] | null; combo_keys: string[] } | null;
+  /** Why the other defaulted SKUs cannot be stated real (the type's CBM, the package, a weight lighter than the product), or null. */
+  blocked: Exclude<MeasureStatementRefusal, 'changed'> | null;
+}
+
+/**
+ * The live answer the confirmation sheet asks before anything is sent: which SKUs are defaulted, which of them
+ * the owner's statement of the shown values makes real (each measure they need judged alone, as
+ * `attestBaseMeasures` judges it), and why the rest cannot be stated. A SKU whose CBM is the type's own CBM is
+ * never made real by a statement (there is no box to state).
+ */
+export function measureGate(
+  rows: readonly Partial<EstimateInputRow>[],
+  skus: readonly EstimateSku[],
+  applied: AppliedWire | null,
+  dims: PhysicalDimensionOverrides | null | undefined
+): MeasureGate {
+  const needs = new Map<string, Array<'weight' | 'box' | 'cbm'>>();
+  for (const s of skus) {
+    const d = skuDefaultedFields(rows, s, applied);
+    const need = [...(d.weight ? (['weight'] as const) : []), ...(d.cbm === 'shipping_box' ? (['box'] as const) : d.cbm === 'manual_cbm' ? (['cbm'] as const) : [])];
+    if (need.length) needs.set(s.combo_key, need);
+  }
+  const defaulted = uniqueSorted(needs.keys());
+  if (!defaulted.length) return { defaulted, stated: null, blocked: null };
+  const value = (field: EstimateInputField) => applied?.inputs.find((f) => f.scope === 'base' && f.field === field)?.value;
+  const weight = value('shipping_weight_g');
+  const box = value('shipping_box');
+  const verdicts = new Map<'weight' | 'box' | 'cbm', MeasureStatementRefusal | null>();
+  const verdict = (need: 'weight' | 'box' | 'cbm'): MeasureStatementRefusal | null => {
+    if (!verdicts.has(need)) {
+      const sent: StatedMeasures | null =
+        need === 'weight' && typeof weight === 'number' ? { weight_g: weight } : need === 'box' && Array.isArray(box) ? { box_mm: box as readonly [number, number, number] } : null;
+      const a = need === 'cbm' || !sent ? null : attestBaseMeasures(rows, applied, dims, sent);
+      verdicts.set(need, need === 'cbm' ? 'type_cbm' : !a ? 'changed' : a.ok ? null : a.reason);
+    }
+    return verdicts.get(need)!;
+  };
+  const real = defaulted.filter((k) => needs.get(k)!.every((n) => verdict(n) === null));
+  const wanted = new Set(real.flatMap((k) => needs.get(k)!));
+  // The reason the owner reads first: the type's CBM, then a package to complete, then a weight lighter than the
+  // product (its cure is a real weight, which the refresh's apply of a package that differs would then take in too),
+  // then a package that differs.
+  const reasons = new Set(defaulted.filter((k) => !real.includes(k)).flatMap((k) => needs.get(k)!.map(verdict)));
+  const blocked = (['type_cbm', 'package_partial', 'below_net', 'package_differs'] as const).find((r) => reasons.has(r)) ?? null;
+  return {
+    defaulted,
+    stated: real.length
+      ? {
+          weight_g: wanted.has('weight') ? (weight as number) : null,
+          box_mm: wanted.has('box') ? [...(box as readonly [number, number, number])] as [number, number, number] : null,
+          combo_keys: real,
+        }
+      : null,
+    blocked,
+  };
+}
+
 /* ------------------------------------------------------------ compaction -- */
 
 /** One SKU the estimator prices at its catalogue price (canonical amount). */
@@ -1244,9 +1430,8 @@ export function planEstimateInputs(input: EstimatePlanInput): EstimatePlan {
   for (const p of skuPlans) for (const code of p.flags) flag(code, { combo_keys: [p.combo_key] });
   if (ownerEdited.length) flag('EST_OWNER_EDITED', { fields: ownerEdited });
 
-  const measured = skuPlans.filter((p) => p.weight_source !== 'none' && p.cbm_source !== 'none');
-  const defaulted = measured.filter((p) => p.weight_source === 'type_default' || p.cbm_source === 'type_default').length;
-  const measure_basis: EstimatePlan['measure_basis'] = !measured.length ? '' : defaulted === 0 ? 'real' : defaulted === measured.length ? 'type_default' : 'mixed';
+  // The one rule, shared with the owner's statement of real measures (§4.9 step 0), which writes what this apply would.
+  const measure_basis: EstimatePlan['measure_basis'] = measureBasisOf(skuPlans.map((p) => ({ weight: p.weight_source, cbm: p.cbm_source })));
   const flagList = [...flags.values()].sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
 
   return {

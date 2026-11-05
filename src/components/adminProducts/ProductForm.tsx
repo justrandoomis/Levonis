@@ -67,6 +67,9 @@ import {
   type ImportStockState,
   type ProductResponse,
   type SaveResponse,
+  keepEdits,
+  withStatedPackage,
+  type StatedPackage,
 } from './types';
 import DeliveryRuleLine from './DeliveryRuleLine';
 const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
@@ -751,6 +754,62 @@ export default function ProductForm({
     requestAnimationFrame(() =>
       document.querySelector(n === 3 ? '[data-form="pricing-v2"]' : '[data-section="5"]')?.scrollIntoView({ block: 'start', behavior: 'smooth' })
     );
+  };
+  /**
+   * The estimate confirmation's ways to the real measures (docs/SMART_PRICING.md §4.9): «الأبعاد والوزن» — section ٤,
+   * its «صندوق الشحن» block scrolled to and its first field focused — and the cost card's weight in section ٣.
+   * Focused a frame later, once the closing sheet has handed focus back.
+   */
+  const showPackageMeasures = () => {
+    setOpen(4);
+    requestAnimationFrame(() => {
+      const block = document.querySelector<HTMLElement>('[data-package-measures]');
+      block?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      block?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
+    });
+  };
+  const showCostWeight = () => {
+    showPricing(3);
+    requestAnimationFrame(() => document.querySelector<HTMLInputElement>('[data-v2-field="weight"]')?.focus({ preventScroll: true }));
+  };
+  /**
+   * THE CONFIRMATION STATED THE SHOWN MEASURES REAL (docs/SMART_PRICING.md §4.9 step 0, §7): the server wrote them into
+   * this product's package and moved its version. A BACKGROUND READ, NOT A RELOAD — `loadProduct` shows the spinner,
+   * which unmounts the form and every edit held outside the document and structure, and a failed load leaves only
+   * «رجوع». The read becomes the baseline and every edit the admin had not saved is laid back on top (`keepEdits`):
+   * «المواصفات» too, which nothing else wrote, and `dimensions` field by field, so the package just written survives an
+   * unsaved net weight. The next save then carries the new version: it neither meets STALE_EDIT nor writes the empty
+   * package back. A read that fails keeps the form as it is, with the stated package laid in where the form's own is
+   * empty (`withStatedPackage`): the next save meets STALE_EDIT (the package write moved the version), and even a save
+   * over the stored copy keeps the package.
+   */
+  const afterEstimateMeasures = (stated: StatedPackage) => {
+    const id = doc.id || productId;
+    if (!id) return;
+    // Dropped when a save or a load took a newer baseline meanwhile: it is older than what the form holds.
+    const generation = baselineGeneration.current;
+    const current = () => reloadIdRef.current === id && baselineGeneration.current === generation;
+    void readProduct(id)
+      .then((read) => {
+        if (!current()) return;
+        const before = baselineRef.current ? (JSON.parse(baselineRef.current) as { d: EditorDoc; rs: RelationsState }) : null;
+        const mine = docRef.current;
+        const myRel = relRef.current;
+        const mineCostLoaded = costLoadedRef.current;
+        applyProduct(read);
+        if (!before) return;
+        setDoc((d) => keepEdits(before.d, mine, d));
+        if (JSON.stringify(myRel) !== JSON.stringify(before.rs)) {
+          setRel(myRel);
+          // Structure edited on a form read without cost carries its blanks back in (as `reloadKeepingEdits`).
+          if (!mineCostLoaded) setCostLoaded(false);
+        }
+      })
+      .catch(() => {
+        if (!current()) return;
+        setDoc((d) => ({ ...d, dimensions: withStatedPackage(d.dimensions, stated) }));
+        setSaveNote(saveOutcomeText('measuresUnread', lang));
+      });
   };
   /** A deep link's section (`initialSection`): opened from the start, scrolled to once the product has loaded. */
   const deepLinked = useRef(false);
@@ -1559,7 +1618,17 @@ export default function ProductForm({
           </p>
         ) : null}
 
-        <PricesSectionV2 modelNames={modelNames} firstModelId={firstModelId} packageDims={doc.dimensions ?? null} onJump={showPricing} productId={doc.id || null} priceEstimate={priceEstimate} />
+        <PricesSectionV2
+          modelNames={modelNames}
+          firstModelId={firstModelId}
+          packageDims={doc.dimensions ?? null}
+          onJump={showPricing}
+          productId={doc.id || null}
+          priceEstimate={priceEstimate}
+          onProductChanged={afterEstimateMeasures}
+          onOpenDimensions={showPackageMeasures}
+          onOpenCost={showCostWeight}
+        />
 
         {/* The real cost layers behind the stock (the owner's batches): renders nothing
             for a product with no batches, or for an admin whose payload carries no costs. */}

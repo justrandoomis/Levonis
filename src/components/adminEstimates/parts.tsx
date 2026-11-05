@@ -39,6 +39,7 @@ import {
   reasonText,
   say,
   uiLang,
+  type Tri,
   type UiLang,
 } from './strings';
 import { dayOf, moneyText, nameIn, optionsLine } from './format';
@@ -65,6 +66,14 @@ export function isNotInstalled(e: unknown, listRead = false): boolean {
   return listRead && e.status === 404;
 }
 
+/** Why the owner's statement of real measures was not taken (`details.reason`), in his words with the cure. */
+const STATEMENT_REFUSED: Readonly<Record<string, Tri>> = {
+  type_cbm: CONFIRM.typeCbm,
+  package_differs: CONFIRM.packageDiffers,
+  package_partial: CONFIRM.packagePartial,
+  below_net: CONFIRM.belowNet,
+};
+
 /**
  * A refusal in the owner's language, by code: the estimate contract, the owner-only sentences, then the shared
  * table. No act here asks for a fresh sign-in (DECISIONS row 285): an older Worker's REAUTH_REQUIRED reads in
@@ -76,6 +85,13 @@ export function refusalText(e: unknown, lang: UiLang, fallback: string = say(COM
   if (code === 'PRICE_ESTIMATES_NOT_INSTALLED') return say(COMMON.notInstalled, lang);
   // §4.9: the real measures are entered and wait on the refresh's apply, which is the cure.
   if (code === 'PRICE_ESTIMATE_DEFAULT_MEASURES' && e instanceof ApiError && e.details?.waiting_on_apply === true) return say(CONFIRM.applyFirst, lang);
+  // §4.9 step 0: the owner's statement of the shown measures could not be taken — said with its cure.
+  const statement = code === 'PRICE_ESTIMATE_DEFAULT_MEASURES' && e instanceof ApiError ? STATEMENT_REFUSED[String(e.details?.reason ?? '')] : undefined;
+  if (statement) return say(statement, lang);
+  // A catalogue import's guard refused the write (the statement's package, §4.9): its flag's own words name the
+  // cure — wait for the import — where the contract's sentence would send the owner to compute again.
+  const named = code === 'PRICE_ESTIMATE_NOT_ELIGIBLE' && e instanceof ApiError ? e.details?.flags : undefined;
+  if (Array.isArray(named) && named.includes('EST_IMPORT_RUNNING')) return flagText('EST_IMPORT_RUNNING', lang);
   const own = OWNER_REFUSALS[code];
   if (own) return say(own, lang);
   const estimate = estimateRefusalText(code, lang);

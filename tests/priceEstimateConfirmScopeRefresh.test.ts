@@ -24,6 +24,7 @@ import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { asD1, get, json, post, row, stubApp, type StubUser } from './fixtures/app';
 import { pricingWorld } from './fixtures/procurementPricing';
+import { confirmThroughGate } from './fixtures/confirmGate';
 import { noStoreUnlessSet } from '../worker/lib/edgePolicy';
 import { adminPricingRoutes } from '../worker/routes/adminPricing';
 import { adminPriceEstimatesRoutes } from '../worker/routes/adminPriceEstimates';
@@ -77,6 +78,8 @@ function world() {
 type App = ReturnType<typeof world>['app'];
 
 async function call(app: App, path: string, body?: unknown) {
+  // Every confirmation is read through the sheet's live gate first, and the two must agree (§4.9; fixtures/confirmGate.ts).
+  if (body !== undefined && path.endsWith('/confirm')) return confirmThroughGate(app, path, body as Json);
   const res = body === undefined ? await get(app, path) : await post(app, path, body);
   return { status: res.status, body: (await json(res)) as Json };
 }

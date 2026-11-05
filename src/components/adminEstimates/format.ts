@@ -36,6 +36,23 @@ export function iqdText(n: number | null | undefined, lang: UiLang): string {
   return `${groupWhole(n)} ${say(COMMON.iqd, lang)}`;
 }
 
+/**
+ * Whole grams or millimetres as the pricing form shows them, in kilograms or centimetres: «100» → «0.1», «165» →
+ * «16.5». Integer division and remainder only, never a binary float (the product form's `formatScaledInteger`,
+ * copied: this chunk imports nothing of the form's).
+ */
+function scaledText(n: number, scale: 10 | 1000): string {
+  if (!Number.isSafeInteger(n) || n < 0) return '—';
+  const whole = Math.floor(n / scale);
+  const rest = n % scale;
+  return rest === 0 ? String(whole) : `${whole}.${String(rest).padStart(String(scale).length - 1, '0').replace(/0+$/, '')}`;
+}
+
+/** Grams as kilograms («0.1»), for the measures the confirmation shows. */
+export const kgText = (grams: number): string => scaledText(grams, 1000);
+/** Millimetres as centimetres («16.5»). */
+export const cmText = (millimetres: number): string => scaledText(millimetres, 10);
+
 /** The day of an ISO stamp or a YYYY-MM-DD date: «2026-10-31». */
 export function dayOf(stamp: string | null | undefined): string {
   if (!stamp) return '—';

@@ -4,8 +4,9 @@
  * All money is IQD integers; null = inherit, 0 = explicit (never truthiness).
  */
 
-import { emptyDimensions } from '../../lib/productTypes';
+import { DIMENSION_KEYS, emptyDimensions } from '../../lib/productTypes';
 import type {
+  ProductDimensionsV2,
   ProductDocV2,
   ResolvedPriceV2,
   BrandV2,
@@ -143,6 +144,52 @@ export function toEditorDoc(p: Partial<ProductDocV2> & { catalog_ids?: string[];
     catalog_ids: list<string>(p.catalog_ids),
     printer_fit_ids: list<string>(p.printer_fit_ids).filter((x) => typeof x === 'string'),
   } as EditorDoc;
+}
+
+/** The package measures the price confirmation stated real (docs/SMART_PRICING.md §4.9 step 0): grams, and [L, W, H] in mm. */
+export interface StatedPackage {
+  weight_g?: number;
+  box_mm?: readonly [number, number, number];
+}
+
+/**
+ * THE ADMIN'S UNSAVED EDITS, LAID BACK OVER A FRESH READ OF THE PRODUCT (ProductForm `afterEstimateMeasures`): every
+ * key of the document he changed since the form's baseline (`before`) keeps his value (`mine`), every other key takes
+ * the server's (`fresh`). `dimensions` holds the product's own size AND its package in one object, so it is merged
+ * field by field: a package the server just wrote stays unless the admin typed that very field — an unsaved net
+ * weight never lays the old, empty package back over it.
+ */
+export function keepEdits(before: EditorDoc, mine: EditorDoc, fresh: EditorDoc): EditorDoc {
+  const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+  const next: Record<string, unknown> = { ...fresh };
+  for (const k of Object.keys(mine) as Array<keyof EditorDoc>) {
+    if (same(mine[k], before[k])) continue;
+    if (k !== 'dimensions') {
+      next[k] = mine[k];
+      continue;
+    }
+    const had = { ...emptyDimensions(), ...(before.dimensions ?? {}) };
+    const typed = { ...emptyDimensions(), ...(mine.dimensions ?? {}) };
+    const dims = { ...emptyDimensions(), ...(fresh.dimensions ?? {}) };
+    for (const f of DIMENSION_KEYS) if (typed[f] !== had[f]) dims[f] = typed[f];
+    next.dimensions = dims;
+  }
+  return next as unknown as EditorDoc;
+}
+
+/**
+ * The stated package laid into the form's measures where they are empty — exactly where the server wrote it (only an
+ * empty weight, only a box with no side; [L, W, H] → depth, width, height). The form's guard when it cannot read the
+ * product back: even a save over the stored copy («احفظ تغييراتي فوقها») then never writes the package back empty.
+ */
+export function withStatedPackage(dims: ProductDimensionsV2 | null | undefined, stated: StatedPackage): ProductDimensionsV2 {
+  const out = { ...emptyDimensions(), ...(dims ?? {}) };
+  const empty = (v: number | null) => v === null || v <= 0;
+  if (stated.weight_g !== undefined && empty(out.package_weight_g)) out.package_weight_g = stated.weight_g;
+  if (stated.box_mm && empty(out.package_depth_mm) && empty(out.package_width_mm) && empty(out.package_height_mm)) {
+    [out.package_depth_mm, out.package_width_mm, out.package_height_mm] = stated.box_mm;
+  }
+  return out;
 }
 
 /**

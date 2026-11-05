@@ -303,6 +303,8 @@ export default function EstimateListTab({ mode, onReview }: { mode: ListMode; on
           setConfirming(null);
           setReload((n) => n + 1);
         }}
+        // The sheet reads the product itself; when it finds the server moved (a compute, a stale version), so does the list.
+        onStale={() => setReload((n) => n + 1)}
       />
     </section>
   );

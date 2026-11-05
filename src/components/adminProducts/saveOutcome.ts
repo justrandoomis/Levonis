@@ -101,7 +101,7 @@ export async function confirmSaveOutcome(
 type L3 = Record<'ar' | 'en' | 'ckb', string>;
 
 /** Every sentence of the outcome, in the three languages (a `ckb` slot never carries the Arabic). */
-export const SAVE_OUTCOME_TEXT: Record<SaveOutcome | 'stillSaving' | 'checking' | 'checkFields' | 'failed', L3> = {
+export const SAVE_OUTCOME_TEXT: Record<SaveOutcome | 'stillSaving' | 'checking' | 'checkFields' | 'failed' | 'measuresUnread', L3> = {
   saved: {
     ar: 'تم الحفظ — لم يصل ردّ الخادم كاملاً، فتحقّقنا: تغييراتك محفوظة.',
     en: 'Saved — the server’s answer did not come through, so we checked: your changes are saved.',
@@ -136,6 +136,16 @@ export const SAVE_OUTCOME_TEXT: Record<SaveOutcome | 'stillSaving' | 'checking' 
     ar: 'تعذّر الحفظ.',
     en: 'The save failed.',
     ckb: 'پاشەکەوتکردن سەرکەوتوو نەبوو.',
+  },
+  /**
+   * Another write moved the stored product — the price confirmation saved the measures stated real into its package
+   * (docs/SMART_PRICING.md §4.9 step 0) — and the form could not read it back: nothing is lost, and the next save asks
+   * (STALE_EDIT) whenever that write moved the product's version (a package already holding the values is not written).
+   */
+  measuresUnread: {
+    ar: 'حُفظت القياسات في «الأبعاد والوزن»، لكن تعذّرت قراءة المنتج من جديد هنا — تغييراتك أمامك، وقد يسألك حفظك التالي أيّ نسخة تُبقي.',
+    en: 'The measures were saved in “Dimensions & weight”, but the product could not be read again here — your changes are still here, and your next save may ask which copy to keep.',
+    ckb: 'پێوانەکان لە «قەبارە و کێش» پاشەکەوت کران، بەڵام لێرە نەتوانرا بەرهەمەکە دووبارە بخوێندرێتەوە — گۆڕانکارییەکانت هێشتا لێرەن، و لەوانەیە پاشەکەوتکردنی داهاتووت بپرسێت کام وەشان بهێڵیتەوە.',
   },
 };
 

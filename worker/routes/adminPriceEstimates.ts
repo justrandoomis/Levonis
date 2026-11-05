@@ -21,9 +21,9 @@
  *   POST /compute                    {cursor | product_ids[≤10]} — previews stored, no V2 table written
  *   POST /apply                      {items[≤5] | cursor} — one atomic batch per product, within the budget
  *   GET  /products?state=&cursor=    the stored previews, 25 a page
- *   GET  /products/:id               one product's stored preview
+ *   GET  /products/:id               one product's stored preview (an estimated one with its `confirm_gate`, §4.9)
  *   PUT  /products/:id               {version, state?, type_key?, sourcing_override?, route_override?}
- *   POST /products/:id/confirm       {version, accept_flags, combo_keys?} — the label removed, or firm SKUs
+ *   POST /products/:id/confirm       {version, accept_flags, combo_keys?, real_measures?} — the label removed, or firm SKUs
  *
  * OWNER-ONLY DATA (invariant I6): supplier prices, R, types, measures, flags.
  * Every answer is `private, no-store`.
@@ -52,7 +52,7 @@ import {
 } from '../lib/pricingEngine/estimate/control';
 import { LIST_FILTERS, computeEstimates, listEstimates, storedEstimateOf, type ListFilter } from '../lib/pricingEngine/estimate/compute';
 import { applyEstimates, parseApplyItems } from '../lib/pricingEngine/estimate/apply';
-import { confirmEstimate, setEstimateProduct } from '../lib/pricingEngine/estimate/confirm';
+import { confirmEstimate, confirmGateOf, setEstimateProduct } from '../lib/pricingEngine/estimate/confirm';
 
 export const adminPriceEstimatesRoutes = new Hono<AppContext>();
 
@@ -153,7 +153,9 @@ adminPriceEstimatesRoutes.get('/products/:id', async (c) => {
   if (!PRODUCT_ID.test(pid)) throw notFound();
   const product = await storedEstimateOf(c.env.DB, pid);
   if (!product) throw notFound();
-  return c.json({ success: true, product });
+  if (product.state !== 'estimated') return c.json({ success: true, product });
+  // What the confirmation asks of the measures now (§4.9): the sheet's live hold, null on any failed read.
+  return c.json({ success: true, product: { ...product, confirm_gate: await confirmGateOf(c.env.DB, pid) } });
 });
 
 adminPriceEstimatesRoutes.put('/products/:id', async (c) => {

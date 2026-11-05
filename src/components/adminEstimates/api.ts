@@ -530,6 +530,33 @@ export interface StoredEstimate {
   confirmed_at: string | null;
   version: number;
   lines: EstimateLine[];
+  /**
+   * `GET /estimates/products/:id` of an estimated product (§4.9): what the confirmation asks of the measures
+   * now. Absent from an older server and from the lists, null when the server could not read it: the sheet
+   * then reads the latest lines (`confirmGate`).
+   */
+  confirm_gate?: ConfirmGate | null;
+}
+
+/** The measures the owner states real (§4.9 step 0): the values the estimate is priced from, as shown. */
+export interface RealMeasures {
+  weight_g?: number;
+  /** [L, W, H] in mm, as the pricing form's box. */
+  box_mm?: [number, number, number];
+}
+
+/** §4.9's live judgement of a product's measures (worker/lib/pricingEngine/estimate/confirm.ts `ConfirmGate`). */
+export interface ConfirmGate {
+  /** The options priced from a type default now: a confirmation of any of them is refused. */
+  defaulted: string[];
+  /** The whole product's refusal would say its cure is the refresh's apply. */
+  waiting_on_apply: boolean;
+  /** The defaulted options whose real measures wait on that apply. */
+  waiting_keys?: string[];
+  /** The statement on offer: the values those options are priced from, and the options it makes real. */
+  real_measures: { weight_g: number | null; box_mm: [number, number, number] | null; combo_keys: string[] } | null;
+  /** Why the other defaulted options cannot be stated real (`below_net`: the type's weight is lighter than the product's own). */
+  blocked: 'type_cbm' | 'package_differs' | 'package_partial' | 'below_net' | null;
 }
 
 export type EstimateListFilter = 'all' | 'candidate' | 'ready' | 'estimated' | 'flags' | 'refresh' | 'paused' | 'confirmed';
@@ -609,8 +636,11 @@ export function setEstimateProduct(
   return api.put<{ settings: EstimateSettingsAnswer }>(`${ESTIMATES_API}/products/${enc(productId)}`, body);
 }
 
-/** Removes the label (no `combo_keys`, or every SKU) or makes the named SKUs firm; every open soft flag must be accepted by name. */
-export function confirmEstimate(productId: string, body: { version: number; accept_flags: string[]; combo_keys?: string[] }): Promise<ConfirmAnswer> {
+/**
+ * Removes the label (no `combo_keys`, or every SKU) or makes the named SKUs firm; every open soft flag must be accepted by name.
+ * `real_measures` — only once the owner ticked them — states the shown type-default measures real in the same step.
+ */
+export function confirmEstimate(productId: string, body: { version: number; accept_flags: string[]; combo_keys?: string[]; real_measures?: RealMeasures }): Promise<ConfirmAnswer> {
   return api.post<ConfirmAnswer>(`${ESTIMATES_API}/products/${enc(productId)}/confirm`, body);
 }
 
@@ -619,6 +649,11 @@ export function confirmEstimate(productId: string, body: { version: number; acce
 /** The product's editor, opened on section ٣ «الأسعار» (src/components/adminProducts/editLink.ts). Null for an id the link refuses. */
 export function productEditorHref(productId: string): string | null {
   return /^[A-Za-z0-9_-]{1,80}$/.test(productId) ? `/admin?tab=products&edit=${enc(productId)}&section=3` : null;
+}
+
+/** The product's editor on section ٤ «الأبعاد والوزن» (its package measures). Null for an id the link refuses. */
+export function productDimensionsHref(productId: string): string | null {
+  return /^[A-Za-z0-9_-]{1,80}$/.test(productId) ? `/admin?tab=products&edit=${enc(productId)}&section=4` : null;
 }
 
 export type WorkspaceTab = 'snapshots' | 'types' | 'review' | 'ready' | 'estimated' | 'flags' | 'refresh' | 'links';

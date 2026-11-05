@@ -66,6 +66,11 @@ import { prepareFailureText } from '../src/components/adminEstimates/SnapshotsTa
 import EstimateBanner, { StaffEstimateState, sourceDates } from '../src/components/adminEstimates/EstimateBanner';
 import EstimatesCard from '../src/components/adminEstimates/EstimatesCard';
 import { confirmGate, openFlagsOf, withNamed } from '../src/components/adminEstimates/ConfirmSheet';
+import { MeasuresHold, confirmHint, holdText, measureHold, statementOf, type MeasureHold } from '../src/components/adminEstimates/ConfirmSheet';
+import { cmText, kgText } from '../src/components/adminEstimates/format';
+import { productDimensionsHref, type ConfirmGate } from '../src/components/adminEstimates/api';
+import { DimensionsSection } from '../src/components/adminProducts/form/DimensionsSection';
+import { emptyDimensions } from '../src/lib/productTypes';
 import { ApiError } from '../src/lib/api';
 import { COST_REFUSALS } from '../packages/contracts/src/costRefusals';
 import type { EstimateLine, EstimateType, StoredEstimate } from '../src/components/adminEstimates/api';
@@ -185,7 +190,12 @@ test('the workspace is lazy and owner-mounted: a card in «التسعير وال
   const section = codeOf('src/components/adminProducts/form/v2/PricesSectionV2.tsx');
   assert.match(section, /const EstimateBanner = lazy\(\(\) => import\('\.\.\/\.\.\/\.\.\/adminEstimates\/EstimateBanner'\)\);/);
   assert.doesNotMatch(section, /from '\.\.\/\.\.\/\.\.\/adminEstimates\//);
-  assert.match(section, /<Suspense fallback=\{null\}>\s*<EstimateBanner productId=\{productId\} owner=\{v2\.owner\} state=\{priceEstimate\} \/>/);
+  // …handed the form's ways in (§4.9: a statement of real measures reloads the form; «الأبعاد والوزن» and the cost
+  // weight open in place) and read again when the stored pricing moves.
+  assert.match(
+    section,
+    /<Suspense fallback=\{null\}>\s*<EstimateBanner\s+productId=\{productId\}\s+owner=\{v2\.owner\}\s+state=\{priceEstimate\}\s+onProductChanged=\{onProductChanged\}\s+onOpenDimensions=\{onOpenDimensions\}\s+onOpenCost=\{onOpenCost\}\s+revision=\{v2\.stored\?\.seq \? `\$\{v2\.stored\.seq\.inputs_seq\}:\$\{v2\.stored\.seq\.write_seq\}` : ''\}\s*\/>/
+  );
 
   // Nobody else reaches into the workspace, statically or lazily.
   const allowed = new Map([
@@ -876,11 +886,14 @@ test('«تأكيد السعر» asks of the options it confirms what the server 
   assert.deepEqual(openFlagsOf(new ApiError(409, 'x', 'PRICE_ESTIMATE_FLAGS_OPEN')), []);
   assert.deepEqual(openFlagsOf(new Error('PRICE_ESTIMATE_FLAGS_OPEN')), []);
 
-  // The sheet holds its submit and its warning on that gate, for the scope and the options ticked.
+  // The sheet asks the soft flags of that gate, and holds on the measures through `measureHold` — the server's live
+  // gate first, these lines only for an older server — for the scope and the options ticked. Its submit is never
+  // silently disabled: a press that cannot go says what to do (`confirmHint`).
   const sheet = codeOf(`${DIR}/ConfirmSheet.tsx`);
-  assert.match(sheet, /const \{ hard, soft \} = confirmGate\(estimate, scope === 'some' \? skus : null, named\);/);
-  assert.match(sheet, /disabled=\{hard\}/);
-  assert.match(sheet, /\{hard \? \(/);
+  assert.match(sheet, /const chosen = scope === 'some' \? skus : null;\s*const \{ soft \} = confirmGate\(now, chosen, named\);\s*const hold = measureHold\(now, chosen\);/);
+  assert.doesNotMatch(sheet, /disabled=\{hard\}/);
+  assert.match(sheet, /disabled=\{!view && !!failure\}/, 'held only while there is nothing read, the failure said beside it');
+  assert.match(sheet, /\{hold\.hard \? \(\s*<MeasuresHold/);
   assert.match(sheet, /const more = openFlagsOf\(e\);/);
 });
 
@@ -933,4 +946,196 @@ test('the banner’s summary: the sources an estimate prices from, each with the
   const est = { product_id: 'prod_drill', name: 'x', slug: 'x', label: true, state: 'estimated' as const, type: 'accessory', type_source: 'import_type', sourcing_override: null, route_override: null, measure_basis: 'type_default', flags: [{ code: 'EST_DEFAULT_WEIGHT' }], preview_hash: null, computed_at: null, applied_at: null, confirmed_at: null, version: 2, lines: [line] };
   assert.deepEqual(sourceDates(est, p), [{ source: 'tmall_cn', date: '2026-10-31' }]);
   assert.deepEqual(sourceDates(null, p), []);
+});
+
+// ---------------------------------------------------------------- the owner's statement of real measures (§4.9 step 0; row 292)
+
+/** A product on its type's defaults, as `GET /estimates/products/:id` answers it, with the server's live gate (null: an older server). */
+const gated = (gate: Partial<ConfirmGate> | null, lines: readonly string[] = ['']) => ({
+  flags: [
+    { code: 'EST_DEFAULT_BOX', combo_keys: [...lines] },
+    { code: 'EST_DEFAULT_WEIGHT', combo_keys: [...lines] },
+  ],
+  lines: lines.map(
+    (combo_key): EstimateLine => ({
+      combo_key,
+      channel: 'pre_order_sea',
+      source: 'tmall_cn',
+      supplier_amount: '52.5',
+      supplier_currency: 'CNY',
+      measure_source: 'type_default',
+      flags: ['EST_DEFAULT_BOX', 'EST_DEFAULT_WEIGHT'],
+      est_cost_iqd: 1,
+      est_price_iqd: 2,
+      published_price_iqd: 2,
+      change_pct: null,
+      large: false,
+    })
+  ),
+  confirm_gate:
+    gate === null
+      ? undefined
+      : {
+          defaulted: [...lines],
+          waiting_on_apply: false,
+          waiting_keys: [],
+          real_measures: { weight_g: 100, box_mm: [160, 110, 30] as [number, number, number], combo_keys: [...lines] },
+          blocked: null,
+          ...gate,
+        },
+});
+
+test('the measures are shown as the pricing form shows them — kg and cm, exact, never through a float', () => {
+  assert.equal(kgText(100), '0.1');
+  assert.equal(kgText(1250), '1.25');
+  assert.equal(kgText(1000), '1');
+  assert.equal(kgText(5), '0.005');
+  assert.equal(kgText(1300), '1.3');
+  assert.equal(cmText(160), '16');
+  assert.equal(cmText(165), '16.5');
+  assert.equal(cmText(3), '0.3');
+  // Where a binary float would print 0.30000000000000004 or 100.29999999999998, the text is the integer's own.
+  assert.equal(kgText(300), '0.3');
+  assert.equal(cmText(1003), '100.3');
+  for (const bad of [-1, 1.5, Number.NaN]) assert.equal(kgText(bad), '—');
+});
+
+test('«تأكيد السعر» on default measures: the live gate first, the values with their tick, the statement sent exactly as answered and only once ticked — never a silently disabled submit', () => {
+  const hold = measureHold(gated({}), null);
+  assert.deepEqual(hold, { hard: true, live: true, statement: { weight_g: 100, box_mm: [160, 110, 30] }, reason: null });
+  const ask = (h: MeasureHold, ticked: boolean, extra: Partial<Parameters<typeof confirmHint>[0]> = {}) =>
+    confirmHint({ scope: 'whole', skus: new Set(), soft: [], accepted: new Set(), hold: h, ticked, ...extra });
+  // Not ticked: the press says what to do and sends nothing; ticked, it sends the values exactly as the server answered them.
+  assert.equal(ask(hold, false), 'attestFirst');
+  assert.equal(statementOf(hold, false), undefined);
+  assert.equal(ask(hold, true), null);
+  assert.deepEqual(statementOf(hold, true), { weight_g: 100, box_mm: [160, 110, 30] });
+  // Only the measures the gate offers: a box that is real already is never stated.
+  assert.deepEqual(statementOf(measureHold(gated({ real_measures: { weight_g: 100, box_mm: null, combo_keys: [''] } }), null), true), { weight_g: 100 });
+  // The soft flags still come after the measures, and the options must be chosen first.
+  assert.equal(ask(hold, true, { soft: ['EST_MANUAL_PRICE'] }), 'acceptAllFirst');
+  assert.equal(ask(hold, true, { scope: 'some' }), 'pickSkus');
+  // Held with nothing to state: the reason, never a request — and nothing is stated even if a tick lingered.
+  for (const reason of ['type_cbm', 'package_differs', 'package_partial', 'below_net'] as const) {
+    const blocked = measureHold(gated({ real_measures: null, blocked: reason }), null);
+    assert.deepEqual([blocked.hard, blocked.reason, ask(blocked, true), statementOf(blocked, true)], [true, reason, 'blocked', undefined], reason);
+  }
+  // Real measures waiting on the refresh's apply, option by option.
+  const waiting = gated({ real_measures: null, blocked: 'package_differs', waiting_keys: ['c:b'], defaulted: ['c:b', 'c:r'] }, ['c:b', 'c:r']);
+  assert.equal(measureHold(waiting, new Set(['c:b'])).reason, 'waiting');
+  assert.equal(measureHold(waiting, null).reason, 'package_differs', 'red does not wait');
+  // Options the gate does not hold are free, whatever their (older) lines say; with no gate the lines say it, and the press goes to the server.
+  assert.equal(measureHold(gated({ defaulted: ['c:b'], real_measures: null, blocked: 'type_cbm' }, ['c:b', 'c:r']), new Set(['c:r'])).hard, false);
+  const old = measureHold(gated(null), null);
+  assert.deepEqual(old, { hard: true, live: false, statement: null, reason: null });
+  assert.equal(ask(old, false), null, 'an older server judges the press itself');
+  assert.equal(statementOf(old, true), undefined, 'and is never sent a field it would refuse');
+  // A statement covers only the options it makes real: an option on the type's CBM is held with its reason.
+  const mixed = gated({ defaulted: ['c:b', 'c:r'], real_measures: { weight_g: 100, box_mm: null, combo_keys: ['c:r'] }, blocked: 'type_cbm' }, ['c:b', 'c:r']);
+  assert.deepEqual(measureHold(mixed, new Set(['c:r'])).statement, { weight_g: 100, box_mm: null });
+  assert.equal(measureHold(mixed, null).reason, 'type_cbm');
+
+  // The sheet: read on open and on every stale answer (PRICING_CHANGED through useAct's onStale, a compute, a refusal on the measures).
+  const sheet = codeOf(`${DIR}/ConfirmSheet.tsx`);
+  assert.match(sheet, /const stale = useCallback\(\(\) => \{\s*setReads\(\(n\) => n \+ 1\);\s*onStale\?\.\(\);\s*\}, \[onStale\]\);\s*const act = useAct\(lang, stale\);/);
+  assert.match(sheet, /fetchEstimate\(productId, \{ signal: ac\.signal, mascot: 'silent' \}\)[\s\S]*?\}, \[open, productId, reads\]\);/);
+  assert.match(sheet, /if \(errorCode\(e\) === 'PRICE_ESTIMATE_DEFAULT_MEASURES'\) stale\(\);/);
+  assert.match(sheet, /const why = confirmHint\(\{ scope, skus, soft, accepted, hold, ticked: attested \}\);\s*if \(why\) \{\s*setHint\(/);
+  assert.match(sheet, /\.\.\.\(real_measures \? \{ real_measures \} : \{\}\)/);
+  // The tick is bound to the values shown: a read that shows other values leaves it unticked.
+  assert.match(sheet, /const attested = statementKey !== null && ticked === statementKey;/);
+  // After a statement the product form reads the product again, handed the values stated (its guard if that read fails).
+  assert.match(sheet, /if \(real_measures\) onProductChanged\?\.\(real_measures\);/);
+});
+
+test('the measures part of the sheet, in three languages: the values with their units and the tick; each reason with the way to its cure', () => {
+  const html = (h: MeasureHold, lang: UiLang, ways: { dims?: boolean; cost?: boolean; compute?: boolean } = {}) =>
+    renderToStaticMarkup(
+      createElement(MeasuresHold, {
+        hold: h,
+        lang,
+        productId: 'p_cut',
+        ticked: false,
+        onTick: () => {},
+        ...(ways.dims ? { onOpenDimensions: () => {} } : {}),
+        ...(ways.cost ? { onOpenCost: () => {} } : {}),
+        ...(ways.compute ? { onCompute: () => {} } : {}),
+      })
+    );
+  const hrefs = (s: string) => anchors(s).map((a) => attr(a, 'href'));
+  const goes = (s: string) => [...s.matchAll(/data-confirm-go="([a-z]+)"/g)].map((m) => m[1]);
+  for (const lang of LANGS) {
+    const statement = html(measureHold(gated({}), null), lang);
+    const t = text(statement);
+    assert.match(statement, /data-confirm-measures/);
+    assert.match(statement, /<input[^>]*data-confirm-attest/);
+    assert.ok(t.includes(`${say(STRINGS.CONFIRM.weight, lang)}: 0.1 ${say(STRINGS.CONFIRM.kg, lang)}`), `${lang}: ${t}`);
+    assert.ok(t.includes(`${say(STRINGS.CONFIRM.box, lang)}: 16 × 11 × 3 ${say(STRINGS.CONFIRM.cm, lang)}`), `${lang}: ${t}`);
+    for (const k of ['hardOpen', 'measuresTitle', 'fromType', 'attest', 'attestHint', 'notThese', 'enterInCost'] as const) assert.ok(t.includes(say(STRINGS.CONFIRM[k], lang)), `${lang}: ${k}`);
+    // The figures are LTR islands; the units are read in the reader's language.
+    assert.match(statement, /<bdi dir="ltr"[^>]*>16 × 11 × 3<\/bdi>/);
+    // The workspace links the editor's sections; the product form opens its own.
+    assert.deepEqual(hrefs(statement), ['/admin?tab=products&edit=p_cut&section=3', '/admin?tab=products&edit=p_cut&section=4']);
+    const inForm = html(measureHold(gated({}), null), lang, { dims: true, cost: true });
+    assert.deepEqual([hrefs(inForm), goes(inForm)], [[], ['cost', 'dimensions']]);
+
+    // Each reason: its words, and the way to its cure.
+    const blocked = (reason: ConfirmGate['blocked'], extra: Partial<ConfirmGate> = {}) => measureHold(gated({ real_measures: null, blocked: reason, ...extra }), null);
+    const cases: Array<[MeasureHold, string, string[]]> = [
+      [blocked('type_cbm'), say(STRINGS.CONFIRM.typeCbm, lang), ['dimensions', 'compute', 'refresh']],
+      [blocked('package_differs'), say(STRINGS.CONFIRM.packageDiffers, lang), ['compute', 'refresh']],
+      [blocked('package_partial'), say(STRINGS.CONFIRM.packagePartial, lang), ['dimensions']],
+      // The type's weight is lighter than the product itself: a real weight in the cost card, or the net weight corrected.
+      [blocked('below_net'), say(STRINGS.CONFIRM.belowNet, lang), ['cost', 'dimensions']],
+      [blocked('package_differs', { waiting_keys: [''] }), say(STRINGS.CONFIRM.applyFirst, lang), ['refresh']],
+      [measureHold(gated(null), null), say(STRINGS.CONFIRM.hardLines, lang), ['cost', 'dimensions']],
+    ];
+    for (const [h, words, ways] of cases) {
+      const s = html(h, lang, { dims: true, cost: true, compute: true });
+      assert.ok(text(s).includes(words), `${lang} ${h.reason}`);
+      assert.equal(holdText(h, lang), words);
+      assert.deepEqual(goes(s), ways, `${lang} ${h.reason}`);
+      assert.doesNotMatch(s, /data-confirm-attest/, 'nothing to tick');
+    }
+    // «التحديث» is the workspace's own tab, on this product.
+    assert.deepEqual(hrefs(html(blocked('package_differs', { waiting_keys: [''] }), lang)), ['/admin?tab=pricing&view=estimates&etab=refresh&product=p_cut']);
+  }
+});
+
+test('the confirmation’s ways in: the product form reads the product again keeping every edit after a statement, opens «الأبعاد والوزن» and the cost weight in place; the workspace links the editor', () => {
+  // ProductForm never reaches the workspace (test 1): it hands callbacks down through section ٣.
+  const form = codeOf('src/components/adminProducts/ProductForm.tsx');
+  assert.match(form, /onProductChanged=\{afterEstimateMeasures\}\s*onOpenDimensions=\{showPackageMeasures\}\s*onOpenCost=\{showCostWeight\}/);
+  // After a statement: a background read, never the spinner nor its «رجوع»-only failure page; dropped when a newer
+  // baseline came meanwhile; every unsaved edit laid back (`keepEdits`, dimensions field by field: priceEstimateAttest).
+  const after = form.slice(form.indexOf('const afterEstimateMeasures = '), form.indexOf('const deepLinked = useRef(false);'));
+  assert.ok(after.length > 0 && after.length < 2000, 'the handler is found');
+  assert.match(after, /const afterEstimateMeasures = \(stated: StatedPackage\) => \{/);
+  assert.match(after, /void readProduct\(id\)/);
+  assert.doesNotMatch(after, /loadProduct\(|setLoading\(|reloadKeepingEdits\(/, 'loadProduct toggles `loading`, which unmounts the form');
+  assert.match(after, /reloadIdRef\.current === id && baselineGeneration\.current === generation/);
+  assert.match(after, /applyProduct\(read\);[\s\S]*setDoc\(\(d\) => keepEdits\(before\.d, mine, d\)\);/);
+  assert.match(after, /if \(JSON\.stringify\(myRel\) !== JSON\.stringify\(before\.rs\)\) \{\s*setRel\(myRel\);/);
+  // A read that fails keeps the form, the stated package laid in where its own is empty, and says so.
+  assert.match(after, /\.catch\(\(\) => \{\s*if \(!current\(\)\) return;\s*setDoc\(\(d\) => \(\{ \.\.\.d, dimensions: withStatedPackage\(d\.dimensions, stated\) \}\)\);\s*setSaveNote\(saveOutcomeText\('measuresUnread', lang\)\);/);
+  assert.match(form, /const showPackageMeasures = \(\) => \{\s*setOpen\(4\);[\s\S]{0,260}document\.querySelector<HTMLElement>\('\[data-package-measures\]'\)/);
+  assert.match(form, /const showCostWeight = \(\) => \{\s*showPricing\(3\);[\s\S]{0,200}'\[data-v2-field="weight"\]'/);
+  const prices = codeOf('src/components/adminProducts/form/v2/PricesSectionV2.tsx');
+  assert.match(prices, /onProductChanged,\s*onOpenDimensions,\s*onOpenCost,\s*\}: \{/);
+  // The banner reads again when the stored pricing moves, and hands the ways to the sheet.
+  const banner = codeOf(`${DIR}/EstimateBanner.tsx`);
+  assert.match(banner, /\}, \[productId, reload, revision\]\);/);
+  assert.match(banner, /onStale=\{stale\}\s*onProductChanged=\{onProductChanged\}\s*onOpenDimensions=\{onOpenDimensions\}\s*onOpenCost=\{onOpenCost\}/);
+  // The workspace's sheet tells its list when the server moved.
+  assert.match(codeOf(`${DIR}/EstimateLists.tsx`), /onStale=\{\(\) => setReload\(\(n\) => n \+ 1\)\}/);
+  // «الأبعاد والوزن»: the product's own «صندوق الشحن» block carries the anchor; a model's or colour's never does.
+  const own = renderToStaticMarkup(createElement(DimensionsSection, { dimensions: emptyDimensions(), onChange: () => {} }));
+  assert.equal((own.match(/data-package-measures/g) ?? []).length, 1);
+  assert.match(own, /data-package-measures="">\s*<h4[^>]*>\s*صندوق الشحن/);
+  const model = renderToStaticMarkup(createElement(DimensionsSection, { dimensions: emptyDimensions(), onChange: () => {}, collapsible: true }));
+  assert.doesNotMatch(model, /data-package-measures/);
+  // The workspace's links: section ٤ for the package, section ٣ for the cost.
+  assert.equal(productDimensionsHref('p_1'), '/admin?tab=products&edit=p_1&section=4');
+  assert.equal(productEditorHref('p_1'), '/admin?tab=products&edit=p_1&section=3');
+  assert.equal(productDimensionsHref('bad id'), null);
 });

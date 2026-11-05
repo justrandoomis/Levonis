@@ -91,6 +91,8 @@ const SMART_PRICING_PRIVATE = [
   'default_cbm', 'min_profit_usd', 'applied_wire_json', 'type_source',
 ];
 const SMART_PRICING_PUBLIC = ['price_estimate', 'estimate_unit_iqd', 'final_unit_iqd', 'notice_version'];
+/** §4.9 (DECISIONS row 292): the confirmation's live gate and the owner's statement carry the type's default measures. */
+SMART_PRICING_PRIVATE.push('confirm_gate', 'real_measures');
 
 test('both copies of FINANCIAL_FIELDS carry the smart-pricing private names and keep the public estimate facts out', () => {
   const namesIn = (file: string) => new Set([...extractDeclaration(read(file), 'FINANCIAL_FIELDS').matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]!));

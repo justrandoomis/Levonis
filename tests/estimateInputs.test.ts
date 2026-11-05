@@ -45,6 +45,10 @@ import {
   productPackageOf,
   serializeAppliedWire,
   skuMeasureSources,
+  attestBaseMeasures,
+  measureBasisOf,
+  measureGate,
+  skuDefaultedFields,
   type EstimateInputRow,
   type EstimatePackage,
   type EstimatePlan,
@@ -779,6 +783,125 @@ test('skuMeasureSources is §4.9’s test: a measure is defaulted only while the
   assert.deepEqual(skuMeasureSources(typed, skus[0]!, p.applied), { weight: 'owner', cbm: 'type_default', issues: [] });
   // Nothing at all: none, with the engine's codes.
   assert.deepEqual(skuMeasureSources([], skus[0]!, null), { weight: 'none', cbm: 'none', issues: ['CBM_MISSING', 'WEIGHT_MISSING'] });
+});
+
+/* ------------------------------- 4b. the owner's statement of real measures (§4.9 step 0) -- */
+
+test('attestBaseMeasures re-records only the type defaults the store still holds, at the values stated — and the next plan records exactly that', () => {
+  const skus = grid([['a']]);
+  const p = plan({ skus, prices: priceMap(skus, () => cny('1')), product_package: null });
+  const rows = afterApply([], p);
+  const sent = { weight_g: 1300, box_mm: [210, 210, 90] as const };
+  const taken = attestBaseMeasures(rows, p.applied, null, sent);
+  assert.ok(taken.ok);
+  assert.deepEqual(taken.fields, ['shipping_weight_g', 'shipping_box']);
+  assert.deepEqual(taken.package, { weight_g: 1300, box: [210, 210, 90] }, 'the empty package takes them');
+  assert.deepEqual(
+    taken.applied.inputs.filter((f) => f.scope === 'base' && ['shipping_weight_g', 'shipping_box'].includes(f.field)).map((f) => [f.field, f.value, f.source]),
+    [
+      ['shipping_weight_g', 1300, 'product_package'],
+      ['shipping_box', [210, 210, 90], 'product_package'],
+    ]
+  );
+  // Nothing else of the record moves.
+  const others = (w: typeof p.applied) => serializeAppliedWire({ ...w, inputs: w.inputs.filter((f) => !['shipping_weight_g', 'shipping_box'].includes(f.field)) });
+  assert.equal(others(taken.applied), others(p.applied));
+  // §4.9 step 1 reads them real under the new record: the product's package.
+  assert.deepEqual(skuMeasureSources(rows, skus[0]!, taken.applied), { weight: 'product', cbm: 'product', issues: [] });
+
+  // PARITY: the package now holding the very values, the next plan writes nothing, records the same fields from the
+  // package, and states the same sources and basis — what the statement wrote is what the next compute and apply write.
+  const dims = { package_weight_g: 1300, package_depth_mm: 210, package_width_mm: 210, package_height_mm: 90 };
+  const next = plan({ skus, prices: priceMap(skus, () => cny('1')), product_package: dims, inputs: rows, applied: serializeAppliedWire(taken.applied) });
+  assert.deepEqual(next.wire.cost.inputs, [], 'no write: no price can move');
+  assert.equal(serializeAppliedWire(next.applied), serializeAppliedWire(taken.applied));
+  assert.deepEqual(next.skus.map((s) => [s.weight_source, s.cbm_source, s.measure_source, s.flags]), [['product', 'product', 'product', []]]);
+  assert.equal(next.measure_basis, measureBasisOf([skuMeasureSources(rows, skus[0]!, taken.applied)]));
+  // …and with the package equal already, the statement writes no package value at all.
+  const equal = attestBaseMeasures(rows, p.applied, dims, sent);
+  assert.ok(equal.ok);
+  assert.deepEqual(equal.package, { weight_g: null, box: null });
+  // One measure alone: the other record is left as it is.
+  const weightOnly = attestBaseMeasures(rows, p.applied, null, { weight_g: 1300 });
+  assert.ok(weightOnly.ok);
+  assert.deepEqual(skuMeasureSources(rows, skus[0]!, weightOnly.applied), { weight: 'product', cbm: 'type_default', issues: [] });
+});
+
+test('attestBaseMeasures refuses what the store no longer holds, what a level decides before it, the type’s CBM, and a package that differs or is partial', () => {
+  const skus = grid([['a']]);
+  const p = plan({ skus, prices: priceMap(skus, () => cny('1')), product_package: null });
+  const rows = afterApply([], p);
+  const base = (patch: Partial<EstimateInputRow>) => rows.map((r) => (r.scope === 'base' && r.origin === 'MANUAL_OVERRIDE' ? { ...r, ...patch } : r));
+  const refused = (r: ReturnType<typeof attestBaseMeasures>) => (r.ok ? 'taken' : r.reason);
+  // A value other than the one the price is computed from: what the owner saw is not the store.
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, null, { weight_g: 1301 })), 'changed');
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, null, { box_mm: [210, 210, 91] })), 'changed');
+  // The owner's own value in the store (the merge reads it as his, §4.5): nothing of the type's to state.
+  assert.equal(refused(attestBaseMeasures(base({ shipping_weight_g: 1250 }), p.applied, null, { weight_g: 1300 })), 'changed');
+  assert.equal(refused(attestBaseMeasures(base({ shipping_weight_g: 1250 }), p.applied, null, { weight_g: 1250 })), 'changed');
+  // A pricing weight decides the level before the shipping weight; an owner's manual CBM before the box.
+  assert.equal(refused(attestBaseMeasures(base({ pricing_weight_g: 1300 }), p.applied, null, { weight_g: 1300 })), 'changed');
+  assert.equal(refused(attestBaseMeasures(base({ manual_cbm: '0.004' }), p.applied, null, { box_mm: [210, 210, 90] })), 'changed');
+  // No record at all (an older apply, or none).
+  assert.equal(refused(attestBaseMeasures(rows, null, null, { weight_g: 1300 })), 'changed');
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, null, {})), 'changed');
+  // The package holds another value, or one or two of its box axes.
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { package_weight_g: 1250 }, { weight_g: 1300 })), 'package_differs');
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { package_depth_mm: 200, package_width_mm: 210, package_height_mm: 90 }, { box_mm: [210, 210, 90] })), 'package_differs');
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { package_depth_mm: 210 }, { box_mm: [210, 210, 90] })), 'package_partial');
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { package_depth_mm: 210, package_height_mm: 90 }, { box_mm: [210, 210, 90] })), 'package_partial');
+  // A package box beside a stated weight is not the statement's business.
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { package_depth_mm: 210 }, { weight_g: 1300 })), 'taken');
+  // Packed, the product weighs at least itself: a stated weight lighter than its own net weight is never real (the
+  // form's «الصندوق أخف من محتواه»); as heavy is possible, a box alone is not weighed, and a package that differs is the
+  // cure first (its apply takes the package's weight in).
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { net_weight_g: 1301 }, { weight_g: 1300 })), 'below_net');
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { net_weight_g: 1301, package_weight_g: 1300 }, { weight_g: 1300 })), 'below_net', 'even a package that holds it');
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { net_weight_g: 1300 }, { weight_g: 1300 })), 'taken');
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { net_weight_g: 1301 }, { box_mm: [210, 210, 90] })), 'taken');
+  assert.equal(refused(attestBaseMeasures(rows, p.applied, { net_weight_g: 1301, package_weight_g: 1400 }, { weight_g: 1300 })), 'package_differs');
+
+  // The type's CBM written as manual_cbm decides the product level before any box: there is no box to state.
+  const cbmPlan = plan({ skus, prices: priceMap(skus, () => cny('1')), product_package: null, type: typeOf({ default_cbm: '0.004' }) });
+  const cbmRows = afterApply([], cbmPlan);
+  assert.equal(refused(attestBaseMeasures(cbmRows, cbmPlan.applied, null, { box_mm: [210, 210, 90] })), 'type_cbm');
+  assert.deepEqual(skuDefaultedFields(cbmRows, skus[0]!, cbmPlan.applied), { weight: 'shipping_weight_g', cbm: 'manual_cbm' });
+  assert.deepEqual(skuDefaultedFields(rows, skus[0]!, p.applied), { weight: 'shipping_weight_g', cbm: 'shipping_box' });
+});
+
+test('measureGate: the defaulted SKUs, the statement on offer and the SKUs it makes real — each measure judged alone — and why the others cannot be stated', () => {
+  const skus = grid([], ['red', 'black']);
+  const prices = priceMap(skus, () => cny('1'));
+  const p = plan({ skus, prices, product_package: null });
+  const rows = afterApply([], p);
+  const keys = skus.map((s) => s.combo_key).sort();
+  assert.deepEqual(measureGate(rows, skus, p.applied, null), { defaulted: keys, stated: { weight_g: 1300, box_mm: [210, 210, 90], combo_keys: keys }, blocked: null });
+  // Real everywhere: nothing held.
+  const owner = rows.map((r) => (r.scope === 'base' ? { ...r, shipping_weight_g: 1250, shipping_length_mm: 200 } : r));
+  assert.deepEqual(measureGate(owner, skus, p.applied, null), { defaulted: [], stated: null, blocked: null });
+  // The package differs: held, with the reason.
+  assert.deepEqual(measureGate(rows, skus, p.applied, { package_weight_g: 1250 }), { defaulted: keys, stated: null, blocked: 'package_differs' });
+  // The product weighs more than the type's packed weight: nothing to state, and why — before a package box that differs.
+  assert.deepEqual(measureGate(rows, skus, p.applied, { net_weight_g: 1400 }), { defaulted: keys, stated: null, blocked: 'below_net' });
+  assert.deepEqual(measureGate(rows, skus, p.applied, { net_weight_g: 1400, package_depth_mm: 200, package_width_mm: 210, package_height_mm: 90 }).blocked, 'below_net');
+
+  // Red has its own box (its colour's package): it needs the weight alone. Black is on the type's CBM.
+  const red = skus.find((s) => s.color_id === 'red')!;
+  const black = skus.find((s) => s.color_id === 'black')!;
+  const mixedSkus = [{ ...red, packaged: { color: { weight_g: null, box: [200, 200, 100] as const } } }, black];
+  const cbmPlan = plan({ skus: mixedSkus, prices, product_package: null, type: typeOf({ default_cbm: '0.004' }) });
+  const cbmRows = afterApply([], cbmPlan);
+  assert.deepEqual(measureGate(cbmRows, mixedSkus, cbmPlan.applied, null), {
+    defaulted: [black.combo_key, red.combo_key].sort(),
+    stated: { weight_g: 1300, box_mm: null, combo_keys: [red.combo_key] },
+    blocked: 'type_cbm',
+  });
+  // The basis an apply states.
+  assert.equal(measureBasisOf([]), '');
+  assert.equal(measureBasisOf([{ weight: 'none', cbm: 'product' }]), '');
+  assert.equal(measureBasisOf([{ weight: 'product', cbm: 'owner' }]), 'real');
+  assert.equal(measureBasisOf([{ weight: 'type_default', cbm: 'owner' }]), 'type_default');
+  assert.equal(measureBasisOf([{ weight: 'type_default', cbm: 'owner' }, { weight: 'colour', cbm: 'colour' }]), 'mixed');
 });
 
 /* ------------------------------------------------- 5. end to end, real DB -- */
