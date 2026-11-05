@@ -17,8 +17,19 @@
  *     later FX-5 run moves the price and never the rule;
  *   - FROM $5 UP THE CHARM PRICE: THE FLUSH CUTTER (an accessory at $4.50, 25,750 → $11.99, 19,250 at 10%), AN AMS
  *     ($45 at 4%: 530,250 → $294.99, 472,000) and A PRINTER ($135 at 3%: 3,145,000 → $1,879.99, 3,008,000), every
- *     published dollar price on the grid; no ceiling (or an emptied one) is today's estimate byte for byte; a SKU
- *     whose charm price IS today's keeps T — the same hash, lines and record;
+ *     published dollar price on the grid; no ceiling (or an emptied one) is today's estimate byte for byte;
+ *   - TODAY'S DINAR PRICE SHOWS c (the lead's ruling for the owner, 2026-11-05): a SKU whose charm price's dinar price
+ *     IS today's sells there at c's own profit — 105,750 at $65.99, not $66.09 — no line moves, so «التحديث» does not
+ *     list it, and its fresh hash applies through POST /apply; one whose dollar figure already is c keeps T, the same
+ *     hash, lines and record. THE HARDENED-STEEL COMBO as it sold on the live day (an accessory at $4.50 and 10%, a 57.98
+ *     EUR store page, the type's default box, one pre-order SKU by sea): 110,500 at $69.04 → 110,500 at $68.99, stored
+ *     usd_ceil6 68.99, the storefront card 6,899 cents; the soccerbot (nothing goes up: 162,500 at $101.44) and a twin
+ *     the owner prices himself exactly as they were. Its two limits: PAST 19 SKUS TODAY'S PLAN STANDS, compute after
+ *     compute (62 SKUs at today's dinar price keep T and their hash; one colour's supplier price moves: 117,000 at $72.99
+ *     on rules of its own, not a shared 117,750; a re-compute with nothing changed, a new rate, an emptied ceiling, never
+ *     blocked; 19 colours show c, 20 keep T); and FX-5 KEEPS c'S PROFIT IN DOLLARS: between applies such a SKU can sell a
+ *     250 IQD step from where T would, above or under (106,250 where T sells 106,000 at 1,607; 109,000 where T sells
+ *     109,250 at 1,650), its dollar figure still c, until the next compute and apply price it as today's code;
  *   - THE OWNER'S OWN PRICES WIN: a product whose every model carries the owner's option rule keeps its rules and
  *     prices; on a product where he priced one model only, the other models are priced on ONE option group and his
  *     rule is never touched (no tie, no override);
@@ -50,17 +61,21 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { all, asD1, count, get, json, post, put, row, stubApp, type StubUser } from './fixtures/app';
+import { charmTargetBefore } from './fixtures/charmBeforeRuling';
 import { applyRate, fxEnv } from './fixtures/fx';
 import { pricingWorld } from './fixtures/procurementPricing';
 import { noStoreUnlessSet } from '../worker/lib/edgePolicy';
 import { adminPricingRoutes } from '../worker/routes/adminPricing';
 import { adminPriceEstimatesRoutes } from '../worker/routes/adminPriceEstimates';
 import { adminProductsRoutes } from '../worker/routes/adminProducts';
+import { productRoutes } from '../worker/routes/products';
 import { repriceStaleEngineProducts } from '../worker/lib/pricingEngine/autoReprice';
 import { statementBudget } from '../worker/lib/fx/budget';
 import { LOWEST_USED_CHARM_CENTS, isCharmCents } from '../packages/pricing/src/charmPrice';
+import { roundPriceIqd } from '../packages/pricing/src/priceRounding';
 import { skuComboKey } from '../packages/pricing/src/skuChannel';
 import { usdCeilCentsOf } from '../packages/pricing/src/usdCents';
+import { addProcurementExact, mulProcurementExact, procurementExact, procurementExactText } from '../packages/contracts/src/procurementCost';
 import type { Env } from '../worker/lib/types';
 
 type Json = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -84,6 +99,8 @@ const mount = (raw: DatabaseSync) =>
     { publishV2: false }
   );
 type App = ReturnType<typeof mount>;
+/** The public storefront, a guest, as levonis-iq.com/api/products answers it. */
+const storefront = (raw: DatabaseSync) => stubApp(asD1(raw), null, (a) => a.route('/api/products', productRoutes), { publishV2: false });
 
 /** The pricing world at the owner's rate, his type figures (no ceiling yet), a current Tmall capture, «apply» on. */
 function world() {
@@ -105,20 +122,24 @@ function world() {
   return { ...w, app: mount(w.raw) };
 }
 
-/** A product as the Bambu import leaves one (direct sale only, no stock, no price), its type the owner's, its package real. */
+/**
+ * A product as the Bambu import leaves one (direct sale only, no stock, no price), its type the owner's, its package
+ * real — or none (`noPackage`: the type's default box and weight decide, EST_DEFAULT_BOX / EST_DEFAULT_WEIGHT).
+ */
 function seedProduct(
   raw: DatabaseSync,
   id: string,
   type: string,
-  o: { models?: string[]; colours?: string[]; variants?: string[]; weight?: number; box?: [number, number, number] } = {}
+  o: { models?: string[]; colours?: string[]; variants?: string[]; weight?: number; box?: [number, number, number]; noPackage?: boolean; slug?: string } = {}
 ): void {
   const box = o.box ?? [119, 50, 25];
   const mode = o.variants ? 'VARIANT_COMBINATION' : o.colours?.length ? 'COLOR' : 'BASE';
+  const measures = o.noPackage ? 'NULL, NULL, NULL, NULL' : `${q(o.weight ?? 50)}, ${box[0]}, ${box[1]}, ${box[2]}`;
   raw.exec(`
     INSERT INTO products (id, slug, name, name_ar, name_ku, status, price_iqd, stock, selling_type, sale_types, preorder_transports, inventory_mode,
                           package_weight_g, package_depth_mm, package_width_mm, package_height_mm)
-    VALUES (${q(id)}, ${q(`slug-${id}`)}, ${q(`Product ${id}`)}, 'منتج', 'بەرهەم', 'active', 0, NULL, 'direct_sale', '["direct_sale"]', '[]', ${q(mode)},
-            ${q(o.weight ?? 50)}, ${box[0]}, ${box[1]}, ${box[2]});
+    VALUES (${q(id)}, ${q(o.slug ?? `slug-${id}`)}, ${q(`Product ${id}`)}, 'منتج', 'بەرهەم', 'active', 0, NULL, 'direct_sale', '["direct_sale"]', '[]', ${q(mode)},
+            ${measures});
     INSERT INTO product_source_refs (source, source_product_id, product_id, source_handle, canonical_url, match_kind, stock_decision, fingerprint, fetched_at, import_run_id)
       VALUES ('bambu_us', ${q(`sp_${id}`)}, ${q(id)}, ${q(`h-${id}`)}, ${q(`https://us.store.bambulab.com/products/h-${id}`)}, 'created', 'not_configured', 'fp', '2026-10-15T00:00:00.000Z', 'cir_000000000000000000000001');
     INSERT INTO product_price_estimates (product_id, type_key, type_source, updated_at) VALUES (${q(id)}, ${q(type)}, 'owner', ${q(NOW)});
@@ -151,6 +172,10 @@ function tmall(raw: DatabaseSync, pid: string, combo: string, price: string): st
 const typed = (raw: DatabaseSync, pid: string, combo: string, amount: string, currency: string) =>
   raw.exec(`INSERT INTO supplier_price_manual (product_id, combo_key, amount, currency, origin, entered_by, entered_at)
             VALUES (${q(pid)}, ${q(combo)}, ${q(amount)}, ${q(currency)}, 'typed', 'usr_owner', ${q(NOW)})`);
+/** A store page the owner read for one SKU (EST_STORE_PAGE_PRICE), its evidence named. */
+const storePage = (raw: DatabaseSync, pid: string, combo: string, amount: string, currency: string) =>
+  raw.exec(`INSERT INTO supplier_price_manual (product_id, combo_key, amount, currency, origin, evidence_url, evidence_host, entered_by, entered_at)
+            VALUES (${q(pid)}, ${q(combo)}, ${q(amount)}, ${q(currency)}, 'store_page', 'https://eu.store.bambulab.com/products/x', 'eu.store.bambulab.com', 'usr_owner', ${q(NOW)})`);
 
 async function call(app: App, method: 'GET' | 'POST' | 'PUT', path: string, body?: unknown) {
   const res = method === 'GET' ? await get(app, path) : method === 'POST' ? await post(app, path, body ?? {}) : await put(app, path, body ?? {});
@@ -375,27 +400,149 @@ test('the Flush Cutter, an AMS and a printer: each at its highest charm price un
   for (const p of (await compute(w.app, ids)).values()) assert.ok((p.lines as Json[]).every((l) => l.est_price_iqd === l.published_price_iqd), p.product_id);
 });
 
-test('a SKU whose charm price is today’s keeps T: the same hash, lines and record as with no ceiling', async () => {
+test('a SKU whose charm price’s dinar price is today’s shows c there — the same 105,750 at $65.99, not $66.09: no line moves, so «التحديث» does not list it, and its fresh hash applies through POST /apply; one whose dollar figure already is c keeps T — the same hash, lines and record', async () => {
   const w = world();
-  // 400.33 CNY: R = 96,079.2 + 59.5 = 96,138.7; + $6 × 1,600 → 105,750, itself the dinar price of $65.99 (105,584).
+  // 400.33 CNY: R = 96,079.2 + 59.5 = 96,138.7; + $6 × 1,600 → 105,750, itself the dinar price of $65.99 (105,584);
+  // today's own dollar figure 96,138.7 ÷ 1,600 + 6 = $66.0866875 → $66.09.
   seedProduct(w.raw, 'p_dear', 'spare_part');
   tmall(w.raw, 'p_dear', '', '400.33');
-  const today = (await compute(w.app, ['p_dear'])).get('p_dear')!;
-  assert.deepEqual([lineOf(today).est_cost_iqd, lineOf(today).est_price_iqd], [96_139, 105_750]);
+  // 406.3 CNY: R = 97,512 + 59.5 = 97,571.5 → 107,250 at $66.9821875 → $66.99, the very charm price whose dinar price it
+  // is (107,184 → 107,250).
+  seedProduct(w.raw, 'p_even', 'spare_part');
+  tmall(w.raw, 'p_even', '', '406.3');
+  const ids = ['p_dear', 'p_even'];
+  const today = await computeAndApply(w.app, ids);
+  assert.deepEqual(
+    ids.map((id) => [lineOf(today.get(id)!).est_cost_iqd, lineOf(today.get(id)!).est_price_iqd]),
+    [
+      [96_139, 105_750],
+      [97_572, 107_250],
+    ]
+  );
+  assert.deepEqual([dollars(w.raw, 'p_dear'), dollars(w.raw, 'p_even')], [[['', 6_609]], [['', 6_699]]]);
+  const settled = await compute(w.app, ids);
+
   await setType(w.app, 'spare_part', { profit_cap_pct: '10' });
-  const kept = (await compute(w.app, ['p_dear'])).get('p_dear')!;
-  assert.equal(kept.preview_hash, today.preview_hash, 'the same hash: nothing moved');
-  assert.deepEqual(kept.lines, today.lines);
-  assert.deepEqual(kept.flags, today.flags);
-  const done = (await apply(w.app, [{ product_id: 'p_dear', preview_hash: kept.preview_hash }])).get('p_dear')!;
+  const capped = await compute(w.app, ids);
+  // p_even: nothing a customer sees would change — T stays: the same hash, lines and flags as with no ceiling.
+  const even = capped.get('p_even')!;
+  assert.equal(even.preview_hash, settled.get('p_even')!.preview_hash, 'the same hash: nothing moved');
+  assert.deepEqual([even.lines, even.flags], [settled.get('p_even')!.lines, settled.get('p_even')!.flags]);
+  // p_dear: every line the same — 105,750 against 105,750 — but its rule moves, so its hash is its own.
+  const dear = capped.get('p_dear')!;
+  assert.equal(dear.blocking, false, JSON.stringify(dear.blocked_by));
+  assert.deepEqual(dear.lines, settled.get('p_dear')!.lines, 'no dinar figure moves');
+  assert.notEqual(dear.preview_hash, settled.get('p_dear')!.preview_hash, 'the rule moves: a hash of its own');
+  assert.equal((await compute(w.app, ['p_dear'])).get('p_dear')!.preview_hash, dear.preview_hash, 'deterministic over both evaluations');
+  // «التحديث» lists price moves only: neither is listed — the dollar figure is applied through the API.
+  const listed = ((await call(w.app, 'GET', `${BASE}/products?state=refresh`)).body.products as Json[]).map((p) => p.product_id);
+  assert.deepEqual(
+    listed.filter((id) => ids.includes(id)),
+    [],
+    'a change of the dollar figure alone is not listed'
+  );
+  const done = (await apply(w.app, [{ product_id: 'p_dear', preview_hash: dear.preview_hash }])).get('p_dear')!;
   assert.equal(done.outcome, 'applied', JSON.stringify(done).slice(0, 300));
-  assert.deepEqual(rules(w.raw, 'p_dear').map((r) => [r.scope, r.amount_usd]), [['product', '6']]);
+  // floor6(65.99 − 96,138.7 ÷ 1,600) = $5.903312: 96,138.7 + 9,445.2992 → 105,750, usd_ceil6 65.99.
+  assert.deepEqual(rules(w.raw, 'p_dear').map((r) => [r.scope, r.amount_usd]), [['product', '5.903312']]);
+  assert.deepEqual(prices(w.raw, 'p_dear'), [['', 105_750]]);
+  assert.equal(row<{ u: string }>(w.raw, "SELECT usd_ceil6 AS u FROM pricing_v2_sku_results WHERE product_id = 'p_dear'")!.u, '65.99');
+  onGrid(w.raw, 'p_dear', [['', 6_599]]);
+  assert.deepEqual(record(w.raw, 'p_dear').minimum_profit, { amount_usd: '5.903312', source: 'type_default' });
+  // p_even: T, its record as before the ceiling — no new key.
+  assert.deepEqual(rules(w.raw, 'p_even').map((r) => [r.scope, r.amount_usd]), [['product', '6']]);
   assert.equal(
-    row<{ j: string }>(w.raw, "SELECT applied_wire_json AS j FROM product_price_estimates WHERE product_id = 'p_dear'")!.j.endsWith('"minimum_profit":{"amount_usd":"6","source":"type_default"}}'),
+    row<{ j: string }>(w.raw, "SELECT applied_wire_json AS j FROM product_price_estimates WHERE product_id = 'p_even'")!.j.endsWith('"minimum_profit":{"amount_usd":"6","source":"type_default"}}'),
     true,
     'the record as before the ceiling: no new key'
   );
-  assert.deepEqual(prices(w.raw, 'p_dear'), [['', 105_750]]);
+  onGrid(w.raw, 'p_even', [['', 6_699]]);
+  // Nothing left to move.
+  const again = await compute(w.app, ids);
+  for (const id of ids) assert.ok((again.get(id)!.lines as Json[]).every((l) => l.est_price_iqd === l.published_price_iqd), id);
+  assert.deepEqual(rules(w.raw, 'p_dear').map((r) => [r.scope, r.amount_usd]), [['product', '5.903312']]);
+});
+
+test('the hardened-steel combo as it sold on 2026-11-05: 110,500 at $69.04, where $68.99 sells at the same 110,500 — now $68.99 (usd_ceil6 68.99, the card 6,899 cents) at the very same price; the soccerbot (nothing goes up) and a twin the owner prices himself exactly as they were', async () => {
+  const w = world();
+  // The live shapes. The combo: an accessory ($4.50, 220 IQD extra) with no package of its own — the type's default
+  // box, 70 × 50 × 50 mm (0.000175 m³ × 400,000 = 70 IQD by sea), and 100 g — one model, one pre-order SKU by sea, a
+  // 57.98 EUR store page: R = 57.98 × 1,776 + 70 + 220 = 103,262.48. Its twin: the same figures. The soccerbot: a
+  // makers part ($1.50) at 662 CNY in a 100 × 100 × 255 mm box, R = 158,880 + 1,020 = 159,900.
+  w.raw.exec(`
+    UPDATE price_estimate_types SET default_weight_g = 100, default_length_mm = 70, default_width_mm = 50, default_height_mm = 50 WHERE key = 'accessory';
+    UPDATE price_estimate_types SET min_profit_usd = '1.5' WHERE key = 'makers_supply';
+  `);
+  for (const id of ['p_hs', 'p_twin']) {
+    seedProduct(w.raw, id, 'accessory', { models: ['p1'], variants: [`o:${id}_p1`], noPackage: true, ...(id === 'p_hs' ? { slug: 'hardened-steel-upgrade-combo' } : {}) });
+    storePage(w.raw, id, `o:${id}_p1`, '57.98', 'EUR');
+  }
+  seedProduct(w.raw, 'p_sb', 'makers_supply', { box: [100, 100, 255], slug: 'cyberbrick-official-soccerbot' });
+  tmall(w.raw, 'p_sb', '', '662');
+  const ids = ['p_hs', 'p_twin', 'p_sb'];
+  const shop = storefront(w.raw);
+  const card = async (slug: string) => {
+    const page = (await json(await get(shop, `/api/products/${slug}`))) as Json;
+    return [page.product.display_price_iqd, page.product.display_price_usd_cents];
+  };
+
+  // Today, at T: 103,262.48 + 7,200 → 110,500 at $69.03905 → $69.04; 159,900 + 2,400 → 162,500 at $101.4375 → $101.44.
+  const first = await computeAndApply(w.app, ids);
+  assert.deepEqual([lineOf(first.get('p_hs')!, 'o:p_hs_p1').est_cost_iqd, lineOf(first.get('p_hs')!, 'o:p_hs_p1').est_price_iqd], [103_263, 110_500]);
+  assert.deepEqual([lineOf(first.get('p_sb')!).est_cost_iqd, lineOf(first.get('p_sb')!).est_price_iqd], [159_900, 162_500]);
+  assert.deepEqual(dollars(w.raw, 'p_hs'), [['o:p_hs_p1', 6_904]]);
+  assert.deepEqual(await card('hardened-steel-upgrade-combo'), [110_500, 6_904]);
+  // The owner prices the twin himself, $5 in the product form: 103,262.48 + 8,000 → 111,500 at $69.53905 → $69.54.
+  await ownerProductProfit(w.app, 'p_twin', '5');
+  assert.deepEqual([prices(w.raw, 'p_twin'), dollars(w.raw, 'p_twin')], [[['o:p_twin_p1', 111_500]], [['o:p_twin_p1', 6_954]]]);
+  const asItWas = (pid: string) => JSON.stringify([rules(w.raw, pid), prices(w.raw, pid), dollars(w.raw, pid)]);
+  const before = { twin: asItWas('p_twin'), sb: asItWas('p_sb') };
+
+  // The owner's ceilings, 10% on both types.
+  await setType(w.app, 'accessory', { profit_cap_pct: '10' });
+  await setType(w.app, 'makers_supply', { profit_cap_pct: '10' });
+  const previews = await compute(w.app, ids);
+  // The combo: its ceiling is today's 110,500 (R × 1.1 = 113,588.728); the highest charm price within it, $68.99, sells
+  // at 110,384 → 110,500 — today's very price — at floor6(68.99 − 64.53905) = $4.45095: no line moves.
+  const hs = previews.get('p_hs')!;
+  assert.equal(hs.blocking, false, JSON.stringify(hs.blocked_by));
+  assert.deepEqual(
+    (hs.lines as Json[]).map((l) => [l.combo_key, l.channel, l.est_cost_iqd, l.est_price_iqd, l.published_price_iqd]),
+    [['o:p_hs_p1', 'pre_order_sea', 103_263, 110_500, 110_500]]
+  );
+  assert.deepEqual((hs.flags as Json[]).map((f) => f.code).sort(), ['EST_DEFAULT_BOX', 'EST_DEFAULT_WEIGHT', 'EST_STORE_PAGE_PRICE']);
+  assert.equal((await compute(w.app, ['p_hs'])).get('p_hs')!.preview_hash, hs.preview_hash, 'deterministic over both evaluations');
+  // So «التحديث» lists none of the three; each is applied through POST /apply on its fresh hash.
+  const listed = ((await call(w.app, 'GET', `${BASE}/products?state=refresh`)).body.products as Json[]).map((p) => p.product_id);
+  assert.deepEqual(
+    listed.filter((id) => ids.includes(id)),
+    []
+  );
+  const out = await apply(
+    w.app,
+    ids.map((id) => ({ product_id: id, preview_hash: previews.get(id)!.preview_hash }))
+  );
+  for (const id of ids) assert.equal(out.get(id)!.outcome, 'applied', `${id}: ${JSON.stringify(out.get(id)).slice(0, 300)}`);
+
+  // The combo: the same 110,500; its dollar price $68.99, stored and shown.
+  assert.deepEqual(prices(w.raw, 'p_hs'), [['o:p_hs_p1', 110_500]]);
+  assert.deepEqual(rules(w.raw, 'p_hs').map((r) => [r.scope, r.amount_usd]), [['product', '4.45095']]);
+  const stored = row<{ usd: string; r: string; t: string }>(w.raw, "SELECT usd_ceil6 AS usd, replacement_exact AS r, target_profit_usd AS t FROM pricing_v2_sku_results WHERE product_id = 'p_hs'")!;
+  assert.deepEqual([stored.usd, stored.r, stored.t], ['68.99', '103262.48', '4.45095']);
+  onGrid(w.raw, 'p_hs', [['o:p_hs_p1', 6_899]]);
+  assert.deepEqual(await card('hardened-steel-upgrade-combo'), [110_500, 6_899]);
+  // The soccerbot: nothing goes up — $99.99 = 160,000 keeps 84 IQD over its cost, $104.99 = 168,000 is dearer than
+  // today's 162,500 — so T stays: 162,500 at $101.44, exactly as before (no charm price has this dinar price).
+  assert.equal(asItWas('p_sb'), before.sb);
+  assert.deepEqual([prices(w.raw, 'p_sb'), dollars(w.raw, 'p_sb')], [[['', 162_500]], [['', 10_144]]]);
+  assert.deepEqual(await card('cyberbrick-official-soccerbot'), [162_500, 10_144]);
+  // The twin: the owner's own rule decides (EST_OWNER_EDITED) — no profit written, his $5, 111,500 and $69.54 untouched.
+  assert.ok((previews.get('p_twin')!.flags as Json[]).some((f) => f.code === 'EST_OWNER_EDITED'));
+  assert.equal(asItWas('p_twin'), before.twin);
+  // Nothing left to move, and the rule stays the combo's own.
+  const again = await compute(w.app, ids);
+  for (const id of ids) assert.ok((again.get(id)!.lines as Json[]).every((l) => l.est_price_iqd === l.published_price_iqd), id);
+  assert.deepEqual(rules(w.raw, 'p_hs').map((r) => [r.scope, r.amount_usd]), [['product', '4.45095']]);
 });
 
 test('the owner’s own prices win: every model his — rules and prices kept; one model his — the others priced on one option group, his rule untouched', async () => {
@@ -1096,4 +1243,151 @@ test('the 62-SKU filament: 31 colours × spool / refill, the cost by colour, the
   const grid = dollars(w.raw, id).filter(([, c]) => c !== null && isCharmCents(c)).length;
   assert.ok(grid >= 31, `${grid} of 62 dollar prices on the grid`);
   assert.ok(((await compute(w.app, [id])).get(id)!.lines as Json[]).every((l) => l.est_price_iqd === l.published_price_iqd), 'nothing left to move');
+});
+
+/* ------------------------------ the ruling's two limits, through the real doors -- */
+
+test('past 19 SKUs today’s plan stands at every compute: 62 SKUs at today’s dinar price keep T and the same hash; one colour’s supplier price moves to 450 CNY: 117,000 at $72.99 on rules of its own, not a shared 117,750; re-computed, moved again, at a new rate, the ceiling emptied — never blocked, every line as today’s code', async () => {
+  const w = world();
+  const id = 'p_many';
+  // 31 colours × 2 models of one part ($6, ceiling 15%), the cost by colour, the box by model (119 × 50 × 25 mm, 59.5 IQD
+  // by sea; 26 mm high, 61.88): x00–x29 at today's dinar price, $65.99's own 105,750, their dollar figures $66.00–$66.08;
+  // x30 at 105,750 too, its figure already $65.99.
+  const colours = Array.from({ length: 31 }, (_, i) => `x${String(i).padStart(2, '0')}`);
+  const models = ['a', 'b'];
+  const comboOf = (m: string, c: string) => skuComboKey({ option_value_ids: [`${id}_${m}`], color_id: `${id}_${c}` });
+  seedProduct(w.raw, id, 'spare_part', { models, colours, variants: models.flatMap((m) => colours.map((c) => comboOf(m, c))) });
+  w.raw.exec(`UPDATE product_option_values SET package_depth_mm = 119, package_width_mm = 50, package_height_mm = CASE id WHEN ${q(`${id}_a`)} THEN 25 ELSE 26 END, package_weight_g = 50 WHERE product_id = ${q(id)}`);
+  const items = new Map(colours.map((c, i) => [c, models.map((m) => tmall(w.raw, id, comboOf(m, c), i < 30 ? (399.7 + 0.02 * i).toFixed(2) : '399.65'))] as const));
+  const setCny = (c: string, cny: string) => {
+    for (const item of items.get(c)!) w.raw.exec(`UPDATE supplier_price_skus SET price = ${q(cny)} WHERE snapshot_id = 'sps_tmall' AND item_key = ${q(item)}`);
+  };
+  const a00 = comboOf('a', 'x00');
+  const a30 = comboOf('a', 'x30');
+  const flagsOf = (p: Json) => (p.flags as Json[]).map((f) => f.code);
+  const belowProduct = () => rules(w.raw, id).filter((r) => r.state === 'ACTIVE' && r.scope !== 'product').length;
+  const est = (p: Json, combo: string) => lineOf(p, combo).est_price_iqd;
+  const sold = (combo: string) => prices(w.raw, id).find(([k]) => k === combo)![1];
+  const centsOf = (combo: string) => dollars(w.raw, id).find(([k]) => k === combo)![1];
+
+  await computeAndApply(w.app, [id], true);
+  const settled = (await compute(w.app, [id])).get(id)!;
+  await setType(w.app, 'spare_part', { profit_cap_pct: '15' });
+  // The ceiling leaves every price where it is. Past 19 SKUs no SKU takes c's own profit: the same hash, no rule.
+  const capped = (await compute(w.app, [id])).get(id)!;
+  assert.equal(capped.preview_hash, settled.preview_hash, 'today’s plan: nothing to write');
+  await computeAndApply(w.app, [id]);
+  assert.deepEqual([belowProduct(), sold(a00), centsOf(a00), sold(a30), centsOf(a30)], [0, 105_750, 6_600, 105_750, 6_599]);
+
+  // x30's supplier price moves: 117,750 today, $72.99 = 117,000 under it, two SKU rules: exact, no flag. With the 60 at
+  // today's dinar price on rules of their own it would be 60 to take back + 2: x30 shared at 117,750 and the 60 cleared.
+  setCny('x30', '450');
+  const moved = (await compute(w.app, [id])).get(id)!;
+  assert.deepEqual([moved.blocking, flagsOf(moved).includes('EST_CEILING_SHARED'), est(moved, a30), est(moved, a00)], [false, false, 117_000, 105_750]);
+  await computeAndApply(w.app, [id], true);
+  assert.deepEqual([belowProduct(), sold(a30), centsOf(a30), sold(a00), centsOf(a00)], [2, 117_000, 7_299, 105_750, 6_600]);
+
+  // x30 falls back within today's dinar price, its figure off c ($65.95): T. With 62 rules on record no wire could take
+  // them back: EST_TOO_MANY_SCOPES on a re-compute with nothing changed, even with the ceiling emptied.
+  setCny('x30', '399.40');
+  await computeAndApply(w.app, [id], true);
+  assert.deepEqual([belowProduct(), sold(a30), centsOf(a30)], [0, 105_750, 6_595]);
+  const again = (await compute(w.app, [id])).get(id)!;
+  assert.equal(again.blocking, false, JSON.stringify(again.blocked_by));
+  assert.match(again.preview_hash, /^[0-9a-f]{64}$/);
+
+  // The dollar at 1,605: x00 106,000 ($65.99's own dinar price), never blocked; nor with the ceiling emptied.
+  applyRate(w.raw, 'USD_IQD', '1605');
+  const dearer = (await compute(w.app, [id])).get(id)!;
+  assert.deepEqual([dearer.blocking, est(dearer, a00), est(dearer, a30)], [false, 106_000, 106_000]);
+  await setType(w.app, 'spare_part', { profit_cap_pct: null });
+  assert.equal((await compute(w.app, [id])).get(id)!.blocking, false);
+});
+
+test('at the limit: 19 colours at today’s dinar price show c on rules of their own, one hash from compute to apply; 20 keep T and the hash they had with no ceiling', async () => {
+  const w = world();
+  const seedColours = (id: string, n: number) => {
+    const colours = Array.from({ length: n }, (_, i) => `k${String(i).padStart(2, '0')}`);
+    seedProduct(w.raw, id, 'spare_part', { colours });
+    // 399.70 CNY up, by 0.02: 105,750 at $66.00–$66.06, $65.99's own dinar price.
+    colours.forEach((c, i) => tmall(w.raw, id, skuComboKey({ option_value_ids: [], color_id: `${id}_${c}` }), (399.7 + 0.02 * i).toFixed(2)));
+  };
+  seedColours('p_19', 19);
+  seedColours('p_20', 20);
+  const ids = ['p_19', 'p_20'];
+  await computeAndApply(w.app, ids);
+  const settled = await compute(w.app, ids);
+  await setType(w.app, 'spare_part', { profit_cap_pct: '15' });
+  const capped = await compute(w.app, ids);
+  assert.equal(capped.get('p_20')!.preview_hash, settled.get('p_20')!.preview_hash, '20 SKUs: today’s plan, nothing to write');
+  assert.notEqual(capped.get('p_19')!.preview_hash, settled.get('p_19')!.preview_hash, '19 SKUs: a rule of its own for each');
+  for (const id of ids) assert.deepEqual(capped.get(id)!.lines, settled.get(id)!.lines, `${id}: no dinar figure moves`);
+  assert.equal((await compute(w.app, ['p_19'])).get('p_19')!.preview_hash, capped.get('p_19')!.preview_hash, 'deterministic');
+  const out = await apply(
+    w.app,
+    ids.map((id) => ({ product_id: id, preview_hash: capped.get(id)!.preview_hash }))
+  );
+  for (const id of ids) assert.equal(out.get(id)!.outcome, 'applied', `${id}: ${JSON.stringify(out.get(id)).slice(0, 300)}`);
+  assert.deepEqual(new Set(prices(w.raw, 'p_19').map(([, p]) => p)), new Set([105_750]));
+  assert.deepEqual(new Set(dollars(w.raw, 'p_19').map(([, c]) => c)), new Set([6_599]));
+  assert.equal(rules(w.raw, 'p_19').filter((r) => r.scope === 'color' && r.state === 'ACTIVE').length, 19);
+  assert.deepEqual(new Set(prices(w.raw, 'p_20').map(([, p]) => p)), new Set([105_750]));
+  assert.ok(dollars(w.raw, 'p_20').every(([, c]) => c !== 6_599), 'today’s own dollar figures');
+  assert.deepEqual(rules(w.raw, 'p_20').map((r) => [r.scope, r.amount_usd]), [['product', '6']]);
+  assert.equal(record(w.raw, 'p_19').minimum_profit_scopes.length, 19);
+  assert.equal('minimum_profit_scopes' in record(w.raw, 'p_20'), false);
+});
+
+test('between applies FX-5 keeps c’s own profit in dollars: a SKU moved can sit one 250 IQD step from where T would sell it, above or under, its dollar figure still c — until the next compute and apply, which price it exactly as today’s code', async () => {
+  const w = world();
+  // Two parts at $6 under a ceiling that does not bind, both at $65.99's own 105,750: at T the first shows $65.94 (R
+  // 95,903.5, T_sku $6.050312, above T), the second $66.09 (R 96,138.7, T_sku $5.903312, below T).
+  seedProduct(w.raw, 'p_up', 'spare_part');
+  tmall(w.raw, 'p_up', '', '399.35');
+  seedProduct(w.raw, 'p_down', 'spare_part');
+  tmall(w.raw, 'p_down', '', '400.33');
+  const ids = ['p_up', 'p_down'];
+  await computeAndApply(w.app, ids);
+  assert.deepEqual([dollars(w.raw, 'p_up'), dollars(w.raw, 'p_down')], [[['', 6_594]], [['', 6_609]]]);
+  await setType(w.app, 'spare_part', { profit_cap_pct: '25' });
+  await computeAndApply(w.app, ids);
+  const moved = ids.map((id) => rules(w.raw, id).map((r) => [r.scope, r.amount_usd]));
+  assert.deepEqual(moved, [[['product', '6.050312']], [['product', '5.903312']]]);
+  assert.deepEqual(ids.map((id) => [prices(w.raw, id), dollars(w.raw, id)]), [
+    [[['', 105_750]], [['', 6_599]]],
+    [[['', 105_750]], [['', 6_599]]],
+  ]);
+
+  // The cost and what today's code would sell it at, at a rate: the yuan at 0.15 USD, the box 59.5 IQD.
+  const cost = (cny: string, u: string) => procurementExactText(addProcurementExact(mulProcurementExact(procurementExact(cny), procurementExact('0.15'), procurementExact(u)), procurementExact('59.5')));
+  const atT = (cny: string, u: string) => roundPriceIqd(addProcurementExact(procurementExact(cost(cny, u)), mulProcurementExact(procurementExact('6'), procurementExact(u))));
+
+  // The dollar at 1,607: FX-5 prices 96,322.8175 + $6.050312 × 1,607 → 106,250 where T sells it at 105,964.8 → 106,000: a
+  // step ABOVE T's own price, until the owner's next compute and apply. The other lands on T's own 106,250.
+  applyRate(w.raw, 'USD_IQD', '1607');
+  const first = await fxRun(w.raw);
+  assert.deepEqual([[...first.repriced].sort(), first.held], [['p_down', 'p_up'], []]);
+  assert.deepEqual([prices(w.raw, 'p_up'), atT('399.35', '1607')], [[['', 106_250]], 106_000]);
+  assert.deepEqual([prices(w.raw, 'p_down'), atT('400.33', '1607')], [[['', 106_250]], 106_250]);
+  // The dollar at 1,650: the other way round: 109,000, a step UNDER T's own 109,250. The first lands on T's own 109,000.
+  applyRate(w.raw, 'USD_IQD', '1650');
+  await fxRun(w.raw);
+  assert.deepEqual([prices(w.raw, 'p_up'), atT('399.35', '1650')], [[['', 109_000]], 109_000]);
+  assert.deepEqual([prices(w.raw, 'p_down'), atT('400.33', '1650')], [[['', 109_000]], 109_250]);
+  // FX-5 writes no rule, and the dollar figures stay c ($65.988… up to the cent).
+  assert.deepEqual(ids.map((id) => rules(w.raw, id).map((r) => [r.scope, r.amount_usd])), moved);
+  for (const id of ids) assert.deepEqual(dollars(w.raw, id), [['', 6_599]]);
+
+  // The next compute reads the cost at T and prices it as today's code does; its apply puts each on its own price.
+  const next = await compute(w.app, ids);
+  for (const [id, cny] of [['p_up', '399.35'], ['p_down', '400.33']] as const) {
+    const before = charmTargetBefore({ cost_iqd: cost(cny, '1650'), usd_iqd: '1650', min_profit_usd: '6', ceiling_pct: '25' })!;
+    assert.equal(lineOf(next.get(id)!).est_price_iqd, before.price_iqd, `${id}: the next compute prices it as today’s code`);
+  }
+  assert.deepEqual(ids.map((id) => lineOf(next.get(id)!).est_price_iqd), [109_000, 109_000]);
+  await computeAndApply(w.app, ids);
+  assert.deepEqual(ids.map((id) => [prices(w.raw, id), dollars(w.raw, id)]), [
+    [[['', 109_000]], [['', 6_599]]],
+    [[['', 109_000]], [['', 6_599]]],
+  ]);
 });

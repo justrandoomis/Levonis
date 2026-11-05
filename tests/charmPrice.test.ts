@@ -17,7 +17,11 @@
  *       at 1,690 R 9,400: 9,750 at $5.77), never the grid's $5.99; THE MARGIN — a price keeps one rounding step
  *       over its cost (one dinar at or under 1,000 IQD), so the next rate tick cannot close its route under FX-5 (R
  *       4,760: 5,250, never 5,000's 240 IQD); the old band edges 784 / 1,334 / 1,335 / 2,134, now at 862 / 1,750 /
- *       1,750 / 2,500; a price equal to today's keeps T; nothing goes up while today's price clears the route floor;
+ *       1,750 / 2,500; TODAY'S DINAR PRICE SHOWS c (the lead's ruling for the owner, 2026-11-05): a charm price whose
+ *       dinar price is today's sells there at c's own profit, its dollar figure c (R 96,137: $65.99 at 105,750, not
+ *       $66.09; the hardened-steel combo $68.99 at 110,500, not $69.04; a mainboard $99.99 at 160,000, T_sku above T),
+ *       while T stays where today's own dollar figure already is c (R 97,580: $66.99), for a house price, and at the
+ *       $100,000 bound; nothing goes up while today's price clears the route floor;
  *       the floor forces a price above today's only when today's own would not clear it; the owner's positive option
  *       and colour differences stay on top (gold +$1.30: 6,000 under $5, $5.49 at 100%), a negative sum moves nothing;
  *       nothing guessed;
@@ -31,7 +35,11 @@
  *       price is above rp(R) and its margin covers one rounding step, so after any rise of R or U it still clears rp(R)
  *       (sampled); it is never above today's unless today's own would not clear the floor (reached); the price is the
  *       highest within the ceiling that keeps the margin, else the lowest that keeps it; T stays only for today's
- *       price — every figure re-derived with the engine's own `roundPriceIqd` and independent exact arithmetic.
+ *       price, and at a charm price only where today's own dollar figure already is c — a charm price at today's
+ *       dinar price otherwise shows c (both reached) — every figure re-derived with the engine's own `roundPriceIqd`
+ *       and independent exact arithmetic.
+ *
+ * The ruling against the rule it replaced, case by case over 300,000 random figures: tests/charmPriceAtToday.test.ts.
  *
  * Run: node --import tsx --test tests/charmPrice.test.ts
  */
@@ -82,9 +90,11 @@ const target = (cost: string, t: string, p: string, u = '1600', difference: stri
   return x;
 };
 const pinned = (x: CharmTarget) => [x.basis, x.charm_cents === null ? null : centsText(x.charm_cents), x.amount_usd, x.price_iqd, x.today_iqd, x.floor_iqd];
-/** The engine's dollar price at T_sku, ceil6((R + (T_sku + Δ⁺) × U) ÷ U), in whole cents as the storefront shows it. */
-const shownCents = (cost: string, x: CharmTarget, u = '1600', difference = '0'): number =>
-  usdCeilCentsOf(procurementExactText(ceilToPlaces(quotientProcurementExact(addProcurementExact(procurementExact(cost), mulProcurementExact(addProcurementExact(procurementExact(x.amount_usd), procurementExact(difference)), procurementExact(u))), procurementExact(u)), 6)))!;
+/** The engine's dollar price at a USD profit, ceil6((R + (profit + Δ⁺) × U) ÷ U), in whole cents as the storefront shows it. */
+const centsAtProfit = (cost: string, usd: string, u = '1600', difference = '0'): number =>
+  usdCeilCentsOf(procurementExactText(ceilToPlaces(quotientProcurementExact(addProcurementExact(procurementExact(cost), mulProcurementExact(addProcurementExact(procurementExact(usd), procurementExact(difference)), procurementExact(u))), procurementExact(u)), 6)))!;
+/** The same at the SKU's chosen profit (`centsAtProfit` at the type's T itself is today's own dollar figure). */
+const shownCents = (cost: string, x: CharmTarget, u = '1600', difference = '0'): number => centsAtProfit(cost, x.amount_usd, u, difference);
 
 /* ------------------------------------------------------------- (a) the grid -- */
 
@@ -249,15 +259,42 @@ test('(b) the margin: a price keeps one rounding step over its cost (a dinar at 
   assert.deepEqual(pinned(target('1001', '4.5', '10')), ['plain', null, '0.311875', 1_500, 8_250, 1_500]);
 });
 
-test('(b) T stays — a price equal to today’s, or none between the margin and today’s; the floor forces a rise only when today’s own price would not clear it', () => {
-  // R 96,137 at $6 and 10%: today 105,750 is itself the dinar price of $65.99 (105,584 → 105,750): no new rule.
-  assert.deepEqual(pinned(target('96137', '6', '10')), ['today', null, '6', 105_750, 105_750, 96_500]);
+test('(b) today’s dinar price shows c: a charm price there sells at c’s own profit — T stays where today’s own dollar figure already is c, for a house price, and where none lies between the margin and today’s (nothing goes up); the floor forces a rise only when today’s own price would not clear it', () => {
+  // R 96,137 at $6 and 10%: today 105,750 (105,737) is itself the dinar price of $65.99 (105,584 → 105,750), while
+  // today's own dollar figure is 96,137 ÷ 1,600 + 6 = $66.085625 → $66.09. The same 105,750 at $65.99's own profit,
+  // floor6(65.99 − 60.085625) = $5.904375: the dollar shown is $65.99 (the lead's ruling for the owner, 2026-11-05).
+  const sixtyFive = target('96137', '6', '10');
+  assert.deepEqual(pinned(sixtyFive), ['charm', '65.99', '5.904375', 105_750, 105_750, 96_500]);
+  assert.deepEqual([shownCents('96137', sixtyFive), centsAtProfit('96137', '6')], [6_599, 6_609]);
+  // The hardened-steel upgrade combo as it sold on 2026-11-05: an accessory at $4.50 and 10%, R 103,262.48 (57.98 EUR
+  // × 1,776 + 70 freight + 220). Today 110,500 at $69.04; $68.99 sells at the very same 110,500 (110,384): now $68.99,
+  // at $4.45095 — 78.48 IQD of profit under T.
+  const steel = target('103262.48', '4.5', '10');
+  assert.deepEqual(pinned(steel), ['charm', '68.99', '4.45095', 110_500, 110_500, 103_750]);
+  assert.deepEqual([shownCents('103262.48', steel), centsAtProfit('103262.48', '4.5')], [6_899, 6_904]);
+  // A mainboard at $6 and 8% (R 150,288.32): today 160,000 at $99.94; $99.99 = 159,984 → 160,000. T_sku, $6.0598, is
+  // above T and the dinar price the same: the dollar shown rises to $99.99 (orders are charged in dinars).
+  const board = target('150288.32', '6', '8');
+  assert.deepEqual(pinned(board), ['charm', '99.99', '6.0598', 160_000, 160_000, 150_750]);
+  assert.deepEqual([shownCents('150288.32', board), centsAtProfit('150288.32', '6')], [9_999, 9_994]);
+  // Today's own dollar figure already c: R 97,580 at $6 sells at 107,250 and shows 97,580 ÷ 1,600 + 6 = $66.9875 →
+  // $66.99, the charm price whose dinar price it is (107,184 → 107,250). Nothing a customer sees would change: T stays.
+  assert.deepEqual(pinned(target('97580', '6', '10')), ['today', null, '6', 107_250, 107_250, 98_000]);
+  assert.equal(centsAtProfit('97580', '6'), 6_699);
+  // …as the storefront rounds it, up to the cent: R 29,570.4 at $1.50 — 32,000 at $19.9815, shown $19.99, $19.99's
+  // own dinar price (31,984 → 32,000). T stays.
+  assert.deepEqual(pinned(target('29570.4', '1.5', '10')), ['today', null, '1.5', 32_000, 32_000, 30_000]);
+  assert.equal(centsAtProfit('29570.4', '1.5'), 1_999);
   // An accessory at $4.50 costing 160,000 (just over $100): today 167,250; the charm prices around it are 160,000
-  // ($99.99, no margin over R) and 168,000 ($104.99, over today's). Nothing goes up: T stays.
+  // ($99.99, no margin over R) and 168,000 ($104.99, over today's). Nothing goes up: T stays, and so does today's
+  // dollar figure, $104.50 — no charm price has this dinar price.
   assert.deepEqual(pinned(target('160000', '4.5', '10')), ['today', null, '4.5', 167_250, 167_250, 160_250]);
   // Under $5: a makers part at $1.50 costing 3,000 under a 100% ceiling — today's 5,500 is the ceiling and itself the
-  // house price: no new rule.
+  // house price: no new rule (a house price shows its own dollar figure either way).
   assert.deepEqual(pinned(target('3000', '1.5', '100')), ['today', null, '1.5', 5_500, 5_500, 3_250]);
+  // At the $100,000 bound: R 160,015,800 at $100,000 and 100% — $200,009.99 sells at today's 320,016,000 at a profit of
+  // $100,000.115, past what a rule may carry: T stays, as before.
+  assert.deepEqual(pinned(target('160015800', '100000', '100')), ['today', null, '100000', 320_016_000, 320_016_000, 160_016_250]);
   // A minimum profit under one rounding step ($0.05 × 1,600 = 80): today's 5,250 is the cost rounded up — a closed
   // route. The floor forces the price: the lowest house price that keeps the margin, 5,500.
   assert.deepEqual(pinned(target('5001', '0.05', '10')), ['plain', null, '0.311875', 5_500, 5_250, 5_500]);
@@ -355,7 +392,7 @@ function houseAtMost(q: ProcurementExact): number {
 }
 
 test('(c) property: from $5 up on the grid, under it the plain house price; a margin of one rounding step — the route floor never trips, now or after a rise — never above today’s unless the floor forces it; the highest price within the ceiling that keeps the margin, else the lowest that keeps it', () => {
-  const counted = { cases: 0, charm: 0, today: 0, plain: 0, forced: 0, relaxed: 0, plainRelaxed: 0, differences: 0, risen: 0, atFive: 0, underFive: 0, window: 0, atCharm: 0, underCharm: 0 };
+  const counted = { cases: 0, charm: 0, today: 0, plain: 0, forced: 0, relaxed: 0, plainRelaxed: 0, differences: 0, risen: 0, atFive: 0, underFive: 0, window: 0, atCharm: 0, underCharm: 0, charmAtToday: 0, keptAtCharm: 0 };
   const rnd = prng(291_250);
   const list = costs();
   for (const [i, cost] of list.entries()) {
@@ -393,6 +430,8 @@ test('(c) property: from $5 up on the grid, under it the plain house price; a ma
         assert.match(x.amount_usd, /^[0-9]+(?:\.[0-9]{1,6})?$/, at);
         assert.ok(amount.num > 0n && !/\.\d*0$/.test(x.amount_usd), `${at}: a storable, canonical profit`);
         const today = priceAt(procurementExact(t));
+        // Today's own dollar figure as the storefront shows it: ceil6((B + T × U) ÷ U), then up to the cent.
+        const todayCents = () => usdCeilCentsOf(procurementExactText(ceilToPlaces(quotientProcurementExact(addProcurementExact(b, mulProcurementExact(procurementExact(t), U)), U), 6)));
         const costRounded = roundPriceIqd(r);
         const floor = roundPriceIqd(BigInt(costRounded) + 1n);
         // Within R × (1 + P / 100) + Δ⁺ × U: price × 100 ≤ R × (100 + P) + 100 × Δ⁺ × U.
@@ -452,7 +491,12 @@ test('(c) property: from $5 up on the grid, under it the plain house price; a ma
           assert.equal(usdCeilCentsOf(procurementExactText(ceil6)), c);
           // The dinar price is rp(c × U).
           assert.equal(x.price_iqd, roundPriceIqd(mulProcurementExact({ num: BigInt(c), den: 100n }, U)), `${at}: rp(c × U)`);
-          assert.notEqual(x.price_iqd, today, `${at}: a charm price equal to today's keeps T`);
+          // Today's own dinar price only where today's own dollar figure is not c: the price stays, the dollar shown
+          // becomes c (the lead's ruling for the owner, 2026-11-05) — where it already is c, T stays.
+          if (x.price_iqd === today) {
+            counted.charmAtToday++;
+            assert.notEqual(todayCents(), c, `${at}: today's own dollar figure is already $${centsText(c)}: T stays`);
+          }
           if (fits(x.price_iqd)) {
             // The highest: no dearer charm price within the ceiling keeps the margin.
             for (let up = charmAtLeastCents(c + 1), next = charmAt(up); next !== null && fits(next.price); up = charmAtLeastCents(up + 1), next = charmAt(up)) {
@@ -512,7 +556,8 @@ test('(c) property: from $5 up on the grid, under it the plain house price; a ma
             }
           } else {
             // The highest charm price of at least $5 within the ceiling that keeps the margin gives today's price
-            // exactly — or none does, and the lowest that keeps it is no cheaper than today's.
+            // exactly, and today's own dollar figure already is it — or none does, and the lowest that keeps it is
+            // dearer than today's (nothing goes up), or today's price with today's own dollar figure already it.
             let c = charmAtMostCents(Number((ceiling.num * 100n * U.den) / (ceiling.den * U.num)) + 2);
             let found: ReturnType<typeof charmAt> = null;
             for (let at2 = charmAt(c); c !== null && c >= LOWEST_USED_CHARM_CENTS && at2 !== null; c = charmAtMostCents(c - 1), at2 = charmAt(c)) {
@@ -521,12 +566,15 @@ test('(c) property: from $5 up on the grid, under it the plain house price; a ma
                 break;
               }
             }
-            if (found) assert.equal(found.price, today, `${at}: T stays only for today's price`);
-            else {
+            if (found) {
+              assert.equal(found.price, today, `${at}: T stays only for today's price`);
+              assert.equal(todayCents(), c, `${at}: T stays at $${centsText(c!)}'s dinar price only where today's own dollar figure is it`);
+              counted.keptAtCharm++;
+            } else {
               let up = charmAtLeastCents(Math.max(LOWEST_USED_CHARM_CENTS, Number((b.num * 100n * U.den) / (b.den * U.num))));
               let above = charmAt(up);
               while (above === null || !keeps(above.usd)) above = charmAt((up = charmAtLeastCents(up + 1)));
-              assert.ok(above.price >= today, `${at}: no charm price between the margin and today's (${above.price})`);
+              assert.ok(above.price > today || (above.price === today && todayCents() === up), `${at}: no charm price between the margin and today's (${above.price})`);
             }
           }
         }
@@ -534,7 +582,8 @@ test('(c) property: from $5 up on the grid, under it the plain house price; a ma
     }
   }
   assert.equal(counted.cases, CASES);
-  // Not vacuous: every branch is walked — the floor-forced one, both relaxed ones and both boundaries too.
+  // Not vacuous: every branch is walked — the floor-forced one, both relaxed ones, both boundaries, and today's dinar
+  // price both ways (c shown; T kept where today's own figure already is c) too.
   assert.ok(
     counted.charm > 100_000 &&
       counted.plain > 50_000 &&
@@ -548,7 +597,9 @@ test('(c) property: from $5 up on the grid, under it the plain house price; a ma
       counted.underFive > 1_000 &&
       counted.window > 5_000 &&
       counted.atCharm > 100 &&
-      counted.underCharm > 1_000,
+      counted.underCharm > 1_000 &&
+      counted.charmAtToday > 1_000 &&
+      counted.keptAtCharm > 100,
     JSON.stringify(counted)
   );
 });

@@ -66,12 +66,22 @@
  *   difference stays on top of it), and the margin (T_sku + Δ⁺) × U. With no difference every figure above is as
  *   written.
  *
- *   Two exceptions, each keeping a promise the grid cannot:
+ *   One exception keeps a promise the grid cannot, and one rule says what today's own dinar price shows:
  *     - NOTHING GOES UP: when the only admitted price (charm or house) is dearer than today's price while today's
  *       price itself clears the route floor (rp(R)), the type's T stays — today's price exactly, no new rule;
- *     - NO NEW RULE FOR NO CHANGE: a price whose dinar price IS today's keeps T as well.
- *   The price is above todayD only when today's own price would not clear the route floor (T × U under one
- *   rounding step): the floor forces it.
+ *     - TODAY'S DINAR PRICE SHOWS c (the lead's ruling for the owner, 2026-11-05, on his «make the price for product
+ *       be like that 9.99$ , 19.99$ 24.99$»): a charm price whose dinar price IS today's sells at that very price at
+ *       its own T_sku, so the storefront's $ is c. At T it would show today's own figure, ceil(100 × (R ÷ U + T + Δ⁺))
+ *       cents, anywhere within one rounding step's worth of c, either side ($69.04 where $68.99 sells at the same
+ *       110,500). T_sku is then within that much of T, above or below it, and keeps the margin like any charm price.
+ *       T stays only where nothing a customer sees would change — today's own figure already is c, or the price is a
+ *       house price (under $5 the dollar figure is its own either way): no new rule for no change — and where T_sku
+ *       would pass the $100,000 a rule may carry, a T at that very bound.
+ *   No dinar price moves for it at this R and U, and the price is above todayD only when today's own price would not
+ *   clear the route floor (T × U under one rounding step): the floor forces it. Past them the two part by (T_sku − T) ×
+ *   U: FX-5 keeps T_sku in dollars, so until the next compute and apply such a SKU can sell one rounding step from
+ *   where T would, either side. This is one SKU; the planner takes c's profit here only on a product of at most 19 SKUs
+ *   (`planEstimateProfits`, ./estimateInputs.ts; docs/SMART_PRICING.md §4.11).
  *
  * Every dinar figure the choice weighs is the engine's own price at that profit — rp(R + (T_sku + Δ⁺) × U) through
  * `roundPriceIqd` — so what it promises is what the engine publishes, for any U. Exact BigInt rationals, never a
@@ -174,10 +184,12 @@ export interface CharmTargetInput {
 }
 
 /**
- * How the SKU's price was chosen: `charm` at the dollar charm price `charm_cents` (at least $5); `today` the type's
- * T, today's price exactly (the chosen price equal to it, or none at or under it that keeps the margin); `plain`
- * under the charm prices, at the house price `price_iqd` (the highest under the ceiling that keeps the margin, else
- * the lowest that keeps it).
+ * How the SKU's price was chosen: `charm` at the dollar charm price `charm_cents` (at least $5) — today's own dinar
+ * price included, which then shows c rather than today's dollar figure; `today` the type's T, today's price exactly
+ * (none at or under it that keeps the margin — nothing goes up —, or the chosen price is today's and already shows
+ * what it would: a house price, or today's own dollar figure already c; or c's own profit there would pass the $100,000
+ * a rule may carry); `plain` under the charm prices, at the house price `price_iqd` (the highest under the ceiling that
+ * keeps the margin, else the lowest that keeps it).
  */
 export type CharmBasis = 'charm' | 'today' | 'plain';
 
@@ -275,6 +287,10 @@ export function charmTarget(input: CharmTargetInput): CharmTarget | null {
   const keeps = (micro: bigint): boolean => micro >= (priceAt(micro) > PRICE_ROUNDING_THRESHOLD_IQD ? leastAbove : leastAtOrUnder);
 
   const todayD = priceAt(tMicro);
+  // Today's own dollar figure in whole cents, as the storefront shows it: the engine stores usd_ceil6 = ceil6((B + T ×
+  // U) ÷ U) and the storefront rounds that up to the cent (`usdCeilCentsOf`) — two roundings up, which make one:
+  // ceil(100 × (B ÷ U + T)).
+  const todayCents = (): bigint => ceilDiv(100n * (bn * ud * MICRO + tMicro * bd * un), bd * un * MICRO);
   const costRounded = roundPriceIqd(r);
   const floorD = roundPriceIqd(BigInt(costRounded) + 1n);
   // capD = R × (100 + P) / 100 + Δ⁺ × U, exact: a price x is within it when x × capDen ≤ capNum.
@@ -297,12 +313,19 @@ export function charmTarget(input: CharmTargetInput): CharmTarget | null {
     if (++guard.n > 100_000) throw new RangeError('charmTarget: the grid search did not settle');
   };
   type Choice = { micro: bigint; price: number };
-  // The highest price within the ceiling that keeps the margin, else the lowest that keeps it; then the exceptions.
+  // The highest price within the ceiling that keeps the margin, else the lowest that keeps it; then the exception, and
+  // what today's own dinar price shows.
   const settle = (chosen: Choice, withinCeiling: boolean, basis: 'charm' | 'plain', cents: number | null): CharmTarget | null => {
     // Nothing goes up: today's price clears the floor, so it stays rather than a dearer price.
     if (!withinCeiling && chosen.price > todayD && rises(chosen.micro)) return today();
-    // The same price as today: no new rule.
-    if (chosen.price === todayD) return today();
+    if (chosen.price === todayD) {
+      // Today's very dinar price. T stays where it already shows what the choice would: a house price (its dollar
+      // figure is its own either way), or today's own dollar figure already c — no new rule for no change.
+      if (basis === 'plain' || cents === null || BigInt(cents) === todayCents()) return today();
+      // Otherwise the same price at c's own profit, so the dollar figure shown becomes c. (Only a T at the $100,000
+      // bound can leave T_sku past it: then T, as before.)
+      return result(chosen.micro, basis, cents) ?? today();
+    }
     return result(chosen.micro, basis, cents);
   };
 

@@ -63,7 +63,10 @@
  *    keeps it (`charmTarget`, ./charmPrice.ts) — written as fixed USD rules
  *    at the least specific exact scope (past the wire's 60 rows, one profit
  *    per group: the dearest, under $5 the cheapest that keeps every margin;
- *    EST_CEILING_SHARED, information); an owner's rule at any scope wins. The costs, the owner's differences and the USD rate it needs
+ *    EST_CEILING_SHARED, information); a charm price at today's own dinar
+ *    price shows c only on a product of at most 19 SKUs where that plan is
+ *    exact and today's is too, so the wire's rows never move a dinar price for
+ *    a dollar figure; an owner's rule at any scope wins. The costs, the owner's differences and the USD rate it needs
  *    arrive as DATA from the engine's own first evaluation (compute.ts): this
  *    file still reads no rate.
  *
@@ -1501,11 +1504,12 @@ export function planEstimateInputs(input: EstimatePlanInput): EstimatePlan {
  *     T_sku = floor6(c − R ÷ U)            in USD, so the engine's dollar price is c and its dinar price rp(c × U)
  *     T_sku = floor6((D − R) ÷ U)          under $5: the dinar price D, its dollar display D's own figure
  *
- * (`charmTarget`, ./charmPrice.ts, which holds the grid, the threshold, the choice and its exceptions: nothing goes
- * up while today's price clears the floor, and a price equal to today's keeps T; an owner's positive option or colour
- * difference Δ stays on top: T_sku = floor6(c − R ÷ U − Δ), or floor6((D − R) ÷ U − Δ)). At U = 1,600 the same 15 CNY
- * part (R = 3,659.5) sells at 4,000 IQD ($2.50) under a 10% ceiling. A SKU whose price is the owner's own fixed
- * dollar price (a «سعر خاص $» on it or its model) keeps T: the ceiling leaves it alone.
+ * (`charmTarget`, ./charmPrice.ts, which holds the grid, the threshold, the choice and its exception: nothing goes up
+ * while today's price clears the floor; a charm price whose dinar price is today's sells at it at c's own profit, so
+ * its dollar figure is c — T stays there only where today's own figure already is c, or for a house price; an owner's
+ * positive option or colour difference Δ stays on top: T_sku = floor6(c − R ÷ U − Δ), or floor6((D − R) ÷ U − Δ)).
+ * At U = 1,600 the same 15 CNY part (R = 3,659.5) sells at 4,000 IQD ($2.50) under a 10% ceiling. A SKU whose price
+ * is the owner's own fixed dollar price (a «سعر خاص $» on it or its model) keeps T: the ceiling leaves it alone.
  *
  * The ceiling lives in the estimator and reaches the engine as ordinary FIXED USD `target_profit` rules, so the
  * engine's own rules hold as they were: no percentage is stored in a rule, D − R ≥ T_sku is still asserted on
@@ -1531,6 +1535,29 @@ export function planEstimateInputs(input: EstimatePlanInput): EstimatePlan {
  * even that fits: the product as it sells with no ceiling — today's rule at today's U, the very plan compute's first
  * evaluation priced — flagged the same, never blocked: a product today's rule prices is never held back.
  *
+ * TODAY'S PLAN UNLESS THE NEW ONE COSTS NOTHING (the lead's ruling for the owner, 2026-11-05). A SKU whose charm price
+ * sells at today's very dinar price kept T until then; it now takes c's own profit, so the storefront shows c at the
+ * same dinar price — one more rule to write now, and to take back in a later wire. Past the wire's 60 rows those extra
+ * rules would push the product to one profit per group or to no ceiling at all, and lift a sibling the ceiling sells
+ * under today's price back up to it; left on the record they count against every later plan, which then shares a
+ * profit, or blocks with EST_TOO_MANY_SCOPES, where today's rules would have fitted. So the planner first plans today's
+ * targets (each such SKU at T, `keepToday`) and takes the new targets only
+ *   - on a product of at most 19 SKUs (`MAX_SKUS_SHOWING_C_AT_TODAY`, every SKU of the grid counted, the owner's too): a
+ *     write is at most the product's own row, one rule per SKU it wants and one per SKU of the last apply to take back,
+ *     so those rules on the record can never be what passes the wire at a later compute — not even with the grid doubled
+ *     in between (3 × 19 + 1 rows); and
+ *   - when both plans resolve every SKU to exactly its own target within the wire — every dinar price the same, the
+ *     moved SKUs' dollar figures c.
+ * Otherwise today's plan stands, byte for byte, and a larger product never records such a rule: no dinar price moves
+ * for a dollar figure. (The bound's one limit: a product of at most 19 SKUs carrying such rules that jumps past 40 SKUs
+ * between two computes, its next plan needing so many rules of its own that their sum passes the wire — §4.11.)
+ *
+ * AT THE R AND U OF THE APPLY. "The same dinar price" holds there. Between applies FX-5 prices R + T_sku × U at each new
+ * rate, so a SKU on c's profit sits (T_sku − T) × U from what T would have sold it at — under one rounding step at the
+ * apply's rate, either side: the same dinar price or one 250 IQD step from it (two only after a rise of U, rarely: a
+ * T_sku almost a full step from T), its dollar figure still c while its cost follows the dollar — until the next compute
+ * and apply, which read R at T and price it exactly as today's plan does (§4.11, «The route floor and FX-5»).
+ *
  * EACH SKU'S COST R comes from compute's first evaluation, which prices the product as it sells with NO ceiling:
  * this planner with no P (every SKU the estimator prices at T, the ceiling's own scope rules of the last apply back
  * to inherit). Priced with those rules still in force, a SKU whose cost moved past its rounding step since its last
@@ -1548,6 +1575,12 @@ export function planEstimateInputs(input: EstimatePlanInput): EstimatePlan {
 
 /** At most this many minimum-profit rows one wire takes (`MAX_RULES_PER_WRITE`, worker/lib/pricingEngine/ownerRules.ts). */
 export const MAX_ESTIMATE_PROFIT_ROWS = 60;
+/**
+ * The most SKUs a product may have for a charm price at today's dinar price to show c (see the section header): 3N + 1 ≤
+ * 60 — the product's own row, N rules of the last apply to take back and 2N rules for a grid that doubled since. So
+ * those rules on the record can never be what passes the wire at a later compute.
+ */
+export const MAX_SKUS_SHOWING_C_AT_TODAY = Math.floor((MAX_ESTIMATE_PROFIT_ROWS - 1) / 3);
 /** A profit ceiling is a percentage of cost from 0 to this much (the 0222 CHECK). */
 export const MAX_PROFIT_CAP_PCT = 100;
 /** …with at most this many decimals. */
@@ -1566,24 +1599,27 @@ export function canonicalProfitCapPct(raw: unknown): string | null {
 }
 
 /**
- * ONE SKU'S MINIMUM PROFIT UNDER THE CEILING, canonical USD text: the type's T itself when today's price stays,
- * else floor6(c − R ÷ U − Δ⁺) for its dollar charm price c from $5 up, floor6((D − R) ÷ U − Δ⁺) for its house price D
- * under it — see `charmTarget`. R is the engine's exact replacement cost on the SKU's route (`replacement_exact`), U
- * the USD/IQD the price is computed at, Δ the SKU's option and colour differences as the engine adds them
- * (`deltas_usd`, signed; absent: none). Null when a figure does not read: nothing is guessed.
+ * ONE SKU'S MINIMUM PROFIT UNDER THE CEILING, canonical USD text: the type's T itself when today's price stays as it
+ * shows (nothing goes up, or the chosen price is today's and already shows its dollar figure — c itself, or a house
+ * price), else floor6(c − R ÷ U − Δ⁺) for its dollar charm price c from $5 up — today's own dinar price included, its
+ * dollar figure then c —, floor6((D − R) ÷ U − Δ⁺) for its house price D under it — see `charmTarget`. R is the
+ * engine's exact replacement cost on the SKU's route (`replacement_exact`), U the USD/IQD the price is computed at, Δ
+ * the SKU's option and colour differences as the engine adds them (`deltas_usd`, signed; absent: none). Null when a
+ * figure does not read: nothing is guessed. One SKU alone: the planner still keeps T for a charm price at today's
+ * dinar price unless its product has at most 19 SKUs and its new plan and today's are both exact (`planEstimateProfits`).
  */
 export function ceilingProfitUsd(minProfitUsd: unknown, ceilingPct: unknown, costExact: unknown, usdIqd: unknown, differenceUsd?: unknown): string | null {
   return ceilingTargetOf(minProfitUsd, ceilingPct, costExact, usdIqd, differenceUsd)?.amount_usd ?? null;
 }
 
-/** `ceilingProfitUsd` with how the price was chosen (`charmTarget`'s basis) and that price, IQD. */
+/** `ceilingProfitUsd` with how the price was chosen (`charmTarget`'s basis), that price and today's, IQD. */
 function ceilingTargetOf(
   minProfitUsd: unknown,
   ceilingPct: unknown,
   costExact: unknown,
   usdIqd: unknown,
   differenceUsd?: unknown
-): { amount_usd: string; basis: CharmBasis; price_iqd: number } | null {
+): { amount_usd: string; basis: CharmBasis; price_iqd: number; today_iqd: number } | null {
   const t = canonicalUsdRuleAmount(minProfitUsd);
   const p = canonicalProfitCapPct(ceilingPct);
   if (t === null || p === null || typeof costExact !== 'string' || typeof usdIqd !== 'string') return null;
@@ -1592,7 +1628,7 @@ function ceilingTargetOf(
   if (!target) return null;
   // Today's price keeps the type's T as the type spells it, so its rule is byte for byte the one it replaces.
   const amount = target.basis === 'today' ? t : canonicalUsdRuleAmount(target.amount_usd);
-  return amount === null ? null : { amount_usd: amount, basis: target.basis, price_iqd: target.price_iqd };
+  return amount === null ? null : { amount_usd: amount, basis: target.basis, price_iqd: target.price_iqd, today_iqd: target.today_iqd };
 }
 
 /** The levels a minimum-profit rule below the product's sits at (`pricing_rules.scope`). */
@@ -1762,11 +1798,32 @@ export interface EstimateProfitPlan {
 }
 
 /**
+ * The plans step 5 returns — every SKU the estimator prices resolves to exactly its own target within the wire's 60
+ * rows — each with whether a SKU's target kept T for a charm price at today's dinar price (`planProfits`' `keepToday`).
+ * Read by `planEstimateProfits` alone: a plan's own shape is the same either way.
+ */
+const EXACT_PLANS = new WeakMap<EstimateProfitPlan, { keptToday: boolean }>();
+
+/**
  * THE MINIMUM PROFIT OF EVERY SKU UNDER THE CEILING, AS RULES (see the section header): each SKU's target, the least
  * specific exact representation, merged rule by rule against the record — the estimator's rewritten or cleared,
  * the owner's kept (EST_OWNER_EDITED, field names only) — as the wire's rows and the record an apply stores.
+ *
+ * TODAY'S PLAN FIRST (see the section header): each SKU whose charm price sells at today's dinar price at T, as
+ * before the ruling of 2026-11-05. Only on a product of at most 19 SKUs whose plan is exact and kept such a SKU at T is
+ * the new one planned — those SKUs at c's own profit — and it is taken only when it is exact too; otherwise today's
+ * plan stands as it is.
  */
 export function planEstimateProfits(input: EstimateProfitInput): EstimateProfitPlan {
+  const today = planProfits(input, true);
+  // Too large for those rules, not exact, or no SKU kept at T for today's dinar price (the new plan would be this one).
+  if (input.skus.length > MAX_SKUS_SHOWING_C_AT_TODAY || !EXACT_PLANS.get(today)?.keptToday) return today;
+  const next = planProfits(input, false);
+  return EXACT_PLANS.has(next) ? next : today;
+}
+
+/** `planEstimateProfits`, each SKU whose charm price sells at today's dinar price at T (`keepToday`) or at c's own profit. */
+function planProfits(input: EstimateProfitInput, keepToday: boolean): EstimateProfitPlan {
   const applied = parseAppliedWire(input.applied);
   const records = applied?.minimum_profit_scopes ?? [];
   const cap = input.profit_cap_pct === null || input.profit_cap_pct === undefined ? null : canonicalProfitCapPct(input.profit_cap_pct);
@@ -1855,13 +1912,15 @@ export function planEstimateProfits(input: EstimateProfitInput): EstimateProfitP
 
   // 3. Each SKU the estimator prices, its target: T, or under the ceiling its own price's profit — a dollar charm price
   //    from $5 up, the house price under it (`charmTarget`, its own differences counted) — T for a SKU the owner prices
-  //    himself in dollars, whose minimum profit is only its floor (the ceiling leaves his price alone).
+  //    himself in dollars, whose minimum profit is only its floor (the ceiling leaves his price alone). A charm price
+  //    whose dinar price is today's: c's own profit, or T in today's plan (`keepToday`) — the same dinar price.
   const free = skus.filter((s) => !held.has(s.combo_key));
   const fixed = new Set(input.fixed ?? []);
   const targets = new Map<string, string>();
   // The SKUs priced under $5 at their plain house price (`charmTarget`'s `plain`), with that price: the only ones a
   // shared rule may price under their own price (step 6).
   const plainPrice = new Map<string, number>();
+  let keptToday = false;
   for (const s of free) {
     if (cap === null || fixed.has(s.combo_key)) {
       targets.set(s.combo_key, typeProfit);
@@ -1869,7 +1928,9 @@ export function planEstimateProfits(input: EstimateProfitInput): EstimateProfitP
     }
     const x = ceilingTargetOf(typeProfit, cap, lookup<string>(input.costs, s.combo_key), input.usd_iqd, lookup<string>(input.differences, s.combo_key));
     if (x === null) return unplanned('unpriced', out.flags);
-    targets.set(s.combo_key, x.amount_usd);
+    const kept = keepToday && x.basis === 'charm' && x.price_iqd === x.today_iqd;
+    if (kept) keptToday = true;
+    targets.set(s.combo_key, kept ? typeProfit : x.amount_usd);
     if (x.basis === 'plain') plainPrice.set(s.combo_key, x.price_iqd);
   }
   out.targets = free.map((s) => ({ combo_key: s.combo_key, amount_usd: targets.get(s.combo_key)!, capped: targets.get(s.combo_key) !== typeProfit }));
@@ -1979,7 +2040,11 @@ export function planEstimateProfits(input: EstimateProfitInput): EstimateProfitP
   });
   for (const c of candidates) {
     const merged = merge(c, (s, amount) => amount === targets.get(s.combo_key));
-    if (merged) return planned(c, merged);
+    if (!merged) continue;
+    // Exact: `planEstimateProfits` weighs today's plan against the new one by this.
+    const exact = planned(c, merged);
+    EXACT_PLANS.set(exact, { keptToday });
+    return exact;
   }
   if (cap === null) return unplanned('too_many', [...out.flags, tooMany]);
 
