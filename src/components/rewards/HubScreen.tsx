@@ -51,7 +51,7 @@ import { Button } from '../ui/Button';
 import Countdown from '../ui/Countdown';
 import { CoinStar, CountBadge, ForwardChevron, HubSkeleton, ICON_DISC, INLINE_LINK, PRESSABLE_ROW, SetupState } from './AreaChrome';
 import { pointsForm, type CopyKey } from './copy';
-import { useCouponAction } from './couponUse';
+import { useCouponAction, useShipDetail } from './couponUse';
 import { doorLines, doorText, nearDate, nextAction, toDeviceTarget, underADay, type Doors, type NextAction } from './model';
 import type { Competition, PrinterToRate, RewardCoupon, RewardsHubData } from './types';
 import type { Read } from './useRewardsData';
@@ -259,11 +259,12 @@ function EndsLine({ iso, dateKey, clock }: { iso: string; dateKey: 'coupon.endsO
 function NowCoupon({ coupon: c, ending, clock, onUse }: { coupon: RewardCoupon; ending: boolean; clock: Clock; onUse: (c: RewardCoupon) => void }) {
   const { t, lang } = useRewardsT();
   const { money } = useMoney();
+  const shipDetail = useShipDetail();
   const freeDelivery = c.kind === 'free_shipping';
   const title = freeDelivery ? t('coupon.freeShipping') : t('coupon.filament', { percent: formatPercent(c.percent, lang, 0) });
   const cap = c.max_discount_iqd;
   const detail = freeDelivery
-    ? t('coupon.shipDetail')
+    ? shipDetail(c)
     : cap != null && cap > 0
       ? t('coupon.capSelected', { money: money(cap) })
       : t('coupon.selected');

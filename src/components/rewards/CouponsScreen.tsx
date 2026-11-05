@@ -57,7 +57,7 @@ import { Button, IconButton } from '../ui/Button';
 import Countdown from '../ui/Countdown';
 import { CouponsSkeleton, ForwardChevron, ICON_DISC, INLINE_LINK, SetupState } from './AreaChrome';
 import type { CopyKey } from './copy';
-import { useCouponAction } from './couponUse';
+import { useCouponAction, useShipDetail } from './couponUse';
 import { SEP, couponDestination, nearDate, revokeKey, toDeviceTarget, underADay, usable, wholeDaysLeft } from './model';
 import type { RewardCoupon, RewardsHubData } from './types';
 import type { Read } from './useRewardsData';
@@ -216,7 +216,8 @@ function CouponCard({ c, focal, serverTime, skewMs, reloadSoon, onUse }: CouponC
           <CouponScope c={c} onMore={() => onUse(c)} />
         </p>
         <p className="text-[12px] leading-5 text-text-muted">
-          {t('coupon.ruleOne')} · {t(ship ? 'coupon.ruleShip' : 'coupon.ruleNoOffer')}
+          {!ship && c.max_quantity ? `${t('coupon.pieces', { pieces: count('pieces', c.max_quantity) })} · ` : ''}
+          {t('coupon.ruleStack')} · {t(ship ? 'coupon.ruleShip' : 'coupon.ruleNoOffer')}
         </p>
       </div>
 
@@ -241,7 +242,7 @@ function CouponCard({ c, focal, serverTime, skewMs, reloadSoon, onUse }: CouponC
 }
 
 /**
- * What a coupon covers. Free delivery: the whole fee on one order. Filament:
+ * What a coupon covers. Free delivery: its amount and the order it needs. Filament:
  * the cap, then up to two of the coupon's OWN products (links to their pages)
  * and «ومنتجان آخران» opening the rest in the targets sheet; or its section;
  * or — nothing it covers is on sale now — that sentence. An older server
@@ -250,7 +251,8 @@ function CouponCard({ c, focal, serverTime, skewMs, reloadSoon, onUse }: CouponC
 function CouponScope({ c, onMore }: { c: RewardCoupon; onMore: () => void }) {
   const { t, count, tri, lang } = useRewardsT();
   const { money } = useMoney();
-  if (c.kind === 'free_shipping') return <>{t('coupon.shipDetail')}</>;
+  const shipDetail = useShipDetail();
+  if (c.kind === 'free_shipping') return <>{shipDetail(c)}</>;
 
   const cap = c.max_discount_iqd;
   const capped = cap != null && cap > 0;
@@ -386,7 +388,21 @@ function CouponsEmpty({ data }: { data: RewardsHubData }) {
     const ship = !!p.free_shipping?.enabled;
     const filament = !!p.filament?.enabled;
     const percent = formatPercent(p.filament?.percent ?? 0, lang, 0);
-    what = ship && filament ? t('coupons.what.both', { percent }) : ship ? t('coupons.what.ship') : filament ? t('coupons.what.filament', { percent }) : '';
+    const amount = p.free_shipping?.amount_iqd;
+    const min = p.free_shipping?.min_order_iqd ?? 0;
+    const terms = amount ? { amount: money(amount), min: money(min), pieces: count('pieces', p.filament?.max_pieces ?? 1) } : null;
+    what =
+      ship && filament
+        ? terms
+          ? t(min > 0 ? 'coupons.what.bothTerms' : 'coupons.what.bothAmount', { percent, ...terms })
+          : t('coupons.what.both', { percent })
+        : ship
+          ? terms
+            ? t(min > 0 ? 'coupons.what.shipTerms' : 'coupons.what.shipAmount', terms)
+            : t('coupons.what.ship')
+          : filament
+            ? t('coupons.what.filament', { percent })
+            : '';
     const cap = p.filament?.max_discount_iqd;
     if (what && filament && cap != null && cap > 0) what = `${what} ${t('coupons.what.cap', { money: money(cap) })}`;
   }
@@ -394,7 +410,13 @@ function CouponsEmpty({ data }: { data: RewardsHubData }) {
     <EmptyState
       icon={<Ticket className="w-6 h-6" aria-hidden="true" />}
       title={t('coupons.empty.title')}
-      description={what ? t('coupons.empty.body', { what, days: count('days', p.valid_days) }) : undefined}
+      description={
+        what
+          ? p.weekly?.enabled
+            ? t('coupons.empty.bodyWeekly', { what, months: count('months', p.weekly.months), days: count('days', p.valid_days) })
+            : t('coupons.empty.body', { what, days: count('days', p.valid_days) })
+          : undefined
+      }
       action={
         (data.shop ?? []).length > 0 ? (
           <Link to="/rewards/shop" className="lv-button lv-button-secondary mt-1">

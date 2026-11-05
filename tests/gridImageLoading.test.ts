@@ -62,7 +62,7 @@ test('SafeImage: a deferred picture renders its placeholder and no request; prio
   const lead = html(createElement(SafeImage, { src: '/files/products/a.webp', eager: true, sizes: '100px' }));
   assert.match(lead, /fetchPriority="high"|fetchpriority="high"/i);
   assert.match(lead, /loading="eager"/);
-  assert.doesNotMatch(lead, /duration-300/, 'an eager picture is never faded in');
+  assert.doesNotMatch(lead, /u258-photo/, 'an eager picture is never faded in');
   const row3 = html(createElement(SafeImage, { src: '/files/products/a.webp', eager: true, fetchPriority: 'auto', sizes: '100px' }));
   assert.match(row3, /fetchPriority="auto"|fetchpriority="auto"/i);
   assert.match(row3, /loading="eager"/);
@@ -203,7 +203,7 @@ test('a phone requests its six visible cards and the next row only; scrolling re
   // Rows at 86 / 354 / 622 are on screen; 890 is within 300 px of the fold, 1158 is not.
   assert.deepEqual(sorted(requested), [0, 1, 2, 3, 4, 5, 6, 7], 'native lazy loading fetched 16 here');
   const imgs = await page.evaluate<Array<{ card: number; loading: string; prio: string | null; fade: boolean }>>(
-    `[...document.querySelectorAll('[data-card]')].map((li) => { const im = li.querySelector('img'); return im ? { card: +li.getAttribute('data-card'), loading: im.loading, prio: im.getAttribute('fetchpriority'), fade: /duration-300/.test(im.className) } : null; }).filter(Boolean)`
+    `[...document.querySelectorAll('[data-card]')].map((li) => { const im = li.querySelector('img'); return im ? { card: +li.getAttribute('data-card'), loading: im.loading, prio: im.getAttribute('fetchpriority'), fade: /u258-photo/.test(im.className) } : null; }).filter(Boolean)`
   );
   assert.deepEqual(imgs.slice(0, 6).map((x) => [x.loading, x.prio, x.fade]), [
     ['eager', 'high', false], ['eager', 'high', false],
@@ -229,7 +229,7 @@ test('a deferred card that is already on a tall screen loads at once and is not 
   // 1300 px: rows up to 1158 are on screen, 1426 is within 300 px.
   assert.deepEqual(sorted(requested), [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
   const fades = await page.evaluate<boolean[]>(
-    `[6, 7, 8, 9, 10, 11].map((i) => /duration-300/.test(document.querySelector('[data-card="' + i + '"] img').className))`
+    `[6, 7, 8, 9, 10, 11].map((i) => /u258-photo/.test(document.querySelector('[data-card="' + i + '"] img').className))`
   );
   assert.deepEqual(fades, [false, false, false, false, true, true], 'on screen when released: no fade; below the fold: fade');
   await context.close();

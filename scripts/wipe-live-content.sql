@@ -54,6 +54,7 @@ DELETE FROM order_payment_settlements;
 DELETE FROM order_status_history;
 DELETE FROM invoices;
 DELETE FROM inventory_ledger;
+DELETE FROM coupon_redemption_extras;
 DELETE FROM coupon_redemptions;
 DELETE FROM gift_redemptions;
 DELETE FROM gift_entitlements;

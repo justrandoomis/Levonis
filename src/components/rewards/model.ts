@@ -256,6 +256,7 @@ export type DoorText =
       key:
         | 'door.coupons.hours'
         | 'door.coupons.how'
+        | 'door.coupons.howWeekly'
         | 'door.competitions.judging'
         | 'door.competitions.none'
         | 'door.rate.gift'
@@ -304,7 +305,7 @@ function door(lines: DoorText[]): Door {
 function couponsDoor(hub: RewardsHubData): Door {
   const active = (hub.coupons ?? []).filter((c) => c.state === 'active');
   const a = hub.coupon_counts?.active ?? active.length;
-  if (a <= 0) return door([hub.program?.enabled ? { key: 'door.coupons.how' } : { count: 'couponsActive', n: 0 }]);
+  if (a <= 0) return door([hub.program?.enabled ? { key: hub.program.weekly?.enabled ? 'door.coupons.howWeekly' : 'door.coupons.how' } : { count: 'couponsActive', n: 0 }]);
   const lines: DoorText[] = [{ count: 'couponsActive', n: a }];
   const first = soonest(active, (c) => c.expires_at);
   const left = first ? msLeft(first.expires_at, hub.server_time) : NaN;

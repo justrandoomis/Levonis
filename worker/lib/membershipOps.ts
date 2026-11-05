@@ -18,8 +18,9 @@ import { audit } from './audit';
 import { parseSupportSnapshot, type SupportSnapshot } from './supportCode';
 import { levonisCollectibleSql } from './gini';
 import { isSchemaMissing } from './membershipBenefits';
-import { allocateCoupon, type CouponAllocation, type CouponContext, type CouponLine, type CouponRule } from '@levonis/pricing/coupons';
+import { allocateCoupon, type CouponAllocation, type CouponContext, type CouponLine, type CouponRule, type PoolAllocation, type PoolCoupon } from '@levonis/pricing/coupons';
 import { couponNamesDelivery, couponRuleOf, wholeOrderTarget } from './couponLines';
+import { poolFor, spentAsExtra } from './rewards/pool';
 
 /**
  * Calendar-month addition with month-end clamping: the day-of-month is
@@ -305,6 +306,12 @@ export interface CouponCheck {
    */
   min_total_iqd?: number;
   tier_required?: string | null;
+  /**
+   * THE CODE IS A REWARD COUPON (DECISIONS row 295): what the customer's whole
+   * pool takes off these lines. `allocation` and `rule` stay unset, so a reader
+   * of one coupon's figures cannot take this for one coupon.
+   */
+  pool?: { coupons: PoolCoupon[]; allocation: PoolAllocation };
 }
 
 /** The lines a coupon is allocated against, and the order facts it may filter on. */
@@ -370,6 +377,18 @@ export async function validateCoupon(
   // used printer. Answered exactly as an unknown code — no minimum, no tier —
   // so a prober learns nothing about whose it is, or that it exists.
   if (coupon.assigned_user_id && coupon.assigned_user_id !== userId) return { ok: false, reason: 'CODE_NOT_FOUND' };
+
+  // A REWARD COUPON SPENDS AS A POOL (DECISIONS row 295): this customer's code,
+  // and everything else of theirs this order can use, the delivery with the
+  // filament. A code that ended last week, in a box that remembered it, still
+  // opens this week's coupons when they take something off this order; when they
+  // do not, the customer hears what is wrong with the code they gave. A database
+  // without 0225 has no pool, and the code goes the ordinary way.
+  if (coupon.reward_grant_id && coupon.assigned_user_id === userId) {
+    const pooled = await rewardPoolCheck(env, userId, coupon, target ?? wholeOrderTarget(totalIqd));
+    if (pooled) return pooled;
+  }
+
   if (!coupon.active) return { ok: false, reason: 'INACTIVE' };
 
   // From here on the code is live and this customer's to see.
@@ -405,6 +424,10 @@ export async function validateCoupon(
   // ADVICE ONLY, AND COUNTED THE WAY THE TRIGGER COUNTS (offers B7): a
   // released redemption gave its use back, so only `active` rows are spent.
   // The decision is `trg_coupon_redemption_limits`, inside the order's batch.
+  // A reward coupon spent beside another (0225) is written in the extras: the
+  // same answer as one spent at the head of an order, and that same trigger
+  // refuses it if a race gets past this.
+  if (coupon.reward_grant_id && (await spentAsExtra(env.DB, coupon.id))) return refuse('GLOBAL_LIMIT_REACHED');
   if (coupon.max_global !== null) {
     const g = await env.DB.prepare("SELECT COUNT(*) AS n FROM coupon_redemptions WHERE coupon_id = ? AND state = 'active'")
       .bind(coupon.id)
@@ -443,6 +466,26 @@ export async function validateCoupon(
     if (!waitsForDelivery) return refuse('NO_DISCOUNT');
   }
   return { ok: true, coupon_id: coupon.id, code: coupon.code, discount_iqd: allocation.total_iqd, allocation, rule, ...facts };
+}
+
+/** A reward code's answer: the customer's pool over these lines, or null when there is no pool to speak of. */
+async function rewardPoolCheck(env: Env, userId: string, coupon: CouponRow, on: CouponTarget): Promise<CouponCheck | null> {
+  let found: Awaited<ReturnType<typeof poolFor>>;
+  try {
+    found = await poolFor(env.DB, userId, on, new Date().toISOString());
+  } catch (e) {
+    if (isSchemaMissing(e)) return null;
+    throw e;
+  }
+  const a = found.allocation;
+  const facts = { min_total_iqd: a.blocked_min_total_iqd ?? 0, tier_required: null };
+  if (a.total_iqd <= 0 && !a.delivery_waiting) {
+    // A code that is itself dead says so. A live one says why the pool took nothing.
+    if (!found.coupons.some((p) => p.coupon_id === coupon.id)) return null;
+    return a.blocked_min_total_iqd !== null ? { ok: false, reason: 'MIN_TOTAL_NOT_MET', ...facts } : { ok: false, reason: 'NO_DISCOUNT', ...facts };
+  }
+  const first = a.used.find((u) => u.coupon_id === coupon.id) ?? a.used[0];
+  return { ok: true, coupon_id: first?.coupon_id ?? coupon.id, code: first?.code ?? coupon.code, discount_iqd: a.total_iqd, pool: found, ...facts };
 }
 
 /**

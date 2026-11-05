@@ -343,3 +343,147 @@ function spreadAcross(
     });
   return out.filter((o) => o.amount_iqd > 0).map((o) => ({ line_id: o.line_id, amount_iqd: o.amount_iqd }));
 }
+
+// ============================== THE COUPON POOL ==============================
+//
+// «the coupon is for 1 pic, 1 free shipping 5000, 2 coupon mean shipping discount
+// 10000 and 2 pic of filament» (the owner, 2026-11-05; DECISIONS row 295). A
+// customer with two printers holds two delivery coupons and two filament coupons
+// in a week, and one order spends as many of them as it can use: the whole pool,
+// worked out here, so that the checkout, the cart and a test can only ever agree.
+//
+// THE RULES, each a different amount of money:
+//  1. EVERY COUPON KEEPS ITS OWN RULE. Nothing is merged into one big coupon: a
+//     filament coupon names its own filaments at its own percentage and its own
+//     `max_quantity`, and a delivery coupon its own amount. A coupon issued under
+//     yesterday's terms spends on yesterday's terms.
+//  2. THE GOODS FIRST, THE DEAREST PIECE FIRST. One piece is one coupon, and the
+//     customer's coupon goes on the piece where it is worth the most. A piece a
+//     coupon already took is gone: two coupons never discount one unit twice.
+//  3. THEN THE DELIVERY, AGAINST WHAT IS LEFT OF THE FEE. A coupon is spent only
+//     while there is fee left to take, so a 5,000 fee spends one 5,000 coupon and
+//     leaves the second for another order. A delivery that came out free spends
+//     nothing at all.
+//  4. A DELIVERY COUPON'S MINIMUM IS TESTED ON THE GOODS AFTER EVERY DISCOUNT.
+//     Row 223 #4, the owner's words: «فوق 75,000 بعد كل الخصومات». Never on the
+//     delivery itself, so a fee cannot lift an order over its own threshold.
+//  5. WHAT IS NOT SPENT IS NOT TOUCHED. `used` names only the coupons that took
+//     something; the rest stay with the customer for the next order.
+//  6. THE ORDER OF THE POOL IS THE CALLER'S, and the caller passes the soonest to
+//     end first, so a coupon about to expire is the one spent.
+
+export interface PoolCoupon {
+  coupon_id: string;
+  code: string;
+  rule: CouponRule;
+  /** The coupon's stored `min_total_iqd`. 0 means no minimum. */
+  min_total_iqd: number;
+}
+
+export interface PoolUse {
+  coupon_id: string;
+  code: string;
+  merchandise_iqd: number;
+  delivery_iqd: number;
+  total_iqd: number;
+}
+
+export interface PoolAllocation extends CouponAllocation {
+  /** The coupons this order spends, in the order they were spent. Sums to `total_iqd`. */
+  used: PoolUse[];
+  /** The goods the minimums were tested on: after every discount, before the delivery. */
+  goods_after_discount_iqd: number;
+  /** The smallest minimum that kept a delivery coupon out of this order, or null. */
+  blocked_min_total_iqd: number | null;
+  /** The delivery is not known yet (the cart) and a delivery coupon is waiting for it. */
+  delivery_waiting: boolean;
+}
+
+export function allocateCouponPool(
+  coupons: readonly PoolCoupon[],
+  lines: readonly CouponLine[],
+  ctx: CouponContext,
+  options: { deliveryPending?: boolean } = {}
+): PoolAllocation {
+  const namesGoods = (r: CouponRule) => r.applies_to === 'merchandise' || r.applies_to === 'both';
+  const namesDelivery = (r: CouponRule) => r.applies_to === 'delivery' || r.applies_to === 'both';
+
+  // Rule 2: the dearest piece first; ties by line id, so one cart always allocates one way.
+  const dearest = [...lines].sort((a, b) => dinars(b.unit_goods_iqd) - dinars(a.unit_goods_iqd) || (a.line_id < b.line_id ? -1 : 1));
+  const piecesLeft = new Map(lines.map((l) => [l.line_id, Math.max(0, Math.trunc(l.qty))]));
+  const onLine = new Map<string, number>();
+  const used = new Map<string, PoolUse>();
+  const use = (c: PoolCoupon): PoolUse => {
+    const u = used.get(c.coupon_id) ?? { coupon_id: c.coupon_id, code: c.code, merchandise_iqd: 0, delivery_iqd: 0, total_iqd: 0 };
+    used.set(c.coupon_id, u);
+    return u;
+  };
+
+  let goods = 0;
+  for (const c of coupons) {
+    if (!namesGoods(c.rule)) continue;
+    const view = dearest.flatMap((l) => {
+      const left = piecesLeft.get(l.line_id) ?? 0;
+      return left > 0 ? [{ ...l, qty: left }] : [];
+    });
+    if (view.length === 0) break;
+    const goodsOnly: CouponRule = { ...c.rule, applies_to: 'merchandise' };
+    const a = allocateCoupon(goodsOnly, view, ctx);
+    if (a.merchandise_iqd <= 0) continue;
+    const u = use(c);
+    u.merchandise_iqd += a.merchandise_iqd;
+    u.total_iqd += a.merchandise_iqd;
+    goods += a.merchandise_iqd;
+    for (const l of a.lines) onLine.set(l.line_id, (onLine.get(l.line_id) ?? 0) + l.amount_iqd);
+    // The pieces this coupon spent are gone: the resolver's own quota, in its own order.
+    let quota = c.rule.max_quantity === null ? Infinity : Math.max(0, Math.trunc(c.rule.max_quantity));
+    for (const l of view) {
+      if (!couponMatchesLine(goodsOnly, l, ctx)) continue;
+      const take = Math.max(0, Math.min(l.qty, quota));
+      quota -= take;
+      piecesLeft.set(l.line_id, l.qty - take);
+    }
+  }
+
+  const allGoods = lines.reduce((s, l) => s + dinars(l.unit_goods_iqd) * Math.max(0, Math.trunc(l.qty)), 0);
+  const goodsAfter = Math.max(0, allGoods - goods);
+
+  let delivery = 0;
+  let feeLeft = dinars(ctx.delivery_iqd);
+  let blocked: number | null = null;
+  let waiting = false;
+  for (const c of coupons) {
+    if (!namesDelivery(c.rule)) continue;
+    const min = dinars(c.min_total_iqd);
+    if (goodsAfter < min) {
+      blocked = blocked === null ? min : Math.min(blocked, min);
+      continue;
+    }
+    if (options.deliveryPending) {
+      // Valid here and worth what the checkout says, as long as it names a paid line.
+      if (lines.some((l) => couponMatchesLine(c.rule, l, ctx))) waiting = true;
+      continue;
+    }
+    if (feeLeft <= 0) continue;
+    const a = allocateCoupon({ ...c.rule, applies_to: 'delivery' }, lines, { ...ctx, delivery_iqd: feeLeft });
+    if (a.delivery_iqd <= 0) continue;
+    const u = use(c);
+    u.delivery_iqd += a.delivery_iqd;
+    u.total_iqd += a.delivery_iqd;
+    delivery += a.delivery_iqd;
+    feeLeft -= a.delivery_iqd;
+  }
+
+  return {
+    lines: [...onLine].map(([line_id, amount_iqd]) => ({ line_id, amount_iqd })),
+    merchandise_iqd: goods,
+    delivery_iqd: delivery,
+    total_iqd: goods + delivery,
+    matched_line_ids: [...onLine.keys()],
+    matched_goods_iqd: allGoods,
+    used: [...used.values()],
+    goods_after_discount_iqd: goodsAfter,
+    blocked_min_total_iqd: blocked,
+    delivery_waiting: waiting,
+  };
+}

@@ -134,6 +134,13 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'ئەم ئۆفەرە گەیشتە سنووری خۆی.',
   },
 
+  // A pool of reward coupons that takes less than the screen said (0225): nothing was written.
+  COUPON_POOL_CHANGED: {
+    ar: 'تغيّر خصم كوبوناتك منذ آخر حساب. راجع المجموع الجديد ثم أكّد طلبك.',
+    en: 'The discount from your coupons has changed. Check the new total, then confirm your order.',
+    ckb: 'داشکاندنی کۆپۆنەکانت گۆڕاوە. کۆی نوێ ببینە و پاشان داواکارییەکەت پشتڕاست بکەوە.',
+  },
+
   // ---- a promo code refused at checkout (validateCoupon's reasons) ---------
   // The checkout answers each as its refusal code (worker/routes/orders.ts), and
   // since S-P1 the order batch's own trigger can answer INACTIVE and

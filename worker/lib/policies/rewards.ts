@@ -117,11 +117,28 @@ import type { PolicyDocument } from './types';
  *     @levonis_iq (docs/CUSTOMER_REPLY_GUIDE.md §5). The rewards page says so,
  *     so the policy has to.
  *   * The final provisions move from chapter 14 to chapter 16, unchanged.
+ *
+ * VERSION 6 — WHY IT MOVED (owner, 2026-11-05; migration 0225; DECISIONS row
+ * 295). The archive keeps version 5 byte for byte.
+ *   * EVERY WEEK, THROUGH THE WARRANTY — 14.1 and 14.2. «كل اسبوع», «all the
+ *     warranty period 12month»: a new pair every seven days for at most twelve
+ *     months of the base warranty, the extended warranty not counted (row 223
+ *     #4). «كل طابعة ضمانها شغال»: 14.2 no longer shuts out a printer delivered
+ *     before this chapter; it earns from the day the weeks began.
+ *   * WHAT A COUPON IS WORTH — 14.4 and 14.5. «1 free shipping 5000», «للطلبات
+ *     فوق 100 الف», «the coupon is for 1 pic». The minimum is on the products
+ *     after every discount, before the delivery (row 223 #4's words); points are
+ *     a way of paying and do not lower it (row 223 #5).
+ *   * ALL OF THEM ON ONE ORDER — 14.6 said the opposite. «2 coupon mean shipping
+ *     discount 10000 and 2 pic of filament», «كلها بنفس الطلب».
+ *     worker/lib/rewards/pool.ts and `allocateCouponPool` are every sentence of it.
+ *   * 14.8 says no new coupons follow a withdrawal, and 14.12 names values and
+ *     periods among what the Store may change for the future.
  */
 export const rewards: PolicyDocument = {
   key: 'rewards',
-  version: 5,
-  effective_at: '2026-11-03',
+  version: 6,
+  effective_at: '2026-11-05',
   title: {
     ar: 'سياسة النقاط والمراجعات والهدايا والإحالات',
     en: 'Points, Reviews, Gifts and Referrals Policy',
@@ -549,28 +566,28 @@ export const rewards: PolicyDocument = {
 ## 14. كوبونات المكافأة ومتجر النقاط
 
 ### 14.1 كوبونات الطابعة
-عن كل طابعة يُسجَّل تسليمها للزبون من متجر Levonis الرسمي يُصدر المتجر باسم صاحب الحساب كوبونين: كوبون توصيل مجاني، وكوبون خصم على خيط الطباعة (الفلامنت) الذي يختاره المتجر. ويُحسب ذلك لكل طابعة على حدة، فمن استلم طابعتين نال أربعة كوبونات. والطابعة كل منتج مصنَّف في أقسام الطابعات في المتجر.
+عن كل طابعة يُسجَّل تسليمها للزبون من متجر Levonis الرسمي يُصدر المتجر باسم صاحب الحساب كل أسبوع كوبونين: كوبون توصيل مجاني، وكوبون خصم على خيط الطباعة (الفلامنت) الذي يختاره المتجر. يصدر الزوج الأول عند التسليم، ثم زوج جديد كل سبعة أيام طوال ضمان الطابعة الأساسي، بما لا يجاوز اثني عشر شهراً من بدء ضمانها؛ ولا يُحسب الضمان الممدَّد. ويُحسب ذلك لكل طابعة على حدة، فمن عنده طابعتان نال كل أسبوع أربعة كوبونات. والطابعة كل منتج مصنَّف في أقسام الطابعات في المتجر.
 
 ### 14.2 ما لا يُنشئ كوبونات
-لا يُنشئ كوبوناتٍ ما وصل هديةً، ولا طلبٌ من متجر في مجتمع ليفو، ولا طلبٌ لم يُسجَّل تسليمه. ولا تُصدر كوبونات عن طابعة سُلِّمت قبل بدء العمل بهذا الفصل.
+لا يُنشئ كوبوناتٍ ما وصل هديةً، ولا طلبٌ من متجر في مجتمع ليفو، ولا طلبٌ لم يُسجَّل تسليمه. وتتوقف كوبونات الطابعة إذا أُرجعت واستُرد ثمنها، أو عادت إلى Levonis باستبدال (Trade-in)، أو أُغلق ضمانها. ولا يُصدر إلا كوبون الأسبوع الجاري: لا يُعوَّض أسبوع مضى. والطابعة التي سُلِّمت قبل بدء الكوبونات الأسبوعية وضمانها قائم تنال كوبوناتها من ذلك اليوم لما بقي من مدتها.
 
 ### 14.3 الصلاحية
 يصلح كوبون المكافأة سبعة أيام كاملة من لحظة إصداره، ما لم يعلن المتجر مدة أخرى قبل إصداره. وتُعرض نهاية صلاحية كل كوبون معه في صفحة المكافآت، ولا يُقبل بعدها.
 
 ### 14.4 كوبون التوصيل المجاني
-يُسقط أجرة التوصيل كاملة عن طلب واحد، ولا يخصم شيئاً من ثمن المنتجات. ولا يُستهلك في طلب كان توصيله مجانياً أصلاً، ولا في طلب يُستلم من المخزن.
+يخصم من أجرة توصيل الطلب قيمته المعلنة معه، ولا يخصم شيئاً من ثمن المنتجات. ويُقبل في طلب بلغ ثمن منتجاته، بعد كل الخصومات وقبل أجرة التوصيل، الحدَّ المعلن معه. والمعلن عند صدور هذه النسخة: 5,000 د.ع للطلبات فوق 100,000 د.ع. ولا تُحسب النقاط خصماً هنا، فهي طريقة دفع. ولا يخصم أكثر مما بقي من الأجرة، ولا يُستهلك في طلب كان توصيله مجانياً أصلاً، ولا في طلب يُستلم من المخزن.
 
 ### 14.5 كوبون الفلامنت
-يخصم النسبة المعلنة معه من ثمن خيط الطباعة الذي يسمّيه الكوبون وحده، بحد أقصى معلن للطلب الواحد، ولا يمس سائر المنتجات ولا التوصيل. ولا يُطبَّق على قطعة عليها عرض أو خصم آخر. وتُثبَّت نسبته وحده الأقصى وقائمة الخيط المشمول لحظة إصداره.
+يخصم النسبة المعلنة معه من ثمن قطعة واحدة من خيط الطباعة الذي يسمّيه الكوبون، بحد أقصى معلن للكوبون الواحد، ولا يمس سائر المنتجات ولا التوصيل. وإذا اختلفت أثمان القطع في الطلب وقع على أغلاها. ولا يُطبَّق على قطعة عليها عرض أو خصم آخر. وتُثبَّت نسبته وحده الأقصى وعدد قطعه وقائمة الخيط المشمول لحظة إصداره.
 
-### 14.6 كوبون واحد لكل طلب
-لا يُقبل في الطلب الواحد إلا كوبون واحد، فيُستعمل كل كوبون مكافأة في طلب مستقل. والكوبون شخصي لصاحب الحساب، لا يُنقل ولا يُستعمل من حساب آخر، ويُستعمل مرة واحدة.
+### 14.6 جمع الكوبونات في طلب واحد
+يجوز جمع كوبونات المكافأة كلها في طلب واحد. يكفي إدخال كود أحدها، فيطبّق المتجر كل ما ينتفع به الطلب من كوبونات صاحب الحساب، الأقرب انتهاءً أولاً، ويبقى له ما زاد. فكوبونان للتوصيل يخصمان حتى 10,000 د.ع من الأجرة، وكوبونان للفلامنت يخصمان من قطعتين، ولا يقع كوبونان على قطعة واحدة. وكود الخصم الذي ليس كوبون مكافأة لا يجتمع معها. والكوبون شخصي لصاحب الحساب، لا يُنقل ولا يُستعمل من حساب آخر، ويُستعمل مرة واحدة.
 
 ### 14.7 إلغاء الطلب الذي استُعمل فيه الكوبون
 إذا أُلغي قبل التسليم طلبٌ استُعمل فيه كوبون مكافأة عاد الكوبون إلى صاحبه ما دامت صلاحيته قائمة. ولا تُمدَّد صلاحيته بسبب الإلغاء.
 
 ### 14.8 سحب الكوبونات
-إذا أُلغي الطلب الذي أنشأ الكوبونات، أو أُرجعت الطابعة واستُرد ثمنها، سُحب من كوبوناتها ما لم يُستعمل بعد. والكوبون الذي استُعمل في طلب لا يُسحب من ذلك الطلب.
+إذا أُلغي الطلب الذي أنشأ الكوبونات، أو أُرجعت الطابعة واستُرد ثمنها، سُحب من كوبوناتها ما لم يُستعمل بعد، ولا يصدر عنها جديد. والكوبون الذي استُعمل في طلب لا يُسحب من ذلك الطلب.
 
 ### 14.9 متجر النقاط
 للزبون أن يستبدل نقاطه المستقرة بكوبون توصيل مجاني أو بكوبون فلامنت، بالسعر المعلن بالنقاط في صفحة المكافآت. وتُخصم النقاط لحظة الاستبدال، ويسري على الكوبون ما يسري على كوبونات الطابعة. ولا يحوز الزبون في وقت واحد أكثر من كوبون واحد غير مستعمل من كل نوع استبدله بالنقاط.
@@ -582,7 +599,7 @@ export const rewards: PolicyDocument = {
 كوبون المكافأة ليس مالاً ولا رصيداً، ولا يُستبدل بنقد ولا بنقاط، ولا يُعوَّض عنه إذا انتهت صلاحيته.
 
 ### 14.12 تعديل البرنامج
-للمتجر أن يعدّل للمستقبل نسب الكوبونات وحدودها وقائمة الخيط المشمول وأسعار متجر النقاط، أو أن يوقف البرنامج. وما صدر من كوبونات قبل التعديل يبقى على شروطه.
+للمتجر أن يعدّل للمستقبل قيم الكوبونات ونسبها وحدودها ومددها وقائمة الخيط المشمول وأسعار متجر النقاط، أو أن يوقف البرنامج. وما صدر من كوبونات قبل التعديل يبقى على شروطه.
 
 ## 15. المسابقات
 
@@ -1054,28 +1071,28 @@ The measures in this chapter are without prejudice to the Store's right to claim
 ## 14. Reward coupons and the points shop
 
 ### 14.1 Printer coupons
-For every printer recorded as delivered to a customer by the official Levonis store, the Store issues two coupons in the account holder's name: a free-delivery coupon, and a discount coupon on the print filament the Store selects. This is counted per printer: a customer who receives two printers receives four coupons. A printer is any product classified under the Store's printer sections.
+For every printer recorded as delivered to a customer by the official Levonis store, the Store issues two coupons every week in the account holder's name: a free-delivery coupon, and a discount coupon on the print filament the Store selects. The first pair is issued on delivery, then a new pair every seven days through the printer's base warranty, for at most twelve months from the start of its warranty; an extended warranty does not count. This is counted per printer: a customer with two printers receives four coupons every week. A printer is any product classified under the Store's printer sections.
 
 ### 14.2 What creates no coupons
-No coupons are created by a printer received as a gift, by an order from a store in the Levo Community, or by an order whose delivery has not been recorded. No coupons are issued for a printer delivered before this chapter took effect.
+No coupons are created by a printer received as a gift, by an order from a store in the Levo Community, or by an order whose delivery has not been recorded. A printer's coupons stop if it is returned and refunded, returns to Levonis through a trade-in, or its warranty is closed. Only the current week's coupon is issued: a week that has passed is not made up. A printer delivered before the weekly coupons began, whose warranty is still running, earns them from that day for what remains of its period.
 
 ### 14.3 Validity
 A reward coupon is valid for seven full days from the moment it is issued, unless the Store announces another period before it is issued. The end of each coupon's validity is shown with it on the Rewards page, and it is not accepted after that.
 
 ### 14.4 The free-delivery coupon
-It waives the whole delivery charge of one order and takes nothing off the price of the products. It is not used up on an order whose delivery was free already, nor on an order collected from the warehouse.
+It takes the value announced with it off the order's delivery charge and nothing off the price of the products. It is accepted on an order whose products reach the threshold announced with it, after every discount and before the delivery charge. Announced when this version was issued: 5,000 IQD on orders over 100,000 IQD. Points are not counted as a discount here: they are a way of paying. It takes no more than what is left of the charge, and it is not used up on an order whose delivery was free already, nor on an order collected from the warehouse.
 
 ### 14.5 The filament coupon
-It takes the percentage announced with it off the price of the print filament the coupon names, and that alone, up to an announced ceiling per order; it does not touch other products or delivery. It does not apply to an item that carries an offer or another discount. Its percentage, its ceiling and the list of filament it covers are fixed when it is issued.
+It takes the percentage announced with it off the price of one piece of the print filament the coupon names, up to an announced ceiling per coupon; it does not touch other products or delivery. Where the pieces in an order differ in price, it falls on the dearest. It does not apply to an item that carries an offer or another discount. Its percentage, its ceiling, its number of pieces and the list of filament it covers are fixed when it is issued.
 
-### 14.6 One coupon per order
-An order accepts one coupon only, so each reward coupon is used on an order of its own. The coupon is personal to the account holder: it is not transferable, cannot be used from another account, and is used once.
+### 14.6 Using coupons together on one order
+All reward coupons may be used together on one order. Entering the code of any one of them is enough: the Store applies every coupon of the account holder that the order can use, the soonest to end first, and the rest stay with the holder. Two delivery coupons take up to 10,000 IQD off the charge, two filament coupons take from two pieces, and two coupons never fall on one piece. A promo code that is not a reward coupon does not combine with them. The coupon is personal to the account holder: it is not transferable, cannot be used from another account, and is used once.
 
 ### 14.7 Cancelling the order that used the coupon
 If an order on which a reward coupon was used is cancelled before delivery, the coupon returns to its holder for as long as it remains valid. Its validity is not extended because of the cancellation.
 
 ### 14.8 Withdrawing coupons
-If the order that created the coupons is cancelled, or the printer is returned and refunded, the coupons from it that have not yet been used are withdrawn. A coupon already used on an order is not taken back from that order.
+If the order that created the coupons is cancelled, or the printer is returned and refunded, the coupons from it that have not yet been used are withdrawn, and no new ones follow. A coupon already used on an order is not taken back from that order.
 
 ### 14.9 The points shop
 A customer may exchange settled points for a free-delivery coupon or a filament coupon, at the price in points announced on the Rewards page. The points are deducted at the moment of the exchange, and the coupon is subject to everything that applies to printer coupons. A customer holds no more than one unused coupon of each kind bought with points at any one time.
@@ -1087,7 +1104,7 @@ Points exchanged for a coupon do not return if the coupon expires unused.
 A reward coupon is not money and not a balance; it cannot be exchanged for cash or for points, and no compensation is given when it expires.
 
 ### 14.12 Changing the programme
-The Store may change, for the future, the coupons' percentages and ceilings, the list of filament covered and the prices of the points shop, or stop the programme. Coupons issued before a change keep their terms.
+The Store may change, for the future, the coupons' values, percentages, ceilings and periods, the list of filament covered and the prices of the points shop, or stop the programme. Coupons issued before a change keep their terms.
 
 ## 15. Competitions
 
@@ -1559,28 +1576,28 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ## 14. کۆپۆنەکانی پاداشت و فرۆشگای خاڵ
 
 ### 14.1 کۆپۆنەکانی چاپکەر
-بۆ هەر چاپکەرێک کە گەیاندنی بۆ کڕیار لە فرۆشگای فەرمی Levonis ەوە تۆمار کرابێت، فرۆشگا دوو کۆپۆن بە ناوی خاوەنی هەژمارەکە دەردەکات: کۆپۆنێکی گەیاندنی بەخۆڕایی، و کۆپۆنێکی داشکاندن لەسەر ئەو دەزووی چاپەی (فیلامێنت) کە فرۆشگا هەڵیدەبژێرێت. ئەمە بۆ هەر چاپکەرێک جیا دەژمێردرێت: کەسێک کە دوو چاپکەر وەربگرێت چوار کۆپۆن وەردەگرێت. چاپکەر هەر بەرهەمێکە کە لە بەشەکانی چاپکەری فرۆشگادا پۆلێن کرابێت.
+بۆ هەر چاپکەرێک کە گەیاندنی بۆ کڕیار لە فرۆشگای فەرمی Levonis ەوە تۆمار کرابێت، فرۆشگا هەموو هەفتەیەک دوو کۆپۆن بە ناوی خاوەنی هەژمارەکە دەردەکات: کۆپۆنێکی گەیاندنی بەخۆڕایی، و کۆپۆنێکی داشکاندن لەسەر ئەو دەزووی چاپەی (فیلامێنت) کە فرۆشگا هەڵیدەبژێرێت. جووتی یەکەم لە کاتی گەیاندن دەردەچێت، پاشان هەر حەوت ڕۆژ جووتێکی نوێ بە درێژایی گەرەنتی بنەڕەتی چاپکەرەکە، بە زۆرترین دوازدە مانگ لە دەستپێکی گەرەنتییەکەی؛ گەرەنتی درێژکراوە ناژمێردرێت. ئەمە بۆ هەر چاپکەرێک جیا دەژمێردرێت: کەسێک کە دوو چاپکەری هەبێت هەموو هەفتەیەک چوار کۆپۆن وەردەگرێت. چاپکەر هەر بەرهەمێکە کە لە بەشەکانی چاپکەری فرۆشگادا پۆلێن کرابێت.
 
 ### 14.2 ئەوەی کۆپۆن دروست ناکات
-چاپکەرێک کە وەک دیاری گەیشتبێت، داواکارییەک لە فرۆشگایەکی کۆمەڵگەی لێڤۆ، و داواکارییەک کە گەیاندنەکەی تۆمار نەکرابێت، هیچ کۆپۆنێک دروست ناکەن. بۆ چاپکەرێک کە پێش دەستپێکردنی کارکردن بەم بەشە گەیەنرابێت هیچ کۆپۆنێک دەرناچێت.
+چاپکەرێک کە وەک دیاری گەیشتبێت، داواکارییەک لە فرۆشگایەکی کۆمەڵگەی لێڤۆ، و داواکارییەک کە گەیاندنەکەی تۆمار نەکرابێت، هیچ کۆپۆنێک دروست ناکەن. کۆپۆنەکانی چاپکەرێک دەوەستن ئەگەر بگەڕێنرێتەوە و نرخەکەی بدرێتەوە، یان بە گۆڕینەوە (Trade-in) بگەڕێتەوە بۆ Levonis، یان گەرەنتییەکەی داخرابێت. تەنها کۆپۆنی هەفتەی ئێستا دەردەچێت: هەفتەیەکی ڕابردوو قەرەبوو ناکرێتەوە. چاپکەرێک کە پێش دەستپێکردنی کۆپۆنە هەفتانەکان گەیەنرابێت و گەرەنتییەکەی هێشتا کارا بێت، لەو ڕۆژەوە بۆ ئەوەی لە ماوەکەی ماوە کۆپۆنەکانی وەردەگرێت.
 
 ### 14.3 ماوەی بەکارهێنان
 کۆپۆنی پاداشت حەوت ڕۆژی تەواو لە ساتی دەرچوونییەوە بەکاردێت، مەگەر فرۆشگا پێش دەرکردنی ماوەیەکی تر ڕابگەیەنێت. کۆتایی ماوەی هەر کۆپۆنێک لەگەڵیدا لە پەڕەی پاداشتەکاندا پیشان دەدرێت، و دوای ئەوە وەرناگیرێت.
 
 ### 14.4 کۆپۆنی گەیاندنی بەخۆڕایی
-هەموو تێچووی گەیاندنی یەک داواکاری لادەبات و هیچ لە نرخی بەرهەمەکان کەم ناکاتەوە. لە داواکارییەکدا کە گەیاندنەکەی پێشتر بەخۆڕایی بووبێت، یان لە داواکارییەکدا کە لە کۆگا وەردەگیرێت، بەکارنابرێت.
+بەهای ڕاگەیەنراو لەگەڵیدا لە تێچووی گەیاندنی داواکارییەکە کەم دەکاتەوە و هیچ لە نرخی بەرهەمەکان کەم ناکاتەوە. لە داواکارییەکدا وەردەگیرێت کە نرخی بەرهەمەکانی، دوای هەموو داشکاندنەکان و پێش تێچووی گەیاندن، بگاتە ئەو سنوورەی لەگەڵیدا ڕاگەیەنراوە. ئەوەی لە کاتی دەرچوونی ئەم وەشانەدا ڕاگەیەنراوە: 5,000 دینار بۆ داواکارییەکانی سەرووی 100,000 دینار. لێرەدا خاڵەکان وەک داشکاندن ناژمێردرێن، چونکە شێوازێکی پارەدانن. لەوەی لە تێچووەکە ماوە زیاتر کەم ناکاتەوە، و لە داواکارییەکدا کە گەیاندنەکەی پێشتر بەخۆڕایی بووبێت، یان لە داواکارییەکدا کە لە کۆگا وەردەگیرێت، بەکارنابرێت.
 
 ### 14.5 کۆپۆنی دەزووی چاپ
-ئەو ڕێژەیەی لەگەڵیدا ڕاگەیەنراوە تەنها لە نرخی ئەو دەزووی چاپەی کە کۆپۆنەکە ناوی دەبات کەم دەکاتەوە، تا سنوورێکی ڕاگەیەنراو بۆ هەر داواکارییەک، و دەست لە بەرهەمەکانی تر و گەیاندن نادات. لەسەر پارچەیەک کە ئۆفەر یان داشکاندنێکی تری لەسەرە جێبەجێ نابێت. ڕێژە و سنوور و لیستی ئەو دەزووەی دەیگرێتەوە لە کاتی دەرچووندا جێگیر دەکرێن.
+ئەو ڕێژەیەی لەگەڵیدا ڕاگەیەنراوە لە نرخی یەک پارچە لەو دەزووی چاپەی کە کۆپۆنەکە ناوی دەبات کەم دەکاتەوە، تا سنوورێکی ڕاگەیەنراو بۆ هەر کۆپۆنێک، و دەست لە بەرهەمەکانی تر و گەیاندن نادات. ئەگەر نرخی پارچەکانی داواکارییەکە جیاواز بوون، لەسەر گرانترینیان جێبەجێ دەبێت. لەسەر پارچەیەک کە ئۆفەر یان داشکاندنێکی تری لەسەرە جێبەجێ نابێت. ڕێژە و سنوور و ژمارەی پارچەکان و لیستی ئەو دەزووەی دەیگرێتەوە لە کاتی دەرچووندا جێگیر دەکرێن.
 
-### 14.6 یەک کۆپۆن بۆ هەر داواکارییەک
-داواکاری تەنها یەک کۆپۆن وەردەگرێت، بۆیە هەر کۆپۆنێکی پاداشت لە داواکارییەکی جیادا بەکاردێت. کۆپۆنەکە تایبەتە بە خاوەنی هەژمارەکە: ناگوازرێتەوە، لە هەژمارێکی ترەوە بەکارنایەت، و یەک جار بەکاردێت.
+### 14.6 کۆکردنەوەی کۆپۆنەکان لە یەک داواکاریدا
+دەکرێت هەموو کۆپۆنەکانی پاداشت لە یەک داواکاریدا کۆبکرێنەوە. نووسینی کۆدی یەکێکیان بەسە: فرۆشگا هەموو ئەو کۆپۆنانەی خاوەنی هەژمارەکە بەکاردەهێنێت کە داواکارییەکە سوودیان لێ وەردەگرێت، نزیکترین بەسەرچوون لە پێشدا، و ئەوەی زیاد بێت بۆ خاوەنەکەی دەمێنێتەوە. دوو کۆپۆنی گەیاندن تا 10,000 دینار لە تێچووەکە کەم دەکەنەوە، دوو کۆپۆنی دەزوو لە دوو پارچە کەم دەکەنەوە، و دوو کۆپۆن لەسەر یەک پارچە جێبەجێ نابن. کۆدی داشکاندن کە کۆپۆنی پاداشت نەبێت لەگەڵیان کۆنابێتەوە. کۆپۆنەکە تایبەتە بە خاوەنی هەژمارەکە: ناگوازرێتەوە، لە هەژمارێکی ترەوە بەکارنایەت، و یەک جار بەکاردێت.
 
 ### 14.7 هەڵوەشاندنەوەی ئەو داواکارییەی کۆپۆنەکەی تێدا بەکارهاتووە
 ئەگەر داواکارییەک کە کۆپۆنێکی پاداشتی تێدا بەکارهاتووە پێش گەیاندن هەڵبوەشێتەوە، کۆپۆنەکە دەگەڕێتەوە بۆ خاوەنەکەی تا ئەو کاتەی ماوەکەی ماوە. ماوەکەی بەهۆی هەڵوەشاندنەوەکەوە درێژ ناکرێتەوە.
 
 ### 14.8 کشاندنەوەی کۆپۆنەکان
-ئەگەر ئەو داواکارییەی کۆپۆنەکانی دروست کردووە هەڵبوەشێتەوە، یان چاپکەرەکە بگەڕێنرێتەوە و نرخەکەی بدرێتەوە، ئەو کۆپۆنانەی لێیەوە هاتوون و هێشتا بەکارنەهاتوون دەکشێنرێنەوە. کۆپۆنێک کە لە داواکارییەکدا بەکارهاتووە لەو داواکارییە ناسەندرێتەوە.
+ئەگەر ئەو داواکارییەی کۆپۆنەکانی دروست کردووە هەڵبوەشێتەوە، یان چاپکەرەکە بگەڕێنرێتەوە و نرخەکەی بدرێتەوە، ئەو کۆپۆنانەی لێیەوە هاتوون و هێشتا بەکارنەهاتوون دەکشێنرێنەوە، و کۆپۆنی نوێ دەرناچێت. کۆپۆنێک کە لە داواکارییەکدا بەکارهاتووە لەو داواکارییە ناسەندرێتەوە.
 
 ### 14.9 فرۆشگای خاڵ
 کڕیار دەتوانێت خاڵە جێگیرەکانی بە کۆپۆنێکی گەیاندنی بەخۆڕایی یان کۆپۆنێکی دەزووی چاپ بگۆڕێتەوە، بەو نرخە بە خاڵەی لە پەڕەی پاداشتەکاندا ڕاگەیەنراوە. خاڵەکان لە ساتی گۆڕینەوەدا کەم دەکرێنەوە، و هەرچی بەسەر کۆپۆنەکانی چاپکەردا جێبەجێ دەبێت بەسەر ئەم کۆپۆنەشدا جێبەجێ دەبێت. کڕیار لە یەک کاتدا زیاتر لە یەک کۆپۆنی بەکارنەهاتوو لە هەر جۆرێک کە بە خاڵ گۆڕیبێتییەوە ناگرێت.
@@ -1592,7 +1609,7 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 کۆپۆنی پاداشت نە پارەیە و نە باڵانس؛ بە پارە یان بە خاڵ ناگۆڕدرێتەوە، و کاتێک ماوەکەی کۆتایی دێت هیچ قەرەبوویەک نادرێت.
 
 ### 14.12 گۆڕینی بەرنامەکە
-فرۆشگا دەتوانێت بۆ داهاتوو ڕێژە و سنووری کۆپۆنەکان و لیستی ئەو دەزووەی دەیانگرێتەوە و نرخەکانی فرۆشگای خاڵ بگۆڕێت، یان بەرنامەکە ڕابگرێت. ئەو کۆپۆنانەی پێش گۆڕانکارییەکە دەرچوون مەرجەکانی خۆیان دەپارێزن.
+فرۆشگا دەتوانێت بۆ داهاتوو بەها و ڕێژە و سنوور و ماوەی کۆپۆنەکان و لیستی ئەو دەزووەی دەیانگرێتەوە و نرخەکانی فرۆشگای خاڵ بگۆڕێت، یان بەرنامەکە ڕابگرێت. ئەو کۆپۆنانەی پێش گۆڕانکارییەکە دەرچوون مەرجەکانی خۆیان دەپارێزن.
 
 ## 15. پێشبڕکێکان
 

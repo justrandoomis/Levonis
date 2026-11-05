@@ -220,11 +220,13 @@ rewardProgramRoutes.get('/', async (c) => {
     program: {
       enabled: config.enabled,
       valid_days: config.valid_days,
-      free_shipping: { enabled: config.free_shipping.enabled },
+      weekly: config.weekly,
+      free_shipping: config.free_shipping,
       filament: {
         enabled: config.filament.enabled,
         percent: config.filament.percent,
         max_discount_iqd: config.filament.max_discount_iqd,
+        max_pieces: config.filament.max_pieces,
         ...filament,
       },
     },

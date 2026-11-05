@@ -15,6 +15,7 @@ import ProAddressNotice from '../components/membership/ProAddressNotice';
 import { useWallet } from '../WalletContext';
 import { api, ApiAddress, ApiError, ApiOrder, CartItem, newIdempotencyKey, usdCentsToIqd, formatIqd } from '../lib/api';
 import { methodDesc, methodTitle } from '../lib/methodText';
+import { couponPoolLabel } from '../../packages/contracts/src/couponPool';
 import type { CartColourTag, CheckoutEstimateBlock, DeliveryDayOption } from '../lib/api';
 /**
  * «سعر تقديري» — THE WORDS OF AN ESTIMATED PRICE (docs/SMART_PRICING.md §5.5,
@@ -359,7 +360,7 @@ interface CheckoutQuoteDto {
     fee_iqd: number | null;
     waived: boolean;
   };
-  coupon: { code?: string; discount_iqd?: number } | null;
+  coupon: { code?: string; discount_iqd?: number; pool?: Array<{ coupon_id: string; code: string }> } | null;
   /** §3.3 attribution — always `discount_iqd: 0`; it is not a discount. */
   support: { referrer_username: string; ref: string; discount_iqd: number } | null;
   /**
@@ -1887,6 +1888,9 @@ export default function Checkout() {
         // Only the code the QUOTE was already priced with, so the total the
         // customer just agreed to is the total the server computes.
         couponCode: couponCode || undefined,
+        // What the code took on this screen: a pool of reward coupons that has since
+        // shrunk is refused with the new total, never charged quietly (row 295).
+        couponDiscountSeen: quote?.coupon ? Number(quote.coupon.discount_iqd) || 0 : undefined,
         // Versioned consent (§7): only sent once the customer explicitly
         // checked the unchecked-by-default box for these exact versions.
         policyLocale: lang,
@@ -1899,6 +1903,10 @@ export default function Checkout() {
       });
       setPlacedInvoiceNo(data.invoice_no ?? null);
       setPlacedOrder(data.order);
+      // The order took its code with it. Remembered, the next checkout in this tab
+      // would send it again, and a spent reward code still opens this customer's
+      // later coupons: they would go on an order nobody asked them for (DECISIONS row 295).
+      storePromo('');
       /**
        * NOBODY ASKED FOR THIS REQUEST, SO THE CHARACTER MUST NOT PERFORM IT.
        *
@@ -1994,6 +2002,27 @@ export default function Checkout() {
           setQuote(fresh);
         }
         setEstimateAck(false);
+        setSubmitError(msg);
+      } else if (err instanceof ApiError && err.code === 'COUPON_POOL_CHANGED') {
+        /**
+         * THE COUPONS TAKE LESS THAN THIS SCREEN SAID (one ended while the page was
+         * open, or another tab spent it; DECISIONS row 295). Nothing was written. The
+         * server answers with the fresh quote: the new total is drawn at once, a
+         * total that moved resets the consent as any re-quote does, and the customer
+         * presses again knowing it.
+         */
+        const fresh = err.details?.quote as CheckoutQuoteDto | undefined;
+        if (fresh && Array.isArray(fresh.lines) && fresh.shipping && Array.isArray(fresh.policies)) {
+          const sig = quoteSignature(fresh);
+          if (quoteSignatureRef.current && quoteSignatureRef.current !== sig) {
+            setPolicyAccepted((prev) => {
+              if (prev) setConsentResetNote(true);
+              return false;
+            });
+          }
+          quoteSignatureRef.current = sig;
+          setQuote(fresh);
+        }
         setSubmitError(msg);
       } else if (err instanceof ApiError && couponCode && COUPON_FAILURES.has(err.code ?? '')) {
         /**
@@ -3106,8 +3135,14 @@ export default function Checkout() {
             {quote?.coupon && Number(quote.coupon.discount_iqd) > 0 && (
               <div className="flex justify-between items-center text-emerald-400">
                 <span className="font-light">
-                  {loc('خصم الكود', 'Promo discount', 'داشکاندنی کۆد')}{' '}
-                  <span dir="ltr" className="text-text-muted text-xs">{quote.coupon.code}</span>
+                  {(quote.coupon.pool?.length ?? 0) > 1 ? (
+                    couponPoolLabel(quote.coupon.pool!.length, lang)
+                  ) : (
+                    <>
+                      {loc('خصم الكود', 'Promo discount', 'داشکاندنی کۆد')}{' '}
+                      <span dir="ltr" className="text-text-muted text-xs">{quote.coupon.code}</span>
+                    </>
+                  )}
                 </span>
                 <span className="font-normal">-{money(Number(quote.coupon.discount_iqd))}</span>
               </div>
@@ -3554,6 +3589,7 @@ export default function Checkout() {
                   <PromoCodeField
                     lang={lang}
                     showLabel={false}
+                    appliedCode={couponCode}
                     onApplied={(code) => {
                       setCouponError('');
                       // Only a code that CHANGES the quote marks it: re-applying

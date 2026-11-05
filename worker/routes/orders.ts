@@ -194,7 +194,7 @@ import {
 } from '../lib/bnpl';
 import { priorityDeliveryVerdict, type PriorityDeliveryVerdict } from '../lib/priorityDelivery';
 import { validateCoupon } from '../lib/membershipOps';
-import { allocateCoupon, type CouponContext, type CouponRule } from '@levonis/pricing/coupons';
+import { allocateCoupon, allocateCouponPool, type CouponContext, type CouponRule, type PoolCoupon, type PoolUse } from '@levonis/pricing/coupons';
 import { couponDeliveryMethod, couponLinesOf, couponNamesDelivery, productCouponFactsFromRows, transportOf } from '../lib/couponLines';
 import { TradeInError, isTradeInCreditFenceAbort, tradeInCouponLine, tradeInCreditFence } from '../lib/tradeIn';
 import { tradeInV2Installed } from '../lib/tradeInSchema';
@@ -2069,6 +2069,14 @@ export interface CheckoutComputation {
   /** `couponId` is a trade-in credit (0143): the order batch fences it (`tradeInCreditFence`). */
   couponTradeIn: boolean;
   couponDiscount: number;
+  /**
+   * What `coupon_redemptions.amount_iqd` holds: the coupon's own part. It is all
+   * of `couponDiscount` unless the order spends several reward coupons, whose
+   * others go in `couponExtras` (0225; DECISIONS row 295). The two always add up
+   * to `couponDiscount`, so no reader of the order's figure sees a difference.
+   */
+  couponPrimaryAmount: number;
+  couponExtras: ReadonlyArray<{ coupon_id: string; amount_iqd: number }>;
   couponSnapshot: string | null;
   /**
    * What the coupon took off each order item (offers B2), keyed by item id —
@@ -3513,6 +3521,11 @@ export async function computeCheckout(
     let couponId: string | null = null;
     let couponCode: string | null = null;
     let couponSnapshot: string | null = null;
+    /** The code is a reward coupon: every coupon of this customer's this order can use (0225; DECISIONS row 295). */
+    let couponPool: readonly PoolCoupon[] | null = null;
+    let couponPoolUsed: readonly PoolUse[] = [];
+    let couponPrimaryAmount = 0;
+    let couponExtras: Array<{ coupon_id: string; amount_iqd: number }> = [];
     /** The coupon is a trade-in credit: the order batch re-checks it is still the request's (`tradeInCreditFence`). */
     let couponTradeIn = false;
     /** The line a trade-in credit pays for (`coupon_snapshot.trade_in_line_id`). */
@@ -3576,7 +3589,15 @@ export async function computeCheckout(
       // and nets it from that line's refund only (S-P2 §6.9).
       tradeInLineId = tradeInPick?.lineId ?? null;
       // ---- end TRADE-IN CREDIT
-      if (check.payment_in_kind || !check.allocation || !check.rule) {
+      if (check.pool) {
+        // The goods part does not depend on the delivery. The delivery part is
+        // settled, with which coupons it spends, on the final fee below.
+        couponPool = check.pool.coupons;
+        couponMerchandise = check.pool.allocation.merchandise_iqd;
+        couponDelivery = check.pool.allocation.delivery_iqd;
+        couponLineDiscounts = new Map(check.pool.allocation.lines.map((l) => [l.line_id, l.amount_iqd]));
+        couponDiscount = couponMerchandise + couponDelivery;
+      } else if (check.payment_in_kind || !check.allocation || !check.rule) {
         // PAYMENT IN KIND (owner decision 5): the credit is one order-level
         // amount, never spread onto lines as if it were a promotion.
         couponDiscount = Math.max(0, Math.min(Math.floor(Number(check.discount_iqd) || 0), couponBasis));
@@ -3643,9 +3664,37 @@ export async function computeCheckout(
       couponDiscount = couponMerchandise + couponDelivery;
       if (couponDiscount <= 0) throw badRequest('Coupon could not be applied (NO_DISCOUNT)', 'NO_DISCOUNT');
     }
+    if (couponPool) {
+      // The same on the pool, and which coupons it spends is decided here: a fee
+      // the coupons themselves moved may leave one of them with nothing to take,
+      // and that one stays with the customer.
+      const onFinalFee = allocateCouponPool(couponPool, couponLines, couponCtx(shipping.total_iqd));
+      couponDelivery = onFinalFee.delivery_iqd;
+      couponDiscount = couponMerchandise + couponDelivery;
+      couponPoolUsed = onFinalFee.used;
+      if (couponDiscount <= 0 || onFinalFee.used.length === 0) throw badRequest('Coupon could not be applied (NO_DISCOUNT)', 'NO_DISCOUNT');
+      // The code the customer chose heads the order when it was spent; any other first otherwise.
+      const head = onFinalFee.used.find((u) => u.coupon_id === couponId) ?? onFinalFee.used[0];
+      couponId = head.coupon_id;
+      couponCode = head.code;
+      couponPrimaryAmount = head.total_iqd;
+      couponExtras = onFinalFee.used.filter((u) => u.coupon_id !== head.coupon_id).map((u) => ({ coupon_id: u.coupon_id, amount_iqd: u.total_iqd }));
+    } else {
+      couponPrimaryAmount = couponDiscount;
+    }
     if (couponId) {
       couponSnapshot = JSON.stringify(
-        couponRule
+        couponPool
+          ? {
+              coupon_id: couponId,
+              code: couponCode,
+              discount_iqd: couponDiscount,
+              merchandise_iqd: couponMerchandise,
+              delivery_iqd: couponDelivery,
+              // Every coupon this order spent, and what each took: the receipt's own record.
+              pool: couponPoolUsed,
+            }
+          : couponRule
           ? {
               coupon_id: couponId,
               code: couponCode,
@@ -3998,6 +4047,8 @@ export async function computeCheckout(
       couponId,
       couponTradeIn,
       couponDiscount,
+      couponPrimaryAmount,
+      couponExtras,
       couponSnapshot,
       couponLineDiscounts,
       pointsDiscount,
@@ -4142,6 +4193,8 @@ export async function computeCheckout(
     couponId: settled.couponId,
     couponTradeIn: settled.couponTradeIn,
     couponDiscount: settled.couponDiscount,
+    couponPrimaryAmount: settled.couponPrimaryAmount,
+    couponExtras: settled.couponExtras,
     couponSnapshot: settled.couponSnapshot,
     couponLineDiscounts: settled.couponLineDiscounts,
     pointsBalance: available.points_available,
@@ -4769,6 +4822,26 @@ export async function placeOrder(
     }
   }
 
+  /**
+   * THE COUPONS TAKE LESS THAN THE SCREEN SAID (0225; DECISIONS row 295). A
+   * single code applies or is refused, but a pool just shrinks: one coupon ended
+   * while the page was open, or another tab spent it, and the buyer would pay
+   * more than they agreed to. `couponDiscountSeen` is the discount on the screen
+   * they pressed. They are answered with the fresh quote, nothing is written, and
+   * they press again knowing the total. A pool only, and only for less: a tab on
+   * an older bundle sends nothing, and more off the order surprises nobody.
+   */
+  const couponSeen = Number(body.couponDiscountSeen);
+  if (
+    Number.isInteger(couponSeen) &&
+    comp.couponDiscount < couponSeen &&
+    Array.isArray(safeParse<{ pool?: unknown } | null>(comp.couponSnapshot, null)?.pool)
+  ) {
+    throw new HttpError(409, 'The discount from your coupons changed. Please review the new total and confirm again.', 'COUPON_POOL_CHANGED', {
+      quote: quotePayload(comp, input),
+    });
+  }
+
   // `CheckoutStarted` (03-EVENTS.md §3.6) — the quote step, keyed on the
   // checkout session (the idempotency key until `checkout_sagas` exists). At
   // most one per session: the outbox's UNIQUE (aggregate_type, aggregate_id,
@@ -5037,8 +5110,19 @@ export async function placeOrder(
       c.env.DB.prepare(
         `INSERT INTO coupon_redemptions (id, coupon_id, user_id, order_id, amount_iqd, created_at)
          VALUES (?, ?, ?, ?, ?, ?)`
-      ).bind(newId('crd'), comp.couponId, user.id, orderId, comp.couponDiscount, now)
+      ).bind(newId('crd'), comp.couponId, user.id, orderId, comp.couponPrimaryAmount, now)
     );
+    // The other reward coupons this order spends (0225): their own trigger takes
+    // the same decision, inside this same transaction, and answers in the same
+    // words, so a coupon spent elsewhere a moment ago rolls the order back.
+    for (const extra of comp.couponExtras) {
+      stmts.push(
+        c.env.DB.prepare(
+          `INSERT INTO coupon_redemption_extras (id, coupon_id, user_id, order_id, amount_iqd, created_at)
+           VALUES (?, ?, ?, ?, ?, ?)`
+        ).bind(newId('crx'), extra.coupon_id, user.id, orderId, extra.amount_iqd, now)
+      );
+    }
   }
 
   // ONE `offer_redemptions` ROW PER (SUBJECT, ORDER), with `qty` SUMMED across

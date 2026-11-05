@@ -50,7 +50,7 @@ import { Button } from '../ui/Button';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { ForwardChevron, ICON_DISC, INLINE_LINK, SECTION_HEADING, SetupState, ShopSkeleton } from './AreaChrome';
 import { pointsForm, type CopyKey } from './copy';
-import { useCouponAction } from './couponUse';
+import { useCouponAction, useShipDetail } from './couponUse';
 import { nearDate, usable } from './model';
 import type { RewardCoupon, RewardsHubData, ShopItem } from './types';
 import type { Read } from './useRewardsData';
@@ -99,6 +99,7 @@ export function ShopScreen({ hub, onSwapped }: ShopScreenProps) {
   const [done, setDone] = useState<{ id: string; expiresAt: string } | null>(null);
   const alertRef = useRef<HTMLDivElement | null>(null);
   const useNowRef = useRef<HTMLButtonElement | null>(null);
+  const shipDetail = useShipDetail();
   const { reload } = hub;
 
   // The swap disabled the button that opened the dialog (the coupon is now
@@ -122,7 +123,12 @@ export function ShopScreen({ hub, onSwapped }: ShopScreenProps) {
   const program = data.program;
   const shop = data.shop ?? [];
   const cap = program?.filament?.max_discount_iqd;
-  const capText = cap != null && cap > 0 ? t('shop.cap', { money: money(cap) }) : null;
+  const shipAmount = program?.free_shipping?.amount_iqd;
+  const shipText = shipAmount ? shipDetail({ amount_iqd: shipAmount, min_total_iqd: program?.free_shipping?.min_order_iqd }) : null;
+  const pieces = program?.filament?.max_pieces;
+  const filamentText = [cap != null && cap > 0 ? t('shop.cap', { money: money(cap) }) : null, pieces ? t('coupon.pieces', { pieces: count('pieces', pieces) }) : null]
+    .filter(Boolean)
+    .join(' · ');
   const validText = t('shop.valid', { days: count('days', program?.valid_days ?? 0) });
 
   const itemTitle = (item: ShopItem) =>
@@ -249,7 +255,7 @@ export function ShopScreen({ hub, onSwapped }: ShopScreenProps) {
                         <span className="shrink-0 text-[15px] font-bold tabular-nums text-text-primary">{count('points', item.points)}</span>
                       </div>
                       <p className="mt-0.5 text-[12px] leading-5 text-text-secondary">
-                        {item.kind === 'filament_discount' && capText ? `${capText} · ${validText}` : validText}
+                        {item.kind === 'filament_discount' && filamentText ? `${filamentText} · ${validText}` : item.kind === 'free_shipping' && shipText ? `${shipText} · ${validText}` : validText}
                       </p>
                     </div>
                   </div>

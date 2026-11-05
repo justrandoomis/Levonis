@@ -255,6 +255,7 @@ export const GLOBAL_COUNTERS: ReadonlyArray<{ table: string; sums: readonly stri
   { table: 'product_pricing_state', sums: [] },
   { table: 'coupons', sums: [] },
   { table: 'coupon_redemptions', sums: ['amount_iqd'] },
+  { table: 'coupon_redemption_extras', sums: ['amount_iqd'] },
   { table: 'investments', sums: ['amount_usd_cents'] },
   { table: 'investment_contracts', sums: ['principal_iqd'] },
   { table: 'investor_finance_events', sums: ['amount_iqd'] },

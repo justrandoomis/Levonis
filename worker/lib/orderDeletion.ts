@@ -45,6 +45,7 @@ export const ORDER_OWNED_TABLES: Owned[] = [
   { table: 'finance_line_departments', where: 'order_item_id IN (SELECT id FROM order_items WHERE order_id=?1)' },
   { table: 'order_item_inventory_allocations' },
   { table: 'coupon_redemptions' },
+  { table: 'coupon_redemption_extras' },
   { table: 'invoices' },
   { table: 'return_cases' },
   { table: 'price_protection_claims' },

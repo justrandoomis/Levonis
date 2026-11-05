@@ -2,10 +2,12 @@
  * ADMIN → المكافآت (migration 0220; docs/DECISIONS.md row 286).
  *
  * Three screens over /api/admin/rewards:
- *   الإعدادات   the programme's terms: what a delivered printer earns (the
- *               free-delivery coupon and the filament coupon — its percentage,
- *               its ceiling and the filaments it covers), how long a coupon
- *               lasts, and what the points shop charges. The owner's to save:
+ *   الإعدادات   the programme's terms: what a delivered printer earns, and for
+ *               how many months of its warranty, every week (the free-delivery
+ *               coupon — its amount and the order it needs — and the filament
+ *               coupon — its percentage, its ceiling, how many pieces and the
+ *               filaments it covers), how long a coupon lasts, and what the
+ *               points shop charges. The owner's to save:
  *               the server refuses everyone else (OWNER_REQUIRED).
  *   الكوبونات   every reward coupon issued, its customer and its state, with
  *               «سحب» (any admin) and «تمديد» (the financial scope).
@@ -27,8 +29,9 @@ type Kind = 'free_shipping' | 'filament_discount';
 interface Config {
   enabled: boolean;
   valid_days: number;
-  free_shipping: { enabled: boolean };
-  filament: { enabled: boolean; percent: number; max_discount_iqd: number | null; product_ids: string[] };
+  weekly: { enabled: boolean; months: number };
+  free_shipping: { enabled: boolean; amount_iqd: number; min_order_iqd: number };
+  filament: { enabled: boolean; percent: number; max_discount_iqd: number | null; product_ids: string[]; max_pieces: number };
   shop: Record<Kind, { enabled: boolean; points: number | null }>;
 }
 
@@ -174,6 +177,15 @@ function SettingsPanel() {
           <input type="checkbox" checked={cfg.enabled} onChange={(e) => set((c) => ((c.enabled = e.target.checked), c))} />
           {loc('إصدار كوبونات الطابعة عند التسليم', 'Issue printer coupons on delivery', 'دەرکردنی کۆپۆنی چاپکەر لە کاتی گەیاندن')}
         </label>
+        <label className="flex items-center gap-2 text-sm text-text-primary self-end">
+          <input type="checkbox" checked={cfg.weekly.enabled} onChange={(e) => set((c) => ((c.weekly.enabled = e.target.checked), c))} />
+          {loc('كوبونات جديدة كل أسبوع طوال ضمان الطابعة', 'New coupons every week through the printer’s warranty', 'کۆپۆنی نوێ هەموو هەفتەیەک بە درێژایی گەرەنتی چاپکەر')}
+        </label>
+        <div>
+          <label className={label} htmlFor="rw-months">{loc('أقصى مدة من ضمانها (أشهر)', 'At most, of its warranty (months)', 'زۆرترین ماوە لە گەرەنتییەکەی (مانگ)')}</label>
+          <input id="rw-months" className="lv-input text-sm" dir="ltr" type="number" min={1} max={60} value={cfg.weekly.months}
+            onChange={(e) => set((c) => ((c.weekly.months = Math.min(60, Math.max(1, Math.trunc(Number(e.target.value) || 1)))), c))} />
+        </div>
         <div>
           <label className={label} htmlFor="rw-days">{loc('مدة صلاحية الكوبون (أيام)', 'Coupon validity (days)', 'ماوەی کۆپۆن (ڕۆژ)')}</label>
           <input id="rw-days" className="lv-input text-sm" dir="ltr" type="number" min={1} max={90} value={cfg.valid_days}
@@ -183,6 +195,16 @@ function SettingsPanel() {
           <input type="checkbox" checked={cfg.free_shipping.enabled} onChange={(e) => set((c) => ((c.free_shipping.enabled = e.target.checked), c))} />
           {loc('كوبون توصيل مجاني لكل طابعة', 'A free-delivery coupon per printer', 'کۆپۆنێکی گەیاندنی بەخۆڕایی بۆ هەر چاپکەرێک')}
         </label>
+        <div>
+          <label className={label} htmlFor="rw-ship-amount">{loc('قيمة كوبون التوصيل (د.ع)', 'Delivery coupon worth (IQD)', 'بەهای کۆپۆنی گەیاندن (د.ع)')}</label>
+          <input id="rw-ship-amount" className="lv-input text-sm" dir="ltr" type="number" min={1} value={cfg.free_shipping.amount_iqd}
+            onChange={(e) => set((c) => ((c.free_shipping.amount_iqd = Math.max(1, Math.trunc(Number(e.target.value) || 1))), c))} />
+        </div>
+        <div>
+          <label className={label} htmlFor="rw-ship-min">{loc('للطلبات فوق (د.ع، بعد كل الخصومات)', 'On orders over (IQD, after every discount)', 'بۆ داواکارییەکانی سەرووی (د.ع، دوای هەموو داشکاندنەکان)')}</label>
+          <input id="rw-ship-min" className="lv-input text-sm" dir="ltr" type="number" min={0} value={cfg.free_shipping.min_order_iqd}
+            onChange={(e) => set((c) => ((c.free_shipping.min_order_iqd = Math.max(0, Math.trunc(Number(e.target.value) || 0))), c))} />
+        </div>
         {(issued('free_shipping', 'printer') || issued('filament_discount', 'printer')) && (
           <p className="text-text-muted text-[11px] sm:col-span-2" dir="auto">
             {loc('صدر حتى الآن', 'Issued so far', 'تا ئێستا دەرچووە')}:{' '}
@@ -205,9 +227,14 @@ function SettingsPanel() {
             onChange={(e) => set((c) => ((c.filament.percent = Math.min(100, Math.max(1, Math.trunc(Number(e.target.value) || 1)))), c))} />
         </div>
         <div>
-          <label className={label} htmlFor="rw-cap">{loc('أقصى خصم للطلب (د.ع)', 'Most off one order (IQD)', 'زۆرترین داشکاندن بۆ داواکارییەک (د.ع)')}</label>
+          <label className={label} htmlFor="rw-cap">{loc('أقصى خصم للكوبون (د.ع)', 'Most one coupon takes (IQD)', 'زۆرترین داشکاندنی کۆپۆنێک (د.ع)')}</label>
           <input id="rw-cap" className="lv-input text-sm" dir="ltr" type="number" min={1} placeholder={loc('بلا حد', 'No ceiling', 'بێ سنوور')}
             value={cfg.filament.max_discount_iqd ?? ''} onChange={(e) => set((c) => ((c.filament.max_discount_iqd = num(e.target.value)), c))} />
+        </div>
+        <div>
+          <label className={label} htmlFor="rw-pieces">{loc('عدد القطع لكل كوبون', 'Pieces per coupon', 'ژمارەی پارچە بۆ هەر کۆپۆنێک')}</label>
+          <input id="rw-pieces" className="lv-input text-sm" dir="ltr" type="number" min={1} max={100} value={cfg.filament.max_pieces}
+            onChange={(e) => set((c) => ((c.filament.max_pieces = Math.min(100, Math.max(1, Math.trunc(Number(e.target.value) || 1)))), c))} />
         </div>
         <div className="sm:col-span-3">
           <p className={label}>

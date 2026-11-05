@@ -299,7 +299,7 @@ async function loadOrderData(
 
 function buildSnapshot(order: OrderRow, items: OrderItemRow[], owner: OwnerRow): InvoiceSnapshotV1 {
   const address = safeParse<Record<string, unknown>>(order.address_snapshot, {});
-  const coupon = safeParse<{ code?: string; discount_iqd?: number } | null>(order.coupon_snapshot, null);
+  const coupon = safeParse<{ code?: string; discount_iqd?: number; pool?: Array<{ code?: string }> } | null>(order.coupon_snapshot, null);
   const { paid, due, status } = paymentFacts(order);
   // The displayed subtotal already contains unit-applied membership savings.
   // Keep the recorded order saving intact; only unapplied line savings appear
@@ -332,7 +332,8 @@ function buildSnapshot(order: OrderRow, items: OrderItemRow[], owner: OwnerRow):
       cod_tax_exemption_iqd: Number(order.cod_tax_exemption_iqd) || 0,
       membership_discount_iqd: Math.max(0, (Number(order.membership_discount_iqd) || 0) - embeddedSaving),
       delivery_waived: !!order.delivery_waived,
-      coupon_code: coupon?.code || '',
+      // Beside the discount it is the record of: every code when several reward coupons went on the order (0225).
+      coupon_code: (coupon?.pool?.length ?? 0) > 1 ? coupon!.pool!.map((u) => u.code ?? '').join(', ') : coupon?.code || '',
       coupon_discount_iqd: coupon ? Number(coupon.discount_iqd) || 0 : 0,
       points_applied_iqd: Number(order.points_discount_iqd) || 0,
       price_adjustment_iqd: Math.trunc(Number(order.price_adjustment_iqd) || 0),

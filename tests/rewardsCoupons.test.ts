@@ -5,8 +5,10 @@
  *   «1 coupon free shipping for every printer on 1 week and 1 coupon
  *    discounted on selected filament also for every printer on 1 week.»
  *
- * The owner's answers: 15% off the selected filaments, at most 25,000 IQD;
- * issued when the printer is DELIVERED; one pair per printer unit; seven days.
+ * The owner's answers: 15% off one piece of the selected filaments, at most
+ * 25,000 IQD; 5,000 IQD off the delivery on an order over 100,000 IQD (2026-11-05,
+ * row 295; tests/rewardsWeekly.test.ts has the weeks and the pool); issued when
+ * the printer is DELIVERED; one pair per printer unit; seven days.
  *
  * Real migrations, real triggers, the real cart and checkout routers; only the
  * session is stubbed. Issuing goes through `runOrderDeliveredEffects`, the one
@@ -100,16 +102,19 @@ test('a delivered printer order earns one free-delivery and one filament coupon 
     assert.equal(c.active, 1);
     assert.equal(c.reward_grant_id, g.id);
     assert.equal(c.ends_at, g.expires_at);
-    assert.equal(c.kind, 'percent');
     if (g.kind === 'free_shipping') {
       assert.match(String(c.code), /^RWS[A-Z2-9]{10}$/);
-      assert.deepEqual([c.applies_to, c.value, c.scope, c.stacks], ['delivery', 100, 'global', 1], 'the delivery fee, in full, nothing off the goods');
+      assert.deepEqual(
+        [c.kind, c.applies_to, c.value, c.min_total_iqd, c.scope, c.stacks],
+        ['fixed_iqd', 'delivery', 5_000, 100_000, 'global', 1],
+        '5,000 IQD off the delivery on an order over 100,000 IQD, nothing off the goods'
+      );
     } else {
       assert.match(String(c.code), /^RWF[A-Z2-9]{10}$/);
       assert.deepEqual(
-        [c.applies_to, c.value, c.max_discount_iqd, c.scope, c.category_id, c.stacks],
-        ['merchandise', 15, 25_000, 'category', 'cat_materials_fdm', 0],
-        '15% of the FDM filaments, at most 25,000 IQD, never on a line already discounted'
+        [c.kind, c.applies_to, c.value, c.max_discount_iqd, c.max_quantity, c.scope, c.category_id, c.stacks],
+        ['percent', 'merchandise', 15, 25_000, 1, 'category', 'cat_materials_fdm', 0],
+        '15% of ONE PIECE of the FDM filaments, at most 25,000 IQD, never on a line already discounted'
       );
     }
   }
@@ -193,7 +198,7 @@ test('the filament coupon applies at checkout to the selected filaments only, on
   const quote = await json(await post(a.buyer, '/api/orders/quote', quoteBody({ couponCode: code })));
   assert.equal(quote.success, true, JSON.stringify(quote));
   assert.equal(quote.quote.coupon.code, code);
-  assert.equal(quote.quote.coupon.merchandise_iqd, 4_500, '15% of 2 × 15,000 of filament — nothing off the other product');
+  assert.equal(quote.quote.coupon.merchandise_iqd, 2_250, '15% of ONE of the 2 × 15,000 of filament — nothing off the other product');
   assert.equal(quote.quote.coupon.delivery_iqd ?? 0, 0);
 
   // Somebody else typing the same code meets a code that does not exist.
@@ -216,18 +221,18 @@ test('the filament coupon applies at checkout to the selected filaments only, on
   assert.match(String(again.code), /LIMIT/);
 });
 
-test('the free-delivery coupon takes the delivery fee off one order and nothing off the goods', async () => {
+test('the free-delivery coupon takes up to its 5,000 IQD off the delivery of an order over 100,000 IQD, and nothing off the goods', async () => {
   const raw = world();
   const orderId = await deliveredPrinterOrder(raw, 1);
   const code = codeOf(raw, orderId, 'free_shipping');
   const a = apps(raw);
-  paidLine(raw, 'ci_other', 'p_tool', { qty: 1, fulfillmentType: 'direct_sale' });
+  paidLine(raw, 'ci_other', 'p_printer', { qty: 1, fulfillmentType: 'direct_sale' });
   const plainQuote = await json(await post(a.buyer, '/api/orders/quote', quoteBody()));
   const fee = Number(plainQuote.quote.shipping.total_iqd);
   assert.ok(fee > 0, 'standard delivery costs something');
   const quote = await json(await post(a.buyer, '/api/orders/quote', quoteBody({ couponCode: code })));
   assert.equal(quote.success, true, JSON.stringify(quote));
-  assert.equal(quote.quote.coupon.delivery_iqd, fee, 'the whole delivery fee');
+  assert.equal(quote.quote.coupon.delivery_iqd, Math.min(fee, 5_000), 'the delivery fee, up to the coupon’s 5,000 IQD');
   assert.equal(quote.quote.coupon.merchandise_iqd ?? 0, 0, 'nothing off the goods');
 
   // In the cart (no address yet) the code is valid and waits for the delivery.
@@ -296,7 +301,7 @@ test('a cancel by any door withdraws the printer’s unused coupons; a coupon al
   const orderId = await deliveredPrinterOrder(raw, 1);
   const shipCode = codeOf(raw, orderId, 'free_shipping');
   const a = apps(raw);
-  paidLine(raw, 'ci_other', 'p_tool', { qty: 1, fulfillmentType: 'direct_sale' });
+  paidLine(raw, 'ci_other', 'p_printer', { qty: 1, fulfillmentType: 'direct_sale' });
   const spent = await placeOrder(a.buyer, { couponCode: shipCode });
 
   raw.prepare("UPDATE orders SET status = 'shipped' WHERE id = ?").run(orderId);
@@ -315,11 +320,10 @@ test('a cancel by any door withdraws the printer’s unused coupons; a coupon al
 test('a returned printer takes back its coupons not yet used — up to the units returned, once per case', async () => {
   const raw = world();
   const orderId = await deliveredPrinterOrder(raw, 2);
-  const unit1Ship = row<{ coupon_id: string }>(raw, "SELECT coupon_id FROM reward_grants WHERE order_id = ? AND unit_index = 2 AND kind = 'free_shipping'", orderId)!;
-  const ship = String(couponOf(raw, unit1Ship.coupon_id).code);
   const a = apps(raw);
-  paidLine(raw, 'ci_other', 'p_tool', { qty: 1, fulfillmentType: 'direct_sale' });
-  await placeOrder(a.buyer, { couponCode: ship });
+  // One piece of filament under the delivery coupon's minimum: one coupon of the four spends.
+  paidLine(raw, 'ci_other', 'p_plain', { qty: 1, fulfillmentType: 'direct_sale' });
+  await placeOrder(a.buyer, { couponCode: codeOf(raw, orderId, 'filament_discount') });
 
   const item = row<{ id: string }>(raw, "SELECT id FROM order_items WHERE order_id = ? AND product_id = 'p_printer'", orderId)!;
   const out = await revokeRewardsForReturn(envOf(raw), { caseId: 'rc_1', orderItemId: item.id, qty: 1 });
@@ -328,7 +332,7 @@ test('a returned printer takes back its coupons not yet used — up to the units
     acc[`${v.kind}:${v.state}`] = (acc[`${v.kind}:${v.state}`] ?? 0) + 1;
     return acc;
   }, {});
-  assert.deepEqual(live, { 'free_shipping:used': 1, 'free_shipping:revoked': 1, 'filament_discount:active': 1, 'filament_discount:revoked': 1 });
+  assert.deepEqual(live, { 'free_shipping:active': 1, 'free_shipping:revoked': 1, 'filament_discount:used': 1, 'filament_discount:revoked': 1 });
   assert.deepEqual(await revokeRewardsForReturn(envOf(raw), { caseId: 'rc_1', orderItemId: item.id, qty: 1 }), { revoked: 0 }, 'the same case twice withdraws nothing more');
 });
 
@@ -397,7 +401,7 @@ test('the shop says what the swap would: held while a bought coupon is live and 
 
   // Used on an order: no longer held, and the swap agrees.
   const a = apps(raw);
-  paidLine(raw, 'ci_other', 'p_tool', { qty: 1, fulfillmentType: 'direct_sale' });
+  paidLine(raw, 'ci_other', 'p_printer', { qty: 1, fulfillmentType: 'direct_sale' });
   await placeOrder(a.buyer, { couponCode: bought.coupon.code });
   shop = await shopOf();
   assert.equal(shop.free_shipping.holding, false);

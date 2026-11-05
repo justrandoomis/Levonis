@@ -10,7 +10,7 @@
  * `useIt(c)` saves the code for the cart (storePromo, the promo box's own
  * sessionStorage key) and then follows `couponDestination(c)`:
  * - a page (the cart, the coupon's one product, its section): the toast
- *   «حفظنا الكود — ستجده جاهزًا في السلة.», then that page. The toast queue is
+ *   «حفظنا الكود — وعند الدفع نطبّق كل كوبوناتك المناسبة للطلب.», then that page. The toast queue is
  *   module-level, so it survives the shell swap to the main site;
  * - a choice of products: the targets sheet opens, and its rows lead to each
  *   product;
@@ -28,6 +28,7 @@
 import React, { useCallback, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { storePromo } from '../PromoCodeField';
+import { useMoney } from '../../CurrencyContext';
 import { toast } from '../../lib/toastStore';
 import { Sheet } from '../ui/Sheet';
 import SafeImage from '../ui/SafeImage';
@@ -35,6 +36,20 @@ import { ForwardChevron } from './AreaChrome';
 import { couponDestination } from './model';
 import type { RewardCoupon } from './types';
 import { useRewardsT } from './useT';
+
+/**
+ * What a free-delivery coupon is worth, from its own row: an amount and the order
+ * it needs, or (issued before 0225) the whole fee.
+ */
+export function useShipDetail(): (c: Pick<RewardCoupon, 'amount_iqd' | 'min_total_iqd'>) => string {
+  const { t } = useRewardsT();
+  const { money } = useMoney();
+  return (c) => {
+    if (!c.amount_iqd) return t('coupon.shipDetail');
+    const amount = t('coupon.shipAmount', { money: money(c.amount_iqd) });
+    return c.min_total_iqd ? `${amount} · ${t('coupon.shipMin', { money: money(c.min_total_iqd) })}` : amount;
+  };
+}
 
 export interface CouponAction {
   /** Save the code and go where it is spent (see above). Call it as `coupon.useIt(c)`. */

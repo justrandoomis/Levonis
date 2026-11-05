@@ -21,8 +21,15 @@ export interface RewardCoupon {
   source: 'printer' | 'points_shop' | 'admin';
   state: 'active' | 'used' | 'expired' | 'revoked';
   code: string;
+  /** A percentage coupon's percentage; 0 for a coupon worth a fixed amount. */
   percent: number;
+  /** A fixed coupon's dinars off the delivery; null for a percentage, and for free delivery issued before 0225 (the whole fee). */
+  amount_iqd?: number | null;
+  /** The goods, after every discount, an order needs. 0 or absent: none. */
+  min_total_iqd?: number;
   max_discount_iqd: number | null;
+  /** How many pieces it discounts; null or absent: every piece it names. */
+  max_quantity?: number | null;
   scope: string;
   category_id: string | null;
   product_ids: string[];
@@ -132,11 +139,14 @@ export interface RewardsHubData {
   program: {
     enabled: boolean;
     valid_days: number;
-    free_shipping: { enabled: boolean };
+    /** A new pair every week of the printer's warranty (0225); absent from an older server. */
+    weekly?: { enabled: boolean; months: number };
+    free_shipping: { enabled: boolean; amount_iqd?: number; min_order_iqd?: number };
     filament: {
       enabled: boolean;
       percent: number;
       max_discount_iqd: number | null;
+      max_pieces?: number;
       products: Array<{ id: string; slug: string; name: Tri }>;
       section: { id: string; slug: string; path: string; name: Tri } | null;
     };

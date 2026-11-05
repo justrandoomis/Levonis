@@ -20,6 +20,7 @@ import { audit, auditStatements } from '../lib/audit';
 import { limitRoute, rateLimit } from '../lib/ratelimit';
 import { canMoveMoney, canViewCost, isOwner, isUnverifiedOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
 import { moneyAuthorityMessage } from '../../packages/contracts/src/moneyAuthority';
+import { couponPoolLabel } from '../../packages/contracts/src/couponPool';
 import { requireMoneyAuthority } from '../lib/moneyAuthority';
 import { completenessMessage } from '@levonis/contracts/productCompleteness';
 import { assertCostRead, assertCostWrite, ownerEmailUnverified, ownerOnly, requireFreshSession } from '../lib/costAccess';
@@ -2831,7 +2832,9 @@ async function receiptDataFor(c: Context<AppContext>, id: string) {
       .bind(id).first<{ invoice_no: string }>().catch(() => null),
   ]);
   const address = safeParse<Record<string, unknown>>(o.address_snapshot, {});
-  const coupon = safeParse<{ code?: string; discount_iqd?: number } | null>(o.coupon_snapshot, null);
+  const coupon = safeParse<{ code?: string; discount_iqd?: number; pool?: unknown[] } | null>(o.coupon_snapshot, null);
+  // Several reward coupons on one order (0225): their count, where one coupon says its code.
+  const couponPoolSize = Array.isArray(coupon?.pool) ? coupon.pool.length : 0;
   const shippingType = asShippingType(o.shipping_type);
 
   return {
@@ -2879,7 +2882,8 @@ async function receiptDataFor(c: Context<AppContext>, id: string) {
       // filtered by the renderer, so an order with no coupon prints no
       // coupon line rather than "coupon: 0".
       adjustments: [
-        { label_ar: `خصم الكود ${coupon?.code ?? ''}`.trim(), label_en: `Coupon ${coupon?.code ?? ''}`.trim(),
+        { label_ar: couponPoolSize > 1 ? couponPoolLabel(couponPoolSize, 'ar') : `خصم الكود ${coupon?.code ?? ''}`.trim(),
+          label_en: couponPoolSize > 1 ? couponPoolLabel(couponPoolSize, 'en') : `Coupon ${coupon?.code ?? ''}`.trim(),
           amount_iqd: Number(coupon?.discount_iqd) || 0, negative: true },
         { label_ar: 'خصم النقاط', label_en: 'Points', amount_iqd: Number(o.points_discount_iqd) || 0, negative: true },
         { label_ar: 'من المحفظة', label_en: 'Wallet', amount_iqd: Number(o.wallet_applied_iqd) || 0, negative: true },

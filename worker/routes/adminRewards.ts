@@ -27,6 +27,7 @@ import {
   validateRewardConfig,
 } from '../lib/rewards/config';
 import { DAY_MS, GRANT_SELECT, grantSelect, grantView } from '../lib/rewards/coupons';
+import { SPENT_SQL } from '../lib/rewards/pool';
 import {
   cancelCompetition,
   createCompetition,
@@ -92,7 +93,7 @@ adminRewardsRoutes.get('/config', async (c) => {
     db
       .prepare(
         `SELECT g.kind, g.source,
-                SUM(CASE WHEN EXISTS (SELECT 1 FROM coupon_redemptions r WHERE r.coupon_id = g.coupon_id AND r.state = 'active') THEN 1 ELSE 0 END) AS used,
+                SUM(CASE WHEN ${SPENT_SQL('g.coupon_id')} THEN 1 ELSE 0 END) AS used,
                 COUNT(*) AS issued,
                 COALESCE(SUM(g.points_spent), 0) AS points_spent
            FROM reward_grants g GROUP BY g.kind, g.source`

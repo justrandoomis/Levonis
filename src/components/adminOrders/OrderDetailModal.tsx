@@ -28,6 +28,7 @@ import { slotKey } from './serials/UnitSerialSlots';
 import { serialsApi } from './serials/serialsApi';
 import type { GateMissing, OrderSerials } from './serials/types';
 import VariantImg from '../ui/VariantImg';
+import { couponPoolLabel } from '../../../packages/contracts/src/couponPool';
 
 // The §16 serial / warranty page, opened from a linked slot's serial.
 const SerialDetail = React.lazy(() => import('../adminWarranty/serial/SerialDetail'));
@@ -444,7 +445,11 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                       <Row label={loc('المجموع الفرعي', 'Subtotal', 'کۆی بەشەکی')} value={formatIqd(fin.subtotal_iqd)} />
                       {fin.coupon_discount_iqd > 0 && (
                         <Row
-                          label={`${loc('كوبون', 'Coupon', 'کۆپۆن')}${detail.coupon?.code ? ` (${detail.coupon.code})` : ''}`}
+                          label={
+                            (detail.coupon?.pool?.length ?? 0) > 1
+                              ? loc(couponPoolLabel(detail.coupon!.pool!.length, 'ar'), couponPoolLabel(detail.coupon!.pool!.length, 'en'), couponPoolLabel(detail.coupon!.pool!.length, 'ckb'))
+                              : `${loc('كوبون', 'Coupon', 'کۆپۆن')}${detail.coupon?.code ? ` (${detail.coupon.code})` : ''}`
+                          }
                           value={`− ${formatIqd(fin.coupon_discount_iqd)}`}
                           tone="down"
                         />

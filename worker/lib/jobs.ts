@@ -319,7 +319,7 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
     serial_returns: { scanned: 0, closed: 0, errors: 0 },
     bnpl_overdue: { scanned: 0, overdue: 0, suspended: 0 },
     automatic_reviews: { scanned: 0, created: 0, skipped: 0 },
-    reward_coupons: { installed: true, catch_up: { scanned: 0, issued: 0, errors: 0 }, reminders: { coupons: 0, customers: 0 } },
+    reward_coupons: { installed: true, catch_up: { scanned: 0, issued: 0, errors: 0 }, weekly: { scanned: 0, issued: 0, errors: 0 }, reminders: { coupons: 0, customers: 0 } },
     stock_alerts: { scanned: 0, matched: 0, notified: 0, dead: 0, deferred: 0 },
     stock_alert_prune: { deleted: 0, bound_hit: false },
     outbox_final: { sent: 0, failed: 0 },

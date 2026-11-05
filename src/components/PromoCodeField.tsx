@@ -137,6 +137,7 @@ export default function PromoCodeField({
   onApplied,
   showLabel = true,
   initialCode = '',
+  appliedCode,
 }: {
   lang: string;
   /**
@@ -147,6 +148,13 @@ export default function PromoCodeField({
    * re-validates whatever arrives.
    */
   initialCode?: string;
+  /**
+   * The code the checkout's quote is priced with; '' when none. The page is then
+   * the authority, not this box's memory: a code that came from the cart or the
+   * rewards area shows as applied, with its remove button, and one the quote
+   * refused stops showing. The cart passes nothing, and the box keeps its own state.
+   */
+  appliedCode?: string;
   // The formatter used to be a PROP, passed down from whichever page hosted
   // this field. It is a context now (src/CurrencyContext.tsx), so the field
   // follows the customer's chosen currency wherever it is mounted and no
@@ -164,7 +172,9 @@ export default function PromoCodeField({
   const { money } = useMoney();
   const s = STRINGS[(lang as keyof typeof STRINGS) in STRINGS ? (lang as keyof typeof STRINGS) : 'ar'];
   const [input, setInput] = useState(initialCode);
-  const [applied, setApplied] = useState<CheckResult | null>(null);
+  const [checked, setApplied] = useState<CheckResult | null>(null);
+  const applied: CheckResult | null =
+    appliedCode === undefined ? checked : !appliedCode ? null : checked?.code === appliedCode ? checked : { valid: true, code: appliedCode };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 

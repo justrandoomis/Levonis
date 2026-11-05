@@ -1363,7 +1363,8 @@ export interface ApiOrder {
     hold_until: string | null;
     received_at: string | null;
   } | null;
-  coupon?: { coupon_id?: string; code?: string; discount_iqd?: number } | null;
+  /** `pool`: every reward coupon the order spent (0225), when it was spent as a pool. */
+  coupon?: { coupon_id?: string; code?: string; discount_iqd?: number; pool?: Array<{ coupon_id: string; code: string; total_iqd: number }> } | null;
   coupon_discount_iqd?: number;
   progress?: OrderStageProgress;
   /** §5: the single money view — every screen reads this, none recomputes. */
@@ -1684,7 +1685,7 @@ export interface AdminOrderDetail extends ApiOrder {
   price_estimate_open?: boolean;
   membership_tier_snapshot?: string;
   delivery_waived?: boolean;
-  coupon?: { code?: string; discount_iqd?: number } | null;
+  coupon?: { code?: string; discount_iqd?: number; pool?: Array<{ coupon_id: string; code: string; total_iqd: number }> } | null;
   coupon_discount_iqd?: number;
   financial: OrderFinancial;
   customer: {

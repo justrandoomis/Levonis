@@ -11,6 +11,7 @@ import { Coins, Clock, CheckCircle2, Ban } from 'lucide-react';
 import { orderItemUsdBase, type ApiOrder, type ApiOrderItem, type OrderFinancial } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { asLang, formatDate } from './format';
+import { couponPoolLabel } from '../../../packages/contracts/src/couponPool';
 import { useMoney } from '../../CurrencyContext';
 
 const STRINGS = {
@@ -150,6 +151,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
   const s = STRINGS[asLang(lang)];
   const f = financial;
   const couponCode = order.coupon?.code ? ` (${order.coupon.code})` : '';
+  const couponPool = order.coupon?.pool?.length ?? 0;
   const stateStyle =
     f.payment_state === 'paid'
       ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
@@ -181,7 +183,7 @@ export default function PaymentBreakdown({ order, financial }: { order: ApiOrder
       <dl className="mt-3 divide-y divide-border-subtle">
         <Row label={s.merchandise} value={money(f.merchandise_iqd, merchandiseUsd)} />
         {f.fees_iqd > 0 && <Row label={feesLabel} value={money(f.fees_iqd)} />}
-        {f.coupon_discount_iqd > 0 && <Row label={`${s.coupon}${couponCode}`} value={money(f.coupon_discount_iqd)} negative />}
+        {f.coupon_discount_iqd > 0 && <Row label={couponPool > 1 ? couponPoolLabel(couponPool, asLang(lang)) : `${s.coupon}${couponCode}`} value={money(f.coupon_discount_iqd)} negative />}
         {f.points_value_iqd > 0 && <Row label={`${s.pointsUsed} (${f.points_used})`} value={money(f.points_value_iqd)} negative />}
         <Row
           label={s.shipping}

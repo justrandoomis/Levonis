@@ -154,6 +154,11 @@ export const COPY = {
     'You get them with every printer Levonis delivers to you',
     'لەگەڵ هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت وەریاندەگریت',
   ],
+  'door.coupons.howWeekly': [
+    'تصلك كل أسبوع مع كل طابعة تستلمها من Levonis',
+    'You get them every week with every printer Levonis delivers to you',
+    'هەموو هەفتەیەک لەگەڵ هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت وەریاندەگریت',
+  ],
   'door.shop.from': ['كوبونات تبدأ من {points}', 'Coupons from {points}', 'کۆپۆن لە {points}ەوە'], // † pointsObj
   'door.shop.checkout': [
     'استخدمها عند الدفع: كل نقطة بدينار',
@@ -177,6 +182,9 @@ export const COPY = {
   'coupon.freeShipping': ['توصيل مجاني', 'Free delivery', 'گەیاندنی بەخۆڕایی'],
   'coupon.filament': ['خصم {percent} على الفلامنت', '{percent} off filament', '{percent} داشکاندن لەسەر فیلامێنت'],
   'coupon.shipDetail': ['رسوم التوصيل كاملة لطلب واحد', 'The full delivery fee on one order', 'هەموو کرێی گەیاندن بۆ یەک داواکاری'],
+  'coupon.shipAmount': ['خصم {money} من رسوم التوصيل', '{money} off the delivery fee', '{money} لە کرێی گەیاندن کەم دەکاتەوە'],
+  'coupon.shipMin': ['للطلبات فوق {money}', 'On orders over {money}', 'بۆ داواکارییەکانی سەرووی {money}'],
+  'coupon.pieces': ['يشمل {pieces}', 'Covers {pieces}', '{pieces} دەگرێتەوە'],
   'coupon.capOn': ['حتى {money} على:', 'Up to {money} on:', 'تا {money} لەسەر:'],
   'coupon.on': ['على:', 'On:', 'لەسەر:'],
   'coupon.capSelected': ['حتى {money} على الفلامنت المختار', 'Up to {money} on selected filament', 'تا {money} لەسەر فیلامێنتی هەڵبژێردراو'],
@@ -189,7 +197,7 @@ export const COPY = {
   'coupon.chip.noTargets': ['لا منتج متاح له الآن', 'Nothing to use it on now', 'ئێستا هیچ بەرهەمێکی بۆ نییە'],
   'coupon.validUntil': ['صالح حتى {date}', 'Valid until {date}', 'تا {date} بەکاردێت'],
   'coupon.endsOn': ['ينتهي في {date}', 'Ends on {date}', 'لە {date} کۆتایی دێت'],
-  'coupon.ruleOne': ['كوبون واحد لكل طلب', 'One coupon per order', 'بۆ هەر داواکارییەک یەک کۆپۆن'],
+  'coupon.ruleStack': ['تجتمع كوبوناتك كلها في طلب واحد', 'All your coupons can go on one order', 'هەموو کۆپۆنەکانت لە یەک داواکاریدا کۆدەبنەوە'],
   'coupon.ruleNoOffer': [
     'لا يشمل القطع التي عليها عرض أو خصم آخر',
     'Not on items with an offer or another discount',
@@ -210,9 +218,9 @@ export const COPY = {
   'coupon.use': ['استخدمه الآن', 'Use it now', 'ئێستا بەکاری بهێنە'],
   'coupon.useShort': ['استخدمه', 'Use', 'بەکاری بهێنە'],
   'coupon.saved': [
-    'حفظنا الكود — ستجده جاهزًا في السلة.',
-    "We saved the code — you'll find it ready in your cart.",
-    'کۆدەکەمان هەڵگرت — لە عەرەبانەکەدا ئامادە دەیبینیتەوە.',
+    'حفظنا الكود — وعند الدفع نطبّق كل كوبوناتك المناسبة للطلب.',
+    'We saved the code — at checkout we apply every coupon of yours the order can use.',
+    'کۆدەکەمان هەڵگرت — لە کاتی پارەداندا هەموو کۆپۆنە گونجاوەکانت بۆ داواکارییەکە بەکاردەهێنین.',
   ],
   'coupon.fromPrinter': ['مكافأة شراء طابعة', 'Printer purchase reward', 'خەڵاتی کڕینی چاپکەر'],
   'coupon.fromShop': ['من متجر النقاط · {points}', 'From the points shop · {points}', 'لە فرۆشگای خاڵ · {points}'],
@@ -225,6 +233,31 @@ export const COPY = {
     'كل طابعة تستلمها من Levonis تمنحك {what}، ويصلح كل كوبون {days} من لحظة إصداره.',
     'Every printer Levonis delivers to you earns {what}; each coupon is valid for {days} from the moment it is issued.',
     'هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت {what}ت پێدەدات، و هەر کۆپۆنێک {days} لە کاتی دەرچوونییەوە بەکاردێت.',
+  ],
+  'coupons.empty.bodyWeekly': [
+    'كل طابعة تستلمها من Levonis تمنحك كل أسبوع {what} طوال {months} من ضمانها، ويصلح كل كوبون {days} من لحظة إصداره.',
+    'Every printer Levonis delivers to you earns {what} every week for {months} of its warranty; each coupon is valid for {days} from the moment it is issued.',
+    'هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت هەموو هەفتەیەک {what}ت پێدەدات بۆ ماوەی {months} لە گەرەنتییەکەی، و هەر کۆپۆنێک {days} لە کاتی دەرچوونییەوە بەکاردێت.',
+  ],
+  'coupons.what.bothTerms': [
+    'كوبون توصيل مجاني بقيمة {amount} للطلبات فوق {min}، وكوبون خصم {percent} على {pieces} من الفلامنت المختار',
+    'a free-delivery coupon worth {amount} on orders over {min}, and a {percent} coupon on {pieces} of selected filament',
+    'کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای {amount} بۆ داواکارییەکانی سەرووی {min}، و کۆپۆنێکی {percent} داشکاندن لەسەر {pieces} لە فیلامێنتی هەڵبژێردراو',
+  ],
+  'coupons.what.bothAmount': [
+    'كوبون توصيل مجاني بقيمة {amount}، وكوبون خصم {percent} على {pieces} من الفلامنت المختار',
+    'a free-delivery coupon worth {amount}, and a {percent} coupon on {pieces} of selected filament',
+    'کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای {amount}، و کۆپۆنێکی {percent} داشکاندن لەسەر {pieces} لە فیلامێنتی هەڵبژێردراو',
+  ],
+  'coupons.what.shipTerms': [
+    'كوبون توصيل مجاني بقيمة {amount} للطلبات فوق {min}',
+    'a free-delivery coupon worth {amount} on orders over {min}',
+    'کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای {amount} بۆ داواکارییەکانی سەرووی {min}',
+  ],
+  'coupons.what.shipAmount': [
+    'كوبون توصيل مجاني بقيمة {amount}',
+    'a free-delivery coupon worth {amount}',
+    'کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای {amount}',
   ],
   'coupons.what.both': [
     'كوبون توصيل مجاني وكوبون خصم {percent} على الفلامنت المختار',
@@ -701,6 +734,16 @@ export const COUNTED = {
     ar: { zero: 'أقل من يوم', one: 'يومًا واحدًا', two: 'يومين', few: '{n} أيام', many: '{n} يومًا', hundred: '{n} يوم' },
     en: { zero: 'less than a day', one: '1 day', other: '{n} days' },
     ckb: { zero: 'کەمتر لە ڕۆژێک', other: '{n} ڕۆژ' },
+  },
+  pieces: {
+    ar: { zero: 'لا قطع', one: 'قطعة واحدة', two: 'قطعتين', few: '{n} قطع', many: '{n} قطعة', hundred: '{n} قطعة' },
+    en: { zero: 'no pieces', one: '1 piece', other: '{n} pieces' },
+    ckb: { zero: 'هیچ پارچەیەک', other: '{n} پارچە' },
+  },
+  months: {
+    ar: { zero: 'أقل من شهر', one: 'شهرًا واحدًا', two: 'شهرين', few: '{n} أشهر', many: '{n} شهرًا', hundred: '{n} شهر' },
+    en: { zero: 'less than a month', one: '1 month', other: '{n} months' },
+    ckb: { zero: 'کەمتر لە مانگێک', other: '{n} مانگ' },
   },
   daysLeft: {
     ar: { zero: 'آخر يوم', one: 'يوم واحد متبقٍ', two: 'يومان متبقيان', few: '{n} أيام متبقية', many: '{n} يومًا متبقيًا', hundred: '{n} يوم متبقٍ' },

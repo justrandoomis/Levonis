@@ -21,8 +21,11 @@ export interface RewardText {
   body: Trilingual;
 }
 
+type CouponTerms = { percent: number; amount: number; min: number; pieces: number; kinds: readonly RewardCouponKind[] };
+
 type Params =
-  | { kind: 'printer_coupons'; count: number; until: string; percent: number; kinds: readonly RewardCouponKind[] }
+  | ({ kind: 'printer_coupons'; count: number; until: string } & CouponTerms)
+  | ({ kind: 'weekly_coupons'; until: string } & CouponTerms)
   | { kind: 'coupons_expiring'; count: number; until: string }
   | { kind: 'competition_won'; title: Trilingual; place: number; points: number }
   | { kind: 'competition_refund'; title: Trilingual; points: number };
@@ -31,25 +34,56 @@ const n = (v: number) => Math.max(0, Math.trunc(v)).toLocaleString('en-US');
 const capital = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
 const pick = (t: Trilingual, lang: keyof Trilingual) => t[lang] || t.ar;
 
+/** What a printer's coupons are, in a phrase: the amounts are the owner's settings. */
+function couponsPhrase(p: CouponTerms): { what: Trilingual; both: boolean } {
+  const both = p.kinds.includes('free_shipping') && p.kinds.includes('filament_discount');
+  const shipOnly = !both && p.kinds.includes('free_shipping');
+  const hasMin = p.min > 0;
+  const ship: Trilingual = {
+    ar: `كوبون توصيل مجاني بقيمة ${n(p.amount)} د.ع${hasMin ? ` للطلبات فوق ${n(p.min)} د.ع` : ''}`,
+    en: `a free-delivery coupon worth ${n(p.amount)} IQD${hasMin ? ` on orders over ${n(p.min)} IQD` : ''}`,
+    ckb: `کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای ${n(p.amount)} دینار${hasMin ? ` بۆ داواکارییەکانی سەرووی ${n(p.min)} دینار` : ''}`,
+  };
+  const k = Math.max(1, Math.trunc(p.pieces));
+  const filament: Trilingual = {
+    ar: `كوبون خصم ${p.percent}% على ${k === 1 ? 'قطعة واحدة' : k === 2 ? 'قطعتين' : k <= 10 ? `${k} قطع` : `${k} قطعة`} من الفلامنت المختار`,
+    en: `a ${p.percent}% coupon on ${k === 1 ? 'one piece' : `${k} pieces`} of the selected filament`,
+    ckb: `کۆپۆنێکی ${p.percent}% داشکاندن لەسەر ${k === 1 ? 'یەک' : k} پارچە لە فیلامێنتی هەڵبژێردراو`,
+  };
+  const what: Trilingual = both
+    ? { ar: `${ship.ar} و${filament.ar}`, en: `${ship.en} and ${filament.en}`, ckb: `${ship.ckb} و ${filament.ckb}` }
+    : shipOnly
+      ? ship
+      : filament;
+  return { what, both };
+}
+
 export function rewardText(p: Params): RewardText {
   switch (p.kind) {
-    case 'printer_coupons': {
-      const both = p.kinds.includes('free_shipping') && p.kinds.includes('filament_discount');
-      const shipOnly = !both && p.kinds.includes('free_shipping');
-      const many = p.count > 1;
-      const what: Trilingual = both
-        ? {
-            ar: `كوبون توصيل مجاني وكوبون خصم ${p.percent}% على الفلامنت المختار، كل واحد لطلب واحد`,
-            en: `a free-delivery coupon and a ${p.percent}% filament coupon, one order each`,
-            ckb: `کۆپۆنێکی گەیاندنی بەخۆڕایی و کۆپۆنێکی ${p.percent}% داشکاندن لەسەر فیلامێنتی هەڵبژێردراو، هەریەکەیان بۆ یەک داواکاری`,
-          }
-        : shipOnly
-          ? { ar: 'كوبون توصيل مجاني لطلب واحد', en: 'a free-delivery coupon for one order', ckb: 'کۆپۆنێکی گەیاندنی بەخۆڕایی بۆ یەک داواکاری' }
+    case 'weekly_coupons': {
+      const { what, both } = couponsPhrase(p);
+      return {
+        title: {
+          ar: '🎁 كوبونات هذا الأسبوع جاهزة',
+          en: "🎁 This week's coupons are ready",
+          ckb: '🎁 کۆپۆنەکانی ئەم هەفتەیە ئامادەن',
+        },
+        body: both
+          ? {
+              ar: `لكل طابعة عندك: ${what.ar}. صالحة حتى ${p.until}، ويمكنك جمعها كلها في طلب واحد. تجدها في صفحة المكافآت.`,
+              en: `For each of your printers: ${what.en}. Valid until ${p.until}, and you can use them all on one order. Find them on the Rewards page.`,
+              ckb: `بۆ هەر چاپکەرێکت: ${what.ckb}. تا ${p.until} بەکاردێن، و دەتوانیت هەموویان لە یەک داواکاریدا بەکاربهێنیت. لە پەڕەی خەڵاتەکان دەیاندۆزیتەوە.`,
+            }
           : {
-              ar: `كوبون خصم ${p.percent}% على الفلامنت المختار لطلب واحد`,
-              en: `a ${p.percent}% filament coupon for one order`,
-              ckb: `کۆپۆنێکی ${p.percent}% داشکاندن لەسەر فیلامێنتی هەڵبژێردراو بۆ یەک داواکاری`,
-            };
+              ar: `لكل طابعة عندك: ${what.ar}. صالح حتى ${p.until}. تجده في صفحة المكافآت.`,
+              en: `For each of your printers: ${what.en}. Valid until ${p.until}. Find it on the Rewards page.`,
+              ckb: `بۆ هەر چاپکەرێکت: ${what.ckb}. تا ${p.until} بەکاردێت. لە پەڕەی خەڵاتەکان دەیدۆزیتەوە.`,
+            },
+      };
+    }
+    case 'printer_coupons': {
+      const { what, both } = couponsPhrase(p);
+      const many = p.count > 1;
       return {
         title: {
           ar: '🎁 كوبونات طابعتك جاهزة',
@@ -126,10 +160,10 @@ export function rewardText(p: Params): RewardText {
   }
 }
 
-/** Shorthand for the coupons module's two notices. */
+/** Shorthand for the coupons module's notice on delivery. */
 export function rewardNotice(
   kind: 'printer_coupons',
-  p: { count: number; until: string; percent: number; kinds?: readonly RewardCouponKind[] }
+  p: { count: number; until: string; percent: number; amount: number; min: number; pieces: number; kinds?: readonly RewardCouponKind[] }
 ): RewardText {
-  return rewardText({ kind, count: p.count, until: p.until, percent: p.percent, kinds: p.kinds ?? ['free_shipping', 'filament_discount'] });
+  return rewardText({ kind, count: p.count, until: p.until, percent: p.percent, amount: p.amount, min: p.min, pieces: p.pieces, kinds: p.kinds ?? ['free_shipping', 'filament_discount'] });
 }

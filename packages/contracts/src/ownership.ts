@@ -170,7 +170,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'stock_return_unit_evidence', 'stock_return_order_unit_evidence',
     'order_item_inventory_unit_assignments',
     'order_preorder_unit_origins', 'order_preorder_unit_origin_versions',
-    'coupon_redemptions', 'return_cases', 'price_protection_claims',
+    'coupon_redemptions', 'coupon_redemption_extras', 'return_cases', 'price_protection_claims',
     // 0140 — an admin's proposed new final total and the customer's decision on it.
     'order_price_adjustments',
     // 0218 — an order line sold at an estimated price and its settlement, written in the order's own

@@ -12,20 +12,28 @@
  *      (DECISIONS row 106: nothing is granted after the fact without the
  *      owner). A database that cannot say when 0220 arrived catches up
  *      nothing.
- *   2. THE 24-HOUR REMINDER. One in-app notice per customer for the reward
+ *   2. THE WEEK'S COUPONS. Every printer whose warranty runs gets this week's
+ *      pair (`issueWeeklyRewards`, owner 2026-11-05, DECISIONS row 295), counted
+ *      from when 0225 reached this database at the earliest. A database that
+ *      cannot say when issues nothing: the owner's decision was «from now on».
+ *   3. THE 24-HOUR REMINDER. One in-app notice per customer for the reward
  *      coupons that end within a day and are still unused, then marked so it
- *      is never sent twice.
+ *      is never sent twice. Not for a coupon of a later week: next week's is
+ *      about to arrive with its own notice, and two notices a week for the same
+ *      printer is the shop nagging.
  *
- * Both halves are idempotent: the catch-up through `source_ref`, the reminder
- * through `reminded_at` and the notice's event key.
+ * All three are idempotent: the catch-up and the week through `source_ref`, the
+ * reminder through `reminded_at` and the notice's event key.
  */
 import type { Env } from '../types';
 import { isSchemaMissing } from '../membershipBenefits';
 import { notifyStatement } from '../notifications';
-import { issuePrinterRewards } from './coupons';
+import { issuePrinterRewards, issueWeeklyRewards, type WeeklyIssueReport } from './coupons';
+import { SPENT_SQL } from './pool';
 import { rewardText } from './strings';
 
 export const REWARD_MIGRATION = '0220_rewards_program.sql';
+export const WEEKLY_MIGRATION = '0225_weekly_reward_coupons.sql';
 export const CATCH_UP_WINDOW_MS = 2 * 86_400_000;
 export const CATCH_UP_LIMIT = 5;
 export const REMINDER_LIMIT = 25;
@@ -34,13 +42,14 @@ export const REMINDER_LEAD_MS = 86_400_000;
 export interface RewardSweepReport {
   installed: boolean;
   catch_up: { scanned: number; issued: number; errors: number };
+  weekly: WeeklyIssueReport;
   reminders: { coupons: number; customers: number };
 }
 
-/** When 0220 reached this database, or null when the bookkeeping cannot say. */
-export async function programStartedAt(db: D1Database): Promise<string | null> {
+/** When a migration reached this database (0220 by default), or null when the bookkeeping cannot say. */
+export async function programStartedAt(db: D1Database, migration = REWARD_MIGRATION): Promise<string | null> {
   try {
-    const row = await db.prepare('SELECT applied_at FROM d1_migrations WHERE name = ?').bind(REWARD_MIGRATION).first<{ applied_at: string | null }>();
+    const row = await db.prepare('SELECT applied_at FROM d1_migrations WHERE name = ?').bind(migration).first<{ applied_at: string | null }>();
     if (!row?.applied_at) return null;
     // D1 records `CURRENT_TIMESTAMP` («2026-11-04 10:15:00», UTC, no zone).
     const t = Date.parse(/T/.test(row.applied_at) ? row.applied_at : `${row.applied_at.replace(' ', 'T')}Z`);
@@ -54,10 +63,13 @@ export async function runRewardSweep(env: Env, nowIso = new Date().toISOString()
   const report: RewardSweepReport = {
     installed: true,
     catch_up: { scanned: 0, issued: 0, errors: 0 },
+    weekly: { scanned: 0, issued: 0, errors: 0 },
     reminders: { coupons: 0, customers: 0 },
   };
   try {
     await catchUp(env, nowIso, report);
+    const weeklyStarted = await programStartedAt(env.DB, WEEKLY_MIGRATION);
+    if (weeklyStarted) report.weekly = await issueWeeklyRewards(env, weeklyStarted, nowIso);
     await remind(env.DB, nowIso, report);
   } catch (e) {
     if (isSchemaMissing(e)) return { ...report, installed: false };
@@ -106,7 +118,8 @@ async function remind(db: D1Database, nowIso: string, report: RewardSweepReport)
         WHERE g.revoked_at IS NULL AND g.reminded_at IS NULL
           AND g.expires_at > ?1 AND g.expires_at <= ?2
           AND c.active = 1 AND c.ends_at > ?1
-          AND NOT EXISTS (SELECT 1 FROM coupon_redemptions r WHERE r.coupon_id = g.coupon_id AND r.state = 'active')
+          AND g.source_ref NOT GLOB '*:w[0-9]*'
+          AND NOT ${SPENT_SQL('g.coupon_id')}
         ORDER BY g.expires_at ASC
         LIMIT ?3`
     )

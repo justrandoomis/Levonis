@@ -35,6 +35,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { asD1, freshDb, json, post, stubApp, type StubUser } from './fixtures/app';
 import { supportRoutes, matchIntents } from '../worker/routes/support';
 import { STUDIO_URL } from '../src/translations';
+import { REWARD_CONFIG_KEY } from '../worker/lib/rewards/config';
 import {
   normalizeText,
   tokenize,
@@ -489,7 +490,7 @@ test('all three dictionaries carry every new string', () => {
     'c_choose_printer', 'c_price', 'c_stock', 'c_materials', 'c_shipping_cost', 'c_payment', 'c_offers',
     'c_wallet', 'c_studio', 'c_account', 'c_cancel_order', 'c_contact', 'c_greeting',
     // The four topic answers that stopped quoting a legal preamble.
-    'shipping_cost_reply', 'payment_methods_reply', 'offers_reply', 'contact_reply', 'pickup_map', 'fee_free',
+    'shipping_cost_reply', 'payment_methods_reply', 'offers_reply', 'offers_reply_once', 'contact_reply', 'pickup_map', 'fee_free',
     // What the Messenger inbox taught it (docs/CUSTOMER_REPLY_GUIDE.md).
     'contact_whatsapp', 'c_condition', 'c_how_to_order', 'c_print_service', 'product_condition_reply', 'used_printers_open',
     'how_to_order_reply', 'printers_open', 'print_service_reply', 'print_service_closed', 'requests_open', 'warranty_general_reply',
@@ -672,6 +673,16 @@ test('«كود خصم» says where the box is instead of quoting the rewards pre
   // And the page that lists the codes the customer DOES hold (DECISIONS row 290).
   assert.equal(reply.links[0].to, '/rewards/coupons');
   assert.equal(reply.links[0].label, 'كوبوناتي');
+});
+
+test('the chat promises the weekly coupons only while the owner runs them', async () => {
+  const raw = seed();
+  const db = asD1(raw);
+  assert.match((await ask(db, { text: 'كود خصم' })).text, /كل أسبوع/);
+  raw.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES (?, ?)').run(REWARD_CONFIG_KEY, JSON.stringify({ weekly: { enabled: false, months: 12 } }));
+  const off = await ask(db, { text: 'كود خصم' });
+  assert.doesNotMatch(off.text, /كل أسبوع/);
+  assert.match(off.text, /كود الخصم/);
 });
 
 test('«نقاطي» still opens the points page: only the coupon answer moved to «كوبوناتي» (DECISIONS row 290)', async () => {
