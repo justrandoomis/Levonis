@@ -424,6 +424,18 @@ test('windowFromRow keeps fixed_usd; an unknown mode reads as no price', () => {
   assert.equal(row('fixed_usd').offer_price_mode, 'fixed_usd');
   assert.deepEqual(row('fixed_usd').usd_prices, []);
   assert.equal(row('fixed_eur').offer_price_mode, '');
+  // THE OCCASION (0224, DECISIONS row 294): a known key is read, an unknown one and a database before 0224
+  // (no column) read as none, and 'custom' needs a readable Arabic name.
+  const occasion = (badge: unknown, badge_text: unknown = '') =>
+    windowFromRow({ subject_type: 'product', subject_id: 'p', id: 'w', starts_at: null, ends_at: null, required_tiers: '[]', offer_price_mode: 'discount_percent', offer_price_iqd: null, discount_percent: 10, discount_iqd: null, plus_price_iqd: null, locked_preview: 1, active: 1, badge: badge as string, badge_text: badge_text as string });
+  assert.equal(occasion('black_friday').badge, 'black_friday');
+  assert.equal('badge_text' in occasion('black_friday'), false);
+  assert.equal('badge' in occasion('a_future_occasion'), false, 'an unknown key is no label');
+  assert.equal('badge' in occasion(''), false);
+  assert.equal('badge' in row('discount_percent'), false, 'no column (before 0224): no label');
+  assert.deepEqual(occasion('custom', '{"ar":"عيد الحب","ckb":"ڕۆژی خۆشەویستی"}').badge_text, { ar: 'عيد الحب', ckb: 'ڕۆژی خۆشەویستی' });
+  assert.equal('badge' in occasion('custom', '{"en":"Valentine"}'), false, 'a custom name without its Arabic is no label');
+  assert.equal('badge' in occasion('custom', 'not json'), false);
 });
 
 /* ---------------------------------------------- the mirror and the sites -- */

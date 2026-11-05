@@ -1084,3 +1084,81 @@ None of these blocks the build. The default is stated for each.
   - `/api/products?type=discounted` answers;
   - a product page renders;
   - no customer JSON carries any key from §11's list.
+
+---
+
+## 16. Addendum (2026-11-05): the sale's occasion — «بلاك فرايدي» and its siblings, and «العروض»
+
+DECISIONS row 294; migration **0224** (`0224_offer_occasions.sql`).
+
+### 16.1 What the owner asked
+
+- 2026-11-04: «make a label to show this is black friday discount like on to left corner».
+- 2026-11-05, how a discount gets it: «Label all sales by dates on product edit on price dicount can named by what the oocasion like cristmas or blackfriday or cyber monday or flash deal or hyper or white friday or 11.11 or 12.12 or eid al futtur or eid al adhaa or ramaddan or back to school or summer deal or winter or spring deal or anything, any of them have special design and clean ui ux for know this is dicount for this special deal».
+
+بالعربية باختصار: في بطاقة «تخفيض السعر» يختار المالك مناسبة التخفيض من شبكة (كل مناسبة بتصميمها) أو يكتب «اسمًا آخر»؛ وما دام التخفيض حيًّا ويخفّض السعر للزبون تظهر شارة المناسبة في زاوية صورة المنتج (اليسار في العربية والكردية) فوق «−N٪»، وفي صفحته على الصورة وبجانب السعر «سعر بلاك فرايدي». وصفحة `/offers` تعرض كل ما عليه تخفيض الآن، بشرائح المناسبات.
+
+### 16.2 Data and an older database
+
+- The occasion lives **on the sale's own row**, so it starts, ends, gates and lowers exactly as the sale does: `offer_windows.badge` (a preset key or `custom`; `''` = none) and `offer_windows.badge_text` (the custom name as JSON `{ar, en?, ckb?}`). The CHECK is a **shape** (`^[a-z0-9_]{2,32}$`; `json_valid`, at most 400 characters), never a list: a new preset is a code change (`packages/contracts/src/offerOccasions.ts`), never a table rebuild. An unknown key reads as no occasion.
+- **One sale per product** (`PRIMARY KEY (subject_type, subject_id)`, 0060): a sale saved for a new occasion replaces the product's current sale; the older one does not come back when the new one ends. The picker says so.
+- **Deploy-ahead.** Without 0224, `SELECT w.*` simply carries no occasion: nothing is labelled, an ordinary save (the card always sends `badge: ''`) works, and a save that names an occasion is refused `OFFER_OCCASION_NOT_INSTALLED` (409). `offerOccasionInstalled` asks once per binding (`tableColumns`).
+
+### 16.3 The door (`worker/routes/offers.ts`)
+
+- `badge` absent from the body **keeps** the stored occasion: an older client's save (a tab opened before this deploy, a direct call) and every bundle and mystery save (`offerWindowStatements` without its fourth argument writes exactly the SQL before 0224). The three clients of this deploy always name it: the card and `InlineSaleDiscount` send the occasion they opened with (`saveBodyOf`), the «العروض الخاصة» tab its picker's for an ordinary product (`offerSaveBody`), and none for a composition. A stale tab's save over a newer occasion is the lost update the stamp already refuses (`expected_updated_at`, `SPECIAL_OFFER_CHANGED`).
+- A save that does not name it but leaves the sale pricing nothing (mode `''`) while the row still carries an occasion is refused `OFFER_OCCASION_NEEDS_PRICE`, like a named one: an occasion is never kept on a window that lowers nothing.
+- Checked in `planOffer` step 6, said and never repaired, each in ar/en/ckb (`OFFER_OCCASION_REFUSALS`, spread into the door's ISSUES and the SPA's refusal table): an unknown key (`OFFER_OCCASION_UNKNOWN`); a custom name without its Arabic, over 32 characters, or with English or Sorani copying an Arabic-script Arabic (`OFFER_OCCASION_NAME`); an occasion on a window that prices nothing (`OFFER_OCCASION_NEEDS_PRICE`); on a composition (`OFFER_OCCASION_ORDINARY_ONLY`: bundles and mystery offers are not labelled); a database without 0224 (`OFFER_OCCASION_NOT_INSTALLED`, 409). A save is refused; the **preview** prices its rows anyway and lists the sentence beside them, so the owner still sees the sale while naming it.
+- `windowView` and the audit's `before`/`after` carry `badge` and `badge_text`.
+- The list (`GET /api/admin/offers`): `?badge=` a key, `custom`, `any` or `none`; **paged** (`limit` up to 200, `offset`, `has_more`, `next_offset`), newest first then by product id. A Black Friday on hundreds of products no longer pushes every other offer off the tab. One key is read through 0224's partial index (`w.badge <> '' AND w.badge = ?`: SQLite takes a partial index only when the query names its WHERE).
+
+### 16.4 The customer payload and the display rule
+
+- Inside the existing `offer` block, an **explicit allow-list** (`occasionOf`): `badge` (the key), and `badge_text` for `custom`. No preset's words travel (the client draws them), and no new top-level card key.
+- Named only while the window is **live, active, unsuspended, priced and eligible for this viewer and actually lowers the price**: on a card, the card's own «from» (`offerLowered`, i.e. `price_source: 'offer'`); on the product page (`publicWithDisplayPrice(..., { occasionOnAnyLevel: true })`), any level. So a Combo-only sale above the card's «from» is labelled on the page, on the Combo (`offerBefore`), and never on the card. A members-only sale names nothing to whoever it does not cover (they see the lock). The client's two gates sit beside the badge both surfaces already wear (`occasionOnCard`, `occasionOnPage` in `src/components/ui/OfferBadge.tsx`).
+- No new cache path: the occasion is a column of the row `loadOffers` already reads, and every door write already purges the listing, the home and the product page (F3). Label and price flip at the same instants.
+
+### 16.5 The designs (`src/components/ui/OccasionTag.tsx`)
+
+Each tag is a **dark island** (`data-theme="dark"`): every palette shade and named tone inside it reads its designed value, so one design serves both themes. Only fixed tokens, named tones and palette shades the shop already uses (the theme generator writes nothing new); flat and opaque like the «−N٪» chip; no zinc, blur, shadow or arbitrary radius. The ink reads at 4.5:1 or more on its fill, every glyph at 3:1, and every tag stands off a dark photo, a white photo and every tray by its fill or its edge; two designs that share an edge keep their fills at least 0.08 apart in OKLab, so Ramadan's night blue can never read as Black Friday's onyx (all computed in `tests/offerOccasionCard.test.ts`).
+
+| Key | ar / en / ckb | Fill · ink · edge | Mark |
+|---|---|---|---|
+| `black_friday` | بلاك فرايدي / Black Friday / بلاک فرایدەی | onyx · snow · gold-fill | gold medallion, tag |
+| `white_friday` | الجمعة البيضاء / White Friday / هەینیی سپی | snow · yellow-900 · yellow-900 | gold medallion, sparkles |
+| `cyber_monday` | سايبر مونداي / Cyber Monday / سایبەر ماندەی | violet-950 · cyan-300 · cyan-500 | cyan medallion, pointer |
+| `singles_day` | عروض 11.11 / 11.11 Sale / ئۆفەری 11.11 | crimson · snow · flame | snow medallion, bag |
+| `double_twelve` | عروض 12.12 / 12.12 Sale / ئۆفەری 12.12 | flame · onyx · crimson | onyx medallion, gift |
+| `flash_deal` | عرض خاطف / Flash Deal / ئۆفەری خێرا | amber-400 · onyx · onyx | onyx medallion, bolt |
+| `hyper_deal` | عرض هايبر / Hyper Deal / ئۆفەری هایپەر | violet-700 · snow · fuchsia-500 | fuchsia medallion, gauge |
+| `ramadan` | عروض رمضان / Ramadan Deal / ئۆفەری ڕەمەزان | sky-900 (night blue) · amber-100 · gold-fill | gold lantern |
+| `eid_al_fitr` | عيد الفطر / Eid al-Fitr / جەژنی ڕەمەزان | emerald-900 · amber-100 · gold-fill | gold crescent |
+| `eid_al_adha` | عيد الأضحى / Eid al-Adha / جەژنی قوربان | teal-950 (deeper green) · amber-100 · gold-fill | gold medallion, crescent and star |
+| `christmas` | كريسمس / Christmas / کریسمس | emerald-950 · snow · red-500 | red medallion, snow pine |
+| `back_to_school` | عودة المدارس / Back to School / بۆ قوتابخانە | yellow-300 · sky-900 · sky-900 | navy pencil |
+| `summer` | عروض الصيف / Summer Deal / ئۆفەری هاوین | orange-500 · onyx · orange-900 | yellow medallion, sun |
+| `winter` | عروض الشتاء / Winter Deal / ئۆفەری زستان | sky-100 · sky-900 · sky-900 | navy medallion, snowflake |
+| `spring` | عروض الربيع / Spring Deal / ئۆفەری بەهار | petal · emerald-900 · emerald-700 | green flower |
+| `custom` | the owner's name; else عرض خاص / Special deal / ئۆفەری تایبەت | slate-400 · onyx · onyx | onyx badge-percent |
+
+Placement: the card's photo, logical **top-end** (top-left in Arabic and Sorani, where the owner asked; top-right in English, where top-left is the compare toggle), stacked **above** the unchanged «−N٪» chip. The stack stops 2.875 rem short of the photo's start, 6 px clear of the compare toggle's disc, and truncates a name too long for what is left (an owner's long custom name). Card size is 10 px semibold on a 12 px medallion: every preset, and the custom fallback, fits the narrowest card — the home rail's 148 px, a 92 px stack — with at least 6 px to spare in all three languages, measured in headless Edge with the shop's Cairo and pinned in `tests/fixtures/occasionTagWidths.json` (a renamed preset or a changed tag fails `tests/offerOccasionCard.test.ts` until it is measured again). A list row's 96 px photo keeps its «−N٪» chip alone, where it always was (it has room for no name, and a tag above the chip would push it under the offer's clock, which fills that photo's lower half); the row names the occasion in its design above the price instead, inside the card's link (its sentence part of the link's name). Every surface that draws `ProductCard` (rail, grid, list) shows it. The tag is its own chunk, loaded by the card only when an occasion is named (its place held at its height meanwhile, so nothing moves): the home rail and every listing download none of it the rest of the year. The product page: a larger tag at the gallery's top-end, and «سعر <occasion>» beside the sale price (the page's own «سعر العرض» until the lazy chunk arrives); the page's opening downloads neither.
+
+### 16.6 «العروض» (`/offers`)
+
+- `GET /api/products?type=offers[&occasion=key]`: every ordinary product a **live, active, priced, unsuspended** sale reaches, narrowed **in SQL** (`LIVE_PRICED_OFFER`) so the 1,000-candidate cap walks sales only and can hide none; each candidate is resolved and kept only when its card shows the sale (`price_source: 'offer'`) — the rule of «عليها عرض» (§8.8). So a sale on a dearer model alone (a Combo-only dollar sale) is named on its product page, on that model, but is not listed here: its card shows no sale. Past 1,000 live priced sales the cap itself would drop some (`partial_order`), which no single-product door reaches. `occasions` counts each occasion on the kept cards **before** `occasion=` narrows them, so the chips stay; an unknown occasion lists nothing. Cached at the edge like every listing (`occasion` is a cache parameter) and purged by every offer write.
+- The page (`src/pages/Offers.tsx`): «الكل» and one chip per occasion (a link, drawn in its design, with its count), the shop's compact cards, «عرض المزيد», an empty state per occasion; its snapshot is kept per occasion (`offers:<occasion>`); the count's noun agrees with the number (`countNoun`: «100 منتج», «103 منتجات»; Sorani «یەک بەرهەم» for one); «رجوع» from a shared link goes home (`useGoBack`), never out of the shop. Public, lazy, reported to the pixel like /products (privacy policy 7.5 already names product lists), in the sitemap, the guest e2e walk and the theme shots.
+- **The way in**: the home rail «أحدث المنتجات» (`src/components/home/v2/LatestProducts.tsx`) adds an «العروض» chip after its sections while the page holds a product a live sale lowers (no sale, no chip); the chip lists those products (and asks `type=offers&limit=20` once) and «عرض الكل» then opens `/offers`. The «عروض سريعة» board (`FlashDealsBoard`) the brief named is retired from Home V2 (`flash_deals` in `RETIRED_SECTION_IDS`); its «عرض الكل» was corrected too (it opened `/products?type=discounted`, which `Products.tsx` ignores — the whole catalogue). The owner can also put `/offers?occasion=black_friday` on a banner, and the support chat will link it.
+
+### 16.7 Not in this addendum, and open questions
+
+1. **No bulk tool**: one sale per product at a time; a bulk preview, apply and end is a separate lane.
+2. The cart, checkout, order page and invoice show the saving without the occasion (phase 2: `offer_badge` on the line and the snapshot).
+3. The wishlist reads raw `products.price_iqd` and shows no sale at all (an existing gap).
+4. The Sorani transliterations «بلاک فرایدەی» and «سایبەر ماندەی», and the short tag names «عودة المدارس» and «بۆ قوتابخانە» for back to school, wait for the owner's confirmation; any new wording is measured again (`tests/fixtures/occasionTagWidths.json`).
+5. Should «العروض» also list members-only sales to a guest (with the lock), or bundles and mystery offers? Today: no.
+6. Where else should «العروض» be linked? Today the home rail's chip, while a sale is live; the main navigation and the services grid do not name it.
+7. Should a sale on one dearer model (a Combo-only price) be listed on «العروض» with its tag although its card shows no strike? Today: no (§16.6).
+
+### 16.8 Tests
+
+`tests/offerOccasion.test.ts` (the migration, the door, the refusals — a kept occasion on a save that switches the price off included —, deploy-ahead, the list's filter through the partial index, and paging), `tests/offerOccasionSurfaces.test.ts` (the display rule, a member's and a guest's view of a members-only sale, the allow-list and the leak scanners, the listing predicate, ordinary products only, and the cap), `tests/offerOccasionCard.test.ts` (the lazy tag and its held place, every design rendered on grid and list cards, the two gates, the measured fit against `tests/fixtures/occasionTagWidths.json`, the contrast, distinctness and token rules, the words, the product page), `tests/offersPage.test.ts` (the route, the page, the home rail's chip, the counts, the back button). Changed pins: `productDiscountCard` (with the «العروض الخاصة» tab's save body, row chip, picker gate and list address), `productDiscountAdmin`, `productDiscountResolver`, `backNavigationCache`, `metaPixel`, `metaCapi`.

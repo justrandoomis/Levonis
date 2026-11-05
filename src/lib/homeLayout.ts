@@ -377,7 +377,11 @@ export function resolveBento(
 
 // ------------------------------------------------------------- latest chips
 
-export type LatestChipId = 'all' | 'printers' | 'filament' | 'resin' | 'accessories';
+/**
+ * `offers` is not a section: «العروض», the rail's chip for the products a live sale lowers, drawn by
+ * LatestProducts itself while the page holds one (DECISIONS row 294) — `latestChips` never makes it.
+ */
+export type LatestChipId = 'all' | 'printers' | 'filament' | 'resin' | 'accessories' | 'offers';
 
 export interface LatestChip {
   id: LatestChipId;

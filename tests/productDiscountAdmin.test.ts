@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
 import { all, count, row } from './fixtures/app';
 import { COST_PID, discountWorld, M1, M2, PID, SLUG, SHAPES, seedShapes, writeV2Uniform, type DiscountWorld } from './fixtures/productDiscount';
 import { OFFER_DOOR_SENTENCES } from '../worker/routes/offers';
-import { OFFER_DISCOUNT_REFUSALS, OFFER_DISCOUNT_WARNINGS } from '../packages/contracts/src/offerRefusals';
+import { OFFER_DISCOUNT_REFUSALS, OFFER_DISCOUNT_WARNINGS, OFFER_OCCASION_REFUSALS } from '../packages/contracts/src/offerRefusals';
 import { REFUSAL_STRINGS } from '../src/lib/refusalStrings';
 
 const perModel = (p1s: string | null, combo: string | null) => ({
@@ -201,8 +201,8 @@ test('every §5.8 refusal, with its status and three sentences (the Sorani never
   }
   assert.equal(count(w.raw, 'SELECT COUNT(*) AS n FROM offer_windows'), 0, 'nothing was written by any refusal');
   // Every new code the door can say has its three sentences in the client table too (src/lib/refusalStrings.ts),
-  // the very ones the door answers with.
-  for (const code of [...Object.keys(OFFER_DISCOUNT_REFUSALS), ...Object.keys(OFFER_DISCOUNT_WARNINGS)]) {
+  // the very ones the door answers with — the occasion's refusals (DECISIONS row 294) included.
+  for (const code of [...Object.keys(OFFER_DISCOUNT_REFUSALS), ...Object.keys(OFFER_DISCOUNT_WARNINGS), ...Object.keys(OFFER_OCCASION_REFUSALS)]) {
     assert.deepEqual(
       { ...(OFFER_DOOR_SENTENCES as Record<string, unknown>)[code] as object },
       { ...(REFUSAL_STRINGS as Record<string, unknown>)[code] as object },

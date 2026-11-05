@@ -21,6 +21,10 @@ import {
 import ProductPicker from '../adminProducts/form/ProductPicker';
 import { UsdInput } from '../adminProducts/form/v2/v2Ui';
 import { baghdadInputToZoned, isoToBaghdadInput } from '../../lib/offerTime';
+import OccasionTag from '../ui/OccasionTag';
+import OccasionPicker from '../adminProducts/form/OccasionPicker';
+import { occasionBodyOf, occasionDraftOf, type OccasionDraft } from '../adminProducts/form/productDiscountWire';
+import { OFFER_OCCASION_KEYS, occasionWords } from '../../../packages/contracts/src/offerOccasions';
 
 /**
  * SPECIAL OFFERS — one panel for the ONE promotion model
@@ -91,6 +95,11 @@ const STRINGS = {
     kindBundle: 'باقات',
     kindMystery: 'عروض غامضة',
     state: { upcoming: 'لم يبدأ', live: 'يعمل الآن', ended: 'انتهى' },
+    occasionAll: 'كل المناسبات',
+    occasionAny: 'بمناسبة',
+    occasionNone: 'بلا مناسبة',
+    loadMore: 'عرض المزيد',
+    loadingMore: 'جارٍ التحميل…',
   },
   en: {
     title: 'Special offers',
@@ -137,6 +146,11 @@ const STRINGS = {
     kindBundle: 'Bundles',
     kindMystery: 'Mystery offers',
     state: { upcoming: 'Not started', live: 'Live now', ended: 'Ended' },
+    occasionAll: 'All occasions',
+    occasionAny: 'With an occasion',
+    occasionNone: 'No occasion',
+    loadMore: 'Load more',
+    loadingMore: 'Loading…',
   },
   ckb: {
     title: 'ئۆفەرە تایبەتەکان',
@@ -183,12 +197,17 @@ const STRINGS = {
     kindBundle: 'پاکێجەکان',
     kindMystery: 'ئۆفەرە نهێنییەکان',
     state: { upcoming: 'دەستی پێنەکردووە', live: 'ئێستا کار دەکات', ended: 'کۆتایی هات' },
+    occasionAll: 'هەموو بۆنەکان',
+    occasionAny: 'بە بۆنە',
+    occasionNone: 'بێ بۆنە',
+    loadMore: 'زیاتر پیشان بدە',
+    loadingMore: 'بارکردن…',
   },
 } as const;
 
 const TIERS = ['plus', 'prime', 'pro'] as const;
 
-interface OfferRow {
+export interface OfferRow {
   subject_id: string;
   offer_id: string;
   starts_at: string | null;
@@ -211,6 +230,10 @@ interface OfferRow {
   offer_usd_prices?: UsdRow[];
   /** D7: may THIS viewer type a dollar sale price here? False for an editor on a cost-first product. */
   usd_allowed?: boolean;
+  /** The sale's occasion (0224, DECISIONS row 294): a preset key or 'custom'; '' = none. */
+  badge?: string;
+  /** The owner's own name, for 'custom'. */
+  badge_text?: { ar: string; en?: string; ckb?: string } | null;
   product: { id: string; name: string; slug: string; composition: string; status: string };
   redeemed: number;
   /** Slots given back by a genuine cancellation (§17 decision 4). They no
@@ -266,6 +289,9 @@ export interface UsdRow {
 
 type TabLang = keyof typeof STRINGS;
 
+/** «اسم آخر» in the filter: the owner's own names, all of them. */
+const discountCustomName = (lang: TabLang) => (lang === 'en' ? 'Another name' : lang === 'ckb' ? 'ناوێکی تر' : 'اسم آخر');
+
 /** A model's name in the reader's language (Sorani ← Arabic ← English). */
 const nameIn = (n: UsdRow['names'], lang: TabLang): string =>
   !n ? '' : (lang === 'en' ? n.en || n.ar : lang === 'ckb' ? n.ckb || n.ar || n.en : n.ar || n.en) || '';
@@ -289,6 +315,57 @@ export function usdModelsLine(set: readonly UsdRow[], lang: TabLang): Array<{ ke
   return set.map((p) => ({ key: p.model_id || '_', name: nameIn(p.names, lang), usd: `$${p.usd}` }));
 }
 
+/**
+ * THE LIST'S ADDRESS (DECISIONS row 294): the search, the kind, the occasion filter ('' every row, 'any',
+ * 'none' or one key) and the page (`offset`, from the door's `next_offset`).
+ */
+export function offersListPath(filter: { search: string; kind: string; badge: string }, offset: number): string {
+  const q = new URLSearchParams();
+  if (filter.search) q.set('search', filter.search);
+  if (filter.kind) q.set('kind', filter.kind);
+  if (filter.badge) q.set('badge', filter.badge);
+  if (offset > 0) q.set('offset', String(offset));
+  return `/api/admin/offers${q.size ? `?${q}` : ''}`;
+}
+
+/** The occasion is an ordinary product's (the door refuses it on a bundle or a mystery offer, OFFER_OCCASION_ORDINARY_ONLY). */
+export const occasionEditable = (row: Pick<OfferRow, 'product'>): boolean => row.product.composition === '';
+
+/** THE TAB'S PUT BODY: the row as edited, the tab's own dollar input when it changed, the occasion, the stamp. */
+export function offerSaveBody(editing: OfferRow, usdDraft: string | null, occasion: OccasionDraft): Record<string, unknown> {
+  return {
+    starts_at: editing.starts_at,
+    ends_at: editing.ends_at,
+    required_tiers: editing.required_tiers,
+    offer_price_mode: editing.offer_price_mode,
+    offer_price_iqd: editing.offer_price_iqd,
+    discount_percent: editing.discount_percent,
+    discount_iqd: editing.discount_iqd,
+    plus_price_iqd: editing.plus_price_iqd,
+    locked_preview: editing.locked_preview,
+    active: editing.active,
+    max_per_user: editing.max_per_user,
+    max_global: editing.max_global,
+    // The dollar set travels only when THIS tab's own input changed it (§7): the product form's
+    // per-model prices are kept by a save that does not name them.
+    ...(editing.offer_price_mode === 'fixed_usd' && usdDraft !== null ? { offer_usd_prices: [{ model_id: '', usd: usdDraft }] } : {}),
+    // The occasion (DECISIONS row 294), on an ordinary product only; a bundle's save never names it.
+    ...(occasionEditable(editing) ? occasionBodyOf(occasion) : {}),
+    // D12: the stamp this tab read (null = it saw no row) — a save over someone else's is refused.
+    expected_updated_at: editing.offer_id ? editing.updated_at : null,
+  };
+}
+
+/** A list row's occasion, in its own design (DECISIONS row 294); nothing for a row without one. */
+export function OfferOccasionChip({ row, lang }: { row: Pick<OfferRow, 'badge' | 'badge_text'>; lang: TabLang }) {
+  if (!row.badge) return null;
+  return (
+    <span className="flex min-w-0 max-w-[45%]" data-offer-occasion>
+      <OccasionTag badge={row.badge} name={row.badge_text} lang={lang} size="card" />
+    </span>
+  );
+}
+
 export default function AdminOffers() {
   const { lang, dir, loc } = useLanguage();
   const s = STRINGS[lang];
@@ -304,24 +381,49 @@ export default function AdminOffers() {
   const [newId, setNewId] = useState('');
   /** The tab's own whole-product dollar input; null = untouched (the stored set is kept, §7). */
   const [usdDraft, setUsdDraft] = useState<string | null>(null);
+  /** The occasion being edited (DECISIONS row 294): opened from the row, saved with it. */
+  const [occasion, setOccasion] = useState<OccasionDraft>(() => occasionDraftOf(null));
+  /** The list's occasion filter: '' all, 'any', 'none', or one key. */
+  const [badgeFilter, setBadgeFilter] = useState('');
+  /** PAGED (the door's `has_more` / `next_offset`): a Black Friday on hundreds of products pushes no offer off the tab. */
+  const [nextOffset, setNextOffset] = useState<number | null>(null);
+  const [moreBusy, setMoreBusy] = useState(false);
   const seq = useRef(0);
+
+  const listPath = useCallback((offset: number) => offersListPath({ search, kind, badge: badgeFilter }, offset), [search, kind, badgeFilter]);
 
   const load = useCallback(async () => {
     const mine = ++seq.current;
     setError(null);
     try {
-      const q = new URLSearchParams();
-      if (search) q.set('search', search);
-      if (kind) q.set('kind', kind);
-      const res = await api.get<{ offers: OfferRow[] }>(`/api/admin/offers${q.size ? `?${q}` : ''}`);
+      const res = await api.get<{ offers: OfferRow[]; next_offset?: number | null }>(listPath(0));
       if (mine !== seq.current) return; // a slower earlier reload must not win
       setRows(res.offers ?? []);
+      setNextOffset(res.next_offset ?? null);
     } catch (e) {
       if (mine !== seq.current) return;
       setError(e instanceof Error ? e.message : String(e));
       setRows([]);
+      setNextOffset(null);
     }
-  }, [search, kind]);
+  }, [listPath]);
+
+  /** The next page, appended; a failure costs the page asked for, never the list on screen. */
+  const loadMore = async () => {
+    if (nextOffset === null) return;
+    const mine = seq.current;
+    setMoreBusy(true);
+    try {
+      const res = await api.get<{ offers: OfferRow[]; next_offset?: number | null }>(listPath(nextOffset));
+      if (mine !== seq.current) return;
+      setRows((prev) => [...(prev ?? []), ...(res.offers ?? [])]);
+      setNextOffset(res.next_offset ?? null);
+    } catch {
+      setNextOffset(null);
+    } finally {
+      setMoreBusy(false);
+    }
+  };
 
   useEffect(() => {
     void load();
@@ -338,25 +440,7 @@ export default function AdminOffers() {
     try {
       const res = await api.put<{ offer: OfferRow | null; warnings?: Issue[] }>(
         `/api/admin/offers/${editing.subject_id}`,
-        {
-          starts_at: editing.starts_at,
-          ends_at: editing.ends_at,
-          required_tiers: editing.required_tiers,
-          offer_price_mode: editing.offer_price_mode,
-          offer_price_iqd: editing.offer_price_iqd,
-          discount_percent: editing.discount_percent,
-          discount_iqd: editing.discount_iqd,
-          plus_price_iqd: editing.plus_price_iqd,
-          locked_preview: editing.locked_preview,
-          active: editing.active,
-          max_per_user: editing.max_per_user,
-          max_global: editing.max_global,
-          // The dollar set travels only when THIS tab's own input changed it (§7): the product form's
-          // per-model prices are kept by a save that does not name them.
-          ...(editing.offer_price_mode === 'fixed_usd' && usdDraft !== null ? { offer_usd_prices: [{ model_id: '', usd: usdDraft }] } : {}),
-          // D12: the stamp this tab read (null = it saw no row) — a save over someone else's is refused.
-          expected_updated_at: editing.offer_id ? editing.updated_at : null,
-        }
+        offerSaveBody(editing, usdDraft, occasion)
       );
       // Warnings stay visible AFTER a successful save (§11.3): the sentence
       // that matters most is the one about a configuration that worked and is
@@ -364,7 +448,10 @@ export default function AdminOffers() {
       setWarnings(res.warnings ?? []);
       setNote(s.saved);
       setUsdDraft(null);
-      if (res.offer) setEditing({ ...editing, ...res.offer });
+      if (res.offer) {
+        setEditing({ ...editing, ...res.offer });
+        setOccasion(occasionDraftOf(res.offer));
+      }
       await load();
     } catch (e) {
       const body = (e as { code?: string; details?: { errors?: Issue[] }; message?: string }) ?? {};
@@ -437,6 +524,17 @@ export default function AdminOffers() {
           <option value="bundle">{s.kindBundle}</option>
           <option value="mystery">{s.kindMystery}</option>
         </Select>
+        {/* BY OCCASION (DECISIONS row 294): «بلاك فرايدي» alone, every labelled sale, or the unlabelled ones. */}
+        <Select value={badgeFilter} onChange={(e) => setBadgeFilter(e.target.value)} aria-label={s.occasionAll} data-offer-occasion-filter>
+          <option value="">{s.occasionAll}</option>
+          <option value="any">{s.occasionAny}</option>
+          <option value="none">{s.occasionNone}</option>
+          {OFFER_OCCASION_KEYS.map((key) => (
+            <option key={key} value={key}>
+              {key === 'custom' ? discountCustomName(lang) : occasionWords(key, null, lang)?.name}
+            </option>
+          ))}
+        </Select>
       </div>
 
       {/* CHOOSING THE SUBJECT IS A SEARCH, NOT A PASTE.
@@ -469,6 +567,7 @@ export default function AdminOffers() {
           disabled={!newId.trim()}
           onClick={() => {
             setEditing(blank(newId.trim()));
+            setOccasion(occasionDraftOf(null));
             setUsdDraft(null);
             setIssues([]);
             setWarnings([]);
@@ -494,6 +593,7 @@ export default function AdminOffers() {
               type="button"
               onClick={() => {
                 setEditing(o);
+                setOccasion(occasionDraftOf(o));
                 setUsdDraft(null);
                 setIssues([]);
                 setWarnings([]);
@@ -507,6 +607,7 @@ export default function AdminOffers() {
                   {o.product.name || o.subject_id}
                 </span>
                 {stateChip(o.schedule_state)}
+                <OfferOccasionChip row={o} lang={lang} />
                 {o.suspended && (
                   <span className="shrink-0 rounded-full lv-chip [--chip:var(--color-warning)] px-2 py-0.5 text-[10px] font-bold" data-offer-suspended>
                     {loc('موقوف: أُنشئ قبل التسعير الجديد', 'Paused: created before the new pricing', 'ڕاگیراوە: پێش نرخدانانی نوێ دروستکراوە')}
@@ -557,6 +658,13 @@ export default function AdminOffers() {
           </li>
         ))}
       </ul>
+      {nextOffset !== null && list.length > 0 ? (
+        <div className="mt-3 flex justify-center" data-offer-load-more>
+          <button type="button" className={`${btnGhost} h-9 px-4 text-[12px]`} disabled={moreBusy} onClick={() => void loadMore()}>
+            {moreBusy ? s.loadingMore : s.loadMore}
+          </button>
+        </div>
+      ) : null}
 
       {editing && (
         <div className="lv-surface mt-4 p-3">
@@ -732,6 +840,13 @@ export default function AdminOffers() {
                 <Money value={editing.plus_price_iqd} onChange={(v) => setEditing({ ...editing, plus_price_iqd: v })} />
               </Field>
             </Grid>
+            {/* The sale's occasion (DECISIONS row 294): an ordinary product's only — the door refuses it on a
+                bundle or a mystery offer, so their editor never offers it. */}
+            {occasionEditable(editing) ? (
+              <div className="mt-3">
+                <OccasionPicker value={occasion} onChange={setOccasion} lang={lang} />
+              </div>
+            ) : null}
           </SectionCard>
 
           <SectionCard n={4} ar="الحدود" en={STRINGS.en.limits} open onToggle={() => {}}>

@@ -91,4 +91,40 @@ export const OFFER_DISCOUNT_WARNINGS = {
   },
 } as const satisfies Record<string, OfferSentence>;
 
-export type OfferDiscountCode = keyof typeof OFFER_DISCOUNT_REFUSALS | keyof typeof OFFER_DISCOUNT_WARNINGS;
+/**
+ * THE SALE'S OCCASION (DECISIONS row 294, migration 0224): «بلاك فرايدي», «رمضان», the owner's own name.
+ * A label rides a sale that lowers the price, on an ordinary product, from the list or with an Arabic name;
+ * on a database without 0224 a save that names one is refused (409) and every other save works.
+ */
+export const OFFER_OCCASION_REFUSALS = {
+  OFFER_OCCASION_UNKNOWN: {
+    ar: 'هذه المناسبة غير معروفة — اختر من القائمة أو اكتب «اسمًا آخر»',
+    en: 'this occasion is not one the shop knows — choose one from the list or type another name',
+    ckb: 'ئەم بۆنەیە ناناسرێت — یەکێک لە لیستەکە هەڵبژێرە یان ناوێکی تر بنووسە',
+  },
+  OFFER_OCCASION_NEEDS_PRICE: {
+    ar: 'المناسبة تحتاج تخفيضًا يخفّض السعر — اختر نسبة خصم أو سعرًا بعد الخصم',
+    en: 'an occasion needs a sale that lowers the price — choose a discount percent or a price after the discount',
+    ckb: 'بۆنە پێویستی بە داشکاندنێکە کە نرخ کەم بکاتەوە — ڕێژەیەکی داشکاندن یان نرخێکی دوای داشکاندن هەڵبژێرە',
+  },
+  OFFER_OCCASION_ORDINARY_ONLY: {
+    ar: 'المناسبة للمنتجات العادية فقط — لا تظهر على الباقات والعروض الغامضة',
+    en: 'an occasion is for ordinary products only — it does not show on bundles or mystery offers',
+    ckb: 'بۆنە تەنها بۆ بەرهەمە ئاساییەکانە — لەسەر پاکێج و ئۆفەرە نهێنییەکان دەرناکەوێت',
+  },
+  OFFER_OCCASION_NAME: {
+    ar: 'اكتب اسم المناسبة بالعربية، حتى 32 حرفًا — الإنجليزية والكردية اختياريتان، ولا تكون أيّ منهما نسخة من العربية',
+    en: "enter the occasion's name in Arabic, up to 32 characters — English and Sorani are optional, and neither is a copy of the Arabic",
+    ckb: 'ناوی بۆنەکە بە عەرەبی بنووسە، تا 32 پیت — ئینگلیزی و کوردی ئارەزوومەندانەن، و هیچیان کۆپی عەرەبییەکە نییە',
+  },
+  OFFER_OCCASION_NOT_INSTALLED: {
+    ar: 'اسم المناسبة غير متاح بعد على قاعدة البيانات هذه — احفظ التخفيض بلا مناسبة، أو انتظر التحديث',
+    en: 'occasions are not available on this database yet — save the sale without an occasion, or wait for the update',
+    ckb: 'بۆنە هێشتا لەم بنکەدراوەیە بەردەست نییە — داشکاندنەکە بێ بۆنە پاشەکەوت بکە، یان چاوەڕێی نوێکردنەوە بکە',
+  },
+} as const satisfies Record<string, OfferSentence>;
+
+export type OfferDiscountCode =
+  | keyof typeof OFFER_DISCOUNT_REFUSALS
+  | keyof typeof OFFER_DISCOUNT_WARNINGS
+  | keyof typeof OFFER_OCCASION_REFUSALS;

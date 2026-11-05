@@ -15,6 +15,7 @@ const read = (path: string) => readFileSync(new URL(`../${path}`, import.meta.ur
 test('public shopping and browsing pages are reported', () => {
   for (const path of [
     '/', '/products', '/product/bambu-a1-mini', '/categories', '/categories/printers', '/categories/printers/fdm',
+    '/offers', // «العروض» (DECISIONS row 294): a product list; its ?occasion= is not consulted
     '/compare', '/used-printers', '/bundles', '/bundles/starter', '/cart', '/checkout',
     '/community', '/community/stores', '/community/makers', '/community/projects', '/community/projects/p_123',
     '/community/store/ali3d', '/community/store/ali3d/p/benchy', '/u/sara', '/tools', '/printer-finder',

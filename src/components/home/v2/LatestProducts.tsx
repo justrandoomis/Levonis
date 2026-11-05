@@ -25,12 +25,29 @@ import SectionHead from './SectionHead';
  * the compare toggle. On a phone the list is a rail of 148 px cards — two and
  * a half visible, which invites the swipe; on a wide screen it becomes a
  * grid.
+ *
+ * «العروض» — THE HOME'S WAY TO EVERY LIVE SALE (DECISIONS row 294). While the
+ * page holds a product a live sale lowers (its card's own «from», the rule of
+ * /offers), one more chip follows the sections: it lists those products —
+ * and asks `/api/products?type=offers` for more, once — and «عرض الكل» then
+ * opens /offers, every sale by occasion. No sale on the page, no chip: it
+ * never promises a sale the shop does not have.
  */
 // Two full rows at every grid width: 5 + 5 from 1024 px, 6 + 6 from 1536 px
 // (the two extra cards are hidden below that — see the rail). A phone's rail
 // scrolls, so it simply holds all twelve.
 const LIMIT = 12;
 const ROWS_OF_FIVE = 10;
+
+/** A card whose own sale lowers its «from» right now — what /offers lists (`type=offers`). */
+const onSale = (p: ApiProduct) => p.offer?.price_source === 'offer';
+const OFFERS_CHIP: LatestChip = { id: 'offers', categoryIds: [], memberIds: new Set<string>() };
+
+/** Where the rail's «عرض الكل» goes for a chip: /offers for «العروض», the section's own list, else every product. */
+export function latestSeeAll(chip: Pick<LatestChip, 'id' | 'categoryIds'> | undefined): string {
+  if (chip?.id === 'offers') return '/offers';
+  return chip && chip.categoryIds.length === 1 ? `/products?category=${encodeURIComponent(chip.categoryIds[0])}` : '/products';
+}
 
 export default function LatestProducts({
   latest,
@@ -57,19 +74,22 @@ export default function LatestProducts({
   const [failed, setFailed] = React.useState<Partial<Record<LatestChipId, boolean>>>({});
   const inflight = React.useRef(new Set<LatestChipId>());
 
-  const chip = chips.find((c) => c.id === active) ?? chips[0];
+  // «العروض» joins the sections only while a live sale is on the page.
+  const saleOnPage = React.useMemo(() => latest.some(onSale) || pool.some(onSale), [latest, pool]);
+  const shownChips = React.useMemo(() => (saleOnPage ? [...chips, OFFERS_CHIP] : chips), [chips, saleOnPage]);
+  const chip = shownChips.find((c) => c.id === active) ?? shownChips[0];
 
   React.useEffect(() => {
     if (!chip || chip.id === 'all' || fetched[chip.id] || inflight.current.has(chip.id)) return;
     const id = chip.id;
     inflight.current.add(id);
     // One request per section the chip covers, in parallel — «الإكسسوارات»
-    // covers two.
-    Promise.all(
-      chip.categoryIds.map((cat) =>
-        api.get<{ products: ApiProduct[] }>(`/api/products?category=${encodeURIComponent(cat)}&limit=20`)
-      )
-    )
+    // covers two; «العروض» asks the sales list itself.
+    const paths =
+      id === 'offers'
+        ? ['/api/products?type=offers&limit=20']
+        : chip.categoryIds.map((cat) => `/api/products?category=${encodeURIComponent(cat)}&limit=20`);
+    Promise.all(paths.map((path) => api.get<{ products: ApiProduct[] }>(path)))
       .then((pages) => setFetched((prev) => ({ ...prev, [id]: pages.flatMap((p) => p.products ?? []) })))
       .catch(() => setFailed((prev) => ({ ...prev, [id]: true })))
       .finally(() => inflight.current.delete(id));
@@ -77,7 +97,7 @@ export default function LatestProducts({
 
   const products = React.useMemo(() => {
     if (!chip || chip.id === 'all') return orderLatest(latest).slice(0, LIMIT);
-    const onPage = [...latest, ...pool].filter((p) => inSections(p, chip.memberIds));
+    const onPage = [...latest, ...pool].filter((p) => (chip.id === 'offers' ? onSale(p) : inSections(p, chip.memberIds)));
     return orderLatest([...(fetched[chip.id] ?? []), ...onPage]).slice(0, LIMIT);
   }, [chip, latest, pool, fetched]);
 
@@ -98,24 +118,22 @@ export default function LatestProducts({
     filament: 'Filament',
     resin: 'Resin',
     accessories: loc('الإكسسوارات', 'Accessories'),
+    offers: loc('العروض', 'Deals', 'ئۆفەرەکان'),
   };
 
   return (
     <section data-home-section="latest" aria-labelledby="home-latest-title">
-      <SectionHead
-        id="home-latest-title"
-        title={loc('أحدث المنتجات', 'Latest products')}
-        to={chip && chip.categoryIds.length === 1 ? `/products?category=${encodeURIComponent(chip.categoryIds[0])}` : '/products'}
-      />
+      <SectionHead id="home-latest-title" title={loc('أحدث المنتجات', 'Latest products')} to={latestSeeAll(chip)} />
 
-      {chips.length > 1 && (
+      {shownChips.length > 1 && (
         <div
           role="group"
           aria-label={loc('تصفية المنتجات', 'Filter products')}
           className="-mx-4 mb-2 flex gap-1.5 overflow-x-auto overscroll-x-contain px-4 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:mb-4 lg:px-0"
         >
-          {chips.map((c) => {
-            const on = c.id === active;
+          {shownChips.map((c) => {
+            // The chip on screen: a chosen «العروض» whose sale has since left the page falls back to «الكل».
+            const on = c.id === chip?.id;
             return (
               <button
                 key={c.id}

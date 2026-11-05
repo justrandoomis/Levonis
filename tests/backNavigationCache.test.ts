@@ -117,12 +117,14 @@ test('the cache is memory only — no storage API is touched', () => {
 
 // ------------------------------------------------------------ the wiring
 
-test('the four catalogue listings paint from a snapshot and revalidate', () => {
+test('the five catalogue listings paint from a snapshot and revalidate', () => {
   for (const [file, key] of [
     ['src/pages/Home.tsx', 'HOME_CACHE_KEY'],
     ['src/pages/Products.tsx', 'cacheKey'],
     ['src/pages/UsedPrinters.tsx', 'USED_CACHE_KEY'],
     ['src/pages/Bundles.tsx', 'cacheKey'],
+    // «العروض» (DECISIONS row 294): every live sale, by occasion.
+    ['src/pages/Offers.tsx', 'cacheKey'],
   ] as const) {
     const src = read(file);
     assert.match(src, /from '\.\.\/lib\/pageCache'/, `${file} does not use the cache`);
@@ -144,6 +146,7 @@ test('a snapshot is only ever written after a successful read', () => {
     'src/pages/Products.tsx',
     'src/pages/UsedPrinters.tsx',
     'src/pages/Bundles.tsx',
+    'src/pages/Offers.tsx',
   ]) {
     const src = read(file);
     for (const m of src.matchAll(/writePageCache\(/g)) {
@@ -155,10 +158,12 @@ test('a snapshot is only ever written after a successful read', () => {
   }
 });
 
-test('the two pages that carry a query put it in the key', () => {
+test('the three pages that carry a query put it in the key', () => {
   // «products:» alone would let a return to «فلامنت» paint «طابعات».
   assert.match(read('src/pages/Products.tsx'), /`products:\$\{search\}\|\$\{category\}`/);
   assert.match(read('src/pages/Bundles.tsx'), /`bundles:\$\{kind\}\|\$\{search\}\|\$\{category\}`/);
+  // …and «العروض»'s occasion: a return to «بلاك فرايدي» never paints «رمضان».
+  assert.match(read('src/pages/Offers.tsx'), /`offers:\$\{occasion\}`/);
 });
 
 test('the money pages are deliberately NOT cached', () => {

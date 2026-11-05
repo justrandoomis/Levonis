@@ -32,6 +32,10 @@
  * tab and the card edit one row, and a lost update is refused
  * (`SPECIAL_OFFER_CHANGED`). Every write purges the catalogue it reprices.
  *
+ * A SALE CAN BE NAMED BY ITS OCCASION (DECISIONS row 294, migration 0224): «بلاك فرايدي», «رمضان», the
+ * owner's own name — `badge` (+ `badge_text` for a custom name) on the same row, so the label starts,
+ * ends, gates and lowers exactly as the sale does. A save that does not name it keeps the stored one.
+ *
  * `requireAdmin` IS ATTACHED HERE. `requireMainHost` on `/api/admin/*` is a
  * HOST check and never a role check, so a router mounted without its own guard
  * is an open admin API guarded only by hostname.
@@ -52,6 +56,8 @@ import {
   INHERITS,
   isOfferPriceMode,
   normalizeUtc,
+  occasionOfRow,
+  offerOccasionInstalled,
   offerWindowStatements,
   parseRequiredTiers,
   scheduleState,
@@ -79,7 +85,8 @@ import {
 } from '../lib/offerDiscount';
 import { offerBelowCostBell, productNameOf } from '../lib/pricingEngine/v2/bell';
 import { v2ViewerOf } from '../lib/pricingEngine/v2/api';
-import { OFFER_DISCOUNT_REFUSALS, OFFER_DISCOUNT_WARNINGS } from '@levonis/contracts/offerRefusals';
+import { OFFER_DISCOUNT_REFUSALS, OFFER_DISCOUNT_WARNINGS, OFFER_OCCASION_REFUSALS } from '@levonis/contracts/offerRefusals';
+import { checkOccasionName, isOfferOccasionKey } from '@levonis/contracts/offerOccasions';
 
 export const adminOffersRoutes = new Hono<AppContext>();
 adminOffersRoutes.use('*', requireAdmin);
@@ -107,6 +114,13 @@ interface OfferInput {
   offer_usd_prices: unknown;
   /** D12: absent = no check; null = "I saw no row"; a string = "I saw this stamp". */
   expected_updated_at: string | null | undefined;
+  /**
+   * THE OCCASION (0224): absent = keep the stored one; '' = none; a preset key or 'custom'. Checked in
+   * `planOffer` (step 6), never repaired.
+   */
+  badge: string | undefined;
+  /** The custom name {ar, en?, ckb?} for `badge: 'custom'`; ignored for any other key. */
+  badge_text: unknown;
 }
 
 const money = (v: unknown): number | null =>
@@ -134,6 +148,8 @@ function readOffer(b: Record<string, unknown>): OfferInput {
     offer_usd_prices: 'offer_usd_prices' in b ? b.offer_usd_prices : undefined,
     expected_updated_at:
       !('expected_updated_at' in b) ? undefined : typeof b.expected_updated_at === 'string' ? b.expected_updated_at : null,
+    badge: !('badge' in b) ? undefined : b.badge === null ? '' : typeof b.badge === 'string' ? b.badge.trim() : String(b.badge),
+    badge_text: b.badge_text,
   };
 }
 
@@ -176,6 +192,8 @@ const ISSUES = {
   },
   // ---- the dollar sale price and the lost update (docs/ux/PRODUCT-DISCOUNT.md §5.8) ----
   ...OFFER_DISCOUNT_REFUSALS,
+  // ---- the sale's occasion (DECISIONS row 294, docs/ux/PRODUCT-DISCOUNT.md §16) ----
+  ...OFFER_OCCASION_REFUSALS,
 } as const;
 
 type IssueCode = keyof typeof ISSUES;
@@ -185,6 +203,7 @@ const STATUS: Partial<Record<IssueCode, number>> = {
   OFFER_USD_NOT_INSTALLED: 409,
   OFFER_USD_NOT_PRICED: 409,
   SPECIAL_OFFER_CHANGED: 409,
+  OFFER_OCCASION_NOT_INSTALLED: 409,
 };
 
 const issue = (code: IssueCode) => ({ code, message: ISSUES[code].en, ...ISSUES[code] });
@@ -225,6 +244,19 @@ export const OFFER_DOOR_SENTENCES = { ...ISSUES, ...WARNINGS } as const;
 adminOffersRoutes.get('/', async (c) => {
   const search = str(c.req.query('search'), 'search', { max: 100, required: false });
   const kind = str(c.req.query('kind'), 'kind', { max: 20, required: false });
+  /**
+   * BY OCCASION (0224): a key or 'custom' (exactly those), 'any' (every labelled sale) or 'none'. Before
+   * 0224 no row carries one: 'none' lists every row and a key lists none.
+   */
+  const badge = str(c.req.query('badge'), 'badge', { max: 32, required: false });
+  if (badge && badge !== 'any' && badge !== 'none' && !isOfferOccasionKey(badge)) refuse('OFFER_OCCASION_UNKNOWN');
+  /**
+   * PAGED (a Black Friday on hundreds of products must not push every other offer off this tab): the
+   * newest first, then the product id, so two pages walk one order; `has_more` and `next_offset` say
+   * where the next page starts.
+   */
+  const limit = int(c.req.query('limit'), 'limit', { min: 1, max: 200, def: 200 });
+  const offset = int(c.req.query('offset'), 'offset', { min: 0, max: 100_000, def: 0 });
   const params: unknown[] = [];
   let where = "w.subject_type = 'product'";
   if (search) {
@@ -237,12 +269,25 @@ adminOffersRoutes.get('/', async (c) => {
     where += ' AND p.composition = ?';
     params.push(kind);
   }
+  if (badge) {
+    const occasions = await offerOccasionInstalled(c.env.DB);
+    if (!occasions) {
+      if (badge !== 'none') return c.json({ success: true, offers: [], has_more: false, next_offset: null });
+    } else if (badge === 'any') where += " AND w.badge <> ''";
+    else if (badge === 'none') where += " AND w.badge = ''";
+    else {
+      // `badge <> ''` spelled out: SQLite takes a partial index only when the query names its WHERE
+      // (0224's `idx_offer_windows_badge`), and a bound key alone does not.
+      where += " AND w.badge <> '' AND w.badge = ?";
+      params.push(badge);
+    }
+  }
   // The dollar set of each row, in the same statement (0197) — the second variant without it.
   const usdSet = (await offerUsdInstalled(c.env.DB))
     ? `(SELECT json_group_array(json_object('model_id', u.model_id, 'cents', u.price_usd_cents)) FROM offer_usd_prices u
           WHERE u.subject_type = w.subject_type AND u.subject_id = w.subject_id) AS usd_set,`
     : '';
-  const { results } = await c.env.DB
+  const { results: fetched } = await c.env.DB
     .prepare(
       `SELECT w.*, ${usdSet} l.max_per_user AS max_per_user, l.max_global AS max_global,
               p.name AS product_name, p.slug AS product_slug, COALESCE(p.composition,'') AS composition,
@@ -262,11 +307,13 @@ adminOffersRoutes.get('/', async (c) => {
          LEFT JOIN offer_limits l ON l.subject_type = w.subject_type AND l.subject_id = w.subject_id
          LEFT JOIN products p ON p.id = w.subject_id
         WHERE ${where}
-        ORDER BY w.updated_at DESC
-        LIMIT 200`
+        ORDER BY w.updated_at DESC, w.subject_id ASC
+        LIMIT ? OFFSET ?`
     )
-    .bind(...params)
+    .bind(...params, limit + 1, offset)
     .all<Record<string, unknown>>();
+  const hasMore = (fetched ?? []).length > limit;
+  const results = hasMore ? fetched.slice(0, limit) : (fetched ?? []);
   const now = Date.now();
   const cleanStart = await cleanStartAt(c.env.DB);
   const sets = (results ?? []).map((r) => usdSetOf(r.usd_set));
@@ -293,6 +340,8 @@ adminOffersRoutes.get('/', async (c) => {
         now
       ),
     })),
+    has_more: hasMore,
+    next_offset: hasMore ? offset + limit : null,
   });
 });
 
@@ -321,7 +370,17 @@ function windowView(r: Record<string, unknown>, cleanStart: string | null = null
     // not cost: whoever may open this tab may read them (§5.6). A model row carries its model's names
     // (§7: «P1S $500.00 · P1S Combo $640.00»), in the product's model order.
     offer_usd_prices: usd.map((p) => ({ model_id: p.model_id, usd: usdTextOfCents(p.cents), ...(p.names ? { names: p.names } : {}) })),
+    ...occasionView(r),
   };
+}
+
+/**
+ * The row's occasion as the card and the tab read it (0224): the key ('' = none, and on a database before
+ * 0224) and the custom name (null unless 'custom').
+ */
+function occasionView(r: Record<string, unknown>): { badge: string; badge_text: { ar: string; en?: string; ckb?: string } | null } {
+  const o = occasionOfRow(r);
+  return { badge: o.badge ?? '', badge_text: o.badge_text ?? null };
 }
 
 /** One stored dollar row, with its model's names when it names a model. */
@@ -459,6 +518,11 @@ interface OfferPlan {
   /** Step 7's refusals, collected instead of thrown (the preview). */
   issues: Array<Record<string, unknown>>;
   warnings: Array<Record<string, unknown>>;
+  /**
+   * The occasion to write (step 6): present only when the body named one AND 0224 is installed — then the
+   * write names both columns ('' clears them). Absent: the stored occasion is kept.
+   */
+  occasion?: { badge: string; badge_text: string };
 }
 
 /** The answer's rows for this viewer: the owner's flags reach the owner only (D6). */
@@ -587,6 +651,39 @@ async function planOffer(
   // 6. (Retired by DECISIONS row 251.) A composition is priced like an ordinary product: a derived
   // `bundle_config.price_mode` prices nothing any more, so a window beside one is no longer two price
   // sources — the window is the only one, exactly as on an ordinary product.
+  //
+  // 6, ITS PLACE REUSED: THE OCCASION (DECISIONS row 294, migration 0224). A body that names one: a known
+  // key, or 'custom' with an Arabic name; on an ordinary product; on a sale that prices something; and only
+  // on a database that has the columns (409 otherwise — every other save works there). A body that does not
+  // name it keeps the stored occasion — unless that save leaves the sale pricing nothing (an older tab, a
+  // direct call): an occasion is never kept on a window that lowers nothing. Said, never repaired: a save
+  // is refused here; the preview prices its rows anyway and says the sentence beside them, so the owner
+  // still sees the sale while naming it.
+  let occasion: OfferPlan['occasion'];
+  let occasionRefusal: IssueCode | null = null;
+  if (input.badge !== undefined) {
+    const key = input.badge;
+    let text = '';
+    if (key !== '' && !isOfferOccasionKey(key)) occasionRefusal = 'OFFER_OCCASION_UNKNOWN';
+    else if (key === 'custom') {
+      const named = checkOccasionName(input.badge_text);
+      if (named.ok) text = JSON.stringify(named.name);
+      else occasionRefusal = 'OFFER_OCCASION_NAME';
+    }
+    if (!occasionRefusal && key !== '' && p.composition !== '') occasionRefusal = 'OFFER_OCCASION_ORDINARY_ONLY';
+    if (!occasionRefusal && key !== '' && input.offer_price_mode === '') occasionRefusal = 'OFFER_OCCASION_NEEDS_PRICE';
+    const installed = await offerOccasionInstalled(c.env.DB);
+    if (!occasionRefusal && key !== '' && !installed) occasionRefusal = 'OFFER_OCCASION_NOT_INSTALLED';
+    if (occasionRefusal && mode === 'save') refuse(occasionRefusal);
+    if (!occasionRefusal && installed) occasion = { badge: key, badge_text: text };
+  } else if (input.offer_price_mode === '' && (await offerOccasionInstalled(c.env.DB))) {
+    const kept = await c.env.DB
+      .prepare("SELECT badge FROM offer_windows WHERE subject_type = 'product' AND subject_id = ?")
+      .bind(productId)
+      .first<{ badge: string | null }>();
+    if (typeof kept?.badge === 'string' && kept.badge !== '') occasionRefusal = 'OFFER_OCCASION_NEEDS_PRICE';
+    if (occasionRefusal && mode === 'save') refuse(occasionRefusal);
+  }
 
   // 7. THE PREVIEW ON THE STORED PUBLISHED ROWS (§5.2) — a dollar price and a percent alike. A sale
   // that lowers nothing is refused, a route at 0 or below is refused; a model it does not lower and a
@@ -607,6 +704,8 @@ async function planOffer(
     if (rows.some((r) => r.state === 'not_lower')) warnings.push(warning('OFFER_PARTLY_NOT_LOWER'));
     if (d.viewer === 'owner' && rows.some((r) => r.owner?.below_cost || r.owner?.below_min_profit)) warnings.push(warning('OFFER_BELOW_COST'));
   }
+  // The preview's occasion sentence (step 6), beside its priced rows.
+  if (occasionRefusal) issues.push(issue(occasionRefusal));
   return {
     input,
     product: { id: p.id, composition: p.composition, slug: p.slug, name: productNameOf(p as unknown as Record<string, unknown>) },
@@ -614,6 +713,7 @@ async function planOffer(
     rows,
     issues,
     warnings,
+    ...(occasion ? { occasion } : {}),
   };
 }
 
@@ -642,7 +742,7 @@ async function writeOffer(c: Context<AppContext>, productId: string) {
           "(SELECT updated_at FROM offer_windows WHERE subject_type = 'product' AND subject_id = ?) IS ?",
           [productId, input.expected_updated_at]
         );
-  const statements = offerWindowStatements(c.env.DB, subjectOf(productId), input);
+  const statements = offerWindowStatements(c.env.DB, subjectOf(productId), input, plan.occasion);
   // The dollar set is rewritten whole (DELETE, then the INSERTs); any other mode leaves it empty.
   const usdStatements = usdInstalled ? offerUsdStatements(c.env.DB, productId, input.offer_price_mode === 'fixed_usd' ? plan.usd : []) : [];
   // INSIDE the batch: this write changes who may buy a thing and for how much.
@@ -667,6 +767,8 @@ async function writeOffer(c: Context<AppContext>, productId: string) {
         max_global: input.max_global,
         offer_usd_prices:
           input.offer_price_mode === 'fixed_usd' ? plan.usd.map((p) => ({ model_id: p.model_id, usd: usdTextOfCents(p.cents) })) : [],
+        // The occasion the row carries after the save: the one named, else the one kept (0224).
+        ...occasionView(plan.occasion ?? before ?? {}),
       },
     }
   );

@@ -89,6 +89,29 @@ export const INSTEAD_OF = { ar: 'بدل', en: 'instead of', ckb: 'لە جیات�
 export const SALE_PRICE = { ar: 'سعر العرض', en: 'Sale price', ckb: 'نرخی ئۆفەر' } as const;
 
 /**
+ * WHEN A SALE'S OCCASION IS DRAWN (DECISIONS row 294; docs/ux/PRODUCT-DISCOUNT.md §16.4). The server names
+ * the occasion («بلاك فرايدي» …, `offer.badge`) only while this viewer's sale is live and lowers a price;
+ * each surface then draws it only where that sale lowers what it shows:
+ *   - a CARD, its own «from» (`price_source: 'offer'`, the rule of its strike): a sale on a dearer model
+ *     alone names nothing there;
+ *   - the PRODUCT PAGE, the selection on screen (`offerBefore`, the struck price beside it).
+ * Here, beside the badge both surfaces already wear: the rule costs neither of them a chunk, and the tag
+ * itself (src/components/ui/OccasionTag.tsx) is downloaded only when one of these says yes.
+ */
+interface OccasionOffer {
+  badge?: string;
+  badge_text?: { ar: string; en?: string; ckb?: string };
+}
+
+export function occasionOnCard<T extends OccasionOffer & { price_source?: string }>(offer: T | null | undefined): T | null {
+  return offer && offer.price_source === 'offer' && offer.badge ? offer : null;
+}
+
+export function occasionOnPage<T extends OccasionOffer>(offer: T | null | undefined, offerBefore: number | null): T | null {
+  return offer && offerBefore !== null && offer.badge ? offer : null;
+}
+
+/**
  * A STRUCK AMOUNT WHOSE FIGURE ALONE IS AN LTR ISLAND (review, bidi): «900,000» isolated, «د.ع» after it in
  * the sentence's own direction — exactly as the main price beside it is drawn. Isolating the whole money
  * string, unit included, put the unit on the opposite side from the main price's whenever the digits are

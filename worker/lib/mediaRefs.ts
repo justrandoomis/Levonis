@@ -679,6 +679,9 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'gift_entitlements.gift_option_value_ids': 'option ids',
   'gift_pool_items.option_value_ids': 'option ids',
   'offer_windows.required_tiers': 'membership tier names',
+  // 0224 — the sale's occasion (DECISIONS row 294): a preset key, and the owner's own name in words.
+  'offer_windows.badge': "an occasion key ('black_friday', 'custom'), never a file",
+  'offer_windows.badge_text': 'the owner’s occasion name as text {ar, en, ckb}; no media field',
   'coupons.fulfillment_types': 'enum words',
   'coupons.transport_methods': 'enum words',
   'coupons.delivery_methods': 'enum words',

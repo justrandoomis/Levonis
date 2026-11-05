@@ -42,7 +42,10 @@ export default function FlashDealsBoard({ products }: { products: ApiProduct[] }
 
   return (
     <section data-home-section="flash_deals" className="mb-10 sm:mb-12">
-      <SectionHeader title={t('homeFlashDeals')} accent="bg-rose-500" to="/products?type=discounted" />
+      {/* «عرض الكل» opens every live sale (DECISIONS row 294): /products ignored `type=discounted` and listed the whole catalogue.
+          The board itself is retired from the home page (`flash_deals`, src/lib/homeSections.ts); the live way in is
+          the «العروض» chip of «أحدث المنتجات» (src/components/home/v2/LatestProducts.tsx). */}
+      <SectionHeader title={t('homeFlashDeals')} accent="bg-rose-500" to="/offers" />
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-3">
         {[lead, ...rest].map((p, index) => (
           <Link

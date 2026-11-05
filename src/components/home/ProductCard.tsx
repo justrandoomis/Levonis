@@ -3,7 +3,8 @@ import { ProductTransitionLink as Link } from '../motion/ProductTransition';
 import { type ApiProduct } from '../../lib/api';
 import SafeImage from '../ui/SafeImage';
 import CardPrice from '../CardPrice';
-import OfferBadge, { offerPercentSr, offerPercentText } from '../ui/OfferBadge';
+import OfferBadge, { occasionOnCard, offerPercentSr, offerPercentText } from '../ui/OfferBadge';
+import type { OccasionTagProps } from '../ui/OccasionTag';
 import Countdown from '../ui/Countdown';
 import { productMainImage, productPrimaryImage } from '../../lib/productImage';
 import { useTheme } from '../../lib/theme';
@@ -19,9 +20,10 @@ import { shownSavingPercent, useOptionalMoney } from '../../CurrencyContext';
 /**
  * THE PHOTO BADGE (docs/ux/PRODUCT-DISCOUNT.md §8.2): a live offer's «−17٪» (the server's percent of the
  * two numbers the card prints) when it has one, else today's SALE when the viewer's own price is below
- * the regular one. Nothing when neither.
+ * the regular one. Nothing when neither. `className` places it: in its corner alone, or in the stack
+ * under the sale's occasion (`SaleBadge`).
  */
-function SaleBadge({ p, hasSale }: { p: ApiProduct; hasSale: boolean }) {
+function SaleChip({ p, hasSale, className = '' }: { p: ApiProduct; hasSale: boolean; className?: string }) {
   const { lang } = useLanguage();
   const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
   // In dollars, the percent of the dollar pair the card prints (DECISIONS row 248).
@@ -29,7 +31,7 @@ function SaleBadge({ p, hasSale }: { p: ApiProduct; hasSale: boolean }) {
   const n = shownSavingPercent(converted, p.display_offer_saving_percent, p.display_offer_saving_percent_usd);
   if (n !== null) {
     return (
-      <OfferBadge className="absolute top-2 end-2">
+      <OfferBadge className={className}>
         <bdi dir="ltr" aria-hidden>
           {offerPercentText(n, l)}
         </bdi>
@@ -44,7 +46,7 @@ function SaleBadge({ p, hasSale }: { p: ApiProduct; hasSale: boolean }) {
    */
   if (p.offer?.locked === true) {
     return (
-      <OfferBadge tone="member" className="absolute top-2 end-2 gap-1">
+      <OfferBadge tone="member" className={className ? `${className} gap-1` : 'gap-1'}>
         <span data-offer-locked className="inline-flex items-center gap-1">
           <svg aria-hidden viewBox="0 0 24 24" className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="4" y="11" width="16" height="10" rx="2" />
@@ -55,7 +57,52 @@ function SaleBadge({ p, hasSale }: { p: ApiProduct; hasSale: boolean }) {
       </OfferBadge>
     );
   }
-  return hasSale ? <OfferBadge className="absolute top-2 end-2">SALE</OfferBadge> : null;
+  return hasSale ? <OfferBadge className={className}>SALE</OfferBadge> : null;
+}
+
+/**
+ * THE OCCASION'S TAG IS ITS OWN CHUNK (DECISIONS row 294): its sixteen designs, glyphs and words reach a
+ * visitor only when a card on screen names an occasion — most of the year none does, and the home rail and
+ * every listing then download none of it. Until it lands, its place is held at its height (`TAG_PLACE`, the
+ * card tag's 20 px), so nothing under it moves; a chunk that does not arrive draws nothing and the «−N٪»
+ * chip stays, as on any sale (the bottom nav's own pattern for a decorative chunk).
+ */
+const OccasionTag = React.lazy<React.ComponentType<OccasionTagProps>>(() =>
+  import('../ui/OccasionTag').catch(() => ({ default: () => null }))
+);
+const TAG_PLACE = <span aria-hidden className="block h-5" />;
+
+/**
+ * THE PHOTO'S TOP-END CORNER (DECISIONS row 294): the sale's OCCASION — «بلاك فرايدي», «رمضان», the
+ * owner's own name, each in its own design (src/components/ui/OccasionTag.tsx) — stacked ABOVE the
+ * unchanged «−N٪» chip. Top-left in Arabic and Sorani, where the owner asked for it; top-right in English,
+ * where top-left holds the compare toggle. The tag is drawn only when this card's own sale lowered the
+ * price it prints (`occasionOnCard`: `price_source: 'offer'`, the rule of its strike): never before the
+ * sale starts, after it ends, or for a viewer a members-only sale does not cover — the server names no
+ * occasion then anyway.
+ *
+ * The stack stops 2.875 rem short of the photograph's start: the compare toggle's 30 px disc ends 32 px
+ * into it (`start-1.5` on the card, the photograph `mx-1` inside it), so the tag keeps 6 px clear of the
+ * disc, and a name too long for what is left is truncated, never drawn over it.
+ *
+ * A LIST ROW'S 96 px PHOTOGRAPH KEEPS ITS CHIP ALONE, where it always was: it has room for no name, and a
+ * tag above the chip pushes the chip down under the offer's clock, which fills that photograph's lower
+ * half. The row names the occasion in its own design beside the price instead (`CompactCard`).
+ */
+function SaleBadge({ p, hasSale, layout = 'grid' }: { p: ApiProduct; hasSale: boolean; layout?: 'grid' | 'list' }) {
+  const { lang } = useLanguage();
+  const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+  const occasion = layout === 'grid' ? occasionOnCard(p.offer) : null;
+  // No occasion (or a list row's photograph): the chip alone in its corner, exactly as before.
+  if (!occasion) return <SaleChip p={p} hasSale={hasSale} className="absolute top-2 end-2" />;
+  return (
+    <span data-photo-badges className="absolute top-2 end-2 flex max-w-[calc(100%-2.875rem)] flex-col items-end gap-1">
+      <React.Suspense fallback={TAG_PLACE}>
+        <OccasionTag badge={occasion.badge} name={occasion.badge_text} lang={l} size="card" />
+      </React.Suspense>
+      <SaleChip p={p} hasSale={hasSale} />
+    </span>
+  );
 }
 
 /** The lock's words — the bundle tile's (src/components/bundles/BundleTile.tsx). */
@@ -233,7 +280,10 @@ function CompactCard({
   const clock = priced ? offerClock(p) : null;
   const type = compareToggle ? compareTypeOf(p) : null;
   const condition = p.condition?.kind ? conditionKindLabel(p.condition.kind, lang) : '';
-  const line = cardKnowledgeLine(p, lang === 'en' || lang === 'ckb' ? lang : 'ar');
+  const l = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+  const line = cardKnowledgeLine(p, l);
+  /** The sale's occasion a LIST row names beside its price (its photograph keeps the chip alone): the photo badge's own rule. */
+  const listOccasion = list && priced ? occasionOnCard(p.offer) : null;
 
   return (
     <div
@@ -255,7 +305,7 @@ function CompactCard({
           fallbackClassName="text-snow/35"
           imgClassName="object-[50%_4%]"
         />
-        {priced && <SaleBadge p={p} hasSale={hasSale} />}
+        {priced && <SaleBadge p={p} hasSale={hasSale} layout={layout} />}
         {/* A scheduled special offer (§12, §13.2): decoration only — the API
             refuses an expired offer, and the price is already the offer's. */}
         {/* The clock names zinc on its own spans (Countdown): on this onyx pill they read snow in either theme. */}
@@ -305,6 +355,15 @@ function CompactCard({
             </>
           ) : null}
         </p>
+        {/* A LIST ROW NAMES THE OCCASION HERE (DECISIONS row 294), its 96 px photograph having room for no
+            name: the tag in its own design — and its sentence, inside the card's link — above the price. */}
+        {listOccasion ? (
+          <span className="mt-1 flex min-w-0" data-card-occasion>
+            <React.Suspense fallback={TAG_PLACE}>
+              <OccasionTag badge={listOccasion.badge} name={listOccasion.badge_text} lang={l} size="card" />
+            </React.Suspense>
+          </span>
+        ) : null}
         <div className="mt-1.5" data-motion-price>
           <CardPrice p={p} density="compact" />
         </div>

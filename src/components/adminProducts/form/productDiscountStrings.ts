@@ -63,6 +63,16 @@ export interface DiscountStrings {
   usdOne: string;
   percentLabel: string;
   previewing: string;
+  /** The sale's occasion (DECISIONS row 294, OccasionPicker.tsx). */
+  occasion: string;
+  occasionHint: string;
+  occasionNone: string;
+  occasionCustom: string;
+  occasionNameAr: string;
+  occasionNameEn: string;
+  occasionNameCkb: string;
+  occasionNameHint: string;
+  occasionOneSale: string;
 }
 
 const AR: DiscountStrings = {
@@ -121,6 +131,16 @@ const AR: DiscountStrings = {
   usdOne: 'السعر بعد الخصم ($)',
   percentLabel: 'نسبة الخصم',
   previewing: 'يُحسب…',
+  occasion: 'المناسبة',
+  occasionHint:
+    'تظهر شارة المناسبة في زاوية صورة المنتج وفي صفحته فقط ما دام هذا التخفيض يخفّض السعر للزبون: لا قبل بدايته ولا بعد نهايته، ولا لمن لا يشمله.',
+  occasionNone: 'بلا مناسبة',
+  occasionCustom: 'اسم آخر',
+  occasionNameAr: 'الاسم بالعربية',
+  occasionNameEn: 'بالإنجليزية (اختياري)',
+  occasionNameCkb: 'بالكردية (اختياري)',
+  occasionNameHint: 'حتى 32 حرفًا. اللغة التي تُترك فارغة تُظهر «عرض خاص» بتلك اللغة.',
+  occasionOneSale: 'للمنتج تخفيض واحد في كل مرة: حفظ تخفيض بمناسبة جديدة يستبدل التخفيض الحالي.',
 };
 
 const EN: DiscountStrings = {
@@ -179,6 +199,16 @@ const EN: DiscountStrings = {
   usdOne: 'Price after discount ($)',
   percentLabel: 'Discount percent',
   previewing: 'Working…',
+  occasion: 'Occasion',
+  occasionHint:
+    "The occasion's label shows in the corner of the product photo and on its page only while this sale lowers the price for the shopper — never before it starts or after it ends, and never to someone it does not cover.",
+  occasionNone: 'No occasion',
+  occasionCustom: 'Another name',
+  occasionNameAr: 'Name in Arabic',
+  occasionNameEn: 'In English (optional)',
+  occasionNameCkb: 'In Sorani (optional)',
+  occasionNameHint: 'Up to 32 characters. A language left empty shows "Special deal" in that language.',
+  occasionOneSale: 'A product has one sale at a time: saving a sale for a new occasion replaces the current one.',
 };
 
 const CKB: DiscountStrings = {
@@ -237,6 +267,16 @@ const CKB: DiscountStrings = {
   usdOne: 'نرخی دوای داشکاندن ($)',
   percentLabel: 'ڕێژەی داشکاندن',
   previewing: 'هەژمار دەکرێت…',
+  occasion: 'بۆنە',
+  occasionHint:
+    'نیشانەی بۆنەکە لە گۆشەی وێنەی بەرهەمەکە و لە پەڕەکەیدا تەنها ئەو کاتە دەردەکەوێت کە ئەم داشکاندنە نرخەکە بۆ کڕیار کەم دەکاتەوە: نە پێش دەستپێکردنی، نە دوای کۆتاییهاتنی، و نە بۆ کەسێک کە نایگرێتەوە.',
+  occasionNone: 'بێ بۆنە',
+  occasionCustom: 'ناوێکی تر',
+  occasionNameAr: 'ناو بە عەرەبی',
+  occasionNameEn: 'بە ئینگلیزی (ئارەزوومەندانە)',
+  occasionNameCkb: 'بە کوردی (ئارەزوومەندانە)',
+  occasionNameHint: 'تا 32 پیت. ئەو زمانەی بە بەتاڵی دەمێنێتەوە «ئۆفەری تایبەت» بەو زمانە پیشان دەدات.',
+  occasionOneSale: 'بەرهەم لە یەک کاتدا یەک داشکاندنی هەیە: پاشەکەوتکردنی داشکاندنێک بۆ بۆنەیەکی نوێ داشکاندنی ئێستا دەگۆڕێت.',
 };
 
 export const DISCOUNT_STRINGS: Readonly<Record<DiscountLang, DiscountStrings>> = { ar: AR, en: EN, ckb: CKB };

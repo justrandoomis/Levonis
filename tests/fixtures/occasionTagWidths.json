@@ -1,0 +1,65 @@
+{
+  "_": "THE CARD TAG'S NATURAL WIDTH, MEASURED (DECISIONS row 294; docs/ux/PRODUCT-DISCOUNT.md §16.5). Each preset's name — and the custom fallback, which English and Sorani show when the owner typed no name in them — drawn by src/components/ui/OccasionTag.tsx at its card size, in px, unconstrained. tests/offerOccasionCard.test.ts holds every one at least 6 px inside the narrowest card (the home rail's 148 px). A renamed preset or a changed card tag fails that test until it is measured again: render every tag at size card in ar, en and ckb with the built CSS and the shop's Cairo (public/fonts), and read getBoundingClientRect().width with the stack's max-width lifted.",
+  "measured": {
+    "on": "2026-11-05",
+    "browser": "Microsoft Edge 156 headless (DPR 1, 2 and 3 alike)",
+    "font": "Cairo v31 arabic + latin and the Kurdish patch (public/fonts)",
+    "css": "npm run build of this tree"
+  },
+  "card": "gap-0.5 ps-0.5 pe-0.75 py-px text-[10px] leading-4 font-semibold | size-3 | size-2.5",
+  "widths": {
+    "ar": {
+      "black_friday": ["بلاك فرايدي",70.4],
+      "white_friday": ["الجمعة البيضاء",83.4],
+      "cyber_monday": ["سايبر مونداي",76.4],
+      "singles_day": ["عروض 11.11",74.4],
+      "double_twelve": ["عروض 12.12",74.4],
+      "flash_deal": ["عرض خاطف",71.1],
+      "hyper_deal": ["عرض هايبر",64.5],
+      "ramadan": ["عروض رمضان",77.5],
+      "eid_al_fitr": ["عيد الفطر",60.7],
+      "eid_al_adha": ["عيد الأضحى",70.5],
+      "christmas": ["كريسمس",62.5],
+      "back_to_school": ["عودة المدارس",81.6],
+      "summer": ["عروض الصيف",78],
+      "winter": ["عروض الشتاء",76.2],
+      "spring": ["عروض الربيع",71.1]
+    },
+    "en": {
+      "black_friday": ["Black Friday",72.1],
+      "white_friday": ["White Friday",74.4],
+      "cyber_monday": ["Cyber Monday",81.6],
+      "singles_day": ["11.11 Sale",65.8],
+      "double_twelve": ["12.12 Sale",65.8],
+      "flash_deal": ["Flash Deal",65],
+      "hyper_deal": ["Hyper Deal",67.8],
+      "ramadan": ["Ramadan Deal",82.8],
+      "eid_al_fitr": ["Eid al-Fitr",62.6],
+      "eid_al_adha": ["Eid al-Adha",69.8],
+      "christmas": ["Christmas",64],
+      "back_to_school": ["Back to School",83.1],
+      "summer": ["Summer Deal",78.4],
+      "winter": ["Winter Deal",70.9],
+      "spring": ["Spring Deal",69.4],
+      "custom": ["Special deal",71.1]
+    },
+    "ckb": {
+      "black_friday": ["بلاک فرایدەی",75.3],
+      "white_friday": ["هەینیی سپی",75.5],
+      "cyber_monday": ["سایبەر ماندەی",80.5],
+      "singles_day": ["ئۆفەری 11.11",78.4],
+      "double_twelve": ["ئۆفەری 12.12",78.4],
+      "flash_deal": ["ئۆفەری خێرا",69],
+      "hyper_deal": ["ئۆفەری هایپەر",79.2],
+      "ramadan": ["ئۆفەری ڕەمەزان",85.5],
+      "eid_al_fitr": ["جەژنی ڕەمەزان",80.4],
+      "eid_al_adha": ["جەژنی قوربان",76.1],
+      "christmas": ["کریسمس",61.8],
+      "back_to_school": ["بۆ قوتابخانە",68.5],
+      "summer": ["ئۆفەری هاوین",80.5],
+      "winter": ["ئۆفەری زستان",78.2],
+      "spring": ["ئۆفەری بەهار",75.7],
+      "custom": ["ئۆفەری تایبەت",79.2]
+    }
+  }
+}

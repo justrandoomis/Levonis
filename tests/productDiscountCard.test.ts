@@ -263,6 +263,40 @@ test('the save body: the row as loaded (tiers, limits, locked_preview, PLUS) unt
   assert.equal(fresh.discount_percent, 10);
   assert.equal('offer_usd_prices' in fresh, false);
   assert.deepEqual(fresh.required_tiers, []);
+  // THE OCCASION (DECISIONS row 294) travels with the sale: the stored one as opened ('' = none, never
+  // omitted — the door reads absent as "keep"), a preset by its key, and «اسم آخر» with its three names.
+  assert.equal(body.badge, '', 'no occasion stored: the body says none');
+  assert.equal('badge_text' in body, false);
+  const friday = offer({ badge: 'black_friday' });
+  assert.deepEqual(draftFrom(friday, read()).occasion, { badge: 'black_friday', ar: '', en: '', ckb: '' });
+  assert.equal(saveBodyOf(friday, draftFrom(friday, read())).badge, 'black_friday', 'a re-save keeps the stored occasion');
+  const own = offer({ badge: 'custom', badge_text: { ar: 'عيد الحب', en: 'Valentine' } });
+  const ownDraft = draftFrom(own, read());
+  assert.deepEqual(ownDraft.occasion, { badge: 'custom', ar: 'عيد الحب', en: 'Valentine', ckb: '' });
+  const ownBody = saveBodyOf(own, { ...ownDraft, occasion: { ...ownDraft.occasion, ckb: ' ڕۆژی خۆشەویستی ' } });
+  assert.deepEqual([ownBody.badge, ownBody.badge_text], ['custom', { ar: 'عيد الحب', en: 'Valentine', ckb: 'ڕۆژی خۆشەویستی' }]);
+  // An older Worker's row carries no occasion at all: the draft opens on none.
+  assert.deepEqual(draftFrom(offer(), read()).occasion, { badge: '', ar: '', en: '', ckb: '' });
+});
+
+test('the occasion picker: every preset in its own design, «اسم آخر» with three names, the rule said', () => {
+  const html = view({ draft: { ...draftFrom(offer({ badge: 'ramadan' }), read()) } });
+  assert.match(html, /data-occasion-picker/);
+  for (const key of ['black_friday', 'white_friday', 'cyber_monday', 'singles_day', 'double_twelve', 'flash_deal', 'hyper_deal', 'ramadan', 'eid_al_fitr', 'eid_al_adha', 'christmas', 'back_to_school', 'summer', 'winter', 'spring']) {
+    assert.match(html, new RegExp(`data-occasion-option="${key}"[^>]*>[\\s\\S]*?data-occasion="${key}"`), `${key} is drawn in its own design`);
+  }
+  assert.match(html, /role="radio" aria-checked="true"[^>]*aria-label="عروض رمضان"/, 'the stored occasion is the checked one');
+  assert.match(html, /data-occasion-option=""[\s\S]*?بلا مناسبة/);
+  assert.match(html, /data-occasion-option="custom"[\s\S]*?اسم آخر/);
+  assert.match(html, /data-occasion-hint/, 'the display rule is said beside a chosen occasion');
+  assert.doesNotMatch(html, /data-occasion-custom[ >]/, 'no name fields until «اسم آخر» is chosen');
+  const own = view({ draft: { ...draftFrom(offer(), read()), occasion: { badge: 'custom', ar: 'عيد الحب', en: '', ckb: '' } } });
+  assert.match(own, /data-occasion-custom/);
+  assert.match(own, /lang="ar"[^>]*maxLength="32"|maxLength="32"[^>]*lang="ar"/i);
+  assert.match(own, /data-occasion-custom-preview[\s\S]*?عيد الحب/, 'the custom name previewed in its tag');
+  // English is English, Sorani is Sorani: the picker names each occasion in the reader's language.
+  assert.match(view({ draft: { ...draftFrom(offer({ badge: 'ramadan' }), read()) } }, 'en'), /aria-label="Ramadan Deal"/);
+  assert.match(view({ draft: { ...draftFrom(offer({ badge: 'ramadan' }), read()) } }, 'ckb'), /aria-label="ئۆفەری ڕەمەزان"/);
 });
 
 /* ------------------------------------------------------------ strings -- */
@@ -342,6 +376,67 @@ test('the offers tab: per-model dollar prices name their models in the reader’
   const tab = readFileSync('src/components/adminOffers/AdminOffers.tsx', 'utf8');
   assert.match(tab, /<option value="fixed_usd" disabled=\{editing\.usd_allowed === false/);
   assert.match(tab, /data-offer-usd-owner-only/);
+});
+
+test('the offers tab and the occasion (DECISIONS row 294): its chip on a row, its picker and its save on an ordinary product only, the list by occasion and page', async () => {
+  const { offerSaveBody, occasionEditable, OfferOccasionChip, offersListPath } = await import('../src/components/adminOffers/AdminOffers');
+  type Row = Parameters<typeof offerSaveBody>[0];
+  const row = (over: Partial<Row> = {}): Row => ({
+    subject_id: 'p_p1s',
+    offer_id: 'ofw_pp1s',
+    starts_at: null,
+    ends_at: '2099-01-01T00:00:00.000Z',
+    required_tiers: [],
+    offer_price_mode: 'discount_percent',
+    offer_price_iqd: null,
+    discount_percent: 10,
+    discount_iqd: null,
+    plus_price_iqd: null,
+    locked_preview: true,
+    active: true,
+    max_per_user: null,
+    max_global: null,
+    updated_at: '2026-11-05T10:00:00.000Z',
+    product: { id: 'p_p1s', name: 'Bambu Lab P1S', slug: 'bambu-p1s', composition: '', status: 'active' },
+    redeemed: 0,
+    schedule_state: 'live',
+    ...over,
+  });
+  const none = { badge: '', ar: '', en: '', ckb: '' };
+  const bundle = row({ product: { id: 'p_b', name: 'A bundle', slug: 'a-bundle', composition: 'bundle', status: 'active' } });
+  // The save: an ordinary product's names its occasion (never omitted: absent would keep the stored one);
+  // a composition's never does (the door refuses one there, OFFER_OCCASION_ORDINARY_ONLY).
+  assert.equal(offerSaveBody(row(), null, { ...none, badge: 'black_friday' }).badge, 'black_friday');
+  assert.equal(offerSaveBody(row(), null, none).badge, '', 'none chosen: the body says none');
+  assert.deepEqual(offerSaveBody(row(), null, { badge: 'custom', ar: ' عيد الحب ', en: 'Valentine', ckb: '' }).badge_text, { ar: 'عيد الحب', en: 'Valentine', ckb: '' });
+  const bundleBody = offerSaveBody(bundle, null, { ...none, badge: 'black_friday' });
+  assert.equal('badge' in bundleBody, false);
+  assert.equal('badge_text' in bundleBody, false);
+  assert.equal(offerSaveBody(row(), null, none).expected_updated_at, '2026-11-05T10:00:00.000Z', 'the stamp it read');
+  assert.equal(offerSaveBody(row({ offer_id: '' }), null, none).expected_updated_at, null, 'it saw no row');
+  assert.deepEqual([occasionEditable(row()), occasionEditable(bundle)], [true, false], 'the picker is an ordinary product’s');
+  // The row's chip, in the occasion's own design; nothing for a row without one.
+  const chip = (r: Row, lang: 'ar' | 'en' | 'ckb' = 'ar') => {
+    LANG = lang;
+    return renderToStaticMarkup(createElement(LanguageProvider, null, createElement(OfferOccasionChip, { row: r, lang })));
+  };
+  assert.match(chip(row({ badge: 'black_friday' })), /data-offer-occasion[\s\S]*data-occasion="black_friday" data-occasion-size="card"[\s\S]*>بلاك فرايدي</);
+  assert.match(chip(row({ badge: 'black_friday' }), 'ckb'), />بلاک فرایدەی</);
+  assert.match(chip(row({ badge: 'custom', badge_text: { ar: 'عيد الحب' } })), />عيد الحب</);
+  assert.equal(chip(row()), '');
+  assert.equal(chip(row({ badge: '' })), '');
+  // The list's address: the occasion filter and the next page.
+  assert.equal(offersListPath({ search: '', kind: '', badge: '' }, 0), '/api/admin/offers');
+  assert.equal(offersListPath({ search: '', kind: '', badge: 'black_friday' }, 0), '/api/admin/offers?badge=black_friday');
+  assert.equal(offersListPath({ search: 'p1s', kind: 'product', badge: 'any' }, 200), '/api/admin/offers?search=p1s&kind=product&badge=any&offset=200');
+  // The tab wears them: the PUT body, the row chip, the picker's gate, the filter of every key, «عرض المزيد».
+  const tab = readFileSync('src/components/adminOffers/AdminOffers.tsx', 'utf8');
+  assert.match(tab, /`\/api\/admin\/offers\/\$\{editing\.subject_id\}`,\s*offerSaveBody\(editing, usdDraft, occasion\)/);
+  assert.match(tab, /<OfferOccasionChip row=\{o\} lang=\{lang\} \/>/);
+  assert.match(tab, /\{occasionEditable\(editing\) \? \(\s*<div className="mt-3">\s*<OccasionPicker value=\{occasion\}/);
+  assert.match(tab, /data-offer-occasion-filter>[\s\S]*?<option value="any">[\s\S]*?<option value="none">[\s\S]*?OFFER_OCCASION_KEYS\.map/);
+  assert.match(tab, /data-offer-load-more[\s\S]*?onClick=\{\(\) => void loadMore\(\)\}/);
+  assert.match(tab, /listPath\(nextOffset\)/, 'the next page starts where the door said');
 });
 
 /* -------------------------------------------------------- review fixes -- */

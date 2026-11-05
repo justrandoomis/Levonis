@@ -37,6 +37,8 @@ import { roundPriceIqd } from '@levonis/pricing/priceRounding';
 import { benefits, tierInherits, TIER_INHERITANCE, type TierStatus } from './entitlements';
 import { safeParse } from './types';
 import { newId } from './crypto';
+import { tableColumns } from './schemaColumns';
+import { isOfferOccasionKey, occasionNameOf, type OccasionName, type OfferOccasionKey } from '@levonis/contracts/offerOccasions';
 
 export type ScheduleState = 'upcoming' | 'live' | 'ended';
 
@@ -81,6 +83,15 @@ export interface OfferWindow {
    * re-saves it («موقوف: أُنشئ قبل التسعير الجديد»).
    */
   suspended?: true;
+  /**
+   * THE SALE'S OCCASION (migration 0224, DECISIONS row 294): a preset key («بلاك فرايدي», «رمضان» …) or
+   * 'custom' with the owner's own name. Absent when the row carries none, carries a key this code does not
+   * know, or the database predates 0224 — no label. It is shown only where the sale itself lowers the
+   * price (`occasionOf`), never on its own.
+   */
+  badge?: OfferOccasionKey;
+  /** The owner's own name, for `badge: 'custom'` only: Arabic, and English and Sorani when typed. */
+  badge_text?: OccasionName;
 }
 
 export interface OfferLimits {
@@ -335,6 +346,9 @@ interface WindowRow {
   active: number;
   /** 1 when the window was last saved before the clean start (see `OfferWindow.suspended`). */
   pre_clean_start?: number | null;
+  /** The occasion (0224): absent on an older database. */
+  badge?: string | null;
+  badge_text?: string | null;
 }
 
 interface LimitRow {
@@ -361,7 +375,42 @@ export function windowFromRow(r: WindowRow): OfferWindow {
     // Filled by `loadOffers` for a 'fixed_usd' window (0197); every other reader leaves it empty.
     usd_prices: [],
     ...(Number(r.pre_clean_start ?? 0) === 1 ? { suspended: true as const } : {}),
+    ...occasionOfRow(r),
   };
+}
+
+/**
+ * A ROW'S OCCASION (0224): a key this code knows, and for 'custom' a readable name — else nothing. A
+ * database before 0224 has neither column, and `SELECT w.*` simply carries none.
+ */
+export function occasionOfRow(r: { badge?: unknown; badge_text?: unknown }): { badge?: OfferOccasionKey; badge_text?: OccasionName } {
+  const key = r.badge;
+  if (!isOfferOccasionKey(key)) return {};
+  if (key !== 'custom') return { badge: key };
+  const name = occasionNameOf(r.badge_text);
+  return name ? { badge: key, badge_text: name } : {};
+}
+
+/**
+ * WHAT A CUSTOMER'S PAYLOAD CARRIES OF A SALE'S OCCASION — an explicit allow-list: the key, and the owner's
+ * name for 'custom'. The caller decides WHEN (a live, priced, eligible window that lowers the price for
+ * this viewer, worker/routes/products.ts); this decides WHAT. Null when the window has no occasion.
+ */
+export function occasionOf(window: Pick<OfferWindow, 'badge' | 'badge_text'> | null | undefined): { badge: OfferOccasionKey; badge_text?: OccasionName } | null {
+  if (!window || !isOfferOccasionKey(window.badge)) return null;
+  if (window.badge !== 'custom') return { badge: window.badge };
+  const name = occasionNameOf(window.badge_text);
+  return name ? { badge: 'custom', badge_text: name } : null;
+}
+
+/**
+ * Migration 0224 is on this database: `offer_windows` has both occasion columns. One PRAGMA per binding
+ * until they are there (`tableColumns`); a database without them labels nothing, and a save that names an
+ * occasion is refused there (OFFER_OCCASION_NOT_INSTALLED).
+ */
+export async function offerOccasionInstalled(db: D1Database): Promise<boolean> {
+  const cols = await tableColumns(db, 'offer_windows', ['badge', 'badge_text']);
+  return !!cols && cols.has('badge') && cols.has('badge_text');
 }
 
 /**
@@ -634,7 +683,14 @@ export function offerWindowStatements(
     active: boolean;
     max_per_user: number | null;
     max_global: number | null;
-  } | null
+  } | null,
+  /**
+   * THE OCCASION (0224), ONLY WHEN THE CALLER NAMED ONE and the columns exist (the admin door checks both).
+   * Absent — every bundle and mystery save, and a door save that did not name it — the SQL is exactly the
+   * one before 0224: an insert takes the column default '' and an update leaves the stored occasion as it
+   * is, so no save that does not mean to clear a label ever clears it.
+   */
+  occasion?: { badge: string; badge_text: string }
 ): D1PreparedStatement[] {
   const [type, id] = subject;
   if (!offer) {
@@ -647,13 +703,16 @@ export function offerWindowStatements(
   // 'fixed_usd' (0197): the dollar prices live in `offer_usd_prices` (`offerUsdStatements`); the
   // three dinar price columns are NULL for it.
   const mode = isOfferPriceMode(offer.offer_price_mode) ? offer.offer_price_mode : '';
+  const occasionCols = occasion ? ', badge, badge_text' : '';
+  const occasionMarks = occasion ? ', ?, ?' : '';
+  const occasionSet = occasion ? 'badge = excluded.badge, badge_text = excluded.badge_text, ' : '';
   return [
     db
       .prepare(
         `INSERT INTO offer_windows
            (subject_type, subject_id, id, starts_at, ends_at, required_tiers, offer_price_mode,
-            offer_price_iqd, discount_percent, discount_iqd, plus_price_iqd, locked_preview, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            offer_price_iqd, discount_percent, discount_iqd, plus_price_iqd, locked_preview, active${occasionCols})
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?${occasionMarks})
          ON CONFLICT(subject_type, subject_id) DO UPDATE SET
            starts_at = excluded.starts_at,
            ends_at = excluded.ends_at,
@@ -665,7 +724,7 @@ export function offerWindowStatements(
            plus_price_iqd = excluded.plus_price_iqd,
            locked_preview = excluded.locked_preview,
            active = excluded.active,
-           updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`
+           ${occasionSet}updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')`
       )
       .bind(
         type,
@@ -683,7 +742,8 @@ export function offerWindowStatements(
         mode === 'discount_iqd' ? offer.discount_iqd : null,
         offer.plus_price_iqd,
         offer.locked_preview ? 1 : 0,
-        offer.active ? 1 : 0
+        offer.active ? 1 : 0,
+        ...(occasion ? [occasion.badge, occasion.badge_text] : [])
       ),
     db
       .prepare(

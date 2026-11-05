@@ -42,6 +42,8 @@ export const META_PIXEL_SCRIPT_URL = 'https://connect.facebook.net/en_US/fbevent
 const TRACKED_PATHS: readonly RegExp[] = [
   /^\/$/,
   /^\/products$/,
+  // «العروض» (DECISIONS row 294): a product list, as public as /products.
+  /^\/offers$/,
   /^\/product\/[^/]+$/,
   /^\/categories(?:\/[^/]+){0,2}$/,
   /^\/compare$/,

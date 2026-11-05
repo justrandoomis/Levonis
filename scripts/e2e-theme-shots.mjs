@@ -257,6 +257,7 @@ const REWARDS_LIST = (query) => {
 const SPA = [
   { name: 'home', path: '/', wait: '[data-home-section="latest"]', full: true },
   { name: 'products', path: '/products', wait: 'main a[href^="/product/"]', full: false },
+  { name: 'offers', path: '/offers', wait: '[data-offers-page]', full: false },
   { name: 'product', path: 'PRODUCT', wait: 'h1', full: true },
   { name: 'cart', path: '/cart', as: 'customer' },
   { name: 'settings', path: '/settings', as: 'customer', wait: '[data-settings-appearance]', full: true },

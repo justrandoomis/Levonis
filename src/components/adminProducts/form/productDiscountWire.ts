@@ -58,6 +58,10 @@ export interface OfferWire {
   updated_at: string | null;
   suspended?: boolean;
   offer_usd_prices?: Array<{ model_id: string; usd: string }>;
+  /** The sale's occasion (0224, DECISIONS row 294): a preset key or 'custom'; '' = none. Absent from an older Worker. */
+  badge?: string;
+  /** The owner's own name, for 'custom'. */
+  badge_text?: { ar: string; en?: string; ckb?: string } | null;
 }
 
 export interface Issue {
@@ -79,6 +83,31 @@ export interface DiscountDraft {
   startsAt: string;
   endsAt: string;
   active: boolean;
+  /** The occasion picked in the card (src/components/adminProducts/form/OccasionPicker.tsx). */
+  occasion: OccasionDraft;
+}
+
+/** The occasion as the picker edits it: the key ('' = none) and, for 'custom', the three names as typed. */
+export interface OccasionDraft {
+  badge: string;
+  ar: string;
+  en: string;
+  ckb: string;
+}
+
+/** The stored occasion as the picker opens it. */
+export function occasionDraftOf(offer: Pick<OfferWire, 'badge' | 'badge_text'> | null | undefined): OccasionDraft {
+  const name = offer?.badge === 'custom' ? offer.badge_text ?? null : null;
+  return { badge: offer?.badge ?? '', ar: name?.ar ?? '', en: name?.en ?? '', ckb: name?.ckb ?? '' };
+}
+
+/**
+ * The occasion as the door reads it (DECISIONS row 294): the key, always — '' clears one, and the stored
+ * one is otherwise rewritten as it was opened — and the three names for 'custom' (an empty one reads the
+ * generic words on the shop).
+ */
+export function occasionBodyOf(o: OccasionDraft): { badge: string; badge_text?: { ar: string; en: string; ckb: string } } {
+  return o.badge === 'custom' ? { badge: 'custom', badge_text: { ar: o.ar.trim(), en: o.en.trim(), ckb: o.ckb.trim() } } : { badge: o.badge };
 }
 
 /** The draft a stored row opens as: its own mode when the card can show it, else the percent (§6.2). */
@@ -107,6 +136,7 @@ export function draftFrom(offer: OfferWire | null, read: DiscountReadWire): Disc
     startsAt: isoToBaghdadInput(offer?.starts_at ?? null),
     endsAt: isoToBaghdadInput(offer?.ends_at ?? null),
     active: offer ? offer.active : true,
+    occasion: occasionDraftOf(offer),
   };
 }
 
@@ -120,8 +150,8 @@ export function usdSetOf(d: DiscountDraft): Array<{ model_id: string; usd: strin
 
 /**
  * THE PUT (and the preview) BODY: the WHOLE row as loaded — tiers, limits, `locked_preview`, the PLUS
- * price carried untouched — the card's own fields, the dollar set in the dollar mode, and the stamp the
- * card read (null when it saw no row).
+ * price carried untouched — the card's own fields, the dollar set in the dollar mode, the occasion, and
+ * the stamp the card read (null when it saw no row).
  */
 export function saveBodyOf(loaded: OfferWire | null, d: DiscountDraft): Record<string, unknown> {
   const usd = d.mode === 'usd';
@@ -139,6 +169,7 @@ export function saveBodyOf(loaded: OfferWire | null, d: DiscountDraft): Record<s
     discount_percent: usd ? null : d.percent,
     discount_iqd: null,
     ...(usd ? { offer_usd_prices: usdSetOf(d) } : {}),
+    ...occasionBodyOf(d.occasion),
     expected_updated_at: loaded ? loaded.updated_at : null,
   };
 }

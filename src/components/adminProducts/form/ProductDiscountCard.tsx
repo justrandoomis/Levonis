@@ -24,6 +24,7 @@ import { Chip, UsdInput, V2Field, useV2Lang } from './v2/v2Ui';
 import { iqdText } from './v2/v2Model';
 import { useV2 } from './v2/useV2Pricing';
 import { discountStrings, type DiscountLang, type DiscountStrings } from './productDiscountStrings';
+import OccasionPicker from './OccasionPicker';
 
 /* ------------------------------------------- the wire (productDiscountWire.ts) -- */
 
@@ -471,6 +472,9 @@ export function DiscountCardView(p: DiscountViewProps) {
           {(id) => <TextInput id={id} type="datetime-local" value={d.endsAt} onChange={(e) => set({ endsAt: e.target.value })} />}
         </V2Field>
       </Grid>
+      {/* The sale's occasion (DECISIONS row 294): «بلاك فرايدي», «رمضان» or the owner's own name — saved with
+          the discount, shown on the photo and the page only while this sale lowers the price. */}
+      <OccasionPicker value={d.occasion} onChange={(occasion) => set({ occasion })} lang={p.lang} />
       <Toggle label={s.active} checked={d.active} onChange={(active) => set({ active })} />
       <p className="text-[11px] leading-relaxed text-text-muted">{d.mode === 'usd' ? s.rateNote : s.percentNote}</p>
       {extras.length ? (

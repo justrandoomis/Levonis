@@ -479,6 +479,12 @@ const CategoryListing = prefetchable(() => import('./pages/CategoryListing'));
  */
 const UsedPrinters = React.lazy(() => import('./pages/UsedPrinters'));
 const TradeIn = React.lazy(() => import('./pages/TradeIn'));
+/**
+ * «العروض» (DECISIONS row 294): every product on sale right now, by occasion — the home rail's «العروض»
+ * chip («عرض الكل»), an owner's banner and, later, the support chat land here. Public, lazy like the
+ * shelves around it.
+ */
+const Offers = React.lazy(() => import('./pages/Offers'));
 const MyGifts = React.lazy(() => import('./components/reviews/MyGifts'));
 const EmailVerifyBannerLazy = React.lazy(() => import('./components/auth/EmailVerifyBanner'));
 
@@ -1162,6 +1168,7 @@ function AppContent() {
           <Route path="/chats" element={<Chats />} />
           <Route path="/product/:slug" element={<Product />} />
           <Route path="/products" element={<Products />} />
+          <Route path="/offers" element={<Offers />} />
           <Route path="/categories" element={<CategoriesExplorer />} />
           <Route path="/categories/:categorySlug" element={<CategoryPage />} />
           <Route path="/categories/:categorySlug/:subCategorySlug" element={<CategoryListing />} />

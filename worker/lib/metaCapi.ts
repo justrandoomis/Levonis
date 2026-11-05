@@ -94,6 +94,7 @@ export function onMetaMainSite(c: Context<AppContext>): boolean {
 const REPORTED_PATHS: readonly RegExp[] = [
   /^\/$/,
   /^\/products$/,
+  /^\/offers$/,
   /^\/product\/[^/]+$/,
   /^\/categories(?:\/[^/]+){0,2}$/,
   /^\/compare$/,

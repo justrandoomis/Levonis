@@ -41,8 +41,8 @@
  *     listings — what the shop sells — which is exactly the data the back
  *     button lands on.
  *
- * WHERE IT IS WIRED, AND WHERE IT DELIBERATELY IS NOT. Four catalogue
- * listings use it — Home, /products, /used-printers and /bundles — which is
+ * WHERE IT IS WIRED, AND WHERE IT DELIBERATELY IS NOT. Five catalogue
+ * listings use it — Home, /products, /used-printers, /bundles and /offers — which is
  * the loop `back` actually travels: a shelf, a product, back to the shelf.
  * THE PRODUCT PAGE IS NOT ONE OF THEM, on purpose. Its load resolves the
  * order type, the transport, the variant and the price together, and painting

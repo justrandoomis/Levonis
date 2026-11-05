@@ -101,6 +101,7 @@ export function robotsAllows(path: string, hostKind: string): boolean {
 const PLATFORM_PATHS: readonly string[] = [
   '/',
   '/products',
+  '/offers',
   '/bundles',
   '/compare',
   '/tools',

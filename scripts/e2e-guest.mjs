@@ -31,6 +31,7 @@ const check = (l, ok, d = '') => {
 const OPEN = [
   { path: '/', name: 'the home page' },
   { path: '/products', name: 'the products list' },
+  { path: '/offers', name: 'the deals' },
   { path: '/bundles', name: 'the bundles' },
   { path: '/community', name: 'the community' },
   { path: '/requests', name: 'the requests board' },

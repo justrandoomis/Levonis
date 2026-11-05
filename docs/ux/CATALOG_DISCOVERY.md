@@ -95,6 +95,7 @@ flowchart TD
 | `/compare` | `Compare` (existing) | Unchanged contract (`?ids=a,b,c`, max 4, option slots). New optional `?lens=business`. |
 | `/products` | `Products` (existing) → renders `CatalogListing` | `?search=` keeps search ranking. No params gives «كل المنتجات». **`?category=` resolves, then `navigate(replace)`** to the canonical `/categories/...` URL (the API response now carries the path). An unknown or legacy free-text token keeps listing exactly as today (see `tests/homeCategories.test.ts`). |
 | `/used-printers`, `/bundles` | existing | Linked from the explorer only when they have stock. |
+| `/offers` | `Offers` (DECISIONS row 294) | Every product whose card shows a live sale (its own «from» lowered, the «عليها عرض» rule), by occasion (`?occasion=black_friday`), from `/api/products?type=offers`. Linked from the home rail «أحدث المنتجات» by its «العروض» chip, drawn only while the page holds a live sale (the retired «عروض سريعة» board points there too). |
 
 **Why nested slugs rather than ids:** `catalogs.slug` is `UNIQUE`, human-readable and already accepted by `/api/products?category=`. Nesting reads well in a shared link, and the server resolves by the last segment. A path whose parent does not match gets a canonical redirect, never a 404. Slug renames in the admin should keep the old slug in a `catalog_slug_history` table so links survive. This is optional and listed as an owner question.
 

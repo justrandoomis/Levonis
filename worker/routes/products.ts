@@ -39,6 +39,7 @@ import type { AppContext } from '../lib/types';
 import { safeParse, localeToApi } from '../lib/types';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { ProductViewedV1 } from '@levonis/contracts/events/v1/ProductViewed';
+import { isOfferOccasionKey, OFFER_OCCASION_KEYS, type OccasionName } from '@levonis/contracts/offerOccasions';
 import { HttpError, notFound, int, str } from '../lib/http';
 import { getSetting, getSettings, PUBLIC_SETTING_KEYS, projectPublicSettings, publicPrintServiceRates } from '../lib/settings';
 import { getPublicDisplayRate } from '../lib/fx/displayRate';
@@ -141,7 +142,7 @@ import {
 } from '../lib/bundleCart';
 import { publicMysteryBlock, resolveMysteryLines, type MysteryContext } from '../lib/mysteryLine';
 import { activePoolProductIds } from '../lib/mysteryDraw';
-import { applyOfferToResolved, loadOffers, OFFER_NOT_SUSPENDED_SQL, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
+import { applyOfferToResolved, loadOffers, OFFER_NOT_SUSPENDED_SQL, occasionOf, offerEligible, offerKey, scheduleState, subjectOf, type OfferView } from '../lib/offers';
 import { offerSavingPercent } from '../lib/offerUsd';
 import { isPrinterProduct } from '../lib/printerIdentity';
 import { skuLevelResolveInput, skuLevelSelections, skuPreorderTwins, type SkuLevelSelection } from '../lib/skuLevels';
@@ -3006,7 +3007,14 @@ export function publicWithDisplayPrice(
    *  counters are suppressed here as well as inside `publicRelations`. The
    *  base `stock` field is the one a card reads, and it moves by exactly the
    *  size of a mystery purchase. */
-  coarseStock = false
+  coarseStock = false,
+  /**
+   * THE PRODUCT PAGE'S OCCASION RULE (DECISIONS row 294). A card names a sale's occasion only when the
+   * sale lowered the card's own «from» (`price_source: 'offer'`); the product page paints per selection
+   * (`offerBefore`), so its payload names the occasion when the sale lowers ANY level for this viewer —
+   * a Combo-only sale above the card's «from» is labelled on the page, on the Combo, and never on the card.
+   */
+  opts: { occasionOnAnyLevel?: boolean } = {}
 ): Record<string, unknown> {
   const doc = view ? applyRelations(parseProductRow(row), view) : parseProductRow(row);
   if (!state.sellable) return catalogOnlyCard(doc, coarseStock);
@@ -3153,9 +3161,21 @@ export function publicWithDisplayPrice(
     resolved.applied_iqd < preRegular;
   /** A LIVE OFFER PRICED THE CARD'S OWN FIGURE — read by the membership teaser below. */
   const offerPriced = bestLevel!.source === 'offer';
+  /**
+   * THE SALE'S OCCASION («بلاك فرايدي», «رمضان», the owner's own name — DECISIONS row 294, migration 0224):
+   * named in the offer block only while the window is live, active, unsuspended, priced and eligible for
+   * THIS viewer and actually lowers the price — the card's own «from» (`offerLowered`, the card shows it
+   * with `price_source: 'offer'`), or any level on the product page (`occasionOnAnyLevel`). Never before
+   * the sale starts, after it ends, on a members-only sale to whoever it does not cover (`priceWithOffer`
+   * is the eligibility verdict), or on a composition (`offerOn`). An explicit allow-list (`occasionOf`):
+   * the key, and the owner's name for `custom` — no preset's words travel.
+   */
+  const occasionShown =
+    offerLowered || (opts.occasionOnAnyLevel === true && priceWithOffer && results.some((x) => x.source === 'offer'));
   if (offerOn) {
     const w = offer!.window;
     if (w) {
+      const occasion = occasionShown ? occasionOf(w) : null;
       out.offer = {
         offer_id: w.id,
         required_tiers: w.required_tiers,
@@ -3167,6 +3187,7 @@ export function publicWithDisplayPrice(
         priced: w.offer_price_mode !== '',
         /** The card badges the gate; the door re-checks it independently. */
         locked: !offerCheck!.ok && offerCheck!.reason === 'MEMBERSHIP_REQUIRED',
+        ...(occasion ?? {}),
       };
       if (offerLowered && offerPriced && bestLevel!.plus !== null) out.display_plus_iqd = bestLevel!.plus;
     }
@@ -4216,15 +4237,23 @@ async function pagedListing(
      * a judged answer walks the whole scope like any listing and prices only what it must.
      */
     keep?: ((row: Record<string, unknown>) => boolean) | null;
+    /**
+     * «العروض» (`type=offers`, /offers — DECISIONS row 294): the candidates are already the products a
+     * live priced sale reaches (narrowed in SQL); each is RESOLVED and kept only when its card says the
+     * sale lowers this viewer's «from» (`price_source: 'offer'`). `occasion` (a key or 'custom') then
+     * keeps that occasion's sales; the per-occasion counts are taken before it, so the chips stay.
+     */
+    offerGate?: { occasion: string | null };
   }
 ): Promise<CatalogListing> {
   const { state, wantsFacets, limit, offset, candidateCap, keysCap } = o;
   const keep = o.keep ?? null;
+  const gated = !!o.offerGate;
   const specFiltered = Object.values(state.specs ?? {}).some((v) => Array.isArray(v) && v.length > 0);
   const resolvedFilter = filtersReadResolved(state);
   const resolvedSort = sortReadsResolved(state.sort, false);
-  /** The order or a filter reads a price or a stock: the head is resolved to answer it. */
-  const orderResolved = resolvedFilter || resolvedSort;
+  /** The order or a filter reads a price or a stock — or the offers gate reads the card: the head is resolved to answer it. */
+  const orderResolved = resolvedFilter || resolvedSort || gated;
   /**
    * «يناسب طابعة» WITH THE COUNTS is applied in memory (its own counts must see
    * the other printers), so the keys say whether each candidate fits a chosen
@@ -4322,7 +4351,7 @@ async function pagedListing(
       false
     );
     foreseen = keyedOrder.slice(offset, offset + limit).map((i) => i.id);
-  } else if (resolvedFilter) {
+  } else if (resolvedFilter || gated) {
     // Only head rows can be on the page, and every head row is resolved anyway.
     foreseen = [];
   } else {
@@ -4373,17 +4402,21 @@ async function pagedListing(
    * row and no card — and a page it was on comes back one card short (the
    * client pages from the server's cursor).
    */
-  const items: ListingItem[] = [];
+  let items: ListingItem[] = [];
   if (orderResolved || wantsFacets) {
     all.forEach((c, i) => {
       if (resolvedSet.has(c.id)) {
         const r = resolved.get(c.id);
-        if (r) items.push(listingItemOf(r.row, r.card, c.rank, brandSlugOf(c.key), fitsOf(c.id)));
-      } else {
+        if (r && (!gated || offerLoweredCard(r.card))) items.push(listingItemOf(r.row, r.card, c.rank, brandSlugOf(c.key), fitsOf(c.id)));
+      } else if (!gated) {
+        // The offers gate lists only what it proved on a resolved card; a candidate past the cap is said by `partial_order`.
         items.push(wantsFacets ? { ...keyedItems[i], fits: fitsOf(c.id) } : keyedItems[i]);
       }
     });
   }
+  // «العروض»: the occasions on this viewer's sales (the chips), then the chosen one.
+  const occasions = gated ? occasionCounts(items) : null;
+  if (gated && o.offerGate!.occasion !== null) items = items.filter((i) => cardOccasionKey(i.card) === o.offerGate!.occasion);
 
   const brands = new Map<string, BrandInfo>();
   if (wantsFacets) {
@@ -4434,9 +4467,46 @@ async function pagedListing(
       has_more: offset + page.length < listed.length,
       sort: state.sort,
       ...(facets ? { facets, partial_counts: partialCounts } : {}),
+      ...(occasions ? { occasions } : {}),
     },
     rows: new Map([...pageCards].map(([id, r]) => [id, r.row] as const)),
   };
+}
+
+/** The card shows a live sale that lowered this viewer's «from» (`price_source: 'offer'`, the same rule as its strike). */
+function offerLoweredCard(card: Record<string, unknown>): boolean {
+  const o = card.offer as { price_source?: unknown } | null | undefined;
+  return !!o && o.price_source === 'offer';
+}
+
+/** The occasion key a card's offer block names ('' = a sale with none). */
+function cardOccasionKey(card: Record<string, unknown>): string {
+  const o = card.offer as { badge?: unknown } | null | undefined;
+  return o && typeof o.badge === 'string' ? o.badge : '';
+}
+
+/**
+ * THE OCCASIONS ON THE LISTED SALES, for «العروض»'s chips: each key with how many cards carry it, in the
+ * presets' order (the owner's own names last, as one 'custom' entry that carries the name when they all
+ * share one). A sale with no occasion is in «الكل» only.
+ */
+function occasionCounts(items: readonly ListingItem[]): Array<{ key: string; count: number; badge_text?: OccasionName }> {
+  const counts = new Map<string, number>();
+  const customNames = new Map<string, OccasionName>();
+  for (const i of items) {
+    const key = cardOccasionKey(i.card);
+    if (!key) continue;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    if (key === 'custom') {
+      const name = (i.card.offer as { badge_text?: OccasionName } | undefined)?.badge_text;
+      if (name?.ar) customNames.set(name.ar, name);
+    }
+  }
+  return OFFER_OCCASION_KEYS.filter((k) => counts.has(k)).map((k) => ({
+    key: k,
+    count: counts.get(k)!,
+    ...(k === 'custom' && customNames.size === 1 ? { badge_text: [...customNames.values()][0]! } : {}),
+  }));
 }
 
 export async function listCatalogProducts(
@@ -4466,7 +4536,13 @@ export async function listCatalogProducts(
   // A slug as long as /api/catalog/:slug takes (80): the admin's taxonomy
   // slugs reach 63 (slugify's 60 + uniqueSlug's "-2"…"-50").
   const category = str(q.category, 'category', { max: 80, required: false });
-  const type = str(q.type, 'type', { max: 20, required: false }); // 'bundle' | 'discounted' | 'featured'
+  const type = str(q.type, 'type', { max: 20, required: false }); // 'bundle' | 'discounted' | 'featured' | 'offers'
+  /**
+   * «العروض» BY OCCASION (`type=offers`): a preset key or 'custom'. A value no occasion has lists nothing —
+   * an honest empty answer for a stale link, never the whole catalogue.
+   */
+  const occasionParam = type === 'offers' ? str(q.occasion, 'occasion', { max: 32, required: false }) : '';
+  const occasion = occasionParam ? (isOfferOccasionKey(occasionParam) ? occasionParam : '!') : null;
   const limit = int(q.limit, 'limit', { min: 1, max: 50, def: 20 });
   /**
    * `offset` is the paging parameter. `page` (1-based) is read only when no
@@ -4514,7 +4590,9 @@ export async function listCatalogProducts(
    * state or a product is judged (`nlKeep`). A search they understood nothing in («pla» while it is
    * typed, a product name) keeps the plain read, a page of rows priced, exactly as without `nl=1`.
    */
-  const listing = (nlField.understood?.chips.length ?? 0) > 0 || nlKeep !== null || LISTING_PARAM_KEYS.some((k) => q[k] !== undefined);
+  // «العروض» (`type=offers`) is always a listing: its card gate pages in memory, after the resolve.
+  const listing =
+    (nlField.understood?.chips.length ?? 0) > 0 || nlKeep !== null || LISTING_PARAM_KEYS.some((k) => q[k] !== undefined) || type === 'offers';
   const wantsFacets = q.facets === '1';
   // The taxonomy index: card `compare_type` and the category's `path`. Memoised
   // per isolate (catalogPresentation.ts), so this is usually free.
@@ -4622,7 +4700,7 @@ export async function listCatalogProducts(
    * while sellable (default D6). The commercial lists — discounted, featured,
    * bundles — are SELLABLE only. The count below rewrites the SELECT list.
    */
-  const commercialList = type === 'discounted' || type === 'featured' || type === 'bundle';
+  const commercialList = type === 'discounted' || type === 'featured' || type === 'bundle' || type === 'offers';
   const selectList = `SELECT *, ${optimisticSellableFlag(db)} AS sellable_now FROM products`;
   /** Who may be listed at all — the paged listing's row read asks it again (`pagedListing`). */
   const listedScope = commercialList
@@ -4829,6 +4907,18 @@ export async function listCatalogProducts(
     sql += ` AND ${reach.sql}`;
     params.push(...reach.params);
   }
+  /**
+   * «العروض» (/offers, DECISIONS row 294): every ordinary product a LIVE, active, PRICED, unsuspended sale
+   * reaches — narrowed IN SQL (`LIVE_PRICED_OFFER`, the same predicate as `type=discounted`'s offer half),
+   * so the candidate cap walks sales only and the whole catalogue can never push one out. The card gate
+   * (`pagedListing`'s `offerGate`) then keeps the cards whose sale lowers this viewer's «from»: a
+   * members-only sale lists for the members it covers, never for a guest.
+   */
+  if (type === 'offers') {
+    const at = new Date().toISOString();
+    sql += ` AND products.composition = '' AND ${LIVE_PRICED_OFFER}`;
+    params.push(at, at);
+  }
   if (type === 'featured') sql += ' AND is_featured = 1';
   /**
    * BRAND NARROWS IN SQL — as ONE bound parameter however many brands are
@@ -4879,8 +4969,9 @@ export async function listCatalogProducts(
    */
   // Words judged per product (a colour, a material, an exclusion) with no search words left are judged
   // on the KEYS (`keep`): the whole scope is walked, and only the page is priced.
-  if (listing && !search && type !== 'bundle') {
+  if (listing && (!search || type === 'offers') && type !== 'bundle') {
     const paged = await pagedListing(db, {
+      ...(type === 'offers' ? { offerGate: { occasion } } : {}),
       keep: nlKeep,
       whereSql: sql,
       whereParams: params,
@@ -5049,7 +5140,7 @@ function nlProductOf(row: Record<string, unknown>): NlProduct {
  * `listCatalogProducts` reads is here; a parameter it ignores cannot mint an
  * entry.
  */
-export const LISTING_CACHE_PARAMS: readonly string[] = ['search', 'category', 'type', 'limit', 'offset', 'page', 'nl', ...LISTING_PARAM_KEYS];
+export const LISTING_CACHE_PARAMS: readonly string[] = ['search', 'category', 'type', 'limit', 'offset', 'page', 'nl', 'occasion', ...LISTING_PARAM_KEYS];
 
 productRoutes.get('/', (c) =>
   // A GUEST'S listing is the same for every guest and is served from the
@@ -5346,7 +5437,7 @@ export async function catalogProductDetail(
   // C2: the page seeds its first quote with this answer, so it carries the
   // live offer the cart will charge — never the higher ladder price.
   const openingPrice = withLiveOffer(resolved, doc, ctx, offer, now);
-  const out = publicWithDisplayPrice(row, ctx, { sellable: true }, relations, undefined, offer, poolMember);
+  const out = publicWithDisplayPrice(row, ctx, { sellable: true }, relations, undefined, offer, poolMember, { occasionOnAnyLevel: true });
   // A fact about the product, not a price: the storefront renders the
   // home-delivery note beside a printer's price block from this flag.
   out.is_printer = isPrinter;

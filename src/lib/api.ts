@@ -448,6 +448,15 @@ export interface ApiProduct {
      *  nothing on this card shows no clock. Absent on an older payload. */
     priced?: boolean;
     locked?: boolean;
+    /**
+     * THE SALE'S OCCASION (DECISIONS row 294): a preset key («black_friday», «ramadan» …) or 'custom'.
+     * Present only while this viewer's sale is live and lowers the price — on a card, the card's own
+     * «from» (`price_source: 'offer'`); on the product page, any selection. Drawn by
+     * src/components/ui/OccasionTag.tsx; an unknown key draws nothing.
+     */
+    badge?: string;
+    /** The owner's own name, for `badge: 'custom'`: Arabic, and English and Sorani when typed. */
+    badge_text?: { ar: string; en?: string; ckb?: string };
   } | null;
   /** The offer's PLUS rung, offer-scoped only (§4.4). */
   display_plus_iqd?: number | null;
@@ -2056,6 +2065,12 @@ export interface ProductsListResponse {
   exact_miss?: string[];
   /** productId → the selection its codes matched, which the card link carries as `?v=`. */
   matched?: Record<string, { option_value_ids: string[]; color_id: string | null; variant_id: string | null }>;
+  /**
+   * «العروض» (`type=offers`, DECISIONS row 294): the occasions on this viewer's live sales, in the presets'
+   * order, each with how many products carry it — counted before `occasion=` narrows the list, so the
+   * chips stay. `badge_text`: the owner's name when every custom-named sale shares one.
+   */
+  occasions?: Array<{ key: string; count: number; badge_text?: { ar: string; en?: string; ckb?: string } }>;
 }
 
 /** One understood constraint, and `drop`: the search text without its words (what removing the chip searches). */

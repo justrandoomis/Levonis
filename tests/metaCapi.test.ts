@@ -48,7 +48,7 @@ test('the dataset is the pixel, on the current Graph API', () => {
 
 test('the server reports exactly the pages the browser reports', () => {
   const sample = [
-    '/', '/products', '/product/x', '/product/x/', '/categories', '/categories/a', '/categories/a/b', '/categories/a/b/c', '/compare',
+    '/', '/products', '/offers', '/offers/x', '/product/x', '/product/x/', '/categories', '/categories/a', '/categories/a/b', '/categories/a/b/c', '/compare',
     '/used-printers', '/trade-in', '/bundles', '/bundles/s', '/cart', '/checkout', '/community', '/community/stores',
     '/community/makers', '/community/projects', '/community/projects/p1', '/community/projects/new', '/community/projects/p1/edit',
     '/community/store/s', '/community/store/s/p/x', '/community/saved', '/u/sara', '/tools', '/printer-finder', '/policies',

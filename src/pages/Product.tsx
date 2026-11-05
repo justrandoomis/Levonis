@@ -87,7 +87,7 @@ import type {
   ProductDimensionsV2,
 } from '../lib/productTypes';
 import { tierLabel } from '../components/subscription/tierMeta';
-import { OfferSaving, SALE_PRICE } from '../components/ui/OfferBadge';
+import { OfferSaving, SALE_PRICE, occasionOnPage } from '../components/ui/OfferBadge';
 import Countdown from '../components/ui/Countdown';
 import ConditionPanel from '../components/product/ConditionPanel';
 const StockAlertPanel = React.lazy(() => import('../components/product/StockAlertPanel'));
@@ -198,6 +198,14 @@ const PriceRequestPanel = React.lazy(() => import('../components/product/PriceRe
  * downloads it, nor the contract of words it reads.
  */
 const EstimateNotice = React.lazy(() => import('../components/product/EstimateNotice'));
+/**
+ * THE SALE'S OCCASION (DECISIONS row 294): «بلاك فرايدي» at the gallery's top-end and «سعر بلاك فرايدي»
+ * beside the sale price, mounted only while a sale with an occasion lowers the selection on screen — a
+ * page without one never downloads the tags, their glyphs or their words (the opening stays as it was).
+ */
+const loadOccasionTag = () => import('../components/ui/OccasionTag');
+const OccasionTag = React.lazy(loadOccasionTag);
+const OccasionPriceLabel = React.lazy(() => loadOccasionTag().then((m) => ({ default: m.OccasionPriceLabel })));
 /**
  * The estimate refusals' sentences in the reader's language (§5.5): the
  * contract is a lazy chunk, fetched only when the door answered one of them.
@@ -674,6 +682,12 @@ interface ProductDetail {
     starts_at?: string | null;
     ends_at?: string | null;
     priced?: boolean;
+    /**
+     * The sale's occasion (DECISIONS row 294): present while this viewer's sale is live and lowers some
+     * selection; drawn while it lowers the one on screen.
+     */
+    badge?: string;
+    badge_text?: { ar: string; en?: string; ckb?: string };
   } | null;
 }
 
@@ -3034,6 +3048,12 @@ export default function Product() {
   /** A live offer lowered what is on screen: the struck line, the «سعر العرض» label and the clock (§8.3). */
   const offerBefore = shownPrice && typeof shownPrice.before === 'number' && shownPrice.before > shownPrice.applied ? shownPrice.before : null;
   /**
+   * …and the sale's OCCASION (DECISIONS row 294): named by the server only while this viewer's sale is live
+   * and lowers some selection; shown only while it lowers the one on screen (`occasionOnPage`: `offerBefore`).
+   */
+  const pageOccasion = occasionOnPage(product.offer, offerBefore);
+  const occasionLang = lang === 'en' || lang === 'ckb' ? lang : 'ar';
+  /**
    * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 248): the price and the struck price beside it
    * (the offer's, else a member's regular), in dollars only when both have one — never half base and
    * half conversion. The struck price is paired with the APPLIED price it is compared with (a warranty
@@ -3424,9 +3444,18 @@ export default function Product() {
       {s.appliedPriceOf(appliedMemberLabel)}
     </span>
   ) : offerBefore !== null ? (
-    /* A live offer set this price (§8.3): «سعر العرض», never the plain «السعر». */
+    /* A live offer set this price (§8.3): «سعر العرض», never the plain «السعر» — or its occasion's own
+       label, «سعر بلاك فرايدي» (DECISIONS row 294), «سعر العرض» until its words arrive. */
     <span data-testid="product-sale-label" className="text-text-secondary text-[12px] font-bold">
-      {lang === 'en' ? SALE_PRICE.en : lang === 'ckb' ? SALE_PRICE.ckb : SALE_PRICE.ar}
+      {pageOccasion ? (
+        <ChunkBoundary compact renderFallback={() => SALE_PRICE[occasionLang]}>
+          <React.Suspense fallback={SALE_PRICE[occasionLang]}>
+            <OccasionPriceLabel badge={pageOccasion.badge} name={pageOccasion.badge_text} lang={occasionLang} fallback={SALE_PRICE[occasionLang]} />
+          </React.Suspense>
+        </ChunkBoundary>
+      ) : (
+        SALE_PRICE[occasionLang]
+      )}
     </span>
   ) : null;
   /** «سعر تقديري» — the chip beside an estimated price (docs/SMART_PRICING.md §5.3), from the eager card label. */
@@ -5363,6 +5392,17 @@ export default function Product() {
                   fallbackClassName="text-text-muted"
                 />
                 {galleryColourChip}
+                {/* The sale's occasion at the photo's top-end (DECISIONS row 294): top-left in Arabic and
+                    Sorani, as on the card. Decoration over the photo — a failed chunk draws nothing. */}
+                {pageOccasion ? (
+                  <span data-gallery-occasion className="pointer-events-none absolute top-3 end-3 z-[1] flex max-w-[calc(100%-1.5rem)]">
+                    <ChunkBoundary compact renderFallback={() => null}>
+                      <React.Suspense fallback={null}>
+                        <OccasionTag badge={pageOccasion.badge} name={pageOccasion.badge_text} lang={occasionLang} size="page" />
+                      </React.Suspense>
+                    </ChunkBoundary>
+                  </span>
+                ) : null}
                 {activeMedia?.url ? (
                   /* The house round button: a 44px target around a 36px
                      raised disc. IconButton positions itself relative, so
