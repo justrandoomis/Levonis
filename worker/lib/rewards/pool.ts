@@ -48,7 +48,14 @@ export async function spentAsExtra(db: D1Database, couponId: string): Promise<bo
   }
 }
 
-/** Every reward coupon this customer can spend right now, the soonest to end first. */
+/**
+ * Every reward coupon this customer can spend right now, the soonest to end
+ * first. Among coupons that end together the first printer's go first, then the
+ * coupon's id, so one wallet always spends one way. Without this the coupon spent
+ * was decided by a random id, and so was what a later return could withdraw: a
+ * returned printer takes the highest unit's coupons (`revokeRewardsForReturn`),
+ * and those are whole only if the order spent from the lowest.
+ */
 export async function livePool(db: D1Database, userId: string, nowIso: string): Promise<PoolCoupon[]> {
   const { results } = await db
     .prepare(
@@ -60,7 +67,7 @@ export async function livePool(db: D1Database, userId: string, nowIso: string): 
           AND (c.starts_at IS NULL OR c.starts_at <= ?2)
           AND (c.ends_at IS NULL OR c.ends_at > ?2)
           AND NOT ${SPENT_SQL('g.coupon_id')}
-        ORDER BY c.ends_at ASC, c.id ASC
+        ORDER BY c.ends_at ASC, g.unit_index ASC, c.id ASC
         LIMIT ?3`
     )
     .bind(userId, nowIso, POOL_LIMIT)

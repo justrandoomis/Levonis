@@ -324,6 +324,12 @@ test('a returned printer takes back its coupons not yet used — up to the units
   // One piece of filament under the delivery coupon's minimum: one coupon of the four spends.
   paidLine(raw, 'ci_other', 'p_plain', { qty: 1, fulfillmentType: 'direct_sale' });
   await placeOrder(a.buyer, { couponCode: codeOf(raw, orderId, 'filament_discount') });
+  // The first printer's coupon is the one spent, every time: a random id used to decide, and this test failed about one run in two.
+  const spent = row<{ unit_index: number }>(
+    raw,
+    "SELECT g.unit_index FROM reward_grants g JOIN coupon_redemptions r ON r.coupon_id = g.coupon_id AND r.state = 'active' WHERE g.user_id = 'buyer'"
+  )!;
+  assert.equal(spent.unit_index, 1);
 
   const item = row<{ id: string }>(raw, "SELECT id FROM order_items WHERE order_id = ? AND product_id = 'p_printer'", orderId)!;
   const out = await revokeRewardsForReturn(envOf(raw), { caseId: 'rc_1', orderItemId: item.id, qty: 1 });
