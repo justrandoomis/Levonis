@@ -588,6 +588,15 @@ export function seededCopy(): DatabaseSync {
     raw.exec(`VACUUM INTO '${templateFile.replace(/'/g, "''")}'`);
     raw.close();
     process.once('exit', () => {
+      // Closed first: Windows refuses to remove a file that is still open, and every
+      // process using this fixture left a folder behind (140 GB of them by 2026-11-06).
+      for (const copy of openCopies.values()) {
+        try {
+          if (copy.isOpen) copy.close();
+        } catch {
+          /* already closed */
+        }
+      }
       try {
         rmSync(scratchDir!, { recursive: true, force: true });
       } catch {
