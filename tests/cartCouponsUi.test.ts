@@ -619,3 +619,15 @@ test('the settings tab’s product row uses the tab’s own checkbox, not the pr
   assert.doesNotMatch(file, /<Toggle|formUi/);
   assert.match(file, /data-admin-shop-on-sale/);
 });
+
+test('a typed code in force: the page offers only the better of the two, and never promises a saving it would take back', () => {
+  const r = read([coupon({ take_iqd: 5_000 })], { total_iqd: 5_000, delivery_iqd: 5_000 });
+  const with_ = (promoSaving: number) => render(createElement(CartCoupons, { read: r, mode: 'promo', promoCode: 'PROMO10', promoSaving, lineName: () => 'eSUN PLA+', onApply: () => {}, onRemove: () => {} }), 'ar');
+  const codeBetter = with_(74_400);
+  assert.doesNotMatch(codeBetter, /data-cart-coupons-apply/, 'pressing would cost the customer money');
+  assert.match(codeBetter, /لا تجتمع معه/);
+  const couponsBetter = with_(1_000);
+  assert.match(couponsBetter, /data-cart-coupons-apply/);
+  assert.match(couponsBetter, /توفّر أكثر من هذا الكود/);
+  assert.doesNotMatch(couponsBetter, /· وفّر/, 'the press replaces the code: the figure would not be what it saves');
+});

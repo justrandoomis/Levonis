@@ -84,7 +84,7 @@ export default function AdminRewards() {
             { id: 'printers', label: loc('الطابعات', 'Printers', 'چاپکەران') },
             { id: 'coupons', label: loc('الكوبونات', 'Coupons', 'کۆپۆنەکان') },
             { id: 'competitions', label: loc('المسابقات', 'Contests', 'پێشبڕکێ') },
-            { id: 'ads', label: loc('الإعلانات', 'Ads', 'ڕیکلام') },
+            { id: 'ads', label: loc('الإعلانات', 'Ads', 'ڕیکلامەکان') },
             { id: 'settings', label: loc('الإعدادات', 'Settings', 'ڕێکخستن') },
           ]}
           label={loc('أقسام المكافآت', 'Rewards sections', 'بەشەکانی خەڵات')}

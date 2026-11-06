@@ -122,7 +122,13 @@ export const CART_COUPON_WORDS = {
     'The promo code {code} is in force, and coupons do not join it.',
     'کۆدی داشکاندنی {code} جێبەجێ کراوە و کۆپۆنەکان لەگەڵیدا کۆنابنەوە.',
   ],
+  promoLess: [
+    'كوبوناتك توفّر أكثر من هذا الكود، وتحلّ محله إن طبّقتها.',
+    'Your coupons save more than this code, and replace it if you apply them.',
+    'کۆپۆنەکانت لەم کۆدە زیاتر پاشەکەوت دەکەن، و ئەگەر جێبەجێیان بکەیت جێگەی دەگرنەوە.',
+  ],
   lineChip: ['كوبون', 'Coupon', 'کۆپۆن'],
+  lineChipPromo: ['كود الخصم', 'Promo code', 'کۆدی داشکاندن'],
   summaryGoods: ['كوبونات المكافأة', 'Reward coupons', 'کۆپۆنەکانی خەڵات'],
   summaryPromo: ['كود الخصم', 'Promo code', 'کۆدی داشکاندن'],
   summaryDelivery: ['كوبون التوصيل', 'Delivery coupon', 'کۆپۆنی گەیاندن'],
@@ -453,6 +459,8 @@ export interface CartCouponsProps {
   mode: CartCouponMode;
   /** The typed code in force, in `promo` mode. */
   promoCode: string;
+  /** What the typed code takes off this cart: the page offers only the better of the two (row 223 #5). */
+  promoSaving?: number;
   /** A ticked line's name, by its id. */
   lineName: (lineId: string) => string;
   /** A ticked line whose price moves when it is paid on delivery: what a coupon takes of it moves too. */
@@ -461,13 +469,15 @@ export interface CartCouponsProps {
   onRemove: () => void;
 }
 
-export function CartCoupons({ read, mode, promoCode, lineName, repricesAtCheckout = false, onApply, onRemove }: CartCouponsProps) {
+export function CartCoupons({ read, mode, promoCode, promoSaving = 0, lineName, repricesAtCheckout = false, onApply, onRemove }: CartCouponsProps) {
   const t = useWords();
   const { money } = useMoney();
   const rows = cartCouponRows(read.coupons);
   const preview = read.preview;
   const applied = mode === 'pool';
-  const offersApply = !applied && !!preview;
+  // A typed code that saves as much or more stands alone: pressing would cost the customer money.
+  const promoWins = mode === 'promo' && !!preview && promoSaving >= previewSaving(preview);
+  const offersApply = !applied && !!preview && !promoWins;
   const feeBack = preview?.fee_back_iqd ?? 0;
   // The note qualifies a figure: a waiting coupon has none, and its own row says when it comes off.
   const estimated = !!preview && (preview.delivery_iqd > 0 || feeBack > 0 || (repricesAtCheckout && preview.total_iqd > 0));
@@ -482,6 +492,7 @@ export function CartCoupons({ read, mode, promoCode, lineName, repricesAtCheckou
       {mode === 'promo' && (
         <p data-cart-coupons-promo className="text-[12.5px] leading-5 text-text-secondary">
           {t('promoInForce', { code: promoCode })}
+          {offersApply && ` ${t('promoLess')}`}
         </p>
       )}
 
@@ -505,7 +516,7 @@ export function CartCoupons({ read, mode, promoCode, lineName, repricesAtCheckou
 
       {offersApply && (
         <Button variant="primary" block className="py-2" onClick={onApply} data-cart-coupons-apply>
-          {preview.total_iqd > 0 ? t('applySave', { money: money(previewSaving(preview)) }) : t('apply')}
+          {preview.total_iqd > 0 && mode !== 'promo' ? t('applySave', { money: money(previewSaving(preview)) }) : t('apply')}
         </Button>
       )}
       {applied && (

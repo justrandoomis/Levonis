@@ -390,9 +390,10 @@ test('a ticked filament on a live offer: the settings and the overview say the c
     raw.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES (?, ?)').run(REWARD_CONFIG_KEY, JSON.stringify({ filament: { enabled: true, percent: 15, max_discount_iqd: 25_000, max_pieces: 1, product_ids: ['p_plain'], ...filament } }));
   const app = as(raw, FULL);
 
-  terms({});
+  assert.equal((await json(await get(app, '/api/admin/rewards/config'))).config.filament.on_offer, true, 'on by the owner’s ruling of 2026-11-06 (row 302)');
+  terms({ on_offer: false });
   const config = await json(await get(app, '/api/admin/rewards/config'));
-  assert.equal(config.config.filament.on_offer, false, 'off unless he turns it on: row 223 #5, one discount per line');
+  assert.equal(config.config.filament.on_offer, false, 'the switch, off: one discount per line');
   assert.equal(config.filaments.find((f: J) => f.id === 'p_plain').on_offer, true, 'the list marks it');
   const overview = await json(await get(app, '/api/admin/rewards/overview'));
   assert.deepEqual(overview.attention.filament_on_offer.map((p: J) => p.id), ['p_plain']);

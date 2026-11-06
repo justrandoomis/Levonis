@@ -61,7 +61,8 @@ export async function handCoupon(raw: DatabaseSync, kind: RewardCouponKind, user
       orderId: null,
       orderItemId: null,
       unitIndex: null,
-      terms: termsFor(kind, REWARD_PROGRAM_DEFAULT),
+      // A hand-made coupon keeps one discount per piece (the switch off): the cases on a sale price say so themselves.
+      terms: { ...termsFor(kind, REWARD_PROGRAM_DEFAULT), stacks: kind !== 'filament_discount' },
       issuedAt,
       expiresAt,
     })

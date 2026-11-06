@@ -199,7 +199,7 @@ test('the estimated price moved purchase to 7, price_protection to 6 and faq to 
  * 301). Neither is a consent document, so nobody is asked to accept again; the
  * previous versions stay in the ledger as the archive holds them.
  */
-test('the review road moved rewards to 7 and faq to 8 on one date; rewards 6 and faq 7 stay in the ledger', () => {
+test('the review road moved rewards to 8 and faq to 8 on one date; rewards 7 and faq 7 stay in the ledger', () => {
   for (const [key, version] of [['rewards', 8], ['faq', 8]] as const) {
     const doc = POLICY_DOCUMENTS.find((d) => d.key === key)!;
     assert.equal(doc.version, version, key);

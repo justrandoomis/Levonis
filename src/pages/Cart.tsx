@@ -1863,7 +1863,7 @@ export default function Cart() {
           {/* THE COUPON ON THE LINE IT LANDS ON, only while applied (DECISIONS row 298). */}
           {(coupons.lineAmounts.get(item.id) ?? 0) > 0 && selected && (
             <p className="-mt-1 mb-2 text-[12px] font-semibold leading-relaxed tabular-nums text-success" data-cart-line-coupon={item.id}>
-              {cartCouponText('lineChip', asLang(lang))} {minus(money(coupons.lineAmounts.get(item.id) ?? 0))}
+              {cartCouponText(coupons.mode === 'promo' ? 'lineChipPromo' : 'lineChip', asLang(lang))} {minus(money(coupons.lineAmounts.get(item.id) ?? 0))}
             </p>
           )}
 
@@ -2410,6 +2410,7 @@ export default function Cart() {
             read={coupons.read}
             mode={coupons.mode}
             promoCode={coupons.promo?.code ?? ''}
+            promoSaving={(coupons.promo?.merchandise_iqd ?? 0) + (coupons.promo?.delivery_iqd ?? 0)}
             lineName={(id) => {
               const line = items.find((i) => i.id === id);
               return line ? itemName(line) : '';
