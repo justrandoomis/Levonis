@@ -1133,6 +1133,24 @@ html:lang(ckb) .leading-tight {
   height: var(--nav-stack);
 }
 
+/* THE BROWSE MISSION'S CLOCK (src/components/BrowseMissionTimer.tsx) floats above
+   whatever owns the bottom edge: the nav, or a taller bar a page declares in
+   --shell-bottom-inset. The cart's summary bar floats above the nav and declares
+   nothing, so while it is on screen the clock clears it by the same 9rem the
+   scroller's own rule below (#main-scroll-container:has([data-bottom-bar])) keeps
+   focus clear of it. The product page has no nav: its buy bar IS the bottom edge
+   and measures itself into --shell-bottom-inset, so the clock sits just above it,
+   not mid-screen over the page (the mission is about these pages). */
+.lv-browse-clock {
+  inset-block-end: calc(max(var(--shell-bottom-inset, 0px), var(--nav-stack)) + 0.5rem);
+}
+body:has([data-bottom-bar]) .lv-browse-clock {
+  inset-block-end: calc(var(--nav-stack) + 9rem);
+}
+body:has([data-testid='product-buybar']) .lv-browse-clock {
+  inset-block-end: calc(var(--shell-bottom-inset) + 0.5rem);
+}
+
 /*
   HOW MUCH OF THE BOTTOM EDGE THE FLOATING NAV OWNS — one number, so a page
   with its own bottom bar can sit ABOVE it instead of guessing.

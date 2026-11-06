@@ -78,7 +78,8 @@ export default {
         'DELETE /site-media/:slot': { cls: 'op', noBody: NB.MEDIA },
         // Mixed by KEY: the cost keys are the owner's (403 COST_ACCESS_DENIED to
         // anyone else, tests/costLeaksPhase0.test.ts L6), the money keys need
-        // money scope, the rest are every admin's. The sweep writes a cost key.
+        // money scope, a film in `adVideoUrl` is the owner's (coupon_issue,
+        // tests/rewardAds.test.ts), the rest are every admin's. The sweep writes a cost key.
         'PUT /settings/:key': { cls: 'op', path: '/api/admin/settings/minMarginPercent', body: { value: 17 } },
         'GET /warranty-claims': 'op',
         'PATCH /warranty-claims/:id': { cls: 'op', noBody: 'warranty claim status and notes; no cost column is read' },

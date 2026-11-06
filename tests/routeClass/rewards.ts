@@ -39,6 +39,14 @@ export default {
         'GET /competitions/:id/entries': 'op',
         'POST /competitions/:id/entries/:entryId/disqualify': { cls: 'op', noBody: 'refuses one entry by id; needs an entry the role fixture does not seed' },
         'POST /competitions/:id/finish': 'money',
+        // 0227 — the points mission's video ads: what every customer is shown and paid for is the owner's act.
+        'GET /ads': 'op',
+        'POST /ads': 'owner',
+        'PUT /ads/:id': 'owner',
+        'POST /ads/:id/toggle': {
+          cls: 'op',
+          noBody: 'switches one ad by id, with no cost in reach; switching OFF is any admin, switching ON refuses all but the owner inside the handler (tests/rewardAds.test.ts); needs an ad the role fixture does not seed',
+        },
       },
     },
   ],

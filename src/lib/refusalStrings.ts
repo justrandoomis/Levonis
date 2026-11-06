@@ -40,6 +40,114 @@ export interface RefusalStrings {
 }
 
 export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
+  // ---- «اجمع النقاط»: the missions and their video ads (0227, DECISIONS row 300) ----
+  REWARD_ALREADY_CLAIMED: {
+    ar: 'أخذت نقاط هذه المهمة من قبل.',
+    en: "You've already earned this mission's points.",
+    ckb: 'پێشتر خاڵی ئەم ئەرکەت وەرگرتووە.',
+  },
+  CHECKIN_ALREADY_DONE: {
+    ar: 'سجّلت دخولك اليومي من قبل. عد غدًا.',
+    en: "You've already checked in today. Come back tomorrow.",
+    ckb: 'ئەمڕۆ پێشتر ئامادەبوونت تۆمار کردووە. سبەی بگەڕێوە.',
+  },
+  TASK_DISABLED: {
+    ar: 'هذه المهمة غير متاحة الآن.',
+    en: 'This mission is not available right now.',
+    ckb: 'ئەم ئەرکە ئێستا بەردەست نییە.',
+  },
+  NO_VIDEO: {
+    ar: 'لا يوجد إعلان متاح اليوم.',
+    en: 'No ad is available today.',
+    ckb: 'ئەمڕۆ هیچ ڕیکلامێک بەردەست نییە.',
+  },
+  NO_TICKET: {
+    ar: 'شغّل الإعلان أولًا، ثم اطلب نقاطك بعد انتهائه.',
+    en: 'Play the ad first, then claim your points when it ends.',
+    ckb: 'سەرەتا ڕیکلامەکە لێبدە، پاشان دوای تەواوبوونی خاڵەکانت داوا بکە.',
+  },
+  TOO_SOON: {
+    ar: 'لم ينتهِ وقت الإعلان بعد. أكمل مشاهدته ثم اطلب نقاطك.',
+    en: "The ad's time isn't over yet. Finish watching it, then claim your points.",
+    ckb: 'هێشتا کاتی ڕیکلامەکە تەواو نەبووە. بینینەکەی تەواو بکە، پاشان خاڵەکانت داوا بکە.',
+  },
+  AD_LIMIT_REACHED: {
+    ar: 'شاهدت هذا الإعلان كل المرات المتاحة لك.',
+    en: "You've used every view of this ad.",
+    ckb: 'هەموو جارەکانی بینینی ئەم ڕیکلامەت بەکارهێنا.',
+  },
+  // The owner's screen: Admin → المكافآت → الإعلانات.
+  REWARD_AD_MP4_REQUIRED: {
+    ar: 'يجب أن يكون الإعلان فيديو MP4.',
+    en: 'An ad must be an MP4 video.',
+    ckb: 'ڕیکلام دەبێت ڤیدیۆی MP4 بێت.',
+  },
+  REWARD_AD_NOT_FASTSTART: {
+    ar: 'هذا الفيديو لا يبدأ التشغيل إلا بعد تنزيله كاملًا، وهذا لا يصلح لإعلان يُشاهَد على بيانات الهاتف. صدّره بخيار «Fast start» (محسَّن للويب) ثم ارفعه من جديد.',
+    en: 'This video starts playing only after it has fully downloaded, which will not do for an ad watched on mobile data. Export it with “Fast start” (web optimized) and upload it again.',
+    ckb: 'ئەم ڤیدیۆیە تەنها دوای داگرتنی تەواوی دەست بە لێدان دەکات، ئەمەش بۆ ڕیکلامێک کە بە داتای مۆبایل دەبینرێت نابێت. بە هەڵبژاردەی «Fast start» (باشکراو بۆ وێب) دەریبکە و دووبارە باری بکە.',
+  },
+  // Both upload doors, for anyone: a file that claims to be a video and cannot play as one.
+  VIDEO_UNSUPPORTED: {
+    ar: 'لا يعمل هذا الفيديو في المتصفح: الملف ناقص، أو بلا صورة، أو بترميز غير مدعوم. ارفع فيديو MP4 كاملًا (H.264).',
+    en: "This video can't play in a browser: the file is incomplete, has no picture, or uses a codec that isn't supported. Upload a complete MP4 (H.264) video.",
+    ckb: 'ئەم ڤیدیۆیە لە وێبگەڕدا لێنادرێت: فایلەکە ناتەواوە، یان وێنەی تێدا نییە، یان کۆدێکی پشتگیرینەکراوی هەیە. ڤیدیۆیەکی MP4ی تەواو (H.264) بار بکە.',
+  },
+  REWARD_AD_TITLE_REQUIRED: {
+    ar: 'اكتب عنوان الإعلان باللغات الثلاث.',
+    en: "Write the ad's title in all three languages.",
+    ckb: 'ناونیشانی ڕیکلامەکە بە هەر سێ زمانەکە بنووسە.',
+  },
+  REWARD_AD_SORANI_COPY: {
+    ar: 'العنوان الكردي نسخة من العربي. اكتبه بالسورانية.',
+    en: 'The Sorani title copies the Arabic. Write it in Sorani.',
+    ckb: 'ناونیشانی کوردی کۆپیی عەرەبییەکەیە. بە سۆرانی بینووسە.',
+  },
+  REWARD_AD_VIDEO_REQUIRED: {
+    ar: 'ارفع فيديو الإعلان من هذه الصفحة أولًا.',
+    en: "Upload the ad's video on this page first.",
+    ckb: 'سەرەتا ڤیدیۆی ڕیکلامەکە لەم پەڕەیەوە بار بکە.',
+  },
+  REWARD_AD_POSTER_INVALID: {
+    ar: 'ارفع صورة الغلاف من هذه الصفحة، أو احذفها.',
+    en: 'Upload the poster on this page, or remove it.',
+    ckb: 'وێنەی بەرگەکە لەم پەڕەیەوە بار بکە، یان بیسڕەوە.',
+  },
+  REWARD_AD_SIZE_INVALID: {
+    ar: 'تعذّرت قراءة أبعاد الفيديو. اختر الملف من جديد.',
+    en: "The video's size couldn't be read. Choose the file again.",
+    ckb: 'قەبارەی ڤیدیۆکە نەخوێنرایەوە. فایلەکە دووبارە هەڵبژێرە.',
+  },
+  REWARD_AD_DURATION_INVALID: {
+    ar: 'مدة الإعلان يجب أن تكون بين 5 ثوانٍ وساعة.',
+    en: 'An ad must run between 5 seconds and an hour.',
+    ckb: 'ماوەی ڕیکلام دەبێت لە نێوان 5 چرکە و کاتژمێرێکدا بێت.',
+  },
+  REWARD_AD_SECONDS_INVALID: {
+    ar: 'أقل مدة مشاهدة يجب أن تكون 5 ثوانٍ على الأقل، ولا تتجاوز مدة الفيديو ولا 10 دقائق.',
+    en: "The minimum watch time must be at least 5 seconds, and no longer than the video or 10 minutes.",
+    ckb: 'کەمترین کاتی بینین دەبێت لانیکەم 5 چرکە بێت، و لە ماوەی ڤیدیۆکە و 10 خولەک زیاتر نەبێت.',
+  },
+  REWARD_AD_WINDOW_INVALID: {
+    ar: 'تحقّق من التاريخين: النهاية بعد البداية، والمدة سنة على الأكثر.',
+    en: 'Check the dates: the end after the start, and a year at most.',
+    ckb: 'بەروارەکان بپشکنە: کۆتایی دوای دەستپێک بێت، و ماوەکە لە ساڵێک زیاتر نەبێت.',
+  },
+  REWARD_AD_VIEWS_INVALID: {
+    ar: 'عدد المشاهدات لكل زبون بين 1 و50.',
+    en: 'Views per customer must be from 1 to 50.',
+    ckb: 'ژمارەی بینین بۆ هەر کڕیارێک دەبێت لە 1 تا 50 بێت.',
+  },
+  REWARD_AD_SORT_INVALID: {
+    ar: 'رقم الترتيب بين -1000 و1000.',
+    en: 'The order number must be from -1000 to 1000.',
+    ckb: 'ژمارەی ڕیزبەندی دەبێت لە -1000 تا 1000 بێت.',
+  },
+  REWARD_AD_ACTIVE_REQUIRED: {
+    ar: 'حدّد تشغيل الإعلان أو إيقافه.',
+    en: 'Say whether to switch the ad on or off.',
+    ckb: 'دیاری بکە ڕیکلامەکە چالاک بکرێت یان بوەستێنرێت.',
+  },
   // ---- PRO Buy Now, Pay Later --------------------------------------------
   PRO_REQUIRED: {
     ar: 'الدفع لاحقًا متاح حصريًا لعضوية PRO الفعّالة.',

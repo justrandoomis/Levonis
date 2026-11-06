@@ -28,6 +28,7 @@ import {
   SIMPLE_UPLOAD_PURPOSES,
   assertAssistUploadWithinLimit,
   assertQuota,
+  assertRewardAdVideo,
   assertUploadEntity,
   chatKeyKind,
   kindLimitBytes,
@@ -369,7 +370,7 @@ uploadRoutes.post('/', async (c) => {
    * drop, and a ticket's attachment row has no `file` kind.
    */
   const allowVideo =
-    purpose === 'product' || purpose === 'chat' || purpose === 'support' || purpose === 'complaint' || purpose === 'assist' || merchantVideo;
+    purpose === 'product' || purpose === 'chat' || purpose === 'support' || purpose === 'complaint' || purpose === 'assist' || merchantVideo || purpose === 'reward_ad';
   const maxSize = allowVideo ? videoMax : imageMax;
   if (file.size > maxSize) {
     throw badRequest(`File is too large (max ${Math.round(maxSize / 1024 / 1024)} MB)`, 'UPLOAD_TOO_LARGE', { limit_bytes: maxSize });
@@ -418,6 +419,19 @@ uploadRoutes.post('/', async (c) => {
         used_bytes: usedBytes,
       });
     }
+  }
+  /**
+   * A VIDEO AD (0227) is proven end to end like a merchant's clip, and must also
+   * be an MP4 that can start before it has fully arrived (`assertRewardAdVideo`).
+   * It has no quota of its own: only an admin stores one.
+   */
+  if (purpose === 'reward_ad' && (kind?.mime.startsWith('video/') || (buf[0] === 0x1a && buf[1] === 0x45 && buf[2] === 0xdf && buf[3] === 0xa3))) {
+    const video = sniffVideo(buf);
+    if (!video.ok) {
+      throw badRequest('This video cannot be played in a browser — upload an MP4 (H.264) video.', 'VIDEO_UNSUPPORTED', { reason: video.reason });
+    }
+    assertRewardAdVideo(video.mime, buf);
+    kind = { ext: video.ext, mime: video.mime };
   }
   /**
    * NAME THE FORMAT BEFORE SAYING "UNSUPPORTED".
@@ -599,6 +613,8 @@ uploadRoutes.post('/', async (c) => {
     purpose === 'assist' ? { visibility: 'private', domain: 'assist', entityId: user.id, keyKind: chatKeyKind(storedMime) } :
     purpose === 'community' ? { visibility: 'public', domain: 'merchants', entityId: user.id, keyKind: 'public' } :
     purpose === 'post' ? { visibility: 'public', domain: 'users', entityId: user.id, keyKind: 'posts' } :
+    // The same place the session door files it (worker/lib/uploadEntity.ts `placementFor`).
+    purpose === 'reward_ad' ? { visibility: 'public', domain: 'rewards', entityId: 'ads', keyKind: storedMime.startsWith('video/') ? 'video' : 'poster' } :
     { visibility: 'public', domain: 'products', entityId: 'catalog', keyKind: storedMime.startsWith('video/') ? 'video' : 'gallery' };
   // `storedMime` / `storedExt`, never the sniffed pair: after a conversion they
   // differ, and a key that says .jpg over WebP bytes is the same class of lie

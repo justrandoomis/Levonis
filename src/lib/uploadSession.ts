@@ -30,7 +30,9 @@ import type { HashWorkerMessage } from '../components/upload/sha256.worker';
 export type SessionPurpose =
   | 'post' | 'community' | 'chat' | 'request' | 'product_file' | 'order_update'
   // An offer's files (0159, §9.5): private, under the merchant's prefix, keyed back to the offer composer.
-  | 'offer';
+  | 'offer'
+  // A video ad of the points mission and its poster (0227): an admin's, public.
+  | 'reward_ad';
 
 /** Above this a file takes the session path; the whole-body route is for what fits in one request. */
 export const SESSION_THRESHOLD_BYTES = 8 * 1024 * 1024;

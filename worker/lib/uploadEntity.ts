@@ -20,6 +20,7 @@ import { onPublicBoard } from './communityRequests';
 import { liveVerdictForUser } from './printMatchingStore';
 import { assertRequestFilesOpen } from './requestFileRoom';
 import { canHandleDisputes } from './staffCapabilities';
+import { mp4IndexComesFirst } from './videoSniff';
 
 export const MiB = 1024 * 1024;
 
@@ -78,11 +79,13 @@ export const UPLOAD_PURPOSES = [
   // A photo, clip or voice note in the support assistant chat (0209): filed
   // under the uploader, handed to a ticket by the ticket door.
   'assist',
+  // A video ad of the points mission and its poster (0227): an admin's, public.
+  'reward_ad',
 ] as const;
 export type UploadPurpose = (typeof UPLOAD_PURPOSES)[number];
 
 /** What the whole-body route takes: small pictures, clips, voice notes and PDFs. */
-export const SIMPLE_UPLOAD_PURPOSES = ['receipt', 'avatar', 'chat', 'product', 'community', 'support', 'complaint', 'post', 'assist'] as const;
+export const SIMPLE_UPLOAD_PURPOSES = ['receipt', 'avatar', 'chat', 'product', 'community', 'support', 'complaint', 'post', 'assist', 'reward_ad'] as const;
 export type SimpleUploadPurpose = (typeof SIMPLE_UPLOAD_PURPOSES)[number];
 
 /** What a resumable session may be opened for. */
@@ -90,6 +93,7 @@ export const SESSION_PURPOSES = [
   'post', 'community', 'chat', 'request', 'product_file',
   'order_update',
   'offer',
+  'reward_ad',
 ] as const;
 export type SessionPurpose = (typeof SESSION_PURPOSES)[number];
 
@@ -104,6 +108,8 @@ export const KEY_PURPOSES: ReadonlySet<string> = new Set([
   'order_update',
   // An offer's files (0159, §9.5): the composer sends the keys back as `files: [{key}]`.
   'offer',
+  // An ad's video and poster (0227): the admin's form sends the `/files/<key>` back.
+  'reward_ad',
 ]);
 
 const SESSION_KINDS: Record<SessionPurpose, readonly UploadKind[]> = {
@@ -116,6 +122,8 @@ const SESSION_KINDS: Record<SessionPurpose, readonly UploadKind[]> = {
   order_update: ['image'],
   // What an offer may show the customer: a photo of a sample, a PDF quote, a model.
   offer: ['image', 'model', 'document'],
+  // An ad is a video; a poster is its picture.
+  reward_ad: ['image', 'video'],
 };
 
 /** May a session for this purpose carry this kind of file? */
@@ -168,6 +176,16 @@ export async function assertUploadEntity(
 
     case 'product':
       if (user.role !== 'admin') throw forbidden('Only administrators can upload product media');
+      return '';
+
+    /**
+     * AN AD IS THE SHOP'S OWN VOICE TO EVERY CUSTOMER (0227): public and shown
+     * to all, so only an admin stores one. Publishing it is the owner's
+     * (`coupon_issue`, worker/routes/adminRewards.ts): a file here names no ad
+     * until that door takes it.
+     */
+    case 'reward_ad':
+      if (user.role !== 'admin') throw forbidden('Only administrators can upload an ad');
       return '';
 
     /**
@@ -417,6 +435,9 @@ export function placementFor(
     // the merchant's own, which is what `ownedFileObject` checks.
     case 'offer':
       return { visibility: 'private', domain: 'merchants', entityId: ctx.userId, kind: 'offers' };
+    // `rewards/ads/video/<id>.mp4` and `rewards/ads/poster/<id>.<ext>`, public: a phone plays it from /files.
+    case 'reward_ad':
+      return { visibility: 'public', domain: 'rewards', entityId: 'ads', kind: kind === 'video' ? 'video' : 'poster' };
   }
 }
 
@@ -430,7 +451,22 @@ export const orderUpdateKeyPrefix = (orderId: string) => `community-orders/${ord
 
 /** The visibility a session key was opened under, read back from its shape (the sweep has only the key). */
 export function visibilityForKey(key: string): MediaVisibility {
-  return /^users\/[^/]+\/posts\//.test(key) || /^merchants\/[^/]+\/public\//.test(key) ? 'public' : 'private';
+  return /^users\/[^/]+\/posts\//.test(key) || /^merchants\/[^/]+\/public\//.test(key) || key.startsWith('rewards/ads/') ? 'public' : 'private';
+}
+
+/**
+ * WHAT AN AD MUST BE BEFORE IT IS STORED (owner's ad, DECISIONS row 300): an MP4
+ * whose index comes before its frames. A customer watches this on Iraqi mobile
+ * data, with a countdown running; an index at the end means a spinner until the
+ * whole file has arrived, so what is only a hint for a merchant's clip
+ * (`VIDEO_NOT_FASTSTART`) is a refusal here. Both upload doors ask this, on the
+ * first bytes, so the session door need not read the whole object.
+ */
+export function assertRewardAdVideo(mime: string, head: Uint8Array): void {
+  if (mime !== 'video/mp4') throw badRequest('An ad must be an MP4 video', 'REWARD_AD_MP4_REQUIRED');
+  if (!mp4IndexComesFirst(head)) {
+    throw badRequest('This MP4 starts playing only after it has fully downloaded — export it with «Fast start» (web optimized)', 'REWARD_AD_NOT_FASTSTART');
+  }
 }
 
 /** The ceiling, in bytes, for a kind of file under the current limits. */

@@ -149,7 +149,7 @@ export function UploadTile({ file, purpose, entityId, onDone, onCancel }: Upload
   else status = failedText ?? t.failed;
 
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border-subtle bg-surface p-3" role="group" aria-label={file.name}>
+    <div className={`flex ${state.status === 'failed' ? 'flex-wrap ' : ''}items-center gap-3 rounded-2xl border border-border-subtle bg-surface p-3`} role="group" aria-label={file.name}>
       <div
         className={`relative h-11 w-11 shrink-0 ${tone}`}
         role="progressbar"
@@ -198,8 +198,9 @@ export function UploadTile({ file, purpose, entityId, onDone, onCancel }: Upload
           {t.cancel}
         </Button>
       )}
+      {/* On a line of their own: beside them, a refusal's whole sentence read down a narrow column. */}
       {state.status === 'failed' && (
-        <div className="flex shrink-0 items-center gap-1">
+        <div className="flex w-full justify-end items-center gap-1">
           <Button type="button" variant="secondary" size="sm" onClick={retry}>
             {t.retry}
           </Button>

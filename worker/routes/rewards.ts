@@ -72,6 +72,7 @@ import {
   MISSION_BASE_POINTS,
   type MissionId,
   baghdadDay,
+  buildAdTicketStatement,
   buildDirectAwardStatements,
   buildTicketStatement,
   buildTimedAwardStatements,
@@ -84,6 +85,7 @@ import {
   readStreak,
 } from '../lib/pointsTasks';
 import { readPendingPoints } from '../lib/rewards/pending';
+import { adForPage, adLimitRefusal, noAdRefusal, planVideoMission, readAdState, readTodayAdId } from '../lib/rewards/ads';
 
 export const rewardRoutes = new Hono<AppContext>();
 rewardRoutes.use('*', requireAuth);
@@ -129,7 +131,7 @@ async function runAward(
   build: (pausable: boolean) => D1PreparedStatement[]
 ): Promise<D1Result[]> {
   return runBatch(c.env.DB, build).catch((e) => {
-    if (isUniqueViolation(e)) throw conflict('You have already claimed this reward');
+    if (isUniqueViolation(e)) throw conflict('You have already claimed this reward', 'REWARD_ALREADY_CLAIMED');
     throw e;
   });
 }
@@ -167,7 +169,7 @@ rewardRoutes.get('/', async (c) => {
   const yesterday = baghdadDay(-1, nowMs);
   const nowSecs = Math.floor(nowMs / 1000);
 
-  const [balances, claims, adVideoUrl, browse, tierStatus, streak, history, taskCfg, pointsRule, pending] = await Promise.all([
+  const [balances, claims, adVideoUrl, browse, tierStatus, streak, history, taskCfg, pointsRule, pending, adState] = await Promise.all([
     getBalances(c.env.DB, user.id),
     c.env.DB.prepare(
       `SELECT mission, day, state, started_at, required_seconds, points
@@ -186,6 +188,7 @@ rewardRoutes.get('/', async (c) => {
     getRewardTaskConfig(c.env),
     getPointsRuleConfig(c.env),
     readPendingPoints(c.env.DB, user.id),
+    readAdState(c.env.DB, user.id, today),
   ]);
 
   const multiplierX100 = rewardMultiplierX100(tierStatus);
@@ -216,6 +219,15 @@ rewardRoutes.get('/', async (c) => {
   // The ladder the page draws. Computed HERE so the page never guesses at an
   // amount: it used to multiply by 2 for any PRO, which was wrong for PREMIUM
   // and wrong again wherever rounding applied.
+  // THE AD ON THE CARD, decided by the one plan `/video/start` also follows.
+  const videoRow = rows.get('video');
+  const videoPlan = planVideoMission(adState, {
+    claim: videoRow ? { state: videoRow.state, started_at: videoRow.started_at, required_seconds: videoRow.required_seconds, ad_id: adState.todayAdId } : null,
+    nowMs,
+    legacyUrl: adVideoUrl,
+    minSeconds: taskCfg.video_min_seconds,
+  });
+
   const firstOfWeek = Math.max(1, Math.floor((Math.max(1, streak.nextDay) - 1) / 7) * 7 + 1);
   const ladder = Array.from({ length: 7 }, (_, i) => {
     const day = firstOfWeek + i;
@@ -249,17 +261,31 @@ rewardRoutes.get('/', async (c) => {
     missions: {
       push: mission('push'),
       video: mission('video', {
-        available: missionEnabled('video', taskCfg) && !!adVideoUrl,
-        videoUrl: adVideoUrl || null,
-        required_seconds: taskCfg.video_min_seconds,
+        available: missionEnabled('video', taskCfg) && !!videoPlan.videoUrl,
+        videoUrl: videoPlan.videoUrl,
+        required_seconds: videoPlan.requiredSeconds,
         /** Non-null once the server has issued the ticket for today. */
-        seconds_remaining: waitLeft('video'),
-        started: rows.get('video')?.state === 'started',
+        seconds_remaining: videoPlan.ticketOpen ? waitLeft('video') : null,
+        started: videoPlan.ticketOpen,
+        /** The ad on the card (0227); null while the old setting runs the mission or nothing runs today. */
+        ad: videoPlan.ad ? adForPage(videoPlan.ad) : null,
+        /** Today's view is paid and another remains: the instant tomorrow starts. */
+        next_at: videoPlan.nextAt,
+        /** This ad is used up: every view it gives this customer has been paid. */
+        done: videoPlan.done,
       }),
       browse: mission('browse', {
         required_seconds: BROWSE_REQUIRED_SECS,
         progress_seconds: browse && browse.day === today ? browse.seconds : 0,
         seconds_remaining: waitLeft('browse'),
+        /**
+         * THE TICKET IS OPEN. The clock (src/components/BrowseMissionTimer.tsx)
+         * lives only in the main shell and /points is a full-screen route, so the
+         * customer who pressed the mission arrives with 0 seconds recorded and no
+         * event the clock could have heard. Without this it stayed hidden, never
+         * pinged, and the mission could not finish.
+         */
+        started: rows.get('browse')?.state === 'started',
       }),
     },
     /**
@@ -300,7 +326,7 @@ rewardRoutes.post('/checkin', async (c) => {
   const yesterday = baghdadDay(-1, nowMs);
 
   const streak = await readStreak(c.env.DB, user.id, today, yesterday);
-  if (streak.todayDay !== null) throw conflict('You have already checked in today');
+  if (streak.todayDay !== null) throw conflict('You have already checked in today', 'CHECKIN_ALREADY_DONE');
 
   const day = streak.nextDay;
   const base = checkinBasePoints(day);
@@ -327,7 +353,7 @@ rewardRoutes.post('/checkin', async (c) => {
         WHERE id = ? AND (last_checkin_day IS NULL OR last_checkin_day <> ?)`
     ).bind(day, today, user.id, today),
   ]);
-  if ((res[0]?.meta.changes ?? 0) === 0) throw conflict('You have already checked in today');
+  if ((res[0]?.meta.changes ?? 0) === 0) throw conflict('You have already checked in today', 'CHECKIN_ALREADY_DONE');
 
   const row = await awardedClaim(c, 'checkin', today, nowIso);
   return c.json({
@@ -366,7 +392,7 @@ rewardRoutes.post('/push', async (c) => {
       pausable,
     })
   );
-  if ((res[0]?.meta.changes ?? 0) === 0) throw conflict('You have already claimed this reward');
+  if ((res[0]?.meta.changes ?? 0) === 0) throw conflict('You have already claimed this reward', 'REWARD_ALREADY_CLAIMED');
   const row = await awardedClaim(c, 'push', period, nowIso);
   return c.json({
     success: true,
@@ -387,28 +413,39 @@ rewardRoutes.post('/video/start', async (c) => {
   await rateLimit(c, 'rewards', 60, 3600);
   const cfg = await requireMissionEnabled(c, 'video');
   const user = c.get('user')!;
-  const adVideoUrl = await getSetting(c.env.DB, 'adVideoUrl');
-  if (!adVideoUrl) throw unavailable('No ad video is configured today', 'NO_VIDEO');
-
-  const today = baghdadDay();
-  const existing = await c.env.DB.prepare(
-    "SELECT state FROM reward_claims WHERE user_id = ? AND mission = 'video' AND day = ?"
-  )
-    .bind(user.id, today)
-    .first<{ state: string }>();
-  if (existing?.state === 'awarded') throw conflict('You have already claimed this reward');
-
-  await c.env.DB.batch([
-    buildTicketStatement(c.env.DB, {
-      claimId: newId('rc'),
-      userId: user.id,
-      mission: 'video',
-      period: today,
-      basePoints: MISSION_BASE_POINTS.video,
-      requiredSeconds: cfg.video_min_seconds,
-      nowIso: new Date().toISOString(),
-    }),
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  const today = baghdadDay(0, nowMs);
+  const [legacyUrl, adState, existing] = await Promise.all([
+    getSetting(c.env.DB, 'adVideoUrl'),
+    readAdState(c.env.DB, user.id, today),
+    c.env.DB.prepare("SELECT state, started_at, required_seconds FROM reward_claims WHERE user_id = ? AND mission = 'video' AND day = ?")
+      .bind(user.id, today)
+      .first<{ state: string; started_at: string | null; required_seconds: number }>(),
   ]);
+  if (existing?.state === 'awarded') throw conflict('You have already claimed this reward', 'REWARD_ALREADY_CLAIMED');
+
+  // THE SERVER PICKS THE AD: the first running one this customer still has a
+  // view of, or the one today's open ticket already names. Nothing in the
+  // request can ask for another.
+  const plan = planVideoMission(adState, {
+    claim: existing ? { ...existing, ad_id: adState.todayAdId } : null,
+    nowMs,
+    legacyUrl,
+    minSeconds: cfg.video_min_seconds,
+  });
+  if (!plan.videoUrl) throw noAdRefusal(plan);
+
+  const ticket = {
+    claimId: newId('rc'),
+    userId: user.id,
+    mission: 'video' as const,
+    period: today,
+    basePoints: MISSION_BASE_POINTS.video,
+    requiredSeconds: plan.requiredSeconds,
+    nowIso,
+  };
+  await c.env.DB.batch([plan.ad ? buildAdTicketStatement(c.env.DB, { ...ticket, adId: plan.ad.id }) : buildTicketStatement(c.env.DB, ticket)]);
 
   const row = await c.env.DB.prepare(
     "SELECT started_at, required_seconds FROM reward_claims WHERE user_id = ? AND mission = 'video' AND day = ?"
@@ -417,9 +454,23 @@ rewardRoutes.post('/video/start', async (c) => {
     .first<{ started_at: string | null; required_seconds: number }>();
   const startedSecs = row?.started_at ? Math.floor(Date.parse(row.started_at) / 1000) : null;
   const remaining =
-    startedSecs === null ? cfg.video_min_seconds
-      : Math.max(0, (Number(row?.required_seconds) || 0) - (Math.floor(Date.now() / 1000) - startedSecs));
-  return c.json({ success: true, required_seconds: cfg.video_min_seconds, seconds_remaining: remaining });
+    startedSecs === null ? plan.requiredSeconds
+      : Math.max(0, (Number(row?.required_seconds) || 0) - (Math.floor(nowMs / 1000) - startedSecs));
+  return c.json({
+    success: true,
+    required_seconds: plan.requiredSeconds,
+    seconds_remaining: remaining,
+    videoUrl: plan.videoUrl,
+    ad: plan.ad ? adForPage(plan.ad) : null,
+    /**
+     * WHICH TICKET THIS IS: the server's own instant, the same on every press of
+     * one day and new on the next. The page keeps a film's end against it
+     * (src/components/points/adMission.ts), so whoever finished the film and left
+     * is not made to watch it again for the same ticket, and a new day's ticket is
+     * watched again. It decides nothing here: `/video` asks only the server's clock.
+     */
+    started_at: row?.started_at ?? null,
+  });
 });
 
 rewardRoutes.post('/video', async (c) => {
@@ -429,6 +480,12 @@ rewardRoutes.post('/video', async (c) => {
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
   const today = baghdadDay(0, nowMs);
+  // Which ad the ticket names, if the database knows ads at all. The award then
+  // re-checks that ad's count in its own transaction. It deliberately does NOT
+  // re-check the ad's window or its switch: a ticket for an ad that ended may
+  // still be claimed that day if its time ran. The customer stayed for what was
+  // on the screen; the ad ending while they watched takes nothing from them.
+  const todayAdId = await readTodayAdId(c.env.DB, user.id, today);
 
   const res = await runAward(c, (pausable) =>
     buildTimedAwardStatements(c.env.DB, {
@@ -440,6 +497,7 @@ rewardRoutes.post('/video', async (c) => {
       nowSecs: Math.floor(nowMs / 1000),
       label: 'Watched ad',
       pausable,
+      adLimit: !!todayAdId,
     })
   );
 
@@ -452,7 +510,12 @@ rewardRoutes.post('/video', async (c) => {
       .bind(user.id, today)
       .first<{ state: string; started_at: string | null; required_seconds: number }>();
     if (!row) throw badRequest('Start the ad first', 'NO_TICKET');
-    if (row.state === 'awarded') throw conflict('You have already claimed this reward');
+    if (row.state === 'awarded') throw conflict('You have already claimed this reward', 'REWARD_ALREADY_CLAIMED');
+    if (todayAdId) {
+      const refused = await adLimitRefusal(c.env.DB, user.id, todayAdId);
+      if (refused === 'limit') throw noAdRefusal({ done: true });
+      if (refused === 'gone') throw noAdRefusal({ done: false });
+    }
     const startedSecs = row.started_at ? Math.floor(Date.parse(row.started_at) / 1000) : null;
     const remaining =
       startedSecs === null ? Number(row.required_seconds) || 0
@@ -483,7 +546,7 @@ rewardRoutes.post('/browse/start', async (c) => {
   )
     .bind(user.id, today)
     .first<{ state: string }>();
-  if (existing?.state === 'awarded') throw conflict('You have already claimed the browse reward today');
+  if (existing?.state === 'awarded') throw conflict('You have already claimed the browse reward today', 'REWARD_ALREADY_CLAIMED');
 
   const now = Math.floor(nowMs / 1000);
   await c.env.DB.batch([

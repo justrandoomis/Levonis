@@ -2463,7 +2463,7 @@ export function newIdempotencyKey(): string {
 /** Upload a file; returns its key + URL. */
 export async function uploadFile(
   file: File,
-  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community' | 'support' | 'complaint' | 'post' | 'assist',
+  purpose: 'receipt' | 'avatar' | 'chat' | 'product' | 'community' | 'support' | 'complaint' | 'post' | 'assist' | 'reward_ad',
   /**
    * The thing this file belongs to, when it is not the uploader.
    *

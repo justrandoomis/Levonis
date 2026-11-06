@@ -21,7 +21,7 @@ import { limitRoute, rateLimit } from '../lib/ratelimit';
 import { canMoveMoney, canViewCost, isOwner, isUnverifiedOwner, normalizeAdminScope, projectForAdmin, userPatchElevates, userPatchRefusal } from '../lib/adminScope';
 import { moneyAuthorityMessage } from '../../packages/contracts/src/moneyAuthority';
 import { couponPoolLabel } from '../../packages/contracts/src/couponPool';
-import { requireMoneyAuthority } from '../lib/moneyAuthority';
+import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
 import { completenessMessage } from '@levonis/contracts/productCompleteness';
 import { assertCostRead, assertCostWrite, ownerEmailUnverified, ownerOnly, requireFreshSession } from '../lib/costAccess';
 import { acceptedCodTaxField } from '../lib/codTax';
@@ -4409,6 +4409,11 @@ adminRoutes.put('/settings/:key', async (c) => {
     value = oneOf(value, 'currency', ['IQD', 'USD'] as const);
   } else if (key === 'adVideoUrl') {
     const s = str(value, 'adVideoUrl', { max: 500, required: false });
+    // A FILM HERE IS AN AD EVERY CUSTOMER IS SHOWN AND PAID FOR, while no row exists
+    // in Admin → المكافآت → الإعلانات (worker/lib/rewards/ads.ts): the same owner's
+    // act as creating one there, so the old field is not a way round it. Emptying it
+    // gives nothing away and stays any admin's, as switching an ad off does.
+    if (s) assertMoneyAuthority(c, { act: 'coupon_issue' });
     if (s && !/^https?:\/\//.test(s)) throw badRequest('adVideoUrl must be an http(s) URL');
     value = s;
   } else if (

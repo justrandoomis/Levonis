@@ -52,7 +52,11 @@ export type MediaDomain =
   /** 0216 — the Creative Studio's files: `creative-studio/assets/<kind>/<id>.<ext>` and
    *  `creative-studio/exports/<document id>/<id>.<ext>`, private. /files serves no such
    *  prefix; only the studio's own guarded routes stream them (worker/routes/adminCreativeStudio.ts). */
-  | 'creative-studio';
+  | 'creative-studio'
+  /** 0227 — the video ads of the points mission: `rewards/ads/<video|poster>/<id>.<ext>`,
+   *  public (a customer's phone plays them from /files with Range), written only
+   *  through purpose `reward_ad` by an admin (worker/lib/uploadEntity.ts). */
+  | 'rewards';
 
 export interface MediaKeyInput {
   visibility: MediaVisibility;
@@ -767,6 +771,10 @@ export function isAnonymousPublicMediaKey(key: string): boolean {
     // `link-cards/`: a link preview's picture, re-hosted by the server from a
     // public page (0158) — public by the nature of what it is.
     key.startsWith('link-cards/') ||
+    // `rewards/ads/`: the shop's own video ads and their posters (0227), shown
+    // to every customer, written only by an admin. Nothing else lives under
+    // `rewards/`, so nothing else is opened by this line.
+    key.startsWith('rewards/ads/') ||
     // `posts/`: a maker's project pictures and clips (0153) — public by the
     // author's own act of publishing, like an avatar.
     /^users\/[^/]+\/(?:avatar|public-avatars|posts)\//.test(key) ||

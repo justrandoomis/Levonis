@@ -11,7 +11,9 @@
  *     financial scope ('gift_grant'), and the owner when the admin is that
  *     person (four eyes);
  *   · WITHDRAWING a coupon, cancelling a competition (every entry fee comes
- *     back) and writing a draft give nothing away: any admin.
+ *     back) and writing a draft give nothing away: any admin;
+ *   · A VIDEO AD (0227): creating, editing and switching one on is the owner's
+ *     ('coupon_issue'), switching one off is any admin's.
  */
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -41,6 +43,8 @@ import {
   updateDraftCompetition,
   type WinnerPick,
 } from '../lib/rewards/competitions';
+import { adActiveFrom, assertAdFiles, createAd, listAdsForAdmin, parseAdInput, setAdActive, updateAd } from '../lib/rewards/ads';
+import { getRewardTaskConfig } from '../lib/pointsTasks';
 
 export const adminRewardsRoutes = new Hono<AppContext>();
 adminRewardsRoutes.use('*', requireAdmin);
@@ -293,4 +297,51 @@ adminRewardsRoutes.post('/competitions/:id/finish', requireMoneyAuthority('gift_
   const out = await finishCompetition(c.env, id, picks);
   await audit(c.env.DB, admin.id, 'competition.finish', id, { winners: picks, points: out.points, authority: grants.map((g) => g.audit) });
   return c.json({ success: true, ...out });
+});
+
+// ------------------------------------------------------------- the video ads
+
+/**
+ * THE ADS OF «اجمع النقاط» (migration 0227, docs/DECISIONS.md row 300). What
+ * every customer is shown and paid for is the owner's act ('coupon_issue',
+ * the public-promotion act): creating, editing and switching on. Switching OFF
+ * gives nothing away: any admin. Reading is any admin: views and points paid are
+ * no cost. A database before 0227 lists nothing and refuses a write with 503.
+ */
+adminRewardsRoutes.get('/ads', async (c) => {
+  const flag = { installed: true };
+  const [ads, tasks] = await Promise.all([
+    listAdsForAdmin(c.env.DB, new Date().toISOString()).catch(emptyBeforeInstall([] as Awaited<ReturnType<typeof listAdsForAdmin>>, flag)),
+    getRewardTaskConfig(c.env),
+  ]);
+  return c.json({ success: true, installed: flag.installed, ads, mission_enabled: tasks.video_enabled });
+});
+
+adminRewardsRoutes.post('/ads', requireMoneyAuthority('coupon_issue'), async (c) => {
+  const admin = c.get('user')!;
+  const input = parseAdInput((await c.req.json().catch(() => ({}))) as Record<string, unknown>);
+  await assertAdFiles(c.env.DB, input);
+  const id = await createAd(c.env.DB, admin.id, input, new Date().toISOString());
+  await audit(c.env.DB, admin.id, 'rewards.ad.create', id, { title: input.title.ar, active: input.active, window: [input.starts_at, input.ends_at], max_views: input.max_views });
+  return c.json({ success: true, id }, 201);
+});
+
+adminRewardsRoutes.put('/ads/:id', requireMoneyAuthority('coupon_issue'), async (c) => {
+  const admin = c.get('user')!;
+  const id = c.req.param('id') ?? '';
+  const input = parseAdInput((await c.req.json().catch(() => ({}))) as Record<string, unknown>);
+  await assertAdFiles(c.env.DB, input);
+  await updateAd(c.env.DB, id, input, new Date().toISOString());
+  await audit(c.env.DB, admin.id, 'rewards.ad.update', id, { title: input.title.ar, active: input.active, window: [input.starts_at, input.ends_at], max_views: input.max_views });
+  return c.json({ success: true });
+});
+
+adminRewardsRoutes.post('/ads/:id/toggle', async (c) => {
+  const admin = c.get('user')!;
+  const id = c.req.param('id') ?? '';
+  const active = adActiveFrom((await c.req.json().catch(() => ({}))) as Record<string, unknown>);
+  if (active) assertMoneyAuthority(c, { act: 'coupon_issue' });
+  const out = await setAdActive(c.env.DB, id, active, new Date().toISOString());
+  if (out.changed) await audit(c.env.DB, admin.id, 'rewards.ad.toggle', id, { active });
+  return c.json({ success: true, active, changed: out.changed });
 });

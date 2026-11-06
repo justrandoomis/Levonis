@@ -404,6 +404,10 @@ export const MEDIA_REFERENCE_SOURCES: readonly MediaRefSource[] = [
   // 0220 — a competition entry's photo: the entrant's own public post media
   // (users/<uid>/posts/…), uploaded through purpose=post.
   { table: 'reward_competition_entries', column: 'media_key', kind: 'text', why: "a competition entry's photo, the entrant's own public post media (0220)" },
+  // 0227 — the points mission's video ads: every customer's phone plays these. Not
+  // narrowed by `active`: an ad switched off is routinely switched on again.
+  { table: 'reward_ads', column: 'video_url', kind: 'text', why: 'a video ad of the points mission, as /files/rewards/ads/video/… (0227)' },
+  { table: 'reward_ads', column: 'poster_url', kind: 'text', why: 'the picture shown while that ad loads, as /files/rewards/ads/poster/… (0227)' },
 
   // ---- printing ----------------------------------------------------------
   { table: 'community_request_files', column: 'file_key', kind: 'text', why: 'the uploaded 3D model or drawing' },

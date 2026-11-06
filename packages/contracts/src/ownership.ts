@@ -222,6 +222,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // earns or points buy, and the owner's competitions. Points are spent and
     // won in `wallet_transactions` beside them, so they stay with the journal.
     'reward_grants', 'reward_competitions', 'reward_competition_entries',
+    // 0227 — the video ads of the «شاهد إعلانًا» mission: a view is one reward_claims row.
+    'reward_ads',
     // 0095 — THE OPERATING-EXPENSE LEDGER: «تكاليف اخرى ... خاصه في لوحه الادمن».
     // Rent, salaries, advertising, customs. They belong to no product and no
     // order, which is exactly why they are not Commerce's: an expense row has

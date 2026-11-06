@@ -8,11 +8,14 @@ import { useSignInPrompt } from '../lib/guest';
 import { api, ApiError } from '../lib/api';
 import { refusalLang, refusalText } from '../lib/refusalStrings';
 import { formatFigure } from '../lib/localeNumber';
-import { formatDate } from '../components/orders/format';
+import { formatDate, formatDayMonth } from '../components/orders/format';
 import { EmptyState } from '../components/ui/AsyncStates';
 import { MotionCharacterHome } from '../components/bloub/MotionCharacterAnchor';
-import { Overlay } from '../components/ui/Overlay';
 import Spinner from '../components/ui/Spinner';
+import { toast } from '../lib/toastStore';
+import { clockText } from '../lib/browseMissionClock';
+import { adCard, adCardLine, adClaimFailure, adNewDayText, missionsAllDone, type AdView } from '../components/points/adMission';
+import AdWatchModal from '../components/points/AdWatchModal';
 
 /**
  * THE POINTS & MISSIONS PAGE.
@@ -54,11 +57,17 @@ interface VideoView extends MissionView {
   required_seconds: number;
   seconds_remaining: number | null;
   started: boolean;
+  /** The ad on the card (0227). Absent on an older server, null when none is on it. */
+  ad?: AdView | null;
+  next_at?: string | null;
+  done?: boolean;
 }
 interface BrowseView extends MissionView {
   required_seconds: number;
   progress_seconds: number;
   seconds_remaining: number | null;
+  /** Today's ticket is open (the clock reads the same fact). */
+  started?: boolean;
 }
 interface LadderDay {
   day: number;
@@ -153,10 +162,12 @@ function PointsPage() {
   const [notice, setNotice] = useState<{ tone: 'good' | 'bad'; text: string } | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [loadingMission, setLoadingMission] = useState<string | null>(null);
-  const [showVideoModal, setShowVideoModal] = useState(false);
-  const [isVideoFinished, setIsVideoFinished] = useState(false);
+  /** What the server chose to play: its answer, never this page's last read. */
+  const [adShown, setAdShown] = useState<{ videoUrl: string; ad: AdView | null; ticket: string | null } | null>(null);
   /** Counted down from the server's own answer; the server still decides. */
   const [adWait, setAdWait] = useState(0);
+  /** Why a claim did not go through, said in the window that stays open for another press. */
+  const [adNote, setAdNote] = useState('');
 
   const videoTriggerRef = useRef<HTMLButtonElement>(null);
 
@@ -205,8 +216,11 @@ function PointsPage() {
       : `${what} · ${gain}`;
   };
 
+  // The refusal table's sentence for a code it knows, in the reader's language
+  // («You have already claimed this reward» reached an Arabic screen), else ours.
   const failureText = (err: unknown) =>
-    err instanceof Error && err.message ? err.message : loc('تعذّر إتمام العملية', 'That did not go through', 'کردارەکە تەواو نەبوو');
+    refusalText(err instanceof ApiError ? err.code : undefined, refusalLang(lang)) ||
+    (err instanceof Error && err.message ? err.message : loc('تعذّر إتمام العملية', 'That did not go through', 'کردارەکە تەواو نەبوو'));
 
   const handleCheckIn = async () => {
     if (!data || data.checked_in_today || isCheckingIn) return;
@@ -279,13 +293,14 @@ function PointsPage() {
     }
     setLoadingMission('video');
     setNotice(null);
+    setAdNote('');
     try {
-      const res = await api.post<{ required_seconds: number; seconds_remaining: number }>('/api/rewards/video/start');
+      const res = await api.post<{ required_seconds: number; seconds_remaining: number; videoUrl?: string | null; ad?: AdView | null; started_at?: string | null }>('/api/rewards/video/start');
       setAdWait(res.seconds_remaining);
-      setIsVideoFinished(false);
-      setShowVideoModal(true);
+      setAdShown({ videoUrl: res.videoUrl ?? data.missions.video.videoUrl, ad: res.ad ?? null, ticket: res.started_at ?? null });
     } catch (err) {
-      say('bad', failureText(err));
+      // On the screen they are on: the card they pressed is far below the page's notice.
+      toast.error(failureText(err));
       await loadRewards();
     } finally {
       setLoadingMission(null);
@@ -294,15 +309,27 @@ function PointsPage() {
 
   const handleVideoClaim = async () => {
     setLoadingMission('video_claim');
+    setAdNote('');
     try {
       const res = await api.post<AwardReply>('/api/rewards/video');
-      say('good', awardMessage(res, loc('شاهدت الإعلان', 'Ad watched', 'ڕیکلامەکەت بینی')));
-      setShowVideoModal(false);
+      toast.success(awardMessage(res, loc('شاهدت الإعلان', 'Ad watched', 'ڕیکلامەکەت بینی')));
+      setAdShown(null);
       await Promise.all([loadRewards(), refreshWallet()]);
     } catch (err) {
-      // The server's refusal is the truth — including "not finished yet".
-      say('bad', failureText(err));
-      await loadRewards();
+      // The server's refusal is the truth, and "not finished yet" leaves the film on
+      // the screen. So does NO ANSWER at all: nothing is lost, and the customer presses
+      // again rather than watching it again. Anything else has nothing more to wait for.
+      const outcome = adClaimFailure(err);
+      if (outcome === 'keep') {
+        // In the window, not a toast: on a small phone a toast sits over the very claim to press again.
+        setAdNote(failureText(err));
+        return;
+      }
+      if (outcome === 'new_day') toast.info(adNewDayText(loc));
+      else toast.error(failureText(err));
+      setAdShown(null);
+      // An answer that went missing may have paid: «already earned» is then the news.
+      await Promise.all([loadRewards(), refreshWallet()]);
     } finally {
       setLoadingMission(null);
     }
@@ -316,17 +343,20 @@ function PointsPage() {
       await api.post('/api/rewards/browse/start');
       window.dispatchEvent(new Event('levo_mission_start'));
       const mins = Math.round(data.missions.browse.required_seconds / 60);
-      say(
-        'good',
+      // A toast, because the page is about to leave: a notice here was never seen.
+      // The clock is not on full-screen pages, and the sentence says so.
+      toast.info(
         loc(
-          `بدأت المهمة — تصفّح المنتجات ${mins} دقائق. الوقت يُحسب على خادم المتجر ويتوقف عند الخمول.`,
-          `Mission started — browse for ${mins} minutes. The time is counted by the store's server and pauses when you are idle.`,
-          `ئەرکەکە دەستی پێکرد — ${mins} خولەک بەرهەمەکان بگەڕێ. کاتەکە لەسەر ڕاژەکاری فرۆشگا دەژمێردرێت و کاتێک بێکار بیت دەوەستێت.`
-        )
+          `بدأت المهمة — تصفّح المنتجات ${mins} دقائق. الوقت يُحسب أثناء تصفّحك للمتجر فقط ويتوقف عند الخمول.`,
+          `Mission started — browse for ${mins} minutes. The time counts only while you browse the shop, and pauses when you are idle.`,
+          `ئەرکەکە دەستی پێکرد — ${mins} خولەک بەرهەمەکان بگەڕێ. کاتەکە تەنها لە کاتی گەڕان بە فرۆشگادا دەژمێردرێت و کاتێک بێکار بیت دەوەستێت.`
+        ),
+        { duration: 7000 }
       );
       navigate('/');
     } catch (err) {
-      say('bad', failureText(err));
+      // On the screen they are on: the card they pressed is far below the page's notice.
+      toast.error(failureText(err));
       await loadRewards();
     } finally {
       setLoadingMission(null);
@@ -335,7 +365,10 @@ function PointsPage() {
 
   const missions = data?.missions;
   const ladder = data?.checkin.ladder ?? [];
-  const allDailyDone = !!missions && missions.push.claimed && missions.video.claimed && missions.browse.claimed;
+  const allDailyDone = !!missions && missionsAllDone(missions);
+  /** What the ad's card says: the old setting's card, a view to watch, today's done, or used up. */
+  const videoCard = missions ? adCard(missions.video) : null;
+  const videoClosed = videoCard?.kind === 'watched' || videoCard?.kind === 'used_up';
 
   const missionLabel: Record<string, string> = {
     checkin: loc('تسجيل الدخول اليومي', 'Daily check-in', 'ئامادەبوونی ڕۆژانە'),
@@ -726,12 +759,30 @@ function PointsPage() {
                   </button>
                 )}
 
-                {missions && !missions.video.claimed && (
+                {/* THE AD STAYS ON SCREEN AFTER TODAY'S VIEW, saying when it can be watched
+                    again; a card that vanished read as «there is no more», which is not
+                    true until the ad is used up. Not a button then: nothing to press. */}
+                {missions && videoClosed && videoCard && (
+                  <div data-ad-card={videoCard.kind} className="lv-surface w-full p-4 flex items-center gap-3">
+                    <div className="size-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                      <Check aria-hidden="true" className="w-5 h-5 text-gold" strokeWidth={3} />
+                    </div>
+                    <div className="min-w-0">
+                      <h4 className="text-text-primary font-bold text-[14px]">{loc('شاهد إعلانًا', 'Watch Ad', 'ڕیکلامێک ببینە')}</h4>
+                      <span className="text-text-secondary font-medium text-[12px]">
+                        {adCardLine(videoCard, loc, (iso) => formatDayMonth(iso, lang))}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {missions && !videoClosed && !missions.video.claimed && (
                   <button
                     type="button"
                     ref={videoTriggerRef}
                     onClick={handleVideoMission}
                     disabled={!missions.video.available || loadingMission === 'video'}
+                    data-ad-card={videoCard?.kind}
                     className={`lv-surface w-full text-start p-4 flex items-center justify-between focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus transition-colors ${
                       missions.video.available ? 'hover:bg-surface-raised active:shadow-press' : 'opacity-60 cursor-not-allowed'
                     }`}
@@ -741,7 +792,7 @@ function PointsPage() {
                         {loadingMission === 'video' ? (
                           <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
                         ) : (
-                          <PlayCircle aria-hidden="true" className="w-5 h-5 text-gold" fill="currentColor" />
+                          <PlayCircle aria-hidden="true" className="w-5 h-5 text-gold" />
                         )}
                       </div>
                       <div>
@@ -750,13 +801,15 @@ function PointsPage() {
                           <UnverifiedTag proof={missions.video.proof} />
                         </h4>
                         <span className="text-text-secondary font-medium text-[12px]">
-                          {missions.video.available
-                            ? loc(
-                                `${missions.video.required_seconds} ثانية على الأقل — يحسبها الخادم`,
-                                `${missions.video.required_seconds}s minimum, timed by the server`,
-                                `لانیکەم ${missions.video.required_seconds} چرکە — ڕاژەکار دەیژمێرێت`
-                              )
-                            : loc('لا يوجد إعلان اليوم', 'No ad today', 'ئەمڕۆ ڕیکلام نییە')}
+                          {videoCard?.kind === 'ready'
+                            ? adCardLine(videoCard, loc, (iso) => formatDayMonth(iso, lang))
+                            : missions.video.available
+                              ? loc(
+                                  `${missions.video.required_seconds} ثانية على الأقل — يحسبها الخادم`,
+                                  `${missions.video.required_seconds}s minimum, timed by the server`,
+                                  `لانیکەم ${missions.video.required_seconds} چرکە — ڕاژەکار دەیژمێرێت`
+                                )
+                              : loc('لا يوجد إعلان اليوم', 'No ad today', 'ئەمڕۆ ڕیکلام نییە')}
                         </span>
                       </div>
                     </div>
@@ -783,7 +836,7 @@ function PointsPage() {
                         {loadingMission === 'browse' ? (
                           <div className="w-4 h-4 border-2 border-gold/30 border-t-gold rounded-full animate-spin" />
                         ) : (
-                          <ShoppingBag aria-hidden="true" className="w-5 h-5 text-gold" fill="currentColor" />
+                          <ShoppingBag aria-hidden="true" className="w-5 h-5 text-gold" />
                         )}
                       </div>
                       <div>
@@ -793,12 +846,16 @@ function PointsPage() {
                         </h4>
                         <span className="text-text-secondary font-medium text-[12px]">
                           {loc(
-                            `${Math.round(missions.browse.required_seconds / 60)} دقائق`,
-                            `${Math.round(missions.browse.required_seconds / 60)} mins`,
-                            `${Math.round(missions.browse.required_seconds / 60)} خولەک`
+                            `${Math.round(missions.browse.required_seconds / 60)} دقائق · يُحسب الوقت أثناء تصفّح المتجر فقط`,
+                            `${Math.round(missions.browse.required_seconds / 60)} mins · time counts only while you browse the shop`,
+                            `${Math.round(missions.browse.required_seconds / 60)} خولەک · کات تەنها لە کاتی گەڕان بە فرۆشگادا دەژمێردرێت`
                           )}
                           {missions.browse.progress_seconds > 0 &&
-                            ` • ${missions.browse.progress_seconds}/${missions.browse.required_seconds}s`}
+                            ` · ${loc(
+                              `تبقّى ${clockText({ seconds: missions.browse.progress_seconds, required: missions.browse.required_seconds })}`,
+                              `${clockText({ seconds: missions.browse.progress_seconds, required: missions.browse.required_seconds })} left`,
+                              `${clockText({ seconds: missions.browse.progress_seconds, required: missions.browse.required_seconds })} ماوە`
+                            )}`}
                         </span>
                       </div>
                     </div>
@@ -887,63 +944,19 @@ function PointsPage() {
         through AND the server's own countdown has run out. Even then the
         server re-checks its own `started_at` — this is a courtesy, not the gate.
       */}
-      <Overlay
-        open={showVideoModal && !!data?.missions.video.videoUrl}
-        onClose={() => setShowVideoModal(false)}
-        labelledBy="rewards-video-title"
+      <AdWatchModal
+        open={!!adShown}
+        onClose={() => setAdShown(null)}
         anchor={videoTriggerRef}
-        placement="center"
-        z={50}
-        dismissOnScrim={false}
-        testId="rewards-video"
-        panelClassName="w-full max-w-md"
-      >
-        <div className="p-6 flex flex-col items-center">
-          <h3 id="rewards-video-title" className="text-text-primary font-bold text-lg mb-2">
-            {loc('شاهد الإعلان لتربح النقاط', 'Watch the ad to earn', 'ڕیکلامەکە ببینە بۆ بردنەوەی خاڵ')}
-          </h3>
-          <p className="text-text-secondary text-sm text-center mb-6">
-            {loc('شاهد الإعلان كاملًا للحصول على نقاطك.', 'Please watch the entire video to receive your points.', 'ڕیکلامەکە بە تەواوی ببینە بۆ وەرگرتنی خاڵەکانت.')}
-          </p>
-
-          <div className="w-full aspect-video bg-charcoal rounded-lg mb-6 relative overflow-hidden flex items-center justify-center border border-border-subtle">
-            <video
-              src={data?.missions.video.videoUrl ?? undefined}
-              autoPlay
-              controls={false}
-              playsInline
-              className="w-full h-full object-contain"
-              onEnded={() => setIsVideoFinished(true)}
-            />
-          </div>
-
-          {isVideoFinished && adWait <= 0 ? (
-            <button
-              className="lv-button lv-button-primary w-full min-h-12"
-              onClick={handleVideoClaim}
-              disabled={loadingMission === 'video_claim'}
-            >
-              {loadingMission === 'video_claim'
-                ? loc('جارٍ المطالبة…', 'Claiming...', 'وەرگرتن…')
-                : loc(`احصل على ${data?.missions.video.points} نقطة`, `Claim ${data?.missions.video.points} pts`, `${data?.missions.video.points} خاڵ وەربگرە`)}
-            </button>
-          ) : (
-            <div className="w-full flex items-center justify-between gap-3">
-              <span className="text-gold font-bold text-sm">
-                {adWait > 0
-                  ? loc(`متبقٍ ${adWait} ثانية`, `${adWait}s remaining`, `${adWait} چرکە ماوە`)
-                  : loc('الإعلان قيد التشغيل…', 'Video is playing...', 'ڕیکلامەکە پەخش دەکرێت…')}
-              </span>
-              <button
-                className="lv-button lv-button-ghost"
-                onClick={() => setShowVideoModal(false)}
-              >
-                {loc('إغلاق', 'Close', 'داخستن')}
-              </button>
-            </div>
-          )}
-        </div>
-      </Overlay>
+        videoUrl={adShown?.videoUrl ?? null}
+        ad={adShown?.ad ?? null}
+        ticket={adShown?.ticket ?? null}
+        note={adNote}
+        secondsLeft={adWait}
+        points={data?.missions.video.points ?? 0}
+        claiming={loadingMission === 'video_claim'}
+        onClaim={handleVideoClaim}
+      />
     </div>
   );
 }

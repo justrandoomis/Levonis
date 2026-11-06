@@ -12,6 +12,7 @@
  *   الكوبونات   every reward coupon issued, its customer and its state, with
  *               «سحب» (any admin) and «تمديد» (the financial scope).
  *   المسابقات   drafts, publishing (the owner), entries, winners and cancels.
+ *   الإعلانات   the video ads of «شاهد إعلانًا» (AdminAds.tsx, migration 0227).
  *
  * Nothing here decides money: each figure is validated and applied by the
  * server, and a refusal is shown in the server's own words.
@@ -22,6 +23,7 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { Segmented } from '../ui/Segmented';
 import AdminCompetitions from './AdminCompetitions';
+import AdminAds from './AdminAds';
 
 type Tri = { ar: string; en: string; ckb: string };
 type Kind = 'free_shipping' | 'filament_discount';
@@ -58,7 +60,7 @@ const day = (iso: string | null) => (iso ? iso.slice(0, 10) : '—');
 
 export default function AdminRewards() {
   const { loc } = useLanguage();
-  const [view, setView] = useState<'settings' | 'coupons' | 'competitions'>('settings');
+  const [view, setView] = useState<'settings' | 'coupons' | 'competitions' | 'ads'>('settings');
   return (
     <div className="space-y-6" data-admin-rewards>
       <div>
@@ -79,15 +81,18 @@ export default function AdminRewards() {
         onChange={(v) => setView(v as typeof view)}
         group="admin-rewards"
         items={[
-          { id: 'settings', label: loc('الإعدادات', 'Settings', 'ڕێکخستنەکان') },
+          // The Sorani is the short form: «ڕێکخستنەکان» does not fit a quarter of a 390 px strip.
+          { id: 'settings', label: loc('الإعدادات', 'Settings', 'ڕێکخستن') },
           { id: 'coupons', label: loc('الكوبونات', 'Coupons', 'کۆپۆنەکان') },
-          { id: 'competitions', label: loc('المسابقات', 'Competitions', 'پێشبڕکێکان') },
+          { id: 'competitions', label: loc('المسابقات', 'Contests', 'پێشبڕکێکان') },
+          { id: 'ads', label: loc('الإعلانات', 'Ads', 'ڕیکلامەکان') },
         ]}
         label={loc('أقسام المكافآت', 'Rewards sections', 'بەشەکانی خەڵات')}
       />
       {view === 'settings' && <SettingsPanel />}
       {view === 'coupons' && <CouponsPanel />}
       {view === 'competitions' && <AdminCompetitions />}
+      {view === 'ads' && <AdminAds />}
     </div>
   );
 }

@@ -400,6 +400,39 @@ export function buildTicketStatement(db: D1Database, i: TicketInput): D1Prepared
     .bind(i.claimId, i.userId, i.mission, i.period, i.basePoints, i.requiredSeconds, i.nowIso, idem);
 }
 
+/**
+ * THE SAME TICKET, FOR ONE VIDEO AD (0227). It says which ad the seconds are
+ * for, chosen by the server (worker/lib/rewards/ads.ts), and carries that ad's
+ * own `required_seconds`.
+ *
+ * Re-opening it for the SAME ad keeps the earliest `started_at`, as above: a
+ * customer who reloads, or leaves and comes back, keeps the server's clock. A
+ * ticket that moves to ANOTHER ad (the first one was switched off, or a ticket
+ * from before the ad) starts its clock now: the seconds run are for what was
+ * watched, and a restart only ever waits longer.
+ *
+ * Only ever built when `reward_ads` exists, so `buildTicketStatement` above
+ * stays the one statement a database before 0227 can run.
+ */
+export function buildAdTicketStatement(db: D1Database, i: TicketInput & { adId: string }): D1PreparedStatement {
+  const idem = rewardIdempotencyKey(i.userId, i.mission, i.period);
+  return db
+    .prepare(
+      `INSERT INTO reward_claims
+         (id, user_id, mission, day, points, base_points, state, required_seconds, started_at, idempotency_key, wallet_tx_id, ad_id)
+       VALUES (?1, ?2, ?3, ?4, ?5, ?5, 'started', ?6, ?7, ?8, 'wtx_rc_' || ?1, ?9)
+       ON CONFLICT(user_id, mission, day) DO UPDATE SET
+         started_at = CASE WHEN reward_claims.ad_id IS excluded.ad_id
+                           THEN COALESCE(reward_claims.started_at, excluded.started_at)
+                           ELSE excluded.started_at END,
+         required_seconds = excluded.required_seconds,
+         base_points = excluded.base_points,
+         ad_id = excluded.ad_id
+        WHERE reward_claims.state = 'started'`
+    )
+    .bind(i.claimId, i.userId, i.mission, i.period, i.basePoints, i.requiredSeconds, i.nowIso, idem, i.adId);
+}
+
 export interface TimedAwardInput {
   userId: string;
   mission: MissionId;
@@ -410,6 +443,12 @@ export interface TimedAwardInput {
   label: string;
   /** false on a database that has not run 0145 (tierPause.ts `isPausedAtMissing`). */
   pausable?: boolean;
+  /**
+   * The ticket names a video ad (0227): the award also asks, inside this one
+   * statement, that this customer is still under that ad's `max_views`. Set
+   * only for such a ticket, so a database before 0227 never reads `ad_id`.
+   */
+  adLimit?: boolean;
 }
 
 /**
@@ -425,6 +464,9 @@ export interface TimedAwardInput {
  * There is no field in this statement a browser can influence. A device whose
  * date is moved forward, a replayed request, a fabricated "I watched it"
  * payload: none of them appear here, so none of them can shorten the wait.
+ *
+ * WITH `adLimit` THE COUNT IS PART OF THE GUARD: «2 times he can see» is decided
+ * here, in the transaction that pays, not by whichever screen asked first.
  *
  * `meta.changes` on the first statement is the honest answer to "did this
  * request award anything" — 0 means it did not, and the caller says so
@@ -444,7 +486,14 @@ export function buildTimedAwardStatements(db: D1Database, i: TimedAwardInput): D
                 points = ${multipliedPointsSql('?3', mult)}
           WHERE user_id = ?1 AND mission = ?4 AND day = ?5 AND state = 'started'
             AND started_at IS NOT NULL
-            AND ?6 - CAST(strftime('%s', started_at) AS INTEGER) >= required_seconds`
+            AND ?6 - CAST(strftime('%s', started_at) AS INTEGER) >= required_seconds${
+              i.adLimit
+                ? `
+            AND (SELECT COUNT(*) FROM reward_claims v
+                  WHERE v.user_id = ?1 AND v.mission = ?4 AND v.state = 'awarded' AND v.ad_id = reward_claims.ad_id)
+                < COALESCE((SELECT a.max_views FROM reward_ads a WHERE a.id = reward_claims.ad_id), 0)`
+                : ''
+            }`
       )
       .bind(i.userId, i.nowIso, i.basePoints, i.mission, i.period, i.nowSecs),
     ledgerStatement(db, 'rc.user_id = ?3 AND rc.mission = ?4 AND rc.day = ?5', i.label, i.nowIso, [

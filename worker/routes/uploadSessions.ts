@@ -49,7 +49,7 @@ import {
   zipEndOfDirectory,
   zipWithinBounds,
 } from '../lib/attachments';
-import { mp4IsFastStart, sniffVideo } from '../lib/videoSniff';
+import { mp4IsFastStart, sniffStoredMp4, sniffVideo } from '../lib/videoSniff';
 import { rasterDimensions } from '../lib/imageMetadata';
 import { analyseModel, type ModelAnalysis } from '../lib/modelGeometry';
 import { MEASURE_MAX_BYTES, afterRequestFileAdded, insertRequestFile, outliveClient } from '../lib/requestFileHooks';
@@ -62,6 +62,7 @@ import {
   MiB,
   SESSION_PURPOSES,
   assertQuota,
+  assertRewardAdVideo,
   assertUploadEntity,
   chunkBytesFor,
   kindLimitBytes,
@@ -391,6 +392,13 @@ async function inspectStoredObject(env: Env, s: SessionRow, visibility: MediaVis
       ext = ebml ? 'webm' : 'mp4';
     }
     if (mime === 'video/mp4' && !mp4IsFastStart(head)) warnings.push('VIDEO_NOT_FASTSTART');
+    // An ad is refused where another clip is only warned: the caller deletes the object.
+    if (s.purpose === 'reward_ad') {
+      assertRewardAdVideo(mime, head);
+      // As much as the whole-body door proves of an ad, from a few ranges of a file too large to read back.
+      const film = await sniffStoredMp4(head, size, (offset, length) => readRange(env, visibility, key, offset, length));
+      if (!film.ok) throw badRequest('This video cannot be played in a browser — upload an MP4 (H.264) video.', 'VIDEO_UNSUPPORTED', { reason: film.reason });
+    }
   } else if (base) {
     mime = base.mime;
     ext = base.ext;
@@ -517,6 +525,8 @@ uploadSessionRoutes.post('/', async (c) => {
       purpose,
     });
   }
+  // An ad's name is held to what it must turn out to be, before a byte travels.
+  if (purpose === 'reward_ad' && named.kind === 'video' && named.ext !== 'mp4') throw badRequest('An ad must be an MP4 video', 'REWARD_AD_MP4_REQUIRED');
   const limits = limitsForPurpose(purpose, await getSetting(c.env.DB, 'uploadLimits'));
   const limitBytes = kindLimitBytes(limits, named.kind);
   if (declaredBytes > limitBytes) {

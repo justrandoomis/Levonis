@@ -47,7 +47,7 @@ export const VARIANT_SOURCE = /^(?:https?:\/\/[^/?#]+)?\/files\/([^?#]+\.(?:webp
  * one address, read after the per-request access check. Exact prefixes, except
  * the brand folder, which is case-insensitive there too.
  */
-const PUBLIC_MEDIA_KEY = /^(?:products|avatars|community|link-cards|brands|services|users\/[^/]+\/(?:avatar|public-avatars|posts)|merchants\/[^/]+\/(?:public|logos|covers)|[Uu][Ii](?:[Uu][Xx])?)\//;
+const PUBLIC_MEDIA_KEY = /^(?:products|avatars|community|link-cards|rewards\/ads|brands|services|users\/[^/]+\/(?:avatar|public-avatars|posts)|merchants\/[^/]+\/(?:public|logos|covers)|[Uu][Ii](?:[Uu][Xx])?)\//;
 
 /** A key anyone may read (never the copy store's own `variants/`, which no public prefix matches). */
 export function isPublicVariantKey(key: string): boolean {

@@ -811,6 +811,9 @@ export const NOT_LIBRARY_HOLDERS: Readonly<Record<string, string>> = {
   ),
   'merchant_store_icons.source_key': 'the logo the renditions were cut from — the same key `merchant_stores.logo_key` holds, which is read',
   'link_cards.image_key': 'a re-hosted Open Graph picture under link-cards/, never a library file',
+  // 0227: the points mission's video ads, rewards/ads/… and written only through an admin's upload.
+  'reward_ads.video_url': 'an ad of the points mission under rewards/ads/, an admin upload, never a library file',
+  'reward_ads.poster_url': 'the picture of an ad under rewards/ads/, an admin upload, never a library file',
   'upload_sessions.object_key': 'an upload still being assembled: not in the library until it completes',
   // The Creative Studio (0215): the platform owner's private ad files and designs; a design draws only the admin
   // catalogue's product pictures (products/…) and its own assets (creative-studio/…), never a store's library.

@@ -88,6 +88,11 @@ function sniffMp4(b: Uint8Array): VideoSniff {
   if (AUDIO_BRANDS.has(major)) return { ok: false, reason: 'audio_only' };
   const moov = top.find((x) => x.type === 'moov');
   if (!moov) return { ok: false, reason: 'malformed' };
+  return tracksVerdict(b, moov);
+}
+
+/** Does this `moov` hold a video track in a codec a browser plays? */
+function tracksVerdict(b: Uint8Array, moov: Box): VideoSniff {
   const traks = (boxes(b, moov.body, moov.end, false) ?? []).filter((x) => x.type === 'trak');
   let sawVideo = false;
   for (const trak of traks) {
@@ -217,4 +222,98 @@ export function mp4IsFastStart(bytes: Uint8Array): boolean {
   const mdat = top.findIndex((x) => x.type === 'mdat');
   if (moov < 0 || mdat < 0) return true;
   return moov < mdat;
+}
+
+/**
+ * FAST START, DECIDED FROM THE FIRST BYTES ALONE (an ad must be: DECISIONS row
+ * 300). `mp4IsFastStart` needs the whole chain of top-level boxes, so on a head
+ * it answers true for what it cannot see; this one walks the box headers in order
+ * and stops at the first of `moov` or `mdat`, which is the question. False for
+ * `mdat` first, and false when neither is reached (nothing shows the index is
+ * near the front, so a phone cannot be promised it is).
+ */
+export function mp4IndexComesFirst(head: Uint8Array): boolean {
+  if (head.length < 16 || fourcc(head, 4) !== 'ftyp') return false;
+  let at = 0;
+  while (at + 8 <= head.length) {
+    const type = fourcc(head, at + 4);
+    if (type === 'moov') return true;
+    if (type === 'mdat') return false;
+    let size = u32(head, at);
+    if (size === 1) {
+      if (at + 16 > head.length) return false;
+      size = u32(head, at + 8) * 0x100000000 + u32(head, at + 12);
+    }
+    if (size < 8) return false;
+    at += size;
+  }
+  return false;
+}
+
+/** No film's index is this large (a 47-second film's is a few KiB): beyond it, it is not read into memory. */
+const MOOV_READ_CAP = 8 * 1024 * 1024;
+
+/**
+ * IS THIS STORED MP4 WHOLE, AND A FILM? — WITHOUT READING THE FILM (owner's ad,
+ * DECISIONS row 300).
+ *
+ * The session door stores files far too large to read back whole, so it proves a
+ * head, and a head cannot chain to the end of the file: for a merchant's clip it
+ * then takes the container on trust and warns. An ad is what a customer must watch
+ * to the end to be paid, so it asks what the whole-body door's `sniffVideo` asks:
+ *
+ *   whole    every top-level box up to and including the first `mdat` ends inside
+ *            the bytes that arrived: a file cut off mid-way declares frames it
+ *            does not have, and could never reach its end on a phone;
+ *   a film   its `moov` holds a video track in a codec browsers play, not sound
+ *            alone. A `moov` past the head is read on its own, so this costs at
+ *            most a few small ranges of a file of any size.
+ *
+ * It answers only for an MP4 whose index comes first (`mp4IndexComesFirst`, which
+ * both doors ask before this).
+ */
+export async function sniffStoredMp4(
+  head: Uint8Array,
+  bytes: number,
+  read: (offset: number, length: number) => Promise<Uint8Array>
+): Promise<VideoSniff> {
+  const malformed: VideoSniff = { ok: false, reason: 'malformed' };
+  if (head.length < 16 || fourcc(head, 4) !== 'ftyp') return malformed;
+  const major = fourcc(head, 8);
+  if (IMAGE_BRANDS.has(major)) return { ok: false, reason: 'image_container' };
+  if (AUDIO_BRANDS.has(major)) return { ok: false, reason: 'audio_only' };
+
+  let moov: { start: number; end: number } | null = null;
+  let frames = false;
+  let at = 0;
+  // A real film reaches its frames in a handful of boxes; a chain that does not is not one.
+  for (let step = 0; step < 64 && at < bytes && !frames; step++) {
+    const wanted = Math.min(16, bytes - at);
+    const header = at + wanted <= head.length ? head.subarray(at, at + wanted) : await read(at, wanted);
+    if (header.length < 8) return malformed;
+    const type = fourcc(header, 4);
+    if (!/^[\x20-\x7e]{4}$/.test(type)) return malformed;
+    let size = u32(header, 0);
+    let headerSize = 8;
+    if (size === 1) {
+      if (header.length < 16) return malformed;
+      size = u32(header, 8) * 0x100000000 + u32(header, 12);
+      headerSize = 16;
+    } else if (size === 0) {
+      // "To the end of the file": only the last box may say so, which is what it then is.
+      size = bytes - at;
+    }
+    if (size < headerSize || at + size > bytes) return malformed;
+    if (type === 'moov' && !moov) moov = { start: at, end: at + size };
+    if (type === 'mdat') frames = true;
+    at += size;
+  }
+  if (!moov || !frames) return malformed;
+
+  const length = moov.end - moov.start;
+  if (length > MOOV_READ_CAP) return malformed;
+  const index = moov.end <= head.length ? head.subarray(moov.start, moov.end) : await read(moov.start, length);
+  if (index.length !== length) return malformed;
+  const headerSize = u32(index, 0) === 1 ? 16 : 8;
+  return tracksVerdict(index, { type: 'moov', start: 0, body: headerSize, end: length });
 }

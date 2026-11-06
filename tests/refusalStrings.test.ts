@@ -194,6 +194,9 @@ test('every code the table translates is one the server can actually emit', () =
     // the archive bound, the per-purpose quota and the configurable ceilings.
     'worker/routes/uploadSessions.ts',
     'worker/lib/uploadEntity.ts',
+    // «اجمع النقاط»: the missions' refusals, and the video ads and their form (0227, DECISIONS row 300).
+    'worker/routes/rewards.ts',
+    'worker/lib/rewards/ads.ts',
     // A request's file room and state, asked by both upload doors and by the
     // guarded insert where the row lands (DECISIONS row 258).
     'worker/lib/requestFileRoom.ts',

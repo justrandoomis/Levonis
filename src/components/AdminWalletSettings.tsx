@@ -4,6 +4,7 @@ import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import RoundingDriftTool from './adminWallet/RoundingDriftTool';
 import { api, ApiError, formatIqd, type PayoutMethod } from '../lib/api';
+import { apiRefusal } from '../lib/refusalStrings';
 import { Check, Edit2, Plus, Trash2, Video, DollarSign, CreditCard, Save, AlertTriangle, ArrowUpFromLine, Banknote } from 'lucide-react';
 
 /**
@@ -67,7 +68,7 @@ export default function AdminWalletSettings() {
     isLoaded,
   } = useWallet();
 
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   // THE ONE OFFICIAL RATE (DECISIONS row 252): the applied USD/IQD the products are priced at, set in
   // «التسعير والشحن». Read-only here — the legacy `exchangeRate` setting no longer drives anything
   // while an applied rate exists. `displayUsdRate` is that rate exactly; null while none is set.
@@ -239,7 +240,8 @@ export default function AdminWalletSettings() {
       setUrlState('saved');
     } catch (e) {
       setUrlState('error');
-      setUrlError(e instanceof ApiError ? e.message : 'Save failed');
+      // A film here is the owner's to publish: the refusal in the reader's language, not «ar / en» at once.
+      setUrlError(apiRefusal(e, lang, loc('تعذّر الحفظ', 'Save failed', 'پاشەکەوت نەکرا')));
     }
   };
 
@@ -408,6 +410,14 @@ export default function AdminWalletSettings() {
               </button>
             </div>
             <SaveStatus state={urlState} error={urlError} />
+            {/* The old setting (0227, DECISIONS row 300): any row in the ads tab ends it. */}
+            <p className="text-text-muted text-[11px]">
+              {loc(
+                'الإعلانات تُدار من المكافآت ← الإعلانات. هذا الرابط لا يعمل إلا ما دام لا يوجد أي إعلان هناك، ونشره للمالك وحده.',
+                'Ads are managed in Rewards → Ads. This link only works while there is no ad there at all, and only the owner can publish it.',
+                'ڕیکلامەکان لە خەڵاتەکان ← ڕیکلامەکان بەڕێوەدەبرێن. ئەم بەستەرە تەنها کاردەکات مادام هیچ ڕیکلامێک لەوێ نەبێت، و تەنها خاوەن دەتوانێت بڵاوی بکاتەوە.'
+              )}
+            </p>
           </div>
         </div>
       </div>
