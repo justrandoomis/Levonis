@@ -7,7 +7,8 @@ import type { PolicyDocument } from './types';
  * THE ONE SENTENCE THIS DOCUMENT EXISTS TO PROTECT (chapters 7 and 8):
  * REVIEW POINTS ARE AUTOMATIC, THE REVIEW GIFT IS NOT. worker/routes/reviews.ts
  * awards the doubled review points INSIDE the submission batch, with no human
- * in the loop, for every valid manual review that does NOT reach a gift tier —
+ * in the loop, for every valid manual review that does NOT enter the gift queue
+ * (a gift line proves nothing, and earns neither, article 7.5) —
  * and awards nothing automatically for one that does, because that review goes
  * into `review_rewards` as `submitted` and waits for an admin decision that may
  * be approve, reject or request-changes. The product page already tells the
@@ -140,10 +141,39 @@ import type { PolicyDocument } from './types';
  *   * 14.5: the filament coupon works on an item already on sale, off the sale
  *     price, unless announced otherwise with it. eSUN PLA+, the one filament it
  *     names, is on sale at $15, and 14.5 said the coupon would refuse it.
+ *
+ * VERSION 8 — WHY IT MOVED (owner, 2026-11-05; migration 0228; DECISIONS row
+ * 301, with rows 299 and 300 for 14.9 and 5.5). The archive keeps version 7 byte
+ * for byte.
+ *   * THE CODE, THE SCORE AND THE LEVELS — chapter 8, and 7.4, 7.5, 7.8, 7.9 and
+ *     the definitions beside it. «system reviwes from 1-100 to give admin to user
+ *     code to redeem his gift», «every 20 score the level appear». A review enters
+ *     the queue at any score of its own unless it is abuse; the admin's approval
+ *     makes a code, the code makes the gift, and the gift is one product across
+ *     the levels the score opened, at 0, delivery paid. The box and its five fixed
+ *     contents leave the text: a level holds what the Store places on it.
+ *     worker/lib/gifts/reviewCode.ts and packages/contracts/src/giftScore.ts are
+ *     every sentence of it. 8.15 keeps what was approved before.
+ *   * THE STORY IS A PART OF THE SCORE, NOT A CONDITION — 8.13. Version 5 said the
+ *     gift asks for it (2026-11-03). The owner's own example is now a 5, the stars
+ *     alone, so a review with no story reaches the queue and can be approved: the
+ *     story adds 8 (8.8), and 8.13 says so instead of asking for it.
+ *   * WHAT A GIFT PROVED — 7.5. A review proved only by a gift line earns neither a
+ *     queue place nor points (decision S8, reviews.ts `facts.gift_line`); 7.5 said
+ *     every valid review outside the queue is paid, and now names the exception.
+ *   * MEDIA MEANS MEDIA — 8.3. `reviewQuality.ts` reads a reused video as it reads a
+ *     reused photo, and the upload route keeps the file's digest on the object: it
+ *     used to throw it away, so no real upload could ever match another.
+ *   * THE AD'S LIMITS — 5.5. «2 times he can see. one per day»: a rule, with no
+ *     date and no name; the ad itself is the Store's to run (worker's reward_ads).
+ *     An ad ending or switched off starts no new view, and takes nothing from one
+ *     already running: its ticket may still be claimed that day (rewards.ts `/video`).
+ *   * PRODUCTS FOR POINTS — 14.9. «23000 points to redeem filament»: the rule, with
+ *     no price; the prices are the owner's settings, announced on the page.
  */
 export const rewards: PolicyDocument = {
   key: 'rewards',
-  version: 7,
+  version: 8,
   effective_at: '2026-11-06',
   title: {
     ar: 'سياسة النقاط والمراجعات والهدايا والإحالات',
@@ -171,8 +201,8 @@ export const rewards: PolicyDocument = {
 - المهمة: عمل داخل التطبيق يمنح نقاطاً بقيمة يحددها الخادم وحده.
 - اليوم المعتمد: اليوم التقويمي بتوقيت بغداد كما يحسبه خادم المتجر من ساعته هو.
 - المراجعة: نص وتقييم بالنجوم يكتبه زبون عن منتج استلمه فعلاً ضمن طلب مسلَّم.
-- درجة الجودة: تقدير آلي لفائدة المراجعة ووسائطها، من واحد إلى خمسة، لا علاقة له بعدد النجوم ولا بكون الرأي مادحاً أو ذامّاً.
-- هدية المراجعة: صندوق عيني من مخزون هدايا الطابعات يمنحه المتجر بقرار مستقل.
+- درجة الجودة: تقدير آلي لفائدة المراجعة ووسائطها، من واحد إلى مئة، لا علاقة له بعدد النجوم ولا بكون الرأي مادحاً أو ذامّاً.
+- هدية المراجعة: منتج عيني من منتجات المتجر، يختاره صاحب المراجعة من مستويات الهدايا التي فتحتها درجته، بعد قرار مستقل من المتجر.
 - الإحالة: نسبة حساب جديد إلى صاحب حساب قائم، برمز إحالة أو برابط اسم مستخدم.
 
 ### 1.4 النص المعتمد
@@ -305,7 +335,7 @@ export const rewards: PolicyDocument = {
 مهمة تُمنح مرة واحدة للحساب طوال عمره، قيمتها خمسون نقطة.
 
 ### 5.5 مشاهدة الإعلان
-مهمة يومية قيمتها عشرون نقطة. ولا تُقبل المطالبة بها إلا بعد أن يصدر الخادم تذكرة موقوتة وتنقضي المدة المقررة بساعة الخادم نفسه.
+مهمة يومية قيمتها عشرون نقطة. ولا تُقبل المطالبة بها إلا بعد أن يصدر الخادم تذكرة موقوتة وتنقضي المدة المقررة بساعة الخادم نفسه. ولكل إعلان فترة عرض يحددها المتجر، ويُحتسب منه لكل زبون في تلك الفترة مشاهدتان ما لم يعلن المتجر في بطاقة المهمة عدداً آخر، ومشاهدة واحدة في اليوم المعتمد، في أي يوم شاء منها. فإذا استنفد الزبون مشاهدات الإعلان لم تُحتسب له منه مشاهدة أخرى. وإذا انتهت فترته أو أوقفه المتجر لم تبدأ منه مشاهدة جديدة، أما المشاهدة التي بدأت قبل ذلك فتُحتسب إذا انقضت مدتها في اليوم المعتمد نفسه.
 
 ### 5.6 التصفح
 مهمة يومية قيمتها عشرون نقطة، ولا تُقبل المطالبة بها قبل انقضاء مئة وثمانين ثانية من ساعة الخادم عبر نبضات موثقة.
@@ -363,10 +393,10 @@ export const rewards: PolicyDocument = {
 - عدد المراجعات المرسلة من الحساب الواحد محدود في الساعة، منعاً للإغراق.
 
 ### 7.4 درجة الجودة
-يقيس النظام جودة المراجعة قياساً آلياً ثابتاً من فائدة النص وعدد الصور المتمايزة وجودتها ووجود الفيديو وجودته ووجود الدليل الدائم. ولا تدخل نبرة الرأي في هذا القياس: مراجعة بنجمة واحدة مفيدة قد تبلغ ما تبلغه مراجعة بخمس نجوم مفيدة.
+يقيس النظام جودة المراجعة قياساً آلياً ثابتاً، من واحد إلى مئة، من فائدة النص وعدد الصور المتمايزة وجودتها ووجود الفيديو وجودته ووجود الدليل الدائم. ولا تدخل نبرة الرأي في هذا القياس: مراجعة بنجمة واحدة مفيدة قد تبلغ ما تبلغه مراجعة بخمس نجوم مفيدة.
 
 ### 7.5 نقاط المراجعة تلقائية
-المراجعة اليدوية الصحيحة التي لا تبلغ درجة من درجات الهدية تُمنح نقاطها تلقائياً في المعاملة نفسها التي حفظت المراجعة، من غير قرار إداري ومن غير انتظار. وهذه هي الحالة الغالبة.
+المراجعة اليدوية الصحيحة التي لا تدخل قائمة الهدية تُمنح نقاطها تلقائياً في المعاملة نفسها التي حفظت المراجعة، من غير قرار إداري ومن غير انتظار. وهذه حال مراجعة كل منتج غير الطابعة، وحال مراجعة الطابعة التي ظهرت عليها إشارة إساءة مما تذكره المادة 8.3. ويُستثنى من ذلك كله منتج وصل إلى الزبون هدية: تُنشر مراجعته، ولا تُمنح نقاطاً، ولا تدخل قائمة الهدية.
 
 ### 7.6 قيمة نقاط المراجعة
 قيمة نقاط المراجعة ضِعف القيمة الأساسية المعلنة في إعدادات المتجر، ثم يُطبَّق عليها مضاعف العضوية. والقيمة الأساسية النافذة: {{REVIEW_BASE_POINTS}}.
@@ -374,11 +404,11 @@ export const rewards: PolicyDocument = {
 ### 7.7 إذا لم تُحدَّد القيمة الأساسية
 إذا لم تكن القيمة الأساسية محددة في إعدادات المتجر فلا تُمنح نقاط مراجعة، ويُعلَن ذلك للزبون في الصفحة بصريح العبارة. ولا يخترع النظام قيمة، ولا ينشأ للزبون حق بأثر رجعي عند تحديدها لاحقاً.
 
-### 7.8 المراجعة التي تبلغ درجة هدية
-المراجعة التي تبلغ درجة من درجات الهدية لا تُمنح نقاط المراجعة التلقائية، لأنها دخلت مسار الهدية المبيّن في الفصل الثامن.
+### 7.8 المراجعة التي تدخل قائمة الهدية
+المراجعة التي تدخل قائمة الهدية لا تُمنح نقاط المراجعة التلقائية، لأنها دخلت مسار الهدية المبيّن في الفصل الثامن.
 
 ### 7.9 تعديل المراجعة
-للزبون تعديل مراجعته ما دامت مكافأتها لم يُبتّ فيها. وإن نزل التعديل بالمراجعة دون درجة الهدية بقيت المراجعة منشورة، وسُجّل رفض مكافأة الهدية بسبب مكتوب، ومُنحت المراجعة نقاطها التلقائية كأي مراجعة يدوية صحيحة.
+للزبون تعديل مراجعته ما دامت مكافأتها لم يُبتّ فيها. وإن أظهر التعديل في المراجعة إشارة إساءة مما تذكره المادة 8.3 بقيت المراجعة منشورة، وسُجّل رفض مكافأة الهدية بسبب مكتوب، ومُنحت المراجعة نقاطها التلقائية كأي مراجعة يدوية صحيحة.
 
 ### 7.10 حذف المراجعة أو إخفاؤها
 للمتجر إخفاء أو حذف مراجعة مخالفة لقواعد المحتوى في شروط استخدام الموقع والتطبيق. ولا يُعد ذلك قراراً في المكافأة، كما أن رفض المكافأة ليس حذفاً للمراجعة: القراران مستقلان.
@@ -392,13 +422,13 @@ export const rewards: PolicyDocument = {
 ## 8. هدية المراجعة
 
 ### 8.1 ما هي
-صندوق عيني من مخزون هدايا الطابعات، بخمس درجات: الأولى ملحق، والثانية خيط طباعة، والثالثة خيط طباعة وملحق، والرابعة رأس طباعة، والخامسة رأس طباعة ومنصة.
+منتج عيني من منتجات المتجر، يمنحه المتجر على مراجعة طابعة استلمها الزبون منه. وللهدايا خمسة مستويات، يضع المتجر في كل مستوى ما يشاء من منتجاته ويغيّرها لمن يأتي بعد ذلك، ولا يُعرض على الزبون منها إلا ما فتحته درجته.
 
 ### 8.2 الهدية قرار مستقل للمتجر
-الهدية ليست حقاً يترتب تلقائياً على كتابة مراجعة، ولا على بلوغ درجة جودة معينة. المراجعة المؤهلة تدخل قائمة تقييم، ويصدر في شأنها قرار إداري معلَّل بواحد من ثلاثة: قبول بدرجة، أو طلب تعديل، أو رفض. والقبول وحده ينشئ الاستحقاق.
+الهدية ليست حقاً يترتب تلقائياً على كتابة مراجعة، ولا على بلوغ درجة جودة معينة. المراجعة المؤهلة تدخل قائمة تقييم، ويصدر في شأنها قرار إداري معلَّل بواحد من ثلاثة: قبول بدرجة نهائية، أو طلب تعديل، أو رفض. والقبول وحده يفتح الطريق إلى الاستحقاق، بالكود المبيّن في المادة 8.14.
 
 ### 8.3 شروط دخول قائمة التقييم
-لا تدخل المراجعة قائمة الهدية إلا إذا بلغت درجة جودة مقيسة آلياً، وكان معها نص ذو قدر كافٍ من التفصيل وصور متمايزة. وتتطلب الدرجات العليا فيديو مفيداً ودليلاً دائماً.
+تدخل قائمة الهدية كل مراجعة يدوية لطابعة سُلّمت للزبون، لم يكن مصدرها هدية، بلغت درجتها واحداً على الأقل ولم تظهر عليها إشارة إساءة. وإشارات الإساءة: نص مكرر من مراجعة سابقة للزبون نفسه، أو وسائط استُعملت في مراجعة سابقة له، أو نص تتكرر كلماته، أو نص محشو. والمراجعة التي تظهر عليها إشارة منها لا تدخل القائمة.
 
 ### 8.4 القرار معلَّل
 لا يصدر قبول ولا رفض ولا طلب تعديل بغير سبب مكتوب يُعرض على صاحب المراجعة.
@@ -407,28 +437,34 @@ export const rewards: PolicyDocument = {
 المكافأة التي قُبلت لا يُعاد البتّ فيها، ولا تُسحب بقرار لاحق، إلا في حالات إساءة الاستعمال المبيّنة في الفصل الثالث عشر.
 
 ### 8.6 استحقاق واحد لكل مراجعة
-تنشئ الموافقة استحقاق هدية واحداً لا غير عن المراجعة الواحدة.
+تنشئ كتابة الكود استحقاق هدية واحداً لا غير عن المراجعة الواحدة.
 
-### 8.7 اختيار الصندوق
-يختار صاحب الاستحقاق صندوقاً واحداً بدرجة تساوي درجته أو تقل عنها. والاختيار نهائي ولا يُكرر.
+### 8.7 اختيار الهدية
+يختار صاحب الاستحقاق هدية واحدة من هدايا المستويات التي فتحتها درجته، مما يعرضه المتجر ويمكن طلبه لحظة الاختيار. ولا تُعرض عليه هدايا المستويات التي لم تفتحها درجته. وبعد تأكيد الهدية لا يتغير الاختيار ولا يُكرر.
 
-### 8.8 محتوى الصندوق
-يُحدَّد محتوى الصندوق من الخادم من أصناف متوفرة فعلاً في المخزون، ويُثبَّت مرة واحدة ولا يُعاد سحبه ولا يُبدَّل بعد تثبيته.
+### 8.8 الدرجة والمستويات
+تُحسب الدرجة من واحد إلى مئة من أجزاء معلنة: النص حتى 42، والصور حتى 27، والفيديو حتى 18، وقصة إنستغرام 8، والتقييم بالنجوم 5 أياً كان عددها، وينقص منها ما يُظهره القياس من ضعف الوسائط. وللفريق عند القبول أن يثبّت الدرجة أو يغيّرها. ويرى الزبون الأجزاء والدرجة النهائية، وأي فرق بينهما في سطر مستقل. وكل عشرين درجة تفتح مستوى: ما دون 20 يفتح المستوى الأول، ومن 20 المستويين الأول والثاني، ومن 40 الثلاثة الأولى، ومن 60 الأربعة الأولى، ومن 80 المستويات الخمسة.
 
 ### 8.9 نفاد المخزون
-إذا نفد المتوفر من درجة ما تعذّر اختيارها حتى يتوفر بديل. ولا يُستبدل بها نقد ولا نقاط.
+إذا لم يتوفر في المستويات المفتوحة ما يمكن طلبه بقي الاستحقاق قائماً حتى يتوفر، ولا يُستبدل به نقد ولا نقاط. ولا يصدر قبول إذا كانت المستويات التي تفتحها الدرجة كلها خالية.
 
 ### 8.10 الهدية عينية
 الهدية عينية لا غير، ولا تُبدَّل بمال ولا برصيد محفظة ولا بخصم على طلب.
 
 ### 8.11 تسليم الهدية
-تُسلَّم الهدية وفق ما تحدده الإدارة، وتسري عليها أحكام التوصيل المعتادة وكلفها.
+تُضاف الهدية إلى سلة الزبون بسعر صفر وتُطلب عبر الدفع المعتاد، فلا يدفع عنها إلا أجرة التوصيل وفق أحكام التوصيل المعتادة. وإذا أُلغي الطلب عادت الهدية إليه ليطلبها من جديد.
 
 ### 8.12 المراجعات المولَّدة آلياً
 المراجعة التي يولدها النظام لا تُمنح مكافأة بأي حال، ولا تدخل قائمة الهدايا.
 
 ### 8.13 قصة إنستغرام
-يُطلب لهدية المراجعة كذلك أن ينشر صاحبها قصة (ستوري) على إنستغرام يشارك فيها تجربته ويشير فيها إلى حساب المتجر ⁦@levonis_iq⁩، وأن يرفق رابطها أو لقطة شاشة منها في خانة الدليل في نموذج المراجعة. ويبقى هذا الدليل خاصاً لا يراه إلا المتجر.
+لصاحب مراجعة الطابعة أن ينشر قصة (ستوري) على إنستغرام يشارك فيها تجربته ويشير فيها إلى حساب المتجر ⁦@levonis_iq⁩، وأن يرفق رابطها أو لقطة شاشة منها في خانة الدليل في نموذج المراجعة، فتُضاف إلى درجته ثماني درجات كما في المادة 8.8. وهي اختيارية: لا يتوقف عليها دخول قائمة الهدية ولا القبول. ويبقى هذا الدليل خاصاً لا يراه إلا المتجر.
+
+### 8.14 الكود
+عند القبول يصدر للمراجعة كود شخصي يسلّمه فريق Levonis لصاحبها بنفسه، ويصله في التطبيق إشعار بذلك لا يحمل الكود. ويكتبه صاحبها في صفحة «قيّم طابعتك»، فتُعرض عليه الدرجة وأجزاؤها والمستويات التي فتحتها، وينشأ الاستحقاق. والكود لا يعمل إلا في حساب صاحب المراجعة، ويُستعمل مرة واحدة، وللفريق أن يصدر بدله كوداً جديداً ما دام لم يُستعمل فيبطل القديم.
+
+### 8.15 ما قُبل قبل هذا الإصدار
+المراجعة التي قُبلت قبل نفاذ هذا الإصدار تبقى على الاستحقاق الذي نشأ لها، بمستواها، بلا كود.
 
 ## 9. التقييم التلقائي بعد سبعة أيام
 
@@ -598,6 +634,8 @@ export const rewards: PolicyDocument = {
 ### 14.9 متجر النقاط
 للزبون أن يستبدل نقاطه المستقرة بكوبون توصيل مجاني أو بكوبون فلامنت، بالسعر المعلن بالنقاط في صفحة المكافآت. وتُخصم النقاط لحظة الاستبدال، ويسري على الكوبون ما يسري على كوبونات الطابعة. ولا يحوز الزبون في وقت واحد أكثر من كوبون واحد غير مستعمل من كل نوع استبدله بالنقاط.
 
+وله كذلك أن يستبدل نقاطه المستقرة بمنتج يعرضه المتجر في متجر النقاط، بالسعر المعلن بالنقاط في الصفحة نفسها. تُخصم النقاط لحظة الاستبدال، ويصير المنتج هدية في «هداياي» تُطلب عبر السلة بسعر صفر، فلا يدفع الزبون عنها إلا أجرة التوصيل. ولا يحوز في وقت واحد أكثر من هدية واحدة لم تُطلب بعد من المنتج المعروض الواحد. وإذا ألغى المتجر الهدية قبل طلبها عادت النقاط مرة واحدة. وإذا أُلغي الطلب عادت الهدية قابلة للطلب وبقيت النقاط مصروفة.
+
 ### 14.10 لا عودة للنقاط المستبدلة
 النقاط التي استُبدلت بكوبون لا تعود إذا انتهت صلاحيته دون استعمال.
 
@@ -676,8 +714,8 @@ The Store: {{LEVONIS_LEGAL_NAME}}, registered under number {{LEVONIS_REGISTRATIO
 - Mission: an action inside the application that grants points at a value decided solely by the server.
 - Recorded day: the Baghdad calendar day as computed by the Store's server from its own clock.
 - Review: text and a star rating written by a customer about a product actually received in a delivered order.
-- Quality score: an automatic assessment of a review's usefulness and its media, from one to five, unrelated to the number of stars and to whether the opinion is favourable or critical.
-- Review gift: a physical box from the printer-gift stock granted by the Store as an independent decision.
+- Quality score: an automatic assessment of a review's usefulness and its media, from one to one hundred, unrelated to the number of stars and to whether the opinion is favourable or critical.
+- Review gift: a physical product of the Store, which the author of a review chooses from the gift levels their score has opened, after an independent decision of the Store.
 - Referral: the attribution of a new account to an existing account holder, by referral code or by a username link.
 
 ### 1.4 The authoritative text
@@ -810,7 +848,7 @@ The streak day is derived from the award records themselves in the database, not
 A mission granted once per account for its whole lifetime, worth fifty points.
 
 ### 5.5 Watching the advertisement
-A daily mission worth twenty points. It may not be claimed until the server has issued a timed ticket and the prescribed period has elapsed on the server's own clock.
+A daily mission worth twenty points. It may not be claimed until the server has issued a timed ticket and the prescribed period has elapsed on the server's own clock. Each advertisement has a period set by the Store. In that period each customer is credited with two views of it, unless the Store announces another number on the mission card, and with one view per recorded day, on whichever days they choose. Once the customer has used up an advertisement's views, no further view of it counts. Once its period has ended or the Store has switched it off, no new view of it can begin; a view begun before that still counts if its time runs out on the same recorded day.
 
 ### 5.6 Browsing
 A daily mission worth twenty points, which may not be claimed before one hundred and eighty seconds have elapsed on the server's clock across authenticated pings.
@@ -868,10 +906,10 @@ A review is published as soon as it is sent. It does not wait for an administrat
 - The number of reviews sent from one account is limited per hour, to prevent flooding.
 
 ### 7.4 The quality score
-The system measures the quality of a review by a fixed automatic measure taken from the usefulness of the text, the number of distinct images and their quality, the presence and quality of a video, and the presence of durable evidence. The tone of the opinion plays no part in that measure: a useful one-star review may reach what a useful five-star review reaches.
+The system measures the quality of a review, from one to one hundred, by a fixed automatic measure taken from the usefulness of the text, the number of distinct images and their quality, the presence and quality of a video, and the presence of durable evidence. The tone of the opinion plays no part in that measure: a useful one-star review may reach what a useful five-star review reaches.
 
 ### 7.5 Review points are automatic
-A valid manual review that does not reach one of the gift levels is granted its points automatically, in the very transaction that saved the review, with no administrative decision and no waiting. This is the ordinary case.
+A valid manual review that does not enter the gift queue is granted its points automatically, in the very transaction that saved the review, with no administrative decision and no waiting. This is the case of a review of any product other than a printer, and of a printer review showing a sign of abuse listed in article 8.3. The exception to all of this is a product that reached the customer as a gift: its review is published, earns no points and does not enter the gift queue.
 
 ### 7.6 The value of review points
 The value of review points is twice the base value published in the Store's settings, and the membership multiplier is then applied to it. The base value in force is: {{REVIEW_BASE_POINTS}}.
@@ -879,11 +917,11 @@ The value of review points is twice the base value published in the Store's sett
 ### 7.7 If the base value is not configured
 If the base value is not set in the Store's settings, no review points are granted, and this is stated to the customer on the page in express terms. The system invents no value, and no retroactive right arises for the customer when a value is later set.
 
-### 7.8 A review that reaches a gift level
-A review that reaches one of the gift levels is not granted the automatic review points, because it has entered the gift path set out in chapter 8.
+### 7.8 A review that enters the gift queue
+A review that enters the gift queue is not granted the automatic review points, because it has entered the gift path set out in chapter 8.
 
 ### 7.9 Editing a review
-A customer may edit their review as long as its reward has not been decided. If the edit brings the review below a gift level, the review remains published, the refusal of the gift reward is recorded with a written reason, and the review is granted its automatic points like any other valid manual review.
+A customer may edit their review as long as its reward has not been decided. If the edit shows a sign of abuse listed in article 8.3, the review remains published, the refusal of the gift reward is recorded with a written reason, and the review is granted its automatic points like any other valid manual review.
 
 ### 7.10 Deleting or hiding a review
 The Store may hide or delete a review that breaches the content rules in the Site and Application Terms of Use. That is not a decision on the reward, just as a refusal of a reward is not a deletion of the review: the two decisions are independent.
@@ -897,13 +935,13 @@ Story evidence is stored privately, shown only to its owner and to the Store's a
 ## 8. The review gift
 
 ### 8.1 What it is
-A physical box from the printer-gift stock, in five levels: the first an accessory, the second a print filament, the third a filament and an accessory, the fourth a print nozzle, and the fifth a nozzle and a plate.
+A physical product of the Store, granted by the Store for a review of a printer the customer received from it. Gifts come in five levels. The Store places on each level whichever of its products it wishes and may change them for those who come later, and a customer is offered only what their score has opened.
 
 ### 8.2 The gift is an independent decision of the Store
-The gift is not a right that follows automatically from writing a review, nor from reaching a particular quality score. A qualifying review enters an assessment queue, and a reasoned administrative decision is issued upon it in one of three forms: approval at a level, a request for changes, or a refusal. Approval alone creates the entitlement.
+The gift is not a right that follows automatically from writing a review, nor from reaching a particular quality score. A qualifying review enters an assessment queue, and a reasoned administrative decision is issued upon it in one of three forms: approval at a final score, a request for changes, or a refusal. Approval alone opens the way to the entitlement, through the code set out in article 8.14.
 
 ### 8.3 Conditions for entering the queue
-A review does not enter the gift queue unless it has reached an automatically measured quality score, with a text of sufficient detail and distinct images. The higher levels additionally require a useful video and durable evidence.
+The gift queue takes every manual review of a printer delivered to the customer, not obtained as a gift, whose score is at least one and which shows no sign of abuse. The signs of abuse are: text repeated from an earlier review by the same customer, media used in an earlier review of theirs, text whose words repeat, and padded text. A review showing one of them does not enter the queue.
 
 ### 8.4 The decision is reasoned
 No approval, refusal or request for changes is issued without a written reason shown to the author of the review.
@@ -912,28 +950,34 @@ No approval, refusal or request for changes is issued without a written reason s
 A reward that has been approved is not re-decided and is not withdrawn by a later decision, save in the cases of abuse set out in chapter 13.
 
 ### 8.6 One entitlement per review
-An approval creates one gift entitlement only, per review.
+Writing the code creates one gift entitlement only, per review.
 
-### 8.7 Choosing the box
-The holder of the entitlement chooses one box at a level equal to or below their own. The choice is final and is not repeated.
+### 8.7 Choosing the gift
+The holder of the entitlement chooses one gift from the gifts of the levels their score has opened, among what the Store offers and can be ordered at the moment of choosing. The gifts of levels their score has not opened are not shown to them. Once the gift is confirmed the choice does not change and is not repeated.
 
-### 8.8 The contents of the box
-The contents are determined by the server from items actually available in stock, fixed once, and never re-drawn or exchanged after they have been fixed.
+### 8.8 The score and the levels
+The score runs from one to one hundred and is made of announced parts: the text up to 42, the images up to 27, the video up to 18, the Instagram story 8 and the star rating 5 whatever its number of stars, less what the measure finds of poor media. On approval the team may confirm the score or change it. The customer sees the parts and the final score, and any difference between them on a line of its own. Every twenty points opens a level: below 20 opens the first level, from 20 the first and second, from 40 the first three, from 60 the first four, and from 80 all five.
 
 ### 8.9 Exhausted stock
-If what is available at a level is exhausted, that level cannot be chosen until a substitute is available. It is not converted into cash or into points.
+If nothing that can be ordered is available on the opened levels, the entitlement stands until something is. It is not converted into cash or into points. No approval is issued when every level the score opens is empty.
 
 ### 8.10 The gift is in kind
 The gift is in kind only, and is not exchanged for money, for wallet balance or for a discount on an order.
 
 ### 8.11 Delivery of the gift
-The gift is delivered as the administration determines, and the ordinary delivery provisions and their costs apply to it.
+The gift is added to the customer's cart at a price of zero and ordered through the ordinary checkout, so that the customer pays only for delivery, under the ordinary delivery provisions. If the order is cancelled the gift returns to them to order again.
 
 ### 8.12 Automatically generated reviews
 A review generated by the system is granted no reward in any case and does not enter the gift queue.
 
 ### 8.13 The Instagram story
-The review gift also asks its author to post an Instagram story sharing their experience and mentioning the Store's account @levonis_iq, and to attach its link or a screenshot of it in the evidence field of the review form. That evidence stays private and is seen by the Store alone.
+The author of a printer review may post an Instagram story sharing their experience and mentioning the Store's account @levonis_iq, and attach its link or a screenshot of it in the evidence field of the review form; this adds eight to the score, as article 8.8 states. The story is optional: neither entering the gift queue nor approval depends on it. That evidence stays private and is seen by the Store alone.
+
+### 8.14 The code
+On approval a personal code is issued for the review, which the Levonis team hands to its author itself; the author receives an in-app notice of this that does not carry the code. The author writes it on the «Rate your printer» page, where they are shown the score, its parts and the levels it opened, and the entitlement is created. The code works only on the account of the review's author and is used once. The team may issue a new code in its place while it is unused, and the old one then ceases to work.
+
+### 8.15 What was approved before this version
+A review approved before this version took effect keeps the entitlement created for it, at its level, without a code.
 
 ## 9. The automatic rating after seven days
 
@@ -1103,6 +1147,8 @@ If the order that created the coupons is cancelled, or the printer is returned a
 ### 14.9 The points shop
 A customer may exchange settled points for a free-delivery coupon or a filament coupon, at the price in points announced on the Rewards page. The points are deducted at the moment of the exchange, and the coupon is subject to everything that applies to printer coupons. A customer holds no more than one unused coupon of each kind bought with points at any one time.
 
+A customer may also exchange settled points for a product the Store offers in the points shop, at the price in points announced on the same page. The points are deducted at the moment of the exchange, and the product becomes a gift in «My gifts», ordered through the cart at a price of zero, so that the customer pays only for delivery. A customer holds no more than one gift not yet ordered of the same offered product at any one time. If the Store cancels the gift before it is ordered, the points return once. If the order is cancelled, the gift can be ordered again and the points stay spent.
+
 ### 14.10 Exchanged points do not return
 Points exchanged for a coupon do not return if the coupon expires unused.
 
@@ -1181,8 +1227,8 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 - ئەرک: کردارێک لەناو بەرنامەکەدا کە خاڵ دەبەخشێت بە بەهایەک کە تەنها ڕاژە بڕیاری لەسەر دەدات.
 - ڕۆژی تۆمارکراو: ڕۆژی ڕۆژژمێری بەغدا وەک ڕاژەی فرۆشگا لە کاتژمێری خۆیەوە دەیژمێرێت.
 - پێداچوونەوە: دەق و پلەی ئەستێرە کە کڕیارێک لەسەر بەرهەمێک دەینووسێت کە بەڕاستی لە داواکارییەکی گەیەنراودا وەریگرتووە.
-- پلەی جۆرایەتی: هەڵسەنگاندنێکی خۆکار بۆ سوودمەندی پێداچوونەوە و میدیاکانی، لە یەکەوە بۆ پێنج، پەیوەندی بە ژمارەی ئەستێرەکانەوە نییە و بەوەشەوە نییە کە بۆچوونەکە ستایش یان ڕەخنە بێت.
-- دیاری پێداچوونەوە: سندوقێکی ماددی لە کۆگای دیاری چاپکەرەکان کە فرۆشگا بە بڕیارێکی سەربەخۆ دەیبەخشێت.
+- نمرەی جۆرایەتی: هەڵسەنگاندنێکی خۆکار بۆ سوودمەندی پێداچوونەوە و میدیاکانی، لە یەکەوە بۆ سەد، پەیوەندی بە ژمارەی ئەستێرەکانەوە نییە و بەوەشەوە نییە کە بۆچوونەکە ستایش یان ڕەخنە بێت.
+- دیاری پێداچوونەوە: بەرهەمێکی ماددی لە بەرهەمەکانی فرۆشگا، کە خاوەنی پێداچوونەوەکە لەو ئاستانەی دیاری هەڵیدەبژێرێت کە نمرەکەی کردوونیەتەوە، دوای بڕیارێکی سەربەخۆی فرۆشگا.
 - ناردن: پێدانی هەژمارێکی نوێ بە خاوەن هەژمارێکی هەبوو، بە کۆدی ناردن یان بە بەستەری ناوی بەکارهێنەر.
 
 ### 1.4 دەقی پەسەندکراو
@@ -1315,7 +1361,7 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ئەرکێک کە جارێک بۆ هەژمار لە هەموو تەمەنیدا دەبەخشرێت، بەهای پەنجا خاڵە.
 
 ### 5.5 بینینی ڕیکلام
-ئەرکێکی ڕۆژانە بە بەهای بیست خاڵ. داوای ناکرێت مەگەر دوای ئەوەی ڕاژە بلیتێکی کاتدار دەردەکات و ماوەی دیاریکراو بە کاتژمێری خودی ڕاژە تێدەپەڕێت.
+ئەرکێکی ڕۆژانە بە بەهای بیست خاڵ. داوای ناکرێت مەگەر دوای ئەوەی ڕاژە بلیتێکی کاتدار دەردەکات و ماوەی دیاریکراو بە کاتژمێری خودی ڕاژە تێدەپەڕێت. هەر ڕیکلامێک ماوەیەکی پیشاندانی هەیە کە فرۆشگا دیاری دەکات. لەو ماوەیەدا بۆ هەر کڕیارێک دوو بینینی دەژمێردرێت، مەگەر فرۆشگا لە کارتی ئەرکەکەدا ژمارەیەکی تر ڕابگەیەنێت، و لە هەر ڕۆژێکی تۆمارکراودا یەک بینین، لە هەر ڕۆژێک کە خۆی بیەوێت. کاتێک کڕیار بینینەکانی ڕیکلامێک تەواو دەکات، هیچ بینینێکی تری لێی بۆ ناژمێردرێت. کاتێک ماوەکەی کۆتایی دێت یان فرۆشگا دەیکوژێنێتەوە، هیچ بینینێکی نوێی لێ دەست پێ ناکات؛ بەڵام بینینێک کە پێش ئەوە دەستی پێکردبێت دەژمێردرێت ئەگەر ماوەکەی لە هەمان ڕۆژی تۆمارکراودا تێپەڕێت.
 
 ### 5.6 گەڕان
 ئەرکێکی ڕۆژانە بە بەهای بیست خاڵ، و داوای ناکرێت پێش تێپەڕبوونی سەد و هەشتا چرکە بە کاتژمێری ڕاژە لە ڕێگەی نبزی ڕاستکراوەوە.
@@ -1372,11 +1418,11 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 - ڤیدیۆ لە چل مێگابایت تێناپەڕێت.
 - ژمارەی ئەو پێداچوونەوانەی لە یەک هەژمارەوە دەنێردرێن لە کاتژمێردا سنووردارە، بۆ ڕێگریکردن لە لافاو.
 
-### 7.4 پلەی جۆرایەتی
-سیستەمەکە جۆرایەتی پێداچوونەوە بە پێوانەیەکی خۆکاری نەگۆڕ دەپێوێت، لە سوودمەندی دەق و ژمارەی وێنە جیاوازەکان و جۆرایەتییان و بوونی ڤیدیۆ و جۆرایەتییەکەی و بوونی بەڵگەی هەمیشەیی. تۆنی بۆچوون هیچ ڕۆڵێکی لەو پێوانەیەدا نییە: پێداچوونەوەیەکی سوودمەند بە یەک ئەستێرە دەتوانێت بگاتە ئەوەی پێداچوونەوەیەکی سوودمەند بە پێنج ئەستێرە پێی دەگات.
+### 7.4 نمرەی جۆرایەتی
+سیستەمەکە جۆرایەتی پێداچوونەوە، لە یەکەوە بۆ سەد، بە پێوانەیەکی خۆکاری نەگۆڕ دەپێوێت، لە سوودمەندی دەق و ژمارەی وێنە جیاوازەکان و جۆرایەتییان و بوونی ڤیدیۆ و جۆرایەتییەکەی و بوونی بەڵگەی هەمیشەیی. تۆنی بۆچوون هیچ ڕۆڵێکی لەو پێوانەیەدا نییە: پێداچوونەوەیەکی سوودمەند بە یەک ئەستێرە دەتوانێت بگاتە ئەوەی پێداچوونەوەیەکی سوودمەند بە پێنج ئەستێرە پێی دەگات.
 
 ### 7.5 خاڵی پێداچوونەوە خۆکارە
-پێداچوونەوەی دەستیی دروست کە نەگاتە یەکێک لە پلەکانی دیاری، خاڵەکانی بە شێوەی خۆکار دەبەخشرێن لە خودی ئەو مامەڵەیەدا کە پێداچوونەوەکەی پاراست، بەبێ بڕیاری کارگێڕی و بەبێ چاوەڕوانی. ئەمە دۆخی باوە.
+پێداچوونەوەی دەستیی دروست کە نەچێتە ناو ڕیزی دیاری، خاڵەکانی بە شێوەی خۆکار دەبەخشرێن لە خودی ئەو مامەڵەیەدا کە پێداچوونەوەکەی پاراست، بەبێ بڕیاری کارگێڕی و بەبێ چاوەڕوانی. ئەمە دۆخی پێداچوونەوەی هەر بەرهەمێکی جگە لە چاپکەرە، و دۆخی پێداچوونەوەی چاپکەرێک کە نیشانەیەکی خراپ بەکارهێنانی تێدا بێت لەوانەی ماددەی 8.3 باسیان دەکات. تەنها بەرهەمێک کە وەک دیاری بە کڕیار گەیشتووە لەمە بەدەرە: پێداچوونەوەکەی بڵاو دەکرێتەوە، خاڵی پێ نابەخشرێت، و ناچێتە ناو ڕیزی دیاری.
 
 ### 7.6 بەهای خاڵی پێداچوونەوە
 بەهای خاڵی پێداچوونەوە دوو ئەوەندەی بەها بنەڕەتییەکەیە کە لە ڕێکخستنەکانی فرۆشگادا بڵاو کراوەتەوە، و پاشان زیادکەری ئەندامێتی لەسەری جێبەجێ دەکرێت. بەها بنەڕەتییەکەی کاری پێدەکرێت: {{REVIEW_BASE_POINTS}}.
@@ -1384,11 +1430,11 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ### 7.7 ئەگەر بەها بنەڕەتییەکە دیاری نەکرابێت
 ئەگەر بەها بنەڕەتییەکە لە ڕێکخستنەکانی فرۆشگادا دیاری نەکرابێت، هیچ خاڵی پێداچوونەوە نابەخشرێت، و ئەمە بە ڕوونی لە پەڕەکەدا بە کڕیار ڕادەگەیەنرێت. سیستەمەکە هیچ بەهایەک داناهێنێت، و هیچ مافێکی دواکەوتوو بۆ کڕیار سەرهەڵنادات کاتێک بەهایەک دواتر دیاری دەکرێت.
 
-### 7.8 پێداچوونەوەیەک کە دەگاتە پلەی دیاری
-پێداچوونەوەیەک کە دەگاتە یەکێک لە پلەکانی دیاری، خاڵی خۆکاری پێداچوونەوەی پێ نابەخشرێت، چونکە چووەتە ناو ڕێچکەی دیاری کە لە بەشی هەشتەمدا هاتووە.
+### 7.8 پێداچوونەوەیەک کە دەچێتە ناو ڕیزی دیاری
+پێداچوونەوەیەک کە دەچێتە ناو ڕیزی دیاری، خاڵی خۆکاری پێداچوونەوەی پێ نابەخشرێت، چونکە چووەتە ناو ڕێچکەی دیاری کە لە بەشی هەشتەمدا هاتووە.
 
 ### 7.9 دەستکاریکردنی پێداچوونەوە
-کڕیار دەتوانێت پێداچوونەوەکەی دەستکاری بکات تا ئەو کاتەی بڕیار لەسەر پاداشتەکەی نەدراوە. ئەگەر دەستکارییەکە پێداچوونەوەکە بخاتە خوارتر لە پلەی دیاری، پێداچوونەوەکە بڵاوکراوە دەمێنێتەوە، ڕەتکردنەوەی پاداشتی دیاری بە هۆکارێکی نووسراو تۆمار دەکرێت، و پێداچوونەوەکە خاڵی خۆکاری خۆی وەردەگرێت وەک هەر پێداچوونەوەیەکی دەستیی دروست.
+کڕیار دەتوانێت پێداچوونەوەکەی دەستکاری بکات تا ئەو کاتەی بڕیار لەسەر پاداشتەکەی نەدراوە. ئەگەر دەستکارییەکە نیشانەیەکی خراپ بەکارهێنان دەربخات لەوانەی ماددەی 8.3 باسیان دەکات، پێداچوونەوەکە بڵاوکراوە دەمێنێتەوە، ڕەتکردنەوەی پاداشتی دیاری بە هۆکارێکی نووسراو تۆمار دەکرێت، و پێداچوونەوەکە خاڵی خۆکاری خۆی وەردەگرێت وەک هەر پێداچوونەوەیەکی دەستیی دروست.
 
 ### 7.10 سڕینەوە یان شاردنەوەی پێداچوونەوە
 فرۆشگا دەتوانێت پێداچوونەوەیەک بشارێتەوە یان بیسڕێتەوە کە پێچەوانەی یاساکانی ناوەڕۆکە لە مەرجەکانی بەکارهێنانی ماڵپەڕ و بەرنامەدا. ئەوە بڕیار لەسەر پاداشت نییە، هەروەک ڕەتکردنەوەی پاداشت سڕینەوەی پێداچوونەوە نییە: هەردوو بڕیارەکە سەربەخۆن.
@@ -1402,13 +1448,13 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ## 8. دیاری پێداچوونەوە
 
 ### 8.1 چییە
-سندوقێکی ماددی لە کۆگای دیاری چاپکەرەکان، بە پێنج پلە: یەکەم پێداویستییەک، دووەم دەزووی چاپ، سێیەم دەزووی چاپ و پێداویستییەک، چوارەم لوولەی چاپ، و پێنجەم لوولە و تەختە.
+بەرهەمێکی ماددی لە بەرهەمەکانی فرۆشگا، کە فرۆشگا لەسەر پێداچوونەوەی چاپکەرێک دەیبەخشێت کە کڕیار لێی وەرگرتووە. دیارییەکان پێنج ئاستیان هەیە. فرۆشگا لە هەر ئاستێکدا ئەو بەرهەمانەی خۆی دادەنێت کە دەیەوێت و بۆ ئەوانەی دواتر دێن دەتوانێت بیانگۆڕێت، و تەنها ئەوەی نمرەکەی کڕیار کردوویەتەوە پێی پیشان دەدرێت.
 
 ### 8.2 دیاری بڕیارێکی سەربەخۆی فرۆشگایە
-دیاری مافێک نییە کە بە شێوەی خۆکار لە نووسینی پێداچوونەوەوە بێت، نە لە گەیشتن بە پلەیەکی دیاریکراوی جۆرایەتی. پێداچوونەوەی شایستە دەچێتە ناو ڕیزی هەڵسەنگاندن، و بڕیارێکی کارگێڕی هۆکاردار لەسەری دەردەچێت بە یەکێک لە سێ شێوە: پەسەندکردن بە پلەیەک، یان داواکردنی گۆڕانکاری، یان ڕەتکردنەوە. تەنها پەسەندکردن شایستەیی دروست دەکات.
+دیاری مافێک نییە کە بە شێوەی خۆکار لە نووسینی پێداچوونەوەوە بێت، نە لە گەیشتن بە نمرەیەکی دیاریکراوی جۆرایەتی. پێداچوونەوەی شایستە دەچێتە ناو ڕیزی هەڵسەنگاندن، و بڕیارێکی کارگێڕی هۆکاردار لەسەری دەردەچێت بە یەکێک لە سێ شێوە: پەسەندکردن بە نمرەیەکی کۆتایی، یان داواکردنی گۆڕانکاری، یان ڕەتکردنەوە. تەنها پەسەندکردن ڕێگا بۆ شایستەیی دەکاتەوە، بەو کۆدەی لە ماددەی 8.14دا هاتووە.
 
 ### 8.3 مەرجەکانی چوونە ناو ڕیزەکە
-پێداچوونەوە ناچێتە ناو ڕیزی دیاری مەگەر گەیشتبێتە پلەیەکی جۆرایەتی کە بە خۆکاری پێورابێت، لەگەڵ دەقێکی بەپێی پێویست ورد و وێنەی جیاواز. پلە بەرزەکان سەرەڕای ئەوە ڤیدیۆی سوودمەند و بەڵگەی هەمیشەیی دەخوازن.
+هەموو پێداچوونەوەیەکی دەستی بۆ چاپکەرێک کە بە کڕیار گەیەنراوە و لە ڕێگەی دیارییەوە نەبووە، و نمرەکەی لانیکەم یەکە و هیچ نیشانەیەکی خراپ بەکارهێنانی تێدا نییە، دەچێتە ناو ڕیزی دیاری. نیشانەکانی خراپ بەکارهێنان ئەمانەن: دەقی دووبارەکراوە لە پێداچوونەوەیەکی پێشووی هەمان کڕیار، میدیایەک کە لە پێداچوونەوەیەکی پێشوویدا بەکارهاتووە، دەقێک کە وشەکانی دووبارە دەبنەوە، و دەقی پڕکراوە. پێداچوونەوەیەک کە یەکێک لەمانەی تێدا بێت ناچێتە ناو ڕیزەکە.
 
 ### 8.4 بڕیارەکە هۆکاردارە
 هیچ پەسەندکردن و ڕەتکردنەوە و داواکردنی گۆڕانکارییەک بەبێ هۆکارێکی نووسراو دەرناچێت کە بە خاوەنی پێداچوونەوەکە پیشان دەدرێت.
@@ -1417,28 +1463,34 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ئەو پاداشتەی پەسەند کراوە دووبارە بڕیاری لەسەر نادرێتەوە و بە بڕیارێکی دواتر نافەوتێنرێت، جگە لە دۆخەکانی خراپ بەکارهێنان کە لە بەشی سێزدەیەمدا هاتوون.
 
 ### 8.6 یەک شایستەیی بۆ هەر پێداچوونەوەیەک
-پەسەندکردن تەنها یەک شایستەیی دیاری دروست دەکات بۆ هەر پێداچوونەوەیەک.
+نووسینی کۆدەکە تەنها یەک شایستەیی دیاری دروست دەکات بۆ هەر پێداچوونەوەیەک.
 
-### 8.7 هەڵبژاردنی سندوق
-خاوەنی شایستەیی یەک سندوق هەڵدەبژێرێت بە پلەیەک یەکسان یان خوارتر لە پلەی خۆی. هەڵبژاردنەکە کۆتاییە و دووبارە ناکرێتەوە.
+### 8.7 هەڵبژاردنی دیاری
+خاوەنی شایستەیی یەک دیاری هەڵدەبژێرێت لە دیارییەکانی ئەو ئاستانەی نمرەکەی کردوونیەتەوە، لەوەی فرۆشگا دەیخاتە ڕوو و لە ساتی هەڵبژاردندا دەکرێت داوا بکرێت. دیارییەکانی ئەو ئاستانەی نمرەکەی نەیکردوونەتەوە پێی پیشان نادرێن. دوای پشتڕاستکردنەوەی دیارییەکە، هەڵبژاردنەکە ناگۆڕدرێت و دووبارە ناکرێتەوە.
 
-### 8.8 ناوەڕۆکی سندوق
-ناوەڕۆکەکە لەلایەن ڕاژەوە لە بەرهەمی بەڕاستی بەردەست لە کۆگادا دیاری دەکرێت، جارێک جێگیر دەکرێت، و دوای جێگیرکردن هەرگیز دووبارە هەڵناکێشرێتەوە و ناگۆڕدرێت.
+### 8.8 نمرە و ئاستەکان
+نمرەکە لە یەکەوە بۆ سەدە و لە بەشی ڕاگەیەنراو پێکدێت: دەق تا 42، وێنەکان تا 27، ڤیدیۆ تا 18، ستۆریی ئینستاگرام 8، و هەڵسەنگاندن بە ئەستێرە 5 هەر ژمارەیەک ئەستێرە بێت، و ئەوەی پێوانەکە لە لاوازی میدیا دەیدۆزێتەوە لێی کەم دەکرێتەوە. تیمەکە لە کاتی پەسەندکردندا دەتوانێت نمرەکە جێگیر بکات یان بیگۆڕێت. کڕیار بەشەکان و نمرەی کۆتایی دەبینێت، و هەر جیاوازییەک لە نێوانیاندا لە دێڕێکی سەربەخۆدا. هەر بیست نمرە ئاستێک دەکاتەوە: خوارتر لە 20 ئاستی یەکەم دەکاتەوە، لە 20ەوە یەکەم و دووەم، لە 40ەوە سێ ئاستی یەکەم، لە 60ەوە چوار ئاستی یەکەم، و لە 80ەوە هەر پێنج ئاستەکە.
 
 ### 8.9 تەواوبوونی کۆگا
-ئەگەر ئەوەی لە پلەیەکدا بەردەستە تەواو بێت، ئەو پلەیە ناتوانرێت هەڵبژێردرێت تا جێگرەوەیەک بەردەست دەبێت. بە پارە یان بە خاڵ ناگۆڕدرێت.
+ئەگەر لەو ئاستانەی کراونەتەوە هیچ شتێک بەردەست نەبێت کە بکرێت داوا بکرێت، شایستەییەکە دەمێنێتەوە تا شتێک بەردەست دەبێت، و بە پارە یان بە خاڵ ناگۆڕدرێت. هیچ پەسەندکردنێک دەرناچێت ئەگەر هەموو ئەو ئاستانەی نمرەکە دەیانکاتەوە بەتاڵ بن.
 
 ### 8.10 دیاری ماددییە
 دیاری تەنها ماددییە، و بە پارە یان باڵانسی جزدان یان داشکاندن لەسەر داواکارییەک ناگۆڕدرێت.
 
 ### 8.11 گەیاندنی دیاری
-دیاری بەو شێوەیە دەگەیەنرێت کە کارگێڕی دیاری دەکات، و حوکمەکانی ئاسایی گەیاندن و تێچووەکانی لەسەری جێبەجێ دەکرێن.
+دیارییەکە بە نرخی سفر دەخرێتە سەبەتەی کڕیارەوە و لە ڕێگەی پارەدانی ئاساییەوە داوا دەکرێت، بۆیە کڕیار تەنها کرێی گەیاندن دەدات، بەپێی حوکمەکانی ئاسایی گەیاندن. ئەگەر داواکارییەکە هەڵوەشایەوە، دیارییەکە بۆی دەگەڕێتەوە تا دووبارە داوای بکات.
 
 ### 8.12 پێداچوونەوە خۆکارە دروستکراوەکان
 ئەو پێداچوونەوەیەی سیستەمەکە دروستی دەکات بە هیچ شێوەیەک پاداشتی پێ نابەخشرێت و ناچێتە ناو ڕیزی دیارییەکان.
 
 ### 8.13 ستۆریی ئینستاگرام
-دیاری پێداچوونەوە هەروەها داوا لە خاوەنەکەی دەکات ستۆرییەک لە ئینستاگرام بڵاو بکاتەوە کە ئەزموونەکەی تێدا باس بکات و هەژماری فرۆشگا ⁦@levonis_iq⁩ منشن بکات، و بەستەرەکەی یان وێنەیەکی شاشەی لێی لە خانەی بەڵگەی فۆرمی پێداچوونەوەکەدا هاوپێچ بکات. ئەو بەڵگەیە تایبەت دەمێنێتەوە و تەنها فرۆشگا دەیبینێت.
+خاوەنی پێداچوونەوەی چاپکەر دەتوانێت ستۆرییەک لە ئینستاگرام بڵاو بکاتەوە کە ئەزموونەکەی تێدا باس بکات و هەژماری فرۆشگا ⁦@levonis_iq⁩ منشن بکات، و بەستەرەکەی یان وێنەیەکی شاشەی لێی لە خانەی بەڵگەی فۆرمی پێداچوونەوەکەدا هاوپێچ بکات، ئەمەش هەشت نمرە بۆ نمرەکەی زیاد دەکات وەک ماددەی 8.8 دەڵێت. ستۆرییەکە ئارەزوومەندانەیە: نە بۆ چوونە ناو ڕیزی دیاری مەرجە و نە بۆ پەسەندکردن. ئەو بەڵگەیە تایبەت دەمێنێتەوە و تەنها فرۆشگا دەیبینێت.
+
+### 8.14 کۆدەکە
+لە کاتی پەسەندکردندا کۆدێکی کەسی بۆ پێداچوونەوەکە دەردەچێت، کە تیمی Levonis خۆی دەیداتە خاوەنەکەی، و ئاگادارکردنەوەیەکی لەناو بەرنامەکەدا بەو بارەیەوە پێی دەگات کە کۆدەکەی تێدا نییە. خاوەنەکەی لە پەڕەی «چاپکەرەکەت هەڵبسەنگێنە» دەینووسێت، ئینجا نمرەکە و بەشەکانی و ئەو ئاستانەی کردوونیەتەوە پێی پیشان دەدرێن، و شایستەییەکە دروست دەبێت. کۆدەکە تەنها لە هەژماری خاوەنی پێداچوونەوەکەدا کار دەکات و یەک جار بەکاردێت. تا بەکارنەهاتبێت تیمەکە دەتوانێت کۆدێکی نوێ لە جێگەی دەربکات، و کۆنەکە لە کار دەکەوێت.
+
+### 8.15 ئەوەی پێش ئەم وەشانە پەسەندکراوە
+پێداچوونەوەیەک کە پێش کارپێکردنی ئەم وەشانە پەسەندکراوە، لەسەر ئەو شایستەیییە دەمێنێتەوە کە بۆی دروست بووە، بە ئاستەکەی خۆی، بەبێ کۆد.
 
 ## 9. پلەدانی خۆکار دوای حەوت ڕۆژ
 
@@ -1607,6 +1659,8 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 
 ### 14.9 فرۆشگای خاڵ
 کڕیار دەتوانێت خاڵە جێگیرەکانی بە کۆپۆنێکی گەیاندنی بەخۆڕایی یان کۆپۆنێکی دەزووی چاپ بگۆڕێتەوە، بەو نرخە بە خاڵەی لە پەڕەی پاداشتەکاندا ڕاگەیەنراوە. خاڵەکان لە ساتی گۆڕینەوەدا کەم دەکرێنەوە، و هەرچی بەسەر کۆپۆنەکانی چاپکەردا جێبەجێ دەبێت بەسەر ئەم کۆپۆنەشدا جێبەجێ دەبێت. کڕیار لە یەک کاتدا زیاتر لە یەک کۆپۆنی بەکارنەهاتوو لە هەر جۆرێک کە بە خاڵ گۆڕیبێتییەوە ناگرێت.
+
+هەروەها کڕیار دەتوانێت خاڵە جێگیرەکانی بە بەرهەمێک بگۆڕێتەوە کە فرۆشگا لە فرۆشگای خاڵدا دەیخاتە ڕوو، بەو نرخە بە خاڵەی لە هەمان پەڕەدا ڕاگەیەنراوە. خاڵەکان لە ساتی گۆڕینەوەدا کەم دەکرێنەوە، و بەرهەمەکە دەبێتە دیارییەک لە «دیارییەکانم» کە لە ڕێگەی سەبەتەوە بە نرخی سفر داوا دەکرێت، بۆیە کڕیار تەنها کرێی گەیاندن دەدات. لە یەک کاتدا زیاتر لە یەک دیاریی داوانەکراو لە هەمان بەرهەمی خراوەڕوو ناگرێت. ئەگەر فرۆشگا پێش داواکردن دیارییەکە هەڵبوەشێنێتەوە، خاڵەکان یەک جار دەگەڕێنەوە. ئەگەر داواکارییەکە هەڵوەشایەوە، دیارییەکە دووبارە دەکرێت داوا بکرێت و خاڵەکان خەرجکراو دەمێننەوە.
 
 ### 14.10 خاڵی گۆڕدراو ناگەڕێتەوە
 ئەو خاڵانەی بە کۆپۆن گۆڕدراون ناگەڕێنەوە ئەگەر ماوەی کۆپۆنەکە بەبێ بەکارهێنان کۆتایی بێت.

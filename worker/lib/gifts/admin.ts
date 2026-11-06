@@ -8,7 +8,7 @@ import { badRequest, int, str } from '../http';
 import { likePattern, sqlLikeClause } from '../sqlLike';
 import { safeParse } from '../types';
 import { stripFinancials } from '../adminScope';
-import { chosenItemView, giftStatusOf, GIFT_ROW_SELECT, levelViewFrom, loadLevels, type GiftItemView, type GiftMode, type GiftReason, type GiftStatus, type LevelView } from './model';
+import { chosenItemView, giftChoiceScope, giftStatusOf, GIFT_ROW_SELECT, levelViewFrom, loadLevels, type GiftChoiceScope, type GiftItemView, type GiftMode, type GiftReason, type GiftStatus, type LevelView } from './model';
 
 const text = (v: unknown): string => (typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v));
 const orNull = (v: unknown): string | null => (v === null || v === undefined || v === '' ? null : text(v));
@@ -20,6 +20,9 @@ export interface AdminGiftView {
   mode: GiftMode;
   reason: GiftReason;
   level: LevelView | null;
+  /** 'up_to': the customer chose among levels 1..`level`, and `chosen_level` says which they took (row 301). */
+  choice_scope: GiftChoiceScope;
+  chosen_level: number | null;
   user: { id: string; name: string; email: string; username: string; phone: string };
   note: string;
   granted_by: { id: string; name: string; email: string } | null;
@@ -63,6 +66,8 @@ export function adminGiftView(g: Record<string, unknown>, levels: Map<number, { 
     mode,
     reason: (text(g.reason) || 'legacy') as GiftReason,
     level: Number.isInteger(n) && n >= 1 && n <= 5 ? levels.get(n)?.view ?? levelViewFrom(undefined, n) : null,
+    choice_scope: giftChoiceScope(g),
+    chosen_level: mode === 'level' && g.gift_product_id && g.chosen_level != null ? Number(g.chosen_level) : null,
     user: {
       id: text(g.user_id),
       name: text(g.user_name),

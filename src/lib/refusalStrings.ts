@@ -2336,6 +2336,27 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
   // The gift card on «هداياي», the cart's gift line and the checkout. A gift
   // moves «اختر» → «استرداد» → «أضف إلى السلة» → «تم الطلب»; each sentence
   // names the step the customer can take next.
+  // The gift code of a review (DECISIONS row 301).
+  GIFT_CODE_INVALID: {
+    ar: 'هذا الكود غير صحيح. تأكد منه وأعد كتابته.',
+    en: 'This code is not valid. Check it and type it again.',
+    ckb: 'ئەم کۆدە دروست نییە. دڵنیا بەرەوە و دووبارە بینووسەوە.',
+  },
+  GIFT_CODE_USED: {
+    ar: 'استُخدم هذا الكود من قبل.',
+    en: 'This code has already been used.',
+    ckb: 'ئەم کۆدە پێشتر بەکارهاتووە.',
+  },
+  GIFT_CODE_NONE: {
+    ar: 'لا كود لهذه المراجعة.',
+    en: 'This review holds no code.',
+    ckb: 'ئەم هەڵسەنگاندنە هیچ کۆدێکی نییە.',
+  },
+  GIFT_LEVEL_EMPTY: {
+    ar: 'كل المستويات التي تفتحها هذه الدرجة فارغة. أضف هدية إلى أحدها أو فعّله أولًا.',
+    en: 'Every gift level this score opens is empty. Add a gift to one of them, or switch it on, first.',
+    ckb: 'هەموو ئەو ئاستانەی ئەم نمرەیە دەیانکاتەوە بەتاڵن. سەرەتا دیارییەک بۆ یەکێکیان زیاد بکە یان چالاکی بکە.',
+  },
   GIFT_NOT_FOUND: {
     ar: 'لم نجد هذه الهدية في حسابك.',
     en: 'We could not find this gift on your account.',

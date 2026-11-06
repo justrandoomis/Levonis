@@ -25,6 +25,8 @@ import { asD1, freshDb } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
 import { ensurePolicyCorpus, resetPolicyCorpusMemo } from '../worker/lib/policySync';
 import { stageLabel } from '../worker/lib/orderStages';
+import { evaluateReviewQuality } from '../worker/lib/reviewQuality';
+import { GIFT_SCORE_PARTS } from '../packages/contracts/src/giftScore';
 
 /**
  * THE CORPUS ITSELF — successor to tests/policyDrafts.test.ts.
@@ -1063,4 +1065,89 @@ test('the estimated-price articles name no cost, supplier price, freight, rate, 
       assert.doesNotMatch(unreferenced, /[0-9٠-٩۰-۹]/, `${where}/${lang} states a figure`);
     }
   }
+});
+
+// ---------------------------------------------------------------------------
+// THE REVIEW ROAD — rewards 8, faq 8 (owner, 2026-11-05; DECISIONS row 301)
+// ---------------------------------------------------------------------------
+
+/**
+ * A POLICY SAYS WHAT THE CODE DOES. The archive keeps each version byte for byte, so
+ * once published a sentence the code does not follow cannot be quietly corrected, and
+ * it is the sentence a customer quotes. Each article below once said more than the
+ * code does; these hold the words to the behaviour beside them.
+ */
+test('rewards 8.13: the story is optional and adds the 8 of the score; nothing asks for it, and the score agrees', () => {
+  const rewards = published('rewards');
+  const SAYS: Readonly<Record<(typeof POLICY_LANGS)[number], { optional: RegExp; adds: RegExp; asks: RegExp }>> = {
+    ar: { optional: /وهي اختيارية/, adds: /ثماني درجات كما في المادة 8\.8/, asks: /يُطلب/ },
+    en: { optional: /The story is optional/, adds: /adds eight to the score, as article 8\.8 states/, asks: /\basks\b/ },
+    ckb: { optional: /ئارەزوومەندانەیە/, adds: /هەشت نمرە .* ماددەی 8\.8/, asks: /داوا لە خاوەنەکەی/ },
+  };
+  for (const lang of POLICY_LANGS) {
+    const article = articleOf(rewards.body[lang], '8.13');
+    assert.match(article, SAYS[lang].optional, `rewards 8.13/${lang}`);
+    assert.match(article, SAYS[lang].adds, `rewards 8.13/${lang}`);
+    assert.doesNotMatch(article, SAYS[lang].asks, `rewards 8.13/${lang}: a condition the code does not hold`);
+    assert.ok(article.includes('@levonis_iq'), `rewards 8.13/${lang}: the handle`);
+  }
+  const review = { stars: 3, body: 'Good', media: [], isPrinter: true };
+  const without = evaluateReviewQuality({ ...review, hasEvidence: false });
+  const withStory = evaluateReviewQuality({ ...review, hasEvidence: true });
+  assert.equal(withStory.score - without.score, GIFT_SCORE_PARTS.story, 'the article’s eight');
+  assert.equal(GIFT_SCORE_PARTS.story, 8);
+  assert.equal(without.rewardEligible, true, 'no story: still in the queue');
+});
+
+test('rewards 7.5 names the gift line, and rewards 5.5 keeps a view already running when an ad ends', () => {
+  const rewards = published('rewards');
+  const GIFT: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
+    ar: /منتج وصل إلى الزبون هدية: تُنشر مراجعته، ولا تُمنح نقاطاً، ولا تدخل قائمة الهدية/,
+    en: /a product that reached the customer as a gift: its review is published, earns no points and does not enter the gift queue/,
+    ckb: /بەرهەمێک کە وەک دیاری بە کڕیار گەیشتووە لەمە بەدەرە: پێداچوونەوەکەی بڵاو دەکرێتەوە، خاڵی پێ نابەخشرێت، و ناچێتە ناو ڕیزی دیاری/,
+  };
+  const RUNNING: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
+    ar: /المشاهدة التي بدأت قبل ذلك فتُحتسب إذا انقضت مدتها في اليوم المعتمد نفسه/,
+    en: /a view begun before that still counts if its time runs out on the same recorded day/,
+    ckb: /بینینێک کە پێش ئەوە دەستی پێکردبێت دەژمێردرێت ئەگەر ماوەکەی لە هەمان ڕۆژی تۆمارکراودا تێپەڕێت/,
+  };
+  for (const lang of POLICY_LANGS) {
+    assert.match(articleOf(rewards.body[lang], '7.5'), GIFT[lang], `rewards 7.5/${lang}`);
+    assert.match(articleOf(rewards.body[lang], '5.5'), RUNNING[lang], `rewards 5.5/${lang}`);
+  }
+  // Without the second half, 5.5 reads as if an ad ending took a running view away.
+  assert.doesNotMatch(articleOf(rewards.body.en, '5.5'), /or its period has ended, no further view/);
+  assert.doesNotMatch(articleOf(rewards.body.ar, '5.5'), /أو انتهت فترته لم تُحتسب/);
+});
+
+test('faq 12.11 says which review takes which path, and routes to rewards 7.5, 8.2 and 8.3', () => {
+  const faq = published('faq');
+  const rewards = published('rewards');
+  const REFERENCE: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
+    ar: /المرجع: وثيقة النقاط والمراجعات، المواد 7\.5 و8\.2 و8\.3\.$/m,
+    en: /Reference: the Points and Reviews document, articles 7\.5, 8\.2 and 8\.3\.$/m,
+    ckb: /سەرچاوە: بەڵگەنامەی خاڵ و پێداچوونەوە، ماددەکانی 7\.5 و 8\.2 و 8\.3\.$/m,
+  };
+  // What version 7 said: a review enters the decision only at a measured quality score.
+  const STALE: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
+    ar: /درجة جودة مقيسة/,
+    en: /measured quality score/,
+    ckb: /پلەیەکی جۆرایەتی پێوراو/,
+  };
+  const ANY_SCORE: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
+    ar: /أياً كانت درجتها/,
+    en: /at any score/,
+    ckb: /بە هەر نمرەیەک بێت/,
+  };
+  for (const lang of POLICY_LANGS) {
+    const entry = articleOf(faq.body[lang], '12.11');
+    assert.match(entry, REFERENCE[lang], `faq 12.11/${lang}: the reference`);
+    assert.doesNotMatch(entry, STALE[lang], `faq 12.11/${lang}: the old gate`);
+    assert.match(entry, ANY_SCORE[lang], `faq 12.11/${lang}`);
+    for (const num of ['7.5', '8.2', '8.3']) articleOf(rewards.body[lang], num);
+  }
+  // The code's half of it: the smallest sound printer review enters.
+  const smallest = evaluateReviewQuality({ stars: 1, body: 'Good', media: [], hasEvidence: false, isPrinter: true });
+  assert.equal(smallest.score, 5);
+  assert.equal(smallest.rewardEligible, true);
 });

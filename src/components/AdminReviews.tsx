@@ -13,13 +13,17 @@ import {
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
 import VariantImg from './ui/VariantImg';
+import { CodePanel, ScoreField, canApproveScore, draftScore, initialDraft, type LevelOffer } from './adminReviews/ReviewGiftDecision';
+import { reviewGiftText } from './adminReviews/reviewGiftStrings';
 
 /**
  * Admin: review/reward queue with eligibility facts and evidence viewing and
  * rubric quality scoring (independent from stars/sentiment). Approving a
- * printer-gift reward grants a LEVEL gift of the quality score (0175); the
- * gift levels and the granted gifts are managed in src/components/adminGifts.
- * Public moderation and reward approval are SEPARATE decisions.
+ * printer-gift reward confirms its 1..100 score and issues a CODE the admin hands
+ * to the customer; the gift is born when the customer writes it (DECISIONS row
+ * 301). The gift levels and the granted gifts are managed in
+ * src/components/adminGifts. Public moderation and reward approval are SEPARATE
+ * decisions.
  */
 
 const STRINGS = {
@@ -52,11 +56,8 @@ const STRINGS = {
     requestChanges: 'طلب تعديل',
     reasonPrompt: 'السبب (يُعرض للعميل):',
     rewardPanel: 'قرار المكافأة',
-    scoreLabel: 'درجة الجودة (1-5) — مستقلة عن النجوم والمشاعر؛ مراجعة نقدية بنجمة واحدة يمكن أن تنال 5',
     rubricLabel: 'سبب التقييم وفق المعايير (إلزامي)',
     rubricPlaceholder: 'فائدة الكتابة، الوضوح، ملاءمة الصور/الفيديو، الاكتمال...',
-    approveGift: 'اعتماد ومنح الهدية',
-    levelOff: (n: number) => `المستوى ${n} من الهدايا موقوف — اختر درجة جودة أخرى، أو فعّل المستوى من «مخزون الهدايا» أولاً.`,
     approvePoints: (n: number) => `اعتماد ومنح ${n.toLocaleString()} نقطة`,
     pointsUnconfigured: 'قيمة نقاط المراجعة غير مُعدّة (reviewPointsConfig) — لا يمكن اعتماد مكافأة نقاط حتى إعدادها. لا أرقام مُختلقة.',
     rejectReward: 'رفض المكافأة',
@@ -123,11 +124,8 @@ const STRINGS = {
     requestChanges: 'Request changes',
     reasonPrompt: 'Reason (shown to the customer):',
     rewardPanel: 'Reward decision',
-    scoreLabel: 'Quality score (1-5) — independent of stars/sentiment; a critical 1-star review can score 5',
     rubricLabel: 'Rubric reason (required)',
     rubricPlaceholder: 'Useful writing, clarity, relevant images/video, completeness...',
-    approveGift: 'Approve & grant gift',
-    levelOff: (n: number) => `Gift level ${n} is switched off — choose another quality score, or switch the level on in “Gift pools” first.`,
     approvePoints: (n: number) => `Approve & award ${n.toLocaleString()} points`,
     pointsUnconfigured: 'Review-points value is NOT configured (reviewPointsConfig) — points rewards cannot be approved until it is set. No invented numbers.',
     rejectReward: 'Reject reward',
@@ -192,11 +190,8 @@ const STRINGS = {
     requestChanges: 'داواکردنی گۆڕانکاری',
     reasonPrompt: 'هۆکار (بۆ کڕیار پیشان دەدرێت):',
     rewardPanel: 'بڕیاری خەڵات',
-    scoreLabel: 'نمرەی کوالیتی (1-5) — سەربەخۆیە لە ئەستێرەکان؛ پێداچوونەوەی ڕەخنەگرانەی یەک ئەستێرە دەتوانێت 5 وەربگرێت',
     rubricLabel: 'هۆکاری نمرەدان بەپێی پێوەرەکان (پێویستە)',
     rubricPlaceholder: 'سوودی نووسین، ڕوونی، گونجانی وێنە/ڤیدیۆ، تەواوی...',
-    approveGift: 'پەسەندکردن و بەخشینی دیاری',
-    levelOff: (n: number) => `ئاستی ${n}ی دیارییەکان ڕاگیراوە — نمرەیەکی تری کوالیتی هەڵبژێرە، یان سەرەتا ئاستەکە لە «کۆگای دیارییەکان» چالاک بکە.`,
     approvePoints: (n: number) => `پەسەندکردن و بەخشینی ${n.toLocaleString()} خاڵ`,
     pointsUnconfigured: 'بەهای خاڵی پێداچوونەوە ڕێکنەخراوە (reviewPointsConfig) — ناتوانرێت خەڵاتی خاڵ پەسەند بکرێت هەتا ڕێکدەخرێت.',
     rejectReward: 'ڕەتکردنەوەی خەڵات',
@@ -238,8 +233,8 @@ interface QueueRow {
   review_id: string;
   reward_id: string;
   created_at: string;
-  customer: { email: string; username: string | null };
-  product: { id: string | null; name: string | null; name_ar: string | null };
+  customer: { email: string; username: string | null; name?: string; lang?: string };
+  product: { id: string | null; name: string | null; name_ar: string | null; name_ckb?: string | null };
   order_id: string | null;
   stars: number;
   body: string;
@@ -261,6 +256,12 @@ interface QueueRow {
     suspiciousSignals: string[];
     rewardEligible: boolean;
   } | null;
+  /** The confirmed score and the code (DECISIONS row 301); null on a reward approved before them. */
+  final_score: number | null;
+  levels: number[];
+  code: string | null;
+  code_issued_at: string | null;
+  code_redeemed_at: string | null;
   reason: string;
   points_awarded: number;
   entitlement_id: string | null;
@@ -292,7 +293,8 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
   const [queueLoading, setQueueLoading] = useState(false);
   const [queueError, setQueueError] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [scoreDraft, setScoreDraft] = useState<Record<string, number>>({});
+  const [scoreDraft, setScoreDraft] = useState<Record<string, string>>({});
+  const [giftLevels, setGiftLevels] = useState<LevelOffer[]>([]);
   const [rubricDraft, setRubricDraft] = useState<Record<string, string>>({});
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
@@ -301,11 +303,12 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
     setQueueLoading(true);
     setQueueError('');
     try {
-      const res = await api.get<{ queue: QueueRow[]; review_points_configured: number | null }>(
+      const res = await api.get<{ queue: QueueRow[]; review_points_configured: number | null; gift_levels?: LevelOffer[] }>(
         `/api/reviews/admin/queue?state=${stateFilter}`
       );
       setQueue(res.queue);
       setPointsConfigured(res.review_points_configured);
+      setGiftLevels(res.gift_levels ?? []);
     } catch (e) {
       setQueueError(e instanceof ApiError ? e.message : 'Failed to load queue');
     } finally {
@@ -349,17 +352,23 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
     }
     const payload: Record<string, unknown> = { action, reason };
     if (action === 'approve' && row.kind === 'printer_gift') {
-      payload.qualityScore = scoreDraft[row.review_id] ?? row.quality_score ?? row.quality?.tier;
+      payload.finalScore = draftScore(scoreDraft[row.review_id] ?? initialDraft(row.quality?.score));
     }
     setBusyId(row.review_id);
     setRowError(null);
     try {
-      await api.post(`/api/reviews/admin/${row.review_id}/reward`, payload);
-      await loadQueue();
+      const res = await api.post<{ code?: string }>(`/api/reviews/admin/${row.review_id}/reward`, payload);
+      // The code is what the admin came for: it opens on the approved list, this row first.
+      if (res?.code && stateFilter !== 'approved' && stateFilter !== 'all') {
+        setExpanded(row.review_id);
+        setStateFilter('approved');
+      } else {
+        await loadQueue();
+      }
     } catch (e) {
       const message =
-        e instanceof ApiError && e.code === 'GIFT_LEVEL_INACTIVE'
-          ? S.levelOff(Number(e.details?.level ?? payload.qualityScore))
+        e instanceof ApiError && e.code === 'GIFT_LEVEL_EMPTY'
+          ? reviewGiftText(lang, 'allEmpty')
           : e instanceof ApiError
             ? e.message
             : 'Failed';
@@ -454,7 +463,8 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
           {queue.map((row) => {
             const open = expanded === row.review_id;
             const undecided = row.reward_state === 'submitted' || row.reward_state === 'revision_needed';
-            const selectedTier = scoreDraft[row.review_id] ?? row.quality_score ?? row.quality?.tier ?? undefined;
+            const draft = scoreDraft[row.review_id] ?? initialDraft(row.quality?.score);
+            const finalDraft = draftScore(draft);
             return (
               <div key={row.review_id} className="lv-surface overflow-hidden">
                 <button
@@ -522,7 +532,6 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                       <div className="rounded-lg bg-white/[0.035] px-3 py-2.5 text-[11.5px] text-text-secondary">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                           <span>{loc('درجة الجودة', 'Quality score', 'نمرەی کوالیتی')}: <b className="text-text-primary">{row.quality.score}/100</b></span>
-                          <span>{loc('المستوى المتوقع', 'Predicted level', 'ئاستی پێشبینیکراو')}: <b className="text-text-primary">{row.quality.tier ?? '—'}</b></span>
                           <span>{loc('جودة النص', 'Text quality', 'کوالیتی دەق')}: {row.quality.textQuality}/42</span>
                           <span>{loc('الصور الفريدة', 'Unique images', 'وێنە ڕەسەنەکان')}: {row.quality.imageCount}</span>
                           <span>{loc('جودة الفيديو', 'Video quality', 'کوالیتی ڤیدیۆ')}: {row.quality.videoQuality}/18</span>
@@ -599,10 +608,14 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                       {row.reward_state === 'approved' ? (
                         <div className="text-[13px] text-text-secondary space-y-1">
                           {row.kind === 'printer_gift' ? (
-                            <div>
-                              {S.score}: <b>{row.quality_score}/5</b>
-                              {row.entitlement_id && <span className="text-text-muted text-[11px]"> · {row.entitlement_id}</span>}
-                            </div>
+                            row.code ? (
+                              <CodePanel lang={lang} row={row} onChanged={() => void loadQueue()} />
+                            ) : (
+                              <div>
+                                {S.score}: <b>{row.quality_score}/5</b>
+                                {row.entitlement_id && <span className="text-text-muted text-[11px]"> · {row.entitlement_id}</span>}
+                              </div>
+                            )
                           ) : (
                             <div>
                               {S.kinds.points}: <b>{row.points_awarded.toLocaleString()}</b>
@@ -620,25 +633,14 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                       {undecided && (
                         <>
                           {row.kind === 'printer_gift' && (
-                            <div className="space-y-2">
-                              <label className="block text-[11px] text-text-muted">{S.scoreLabel}</label>
-                              <div className="flex gap-1.5">
-                                {[1, 2, 3, 4, 5].map((n) => (
-                                  <button
-                                    key={n}
-                                    type="button"
-                                    onClick={() => setScoreDraft((m) => ({ ...m, [row.review_id]: n }))}
-                                    className={`w-9 h-9 rounded-lg border text-sm font-black transition-colors ${
-                                      selectedTier === n
-                                        ? 'border-transparent bg-[var(--clay-well-bg)] text-text-primary shadow-press'
-                                        : 'border-border-subtle bg-surface-raised text-text-secondary shadow-xs hover:text-text-primary'
-                                    }`}
-                                  >
-                                    {n}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
+                            <ScoreField
+                              lang={lang}
+                              value={draft}
+                              onChange={(v) => setScoreDraft((m) => ({ ...m, [row.review_id]: v }))}
+                              quality={row.quality}
+                              offer={giftLevels}
+                              onOpenLevels={onOpenGifts ? () => onOpenGifts('levels') : undefined}
+                            />
                           )}
                           <div>
                             <label className="block text-[11px] text-text-muted mb-1">{S.rubricLabel}</label>
@@ -655,13 +657,15 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                               <button
                                 disabled={
                                   busyId === row.review_id ||
-                                  !selectedTier ||
+                                  finalDraft === null ||
+                                  !canApproveScore(finalDraft, giftLevels) ||
                                   (rubricDraft[row.review_id]?.trim().length ?? 0) < 10
                                 }
                                 onClick={() => decideReward(row, 'approve')}
                                 className="lv-button lv-button-primary lv-button-sm"
+                                data-review-approve
                               >
-                                {busyId === row.review_id ? S.working : S.approveGift}
+                                {busyId === row.review_id ? S.working : reviewGiftText(lang, 'approve')}
                               </button>
                             ) : pointsConfigured !== null ? (
                               <button

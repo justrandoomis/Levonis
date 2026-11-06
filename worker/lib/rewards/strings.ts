@@ -21,6 +21,19 @@ export interface RewardText {
   body: Trilingual;
 }
 
+/**
+ * «اعتُمدت مراجعتك»: the one in-app notice an approved review sends (row 301).
+ * It never carries the code: the team hands that over itself.
+ */
+export const GIFT_CODE_NOTICE: RewardText = {
+  title: { ar: 'اعتُمدت مراجعتك', en: 'Your review was approved', ckb: 'هەڵسەنگاندنەکەت پەسەندکرا' },
+  body: {
+    ar: 'سيصلك كود هديتك من فريق Levonis، أدخله في «قيّم طابعتك».',
+    en: 'Your gift code will reach you from the Levonis team; enter it in «Rate your printer».',
+    ckb: 'کۆدی دیارییەکەت لە تیمی Levonis ـەوە پێت دەگات، لە «چاپکەرەکەت هەڵبسەنگێنە» بینووسە.',
+  },
+};
+
 type CouponTerms = { percent: number; amount: number; min: number; pieces: number; kinds: readonly RewardCouponKind[] };
 
 type Params =

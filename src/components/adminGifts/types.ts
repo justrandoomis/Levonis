@@ -74,6 +74,9 @@ export interface AdminGift {
   mode: 'legacy' | 'level' | 'product';
   reason: GrantReason | 'legacy';
   level: { n: number; name: Tri; description: Tri; active: boolean } | null;
+  /** 'up_to': the customer chose among levels 1..`level` (a review's code, DECISIONS row 301); `chosen_level` says which. */
+  choice_scope?: 'level' | 'up_to';
+  chosen_level?: number | null;
   user: { id: string; name: string; email: string; username: string; phone: string };
   note: string;
   granted_by: { id: string; name: string; email: string } | null;

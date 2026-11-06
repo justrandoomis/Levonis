@@ -168,6 +168,11 @@ export const COPY = {
   'door.rate.gift': ['هديتك بانتظارك في «هداياي»', 'Your gift is waiting in «My gifts»', 'دیارییەکەت لە «دیارییەکانم» چاوەڕێتە'],
   'door.rate.pending': ['مراجعتك بانتظار قرار الهدية', 'Your review awaits the gift decision', 'هەڵسەنگاندنەکەت چاوەڕێی بڕیاری دیارییە'],
   'door.rate.done': ['قيّمت كل طابعاتك', "You've reviewed all your printers", 'هەموو چاپکەرەکانت هەڵسەنگاندووە'],
+  'door.rate.code': [
+    'اعتُمدت مراجعتك — أدخل كود هديتك',
+    'Your review was approved — enter your gift code',
+    'هەڵسەنگاندنەکەت پەسەندکرا — کۆدی دیارییەکەت بنووسە',
+  ],
   'door.rate.how': ['هدية مقابل مراجعة طابعتك', 'A gift for reviewing your printer', 'دیارییەک بۆ هەڵسەنگاندنی چاپکەرەکەت'],
   'door.competitions.won': ['فزت بالمركز {place}!', 'You won {place} place!', 'پلەی {place}ت بردەوە!'],
   'door.competitions.judging': ['مشاركتك بانتظار النتيجة', 'Your entry awaits the result', 'بەشدارییەکەت چاوەڕێی ئەنجامە'],
@@ -355,9 +360,9 @@ export const COPY = {
   'rate.chooseGift': ['اختر هديتك', 'Choose your gift', 'دیارییەکەت هەڵبژێرە'],
   'rate.delivered': ['وصلت في {date}', 'Delivered on {date}', 'لە {date} گەیشت'],
   'rate.pendingNote': [
-    'يقرّر فريق Levonis مستوى هديتك بعد قراءة مراجعتك.',
-    'The Levonis team decides your gift level after reading your review.',
-    'تیمی Levonis دوای خوێندنەوەی هەڵسەنگاندنەکەت ئاستی دیارییەکەت دیاری دەکات.',
+    'يقرأ فريق Levonis مراجعتك ويعتمد درجتها، ثم يعطيك كود هديتك.',
+    'The Levonis team reads your review and confirms its score, then gives you your gift code.',
+    'تیمی Levonis هەڵسەنگاندنەکەت دەخوێنێتەوە و نمرەکەی پەسەند دەکات، پاشان کۆدی دیارییەکەت پێدەدات.',
   ],
   'rate.noPage': ['صفحة هذه الطابعة غير متاحة الآن.', "This printer's page isn't available right now.", 'پەڕەی ئەم چاپکەرە ئێستا بەردەست نییە.'],
   'rate.capped': ['تُعرض أحدث {n} طابعة استلمتها', 'Showing the latest {n} printers you received', 'نوێترین {n} چاپکەری وەرگیراوت پیشان دەدرێن'],
@@ -368,14 +373,14 @@ export const COPY = {
     'دوای گەیشتنی چاپکەرەکەت، هەڵسەنگاندنەکەت لە پەڕەکەیدا بنووسە — هەر نمرەیەک لە یەک ئەستێرە تا پێنج.',
   ],
   'rate.step2': [
-    'أضف صورًا واضحة (والمستويات العليا تحتاج فيديو)، وانشر ستوري على إنستغرام تشارك فيه تجربتك مع منشن \u2066@levonis_iq\u2069، ثم أرفق رابطه أو لقطة شاشة منه في خانة «دليل ستوري إنستغرام (خاص)» في نموذج المراجعة — لا يراه غير المتجر.',
-    'Add clear photos (the higher levels need a video), post an Instagram story about your experience mentioning @levonis_iq, then attach its link or a screenshot in the «Instagram story evidence (private)» field of the review form — only the shop sees it.',
-    'وێنەی ڕوون زیاد بکە (ئاستە بەرزەکان ڤیدیۆیان دەوێت)، ستۆرییەک لە ئینستاگرام دەربارەی ئەزموونەکەت دابنێ و \u2066@levonis_iq\u2069 منشن بکە، پاشان بەستەرەکەی یان وێنەیەکی شاشەی لە خانەی «بەڵگەی ستۆری ئینستاگرام (تایبەت)» لە فۆرمی هەڵسەنگاندنەکەدا هاوپێچ بکە — تەنها فرۆشگا دەیبینێت.',
+    'أضف صورًا واضحة. والفيديو وستوري إنستغرام يرفعان درجتك: انشر ستوري تشارك فيه تجربتك مع منشن \u2066@levonis_iq\u2069، ثم أرفق رابطه أو لقطة شاشة منه في خانة «دليل ستوري إنستغرام (خاص)» في نموذج المراجعة — لا يراه غير المتجر.',
+    'Add clear photos. A video and an Instagram story raise your score: post a story about your experience mentioning @levonis_iq, then attach its link or a screenshot in the «Instagram story evidence (private)» field of the review form — only the shop sees it.',
+    'وێنەی ڕوون زیاد بکە. ڤیدیۆ و ستۆری ئینستاگرام نمرەکەت بەرز دەکەنەوە: ستۆرییەک دەربارەی ئەزموونەکەت دابنێ و \u2066@levonis_iq\u2069 منشن بکە، پاشان بەستەرەکەی یان وێنەیەکی شاشەی لە خانەی «بەڵگەی ستۆری ئینستاگرام (تایبەت)» لە فۆرمی هەڵسەنگاندنەکەدا هاوپێچ بکە — تەنها فرۆشگا دەیبینێت.',
   ],
   'rate.step3': [
-    'يقيّم المتجر مراجعتك من 1 إلى 5 حسب فائدتها لا حسب عدد النجوم، فتختار هديتك من مستواك أو أقل.',
-    'The shop grades your review from 1 to 5 by how helpful it is — never by the stars — and you choose a gift from your level or below.',
-    'فرۆشگا هەڵسەنگاندنەکەت لە ١ تا ٥ دەنرخێنێت بەپێی سوودەکەی، نەک ژمارەی ئەستێرەکان، و دیارییەکەت لە ئاستی خۆت یان خوارتر هەڵدەبژێریت.',
+    'يقيّم النظام مراجعتك من {from} إلى {to} حسب فائدتها لا حسب عدد النجوم، ويعتمدها فريق Levonis ويعطيك كودًا. كل {every} درجة تفتح مستوى: تكتب الكود، وتختار هدية واحدة من مستوياتك، وتدفع أجرة التوصيل فقط.',
+    'The system scores your review from {from} to {to} by how helpful it is — never by the stars. The Levonis team approves it and gives you a code. Every {every} points opens a level: write the code, choose one gift from your levels, and pay for delivery only.',
+    'سیستەمەکە هەڵسەنگاندنەکەت لە {from} تا {to} دەنرخێنێت بەپێی سوودەکەی، نەک ژمارەی ئەستێرەکان. تیمی Levonis پەسەندی دەکات و کۆدێکت پێدەدات. هەر {every} نمرە ئاستێک دەکاتەوە: کۆدەکە بنووسە، یەک دیاری لە ئاستەکانت هەڵبژێرە، و تەنها کرێی گەیاندن بدە.',
   ],
   'rate.copyHandle': ['نسخ اسم الحساب', 'Copy the account name', 'ناوی هەژمارەکە کۆپی بکە'],
   'rate.handleCopied': ['نُسخ اسم الحساب', 'Account name copied', 'ناوی هەژمارەکە کۆپی کرا'],
@@ -389,15 +394,10 @@ export const COPY = {
   ],
   'rate.levels': ['مستويات الهدايا', 'Gift levels', 'ئاستەکانی دیاری'],
   'rate.level': ['المستوى {n}', 'Level {n}', 'ئاستی {n}'],
-  'rate.level1': ['ملحق', 'An accessory', 'پاشکۆیەک'],
-  'rate.level2': ['بكرة فلامنت', 'A filament spool', 'بکرەیەک فیلامێنت'],
-  'rate.level3': ['فلامنت وملحق', 'Filament and an accessory', 'فیلامێنت و پاشکۆیەک'],
-  'rate.level4': ['رأس طباعة (نوزل)', 'A print nozzle', 'نۆزڵێکی چاپ'],
-  'rate.level5': ['رأس طباعة ومنصة طباعة', 'A print nozzle and a build plate', 'نۆزڵێکی چاپ و تەختەیەکی چاپ'],
   'rate.noLevel': [ // † pointsObj
-    'مراجعة صالحة لا تبلغ مستوى هدية تمنحك {points} على الأقل.',
-    'A valid review below the gift levels earns at least {points}.',
-    'هەڵسەنگاندنێکی دروست کە نەگاتە ئاستی دیاری لانیکەم {points}ت پێدەدات.',
+    'ومراجعة أي منتج آخر تمنحك {points} على الأقل.',
+    'A review of any other product earns at least {points}.',
+    'هەڵسەنگاندنی هەر بەرهەمێکی تر لانیکەم {points}ت پێدەدات.',
   ],
   'rate.decision': [
     'الهدية قرار يتخذه فريق Levonis لكل مراجعة على حدة، وهي عينية لا تُبدَّل بمال.',
@@ -669,7 +669,107 @@ export const COPY = {
   ],
   'err.notOpen': ['المسابقة ليست مفتوحة الآن.', 'The competition is not open now.', 'پێشبڕکێکە ئێستا کراوە نییە.'],
   'err.generic': ['تعذّر إرسال المشاركة.', 'The entry could not be sent.', 'بەشدارییەکە نەنێردرا.'],
+
+  // ------------------------------------------------------------ the gift code and the analysis (DECISIONS row 301)
+  'code.ask': ['عندك كود هدية؟', 'Have a gift code?', 'کۆدی دیاریت هەیە؟'],
+  'code.label': ['كود الهدية', 'Gift code', 'کۆدی دیاری'],
+  'code.confirm': ['تأكيد', 'Confirm', 'پشتڕاستی بکەرەوە'],
+  'code.checking': ['جارٍ التحقق…', 'Checking…', 'دەپشکنرێت…'],
+  'code.empty': ['اكتب الكود أولًا.', 'Type the code first.', 'سەرەتا کۆدەکە بنووسە.'],
+  'code.err.invalid': [
+    'هذا الكود غير صحيح. تأكد منه وأعد كتابته.',
+    'This code is not valid. Check it and type it again.',
+    'ئەم کۆدە دروست نییە. دڵنیا بەرەوە و دووبارە بینووسەوە.',
+  ],
+  // Said once the gift was delivered or the team cancelled it, so it promises no waiting gift.
+  'code.err.used': [
+    'استُخدم هذا الكود من قبل. تجد حالة هديتك في «هداياي».',
+    "This code has already been used. You can see your gift's status in «My gifts».",
+    'ئەم کۆدە پێشتر بەکارهاتووە. دۆخی دیارییەکەت لە «دیارییەکانم» دەبینیت.',
+  ],
+  'code.err.generic': ['تعذّر التحقق من الكود. أعد المحاولة.', "The code couldn't be checked. Try again.", 'کۆدەکە نەپشکنرا. دووبارە هەوڵ بدەرەوە.'],
+  'rate.codeReady': ['اعتُمدت — أدخل الكود', 'Approved — enter your code', 'پەسەندکرا — کۆدەکە بنووسە'],
+  'rate.codeReady.note': [
+    'اعتُمدت مراجعتك. سيصلك كود هديتك من فريق Levonis، أدخله هنا.',
+    'Your review was approved. Your gift code will reach you from the Levonis team; enter it here.',
+    'هەڵسەنگاندنەکەت پەسەندکرا. کۆدی دیارییەکەت لە تیمی Levonis ـەوە پێت دەگات، لێرە بینووسە.',
+  ],
+  'rate.upTo': ['هديتك جاهزة — حتى المستوى {level}', 'Your gift is ready — up to level {level}', 'دیارییەکەت ئامادەیە — تا ئاستی {level}'],
+  'rate.score': ['درجتك {score} من {max}', 'You scored {score} of {max}', '{score} لە {max} نمرەت هێنا'],
+  'rate.inCart': ['هديتك في سلتك', 'Your gift is in your cart', 'دیارییەکەت لە سەبەتەکەتدایە'],
+  'rate.giftOrdered': ['طلبت هديتك', 'You ordered your gift', 'دیارییەکەت داوا کرد'],
+  'rate.watch': ['شاهد التحليل', 'Watch the analysis', 'شیکردنەوەکە ببینە'],
+  'rate.openFailed': ['تعذّر فتح هديتك. تجدها في «هداياي».', "Your gift couldn't be opened. It is in «My gifts».", 'دیارییەکەت نەکرایەوە. لە «دیارییەکانم»دایە.'],
+  'now.giftCode': ['كود هديتك', 'Your gift code', 'کۆدی دیارییەکەت'],
+  'now.giftCode.body': [
+    'اعتُمدت مراجعتك. حين يصلك الكود من فريق Levonis أدخله في «قيّم طابعتك».',
+    'Your review was approved. When the code reaches you from the Levonis team, enter it in «Rate your printer».',
+    'هەڵسەنگاندنەکەت پەسەندکرا. کاتێک کۆدەکە لە تیمی Levonis ـەوە پێت دەگات، لە «چاپکەرەکەت هەڵبسەنگێنە» بینووسە.',
+  ],
+  'now.giftCode.cta': ['أدخل الكود', 'Enter the code', 'کۆدەکە بنووسە'],
+  'now.giftUpTo.body': [
+    'فتحت مراجعتك المستويات حتى {level}. اختر هدية واحدة منها.',
+    'Your review opened the levels up to {level}. Choose one gift from them.',
+    'هەڵسەنگاندنەکەت ئاستەکانی تا {level} کردەوە. یەک دیاری لێیان هەڵبژێرە.',
+  ],
+  'reveal.title': ['تحليل مراجعتك', 'Your review analysis', 'شیکردنەوەی هەڵسەنگاندنەکەت'],
+  'reveal.skip': ['تخطَّ', 'Skip', 'تێپەڕێنە'],
+  'reveal.download': ['نُنزّل مراجعتك', 'Downloading your review', 'هەڵسەنگاندنەکەت دادەبەزێنین'],
+  'reveal.analysing': ['نحلّل مراجعتك', 'Analysing your review', 'هەڵسەنگاندنەکەت شی دەکەینەوە'],
+  'reveal.text': ['النص: {chars} · {words}', 'Text: {chars} · {words}', 'دەق: {chars} · {words}'],
+  'reveal.images': ['الصور: {images}', 'Photos: {images}', 'وێنەکان: {images}'],
+  'reveal.video.yes': ['الفيديو: فيديو واحد', 'Video: one video', 'ڤیدیۆ: یەک ڤیدیۆ'],
+  'reveal.video.no': ['الفيديو: بلا فيديو', 'Video: none', 'ڤیدیۆ: بێ ڤیدیۆ'],
+  'reveal.story.yes': ['ستوري إنستغرام: وصلنا', 'Instagram story: received', 'ستۆری ئینستاگرام: گەیشت'],
+  'reveal.story.no': ['ستوري إنستغرام: لم يصل', 'Instagram story: not received', 'ستۆری ئینستاگرام: نەگەیشت'],
+  'reveal.stars': ['التقييم بالنجوم: {stars}★', 'Star rating: {stars}★', 'هەڵسەنگاندن بە ئەستێرە: {stars}★'],
+  'reveal.adjust': ['تعديل الجودة', 'Quality adjustment', 'ڕێکخستنی کوالیتی'],
+  'reveal.total': ['درجة مراجعتك', 'Your review score', 'نمرەی هەڵسەنگاندنەکەت'],
+  'reveal.of100': ['من {max}', 'of {max}', 'لە {max}'],
+  'reveal.opensAt': ['يفتح عند {n}', 'Opens at {n}', 'لە {n} دەکرێتەوە'],
+  'reveal.opened.one': ['فتحت المستوى {list}', 'You opened level {list}', 'ئاستی {list}ت کردەوە'],
+  'reveal.opened.many': ['فتحت المستويات {list}', 'You opened levels {list}', 'ئاستەکانی {list}ت کردەوە'],
+  'reveal.pick': ['اختر هدية واحدة', 'Choose one gift', 'یەک دیاری هەڵبژێرە'],
+  'reveal.noGifts': [
+    'لا هدايا متاحة في مستوياتك الآن. هديتك تنتظرك في «هداياي»، وتظهر حين تتوفر.',
+    'No gifts are available on your levels right now. Your gift waits in «My gifts» and appears when they are.',
+    'ئێستا هیچ دیارییەک لە ئاستەکانتدا بەردەست نییە. دیارییەکەت لە «دیارییەکانم» چاوەڕێتە و کاتێک هەبوو دەردەکەوێت.',
+  ],
+  'reveal.deliveryOnly': ['تدفع أجرة التوصيل فقط', 'You pay for delivery only', 'تەنها کرێی گەیاندن دەدەیت'],
+  'reveal.confirm.title': ['هديتك النهائية؟', 'Your final gift?', 'دیارییە کۆتاییەکەت؟'],
+  'reveal.confirm.body': [
+    '{item}. لا يمكن تغييرها بعد التأكيد، وتدفع أجرة التوصيل فقط.',
+    "{item}. It can't be changed after you confirm, and you pay for delivery only.",
+    '{item}. دوای پشتڕاستکردنەوە ناگۆڕدرێت، و تەنها کرێی گەیاندن دەدەیت.',
+  ],
+  'reveal.confirm.go': ['تأكيد الهدية', 'Confirm the gift', 'دیارییەکە پشتڕاست بکەرەوە'],
+  'reveal.addToCart': ['أضف إلى السلة', 'Add to cart', 'زیادی بکە بۆ سەبەتە'],
+  'reveal.chosen': ['هديتك', 'Your gift', 'دیارییەکەت'],
+  'reveal.done.body': [
+    'أكمل طلبك من السلة: الهدية بسعر {zero} وتدفع أجرة التوصيل فقط.',
+    'Complete your order from the cart: the gift costs {zero} and you pay for delivery only.',
+    'داواکارییەکەت لە سەبەتەکەوە تەواو بکە: دیارییەکە بە {zero}ە و تەنها کرێی گەیاندن دەدەیت.',
+  ],
+  'reveal.checkout': ['إتمام الطلب', 'Complete the order', 'داواکارییەکە تەواو بکە'],
+  'reveal.ordered': ['طلبت هذه الهدية. تابعها من صفحة الطلب.', 'You ordered this gift. Follow it from the order page.', 'ئەم دیارییەت داوا کرد. لە پەڕەی داواکارییەکەوە بەدوایدا بچۆ.'],
+  'reveal.fulfilled': ['وصلتك هذه الهدية. نتمنى أن تعجبك!', 'This gift reached you. We hope you like it!', 'ئەم دیارییە پێت گەیشت. هیوادارین بەدڵت بێت!'],
+  'reveal.cancelled': ['أُلغيت هذه الهدية. تواصل مع الدعم إن كان لديك سؤال.', 'This gift was cancelled. Contact support if you have a question.', 'ئەم دیارییە هەڵوەشێنرایەوە. ئەگەر پرسیارت هەیە پەیوەندی بە پشتگیرییەوە بکە.'],
+  'reveal.err.generic': [
+    'تعذّرت هذه الخطوة. هديتك محفوظة، أعد المحاولة.',
+    "That step didn't go through. Your gift is safe; try again.",
+    'ئەم هەنگاوە تەواو نەبوو. دیارییەکەت پارێزراوە، دووبارە هەوڵ بدەرەوە.',
+  ],
+  'reveal.sr.result': ['درجتك {score} من {max}. {opened}.', 'You scored {score} of {max}. {opened}.', '{score} لە {max} نمرەت هێنا. {opened}.'],
 } as const satisfies Record<string, CopyRow>;
+
+/**
+ * THE SCORE'S SCALE, for the sentences that name it (packages/contracts GIFT_SCORE_MIN,
+ * MAX and STEP; tests/giftRevealScript.test.ts holds them equal). Marks and not digits
+ * in the strings: on a phone set to an Arabic locale «٢٦» must not sit beside «من 100».
+ * The screen passes each through `formatFigure`, like the figure beside it. Written
+ * here and not imported, so the customer's rewards chunk shares no module with the admin's.
+ */
+export const SCORE_SCALE = { from: 1, to: 100, every: 20 } as const;
 
 export type CopyKey = keyof typeof COPY;
 export type CopyVars = Record<string, string | number>;
@@ -859,6 +959,21 @@ export const COUNTED = {
     },
     en: { zero: 'Nothing else', one: 'The coupon covers 1 more', other: 'The coupon covers {n} more' },
     ckb: { zero: 'هیچی تر نییە', other: 'کۆپۆنەکە {n}ی تریش دەگرێتەوە' },
+  },
+  chars: {
+    ar: { zero: 'بلا حروف', one: 'حرف واحد', two: 'حرفان', few: '{n} أحرف', many: '{n} حرفًا', hundred: '{n} حرف' },
+    en: { zero: 'no characters', one: '1 character', other: '{n} characters' },
+    ckb: { zero: 'هیچ پیتێک', other: '{n} پیت' },
+  },
+  words: {
+    ar: { zero: 'بلا كلمات', one: 'كلمة واحدة', two: 'كلمتان', few: '{n} كلمات', many: '{n} كلمة', hundred: '{n} كلمة' },
+    en: { zero: 'no words', one: '1 word', other: '{n} words' },
+    ckb: { zero: 'هیچ وشەیەک', other: '{n} وشە' },
+  },
+  images: {
+    ar: { zero: 'بلا صور', one: 'صورة واحدة', two: 'صورتان', few: '{n} صور', many: '{n} صورة', hundred: '{n} صورة' },
+    en: { zero: 'none', one: '1 photo', other: '{n} photos' },
+    ckb: { zero: 'بێ وێنە', other: '{n} وێنە' },
   },
   moreWinners: {
     ar: {

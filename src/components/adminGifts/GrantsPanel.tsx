@@ -150,7 +150,13 @@ export default function GrantsPanel({
                     <p className="mt-0.5 text-[12px] leading-relaxed text-[var(--ap-text-3)]">
                       {/* Each part is isolated, so an English product name never drags the date's digits across the dot. */}
                       {[
-                        g.level ? triOf(lang, g.level.name) || adminText(lang, 'levelN', { n: g.level.n }) : '',
+                        g.level
+                          ? g.choice_scope === 'up_to' && g.chosen_level
+                            ? adminText(lang, 'chosenFromLevel', { n: g.chosen_level })
+                            : g.choice_scope === 'up_to'
+                              ? adminText(lang, 'upToLevelN', { n: g.level.n })
+                              : triOf(lang, g.level.name) || adminText(lang, 'levelN', { n: g.level.n })
+                          : '',
                         t(reasonKey(g.reason)),
                         product,
                         formatDate(g.granted_at, lang),

@@ -424,20 +424,28 @@ async function main() {
   const noBuy = await buyerB.post('/api/reviews', { productId: prodPrinter.id, orderId: devOrder, stars: 5, body: reviewBody, photoKeys: [], instagram: {} });
   check('non-buyer cannot review with someone else\'s order id', noBuy.status === 404, `status=${noBuy.status}`);
 
-  r = await admin.post(`/api/reviews/admin/${reviewId}/reward`, { action: 'approve', qualityScore: 3, reason: 'Detailed critical writing, photos, video and Instagram evidence all present — quality is not sentiment.' });
-  check('admin approves quality score 3 on the 1-star review (score ≠ stars)', r.status === 200 && r.data?.quality_score === 3 && !!r.data?.entitlement_id, JSON.stringify(r.data).slice(0, 160));
-  const entId = r.data?.entitlement_id;
-  const reApprove = await admin.post(`/api/reviews/admin/${reviewId}/reward`, { action: 'approve', qualityScore: 5, reason: 'Replay must not duplicate the entitlement — testing idempotency.' });
-  check('re-approving the same reward rejected (no duplicate entitlement)', reApprove.status === 409, `status=${reApprove.status}`);
+  // DECISIONS row 301: a score of 1..100, every 20 opens a level. An approval
+  // needs an opened level that holds a gift, so one is placed first.
+  r = await admin.post('/api/gifts/admin/levels/1/items', { productId: prodP999.id, saleType: 'direct_sale', optionValueIds: [], colorId: '', qty: 1 });
+  check('a gift is placed on level 1 (real store product)', r.status === 200 || r.data?.code === 'GIFT_ITEM_DUPLICATE', JSON.stringify(r.data).slice(0, 160));
+  r = await admin.post(`/api/reviews/admin/${reviewId}/reward`, { action: 'approve', finalScore: 45, reason: 'Detailed critical writing, photos, video and Instagram evidence all present — quality is not sentiment.' });
+  check('admin approves 45/100 on the 1-star review (score ≠ stars): a code and no gift yet', r.status === 200 && r.data?.final_score === 45 && /^GFT/.test(r.data?.code ?? '') && r.data?.entitlement_id === null, JSON.stringify(r.data).slice(0, 160));
+  const giftCode = r.data?.code;
+  const reApprove = await admin.post(`/api/reviews/admin/${reviewId}/reward`, { action: 'approve', finalScore: 99, reason: 'Replay must not duplicate the entitlement — testing idempotency.' });
+  check('re-approving the same reward rejected (no second code, no gift)', reApprove.status === 409, `status=${reApprove.status}`);
+  r = await buyerB.post('/api/rewards/program/gift-code', { code: giftCode });
+  check('IDOR: user B cannot write A\'s code (one answer: GIFT_CODE_INVALID)', r.status === 404 && r.data?.code === 'GIFT_CODE_INVALID', `status=${r.status}`);
+  r = await buyerA.post('/api/rewards/program/gift-code', { code: giftCode });
+  check('the owner writes the code: 45 opens levels 1, 2, 3', r.status === 200 && r.data?.score === 45 && JSON.stringify(r.data?.levels) === '[1,2,3]', JSON.stringify(r.data).slice(0, 160));
+  const entId = r.data?.gift?.id;
 
-  // 0175 (docs/GIFTS_QUICK_BUY.md §1.2): an approved printer-review reward is
-  // a LEVEL gift of the new flow — the customer chooses one of the level's
-  // real products, redeems it and orders it through the cart at 0 IQD. The
-  // legacy box (label pool, LEVEL_LOCKED, its private stock) belongs to rows
-  // granted before 0175 only.
+  // 0175 (docs/GIFTS_QUICK_BUY.md §1.2): the code makes a LEVEL gift of the new
+  // flow — the customer chooses one real product of the levels it opened, redeems
+  // it and orders it through the cart at 0 IQD. The legacy box (label pool,
+  // LEVEL_LOCKED, its private stock) belongs to rows granted before 0175 only.
   r = await buyerA.get('/api/gifts');
   const myGift = (r.data?.gifts ?? []).find((g) => g.id === entId);
-  check('the approval granted a level-3 gift of the new flow', r.status === 200 && myGift?.status === 'GRANTED' && myGift?.level?.n === 3 && myGift?.reason === 'review', JSON.stringify(myGift ?? {}).slice(0, 160));
+  check('the code made a gift of the new flow, up to level 3', r.status === 200 && myGift?.status === 'GRANTED' && myGift?.level?.n === 3 && myGift?.choice_scope === 'up_to' && myGift?.reason === 'review', JSON.stringify(myGift ?? {}).slice(0, 160));
   check('the customer card never carries the internal note', !JSON.stringify(r.data ?? {}).includes('Detailed critical writing'), 'admin note leaked');
   r = await buyerA.post(`/api/gifts/${entId}/redeem`, {});
   check('a level gift is chosen before it is redeemed (GIFT_CHOICE_REQUIRED)', r.status === 409 && r.data?.code === 'GIFT_CHOICE_REQUIRED', JSON.stringify(r.data).slice(0, 140));

@@ -14,6 +14,7 @@
  * Customer (signed in):
  *   GET  /                 → { gifts: GiftView[] }
  *   POST /:id/choose       { itemId }  → { gift }        404 GIFT_NOT_FOUND · 409 GIFT_STATE, GIFT_ITEM_UNAVAILABLE
+ *     (a review's gift code, choice_scope 'up_to': any item of a level it opened; row 301)
  *   POST /:id/redeem       {}          → { gift, replay? } 409 GIFT_STATE, GIFT_CHOICE_REQUIRED, GIFT_ITEM_UNAVAILABLE
  * Admin (requireAdmin): see the routes under /admin below.
  */
@@ -42,6 +43,7 @@ import {
   giftViewFrom,
   GRANT_REASONS,
   isLostRace,
+  levelOffersTo,
   levelPoolId,
   loadCustomerGift,
   loadCustomerGifts,
@@ -145,7 +147,9 @@ giftRoutes.post('/:id/choose', async (c) => {
 
   const item = await c.env.DB.prepare('SELECT * FROM gift_pool_items WHERE id = ?').bind(itemId).first<Record<string, unknown>>();
   const sel = item ? selectionFromColumns(item) : null;
-  if (!item || !sel || Number(item.active) !== 1 || Number(item.level) !== Number(g.level)) {
+  const itemLevel = Number(item?.level);
+  const levelActive = !!item && (await loadLevels(c.env.DB)).get(itemLevel)?.view.active === true;
+  if (!item || !sel || Number(item.active) !== 1 || !levelOffersTo(g, itemLevel, levelActive)) {
     throw new HttpError(409, 'This gift is not one of the choices of your level.', 'GIFT_ITEM_UNAVAILABLE', { reason: 'ITEM_NOT_IN_LEVEL' });
   }
   const checked = checkGiftSelection(await loadGiftProduct(c.env, sel.productId), selectionInput(sel), { requireSellable: true });
@@ -157,6 +161,7 @@ giftRoutes.post('/:id/choose', async (c) => {
     user_id: user.id,
     actor: user.id,
     level: Number(g.level),
+    chosen_level: itemLevel,
     item_id: itemId,
     previous_item_id: g.gift_item_id ?? null,
     product_id: s.productId,
@@ -170,12 +175,12 @@ giftRoutes.post('/:id/choose', async (c) => {
     await c.env.DB.batch([
       c.env.DB.prepare(
         `UPDATE gift_entitlements
-            SET state = 'ready_to_redeem', gift_item_id = ?, gift_product_id = ?, gift_option_value_ids = ?, gift_color_id = ?,
+            SET state = 'ready_to_redeem', chosen_level = ?, gift_item_id = ?, gift_product_id = ?, gift_option_value_ids = ?, gift_color_id = ?,
                 gift_qty = ?, gift_sale_type = ?, gift_transport_method = ?, gift_snapshot = ?, chosen_at = ?, updated_at = ?,
                 version = version + 1
           WHERE id = ? AND user_id = ? AND grant_mode = 'level' AND state IN ('granted', 'ready_to_redeem') AND version = ?`
       ).bind(
-        itemId, s.productId, JSON.stringify(s.optionValueIds), s.colorId, s.qty, s.saleType, s.transportMethod,
+        itemLevel, itemId, s.productId, JSON.stringify(s.optionValueIds), s.colorId, s.qty, s.saleType, s.transportMethod,
         snapshotJson(checked.snapshot), now, now, id, user.id, Number(g.version)
       ),
       ...changedExactlyOne(c.env.DB),
@@ -221,7 +226,8 @@ async function redeem(c: Context<AppContext>, id: string, body: Record<string, u
     const item = await c.env.DB.prepare('SELECT active, level FROM gift_pool_items WHERE id = ?')
       .bind(text(g.gift_item_id))
       .first<{ active: number; level: number }>();
-    if (!item || Number(item.active) !== 1 || Number(item.level) !== Number(g.level)) {
+    const levelActive = !!item && (await loadLevels(c.env.DB)).get(Number(item.level))?.view.active === true;
+    if (!item || Number(item.active) !== 1 || !levelOffersTo(g, Number(item.level), levelActive)) {
       throw new HttpError(409, 'This choice is no longer offered — choose another gift.', 'GIFT_ITEM_UNAVAILABLE', { reason: 'ITEM_WITHDRAWN' });
     }
   }
@@ -233,6 +239,7 @@ async function redeem(c: Context<AppContext>, id: string, body: Record<string, u
     user_id: user.id,
     actor: user.id,
     level: Number(g.level),
+    chosen_level: g.chosen_level == null ? null : Number(g.chosen_level),
     mode: text(g.grant_mode),
     item_id: g.gift_item_id ?? null,
     product_id: sel.productId,
@@ -253,7 +260,7 @@ async function redeem(c: Context<AppContext>, id: string, body: Record<string, u
       c.env.DB.prepare(
         `INSERT INTO gift_redemptions (entitlement_id, user_id, level, options, contents, created_at)
          VALUES (?, ?, ?, ?, ?, ?)`
-      ).bind(id, user.id, Number(g.level), JSON.stringify({ item_id: g.gift_item_id ?? null }), text(g.gift_snapshot) || '{}', now),
+      ).bind(id, user.id, Number(g.chosen_level) || Number(g.level), JSON.stringify({ item_id: g.gift_item_id ?? null }), text(g.gift_snapshot) || '{}', now),
       ...audit.statements,
     ]);
   } catch (e) {

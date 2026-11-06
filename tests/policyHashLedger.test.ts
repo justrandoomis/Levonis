@@ -25,7 +25,8 @@
  *     row 196) followed with the pricing engine's writer, privacy 4 and
  *     faq 6 (owner, 2026-10-31) with the Meta Pixel on the main site, and
  *     purchase 7, price_protection 6 and faq 7 (owner, 2026-10-31; DECISIONS
- *     row 280) with ordering at an estimated price.
+ *     row 280) with ordering at an estimated price, and rewards 8 and faq 8
+ *     (owner, 2026-11-05; DECISIONS row 301) with the review road.
  *
  * Adding a version: bump it in its module, run this file, and copy the
  * `key@version:lang → hash` lines the failure prints into the fixture.
@@ -107,9 +108,10 @@ test('the ledger is what the archive stores: a fresh sync writes exactly these h
 /**
  * The current version of each document decision 7 reworded: price_protection
  * moved again, to 5, for decision 6, and faq to 6 for the Meta Pixel; then
- * purchase to 7, price_protection to 6 and faq to 7 for the estimated price.
+ * purchase to 7, price_protection to 6 and faq to 7 for the estimated price,
+ * and faq to 8 for the review road.
  */
-const CURRENT_TODAY: Readonly<Record<string, number>> = { purchase: 7, faq: 7, membership: 5, price_protection: 6 };
+const CURRENT_TODAY: Readonly<Record<string, number>> = { purchase: 7, faq: 8, membership: 5, price_protection: 6 };
 
 test('the four documents decision 7 reworded moved to new versions, and their previous versions stay in the ledger', () => {
   const MOVED: ReadonlyArray<[string, number]> = [['purchase', 6], ['faq', 5], ['membership', 5], ['price_protection', 4]];
@@ -149,9 +151,9 @@ test('decision 6 moved price_protection to version 5 with the code that applies 
 test('the Meta Pixel moved privacy to 4 and faq to 6 on one date; privacy 3 and faq 5 stay in the ledger as the archive holds them', () => {
   for (const [key, version] of [['privacy', 4], ['faq', 6]] as const) {
     const doc = POLICY_DOCUMENTS.find((d) => d.key === key)!;
-    // faq has moved once more since, to 7, on the same date (the estimated price, below).
+    // faq has moved since: to 7 on the same date (the estimated price, below), and to 8 for the review road.
     assert.ok(doc.version >= version, key);
-    assert.equal(doc.effective_at, '2026-10-31', `${key}: the day the pixel's disclosure was published`);
+    if (key === 'privacy') assert.equal(doc.effective_at, '2026-10-31', `${key}: the day the pixel's disclosure was published`);
     for (const lang of POLICY_LANGS) {
       assert.ok(`${key}@${version}:${lang}` in LEDGER, `${key}@${version}:${lang}`);
       assert.ok(`${key}@${version - 1}:${lang}` in LEDGER, `${key}@${version - 1}:${lang} left the ledger`);
@@ -175,8 +177,11 @@ test('the Meta Pixel moved privacy to 4 and faq to 6 on one date; privacy 3 and 
 test('the estimated price moved purchase to 7, price_protection to 6 and faq to 7 on one date; purchase 6, price_protection 5 and faq 6 stay in the ledger', () => {
   for (const [key, version] of [['purchase', 7], ['price_protection', 6], ['faq', 7]] as const) {
     const doc = POLICY_DOCUMENTS.find((d) => d.key === key)!;
-    assert.equal(doc.version, version, key);
-    assert.equal(doc.effective_at, '2026-10-31', `${key}: the day the estimated-price clause was published`);
+    // faq alone has moved since, to 8, for the review road (below).
+    if (key !== 'faq') {
+      assert.equal(doc.version, version, key);
+      assert.equal(doc.effective_at, '2026-10-31', `${key}: the day the estimated-price clause was published`);
+    }
     for (const lang of POLICY_LANGS) {
       assert.ok(`${key}@${version}:${lang}` in LEDGER, `${key}@${version}:${lang}`);
       assert.ok(`${key}@${version - 1}:${lang}` in LEDGER, `${key}@${version - 1}:${lang} left the ledger`);
@@ -184,6 +189,27 @@ test('the estimated price moved purchase to 7, price_protection to 6 and faq to 
     }
   }
   // The consent documents did not move for it (CHECKOUT_POLICY_KEYS is terms and privacy).
+  for (const [key, version] of [['terms', 4], ['privacy', 4], ['quick_buy', 1]] as const) {
+    assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, `${key} moved: every consent would be asked again`);
+  }
+});
+
+/**
+ * THE REVIEW ROAD MOVED rewards TO 7 AND faq TO 8 (owner, 2026-11-05; DECISIONS row
+ * 301). Neither is a consent document, so nobody is asked to accept again; the
+ * previous versions stay in the ledger as the archive holds them.
+ */
+test('the review road moved rewards to 7 and faq to 8 on one date; rewards 6 and faq 7 stay in the ledger', () => {
+  for (const [key, version] of [['rewards', 8], ['faq', 8]] as const) {
+    const doc = POLICY_DOCUMENTS.find((d) => d.key === key)!;
+    assert.equal(doc.version, version, key);
+    assert.equal(doc.effective_at, '2026-11-06', `${key}: the day the review road was published`);
+    for (const lang of POLICY_LANGS) {
+      assert.ok(`${key}@${version}:${lang}` in LEDGER, `${key}@${version}:${lang}`);
+      assert.ok(`${key}@${version - 1}:${lang}` in LEDGER, `${key}@${version - 1}:${lang} left the ledger`);
+      assert.notEqual(LEDGER[`${key}@${version}:${lang}`], LEDGER[`${key}@${version - 1}:${lang}`], `${key}/${lang}: the new version is the old text`);
+    }
+  }
   for (const [key, version] of [['terms', 4], ['privacy', 4], ['quick_buy', 1]] as const) {
     assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, `${key} moved: every consent would be asked again`);
   }

@@ -1,5 +1,6 @@
 import { listing } from '../lib/listing';
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import { isPrinterProduct, printerProductIds } from '../lib/printerIdentity';
 import type { AppContext, Env } from '../lib/types';
 import { getTierStatus } from '../lib/entitlements';
@@ -19,10 +20,14 @@ import {
 } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
-import { assertMoneyAuthority } from '../lib/moneyAuthority';
+import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
 import { audit, auditStatements } from '../lib/audit';
 import { notifyGiftGranted, planGrant } from '../lib/gifts/grant';
-import { changedExactlyOne, isLostRace, loadLevels } from '../lib/gifts/model';
+import { changedExactlyOne, isLostRace } from '../lib/gifts/model';
+import { codeTail, levelOffer, newGiftCode, offerIsEmpty, offerWarnings, rewardCodeFacts } from '../lib/gifts/reviewCode';
+import { reachForMany } from '../lib/customerNotify';
+import { clampGiftScore, giftLevelsForScore, maxGiftLevel, scoreForOldLevel } from '../../packages/contracts/src/giftScore';
+import { GIFT_CODE_NOTICE } from '../lib/rewards/strings';
 import { announceAfterResponse } from '../lib/adminTopicRouting';
 import { parseByteRange, sniff } from './uploads';
 import { getMediaObject, headMediaObject, storeMedia } from '../lib/mediaStorage';
@@ -37,16 +42,20 @@ import {
 
 /**
  * Product reviews with evidence, admin quality scoring and the five printer
- * gift levels (final-phase mandate §5).
+ * gift levels (final-phase mandate §5; the score and the code: DECISIONS row 301).
  *
  * Separation of concerns enforced here:
  *  - PUBLIC review moderation (reviews.status) is a different decision from
  *    REWARD approval (review_rewards.state). A published review can have a
  *    rejected reward and vice versa.
- *  - Quality level (1..5) is a usefulness rubric — it is NEVER derived from
- *    praise or sentiment. The server produces a deterministic, auditable
- *    recommendation from text/media quality and anti-abuse signals; an admin
- *    can approve, change or reject that reward without changing publication.
+ *  - Quality (1..100, packages/contracts/src/giftScore.ts says what it opens)
+ *    is a usefulness rubric — it is NEVER derived from praise or sentiment. The
+ *    server produces a deterministic, auditable score from text/media quality
+ *    and anti-abuse signals; an admin can approve, change or reject that reward
+ *    without changing publication.
+ *  - An approval makes a CODE, and the code makes the gift when its owner
+ *    writes it (worker/lib/gifts/reviewCode.ts). Rewards approved before that
+ *    keep the entitlement they were given.
  *  - Distinct ledgers: printer gifts live in gift_entitlements (UNIQUE per
  *    reward → per review), review points in points_awards with source_ref
  *    'review:<id>' + a deterministic wallet_transactions id. Purchase points
@@ -393,18 +402,26 @@ async function adminRewardNotifications(
   quality: ReviewQualityResult
 ): Promise<D1PreparedStatement[]> {
   const { results } = await db.prepare("SELECT id FROM users WHERE role = 'admin'").all<{ id: string }>();
+  const level = maxGiftLevel(quality.score);
   return (results ?? []).map(({ id }) =>
     notifyStatement(db, {
       userId: id,
       kind: 'review_reward_pending',
       title_ar: 'مراجعة مؤهلة لمكافأة',
       title_en: 'Reward-eligible review',
-      body_ar: `المنتج ${input.productId} · المستوى المتوقع ${quality.tier} · الجودة ${quality.score}/100`,
-      body_en: `Product ${input.productId} · predicted level ${quality.tier} · quality ${quality.score}/100`,
+      body_ar: `المنتج ${input.productId} · الجودة ${quality.score}/100 · تفتح المستويات حتى ${level}`,
+      body_en: `Product ${input.productId} · quality ${quality.score}/100 · opens levels up to ${level}`,
       link: '/admin',
       entity_type: 'review',
       entity_id: reviewId,
-      meta: { product_id: input.productId, predicted_tier: quality.tier, score: quality.score },
+      meta: {
+        product_id: input.productId,
+        predicted_tier: quality.tier,
+        score: quality.score,
+        predicted_level: level,
+        title_ckb: 'هەڵسەنگاندنێکی شایستەی خەڵات',
+        body_ckb: `بەرهەم ${input.productId} · کوالیتی ${quality.score}/100 · ئاستەکان تا ${level} دەکاتەوە`,
+      },
       eventKey: `review-reward:${reviewId}`,
     }).stmt
   );
@@ -413,9 +430,10 @@ async function adminRewardNotifications(
 /**
  * POST /api/reviews — create a review for a delivered, owned order.
  * One review per (user, product): DB UNIQUE from 0003. A manual review is
- * public immediately. A reward row is created ONLY when deterministic quality
- * qualifies for one of the existing five levels; publication never waits for
- * that separate admin decision.
+ * public immediately. A manual review of a delivered printer, not from a gift
+ * line, with no severe abuse signal and a score of at least 1 enters the reward
+ * queue (the owner's own example is a 5); publication never waits for that
+ * separate admin decision. Anything else takes the fallback points below.
  */
 reviewRoutes.post('/', requireAuth, async (c) => {
   await rateLimit(c, 'review_submit', 10, 3600);
@@ -464,7 +482,7 @@ reviewRoutes.post('/', requireAuth, async (c) => {
   if (facts.gift_line) {
     // A GIFT TRIGGERS NO OTHER REWARD (S8): the review is published like any
     // other, and earns neither a reward row nor the fallback points.
-  } else if (quality.rewardEligible && quality.tier !== null) {
+  } else if (quality.rewardEligible) {
     const rewardId = newId('rr');
     statements.push(c.env.DB.prepare(
       `INSERT INTO review_rewards
@@ -472,9 +490,10 @@ reviewRoutes.post('/', requireAuth, async (c) => {
           quality_score, quality_snapshot, state, created_at)
        VALUES (?, ?, ?, 'printer_gift', ?, ?, ?, ?, 'submitted', ?)`
     ).bind(
+      // quality_score stays empty: since row 301 a level comes from the final score, and only an admin confirms that.
       rewardId, reviewId, user.id,
       input.evidence ? JSON.stringify(input.evidence) : '',
-      JSON.stringify(facts), quality.tier, JSON.stringify(quality), now
+      JSON.stringify(facts), null, JSON.stringify(quality), now
     ));
     statements.push(...(await adminRewardNotifications(c.env.DB, reviewId, input, quality)));
   } else {
@@ -541,7 +560,7 @@ reviewRoutes.post('/', requireAuth, async (c) => {
       `\nReview: ${reviewId}` +
       `\nOrder: ${input.orderId}` +
       `\nQuality: ${quality.score}/100` +
-      (!facts.gift_line && quality.rewardEligible && quality.tier !== null ? `\nReward level ${quality.tier} — awaiting an admin decision` : '')
+      (!facts.gift_line && quality.rewardEligible ? `\nOpens gift levels up to ${maxGiftLevel(quality.score)} — awaiting an admin decision` : '')
   );
 
   return c.json({
@@ -596,7 +615,7 @@ reviewRoutes.put('/:id', requireAuth, async (c) => {
       quality.score, JSON.stringify(quality), id, user.id
     ),
   ];
-  if (quality.rewardEligible && quality.tier !== null) {
+  if (quality.rewardEligible) {
     statements.push(c.env.DB.prepare(
       `UPDATE review_rewards
           SET instagram_evidence = ?, eligibility = ?, quality_score = ?, quality_snapshot = ?,
@@ -604,13 +623,14 @@ reviewRoutes.put('/:id', requireAuth, async (c) => {
         WHERE id = ? AND state IN ('submitted','revision_needed')`
     ).bind(
       input.evidence ? JSON.stringify(input.evidence) : '', JSON.stringify(facts),
-      quality.tier, JSON.stringify(quality), existing.reward_id
+      null, JSON.stringify(quality), existing.reward_id
     ));
     statements.push(...(await adminRewardNotifications(c.env.DB, id, input, quality)));
   } else {
-    // The review stays public even when edited below a gift threshold. Its
-    // old queue record becomes an auditable rejected reward and it receives
-    // the same configured fallback as any other valid manual review.
+    // The review stays public even when an edit turns it into abuse (a severe
+    // signal: the one way out of the queue). Its old queue record becomes an
+    // auditable rejected reward and it receives the same configured fallback
+    // as any other valid manual review.
     statements.push(c.env.DB.prepare(
       `UPDATE review_rewards
           SET instagram_evidence = ?, eligibility = ?, quality_score = NULL, quality_snapshot = ?,
@@ -943,6 +963,12 @@ reviewRoutes.post('/uploads', requireAuth, async (c) => {
    * from the bytes it actually stored — which is what stops a key claiming
    * `.jpg` over WebP or the reverse. A video passes through untouched: a
    * transform keeps one frame, and one frame of a video is not the video.
+   *
+   * THE DIGEST TRAVELS WITH THE OBJECT, of the bytes the customer sent (a photo's
+   * WebP differs from upload to upload; what they sent does not). `ownMediaEntries`
+   * reads it back on the review, and it is the only way the score can tell that two
+   * uploads are one file: every upload gets a new key. Without it, «distinct images»
+   * (policy 7.4) and «media used in an earlier review» (8.3) could not see anything.
    */
   const stored = await storeMedia(c.env, {
     placement: {
@@ -957,6 +983,7 @@ reviewRoutes.post('/uploads', requireAuth, async (c) => {
     ownerId: user.id,
     originalName: file.name,
     cacheControl: 'private, max-age=300',
+    customMetadata: { sha256 },
   });
   const key = stored.key;
   return c.json({
@@ -1138,12 +1165,12 @@ reviewRoutes.get('/admin/queue', async (c) => {
   const state = allowed.includes(stateQ) ? stateQ : 'submitted';
 
   const { results } = await c.env.DB.prepare(
-    `SELECT r.id AS review_id, r.stars, r.body, r.media, r.status AS review_status, r.source, r.moderation_note,
+    `SELECT r.id AS review_id, r.user_id, r.stars, r.body, r.media, r.status AS review_status, r.source, r.moderation_note,
             r.created_at, r.order_id, r.product_id,
             rr.id AS reward_id, rr.kind, rr.instagram_evidence, rr.eligibility, rr.quality_score,
             rr.quality_snapshot, rr.state AS reward_state, rr.reason, rr.points_awarded, rr.decided_at, rr.decided_by,
-            u.email, u.username,
-            p.name AS product_name, p.name_ar AS product_name_ar,
+            u.email, u.username, u.name AS user_name,
+            p.name AS product_name, p.name_ar AS product_name_ar, p.name_ku AS product_name_ku,
             o.delivered_at AS order_delivered_at, o.status AS order_status,
             (SELECT ge.id FROM gift_entitlements ge WHERE ge.reward_id = rr.id) AS entitlement_id
        FROM reviews r
@@ -1152,10 +1179,19 @@ reviewRoutes.get('/admin/queue', async (c) => {
        LEFT JOIN products p ON p.id = r.product_id
        LEFT JOIN orders o ON o.id = r.order_id
       WHERE (?1 = 'all' OR rr.state = ?1)
-      ORDER BY r.created_at ASC LIMIT 100`
+      ORDER BY CASE WHEN ?1 IN ('submitted', 'revision_needed') THEN NULL ELSE rr.decided_at END DESC, r.created_at ASC
+      LIMIT 100`
   )
     .bind(state)
     .all<Record<string, unknown>>();
+
+  // The code of each approved reward, the customers' languages (the ready sentence
+  // is written in theirs) and what every level offers today, for the warnings.
+  const [codes, reach, offer] = await Promise.all([
+    rewardCodeFacts(c.env.DB, results.map((r) => String(r.reward_id ?? ''))),
+    reachForMany(c.env, results.map((r) => String(r.user_id ?? ''))),
+    levelOffer(c.env),
+  ]);
 
   // Live printer-catalog membership for the listed products (one query).
   const productIds = [...new Set(results.map((r) => String(r.product_id ?? '')).filter(Boolean))];
@@ -1178,12 +1214,13 @@ reviewRoutes.get('/admin/queue', async (c) => {
     const hasVideo = media.some((m) => m.kind === 'video');
     const delivered = !!r.order_delivered_at || r.order_status === 'delivered';
     const textChars = String(r.body ?? '').length;
+    const code = codes.get(String(r.reward_id ?? ''));
     return {
       review_id: r.review_id,
       reward_id: r.reward_id,
       created_at: r.created_at,
-      customer: { email: r.email, username: r.username },
-      product: { id: r.product_id, name: r.product_name, name_ar: r.product_name_ar },
+      customer: { email: r.email, username: r.username, name: r.user_name ?? '', lang: reach.get(String(r.user_id ?? ''))?.lang ?? 'ar' },
+      product: { id: r.product_id, name: r.product_name, name_ar: r.product_name_ar, name_ckb: r.product_name_ku ?? null },
       order_id: r.order_id,
       stars: r.stars,
       body: r.body,
@@ -1195,6 +1232,12 @@ reviewRoutes.get('/admin/queue', async (c) => {
       reward_state: r.reward_state,
       quality_score: r.quality_score ?? null,
       quality: safeParse<ReviewQualityResult | null>(r.quality_snapshot, null),
+      // The final score and the code (row 301); null on a reward approved before them.
+      final_score: code?.final_score ?? null,
+      levels: code?.final_score != null ? giftLevelsForScore(code.final_score) : [],
+      code: code?.code ?? null,
+      code_issued_at: code?.code_issued_at ?? null,
+      code_redeemed_at: code?.code_redeemed_at ?? null,
       reason: r.reason ?? '',
       points_awarded: Number(r.points_awarded) || 0,
       decided_at: r.decided_at ?? null,
@@ -1217,7 +1260,7 @@ reviewRoutes.get('/admin/queue', async (c) => {
   });
 
   const pointsValue = await getReviewPointsValue(c.env.DB);
-  return c.json({ success: true, state, queue, review_points_configured: pointsValue });
+  return c.json({ success: true, state, queue, review_points_configured: pointsValue, gift_levels: offer });
 });
 
 /**
@@ -1244,11 +1287,68 @@ reviewRoutes.post('/admin/:id/moderate', async (c) => {
 });
 
 /**
+ * A DATABASE BEFORE 0228 has nowhere to keep a code (CLAUDE.md rule 2): the
+ * approval does what it did the day before, a level gift of the highest level the
+ * score opens, with its notice, so nothing the admin does here fails.
+ */
+async function grantBefore0228(
+  c: Context<AppContext>,
+  a: { reviewId: string; rewardId: string; userId: string; productId: unknown; level: number; reason: string; now: string; authorityAudit: unknown }
+): Promise<Response> {
+  const admin = c.get('user')!;
+  const plan = await planGrant(c.env.DB, {
+    userId: a.userId,
+    level: a.level,
+    reason: 'review',
+    note: a.reason,
+    actorId: admin.id,
+    rewardId: a.rewardId,
+    now: a.now,
+    auditExtra: { review_id: a.reviewId, reward_id: a.rewardId, product_id_reviewed: a.productId ?? null },
+  });
+  const reviewAudit = await auditStatements(c.env.DB, admin.id, 'review.reward', a.reviewId, {
+    action: 'approve',
+    kind: 'printer_gift',
+    quality_score: a.level,
+    reason: a.reason,
+    entitlement_id: plan.id,
+    authority: a.authorityAudit,
+  });
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        `UPDATE review_rewards SET state = 'approved', quality_score = ?, reason = ?, decided_by = ?, decided_at = ?
+          WHERE id = ? AND state != 'approved'`
+      ).bind(a.level, a.reason, admin.id, a.now, a.rewardId),
+      ...changedExactlyOne(c.env.DB),
+      ...plan.statements,
+      ...reviewAudit.statements,
+    ]);
+  } catch (e) {
+    if (isUniqueViolation(e) || isLostRace(e)) throw conflict('This reward was already approved');
+    console.error('gift approval failed', e instanceof Error ? e.message : e);
+    throw badRequest('Approval failed. Please try again.');
+  }
+  try {
+    c.executionCtx.waitUntil(notifyGiftGranted(c.env, plan.id));
+  } catch {
+    /* no execution context (a test harness): the in-app notice already landed in the batch */
+  }
+  return c.json({ success: true, review_id: a.reviewId, reward_state: 'approved', quality_score: a.level, entitlement_id: plan.id });
+}
+
+/**
  * POST /api/reviews/admin/:id/reward — reward decision (:id = review id).
- * approve (printer_gift): requires quality_score 1..5 + a written rubric
- *   reason; the deterministic checklist must pass. Creates ONE entitlement
- *   (max_level = score) — idempotent via UNIQUE(reward_id); a decided reward
- *   is never silently re-decided.
+ * approve (printer_gift): `finalScore` 1..100 (default: the system's) + a
+ *   written rubric reason; the deterministic checklist must pass. Writes the
+ *   score and a CODE, and NO gift: the gift is born when the customer writes the
+ *   code (worker/lib/gifts/reviewCode.ts). A level the owner switched off or left
+ *   empty is reported in `warnings`; when every opened level is empty the approval
+ *   is refused (GIFT_LEVEL_EMPTY), so a customer never lands on nothing. An old
+ *   tab's `qualityScore` 1..5 is read as the score that opens that level. A
+ *   decided reward is never silently re-decided, and one approved before all this
+ *   keeps its entitlement and its old path. Nothing tells the customer the code:
+ *   the admin hands it over; the in-app notice says one is coming.
  * approve (points): awards the CONFIGURED review-point value through the
  *   points_awards guard (source_ref 'review:<id>') — honest 503 when the
  *   value is not configured.
@@ -1299,9 +1399,6 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
 
   // ---- approve ----
   if (row.kind === 'printer_gift') {
-    const score = body.qualityScore === undefined
-      ? int(row.quality_score, 'qualityScore', { min: 1, max: 5 })
-      : int(body.qualityScore, 'qualityScore', { min: 1, max: 5 });
     const reason = str(body.reason, 'reason', { min: 10, max: 1000 });
     const quality = safeParse<ReviewQualityResult | null>(row.quality_snapshot, null);
     // New submissions are admitted to this queue only after deterministic
@@ -1325,60 +1422,88 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
         'CHECKLIST_INCOMPLETE'
       );
     }
-    // The rule of the admin's «منح هدية» (routes/gifts.ts): a level the owner
-    // switched off is granted by no one — not by hand, not by a review. The
-    // admin approves with another quality score, or switches the level on.
-    if (!(await loadLevels(c.env.DB)).get(score)!.view.active) {
-      throw new HttpError(409, `Gift level ${score} is switched off — approve with another quality score, or switch the level on first.`, 'GIFT_LEVEL_INACTIVE', { level: score });
+    const systemScore = typeof quality?.score === 'number' ? quality.score : null;
+    const finalScore =
+      body.finalScore !== undefined
+        ? int(body.finalScore, 'finalScore', { min: 1, max: 100 })
+        : body.qualityScore !== undefined
+          ? scoreForOldLevel(int(body.qualityScore, 'qualityScore', { min: 1, max: 5 }), systemScore)
+          : systemScore !== null
+            ? clampGiftScore(systemScore)
+            : scoreForOldLevel(int(row.quality_score, 'qualityScore', { min: 1, max: 5 }), null);
+    const levels = giftLevelsForScore(finalScore);
+    const offer = await levelOffer(c.env, levels);
+    const warnings = offerWarnings(offer);
+    if (offerIsEmpty(offer)) {
+      throw new HttpError(409, 'Every gift level this score opens is empty — add a product to one of them, or switch it on, first.', 'GIFT_LEVEL_EMPTY', { levels, warnings });
     }
+    const userId = String(row.user_id);
     /**
-     * THE APPROVAL GRANTS A LEVEL GIFT OF THE NEW FLOW (docs/GIFTS_QUICK_BUY.md
-     * §1.2): level = the quality score, reason 'review', linked to the reward.
-     * The customer then chooses one of the level's real store products on
-     * /gifts and orders it through the cart at 0 IQD. The reward flip, the
-     * grant, its audit row, the review audit row and the in-app notice are ONE
-     * batch; the fence after the flip and UNIQUE(reward_id) make a concurrent
-     * or replayed approval write nothing.
+     * THE APPROVAL MAKES A CODE, NOT A GIFT. The flip, the audit row and the one
+     * in-app notice are ONE batch; the fence after the flip makes a concurrent or
+     * replayed approval write nothing. Two codes colliding (about one in 34
+     * billion per pair) only means making another.
      */
-    const plan = await planGrant(c.env.DB, {
-      userId: String(row.user_id),
-      level: score,
-      reason: 'review',
-      note: reason,
-      actorId: admin.id,
-      rewardId: String(row.reward_id),
-      now,
-      auditExtra: { review_id: id, reward_id: row.reward_id, product_id_reviewed: row.product_id ?? null },
-    });
-    const reviewAudit = await auditStatements(c.env.DB, admin.id, 'review.reward', id, {
-      action: 'approve',
-      kind: 'printer_gift',
-      quality_score: score,
-      reason,
-      entitlement_id: plan.id,
-      authority: authority?.audit ?? null,
-    });
-    try {
-      await c.env.DB.batch([
-        c.env.DB.prepare(
-          `UPDATE review_rewards SET state = 'approved', quality_score = ?, reason = ?, decided_by = ?, decided_at = ?
-            WHERE id = ? AND state != 'approved'`
-        ).bind(score, reason, admin.id, now, row.reward_id),
-        ...changedExactlyOne(c.env.DB),
-        ...plan.statements,
-        ...reviewAudit.statements,
-      ]);
-    } catch (e) {
-      if (isUniqueViolation(e) || isLostRace(e)) throw conflict('This reward was already approved');
-      console.error('gift approval failed', e instanceof Error ? e.message : e);
-      throw badRequest('Approval failed. Please try again.');
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const code = newGiftCode();
+      const reviewAudit = await auditStatements(c.env.DB, admin.id, 'review.reward', id, {
+        action: 'approve',
+        kind: 'printer_gift',
+        final_score: finalScore,
+        system_score: systemScore,
+        levels,
+        warnings,
+        code_tail: codeTail(code),
+        reason,
+        authority: authority?.audit ?? null,
+      });
+      try {
+        await c.env.DB.batch([
+          c.env.DB.prepare(
+            `UPDATE review_rewards
+                SET state = 'approved', final_score = ?, quality_score = NULL, redeem_code = ?, code_issued_at = ?,
+                    reason = ?, decided_by = ?, decided_at = ?
+              WHERE id = ? AND state != 'approved'`
+          ).bind(finalScore, code, now, reason, admin.id, now, row.reward_id),
+          ...changedExactlyOne(c.env.DB),
+          notifyStatement(c.env.DB, {
+            userId,
+            kind: 'reward',
+            title_ar: GIFT_CODE_NOTICE.title.ar,
+            title_en: GIFT_CODE_NOTICE.title.en,
+            body_ar: GIFT_CODE_NOTICE.body.ar,
+            body_en: GIFT_CODE_NOTICE.body.en,
+            link: '/rewards/rate',
+            entity_type: 'review',
+            entity_id: id,
+            meta: { title_ckb: GIFT_CODE_NOTICE.title.ckb, body_ckb: GIFT_CODE_NOTICE.body.ckb },
+            eventKey: `review.gift_code:${String(row.reward_id)}`,
+          }).stmt,
+          ...reviewAudit.statements,
+        ]);
+        return c.json({
+          success: true,
+          review_id: id,
+          reward_state: 'approved',
+          final_score: finalScore,
+          levels,
+          code,
+          code_issued_at: now,
+          warnings,
+          quality_score: null,
+          entitlement_id: null,
+        });
+      } catch (e) {
+        if (isSchemaMissing(e)) {
+          return grantBefore0228(c, { reviewId: id, rewardId: String(row.reward_id), userId, productId: row.product_id, level: maxGiftLevel(finalScore), reason, now, authorityAudit: authority?.audit ?? null });
+        }
+        if (isLostRace(e)) throw conflict('This reward was already approved');
+        if (isUniqueViolation(e) && String(e instanceof Error ? e.message : e).includes('redeem_code')) continue;
+        console.error('gift approval failed', e instanceof Error ? e.message : e);
+        throw badRequest('Approval failed. Please try again.');
+      }
     }
-    try {
-      c.executionCtx.waitUntil(notifyGiftGranted(c.env, plan.id));
-    } catch {
-      /* no execution context (a test harness): the in-app notice already landed in the batch */
-    }
-    return c.json({ success: true, review_id: id, reward_state: 'approved', quality_score: score, entitlement_id: plan.id });
+    throw badRequest('Approval failed. Please try again.');
   }
 
   // kind === 'points'
@@ -1415,4 +1540,50 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
   }
   await audit(c.env.DB, admin.id, 'review.reward', id, { action: 'approve', kind: 'points', points, reason, authority: authority?.audit ?? null });
   return c.json({ success: true, review_id: id, reward_state: 'approved', points_awarded: points });
+});
+
+/**
+ * POST /api/reviews/admin/:id/code/regenerate — the code was lost, or reached the
+ * wrong person, and is still unredeemed: a new one, and the old one stops existing
+ * in the same statement. A financial admin's act, never on their own review. The
+ * audit row names the last characters of both.
+ */
+reviewRoutes.post('/admin/:id/code/regenerate', requireMoneyAuthority('review_reward'), async (c) => {
+  const admin = c.get('user')!;
+  const id = c.req.param('id') ?? '';
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  const row = await c.env.DB.prepare(
+    `SELECT rr.id AS reward_id, rr.user_id, rr.state FROM review_rewards rr WHERE rr.review_id = ? AND rr.kind = 'printer_gift'`
+  )
+    .bind(id)
+    .first<{ reward_id: string; user_id: string; state: string }>();
+  if (!row) throw notFound('Review not found');
+  const authority = assertMoneyAuthority(c, { act: 'review_reward', beneficiaryUserId: row.user_id, reason: str(body.ownerReason, 'ownerReason', { max: 500, required: false }) });
+  const current = (await rewardCodeFacts(c.env.DB, [row.reward_id])).get(row.reward_id);
+  if (row.state !== 'approved' || !current?.code) throw conflict('This reward holds no code.', 'GIFT_CODE_NONE');
+  if (current.code_redeemed_at) throw conflict('This code was already used.', 'GIFT_CODE_USED');
+  const now = new Date().toISOString();
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const code = newGiftCode();
+    const audit = await auditStatements(c.env.DB, admin.id, 'review.code.regenerate', id, {
+      reward_id: row.reward_id,
+      old_code_tail: codeTail(current.code),
+      new_code_tail: codeTail(code),
+      authority: authority.audit,
+    });
+    try {
+      await c.env.DB.batch([
+        c.env.DB.prepare('UPDATE review_rewards SET redeem_code = ?, code_issued_at = ? WHERE id = ? AND redeem_code = ? AND code_redeemed_at IS NULL')
+          .bind(code, now, row.reward_id, current.code),
+        ...changedExactlyOne(c.env.DB),
+        ...audit.statements,
+      ]);
+      return c.json({ success: true, review_id: id, code, code_issued_at: now });
+    } catch (e) {
+      if (isLostRace(e)) throw conflict('This code changed meanwhile — reload and try again.', 'GIFT_CODE_USED');
+      if (isUniqueViolation(e) && String(e instanceof Error ? e.message : e).includes('redeem_code')) continue;
+      throw e;
+    }
+  }
+  throw badRequest('The code could not be made. Please try again.');
 });

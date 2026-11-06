@@ -11,9 +11,9 @@ import { EmptyState } from '../ui/AsyncStates';
  * Product-page review section (mandate §5): submit + public list.
  * - Public list shows APPROVED reviews only, masked reviewer names and an
  *   incentivized-review disclosure; Instagram evidence never appears here.
- * - Submission requires a delivered order that contains the product; the
- *   printer gift path additionally needs written detail, photos, video and
- *   private Instagram evidence.
+ * - Submission requires a delivered order that contains the product; on a
+ *   printer, the writing, photos, video and private Instagram evidence raise the
+ *   review's score, and every 20 points opens a gift level (DECISIONS row 301).
  * - No success UI before the server confirms.
  */
 
@@ -44,7 +44,7 @@ const STRINGS = {
     rewardReason: 'سبب القرار',
     qualityScore: 'درجة الجودة',
     printerNotice:
-      'تُقيَّم جودة مراجعة الطابعة من فائدة النص وأصالة الصور وجودتها، وتزيد المستويات الأعلى مع الوسائط المفيدة والفيديو. درجة الجودة مستقلة عن عدد النجوم.',
+      'تُقيَّم مراجعة الطابعة من 1 إلى 100 من فائدة النص وأصالة الصور والفيديو وستوري إنستغرام، وكل 20 درجة تفتح مستوى هدايا. الدرجة مستقلة عن عدد النجوم.',
     pointsNotice: (n: number) => `المراجعة اليدوية الصالحة غير المؤهلة لهدية تحصل على ضعفي نقاط الأساس (${(n * 2).toLocaleString()} نقطة).`,
     pointsUnconfigured: 'قيمة نقاط المراجعة لم تُحدَّد بعد من الإدارة — ستظهر هنا عند إعدادها.',
     order: 'الطلب',
@@ -53,10 +53,10 @@ const STRINGS = {
     bodyPlaceholder: 'اكتب تجربتك الفعلية مع المنتج بالتفصيل...',
     photos: 'الصور',
     addPhoto: 'إضافة صورة',
-    videoLabel: 'فيديو (مطلوب لهدية الطابعة)',
+    videoLabel: 'فيديو (يرفع درجة مراجعتك)',
     addVideo: 'إضافة فيديو',
     igTitle: 'دليل ستوري إنستغرام (خاص)',
-    igPrivacy: 'يُعرض للإدارة فقط لتأكيد الأهلية، ولا يُنشر أبدًا. الستوري تنتهي خلال 24 ساعة — لقطة الشاشة هي الدليل الدائم.',
+    igPrivacy: 'يُعرض للإدارة فقط ويرفع درجة مراجعتك، ولا يُنشر أبدًا. الستوري تنتهي خلال 24 ساعة — لقطة الشاشة هي الدليل الدائم.',
     igLink: 'رابط الستوري / الحساب',
     igShot: 'لقطة شاشة للستوري',
     addShot: 'رفع لقطة',
@@ -98,7 +98,7 @@ const STRINGS = {
     rewardReason: 'Decision reason',
     qualityScore: 'Quality score',
     printerNotice:
-      'Printer-review quality uses useful writing plus relevant, original media. Higher levels add stronger images and useful video. Quality is independent of the star rating.',
+      'A printer review is scored from 1 to 100 on useful writing, original photos, a video and the Instagram story, and every 20 points opens a gift level. The score is independent of the star rating.',
     pointsNotice: (n: number) => `A valid manual review outside a gift level earns twice the base review points (${(n * 2).toLocaleString()} points).`,
     pointsUnconfigured: 'The review-points value has not been configured by the store yet — it will appear here once set.',
     order: 'Order',
@@ -107,10 +107,10 @@ const STRINGS = {
     bodyPlaceholder: 'Describe your real experience with the product in detail...',
     photos: 'Photos',
     addPhoto: 'Add photo',
-    videoLabel: 'Video (required for the printer gift)',
+    videoLabel: 'Video (raises your review score)',
     addVideo: 'Add video',
     igTitle: 'Instagram story evidence (private)',
-    igPrivacy: 'Shown to administrators only to confirm eligibility; never published. Stories expire in 24h — a screenshot is the durable proof.',
+    igPrivacy: 'Shown to administrators only, and it raises your review score; never published. Stories expire in 24h — a screenshot is the durable proof.',
     igLink: 'Story / account link',
     igShot: 'Story screenshot',
     addShot: 'Upload capture',
@@ -152,7 +152,7 @@ const STRINGS = {
     rewardReason: 'هۆکاری بڕیار',
     qualityScore: 'نمرەی کوالیتی',
     printerNotice:
-      'کوالیتی پێداچوونەوەی پرینتەر بە نووسینی بەسوود و میدیای پەیوەندیدار و ڕەسەن هەڵدەسەنگێندرێت؛ ئاستە بەرزەکان وێنە و ڤیدیۆی باشتر دەوێت.',
+      'پێداچوونەوەی پرینتەر لە 1 تا 100 دەنرخێندرێت بەپێی نووسینی بەسوود، وێنەی ڕەسەن، ڤیدیۆ و ستۆری ئینستاگرام، و هەر 20 نمرە ئاستێکی دیاری دەکاتەوە. نمرەکە سەربەخۆیە لە ژمارەی ئەستێرەکان.',
     pointsNotice: (n: number) => `پێداچوونەوەی دەستی شیاو کە دیاری وەرناگرێت دوو هێندەی خاڵی بنەڕەت وەردەگرێت (${(n * 2).toLocaleString()} خاڵ).`,
     pointsUnconfigured: 'بەهای خاڵی پێداچوونەوە هێشتا لەلایەن فرۆشگاوە دیاری نەکراوە — کاتێک ڕێکخرا لێرە دەردەکەوێت.',
     order: 'داواکاری',
@@ -161,10 +161,10 @@ const STRINGS = {
     bodyPlaceholder: 'ئەزموونی ڕاستەقینەت لەگەڵ بەرهەمەکە بە وردی بنووسە...',
     photos: 'وێنەکان',
     addPhoto: 'زیادکردنی وێنە',
-    videoLabel: 'ڤیدیۆ (پێویستە بۆ دیاری پرینتەر)',
+    videoLabel: 'ڤیدیۆ (نمرەی پێداچوونەوەکەت بەرز دەکاتەوە)',
     addVideo: 'زیادکردنی ڤیدیۆ',
     igTitle: 'بەڵگەی ستۆری ئینستاگرام (تایبەت)',
-    igPrivacy: 'تەنها بۆ بەڕێوەبەرایەتی پیشان دەدرێت بۆ پشتڕاستکردنەوەی شایستەیی؛ هەرگیز بڵاوناکرێتەوە. ستۆری لە ٢٤ کاتژمێردا بەسەردەچێت — وێنەی شاشە بەڵگەی بەردەوامە.',
+    igPrivacy: 'تەنها بۆ بەڕێوەبەرایەتی پیشان دەدرێت و نمرەی پێداچوونەوەکەت بەرز دەکاتەوە؛ هەرگیز بڵاوناکرێتەوە. ستۆری لە ٢٤ کاتژمێردا بەسەردەچێت — وێنەی شاشە بەڵگەی بەردەوامە.',
     igLink: 'بەستەری ستۆری / هەژمار',
     igShot: 'وێنەی شاشەی ستۆری',
     addShot: 'بارکردنی وێنە',

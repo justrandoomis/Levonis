@@ -37,6 +37,7 @@ import {
   wholeDaysLeft,
   type DoorText,
   type Section,
+  giftCardCta,
 } from '../src/components/rewards/model';
 import type {
   Competition,
@@ -309,6 +310,15 @@ test('couponDestination: cart, the one product, a choice, the section, or nowher
   for (const state of ['used', 'expired', 'revoked'] as const) assert.equal(usable(coupon({ state })), false, state);
 });
 
+test('giftCardCta: an old gift goes to «هداياي»; a code’s gift to its own step', () => {
+  assert.deepEqual(giftCardCta({}), { to: '/gifts', label: 'rate.chooseGift' }, 'an older server');
+  assert.deepEqual(giftCardCta({ gift: { id: 'g', status: 'GRANTED', scope: 'level' } }), { to: '/gifts', label: 'rate.chooseGift' });
+  assert.deepEqual(giftCardCta({ gift: { id: 'g', status: 'GRANTED', scope: 'up_to' } }), { to: '/rewards/rate', label: 'rate.chooseGift' });
+  assert.deepEqual(giftCardCta({ gift: { id: 'g', status: 'READY_TO_REDEEM', scope: 'up_to' } }), { to: '/rewards/rate', label: 'rate.chooseGift' });
+  assert.deepEqual(giftCardCta({ gift: { id: 'g', status: 'REDEEMED', scope: 'up_to' } }), { to: '/rewards/rate', label: 'reveal.addToCart' });
+  assert.deepEqual(giftCardCta({ gift: { id: 'g', status: 'ADDED_TO_ORDER', scope: 'up_to' } }), { to: '/cart', label: 'reveal.checkout' });
+});
+
 test('revokeKey names why a coupon was withdrawn', () => {
   assert.equal(revokeKey('order_cancelled'), 'past.withdrawnOrder');
   assert.equal(revokeKey('return:rc_0123'), 'past.withdrawnReturn');
@@ -334,6 +344,10 @@ test('nextAction: the one card, first match wins (1 → 5, then none), by the se
 
     assert.deepEqual(nextAction(full({})), { kind: 'coupon-ending', coupon: ending }, `${server}: 1`);
     assert.deepEqual(nextAction(full({ coupons: [later] })), { kind: 'gift', printer: approved }, `${server}: 2`);
+    // An approved review whose code is unwritten comes after a gift in hand and before everything else.
+    const awaiting = printer('code_ready');
+    assert.deepEqual(nextAction(full({ coupons: [later], printers: [awaiting, noPage, toRate] })), { kind: 'gift-code', printer: awaiting }, `${server}: 2b`);
+    assert.deepEqual(nextAction(full({ coupons: [later], printers: [awaiting, approved] })), { kind: 'gift', printer: approved }, `${server}: 2c`);
     assert.deepEqual(nextAction(full({ coupons: [later], printers: [noPage, toRate] })), { kind: 'competition', competition: closingFirst }, `${server}: 3`);
     assert.deepEqual(nextAction(full({ coupons: [later], printers: [noPage, toRate], competitions: [blocked, noGate] })), { kind: 'rate', printer: toRate }, `${server}: 4`);
     assert.deepEqual(nextAction(full({ coupons: [filament(0, {}, server), later], printers: [noPage], competitions: [blocked] })), { kind: 'coupon', coupon: later }, `${server}: 5`);
@@ -417,6 +431,12 @@ test('doorLines «قيّم طابعتك» and «استبدل نقاطك»: to ra
   assert.deepEqual(rate([printer('rated'), printer('reward_pending')]), { lines: [{ key: 'door.rate.pending' }], badge: 0 });
   assert.deepEqual(rate([printer('rated')]), { lines: [{ key: 'door.rate.done' }], badge: 0 });
   assert.deepEqual(rate([]), { lines: [{ key: 'door.rate.how' }], badge: 0 });
+  // A code waiting is the door's news, and a printer still to rate stays said beside it.
+  assert.deepEqual(rate([printer('code_ready')]), { lines: [{ key: 'door.rate.code' }], badge: 0 });
+  assert.deepEqual(rate([printer('code_ready'), printer('to_rate'), printer('to_rate', { order_id: 'o2' })]), {
+    lines: [{ key: 'door.rate.code' }, { count: 'printersToRate', n: 2 }],
+    badge: 2,
+  });
 
   const shop = doorLines(
     hub({

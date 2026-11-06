@@ -226,6 +226,8 @@ export default {
         // Declining or asking for changes is any admin's; APPROVING pays and is
         // judged in the handler once the action is read (moneyAuthority review_reward).
         'POST /admin/:id/reward': { cls: 'op', why: 'approve is a money act judged in the handler (review_reward); reject and request_changes stay with every admin' },
+        // A new code for an approved, unredeemed reward: the old one dies, nothing else moves (row 301).
+        'POST /admin/:id/code/regenerate': 'money',
       },
     },
     {

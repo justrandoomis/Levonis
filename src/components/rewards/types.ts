@@ -1,3 +1,5 @@
+import type { GiftStatus, GiftView } from '../reviews/gifts/GiftCard';
+
 /**
  * GET /api/rewards/program — the rewards hub, exactly as
  * worker/routes/rewardsProgram.ts answers it (migration 0220). The page draws
@@ -14,6 +16,13 @@ export interface Tri {
 }
 
 export type RewardKind = 'free_shipping' | 'filament_discount';
+
+/** One printer's gift, as far as this page needs to know it: where it stands, and whether a code opened it. */
+export interface PrinterGift {
+  id: string;
+  status: GiftStatus;
+  scope: 'level' | 'up_to';
+}
 
 export interface RewardCoupon {
   id: string;
@@ -64,9 +73,37 @@ export interface PrinterToRate {
   name: Tri;
   image: string;
   delivered_at: string | null;
-  state: 'to_rate' | 'reward_pending' | 'reward_approved' | 'rated';
+  /** code_ready: approved, and the code the team gives them is unwritten (row 301). */
+  state: 'to_rate' | 'reward_pending' | 'code_ready' | 'reward_approved' | 'rated';
   stars: number | null;
   reward_level: number | null;
+  /** The confirmed 1..100, once the customer has written the code: never before. */
+  final_score?: number | null;
+  /** The gift this printer's review became; absent from an older server. */
+  gift?: PrinterGift | null;
+}
+
+/**
+ * POST /api/rewards/program/gift-code and GET /gift-reveal/:giftId
+ * (worker/lib/gifts/reviewCode.ts). Every figure of the analysis is here, and is
+ * real; the page draws it and adds none. A closed level's gifts are never sent.
+ */
+export interface GiftReveal {
+  score: number;
+  levels: number[];
+  track: Array<{ level: number; name: Tri; threshold: number; opened: boolean }>;
+  breakdown: {
+    text: { score: number; max: number; chars: number; words: number };
+    images: { score: number; max: number; count: number };
+    video: { score: number; max: number; present: boolean };
+    story: { score: number; max: number; present: boolean };
+    stars: { score: number; max: number; stars: number };
+    /** The final score less the parts; 0 when they agree. */
+    adjustment: number;
+  };
+  review: { product_id: string; slug: string; name: Tri; image: string; stars: number };
+  gift: GiftView;
+  replay?: boolean;
 }
 
 export interface GiftLevel {
@@ -74,6 +111,8 @@ export interface GiftLevel {
   name: Tri;
   description: Tri;
   active: boolean;
+  /** The score that opens this level; absent from an older server. */
+  threshold?: number;
 }
 
 export interface ShopItem {

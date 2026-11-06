@@ -39,6 +39,7 @@ const ar = {
   titleCancelled: 'أُلغيت هذه الهدية',
 
   bodyGranted: 'اختر منتجًا واحدًا من هدايا هذا المستوى.',
+  bodyGrantedUpTo: 'اختر منتجًا واحدًا من هدايا المستويات التي فتحتها. تدفع أجرة التوصيل فقط.',
   bodyReady: 'بعد الاسترداد يُثبَّت اختيارك، وتضيفها إلى سلتك بسعر 0 د.ع.',
   bodyRedeemed: 'أضفها إلى سلتك الحالية: تُطلب مع مشترياتك بسعر 0 د.ع، وتدفع التوصيل كالمعتاد.',
   bodyInCart: 'أكمل الطلب من السلة. إن حذفتها من السلة تعود هنا.',
@@ -65,6 +66,7 @@ const ar = {
 
   level: 'المستوى',
   levelChip: 'المستوى {level}',
+  upToLevel: 'حتى المستوى {level}',
   saleType: 'نوع البيع',
   saleDirect: 'بيع مباشر',
   salePreorder: 'طلب مسبق',
@@ -135,6 +137,7 @@ const en: Record<GiftStringKey, string> = {
   titleCancelled: 'This gift was cancelled',
 
   bodyGranted: 'Pick one product from this level’s gifts.',
+  bodyGrantedUpTo: 'Pick one product from the gifts of the levels you opened. You pay for delivery only.',
   bodyReady: 'Redeeming fixes your choice; then add it to your cart at 0 IQD.',
   bodyRedeemed: 'Add it to your current cart: it is ordered with your purchases at 0 IQD, and delivery is charged as usual.',
   bodyInCart: 'Complete the order from your cart. If you remove it from the cart, it comes back here.',
@@ -161,6 +164,7 @@ const en: Record<GiftStringKey, string> = {
 
   level: 'Level',
   levelChip: 'Level {level}',
+  upToLevel: 'Up to level {level}',
   saleType: 'Sale type',
   saleDirect: 'Direct sale',
   salePreorder: 'Pre-order',
@@ -229,6 +233,7 @@ const ckb: Record<GiftStringKey, string> = {
   titleCancelled: 'ئەم دیارییە هەڵوەشێنرایەوە',
 
   bodyGranted: 'یەک بەرهەم لە دیارییەکانی ئەم ئاستە هەڵبژێرە.',
+  bodyGrantedUpTo: 'یەک بەرهەم لە دیارییەکانی ئەو ئاستانەی کردووتەتەوە هەڵبژێرە. تەنها کرێی گەیاندن دەدەیت.',
   bodyReady: 'دوای وەرگرتنەوە هەڵبژاردنەکەت جێگیر دەبێت، پاشان بە 0 د.ع زیادی بکە بۆ سەبەتەکەت.',
   bodyRedeemed: 'زیادی بکە بۆ سەبەتەی ئێستات: لەگەڵ کڕینەکانت بە 0 د.ع داوا دەکرێت، و کرێی گەیاندن وەک هەمیشە دەدرێت.',
   bodyInCart: 'داواکارییەکە لە سەبەتەکەوە تەواو بکە. ئەگەر لە سەبەتەکە لایببەیت دەگەڕێتەوە ئێرە.',
@@ -255,6 +260,7 @@ const ckb: Record<GiftStringKey, string> = {
 
   level: 'ئاست',
   levelChip: 'ئاستی {level}',
+  upToLevel: 'تا ئاستی {level}',
   saleType: 'جۆری فرۆشتن',
   saleDirect: 'فرۆشتنی ڕاستەوخۆ',
   salePreorder: 'داواکاریی پێشوەختە',

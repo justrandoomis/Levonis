@@ -367,9 +367,18 @@ test('a legacy review box: converted into a level grant the customer chooses fro
   assert.deepEqual(auditActions(raw, 'ge_open'), ['gift.convert', 'gift.choose', 'gift.redeem']);
 });
 
-test('approving a printer-review reward grants a LEVEL gift of the quality score, linked to the reward, once', async () => {
+/**
+ * RESTATED (owner, 2026-11-05; DECISIONS row 301). An approval used to grant a
+ * level gift on the spot, at a level the admin picked. Now it confirms a score of
+ * 1..100 and makes a code; the customer's code makes the gift
+ * (tests/reviewGiftCode.test.ts walks that road). What these two tests held stays
+ * held: an approval happens once and a replay or a race writes nothing more, and a
+ * customer never lands on a level with nothing in it.
+ */
+test('approving a printer-review reward makes a code and no gift, once, sequential or concurrent', async () => {
   const raw = giftWorld();
   const a = apps(raw);
+  await addLevelItem(a.admin, 1, NOZZLE_04_RED);
   raw.exec(`
     INSERT INTO products (id,slug,name,name_ar,price_iqd,status,stock,options,colors,selling_type,sale_types,preorder_transports,images)
       VALUES ('p_printer','p1s','P1S','طابعة P1S',900000,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]','[]');
@@ -378,33 +387,25 @@ test('approving a printer-review reward grants a LEVEL gift of the quality score
     INSERT INTO review_rewards (id,review_id,user_id,kind,state,quality_score,quality_snapshot)
       VALUES ('rr_1','rv_1','buyer','printer_gift','submitted',4,'{"score":80,"tier":4,"reasons":[],"suspiciousSignals":[],"rewardEligible":true}');
   `);
+  // An old open tab still sends a level: it is read as the score that opens exactly that level.
   const approve = () =>
     post(a.admin, '/api/reviews/admin/rv_1/reward', { action: 'approve', qualityScore: 4, reason: 'Excellent detailed review with media' });
   const res = await approve();
   const out = await json(res);
   assert.equal(res.status, 200, JSON.stringify(out));
-  const g = giftRow(raw, out.entitlement_id);
-  assert.equal(g.grant_mode, 'level');
-  assert.equal(g.state, 'granted');
-  assert.equal(g.level, 4);
-  assert.equal(g.reason, 'review');
-  assert.equal(g.reward_id, 'rr_1');
-  assert.equal(g.granted_by, BOSS.id);
-  assert.equal(row(raw, "SELECT state FROM review_rewards WHERE id = 'rr_1'")?.state, 'approved');
-  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'gift_granted'"), 1);
-  assert.deepEqual(auditActions(raw, g.id), ['gift.grant']);
-  const grantAudit = JSON.parse(row<{ detail: string }>(raw, "SELECT detail FROM audit_log WHERE action = 'gift.grant'")!.detail);
-  assert.equal(grantAudit.reward_id, 'rr_1');
-  assert.equal(grantAudit.review_id, 'rv_1');
+  assert.equal(out.final_score, 79, 'the system’s 80 opens level 5: the nearest score that opens exactly level 4');
+  assert.deepEqual(out.levels, [1, 2, 3, 4]);
+  assert.match(out.code, /^GFT[A-HJ-NP-Z2-9]{7}$/);
+  assert.equal(out.entitlement_id, null);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM gift_entitlements WHERE reward_id = 'rr_1'"), 0, 'no gift until the code is written');
+  const stored = row<J>(raw, "SELECT state, final_score, quality_score, redeem_code, decided_by FROM review_rewards WHERE id = 'rr_1'")!;
+  assert.deepEqual(stored, { state: 'approved', final_score: 79, quality_score: null, redeem_code: out.code, decided_by: BOSS.id });
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'gift_granted'"), 0);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'reward' AND user_id = 'buyer'"), 1, 'told once, without the code');
 
-  // The customer sees a level gift of the new flow.
-  const card = await myGift(a.buyer, g.id);
-  assert.equal(card?.status, 'GRANTED');
-  assert.equal(card?.reason, 'review');
-  assert.equal(card?.level.n, 4);
-
-  // A second approval — replayed or concurrent — grants nothing more.
+  // A second approval — replayed or concurrent — writes nothing more.
   assert.equal((await approve()).status, 409);
+  assert.equal(row<J>(raw, "SELECT redeem_code FROM review_rewards WHERE id = 'rr_1'")!.redeem_code, out.code);
   const s = appsFor(serialD1(raw));
   raw.exec(`
     INSERT INTO reviews (id,user_id,product_id,stars,body,status,source)
@@ -412,15 +413,14 @@ test('approving a printer-review reward grants a LEVEL gift of the quality score
     INSERT INTO review_rewards (id,review_id,user_id,kind,state,quality_score,quality_snapshot)
       VALUES ('rr_2','rv_2','other','printer_gift','submitted',2,'{"score":40,"tier":2,"reasons":[],"suspiciousSignals":[],"rewardEligible":true}');
   `);
-  const body = { action: 'approve', qualityScore: 2, reason: 'Good review with a clear video' };
+  const body = { action: 'approve', finalScore: 25, reason: 'Good review with a clear video' };
   const results = await Promise.all([post(s.admin, '/api/reviews/admin/rv_2/reward', body), post(s.admin, '/api/reviews/admin/rv_2/reward', body)]);
   assert.deepEqual(results.map((r) => r.status).sort(), [200, 409]);
-  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM gift_entitlements WHERE reward_id = 'rr_2'"), 1);
-  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'gift_granted' AND user_id = 'other'"), 1);
-  assert.equal(all(raw, "SELECT id FROM audit_log WHERE action = 'gift.grant'").length, 2);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'reward' AND user_id = 'other'"), 1);
+  assert.equal(all(raw, "SELECT id FROM audit_log WHERE action = 'review.reward' AND target = 'rv_2'").length, 1);
 });
 
-test('a review reward is never granted into a level the owner switched off: refused, nothing written, and another score goes through', async () => {
+test('a review is never approved into nothing: every opened level off or empty is refused with nothing written, and a higher score that opens a live level goes through', async () => {
   const raw = giftWorld();
   const a = apps(raw);
   raw.exec(`
@@ -430,25 +430,31 @@ test('a review reward is never granted into a level the owner switched off: refu
       VALUES ('rv_1','buyer','p_printer',5,'A detailed review of this printer with photos and a video.','published','user');
     INSERT INTO review_rewards (id,review_id,user_id,kind,state,quality_score,quality_snapshot)
       VALUES ('rr_1','rv_1','buyer','printer_gift','submitted',5,'{"score":95,"tier":5,"reasons":[],"suspiciousSignals":[],"rewardEligible":true}');
-    UPDATE gift_pools SET active = 0 WHERE id = 'gift_level_5';
+    UPDATE gift_pools SET active = 0 WHERE id = 'gift_level_1';
   `);
-  const approve = (qualityScore: number) =>
-    post(a.admin, '/api/reviews/admin/rv_1/reward', { action: 'approve', qualityScore, reason: 'Excellent detailed review with media' });
+  await addLevelItem(a.admin, 1, NOZZLE_04_RED);
+  await addLevelItem(a.admin, 3, PLAIN);
+  const approve = (finalScore: number) =>
+    post(a.admin, '/api/reviews/admin/rv_1/reward', { action: 'approve', finalScore, reason: 'Excellent detailed review with media' });
 
-  const refused = await approve(5);
+  // 10 opens level 1 alone, and the owner switched that one off.
+  const refused = await approve(10);
   const body = await json(refused);
   assert.equal(refused.status, 409, JSON.stringify(body));
-  assert.equal(body.code, 'GIFT_LEVEL_INACTIVE');
-  assert.equal(body.details?.level, 5, 'the admin is told which level');
-  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM gift_entitlements WHERE reward_id = 'rr_1'"), 0);
+  assert.equal(body.code, 'GIFT_LEVEL_EMPTY');
+  assert.deepEqual(body.details?.levels, [1], 'the admin is told which levels');
+  assert.deepEqual(body.details?.warnings, [{ level: 1, code: 'GIFT_LEVEL_OFF' }]);
   assert.equal(row(raw, "SELECT state FROM review_rewards WHERE id = 'rr_1'")?.state, 'submitted', 'still waiting for a decision');
-  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'gift_granted'"), 0);
+  assert.equal(row(raw, "SELECT redeem_code FROM review_rewards WHERE id = 'rr_1'")?.redeem_code, null);
+  assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind = 'reward'"), 0);
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM audit_log WHERE action IN ('gift.grant','review.reward')"), 0);
 
-  const granted = await approve(4);
+  // 45 opens levels 1, 2 and 3: level 3 holds a gift, so it goes through and warns of the rest.
+  const granted = await approve(45);
   const out = await json(granted);
   assert.equal(granted.status, 200, JSON.stringify(out));
-  assert.equal(giftRow(raw, out.entitlement_id).level, 4);
+  assert.deepEqual(out.levels, [1, 2, 3]);
+  assert.deepEqual(out.warnings, [{ level: 1, code: 'GIFT_LEVEL_OFF' }, { level: 2, code: 'GIFT_LEVEL_NO_ITEMS' }]);
 });
 
 test('a grant’s detail carries its audit timeline; another admin door answers 404 for an unknown gift', async () => {

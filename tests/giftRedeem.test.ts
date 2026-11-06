@@ -42,6 +42,9 @@ test('a level gift: choose, change the choice, redeem — each one write with it
   const raw = giftWorld();
   const a = apps(raw);
   const nozzle = await addLevelItem(a.admin, 3, NOZZLE_04_RED);
+  // A level lists its items by sort, then created_at, then a random id. On Windows the clock moves in ~15.6 ms
+  // steps, so two items added within one step tie and their order falls to the ids (tests/giftLevels.test.ts).
+  await new Promise((r) => setTimeout(r, 20));
   const plain = await addLevelItem(a.admin, 3, PLAIN);
   const elsewhere = await addLevelItem(a.admin, 4, PLATE_AIR);
   const g = await grantOk(a.admin, { mode: 'level', level: 3, reason: 'review' });
@@ -132,6 +135,7 @@ test('a product the store cannot sell today is neither chosen nor redeemed', asy
   const raw = giftWorld();
   const a = apps(raw);
   const soldOut = await addLevelItem(a.admin, 1, { ...NOZZLE_04_RED, optionValueIds: ['v_06'] });
+  await new Promise((r) => setTimeout(r, 20)); // past one Windows clock step: see the first test above
   const plain = await addLevelItem(a.admin, 1, PLAIN);
   const g = await grantOk(a.admin, { mode: 'level', level: 1, reason: 'review' });
 

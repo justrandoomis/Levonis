@@ -1,11 +1,15 @@
 /**
  * Deterministic, auditable review-quality scoring.
  *
- * This module never reads sentiment: a useful one-star review can earn the
- * same tier as a useful five-star review. It also never grants anything. It
- * only reports evidence for the existing five gift levels; the review route
- * remains authoritative for queueing and the admin remains authoritative for
- * the final tier.
+ * This module never reads sentiment: a useful one-star review earns the same
+ * score as a useful five-star review. It also never grants anything. It reports
+ * a score of 0..100 and its parts (text 42, images 27, video 18, the Instagram
+ * story 8, stars 5); the review route decides the queue and the admin confirms
+ * the final score. What a score opens is one rule, in
+ * packages/contracts/src/giftScore.ts (owner, 2026-11-05; DECISIONS row 301).
+ *
+ * `tier` is the old gate, still computed for the rows and the screens that read
+ * it. It no longer decides who enters the reward queue: `rewardEligible` does.
  */
 
 export interface ReviewQualityMedia {
@@ -39,7 +43,23 @@ export interface ReviewQualityResult {
   videoPresent: boolean;
   videoQuality: number;
   suspiciousSignals: string[];
+  /** A printer review with no severe abuse signal and a score of at least 1: it enters the reward queue. */
   rewardEligible: boolean;
+  /** The figures the customer's analysis says aloud: «النص: 240 حرفًا · 38 كلمة». */
+  textChars: number;
+  wordCount: number;
+}
+
+/** The signals that keep a review out of the reward queue, and take 30 off its score. */
+export const SEVERE_SIGNALS: readonly string[] = ['duplicate_text', 'reused_media', 'repetitive_text', 'padded_text'];
+
+/** How the score counts a review's text: its letters without the spaces, and its words, both normalized. */
+export function reviewTextCounts(value: string): { chars: number; words: number } {
+  const body = normalizeReviewText(value);
+  return {
+    chars: [...body.replace(/\s/g, '')].length,
+    words: body ? body.split(' ').filter(Boolean).length : 0,
+  };
 }
 
 /** Used by tests and duplicate detection so both paths normalize identically. */
@@ -55,9 +75,10 @@ export function normalizeReviewText(value: string): string {
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
 /**
- * Maps evidence to the five EXISTING levels. The gates deliberately grow in
- * substance, not file count alone: level 3 needs three distinct useful
+ * THE OLD GATE, kept for the rows and screens that still read `tier`. It maps
+ * evidence to the five levels by substance: level 3 needs three distinct useful
  * images, level 4 adds useful video, and level 5 also needs durable evidence.
+ * Since row 301 the levels a review opens come from its score alone.
  */
 function tierFor(
   score: number,
@@ -122,8 +143,9 @@ export function evaluateReviewQuality(input: ReviewQualityInput): ReviewQualityR
     uniqueImages.push(image);
   }
 
+  // Photos and video alike: policy 8.3 says «media», and a reused video is worth up to 18, which opens a whole extra level.
   const oldHashes = new Set((input.previousMediaHashes ?? []).filter(Boolean));
-  if (uniqueImages.some((m) => m.sha256 && oldHashes.has(m.sha256))) suspiciousSignals.push('reused_media');
+  if ([...uniqueImages, ...videos].some((m) => m.sha256 && oldHashes.has(m.sha256))) suspiciousSignals.push('reused_media');
 
   const goodImages = uniqueImages.filter((m) => Number(m.bytes ?? 0) >= 80 * 1024);
   const tinyImages = uniqueImages.filter((m) => Number(m.bytes ?? 0) > 0 && Number(m.bytes) < 8 * 1024);
@@ -143,9 +165,7 @@ export function evaluateReviewQuality(input: ReviewQualityInput): ReviewQualityR
   }
   if (input.hasEvidence) reasons.push('supporting_evidence');
 
-  const severe = suspiciousSignals.some((s) =>
-    ['duplicate_text', 'reused_media', 'repetitive_text', 'padded_text'].includes(s)
-  );
+  const severe = suspiciousSignals.some((s) => SEVERE_SIGNALS.includes(s));
   const rawScore =
     (input.stars >= 1 && input.stars <= 5 ? 5 : 0) +
     textQuality +
@@ -170,7 +190,11 @@ export function evaluateReviewQuality(input: ReviewQualityInput): ReviewQualityR
     videoPresent,
     videoQuality,
     suspiciousSignals: [...new Set(suspiciousSignals)],
-    rewardEligible: input.isPrinter && tier !== null,
+    // The owner's own example is a 5: «like he eran 5 so only level 1». Every
+    // printer review the team can read enters the queue unless it is abuse.
+    rewardEligible: input.isPrinter && !severe && score >= 1,
+    textChars,
+    wordCount: words.length,
   };
 }
 

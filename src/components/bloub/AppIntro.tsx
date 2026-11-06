@@ -694,8 +694,19 @@ export default function AppIntro({ ready, shellReady = ready }: {
       handle.current?.apply(render);
     };
 
+    /**
+     * A SHEET OR A DIALOG OWNS THE SCREEN, AND NOBODY CAN SEE THE CHARACTER.
+     * `html[data-overlay-open]` is what takes it to opacity 0 (src/index.css), and it
+     * went on drawing anyway: a layout and a style pass on every frame, 60 a second,
+     * under the very sheets that most need the frames (measured under «تحليل مراجعتك»,
+     * DECISIONS row 301). So the loop stands down while the flag is up, as it does for a
+     * hidden tab. Nothing is lost: the pose is a function of the clock, a journey
+     * in flight lands on its next frame, and a measurement waits in its flag.
+     */
+    const covered = () => document.documentElement.dataset.overlayOpen === 'true';
+
     const start = () => {
-      if (running) return;
+      if (running || covered()) return;
       running = true;
       rafId = window.requestAnimationFrame(tick);
     };
@@ -964,8 +975,9 @@ export default function AppIntro({ ready, shellReady = ready }: {
      * ordering is fixed rather than incidental.
      *
      * The loop has to be turning for the flag to be read. It always is while
-     * the tab is visible; a hidden tab serves frames to nobody, and
-     * `onVisibility` re-arms the loop and the measurement together.
+     * the tab is visible and nothing covers the screen; a hidden tab serves frames
+     * to nobody, and `onVisibility` re-arms the loop and the measurement together,
+     * as `coverWatch` does when a sheet closes.
      */
     function schedule(animate = false) {
       animateNext = animateNext || animate;
@@ -1078,6 +1090,11 @@ export default function AppIntro({ ready, shellReady = ready }: {
     resizeObserver?.observe(document.documentElement);
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener(BLOUB_EVENT, onState);
+    const coverWatch = new MutationObserver(() => {
+      if (covered()) stop();
+      else schedule(false);
+    });
+    coverWatch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-overlay-open'] });
     writeFrame(frameRef.current);
     if (!document.hidden) start();
     schedule(true);
@@ -1100,6 +1117,7 @@ export default function AppIntro({ ready, shellReady = ready }: {
       mascot.activity('anchor-travel', null);
       occupied?.removeAttribute('data-bloub-occupied');
       resizeObserver?.disconnect();
+      coverWatch.disconnect();
       window.removeEventListener('resize', onResize);
       window.removeEventListener('orientationchange', onResize);
       window.visualViewport?.removeEventListener('resize', onResize);

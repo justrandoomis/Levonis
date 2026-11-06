@@ -71,7 +71,7 @@ const STRINGS = {
     reviewStatus: { pending: 'قيد المراجعة', published: 'منشور', rejected: 'مرفوض' } as Record<string, string>,
     chipReviewed: 'مُقيَّم',
     chipTodo: 'بانتظار التقييم',
-    giftHint: 'تُنشر مراجعتك فورًا، وقد تدخل المراجعة الغنية قائمة اعتماد هدايا التقييم.',
+    giftHint: 'تُنشر مراجعتك فورًا. ومراجعة طابعة اشتريتها تدخل قائمة اعتماد هدايا التقييم، والصور والفيديو من صفحة المنتج ترفع درجتها.',
     pointsHint: (n: number) => `تُنشر فورًا؛ وإن لم تتأهل لهدية تحصل على ${(n * 2).toLocaleString()} نقطة وفق إعداد الأساس.`,
     stars: 'التقييم',
     star: (n: number) => (n === 1 ? 'نجمة واحدة' : n === 2 ? 'نجمتان' : `${n} نجوم`),
@@ -100,7 +100,7 @@ const STRINGS = {
     reviewStatus: { pending: 'under review', published: 'published', rejected: 'rejected' } as Record<string, string>,
     chipReviewed: 'Rated',
     chipTodo: 'Not rated yet',
-    giftHint: 'Your review publishes immediately; a rich review may enter gift approval.',
+    giftHint: 'Your review publishes immediately. A review of a printer you bought enters the gift approval queue, and photos and a video from the product page raise its score.',
     pointsHint: (n: number) => `Published immediately; outside a gift level it earns ${(n * 2).toLocaleString()} configured fallback points.`,
     stars: 'Rating',
     star: (n: number) => (n === 1 ? '1 star' : `${n} stars`),
@@ -133,7 +133,7 @@ const STRINGS = {
     reviewStatus: { pending: 'لە پێداچوونەوەدایە', published: 'بڵاوکراوەتەوە', rejected: 'ڕەتکراوەتەوە' } as Record<string, string>,
     chipReviewed: 'مُقيَّم', // OWNER: Sorani to be written by hand.
     chipTodo: 'بانتظار التقييم', // OWNER: Sorani to be written by hand.
-    giftHint: 'پێداچوونەوەکەت دەستبەجێ بڵاودەکرێتەوە و لەوانەیە بچێتە ڕیزی دیاری.',
+    giftHint: 'پێداچوونەوەکەت دەستبەجێ بڵاودەکرێتەوە. پێداچوونەوەی پرینتەرێک کە کڕیوتە دەچێتە ڕیزی دیاری، و وێنە و ڤیدیۆ لە پەڕەی بەرهەمەکەوە نمرەکەی بەرز دەکەنەوە.',
     pointsHint: (n: number) => `دەستبەجێ بڵاودەکرێتەوە؛ ئەگەر دیاری وەرنەگرێت ${(n * 2).toLocaleString()} خاڵ وەردەگرێت.`,
     stars: 'هەڵسەنگاندن',
     star: (n: number) => `${n} ئەستێرە`,

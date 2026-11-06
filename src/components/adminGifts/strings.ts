@@ -31,6 +31,8 @@ const ar = {
 
   level: 'المستوى',
   levelN: 'المستوى {n}',
+  chosenFromLevel: 'اختار من المستوى {n}',
+  upToLevelN: 'حتى المستوى {n}',
   levelName: 'اسم المستوى',
   levelDescription: 'الوصف',
   levelActive: 'المستوى متاح للمنح',
@@ -182,6 +184,8 @@ const en: Record<AdminStringKey, string> = {
 
   level: 'Level',
   levelN: 'Level {n}',
+  chosenFromLevel: 'Chose from level {n}',
+  upToLevelN: 'Up to level {n}',
   levelName: 'Level name',
   levelDescription: 'Description',
   levelActive: 'Level open for grants',
@@ -331,6 +335,8 @@ const ckb: Record<AdminStringKey, string> = {
 
   level: 'ئاست',
   levelN: 'ئاستی {n}',
+  chosenFromLevel: 'لە ئاستی {n} هەڵیبژارد',
+  upToLevelN: 'تا ئاستی {n}',
   levelName: 'ناوی ئاست',
   levelDescription: 'وەسف',
   levelActive: 'ئاستەکە بۆ بەخشین کراوەیە',

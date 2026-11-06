@@ -17,7 +17,7 @@ import { auditStatements } from '../audit';
 import { notifyStatement } from '../notifications';
 import { notifyCustomer, reachFor, type CustomerMessage } from '../customerNotify';
 import type { GiftSelection, GiftSnapshot } from './selection';
-import { snapshotJson, type GrantReason } from './model';
+import { snapshotJson, type GiftChoiceScope, type GrantReason } from './model';
 
 export interface GrantPlanInput {
   id?: string;
@@ -36,6 +36,10 @@ export interface GrantPlanInput {
   now: string;
   /** Extra facts for the audit row (the review a reward came from, …). */
   auditExtra?: Record<string, unknown>;
+  /** 'up_to': the customer chooses among every level from 1 to `level` (0228; a review's gift code). */
+  choiceScope?: GiftChoiceScope;
+  /** The customer did this themself, on a screen that shows it: no «وصلتك هدية». */
+  silent?: boolean;
 }
 
 export const GIFT_COPY = {
@@ -124,6 +128,12 @@ export async function planGrant(db: D1Database, input: GrantPlanInput): Promise<
     ...(input.auditExtra ?? {}),
   });
   statements.push(...audit.statements);
+  // Its own statement rather than a column of the INSERT above: only the code's
+  // door, which exists only with 0228, ever asks for it.
+  if (input.choiceScope === 'up_to') {
+    statements.push(db.prepare("UPDATE gift_entitlements SET choice_scope = 'up_to' WHERE id = ?").bind(id));
+  }
+  if (input.silent) return { id, statements };
   const words = levelWords(input.level);
   statements.push(
     notifyStatement(db, {

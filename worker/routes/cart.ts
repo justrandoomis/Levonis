@@ -164,6 +164,7 @@ import {
   giftUnitValueOf,
   giftVerdictRefusal,
   GIFT_LINE_COLUMNS,
+  giftLineLevel,
   unpricedGiftResolved,
   verifyGiftCartLines,
   zeroGiftPrice,
@@ -2272,7 +2273,7 @@ cartRoutes.post('/gift-items', async (c) => {
   const audit = await auditStatements(c.env.DB, user.id, 'gift.cart_add', giftId, {
     user_id: user.id,
     actor: user.id,
-    level: Number(g.level) || null,
+    level: giftLineLevel(g) || null,
     product_id: sel.productId,
     option_value_ids: sel.optionValueIds,
     color_id: sel.colorId,

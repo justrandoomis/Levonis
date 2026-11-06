@@ -81,11 +81,20 @@ import type { PolicyDocument } from './types';
  * that decide it: purchase 4.11 to 4.17 (purchase 7) and price_protection 5.6
  * and 10.12 (price_protection 6). It states no more than they do, and no
  * figure, cost or supplier price. Nothing else moved.
+ *
+ * VERSION 8 — WHY IT MOVED (owner, 2026-11-05; DECISIONS row 301; rewards 7). The
+ * archive keeps version 7 byte for byte. 12.11 said a review enters the gift's
+ * decision only at a measured quality score, and that every valid review earns
+ * points at once. Since rewards 7 a sound printer review enters the queue at any
+ * score and earns no automatic points there, so the answer now says which review
+ * takes which path, that approval issues the code, and routes to 7.5, 8.2 and 8.3.
+ * Wording only; the FAQ is not a consent document, so nobody is asked to accept
+ * anything for it. Nothing else moved.
  */
 export const faq: PolicyDocument = {
   key: 'faq',
-  version: 7,
-  effective_at: '2026-10-31',
+  version: 8,
+  effective_at: '2026-11-06',
   title: {
     ar: 'الأسئلة الشائعة',
     en: 'Frequently Asked Questions',
@@ -306,7 +315,7 @@ PRO ×2، ومن سواه ×1. ويُحسب لحظة قيد النقاط، لا 
 لأن المحفظة ليست رقماً واحداً: هناك الرصيد المسوّى، وهو كل ما دخل وخرج؛ وهناك المحجوز، وهو ما التزم به لطلب قائم؛ وهناك الرصيد المتاح، وهو الفرق بينهما، وهو وحده ما يمكن إنفاقه. فإذا رأيت رقماً أكبر في مكان وأصغر في الدفع فالسبب في الغالب مبلغ محجوز لطلب لم يُغلق بعد. والنقاط رصيد مستقل عن هذا كله، ولها معلّقها ومستقرها. المرجع: وثيقة الدفع، المواد 6.1 إلى 6.7.
 
 ### 12.11 لماذا حصلت على نقاط مراجعة ولم أحصل على هدية؟
-لأنهما شيئان مختلفان. نقاط المراجعة تُمنح تلقائياً للمراجعة اليدوية الصحيحة في اللحظة نفسها. أما الهدية فقرار مستقل للمتجر، لا يترتب على مجرد كتابة مراجعة، ولا تدخله المراجعة إلا إذا بلغت درجة جودة مقيسة، ثم يصدر فيه قبول أو طلب تعديل أو رفض بسبب مكتوب. المرجع: وثيقة النقاط والمراجعات، المادتان 7.5 و8.2.
+لأنهما طريقان مختلفان. المراجعة التي لا تدخل قائمة الهدية تُمنح نقاطها تلقائياً في اللحظة نفسها، وهذه حال مراجعة كل منتج غير الطابعة، وحال مراجعة الطابعة التي ظهرت عليها إشارة إساءة. أما مراجعة الطابعة السليمة فتدخل قائمة الهدية أياً كانت درجتها، ولا تترتب الهدية على مجرد كتابتها: يصدر فيها قرار مستقل من المتجر بقبول أو طلب تعديل أو رفض بسبب مكتوب، وبالقبول يصدر كود الهدية. المرجع: وثيقة النقاط والمراجعات، المواد 7.5 و8.2 و8.3.
 
 ### 12.12 ما معنى «سعر تقديري»، وماذا يحدث إن اختلف السعر النهائي؟
 السعر التقديري هو السعر الذي يتوقعه المتجر لقطعة بالطلب المسبق قبل أن يؤكد المورّد سعرها، وتظهر بجانبه علامة «سعر تقديري». تطلب هذه القطعة عبر السلة وتدفع من المحفظة أو نقداً عند الاستلام، بعد أن تقرّ في شاشة الدفع بأنك تفهم أن سعرها قد يتغيّر. ثم يبقى طلبك في مرحلة «تم استلام الطلب» ولا يُجهَّز حتى يتأكد السعر النهائي: فإن لم يتغيّر مجموع طلبك تأكد كما هو، وإن تغيّر أُرسل إليك السعر الجديد لتوافق عليه أو ترفضه، ولا يُؤخذ منك أي مبلغ إضافي دون موافقتك. وحتى تأكيد السعر النهائي يمكنك إلغاء الطلب واسترداد كل ما دفعته، ولا تبدأ حماية السعر إلا بعد تأكيده. المرجع: وثيقة الشراء، المواد 4.11 إلى 4.17، ووثيقة حماية السعر، المادتان 5.6 و10.12.
@@ -532,7 +541,7 @@ Where the order was prepaid from the wallet, the amount is returned to the walle
 Because the wallet is not one figure: there is the settled balance, which is everything that came in and went out; there is the held amount, which is committed to a live order; and there is the available balance, which is the difference between them and is the only one that can be spent. If you see a larger figure in one place and a smaller one at checkout, the cause is usually an amount held for an order that has not yet closed. Points are a separate balance from all of this, with their own pending and settled parts. Reference: the Payment document, articles 6.1 to 6.7.
 
 ### 12.11 Why did I receive review points but no gift?
-Because they are two different things. Review points are granted automatically for a valid manual review at the very moment it is saved. The gift, by contrast, is an independent decision of the Store; it does not follow from merely writing a review, a review enters it only where it reaches a measured quality score, and an approval, a request for changes or a refusal then issues upon it with a written reason. Reference: the Points and Reviews document, articles 7.5 and 8.2.
+Because they are two different paths. A review that does not enter the gift queue is granted its points automatically at the very moment it is saved: a review of any product other than a printer, and a printer review showing a sign of abuse. A sound printer review enters the gift queue at any score, and the gift does not follow from merely writing it: an independent decision of the Store issues upon it, an approval, a request for changes or a refusal, with a written reason, and approval issues the gift code. Reference: the Points and Reviews document, articles 7.5, 8.2 and 8.3.
 
 ### 12.12 What does "Estimated price" mean, and what happens if the final price is different?
 An estimated price is the price the Store expects for a pre-order item before the supplier confirms its price, and it is marked "Estimated price" beside the price. You order such an item through the cart and pay from the wallet or in cash on delivery, after acknowledging at checkout that you understand its price may change. Your order then stays at "Order received" and is not prepared until the final price is confirmed: if your order's total does not change, it is confirmed as it is; if it does, the new price is sent to you to approve or reject, and no additional amount is taken from you without your approval. Until the final price is confirmed you can cancel the order and get back everything you paid, and price protection starts only once it is confirmed. Reference: the Purchase document, articles 4.11 to 4.17, and the Price Protection document, articles 5.6 and 10.12.
@@ -758,7 +767,7 @@ PRO بە شێوەیەکی کاتی ڕاگیراوە — بەم زووانە، س
 چونکە جزدان یەک ژمارە نییە: باڵانسی دانراو هەیە، کە هەموو ئەوەیە هاتووەتە ژوورەوە و چووەتە دەرەوە؛ بڕی گیراو هەیە، کە بۆ داواکارییەکی کراوە پابەند کراوە؛ و باڵانسی بەردەست هەیە، کە جیاوازی نێوان ئەو دووانەیە و تەنها ئەوە دەکرێت خەرج بکرێت. ئەگەر لە شوێنێکدا ژمارەیەکی گەورەتر و لە کاتی پارەداندا کەمتر ببینیت، هۆکارەکە زۆرجار بڕێکی گیراوە بۆ داواکارییەک کە هێشتا داخراو نەبووە. خاڵ باڵانسێکی سەربەخۆیە لە هەموو ئەمانە، بە بەشی هەڵپەسێردراو و جێگیری خۆیەوە. سەرچاوە: بەڵگەنامەی پارەدان، ماددەکانی 6.1 تا 6.7.
 
 ### 12.11 بۆچی خاڵی پێداچوونەوەم وەرگرت بەڵام دیارییەکم وەرنەگرت؟
-چونکە دوو شتی جیاوازن. خاڵی پێداچوونەوە بە شێوەی خۆکار بۆ پێداچوونەوەی دەستیی دروست دەبەخشرێت لە هەمان ساتی پاراستنیدا. بەڵام دیاری بڕیارێکی سەربەخۆی فرۆشگایە؛ تەنها بە نووسینی پێداچوونەوەیەک نایەت، و پێداچوونەوە تەنها کاتێک دەچێتە ناوی کە بگاتە پلەیەکی جۆرایەتی پێوراو، و پاشان پەسەندکردن یان داواکردنی گۆڕانکاری یان ڕەتکردنەوە بە هۆکارێکی نووسراو لەسەری دەردەچێت. سەرچاوە: بەڵگەنامەی خاڵ و پێداچوونەوە، ماددەکانی 7.5 و 8.2.
+چونکە دوو ڕێگەی جیاوازن. ئەو پێداچوونەوەیەی ناچێتە ناو ڕیزی دیاری، خاڵەکانی بە شێوەی خۆکار لە هەمان ساتی پاراستنیدا دەبەخشرێن: پێداچوونەوەی هەر بەرهەمێکی جگە لە چاپکەر، و پێداچوونەوەی چاپکەرێک کە نیشانەیەکی خراپ بەکارهێنانی تێدا بێت. بەڵام پێداچوونەوەی دروستی چاپکەر بە هەر نمرەیەک بێت دەچێتە ناو ڕیزی دیاری، و دیاری تەنها بە نووسینی نایەت: بڕیارێکی سەربەخۆی فرۆشگای لەسەر دەردەچێت، پەسەندکردن یان داواکردنی گۆڕانکاری یان ڕەتکردنەوە، بە هۆکارێکی نووسراو، و بە پەسەندکردن کۆدی دیاری دەردەچێت. سەرچاوە: بەڵگەنامەی خاڵ و پێداچوونەوە، ماددەکانی 7.5 و 8.2 و 8.3.
 
 ### 12.12 «نرخی خەمڵێنراو» مانای چییە، و ئەگەر نرخی کۆتایی جیاواز بوو چی دەبێت؟
 نرخی خەمڵێنراو ئەو نرخەیە کە فرۆشگا بۆ کاڵایەکی داواکاری پێشوەختە چاوەڕێی دەکات پێش ئەوەی دابینکەر نرخەکەی پشتڕاست بکاتەوە، و نیشانەی «نرخی خەمڵێنراو» لە تەنیشتیەوە دەردەکەوێت. ئەم کاڵایە لە ڕێگەی سەبەتەوە داوا دەکەیت و لە جزدانەوە یان لە کاتی گەیاندندا پارەکەی دەدەیت، دوای ئەوەی لە شاشەی پارەداندا دان بەوەدا دەنێیت کە تێدەگەیت نرخەکەی لەوانەیە بگۆڕێت. پاشان داواکارییەکەت لە قۆناغی «داواکاری وەرگیرا»دا دەمێنێتەوە و ئامادە ناکرێت هەتا نرخی کۆتایی پشتڕاست دەکرێتەوە: ئەگەر کۆی داواکارییەکەت نەگۆڕا، وەک خۆی پشتڕاست دەکرێتەوە؛ ئەگەر گۆڕا، نرخە نوێیەکەت بۆ دەنێردرێت تا پەسەندی بکەیت یان ڕەتی بکەیتەوە، و بەبێ ڕەزامەندیی تۆ هیچ بڕە پارەیەکی زیاترت لێ وەرناگیرێت. هەتا نرخی کۆتایی پشتڕاست دەکرێتەوە دەتوانیت داواکارییەکە هەڵبوەشێنیتەوە و هەموو ئەوەی داوتە وەربگریتەوە، و پاراستنی نرخ تەنها دوای پشتڕاستکردنەوەی دەست پێدەکات. سەرچاوە: بەڵگەنامەی کڕین، ماددەکانی 4.11 تا 4.17، و بەڵگەنامەی پاراستنی نرخ، ماددەکانی 5.6 و 10.12.

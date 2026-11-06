@@ -27,6 +27,8 @@
  * AND THREE NON-CONSENT DOCUMENTS HAVE MOVED FOR THE ESTIMATED PRICE (owner,
  * 2026-10-31; DECISIONS row 280): purchase 6 → 7, price_protection 5 → 6 and
  * faq 6 → 7. None of them is a consent document, so nobody is asked again.
+ * The FAQ moved once more for the review road (owner, 2026-11-05; DECISIONS
+ * row 301): faq 7 → 8, one answer reworded, and nobody asked again for it either.
  *
  * The version numbers are written out on purpose, not read from the
  * registry: a test that compared the registry with itself would stay green
@@ -59,13 +61,14 @@ const MOVED = { purchase: 6, faq: 5, membership: 5, price_protection: 4 } as con
  * What each reworded document reads today: price_protection moved again, to 5,
  * for owner decision 6 (DECISIONS row 196), and faq to 6 for the Meta Pixel;
  * then purchase 7, price_protection 6 and faq 7 for the estimated price
- * (DECISIONS row 280).
+ * (DECISIONS row 280); and faq 8 for the review road (DECISIONS row 301).
  */
-const CURRENT = { ...MOVED, purchase: 7, price_protection: 6, faq: 7 } as const;
+const CURRENT = { ...MOVED, purchase: 7, price_protection: 6, faq: 8 } as const;
 /** The documents that have moved since decision 7, and the day each did. */
 const META_PIXEL_EFFECTIVE = '2026-10-31';
 const ESTIMATE_EFFECTIVE = '2026-10-31';
-const EFFECTIVE_SINCE: Readonly<Record<string, string>> = { faq: META_PIXEL_EFFECTIVE, purchase: ESTIMATE_EFFECTIVE, price_protection: ESTIMATE_EFFECTIVE };
+const REVIEW_ROAD_EFFECTIVE = '2026-11-06';
+const EFFECTIVE_SINCE: Readonly<Record<string, string>> = { faq: REVIEW_ROAD_EFFECTIVE, purchase: ESTIMATE_EFFECTIVE, price_protection: ESTIMATE_EFFECTIVE };
 /** The consent documents as decision 7 left them — what a customer had accepted before the Meta Pixel. */
 const CONSENT_AT_DECISION_7 = { terms: 4, privacy: 3, quick_buy: 1 } as const;
 /** The consent documents today: privacy moved to 4 for the Meta Pixel; terms and quick_buy did not move. */

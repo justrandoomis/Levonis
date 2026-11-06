@@ -259,3 +259,24 @@ test('the loop still stops when the tab goes away', () => {
   assert.match(visibility, /if \(document\.hidden\) \{[\s\S]*?stop\(\);/);
   assert.match(code, /return \(\) => \{[\s\S]*?stop\(\);/, 'and on unmount');
 });
+
+test('no frames for a character nobody can see: the loop stands down while a sheet or a dialog owns the screen', () => {
+  /**
+   * `html[data-overlay-open]` takes the character to opacity 0 (src/index.css), so the
+   * loop drew it under every sheet for no one: a layout and a style pass, 60 a second,
+   * under the full-screen analysis the owner wants at 60 fps on a phone (DECISIONS row
+   * 301). `start` asks first, so nothing that schedules a measurement meanwhile can
+   * restart it, and closing the sheet re-arms the loop and the measurement together,
+   * as coming back to a hidden tab does.
+   */
+  assert.match(code, /const covered = \(\) => document\.documentElement\.dataset\.overlayOpen === 'true';/);
+  assert.match(code, /const start = \(\) => \{\s*if \(running \|\| covered\(\)\) return;/);
+  assert.match(code, /new MutationObserver\(\(\) => \{\s*if \(covered\(\)\) stop\(\);\s*else schedule\(false\);\s*\}\)/);
+  assert.match(code, /coverWatch\.observe\(document\.documentElement, \{ attributes: true, attributeFilter: \['data-overlay-open'\] \}\)/);
+  assert.match(code, /coverWatch\.disconnect\(\);/, 'and it goes with the component');
+  // The attribute is the one the character's own stylesheet rule and every Overlay use.
+  const css = readFileSync(new URL('../src/index.css', import.meta.url), 'utf8');
+  assert.match(css, /html\[data-overlay-open='true'\] \.lv-app-intro__character \{\s*opacity: 0;/);
+  const overlay = readFileSync(new URL('../src/components/ui/Overlay.tsx', import.meta.url), 'utf8');
+  assert.match(overlay, /document\.documentElement\.dataset\.overlayOpen = 'true';/);
+});

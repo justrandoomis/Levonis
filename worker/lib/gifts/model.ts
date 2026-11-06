@@ -3,6 +3,9 @@
  * D1, D4, §1.2).
  *
  *   level grant ──customer «اختر هديتك»──► ready_to_redeem          (granted → ready_to_redeem)
+ *     choice_scope 'level': one of the items of `level`; 'up_to' (a review's
+ *     gift code, row 301): one of the items of every level from 1 to `level`,
+ *     `chosen_level` saying which
  *   product grant (admin pinned one product) starts at ready_to_redeem
  *   ready_to_redeem ──customer «استرداد الهدية»──► redeemed
  *   redeemed + a cart line names the gift ──► ADDED_TO_ORDER        (DERIVED, never stored)
@@ -38,6 +41,8 @@ import { legacyEntitlementView, legacyPoolItems, levelAvailability, type LegacyL
 
 export type GiftState = 'available' | 'selected' | 'granted' | 'ready_to_redeem' | 'redeemed' | 'ordered' | 'fulfilled' | 'cancelled';
 export type GiftMode = 'legacy' | 'level' | 'product';
+/** Which items a level gift chooses among (0228). A database before it reads 'level' everywhere. */
+export type GiftChoiceScope = 'level' | 'up_to';
 export type GiftReason = 'legacy' | 'review' | 'reward' | 'compensation' | 'admin_gift';
 /** The reasons an admin may give a grant ('legacy' is the migration's own word). */
 export const GRANT_REASONS = ['review', 'reward', 'compensation', 'admin_gift'] as const;
@@ -126,6 +131,8 @@ export interface GiftItemView {
   available: boolean | null;
   /** The refusal code when it is not. */
   reason: string | null;
+  /** The level this item is offered in, or was chosen from. Null for a product the admin pinned directly. */
+  level?: number | null;
 }
 
 /** GET /api/gifts — one card. NEVER the admin note, the granting admin or the internal cancel reason. */
@@ -137,6 +144,10 @@ export interface GiftView {
   level: LevelView | null;
   /** The level's alternatives, while the customer may still choose (level mode, before redeem). */
   choices: GiftItemView[] | null;
+  /** 'up_to': `choices` holds every sellable item of levels 1..`level`, ordered by level (row 301). */
+  choice_scope: GiftChoiceScope;
+  /** The level the chosen item came from: differs from `level` only for 'up_to'. */
+  chosen_level: number | null;
   chosen: GiftItemView | null;
   can_change_choice: boolean;
   cart_item_id: string | null;
@@ -211,6 +222,27 @@ export async function activeLevelItems(db: D1Database, levels: readonly number[]
 
 // ------------------------------------------------------------------ items
 
+/** Which items this gift chooses among. A row before 0228 has no such column: 'level'. */
+export const giftChoiceScope = (g: { choice_scope?: unknown }): GiftChoiceScope => (text(g.choice_scope) === 'up_to' ? 'up_to' : 'level');
+
+/** The levels whose items this gift may become. */
+export function choiceLevels(g: { choice_scope?: unknown; level?: unknown }): number[] {
+  const n = Number(g.level);
+  if (!Number.isInteger(n) || n < 1 || n > 5) return [];
+  return giftChoiceScope(g) === 'up_to' ? Array.from({ length: n }, (_, i) => i + 1) : [n];
+}
+
+/**
+ * MAY THIS GIFT BECOME AN ITEM OF THAT LEVEL? 'level' as it always was: its own
+ * level, whatever the level's switch says. 'up_to': any level it opened that the
+ * owner has not switched off, so a closed level's gift is refused at the door
+ * however its id reached the client.
+ */
+export function levelOffersTo(g: { choice_scope?: unknown; level?: unknown }, itemLevel: number, levelActive: boolean): boolean {
+  if (giftChoiceScope(g) === 'up_to') return levelActive && choiceLevels(g).includes(itemLevel);
+  return Number(g.level) === itemLevel;
+}
+
 /** A level item row's frozen selection. */
 export function itemSelection(item: Record<string, unknown>): GiftSelection | null {
   return selectionFromColumns(item);
@@ -258,13 +290,14 @@ export function levelItemChoice(item: Record<string, unknown>, product: GiftProd
   const sel = itemSelection(item);
   if (!sel) return null;
   const fallback = tri(text(item.label_ar), text(item.label_en), text(item.label_ckb));
-  if (!product) return itemViewFromSnapshot(text(item.id), sel, null, fallback, false, 'GIFT_PRODUCT_NOT_FOUND');
+  const level = Number(item.level) || null;
+  if (!product) return { ...itemViewFromSnapshot(text(item.id), sel, null, fallback, false, 'GIFT_PRODUCT_NOT_FOUND'), level };
   const live = checkGiftSelection(product, selectionInput(sel), { requireSellable: true });
-  if (live.ok) return itemViewFromSnapshot(text(item.id), sel, live.snapshot, fallback, true, null);
+  if (live.ok) return { ...itemViewFromSnapshot(text(item.id), sel, live.snapshot, fallback, true, null), level };
   // Not orderable today: describe it as configured (no stock requirement) when
   // the store can, so the card still names and pictures it.
   const described = checkGiftSelection(product, selectionInput(sel), { requireSellable: false });
-  return itemViewFromSnapshot(text(item.id), sel, described.ok ? described.snapshot : null, fallback, false, live.code);
+  return { ...itemViewFromSnapshot(text(item.id), sel, described.ok ? described.snapshot : null, fallback, false, live.code), level };
 }
 
 /** The gift's own frozen product (chosen or pinned), described from its snapshot. */
@@ -272,7 +305,7 @@ export function chosenItemView(g: Record<string, unknown>, live: GiftSelectionRe
   const sel = giftSelectionOf(g);
   if (!sel) return null;
   const snap = parseGiftSnapshot(g.gift_snapshot);
-  return itemViewFromSnapshot(
+  const view = itemViewFromSnapshot(
     orNull(g.gift_item_id),
     sel,
     snap,
@@ -280,6 +313,7 @@ export function chosenItemView(g: Record<string, unknown>, live: GiftSelectionRe
     live ? live.ok : null,
     live && !live.ok ? live.code : null
   );
+  return { ...view, level: text(g.grant_mode) === 'level' && g.chosen_level != null ? Number(g.chosen_level) : null };
 }
 
 /** The states in which the customer still acts on the product, so today's availability matters. */
@@ -303,7 +337,7 @@ export async function viewContextFor(env: { DB: D1Database }, rows: Record<strin
   const legacy = rows.filter((g) => text(g.grant_mode || 'legacy') === 'legacy');
   const [levels, items] = await Promise.all([
     loadLevels(db),
-    activeLevelItems(db, choosing.map((g) => Number(g.level))),
+    activeLevelItems(db, choosing.flatMap((g) => choiceLevels(g))),
   ]);
   const productIds = [
     ...items.map((i) => text(i.product_id)),
@@ -340,11 +374,15 @@ export function giftViewFrom(g: Record<string, unknown>, ctx: ViewContext): Gift
   const n = Number(g.level);
   const level = Number.isInteger(n) && n >= 1 && n <= 5 ? ctx.levels.get(n)?.view ?? levelViewFrom(undefined, n) : null;
   const canChange = mode === 'level' && (g.state === 'granted' || g.state === 'ready_to_redeem');
+  const scope = giftChoiceScope(g);
   const choices = canChange
     ? ctx.items
-        .filter((i) => Number(i.level) === n)
+        .filter((i) => levelOffersTo(g, Number(i.level), ctx.levels.get(Number(i.level))?.view.active ?? false))
         .map((i) => levelItemChoice(i, ctx.products.get(text(i.product_id))))
         .filter((x): x is GiftItemView => !!x)
+        // 'up_to' offers what can be ordered now, and nothing else; a level's own
+        // list keeps naming a sold-out item, as it always has.
+        .filter((x) => scope !== 'up_to' || x.available === true)
     : null;
   const sel = giftSelectionOf(g);
   const live =
@@ -371,6 +409,8 @@ export function giftViewFrom(g: Record<string, unknown>, ctx: ViewContext): Gift
     reason: (text(g.reason) || 'legacy') as GiftReason,
     level,
     choices,
+    choice_scope: scope,
+    chosen_level: mode === 'level' && sel && g.chosen_level != null ? Number(g.chosen_level) : null,
     chosen: chosenItemView(g, live),
     can_change_choice: canChange,
     cart_item_id: status === 'ADDED_TO_ORDER' ? text(g.cart_item_id) : null,

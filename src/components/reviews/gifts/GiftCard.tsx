@@ -65,6 +65,8 @@ export interface GiftItemView {
   lead_time_max_days?: number | null;
   available: boolean | null;
   reason: string | null;
+  /** The level it is offered in, or was chosen from. */
+  level?: number | null;
 }
 
 /** Mirrors `GiftView` — never the internal note, the granting admin or the cancel reason. */
@@ -75,6 +77,9 @@ export interface GiftView {
   reason: 'legacy' | 'review' | 'reward' | 'compensation' | 'admin_gift';
   level: { n: number; name: Tri; description: Tri; active: boolean } | null;
   choices: GiftItemView[] | null;
+  /** 'up_to' (a review's gift code): `choices` runs across every level from 1 to `level`, each saying its own. */
+  choice_scope?: 'level' | 'up_to';
+  chosen_level?: number | null;
   chosen: GiftItemView | null;
   can_change_choice: boolean;
   cart_item_id: string | null;
@@ -122,6 +127,18 @@ export function sortGifts<T extends { status: GiftStatus }>(gifts: readonly T[])
     .map((g, i) => ({ g, i }))
     .sort((a, b) => (STATUS_ORDER[a.g.status] ?? 99) - (STATUS_ORDER[b.g.status] ?? 99) || a.i - b.i)
     .map((x) => x.g);
+}
+
+/** The alternatives by the level each is offered in, in the server's order. An old answer without levels is one group. */
+export function groupByLevel(choices: readonly GiftItemView[]): Array<{ level: number | null; items: GiftItemView[] }> {
+  const groups: Array<{ level: number | null; items: GiftItemView[] }> = [];
+  for (const c of choices) {
+    const level = c.level ?? null;
+    const last = groups[groups.length - 1];
+    if (last && last.level === level) last.items.push(c);
+    else groups.push({ level, items: [c] });
+  }
+  return groups;
 }
 
 /** A three-language label in the reader's language, falling back to Arabic. */
@@ -239,6 +256,8 @@ function GiftChooser({
   onCancel?: () => void;
 }) {
   const choices = gift.choices ?? [];
+  // A code's gift offers every level it opened: each under its own heading (DECISIONS row 301).
+  const groups = gift.choice_scope === 'up_to' ? groupByLevel(choices) : [{ level: null, items: choices }];
   const [picked, setPicked] = useState<string>(gift.chosen?.item_id ?? (choices.length === 1 && choices[0].available ? choices[0].item_id ?? '' : ''));
   const groupId = useId();
   if (choices.length === 0) {
@@ -250,7 +269,14 @@ function GiftChooser({
         <span id={`${groupId}-label`} className="sr-only">
           {giftText(lang, 'titleGranted')}
         </span>
-        {choices.map((c) => {
+        {groups.map((group) => (
+          <React.Fragment key={group.level ?? 'all'}>
+        {group.level !== null && (
+          <p className="mt-1 text-[13px] font-semibold text-text-secondary" data-gift-level-group={group.level}>
+            {giftText(lang, 'levelChip', { level: group.level })}
+          </p>
+        )}
+        {group.items.map((c) => {
           const id = c.item_id ?? c.product_id;
           const selected = picked === id;
           const off = c.available === false;
@@ -288,6 +314,8 @@ function GiftChooser({
             </button>
           );
         })}
+          </React.Fragment>
+        ))}
       </div>
       <div className="flex flex-wrap gap-2">
         <Button
@@ -357,8 +385,15 @@ export default function GiftCard({ lang, gift, money, busy = false, error, notic
   const [changing, setChanging] = useState(false);
   const status = gift.status === 'LEGACY' ? 'CANCELLED' : gift.status;
   const [titleKey, bodyKey] = TITLE[status];
-  const levelName = gift.level ? pick(lang, gift.level.name) : '';
-  const levelDescription = gift.level ? pick(lang, gift.level.description) : '';
+  const upTo = gift.choice_scope === 'up_to';
+  const levelName = gift.level
+    ? upTo && gift.chosen_level
+      ? giftText(lang, 'levelChip', { level: gift.chosen_level })
+      : upTo
+        ? giftText(lang, 'upToLevel', { level: gift.level.n })
+        : pick(lang, gift.level.name)
+    : '';
+  const levelDescription = gift.level && !upTo ? pick(lang, gift.level.description) : '';
   const reasonKey = REASON_KEY[gift.reason];
   const choosing = status === 'GRANTED' || (status === 'READY_TO_REDEEM' && gift.can_change_choice && changing);
   const chosen = gift.chosen;
@@ -392,7 +427,7 @@ export default function GiftCard({ lang, gift, money, busy = false, error, notic
           </span>
         </h2>
         <p className="text-[13px] leading-relaxed text-text-secondary">
-          {choosing && levelDescription ? levelDescription : giftText(lang, bodyKey)}
+          {choosing && levelDescription ? levelDescription : choosing && upTo ? giftText(lang, 'bodyGrantedUpTo') : giftText(lang, bodyKey)}
         </p>
         {reasonKey && <p className="text-[12px] leading-relaxed text-text-muted">{giftText(lang, reasonKey)}</p>}
       </header>

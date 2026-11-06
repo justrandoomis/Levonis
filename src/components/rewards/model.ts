@@ -202,6 +202,7 @@ export function revokeKey(reason: string | null | undefined): RevokeKey {
 export type NextAction =
   | { kind: 'coupon-ending'; coupon: RewardCoupon }
   | { kind: 'gift'; printer: PrinterToRate }
+  | { kind: 'gift-code'; printer: PrinterToRate }
   | { kind: 'competition'; competition: Competition }
   | { kind: 'rate'; printer: PrinterToRate }
   | { kind: 'coupon'; coupon: RewardCoupon };
@@ -223,8 +224,8 @@ function soonest<T>(items: readonly T[], at: (item: T) => string): T | undefined
 
 /**
  * The ONE thing «بانتظارك» offers, first match wins: a usable coupon ending
- * within 48 h (server order: active by soonest end), a gift to choose, the
- * open competition closing first that this customer can enter, the newest
+ * within 48 h (server order: active by soonest end), a gift to choose, an
+ * approved review whose code is unwritten, the open competition closing first that this customer can enter, the newest
  * delivered printer to rate (with a page), any usable coupon. Otherwise
  * null, and no card is drawn. The shop never takes the card.
  */
@@ -235,6 +236,8 @@ export function nextAction(hub: RewardsHubData): NextAction | null {
   if (ending) return { kind: 'coupon-ending', coupon: ending };
   const gift = printers.find((p) => p.state === 'reward_approved');
   if (gift) return { kind: 'gift', printer: gift };
+  const code = printers.find((p) => p.state === 'code_ready');
+  if (code) return { kind: 'gift-code', printer: code };
   const competition = soonest(
     (hub.competitions ?? []).filter((c) => c.gate?.can_enter === true),
     (c) => c.ends_at
@@ -245,6 +248,13 @@ export function nextAction(hub: RewardsHubData): NextAction | null {
   const coupon = coupons.find(usable);
   if (coupon) return { kind: 'coupon', coupon };
   return null;
+}
+
+/** Where the hub's gift card goes, and what it says: a code's gift lives on «قيّم طابعتك», at its own step. */
+export function giftCardCta(p: Pick<PrinterToRate, 'gift'>): { to: string; label: CopyKey } {
+  if (p.gift?.scope !== 'up_to') return { to: '/gifts', label: 'rate.chooseGift' };
+  if (p.gift.status === 'ADDED_TO_ORDER') return { to: '/cart', label: 'reveal.checkout' };
+  return { to: '/rewards/rate', label: p.gift.status === 'REDEEMED' ? 'reveal.addToCart' : 'rate.chooseGift' };
 }
 
 // ------------------------------------------------------------ the hub's doors (§3.1)
@@ -260,6 +270,7 @@ export type DoorText =
         | 'door.competitions.judging'
         | 'door.competitions.none'
         | 'door.rate.gift'
+        | 'door.rate.code'
         | 'door.rate.pending'
         | 'door.rate.done'
         | 'door.rate.how'
@@ -334,6 +345,10 @@ function competitionsDoor(hub: RewardsHubData): Door {
 function rateDoor(hub: RewardsHubData): Door {
   const printers = hub.printers ?? [];
   const toRate = printers.filter((p) => p.state === 'to_rate').length;
+  // A code waiting is the news on this door, and a printer still to rate stays said beside it.
+  if (printers.some((p) => p.state === 'code_ready')) {
+    return door([{ key: 'door.rate.code' }, ...(toRate > 0 ? [{ count: 'printersToRate' as const, n: toRate }] : [])]);
+  }
   if (toRate > 0) return door([{ count: 'printersToRate', n: toRate }]);
   if (printers.some((p) => p.state === 'reward_approved')) return door([{ key: 'door.rate.gift' }]);
   if (printers.some((p) => p.state === 'reward_pending')) return door([{ key: 'door.rate.pending' }]);

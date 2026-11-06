@@ -14,6 +14,10 @@
  *   GET  /competitions/:id          one competition's own page
  *   POST /shop/:kind                swap points for a reward coupon
  *   POST /competitions/:id/enter    enter a competition
+ *   POST /gift-code                 the customer writes the code the team gave
+ *                                   them for an approved review (row 301): the
+ *                                   analysis, the levels, the gift
+ *   GET  /gift-reveal/:giftId       the same answer later, without the code
  *
  * EVERY FIGURE IS THE SERVER'S. The shop route reads no body at all: which
  * coupon is the path, and what it costs, how long it lasts and what it takes
@@ -56,6 +60,9 @@ import {
   withGates,
 } from '../lib/rewards/competitions';
 import { readPendingPoints } from '../lib/rewards/pending';
+import { giftRevealFor, redeemGiftCode, rewardCodeFacts } from '../lib/gifts/reviewCode';
+import { GIFT_ROW_SELECT, giftChoiceScope, giftStatusOf } from '../lib/gifts/model';
+import { giftLevelThreshold, maxGiftLevel } from '../../packages/contracts/src/giftScore';
 
 export const rewardProgramRoutes = new Hono<AppContext>();
 rewardProgramRoutes.use('*', requireAuth);
@@ -77,6 +84,26 @@ interface PrinterLine {
   images: string | null;
   image_snapshot: string | null;
   name_snapshot: string | null;
+}
+
+/** The gift each reward became, and whether it still waits for this customer. A legacy box still counts. */
+async function rewardGifts(db: D1Database, userId: string, rewardIds: readonly string[]) {
+  const out = new Map<string, { id: string; status: ReturnType<typeof giftStatusOf>; scope: ReturnType<typeof giftChoiceScope>; waiting: boolean }>();
+  if (rewardIds.length === 0) return out;
+  const { results } = await db
+    .prepare(`${GIFT_ROW_SELECT} WHERE g.user_id = ? AND g.reward_id IN (SELECT value FROM json_each(?))`)
+    .bind(userId, JSON.stringify(rewardIds))
+    .all<Record<string, unknown>>();
+  for (const g of results ?? []) {
+    const state = String(g.state ?? '');
+    out.set(String(g.reward_id), {
+      id: String(g.id),
+      status: giftStatusOf(g),
+      scope: giftChoiceScope(g),
+      waiting: state === 'available' || state === 'granted' || state === 'ready_to_redeem' || state === 'redeemed',
+    });
+  }
+  return out;
 }
 
 /** The printers this customer received, one per product, newest first. */
@@ -103,18 +130,24 @@ async function printersToRate(db: D1Database, userId: string) {
   if (!lines.length) return [];
   const { results: reviews } = await db
     .prepare(
-      `SELECT r.id, r.product_id, r.stars, r.source, rr.state AS reward_state, rr.quality_score AS reward_level
+      `SELECT r.id, r.product_id, r.stars, r.source, rr.id AS reward_id, rr.state AS reward_state, rr.quality_score AS reward_level
          FROM reviews r LEFT JOIN review_rewards rr ON rr.review_id = r.id
         WHERE r.user_id = ?1 AND r.product_id IN (SELECT value FROM json_each(?2))`
     )
     .bind(userId, JSON.stringify(lines.map((l) => l.product_id)))
-    .all<{ id: string; product_id: string; stars: number; source: string | null; reward_state: string | null; reward_level: number | null }>();
+    .all<{ id: string; product_id: string; stars: number; source: string | null; reward_id: string | null; reward_state: string | null; reward_level: number | null }>();
   const byProduct = new Map((reviews ?? []).map((r) => [r.product_id, r]));
+  const rewardIds = (reviews ?? []).map((r) => r.reward_id ?? '').filter(Boolean);
+  const [codes, gifts] = await Promise.all([rewardCodeFacts(db, rewardIds), rewardGifts(db, userId, rewardIds)]);
   return lines.map((l) => {
     const review = byProduct.get(l.product_id);
     const own = review && (review.source ?? 'user') !== 'system' ? review : null;
     const images = safeParse<unknown>(l.images ?? '[]', []);
     const firstImage = Array.isArray(images) && typeof images[0] === 'string' ? (images[0] as string) : '';
+    const code = own?.reward_id ? codes.get(own.reward_id) : undefined;
+    const gift = own?.reward_id ? gifts.get(own.reward_id) ?? null : null;
+    // The score belongs to the moment the customer writes the code: not a figure before it.
+    const opened = code?.code_redeemed_at && code.final_score != null;
     return {
       order_id: l.order_id,
       product_id: l.product_id,
@@ -125,18 +158,26 @@ async function printersToRate(db: D1Database, userId: string) {
       /**
        * to_rate          no review of theirs yet (a system rating is replaceable);
        * reward_pending   their review waits for the shop's gift decision;
-       * reward_approved  a gift was granted — it waits under /gifts;
-       * rated            reviewed, outside the gift levels or not approved.
+       * code_ready       approved, and the code the team gives them is unwritten (row 301);
+       * reward_approved  a gift waits for the customer: in /gifts, or on this page for a code's;
+       * rated            reviewed, and nothing is left to do: outside the gift
+       *                  levels, not approved, or the gift already ordered.
        */
       state: !own
         ? 'to_rate'
         : own.reward_state === 'submitted' || own.reward_state === 'revision_needed'
           ? 'reward_pending'
           : own.reward_state === 'approved'
-            ? 'reward_approved'
+            ? code?.code && !code.code_redeemed_at
+              ? 'code_ready'
+              : gift?.waiting
+                ? 'reward_approved'
+                : 'rated'
             : 'rated',
       stars: own ? Number(own.stars) || null : null,
-      reward_level: own && own.reward_state === 'approved' ? Number(own.reward_level) || null : null,
+      reward_level: own && own.reward_state === 'approved' ? (opened ? maxGiftLevel(code.final_score!) : Number(own.reward_level) || null) : null,
+      final_score: opened ? code.final_score : null,
+      gift: gift ? { id: gift.id, status: gift.status, scope: gift.scope } : null,
     };
   });
 }
@@ -153,6 +194,8 @@ async function giftLevels(db: D1Database) {
     name: { ar: g.name_ar, en: g.name_en, ckb: g.name_ckb },
     description: { ar: g.description_ar ?? '', en: g.description_en ?? '', ckb: g.description_ckb ?? '' },
     active: Number(g.active) === 1,
+    // The score that opens it (row 301): the page draws it and computes nothing.
+    threshold: giftLevelThreshold(Number(g.level)),
   }));
 }
 
@@ -322,6 +365,25 @@ rewardProgramRoutes.post('/shop/:kind', async (c) => {
     if (isSchemaMissing(e)) throw new HttpError(503, 'Rewards are being set up', 'REWARDS_NOT_INSTALLED');
     throw e;
   }
+});
+
+/**
+ * THE CUSTOMER WRITES THE CODE (row 301). Ten tries an hour for each customer,
+ * on a limiter of its own. Everything is the server's: which review, its score,
+ * the levels it opens. The body names only the code.
+ */
+rewardProgramRoutes.post('/gift-code', async (c) => {
+  await rateLimit(c, 'gift_code', 10, 3600);
+  const user = c.get('user')!;
+  const body = ((await c.req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+  const answer = await redeemGiftCode(c.env, user.id, body.code);
+  return c.json({ success: true, ...answer });
+});
+
+/** The same answer for a gift this customer already opened, so a reload or a later visit lands on it. */
+rewardProgramRoutes.get('/gift-reveal/:giftId', async (c) => {
+  const user = c.get('user')!;
+  return c.json({ success: true, ...(await giftRevealFor(c.env, user.id, c.req.param('giftId') ?? '')) });
 });
 
 rewardProgramRoutes.post('/competitions/:id/enter', async (c) => {

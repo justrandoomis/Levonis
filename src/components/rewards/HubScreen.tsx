@@ -52,7 +52,7 @@ import Countdown from '../ui/Countdown';
 import { CoinStar, CountBadge, ForwardChevron, HubSkeleton, ICON_DISC, INLINE_LINK, PRESSABLE_ROW, SetupState } from './AreaChrome';
 import { pointsForm, type CopyKey } from './copy';
 import { useCouponAction, useShipDetail } from './couponUse';
-import { doorLines, doorText, nearDate, nextAction, toDeviceTarget, underADay, type Doors, type NextAction } from './model';
+import { doorLines, doorText, giftCardCta, nearDate, nextAction, toDeviceTarget, underADay, type Doors, type NextAction } from './model';
 import type { Competition, PrinterToRate, RewardCoupon, RewardsHubData } from './types';
 import type { Read } from './useRewardsData';
 import { useRewardsT } from './useT';
@@ -194,6 +194,7 @@ function NowCard({ action, hub, skewMs, reloadSoon, onUseCoupon }: NowCardProps)
     return <NowCoupon coupon={action.coupon} ending={action.kind === 'coupon-ending'} clock={clock} onUse={onUseCoupon} />;
   }
   if (action.kind === 'gift') return <NowGift printer={action.printer} />;
+  if (action.kind === 'gift-code') return <NowGiftCode printer={action.printer} />;
   if (action.kind === 'competition') return <NowCompetition competition={action.competition} clock={clock} />;
   return <NowRate printer={action.printer} />;
 }
@@ -286,9 +287,16 @@ function NowCoupon({ coupon: c, ending, clock, onUse }: { coupon: RewardCoupon; 
   );
 }
 
-/** A review the team approved: the gift is the customer's to choose in «هداياي». */
+/**
+ * A review the team approved: the gift is the customer's to choose in «هداياي»,
+ * or, when a code opened it, on «قيّم طابعتك» among every level it opened.
+ */
 function NowGift({ printer: p }: { printer: PrinterToRate }) {
   const { t, tri, lang } = useRewardsT();
+  const upTo = p.gift?.scope === 'up_to';
+  const cta = giftCardCta(p);
+  // Once it is chosen there is no level left to talk about: only what it costs.
+  const chosen = upTo && (p.gift?.status === 'REDEEMED' || p.gift?.status === 'ADDED_TO_ORDER');
   return (
     <NowFrame
       kind="gift"
@@ -297,12 +305,37 @@ function NowGift({ printer: p }: { printer: PrinterToRate }) {
       title={tri(p.name)}
       ownerText
       primary={
-        <Link to="/gifts" className="lv-button lv-button-primary w-full">
-          {t('rate.chooseGift')}
+        <Link to={cta.to} className="lv-button lv-button-primary w-full">
+          {t(cta.label)}
         </Link>
       }
     >
-      {p.reward_level != null && <p className={NOW_LINE}>{t('now.gift.body', { level: formatFigure(p.reward_level, lang) })}</p>}
+      {chosen ? (
+        <p className={NOW_LINE}>{t('reveal.deliveryOnly')}</p>
+      ) : (
+        p.reward_level != null && <p className={NOW_LINE}>{t(upTo ? 'now.giftUpTo.body' : 'now.gift.body', { level: formatFigure(p.reward_level, lang) })}</p>
+      )}
+    </NowFrame>
+  );
+}
+
+/** An approved review whose code the team hands over: where to write it. No figure before the code. */
+function NowGiftCode({ printer: p }: { printer: PrinterToRate }) {
+  const { t, tri } = useRewardsT();
+  return (
+    <NowFrame
+      kind="gift-code"
+      Icon={Gift}
+      eyebrow={t('now.giftCode')}
+      title={tri(p.name)}
+      ownerText
+      primary={
+        <Link to="/rewards/rate" className="lv-button lv-button-primary w-full">
+          {t('now.giftCode.cta')}
+        </Link>
+      }
+    >
+      <p className={NOW_LINE}>{t('now.giftCode.body')}</p>
     </NowFrame>
   );
 }

@@ -503,6 +503,8 @@ export interface StoreMediaInput {
   originalName?: string | null;
   /** Cache-Control for the stored object; the caller knows if it is public. */
   cacheControl?: string;
+  /** Kept on the object and read back by HEAD: what the caller needs to know of the bytes later, without reading them. */
+  customMetadata?: Record<string, string>;
 }
 
 export interface StoreMediaResult {
@@ -581,6 +583,7 @@ export async function storeMedia(
             ? 'public, max-age=31536000, immutable'
             : 'private, max-age=300'),
       },
+      ...(input.customMetadata ? { customMetadata: input.customMetadata } : {}),
     }
   );
 

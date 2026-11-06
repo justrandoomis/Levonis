@@ -63,6 +63,9 @@ test('acceptance: from the admin’s level to the delivered gift, with every dup
   );
   assert.equal(level.success, true, JSON.stringify(level));
   const nozzle = await json(await post(a.admin, '/api/gifts/admin/levels/3/items', NOZZLE_04_RED));
+  // A level lists its items by sort, then created_at, then a random id; on Windows the clock moves in ~15.6 ms
+  // steps, so two items added within one step tie and their order falls to the ids (tests/giftLevels.test.ts).
+  await new Promise((r) => setTimeout(r, 20));
   const plate = await json(await post(a.admin, '/api/gifts/admin/levels/3/items', PLATE_AIR));
   assert.equal(nozzle.success && plate.success, true);
 

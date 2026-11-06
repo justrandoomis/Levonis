@@ -120,7 +120,12 @@ export default function GrantDetail({
           <>
             <div className="flex flex-wrap items-center gap-2">
               <GiftStatusChip lang={lang} status={grant.status} />
-              {grant.level && <span className="text-[12.5px] text-[var(--ap-text-2)]">{triOf(lang, grant.level.name) || adminText(lang, 'levelN', { n: grant.level.n })}</span>}
+              {grant.level && (
+                <span className="text-[12.5px] text-[var(--ap-text-2)]" data-gift-level-line>
+                  {grant.choice_scope === 'up_to' ? adminText(lang, 'upToLevelN', { n: grant.level.n }) : triOf(lang, grant.level.name) || adminText(lang, 'levelN', { n: grant.level.n })}
+                  {grant.choice_scope === 'up_to' && grant.chosen_level ? ` · ${adminText(lang, 'chosenFromLevel', { n: grant.chosen_level })}` : ''}
+                </span>
+              )}
               <span className="text-[12.5px] text-[var(--ap-text-3)]">· {t(reasonKey(grant.reason))}</span>
             </div>
             <dl className="space-y-1">

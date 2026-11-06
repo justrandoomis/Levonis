@@ -65,7 +65,14 @@ export interface GiftLineVerdict {
 
 /** The gift columns every reader of the cart and the checkout names. */
 export const GIFT_LINE_COLUMNS =
-  'id, user_id, state, grant_mode, level, order_seq, order_id, gift_product_id, gift_option_value_ids, gift_color_id, gift_qty, gift_sale_type, gift_transport_method, gift_snapshot';
+  'id, user_id, state, grant_mode, level, chosen_level, order_seq, order_id, gift_product_id, gift_option_value_ids, gift_color_id, gift_qty, gift_sale_type, gift_transport_method, gift_snapshot';
+
+/**
+ * The level a gift line says it is: the one the gift was chosen from. For a review's
+ * gift code that can be below `level`, the highest the score opened (DECISIONS row
+ * 301); for every other gift the two are the same.
+ */
+export const giftLineLevel = (g: { chosen_level?: unknown; level?: unknown }): number => Number(g.chosen_level) || Number(g.level) || 0;
 
 /** The value frozen on the entitlement at its grant (display only; never a price), or null. */
 export function frozenGiftValueOf(g: Record<string, unknown> | null | undefined): number | null {
@@ -133,7 +140,7 @@ export async function verifyGiftCartLines(
       ok: false,
       code: null,
       giftId,
-      level: Number(g.level) || 0,
+      level: giftLineLevel(g),
       nextOrderSeq: (Number(g.order_seq) || 0) + 1,
       selection: sel,
       frozenValueIqd: frozenGiftValueOf(g),

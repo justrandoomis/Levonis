@@ -133,6 +133,9 @@ test('every code the table translates is one the server can actually emit', () =
     // «وجدتها بمكان أرخص» refuses in the customer's own sheet, so its codes are
     // translated rather than rendered as the route's slash-joined ar/en pair.
     'worker/routes/priceReports.ts',
+    // The gift code of a review (DECISIONS row 301).
+    'worker/lib/gifts/reviewCode.ts',
+    'worker/routes/reviews.ts',
     'worker/lib/bnpl.ts',
     'worker/lib/bundleCart.ts',
     'worker/lib/offers.ts',
