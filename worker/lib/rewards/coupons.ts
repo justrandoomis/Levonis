@@ -28,8 +28,9 @@
  *   filament_discount  the owner's percentage and ceiling off ONE PIECE of the
  *                      selected filaments (`max_quantity`): scope 'products'
  *                      over the ticked list, or 'category' over the FDM filament
- *                      section while nothing is ticked. NOT on a line already
- *                      discounted (`stacks = 0`).
+ *                      section while nothing is ticked. On a line already on sale
+ *                      too, off the sale price, while `filament.on_sale` is on
+ *                      (`stacks`; owner, 2026-11-06).
  *
  * A coupon keeps the terms it was minted with. Its row says what it does, so a
  * coupon of last week spends on last week's terms whatever the settings say now.
@@ -56,6 +57,7 @@ import { notifyStatement } from '../notifications';
 import {
   FILAMENT_SECTION_ID,
   getRewardConfig,
+  getRewardConfigStrict,
   type RewardCouponKind,
   type RewardProgramConfig,
 } from './config';
@@ -128,7 +130,7 @@ export function termsFor(kind: RewardCouponKind, config: RewardProgramConfig): R
     product_ids: [...picked],
     category_id: picked.length ? null : FILAMENT_SECTION_ID,
     applies_to: 'merchandise',
-    stacks: false,
+    stacks: config.filament.on_sale,
     valid_days: config.valid_days,
   };
 }
@@ -300,7 +302,7 @@ export async function issuePrinterRewards(env: Env, orderId: string, nowIso = ne
 
 async function issue(env: Env, orderId: string, nowIso: string): Promise<IssueResult> {
   const db = env.DB;
-  const config = await getRewardConfig(db);
+  const config = await getRewardConfigStrict(db);
   const kinds: RewardCouponKind[] = [];
   if (config.free_shipping.enabled) kinds.push('free_shipping');
   if (config.filament.enabled) kinds.push('filament_discount');
@@ -441,7 +443,7 @@ const chainEndOpen = (root = 'd', hop = 'r') =>
 export async function issueWeeklyRewards(env: Env, startedAt: string, nowIso: string): Promise<WeeklyIssueReport> {
   const report: WeeklyIssueReport = { scanned: 0, issued: 0, errors: 0 };
   const db = env.DB;
-  const config = await getRewardConfig(db);
+  const config = await getRewardConfigStrict(db);
   const kinds: RewardCouponKind[] = [];
   if (config.free_shipping.enabled) kinds.push('free_shipping');
   if (config.filament.enabled) kinds.push('filament_discount');
@@ -657,6 +659,8 @@ export interface RewardCouponView {
   max_discount_iqd: number | null;
   /** How many pieces it discounts. Null is every piece it names (a coupon from before 0225). */
   max_quantity: number | null;
+  /** It also works on a piece already on sale. */
+  stacks: boolean;
   scope: string;
   category_id: string | null;
   product_ids: string[];
@@ -680,6 +684,7 @@ interface GrantRow {
   min_total_iqd: number | null;
   max_discount_iqd: number | null;
   max_quantity: number | null;
+  stacks: number | null;
   scope: string | null;
   category_id: string | null;
   product_ids: string | null;
@@ -694,7 +699,7 @@ interface GrantRow {
 
 /** A grant with its coupon and its derived state; `extra` adds columns and joins (the admin list's customer). */
 export const grantSelect = (now: string, extra: { columns?: string; joins?: string } = {}) => `SELECT g.id, g.user_id, g.kind, g.source, g.issued_at, g.expires_at, g.order_id, g.points_spent, g.revoke_reason,
-         c.code, c.kind AS coupon_kind, c.value, c.min_total_iqd, c.max_discount_iqd, c.max_quantity, c.scope, c.category_id, c.product_ids, c.ends_at,
+         c.code, c.kind AS coupon_kind, c.value, c.min_total_iqd, c.max_discount_iqd, c.max_quantity, c.stacks, c.scope, c.category_id, c.product_ids, c.ends_at,
          ${SPENT_ON_SQL('g.coupon_id')} AS used_on_order_id,
          ${GRANT_STATE_SQL(now)} AS state${extra.columns ? `, ${extra.columns}` : ''}
     FROM reward_grants g LEFT JOIN coupons c ON c.id = g.coupon_id${extra.joins ? ` ${extra.joins}` : ''}`;
@@ -719,6 +724,7 @@ export function grantView(r: GrantRow): RewardCouponView {
     min_total_iqd: Math.max(0, Math.trunc(Number(r.min_total_iqd) || 0)),
     max_discount_iqd: r.max_discount_iqd === null || r.max_discount_iqd === undefined ? null : Number(r.max_discount_iqd),
     max_quantity: r.max_quantity === null || r.max_quantity === undefined ? null : Number(r.max_quantity),
+    stacks: r.stacks === null || r.stacks === undefined ? true : Number(r.stacks) !== 0,
     scope: String(r.scope ?? ''),
     category_id: r.category_id ?? null,
     product_ids: stringList(r.product_ids),

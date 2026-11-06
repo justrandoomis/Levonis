@@ -217,7 +217,8 @@ function CouponCard({ c, focal, serverTime, skewMs, reloadSoon, onUse }: CouponC
         </p>
         <p className="text-[12px] leading-5 text-text-muted">
           {!ship && c.max_quantity ? `${t('coupon.pieces', { pieces: count('pieces', c.max_quantity) })} · ` : ''}
-          {t('coupon.ruleStack')} · {t(ship ? 'coupon.ruleShip' : 'coupon.ruleNoOffer')}
+          {t('coupon.ruleStack')}
+          {ship ? ` · ${t('coupon.ruleShip')}` : c.stacks ? '' : ` · ${t('coupon.ruleNoOffer')}`}
         </p>
       </div>
 

@@ -113,8 +113,8 @@ test('a delivered printer order earns one free-delivery and one filament coupon 
       assert.match(String(c.code), /^RWF[A-Z2-9]{10}$/);
       assert.deepEqual(
         [c.kind, c.applies_to, c.value, c.max_discount_iqd, c.max_quantity, c.scope, c.category_id, c.stacks],
-        ['percent', 'merchandise', 15, 25_000, 1, 'category', 'cat_materials_fdm', 0],
-        '15% of ONE PIECE of the FDM filaments, at most 25,000 IQD, never on a line already discounted'
+        ['percent', 'merchandise', 15, 25_000, 1, 'category', 'cat_materials_fdm', 1],
+        '15% of ONE PIECE of the FDM filaments, at most 25,000 IQD, on a line already on sale too (owner, 2026-11-06)'
       );
     }
   }

@@ -31,7 +31,7 @@ interface Config {
   valid_days: number;
   weekly: { enabled: boolean; months: number };
   free_shipping: { enabled: boolean; amount_iqd: number; min_order_iqd: number };
-  filament: { enabled: boolean; percent: number; max_discount_iqd: number | null; product_ids: string[]; max_pieces: number };
+  filament: { enabled: boolean; percent: number; max_discount_iqd: number | null; product_ids: string[]; max_pieces: number; on_sale: boolean };
   shop: Record<Kind, { enabled: boolean; points: number | null }>;
 }
 
@@ -236,6 +236,10 @@ function SettingsPanel() {
           <input id="rw-pieces" className="lv-input text-sm" dir="ltr" type="number" min={1} max={100} value={cfg.filament.max_pieces}
             onChange={(e) => set((c) => ((c.filament.max_pieces = Math.min(100, Math.max(1, Math.trunc(Number(e.target.value) || 1)))), c))} />
         </div>
+        <label className="flex items-center gap-2 text-sm text-text-primary sm:col-span-3">
+          <input type="checkbox" checked={cfg.filament.on_sale} onChange={(e) => set((c) => ((c.filament.on_sale = e.target.checked), c))} />
+          {loc('يعمل أيضًا على الفلامنت المخفَّض (الخصم من سعر العرض)', 'Also works on filament already on sale (off the sale price)', 'لەسەر فیلامێنتی داشکێنراویش کار دەکات (لە نرخی ئۆفەرەکەوە)')}
+        </label>
         <div className="sm:col-span-3">
           <p className={label}>
             {loc('الفلامنت المشمول', 'Filaments covered', 'ئەو فیلامێنتانەی دەگرێتەوە')}{' '}

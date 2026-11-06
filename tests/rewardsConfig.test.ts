@@ -25,7 +25,7 @@ const valid = () => ({
   valid_days: 7,
   weekly: { enabled: true, months: 12 },
   free_shipping: { enabled: true, amount_iqd: 5_000, min_order_iqd: 100_000 },
-  filament: { enabled: true, percent: 15, max_discount_iqd: 25_000, product_ids: [] as string[], max_pieces: 1 },
+  filament: { enabled: true, percent: 15, max_discount_iqd: 25_000, product_ids: [] as string[], max_pieces: 1, on_sale: true },
   shop: { free_shipping: { enabled: false, points: null as number | null }, filament_discount: { enabled: false, points: null as number | null } },
 });
 
@@ -35,7 +35,7 @@ test('the defaults are the owner’s answers: every week for 12 months, 5,000 of
   assert.equal(d.valid_days, 7);
   assert.deepEqual(d.weekly, { enabled: true, months: 12 });
   assert.deepEqual(d.free_shipping, { enabled: true, amount_iqd: 5_000, min_order_iqd: 100_000 });
-  assert.deepEqual(d.filament, { enabled: true, percent: 15, max_discount_iqd: 25_000, product_ids: [], max_pieces: 1 });
+  assert.deepEqual(d.filament, { enabled: true, percent: 15, max_discount_iqd: 25_000, product_ids: [], max_pieces: 1, on_sale: true });
   assert.deepEqual(d.shop.free_shipping, { enabled: false, points: null });
   assert.deepEqual(d.shop.filament_discount, { enabled: false, points: null });
 });
@@ -63,7 +63,7 @@ test('a row saved before the weekly coupons reads the owner’s new terms, and k
   const n = normalizeRewardConfig(JSON.stringify({ valid_days: 10, free_shipping: { enabled: false }, filament: { enabled: true, percent: 20, max_discount_iqd: 9_000, product_ids: ['p_ok'] } }));
   assert.deepEqual(n.weekly, { enabled: true, months: 12 });
   assert.deepEqual(n.free_shipping, { enabled: false, amount_iqd: 5_000, min_order_iqd: 100_000 });
-  assert.deepEqual(n.filament, { enabled: true, percent: 20, max_discount_iqd: 9_000, product_ids: ['p_ok'], max_pieces: 1 });
+  assert.deepEqual(n.filament, { enabled: true, percent: 20, max_discount_iqd: 9_000, product_ids: ['p_ok'], max_pieces: 1, on_sale: true });
   assert.equal(n.valid_days, 10);
   const damaged = normalizeRewardConfig(JSON.stringify({ weekly: { enabled: 'yes', months: 0 }, free_shipping: { amount_iqd: -1, min_order_iqd: 'x' }, filament: { max_pieces: 0 } }));
   assert.deepEqual(damaged.weekly, { enabled: true, months: 12 });
@@ -103,7 +103,8 @@ test('the coupon terms each grant freezes: an amount off the delivery, or a perc
   assert.deepEqual([ship.applies_to, ship.coupon_kind, ship.value, ship.min_total_iqd, ship.scope], ['delivery', 'fixed_iqd', 5_000, 100_000, 'global']);
   const section = termsFor('filament_discount', cfg);
   assert.deepEqual([section.coupon_kind, section.value, section.max_quantity], ['percent', 15, 1]);
-  assert.deepEqual([section.scope, section.category_id, section.stacks], ['category', 'cat_materials_fdm', false]);
+  assert.deepEqual([section.scope, section.category_id, section.stacks], ['category', 'cat_materials_fdm', true]);
+  assert.equal(termsFor('filament_discount', normalizeRewardConfig({ filament: { on_sale: false } })).stacks, false, 'the owner can switch it off for new coupons');
   const listed = termsFor('filament_discount', normalizeRewardConfig({ filament: { product_ids: ['p1', 'p2'] } }));
   assert.deepEqual([listed.scope, listed.product_ids, listed.category_id], ['products', ['p1', 'p2'], null]);
 });

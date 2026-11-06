@@ -134,11 +134,17 @@ import type { PolicyDocument } from './types';
  *     worker/lib/rewards/pool.ts and `allocateCouponPool` are every sentence of it.
  *   * 14.8 says no new coupons follow a withdrawal, and 14.12 names values and
  *     periods among what the Store may change for the future.
+ *
+ * VERSION 7 — WHY IT MOVED (owner, 2026-11-06; DECISIONS row 302). The archive
+ * keeps version 6 byte for byte.
+ *   * 14.5: the filament coupon works on an item already on sale, off the sale
+ *     price, unless announced otherwise with it. eSUN PLA+, the one filament it
+ *     names, is on sale at $15, and 14.5 said the coupon would refuse it.
  */
 export const rewards: PolicyDocument = {
   key: 'rewards',
-  version: 6,
-  effective_at: '2026-11-05',
+  version: 7,
+  effective_at: '2026-11-06',
   title: {
     ar: 'سياسة النقاط والمراجعات والهدايا والإحالات',
     en: 'Points, Reviews, Gifts and Referrals Policy',
@@ -578,7 +584,7 @@ export const rewards: PolicyDocument = {
 يخصم من أجرة توصيل الطلب قيمته المعلنة معه، ولا يخصم شيئاً من ثمن المنتجات. ويُقبل في طلب بلغ ثمن منتجاته، بعد كل الخصومات وقبل أجرة التوصيل، الحدَّ المعلن معه. والمعلن عند صدور هذه النسخة: 5,000 د.ع للطلبات فوق 100,000 د.ع. ولا تُحسب النقاط خصماً هنا، فهي طريقة دفع. ولا يخصم أكثر مما بقي من الأجرة، ولا يُستهلك في طلب كان توصيله مجانياً أصلاً، ولا في طلب يُستلم من المخزن.
 
 ### 14.5 كوبون الفلامنت
-يخصم النسبة المعلنة معه من ثمن قطعة واحدة من خيط الطباعة الذي يسمّيه الكوبون، بحد أقصى معلن للكوبون الواحد، ولا يمس سائر المنتجات ولا التوصيل. وإذا اختلفت أثمان القطع في الطلب وقع على أغلاها. ولا يُطبَّق على قطعة عليها عرض أو خصم آخر. وتُثبَّت نسبته وحده الأقصى وعدد قطعه وقائمة الخيط المشمول لحظة إصداره.
+يخصم النسبة المعلنة معه من ثمن قطعة واحدة من خيط الطباعة الذي يسمّيه الكوبون، بحد أقصى معلن للكوبون الواحد، ولا يمس سائر المنتجات ولا التوصيل. وإذا اختلفت أثمان القطع في الطلب وقع على أغلاها. ويُطبَّق كذلك على القطعة التي عليها عرض أو خصم آخر، فيخصم من سعرها بعده، ما لم يُعلن معه غير ذلك. وتُثبَّت نسبته وحده الأقصى وعدد قطعه وقائمة الخيط المشمول لحظة إصداره.
 
 ### 14.6 جمع الكوبونات في طلب واحد
 يجوز جمع كوبونات المكافأة كلها في طلب واحد. يكفي إدخال كود أحدها، فيطبّق المتجر كل ما ينتفع به الطلب من كوبونات صاحب الحساب، الأقرب انتهاءً أولاً، ويبقى له ما زاد. فكوبونان للتوصيل يخصمان حتى 10,000 د.ع من الأجرة، وكوبونان للفلامنت يخصمان من قطعتين، ولا يقع كوبونان على قطعة واحدة. وكود الخصم الذي ليس كوبون مكافأة لا يجتمع معها. والكوبون شخصي لصاحب الحساب، لا يُنقل ولا يُستعمل من حساب آخر، ويُستعمل مرة واحدة.
@@ -1083,7 +1089,7 @@ A reward coupon is valid for seven full days from the moment it is issued, unles
 It takes the value announced with it off the order's delivery charge and nothing off the price of the products. It is accepted on an order whose products reach the threshold announced with it, after every discount and before the delivery charge. Announced when this version was issued: 5,000 IQD on orders over 100,000 IQD. Points are not counted as a discount here: they are a way of paying. It takes no more than what is left of the charge, and it is not used up on an order whose delivery was free already, nor on an order collected from the warehouse.
 
 ### 14.5 The filament coupon
-It takes the percentage announced with it off the price of one piece of the print filament the coupon names, up to an announced ceiling per coupon; it does not touch other products or delivery. Where the pieces in an order differ in price, it falls on the dearest. It does not apply to an item that carries an offer or another discount. Its percentage, its ceiling, its number of pieces and the list of filament it covers are fixed when it is issued.
+It takes the percentage announced with it off the price of one piece of the print filament the coupon names, up to an announced ceiling per coupon; it does not touch other products or delivery. Where the pieces in an order differ in price, it falls on the dearest. It also applies to an item that carries an offer or another discount, off the price after it, unless announced otherwise with it. Its percentage, its ceiling, its number of pieces and the list of filament it covers are fixed when it is issued.
 
 ### 14.6 Using coupons together on one order
 All reward coupons may be used together on one order. Entering the code of any one of them is enough: the Store applies every coupon of the account holder that the order can use, the soonest to end first, and the rest stay with the holder. Two delivery coupons take up to 10,000 IQD off the charge, two filament coupons take from two pieces, and two coupons never fall on one piece. A promo code that is not a reward coupon does not combine with them. The coupon is personal to the account holder: it is not transferable, cannot be used from another account, and is used once.
@@ -1588,7 +1594,7 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 بەهای ڕاگەیەنراو لەگەڵیدا لە تێچووی گەیاندنی داواکارییەکە کەم دەکاتەوە و هیچ لە نرخی بەرهەمەکان کەم ناکاتەوە. لە داواکارییەکدا وەردەگیرێت کە نرخی بەرهەمەکانی، دوای هەموو داشکاندنەکان و پێش تێچووی گەیاندن، بگاتە ئەو سنوورەی لەگەڵیدا ڕاگەیەنراوە. ئەوەی لە کاتی دەرچوونی ئەم وەشانەدا ڕاگەیەنراوە: 5,000 دینار بۆ داواکارییەکانی سەرووی 100,000 دینار. لێرەدا خاڵەکان وەک داشکاندن ناژمێردرێن، چونکە شێوازێکی پارەدانن. لەوەی لە تێچووەکە ماوە زیاتر کەم ناکاتەوە، و لە داواکارییەکدا کە گەیاندنەکەی پێشتر بەخۆڕایی بووبێت، یان لە داواکارییەکدا کە لە کۆگا وەردەگیرێت، بەکارنابرێت.
 
 ### 14.5 کۆپۆنی دەزووی چاپ
-ئەو ڕێژەیەی لەگەڵیدا ڕاگەیەنراوە لە نرخی یەک پارچە لەو دەزووی چاپەی کە کۆپۆنەکە ناوی دەبات کەم دەکاتەوە، تا سنوورێکی ڕاگەیەنراو بۆ هەر کۆپۆنێک، و دەست لە بەرهەمەکانی تر و گەیاندن نادات. ئەگەر نرخی پارچەکانی داواکارییەکە جیاواز بوون، لەسەر گرانترینیان جێبەجێ دەبێت. لەسەر پارچەیەک کە ئۆفەر یان داشکاندنێکی تری لەسەرە جێبەجێ نابێت. ڕێژە و سنوور و ژمارەی پارچەکان و لیستی ئەو دەزووەی دەیگرێتەوە لە کاتی دەرچووندا جێگیر دەکرێن.
+ئەو ڕێژەیەی لەگەڵیدا ڕاگەیەنراوە لە نرخی یەک پارچە لەو دەزووی چاپەی کە کۆپۆنەکە ناوی دەبات کەم دەکاتەوە، تا سنوورێکی ڕاگەیەنراو بۆ هەر کۆپۆنێک، و دەست لە بەرهەمەکانی تر و گەیاندن نادات. ئەگەر نرخی پارچەکانی داواکارییەکە جیاواز بوون، لەسەر گرانترینیان جێبەجێ دەبێت. لەسەر پارچەیەکیش کە ئۆفەر یان داشکاندنێکی تری لەسەرە جێبەجێ دەبێت و لە نرخەکەی دوای ئەوە کەم دەکاتەوە، مەگەر لەگەڵیدا پێچەوانەکەی ڕابگەیەنرێت. ڕێژە و سنوور و ژمارەی پارچەکان و لیستی ئەو دەزووەی دەیگرێتەوە لە کاتی دەرچووندا جێگیر دەکرێن.
 
 ### 14.6 کۆکردنەوەی کۆپۆنەکان لە یەک داواکاریدا
 دەکرێت هەموو کۆپۆنەکانی پاداشت لە یەک داواکاریدا کۆبکرێنەوە. نووسینی کۆدی یەکێکیان بەسە: فرۆشگا هەموو ئەو کۆپۆنانەی خاوەنی هەژمارەکە بەکاردەهێنێت کە داواکارییەکە سوودیان لێ وەردەگرێت، نزیکترین بەسەرچوون لە پێشدا، و ئەوەی زیاد بێت بۆ خاوەنەکەی دەمێنێتەوە. دوو کۆپۆنی گەیاندن تا 10,000 دینار لە تێچووەکە کەم دەکەنەوە، دوو کۆپۆنی دەزوو لە دوو پارچە کەم دەکەنەوە، و دوو کۆپۆن لەسەر یەک پارچە جێبەجێ نابن. کۆدی داشکاندن کە کۆپۆنی پاداشت نەبێت لەگەڵیان کۆنابێتەوە. کۆپۆنەکە تایبەتە بە خاوەنی هەژمارەکە: ناگوازرێتەوە، لە هەژمارێکی ترەوە بەکارنایەت، و یەک جار بەکاردێت.

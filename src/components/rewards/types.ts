@@ -30,6 +30,8 @@ export interface RewardCoupon {
   max_discount_iqd: number | null;
   /** How many pieces it discounts; null or absent: every piece it names. */
   max_quantity?: number | null;
+  /** It also works on a piece already on sale; absent from an older server. */
+  stacks?: boolean;
   scope: string;
   category_id: string | null;
   product_ids: string[];

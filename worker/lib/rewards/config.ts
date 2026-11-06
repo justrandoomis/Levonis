@@ -18,6 +18,9 @@
  *   · the filament coupon is 15% off ONE PIECE, at most 25,000 IQD, on the
  *     filaments ticked in Admin → Rewards — and, until any is ticked, on every
  *     product in the FDM filament section: «the coupon is for 1 pic»;
+ *   · it also works on a piece already on sale, off the sale price (owner,
+ *     2026-11-06, for eSUN PLA+ at its $15: the filament coupon only, with a
+ *     switch; DECISIONS row 302). Every other discount keeps row 223 #5;
  *   · the POINTS SHOP sells the same two coupons for points, at prices the
  *     owner sets. NO PRICE IS INVENTED HERE: both items start switched off
  *     with no price, and the shop is not shown until the owner sets one.
@@ -72,6 +75,8 @@ export interface RewardProgramConfig {
     product_ids: string[];
     /** How many pieces one coupon discounts. */
     max_pieces: number;
+    /** It also takes its percentage off a piece already on sale, off the sale price. */
+    on_sale: boolean;
   };
   shop: Record<RewardCouponKind, ShopItemConfig>;
 }
@@ -81,7 +86,7 @@ export const REWARD_PROGRAM_DEFAULT: RewardProgramConfig = Object.freeze({
   valid_days: 7,
   weekly: { enabled: true, months: 12 },
   free_shipping: { enabled: true, amount_iqd: 5_000, min_order_iqd: 100_000 },
-  filament: { enabled: true, percent: 15, max_discount_iqd: 25_000, product_ids: [], max_pieces: 1 },
+  filament: { enabled: true, percent: 15, max_discount_iqd: 25_000, product_ids: [], max_pieces: 1, on_sale: true },
   shop: {
     free_shipping: { enabled: false, points: null },
     filament_discount: { enabled: false, points: null },
@@ -138,6 +143,7 @@ export function normalizeRewardConfig(raw: unknown): RewardProgramConfig {
         fl.max_discount_iqd === null ? null : isPosInt(fl.max_discount_iqd, MAX_DISCOUNT_IQD) ? (fl.max_discount_iqd as number) : d.filament.max_discount_iqd,
       product_ids: ids,
       max_pieces: isPosInt(fl.max_pieces, MAX_PIECES) ? (fl.max_pieces as number) : d.filament.max_pieces,
+      on_sale: typeof fl.on_sale === 'boolean' ? fl.on_sale : d.filament.on_sale,
     },
     shop: {
       free_shipping: shopItem(shop.free_shipping, d.shop.free_shipping),
@@ -175,6 +181,7 @@ export function validateRewardConfig(raw: unknown): RewardConfigCheck {
     return fail(`filament.product_ids must be a list of at most ${MAX_FILAMENTS} product ids`);
   }
   if (fl.max_pieces !== undefined && !isPosInt(fl.max_pieces, MAX_PIECES)) return fail(`filament.max_pieces must be a whole number from 1 to ${MAX_PIECES}`);
+  if (fl.on_sale !== undefined && typeof fl.on_sale !== 'boolean') return fail('filament.on_sale must be true or false');
   const shop = r.shop as Record<string, unknown> | undefined;
   if (!shop || typeof shop !== 'object') return fail('shop must be an object');
   for (const kind of REWARD_COUPON_KINDS) {
@@ -194,6 +201,16 @@ export async function getRewardConfig(db: D1Database): Promise<RewardProgramConf
   } catch {
     return normalizeRewardConfig(null);
   }
+}
+
+/**
+ * The stored terms for MINTING. A read that fails throws. `getRewardConfig` answers
+ * with the defaults, which suits a page and not a coupon: one failed read would mint
+ * on terms the owner changed, or with the programme switched off, and a notice with it.
+ */
+export async function getRewardConfigStrict(db: D1Database): Promise<RewardProgramConfig> {
+  const row = await db.prepare('SELECT value FROM admin_settings WHERE key = ?').bind(REWARD_CONFIG_KEY).first<{ value: string }>();
+  return normalizeRewardConfig(row?.value ?? null);
 }
 
 /** The statement that stores validated terms. */
