@@ -7,6 +7,9 @@
  *   mode 'level'    the customer chooses one of the level's items  → granted
  *   mode 'product'  one product pinned by the admin (a level item
  *                   or any store product)                          → ready_to_redeem
+ *   the points shop one product the customer swapped points for    → redeemed
+ *                   (mode 'product', worker/lib/rewards/shopItems.ts,
+ *                   DECISIONS row 299)
  *
  * Nothing is reserved here (D6): stock moves only through the order the gift
  * ends up in.
@@ -17,6 +20,7 @@ import { auditStatements } from '../audit';
 import { notifyStatement } from '../notifications';
 import { notifyCustomer, reachFor, type CustomerMessage } from '../customerNotify';
 import type { GiftSelection, GiftSnapshot } from './selection';
+import { changedExactlyOne } from './fence';
 import { snapshotJson, type GiftChoiceScope, type GrantReason } from './model';
 
 export interface GrantPlanInput {
@@ -40,6 +44,14 @@ export interface GrantPlanInput {
   choiceScope?: GiftChoiceScope;
   /** The customer did this themself, on a screen that shows it: no «وصلتك هدية». */
   silent?: boolean;
+  /**
+   * THE POINTS SHOP (DECISIONS row 299): the customer paid for this product, so the gift
+   * is born `redeemed`, remembers its price, and is written only while they hold no
+   * un-ordered gift of the same shop item, in the batch, with the fence behind it. They
+   * did this themself, so there is no «you received a gift» notice. Only this grant names
+   * the 0229 columns: every other one still writes on a database without them.
+   */
+  shop?: { itemId: string; points: number; txId: string } | null;
 }
 
 export const GIFT_COPY = {
@@ -73,44 +85,52 @@ export async function planGrant(db: D1Database, input: GrantPlanInput): Promise<
   const id = input.id ?? newId('gift');
   const pinned = input.pinned ?? null;
   const sel = pinned?.selection ?? null;
-  const statements: D1PreparedStatement[] = [
-    db
-      .prepare(
-        `INSERT INTO gift_entitlements
-           (id, reward_id, user_id, max_level, chosen_level, state, grant_mode, reason, level, admin_note,
+  const shop = sel ? input.shop ?? null : null;
+  const values: Array<string | number | null> = [
+    id,
+    input.rewardId ?? null,
+    input.userId,
+    input.level,
+    input.level,
+    shop ? 'redeemed' : sel ? 'ready_to_redeem' : 'granted',
+    sel ? 'product' : 'level',
+    input.reason,
+    input.level,
+    input.note,
+    input.actorId,
+    input.now,
+    input.now,
+    input.requestId ?? null,
+    input.requestHash ?? null,
+    pinned?.itemId ?? null,
+    sel?.productId ?? null,
+    JSON.stringify(sel?.optionValueIds ?? []),
+    sel?.colorId ?? '',
+    sel?.qty ?? 1,
+    sel?.saleType ?? '',
+    sel?.transportMethod ?? '',
+    snapshotJson(pinned?.snapshot ?? null),
+    sel ? input.now : null,
+    input.now,
+  ];
+  const columns = `id, reward_id, user_id, max_level, chosen_level, state, grant_mode, reason, level, admin_note,
             granted_by, granted_at, updated_at, version, grant_request_id, grant_request_hash,
             gift_item_id, gift_product_id, gift_option_value_ids, gift_color_id, gift_qty, gift_sale_type,
-            gift_transport_method, gift_snapshot, chosen_at, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-      )
-      .bind(
-        id,
-        input.rewardId ?? null,
-        input.userId,
-        input.level,
-        input.level,
-        sel ? 'ready_to_redeem' : 'granted',
-        sel ? 'product' : 'level',
-        input.reason,
-        input.level,
-        input.note,
-        input.actorId,
-        input.now,
-        input.now,
-        input.requestId ?? null,
-        input.requestHash ?? null,
-        pinned?.itemId ?? null,
-        sel?.productId ?? null,
-        JSON.stringify(sel?.optionValueIds ?? []),
-        sel?.colorId ?? '',
-        sel?.qty ?? 1,
-        sel?.saleType ?? '',
-        sel?.transportMethod ?? '',
-        snapshotJson(pinned?.snapshot ?? null),
-        sel ? input.now : null,
-        input.now
-      ),
-  ];
+            gift_transport_method, gift_snapshot, chosen_at, created_at`;
+  const marks = '?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?';
+  const statements: D1PreparedStatement[] = shop
+    ? [
+        db
+          .prepare(
+            `INSERT INTO gift_entitlements (${columns}, redeemed_at, points_spent, points_tx_id, shop_item_id)
+             SELECT ${marks}, ?, ?, ?, ?
+              WHERE NOT EXISTS (SELECT 1 FROM gift_entitlements h WHERE h.user_id = ? AND h.shop_item_id = ? AND h.state = 'redeemed')`
+          )
+          .bind(...values, input.now, shop.points, shop.txId, shop.itemId, input.userId, shop.itemId),
+        // Holding one already wrote nothing, and nothing after this may stand on it.
+        ...changedExactlyOne(db),
+      ]
+    : [db.prepare(`INSERT INTO gift_entitlements (${columns}) VALUES (${marks})`).bind(...values)];
   const audit = await auditStatements(db, input.actorId === 'system' ? null : input.actorId, 'gift.grant', id, {
     user_id: input.userId,
     level: input.level,
@@ -133,7 +153,7 @@ export async function planGrant(db: D1Database, input: GrantPlanInput): Promise<
   if (input.choiceScope === 'up_to') {
     statements.push(db.prepare("UPDATE gift_entitlements SET choice_scope = 'up_to' WHERE id = ?").bind(id));
   }
-  if (input.silent) return { id, statements };
+  if (input.silent || shop) return { id, statements };
   const words = levelWords(input.level);
   statements.push(
     notifyStatement(db, {

@@ -39,9 +39,11 @@ type CouponTerms = { percent: number; amount: number; min: number; pieces: numbe
 type Params =
   | ({ kind: 'printer_coupons'; count: number; until: string } & CouponTerms)
   | ({ kind: 'weekly_coupons'; until: string } & CouponTerms)
+  | ({ kind: 'team_coupon'; until: string } & CouponTerms)
   | { kind: 'coupons_expiring'; count: number; until: string }
   | { kind: 'competition_won'; title: Trilingual; place: number; points: number }
-  | { kind: 'competition_refund'; title: Trilingual; points: number };
+  | { kind: 'competition_refund'; title: Trilingual; points: number }
+  | { kind: 'shop_gift_refund'; name: Trilingual; points: number };
 
 const n = (v: number) => Math.max(0, Math.trunc(v)).toLocaleString('en-US');
 const capital = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
@@ -73,6 +75,21 @@ function couponsPhrase(p: CouponTerms): { what: Trilingual; both: boolean } {
 
 export function rewardText(p: Params): RewardText {
   switch (p.kind) {
+    case 'team_coupon': {
+      const { what } = couponsPhrase(p);
+      return {
+        title: {
+          ar: '🎁 كوبون هدية من فريق Levonis',
+          en: '🎁 A coupon from the Levonis team',
+          ckb: '🎁 کۆپۆنێکی دیاری لە تیمی Levonis',
+        },
+        body: {
+          ar: `${what.ar}، صالح حتى ${p.until}. تجده في صفحة المكافآت.`,
+          en: `${capital(what.en)}, valid until ${p.until}. Find it on the Rewards page.`,
+          ckb: `${what.ckb}، تا ${p.until} بەکاردێت. لە پەڕەی خەڵاتەکان دەیدۆزیتەوە.`,
+        },
+      };
+    }
     case 'weekly_coupons': {
       const { what, both } = couponsPhrase(p);
       return {
@@ -168,6 +185,19 @@ export function rewardText(p: Params): RewardText {
           ar: `أعدنا إلى رصيدك ${n(p.points)} نقطة دفعتها للمشاركة.`,
           en: `The ${n(p.points)} points you paid to enter are back in your balance.`,
           ckb: `ئەو ${n(p.points)} خاڵەی بۆ بەشداریکردن دابووت گەڕێنرایەوە بۆ باڵانسەکەت.`,
+        },
+      };
+    case 'shop_gift_refund':
+      return {
+        title: {
+          ar: '↩️ أُلغيت هديتك من متجر النقاط',
+          en: '↩️ Your points-shop gift was cancelled',
+          ckb: '↩️ دیارییەکەت لە فرۆشگای خاڵ هەڵوەشێنرایەوە',
+        },
+        body: {
+          ar: `أعدنا إلى رصيدك ${n(p.points)} نقطة دفعتها مقابل ${pick(p.name, 'ar')}.`,
+          en: `The ${n(p.points)} points you paid for ${pick(p.name, 'en')} are back in your balance.`,
+          ckb: `ئەو ${n(p.points)} خاڵەی بۆ ${pick(p.name, 'ckb')} دابووت گەڕێنرایەوە بۆ باڵانسەکەت.`,
         },
       };
   }

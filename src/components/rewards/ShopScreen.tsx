@@ -14,11 +14,12 @@
  * By `hub.status`:
  * - no data yet: <ShopSkeleton />; a failed first read: <ErrorState />;
  * - `installed === false`: <SetupState />;
- * - ready, `shop` empty (the default, nothing priced): the balance row and the
+ * - ready, nothing on sale (the default, nothing priced): the balance row and the
  *   honest unpriced EmptyState — points are spent at checkout; no «opens
  *   soon» promise;
- * - ready: the balance row, the offers, the one-of-each note, «أو استخدم نقاطك
- *   عند الدفع». No raised card on this screen; prices and the balance are ink.
+ * - ready: the balance row, the coupons with their one-of-each note, the products
+ *   for points (./ShopProducts, DECISIONS row 299), «أو استخدم نقاطك عند الدفع».
+ *   No raised card on this screen; prices and the balance are ink.
  *
  * THE SWAP. «استبدل» is disabled by the server's fields only (`!affordable ||
  * holding`) and the line beside it says why — the points still missing
@@ -52,6 +53,7 @@ import { ForwardChevron, ICON_DISC, INLINE_LINK, SECTION_HEADING, SetupState, Sh
 import { pointsForm, type CopyKey } from './copy';
 import { useCouponAction, useShipDetail } from './couponUse';
 import { nearDate, usable } from './model';
+import { ShopProducts } from './ShopProducts';
 import type { RewardCoupon, RewardsHubData, ShopItem } from './types';
 import type { Read } from './useRewardsData';
 import { useRewardsT } from './useT';
@@ -122,6 +124,7 @@ export function ShopScreen({ hub, onSwapped }: ShopScreenProps) {
 
   const program = data.program;
   const shop = data.shop ?? [];
+  const products = data.shop_items ?? [];
   const cap = program?.filament?.max_discount_iqd;
   const shipAmount = program?.free_shipping?.amount_iqd;
   const shipText = shipAmount ? shipDetail({ amount_iqd: shipAmount, min_total_iqd: program?.free_shipping?.min_order_iqd }) : null;
@@ -225,7 +228,7 @@ export function ShopScreen({ hub, onSwapped }: ShopScreenProps) {
         </div>
       )}
 
-      {shop.length === 0 ? (
+      {shop.length === 0 && products.length === 0 ? (
         <EmptyState
           icon={<Coins className="w-6 h-6" aria-hidden="true" />}
           title={t('shop.empty.title')}
@@ -238,68 +241,71 @@ export function ShopScreen({ hub, onSwapped }: ShopScreenProps) {
         />
       ) : (
         <>
-          <ul className="space-y-2">
-            {shop.map((item) => {
-              const held = item.holding === true;
-              const short = !held && !item.affordable;
-              const reasonId = `shop-${item.kind}-why`;
-              return (
-                <li key={item.kind} className="lv-surface p-4 space-y-3" data-testid="shop-item">
-                  <div className="flex items-start gap-3">
-                    <span aria-hidden="true" className={ICON_DISC}>
-                      {item.kind === 'free_shipping' ? <Truck className="w-5 h-5" /> : <Percent className="w-5 h-5" />}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                        <h2 className="min-w-0 text-[15px] font-bold leading-6 text-text-primary">{itemTitle(item)}</h2>
-                        <span className="shrink-0 text-[15px] font-bold tabular-nums text-text-primary">{count('points', item.points)}</span>
+          {shop.length > 0 && (
+            <ul className="space-y-2">
+              {shop.map((item) => {
+                const held = item.holding === true;
+                const short = !held && !item.affordable;
+                const reasonId = `shop-${item.kind}-why`;
+                return (
+                  <li key={item.kind} className="lv-surface p-4 space-y-3" data-testid="shop-item">
+                    <div className="flex items-start gap-3">
+                      <span aria-hidden="true" className={ICON_DISC}>
+                        {item.kind === 'free_shipping' ? <Truck className="w-5 h-5" /> : <Percent className="w-5 h-5" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                          <h2 className="min-w-0 text-[15px] font-bold leading-6 text-text-primary">{itemTitle(item)}</h2>
+                          <span className="shrink-0 text-[15px] font-bold tabular-nums text-text-primary">{count('points', item.points)}</span>
+                        </div>
+                        <p className="mt-0.5 text-[12px] leading-5 text-text-secondary">
+                          {item.kind === 'filament_discount' && filamentText ? `${filamentText} · ${validText}` : item.kind === 'free_shipping' && shipText ? `${shipText} · ${validText}` : validText}
+                        </p>
                       </div>
-                      <p className="mt-0.5 text-[12px] leading-5 text-text-secondary">
-                        {item.kind === 'filament_discount' && filamentText ? `${filamentText} · ${validText}` : item.kind === 'free_shipping' && shipText ? `${shipText} · ${validText}` : validText}
-                      </p>
                     </div>
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-                    {(held || short) && (
-                      <p id={reasonId} className="min-w-0 flex-1 text-[12px] leading-5 text-text-secondary">
-                        {held ? (
-                          <>
-                            {t('shop.holding')}
-                            {' · '}
-                            <Link to="/rewards/coupons" className={CHEVRON_LINK}>
-                              {t('shop.show')}
-                              <ForwardChevron />
-                            </Link>
-                          </>
-                        ) : (
-                          <>
-                            {typeof item.points_short === 'number' && item.points_short > 0
-                              ? count('pointsShort', item.points_short)
-                              : t('shop.err.points')}
-                            {' · '}
-                            <Link to="/points" className={CHEVRON_LINK}>
-                              {t('earn')}
-                              <ForwardChevron />
-                            </Link>
-                          </>
-                        )}
-                      </p>
-                    )}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      disabled={held || short}
-                      aria-describedby={held || short ? reasonId : undefined}
-                      onClick={() => ask(item)}
-                    >
-                      {t('shop.swap')}
-                    </Button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="px-1 text-[12px] leading-5 text-text-muted">{t('shop.oneEach')}</p>
+                    <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+                      {(held || short) && (
+                        <p id={reasonId} className="min-w-0 flex-1 text-[12px] leading-5 text-text-secondary">
+                          {held ? (
+                            <>
+                              {t('shop.holding')}
+                              {' · '}
+                              <Link to="/rewards/coupons" className={CHEVRON_LINK}>
+                                {t('shop.show')}
+                                <ForwardChevron />
+                              </Link>
+                            </>
+                          ) : (
+                            <>
+                              {typeof item.points_short === 'number' && item.points_short > 0
+                                ? count('pointsShort', item.points_short)
+                                : t('shop.err.points')}
+                              {' · '}
+                              <Link to="/points" className={CHEVRON_LINK}>
+                                {t('earn')}
+                                <ForwardChevron />
+                              </Link>
+                            </>
+                          )}
+                        </p>
+                      )}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        disabled={held || short}
+                        aria-describedby={held || short ? reasonId : undefined}
+                        onClick={() => ask(item)}
+                      >
+                        {t('shop.swap')}
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {shop.length > 0 && <p className="px-1 text-[12px] leading-5 text-text-muted">{t('shop.oneEach')}</p>}
+          {products.length > 0 && <ShopProducts items={products} reload={reload} onSwapped={onSwapped} />}
           <section aria-labelledby="shop-checkout-title" className="space-y-2">
             <h2 id="shop-checkout-title" className={SECTION_HEADING}>
               {t('shop.checkout.title')}

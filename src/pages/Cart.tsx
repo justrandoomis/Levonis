@@ -17,7 +17,8 @@ import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
 import { LINE_QTY_MAX, clampQuantity, quantityLimit } from '../../packages/pricing/src/quantity';
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
-import PromoCodeField, { readStoredPromo } from '../components/PromoCodeField';
+import PromoCodeField from '../components/PromoCodeField';
+import { CartCoupons, cartCouponText, minus, useCartCoupons } from '../components/rewards/CartCoupons';
 import Spinner from '../components/ui/Spinner';
 import SafeImage from '../components/ui/SafeImage';
 import BundleContents from '../components/bundles/BundleContents';
@@ -540,6 +541,8 @@ export default function Cart() {
 
   const [dealsExpanded, setDealsExpanded] = useState(false);
   const [usePoints, setUsePoints] = useState(false);
+  // Moves with every answer of the server about the lines: «re-read after a line changes».
+  const [cartAnswers, setCartAnswers] = useState(0);
 
   // A mobile-safe, portalled sheet owns the warranty choices. Keeping this
   // out of the narrow product-detail column prevents RTL text or a long price
@@ -596,6 +599,7 @@ export default function Cart() {
     }
     itemsRef.current = next;
     setItems(next);
+    setCartAnswers((n) => n + 1);
     const existing = new Set(next.map((i) => i.id));
     const known = knownIdsRef.current;
     setSelectedIds((prev) => {
@@ -1328,8 +1332,6 @@ export default function Cart() {
   const otherDiscounts = discounts - memberAlreadyInPrices;
   /** The merchandise after the part of the membership the order takes off. */
   const merchandise = Math.max(0, subtotal - memberOffTheOrder);
-  /** Everything the selected lines saved, however each part was applied. */
-  const savedTotal = otherDiscounts + memberNamedSaving;
 
   // Shipping preview only — the delivery policy's own pure charge over the
   // lines' server-resolved rule groups. The final figure, and every waiver (an active
@@ -1339,10 +1341,28 @@ export default function Cart() {
   // browser-side copy of them had already drifted from the real rule once.
   const shipping = selectedCount > 0 ? cartDeliveryEstimate(selectedItems, deliveryTariff) : 0;
 
-  // §5: points come after the membership, against the merchandise the
-  // membership has already reduced.
-  const pointsDiscount = usePoints ? Math.min(pointBalance, merchandise) : 0;
-  const total = merchandise + (shipping ?? 0) - pointsDiscount;
+  /**
+   * «كوبوناتك» (DECISIONS row 298): a quiet read, nothing shown until it answers, and
+   * one request for a customer who holds no coupon. What comes back lands on the ticked
+   * lines and in the sums below; the checkout quote stays the authority.
+   */
+  const coupons = useCartCoupons({
+    enabled: !loading && loadError == null && merchantScope !== true && items.length > 0,
+    itemIds: selectedItems.map((i) => i.id),
+    signature: `${selectedItems.map((i) => `${i.id}:${i.qty}`).join(',')}~${cartAnswers}`,
+    deliveryIqd: shipping,
+    pointsIqd: usePoints ? pointBalance : 0,
+  });
+  const couponGoods = selectedItems.reduce((sum, item) => sum + (coupons.lineAmounts.get(item.id) ?? 0), 0);
+  // Never more than the fee on screen: the estimate may have moved since the answer.
+  const couponDelivery = Math.min(coupons.deliveryOff, shipping ?? 0);
+  /** Everything the selected lines saved, however each part was applied. A delivery fee the coupons bring back is no saving. */
+  const savedTotal = otherDiscounts + memberNamedSaving + Math.max(0, couponGoods + couponDelivery - coupons.feeBack);
+
+  // §5: points come after the membership and the coupon, against the merchandise
+  // they have already reduced: the same order as the checkout.
+  const pointsDiscount = usePoints ? Math.min(pointBalance, Math.max(0, merchandise - couponGoods)) : 0;
+  const total = merchandise - couponGoods + (shipping ?? 0) - couponDelivery - pointsDiscount;
   /**
    * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 248): Σ each selected line's dollar price ×
    * quantity, and ONE conversion of everything else the dinar figure holds (lines without a dollar
@@ -1398,7 +1418,11 @@ export default function Cart() {
     selectedItems.reduce(
       (sum, item) => sum + (item.breakdown ? item.breakdown.applied_iqd : item.unit_price_iqd) * item.qty,
       0
-    ) - memberOffTheOrder
+    ) -
+      memberOffTheOrder -
+      // A coupon on the lines lowers the basis too: the basis is after the coupon, so a
+      // coupon can take the order back under the line and this says so (row 223 #4).
+      couponGoods
   );
 
   /**
@@ -1835,6 +1859,13 @@ export default function Cart() {
               </>
             )}
           </div>
+
+          {/* THE COUPON ON THE LINE IT LANDS ON, only while applied (DECISIONS row 298). */}
+          {(coupons.lineAmounts.get(item.id) ?? 0) > 0 && selected && (
+            <p className="-mt-1 mb-2 text-[12px] font-semibold leading-relaxed tabular-nums text-success" data-cart-line-coupon={item.id}>
+              {cartCouponText('lineChip', asLang(lang))} {minus(money(coupons.lineAmounts.get(item.id) ?? 0))}
+            </p>
+          )}
 
           {/* The membership named on the line it paid for. The Sorani
               is this file's own «پاشەکەوتت کرد» (the summary bar) with
@@ -2373,6 +2404,22 @@ export default function Cart() {
           {groupCartLines(items).map((entry) => (entry.kind === 'line' ? renderLine(entry.item) : renderColourGroup(entry.productId, entry.items)))}
         </div>
 
+        {/* «كوبوناتك»: only for a customer the read found coupons for (DECISIONS row 298). */}
+        {coupons.read && selectedCount > 0 && (
+          <CartCoupons
+            read={coupons.read}
+            mode={coupons.mode}
+            promoCode={coupons.promo?.code ?? ''}
+            lineName={(id) => {
+              const line = items.find((i) => i.id === id);
+              return line ? itemName(line) : '';
+            }}
+            repricesAtCheckout={selectedItems.some((i) => i.cod_reprices === true)}
+            onApply={coupons.apply}
+            onRemove={coupons.remove}
+          />
+        )}
+
         {/* Deals Row. The header is a real button: as a clickable <div> the
             Tab key never reached it, so the points discount could not be
             opened without a pointer. Its focus ring is INSET because the
@@ -2389,7 +2436,7 @@ export default function Cart() {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
               </svg>
               <span className="text-text-primary text-[15px] font-bold">{loc('العروض والخصومات', 'Deals & Discounts', 'ئۆفەر و داشکاندن')}</span>
-              {(usePoints && pointsDiscount > 0) && (
+              {((usePoints && pointsDiscount > 0) || coupons.mode === 'promo') && (
                 <span className="bg-gold/10 text-gold text-[11px] font-bold px-1.5 py-0.5 rounded">{loc('تم التطبيق', 'Applied', 'جێبەجێ کرا')}</span>
               )}
             </span>
@@ -2457,7 +2504,16 @@ export default function Cart() {
               {/* The engine behind this has existed since migration 0002; the
                   box was disabled because nothing could create a code and
                   nothing could type one. Both halves exist now. */}
-              <PromoCodeField lang={lang} initialCode={readStoredPromo()} />
+              <PromoCodeField
+                key={coupons.boxKey}
+                lang={lang}
+                initialCode={coupons.boxCode}
+                appliedCode={coupons.promo?.code ?? ''}
+                itemIds={selectedItems.map((i) => i.id)}
+                deliveryIqd={shipping}
+                holdOnRefusal={coupons.holdsPool}
+                onApplied={coupons.onBox}
+              />
             </div>
           )}
         </div>
@@ -2665,6 +2721,13 @@ export default function Cart() {
             </div>
           )}
 
+          {couponGoods > 0 && (
+            <div className="flex justify-between items-center text-success" data-cart-coupon-goods>
+              <span className="text-[14px]">{cartCouponText(coupons.mode === 'promo' ? 'summaryPromo' : 'summaryGoods', asLang(lang))}</span>
+              <span className="text-[14px] font-medium">- {money(couponGoods)}</span>
+            </div>
+          )}
+
           {pointsDiscount > 0 && (
             <div className="flex justify-between items-center text-gold/90">
               <div className="flex items-center gap-1">
@@ -2688,6 +2751,12 @@ export default function Cart() {
               )}
             </span>
           </div>
+          {couponDelivery > 0 && (
+            <div className="flex justify-between items-center text-success" data-cart-coupon-delivery>
+              <span className="text-[14px]">{cartCouponText('summaryDelivery', asLang(lang))}</span>
+              <span className="text-[14px] font-medium">- {money(couponDelivery)}</span>
+            </div>
+          )}
           {deliveryTariff?.governorate_stopped && selectedCount > 0 && (
             <p className="text-[12.5px] text-text-secondary" data-cart-governorate-stopped>
               {loc(

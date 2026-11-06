@@ -300,6 +300,8 @@ export interface LineBenefitInput {
   regularUnitIqd: number;
   qty: number;
   rule: BenefitRule | null;
+  /** Who draws first on a shared budget when two savings tie: the cart line's id at every door. */
+  tieKey?: string;
 }
 
 /** Whether a rule carries a limit that belongs to the ORDER, not to a line. */
@@ -324,7 +326,7 @@ function hasOrderWideLimit(rule: BenefitRule): boolean {
  * rule capped at 100,000 per order saved 200,000.
  *
  * The budget goes to the rule's lines with the LARGEST per-unit saving first
- * (ties in cart order), so the customer gets the most the rule allows and the
+ * (ties by `tieKey`, else in the order given), so the customer gets the most the rule allows and the
  * answer does not change when the cart is reordered. Each line then carries
  * the part it actually received, so the per-line figures an order snapshots
  * add up to the clamped total exactly.
@@ -336,8 +338,14 @@ export function orderLineBenefits(inputs: readonly LineBenefitInput[]): LineBene
   const budgets = new Map<string, { qty: number; iqd: number }>();
   const perUnitOf = inputs.map((i) => unitDiscountIqd(i.regularUnitIqd, i.rule));
 
-  // Largest saving first, then cart order: who draws on a shared budget first.
-  const order = inputs.map((_, i) => i).sort((a, b) => perUnitOf[b]! - perUnitOf[a]! || a - b);
+  // Largest saving first, then the line's shared name (the cart line's id, the same at
+  // the cart and at every quote), then the order given: who draws on a shared budget first.
+  const tied = (a: number, b: number): number => {
+    const x = inputs[a]!.tieKey;
+    const y = inputs[b]!.tieKey;
+    return x !== undefined && y !== undefined && x !== y ? (x < y ? -1 : 1) : a - b;
+  };
+  const order = inputs.map((_, i) => i).sort((a, b) => perUnitOf[b]! - perUnitOf[a]! || tied(a, b));
 
   for (const i of order) {
     const input = inputs[i]!;

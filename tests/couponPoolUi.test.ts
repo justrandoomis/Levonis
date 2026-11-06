@@ -50,9 +50,12 @@ test('the checkout’s box shows the code the quote is priced with, and how to t
   assert.doesNotMatch(off, /إزالة/, 'a code the quote refused stops showing');
   assert.match(off, /<input/);
 
-  const cart = box({ initialCode: 'RWS-1234' });
-  assert.doesNotMatch(cart, /إزالة/, 'in the cart nothing is applied until the customer asks');
-  assert.match(cart, /value="RWS-1234"/);
+  // Restated for the owner's «apply on cart product» (DECISIONS row 298): a REWARD code no longer waits in
+  // this box, the cart's own card applies it (tests/cartCouponsUi.test.ts). A TYPED code still does: in the
+  // cart, nothing in the box is applied until the customer asks.
+  const cart = box({ initialCode: 'PROMO10' });
+  assert.doesNotMatch(cart, /إزالة/, 'in the cart a typed code is not applied until the customer asks');
+  assert.match(cart, /value="PROMO10"/);
   assert.match(src('src/pages/Checkout.tsx'), /appliedCode=\{couponCode\}/);
 });
 

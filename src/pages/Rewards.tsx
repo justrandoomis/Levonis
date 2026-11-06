@@ -387,6 +387,8 @@ function PointsPage() {
     if (/^Purchase points/.test(note)) return loc('نقاط الشراء', 'Purchase points', 'خاڵی کڕین');
     if (/^Points reversal/.test(note)) return loc('نقاط طلب أُلغي أو أُرجع', 'Points of a cancelled or returned order', 'خاڵی داواکارییەکی هەڵوەشاوە یان گەڕێنراوە');
     if (/^Valid manual review/.test(note)) return loc('نقاط مراجعة', 'Review points', 'خاڵی هەڵسەنگاندن');
+    if (/^Points shop product/.test(note)) return loc('منتج من متجر النقاط', 'A product from the points shop', 'بەرهەمێک لە فرۆشگای خاڵ');
+    if (/^Points shop refund/.test(note)) return loc('نقاط منتج أُلغي من متجر النقاط', 'Points of a cancelled points-shop product', 'خاڵی بەرهەمێکی هەڵوەشاوەی فرۆشگای خاڵ');
     if (/^Points shop/.test(note)) return loc('كوبون من متجر النقاط', 'A coupon from the points shop', 'کۆپۆنێک لە فرۆشگای خاڵ');
     if (/^Competition prize/.test(note)) return loc('جائزة مسابقة', 'Competition prize', 'خەڵاتی پێشبڕکێ');
     if (/^Competition entry not accepted|^Competition cancelled/.test(note)) return loc('استرداد اشتراك مسابقة', 'Competition entry refunded', 'گەڕاندنەوەی بەشداریکردنی پێشبڕکێ');

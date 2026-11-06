@@ -41,6 +41,8 @@ export interface AdminGiftView {
   cancel_reason: string;
   version: number;
   reward_id: string | null;
+  /** The points shop: what the customer paid for it, and whether a cancel gave it back. */
+  shop: { item_id: string; points_spent: number; points_returned: boolean } | null;
   /** Legacy review boxes: what the old flow recorded. */
   legacy: { state: string; max_level: number; chosen_level: number | null; contents: unknown[]; selected_at: string | null } | null;
   actions: { cancel: boolean; edit_reason: boolean; convert: boolean; fulfill: boolean };
@@ -65,7 +67,7 @@ export function adminGiftView(g: Record<string, unknown>, levels: Map<number, { 
     state,
     mode,
     reason: (text(g.reason) || 'legacy') as GiftReason,
-    level: Number.isInteger(n) && n >= 1 && n <= 5 ? levels.get(n)?.view ?? levelViewFrom(undefined, n) : null,
+    level: !text(g.shop_item_id) && Number.isInteger(n) && n >= 1 && n <= 5 ? levels.get(n)?.view ?? levelViewFrom(undefined, n) : null,
     choice_scope: giftChoiceScope(g),
     chosen_level: mode === 'level' && g.gift_product_id && g.chosen_level != null ? Number(g.chosen_level) : null,
     user: {
@@ -94,6 +96,9 @@ export function adminGiftView(g: Record<string, unknown>, levels: Map<number, { 
     cancel_reason: text(g.cancel_reason),
     version: Number(g.version) || 1,
     reward_id: orNull(g.reward_id),
+    shop: text(g.shop_item_id)
+      ? { item_id: text(g.shop_item_id), points_spent: Math.max(0, Math.trunc(Number(g.points_spent) || 0)), points_returned: state === 'cancelled' && Number(g.points_spent) > 0 }
+      : null,
     legacy: legacy
       ? {
           state,

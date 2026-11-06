@@ -80,9 +80,9 @@ export const COPY = {
     'دیارییەک لە Levonis بۆ هەڵسەنگاندنێکی بەسوودی چاپکەرەکەت.',
   ],
   'guest.benefit.shop': [
-    'استبدل نقاطك بكوبونات حين يعرضها المتجر.',
-    'Swap your points for coupons when the shop offers them.',
-    'خاڵەکانت بە کۆپۆن بگۆڕەوە کاتێک فرۆشگا دەیانخاتە ڕوو.',
+    'استبدل نقاطك بكوبونات ومنتجات حين يعرضها المتجر.',
+    'Swap your points for coupons and products when the shop offers them.',
+    'خاڵەکانت بە کۆپۆن و بەرهەم بگۆڕەوە کاتێک فرۆشگا دەیانخاتە ڕوو.',
   ],
   'guest.benefit.competitions': [
     'مسابقات يختار فريق Levonis فائزيها.',
@@ -98,9 +98,9 @@ export const COPY = {
   ],
   'guest.shop.title': ['سجّل الدخول لتستبدل نقاطك', 'Sign in to spend your points', 'بچۆ ژوورەوە بۆ خەرجکردنی خاڵەکانت'],
   'guest.shop.body': [
-    'تستبدل نقاطك هنا بكوبونات حين يعرضها المتجر.',
-    'Swap your points here for coupons when the shop offers them.',
-    'لێرە خاڵەکانت بە کۆپۆن دەگۆڕیتەوە کاتێک فرۆشگا دەیانخاتە ڕوو.',
+    'تستبدل نقاطك هنا بكوبونات ومنتجات حين يعرضها المتجر.',
+    'Swap your points here for coupons and products when the shop offers them.',
+    'لێرە خاڵەکانت بە کۆپۆن و بەرهەم دەگۆڕیتەوە کاتێک فرۆشگا دەیانخاتە ڕوو.',
   ],
   'guest.rate.title': ['سجّل الدخول لتقيّم طابعتك', 'Sign in to rate your printer', 'بچۆ ژوورەوە بۆ هەڵسەنگاندنی چاپکەرەکەت'],
   'guest.rate.body': [
@@ -160,6 +160,8 @@ export const COPY = {
     'هەموو هەفتەیەک لەگەڵ هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت وەریاندەگریت',
   ],
   'door.shop.from': ['كوبونات تبدأ من {points}', 'Coupons from {points}', 'کۆپۆن لە {points}ەوە'], // † pointsObj
+  'door.shop.fromBoth': ['كوبونات ومنتجات تبدأ من {points}', 'Coupons and products from {points}', 'کۆپۆن و بەرهەم لە {points}ەوە'], // † pointsObj
+  'door.shop.fromProducts': ['منتجات تبدأ من {points}', 'Products from {points}', 'بەرهەم لە {points}ەوە'], // † pointsObj
   'door.shop.checkout': [
     'استخدمها عند الدفع: كل نقطة بدينار',
     'Use them at checkout: 1 point = 1 IQD',
@@ -208,6 +210,7 @@ export const COPY = {
     'Not on items with an offer or another discount',
     'ئەو پارچانە ناگرێتەوە کە ئۆفەر یان داشکاندنێکی تریان لەسەرە',
   ],
+  'coupon.ruleOnOffer': ['يشمل القطع التي عليها عرض', 'Also on items with an offer', 'ئەو پارچانەش دەگرێتەوە کە ئۆفەریان لەسەرە'],
   'coupon.ruleShip': [
     'لا يُستهلك إن كان التوصيل مجانيًا أصلًا أو استلمت من المخزن',
     'Not used up when delivery is already free or you collect from the warehouse',
@@ -336,12 +339,48 @@ export const COPY = {
     'Switch on «Use points» in your cart, and each point takes 1 IQD off the products.',
     'لە عەرەبانەکەدا «بەکارهێنانی خاڵ» چالاک بکە، و هەر خاڵێک یەک دینار لە نرخی بەرهەمەکان کەم دەکاتەوە.',
   ],
+  // ---- products for points (DECISIONS row 299)
+  'shop.products.title': ['منتجات مقابل نقاطك', 'Products for your points', 'بەرهەم بە خاڵەکانت'],
+  'shop.products.lead': [
+    'تستبدل نقاطك بالمنتج نفسه، وتدفع أجرة التوصيل فقط.',
+    'Your points buy the product itself, and you pay for delivery only.',
+    'خاڵەکانت خودی بەرهەمەکە دەکڕن، و تەنها کرێی گەیاندن دەدەیت.',
+  ],
+  'shop.product.holding': ['لديك هذا المنتج بانتظار طلبك', 'You hold this one, waiting for your order', 'ئەم بەرهەمەت هەیە و چاوەڕێی داواکارییەکەتە'],
+  'shop.product.unavailable': ['غير متوفر الآن', 'Not available right now', 'ئێستا بەردەست نییە'],
+  'shop.product.gifts': ['هداياي', 'My gifts', 'دیارییەکانم'],
+  'shop.product.confirm.title': ['استبدل {points} بهذا المنتج؟', 'Swap {points} for this product?', '{points} بەم بەرهەمە دەگۆڕیتەوە؟'], // † pointsObj
+  'shop.product.confirm.body': [
+    '{item}: تُخصم النقاط الآن، ويبقى المنتج في «هداياي» حتى تطلبه. تدفع أجرة التوصيل فقط. وإن ألغيت الطلب لا تعود النقاط، بل يعود المنتج إلى هداياك.',
+    '{item}: the points come off now, and the product stays in «My gifts» until you order it. You pay for delivery only. If you cancel the order the points stay spent and the product comes back to your gifts.',
+    '{item}: خاڵەکان ئێستا کەم دەکرێنەوە، و بەرهەمەکە لە «دیارییەکانم» دەمێنێتەوە تا داوای بکەیت. تەنها کرێی گەیاندن دەدەیت. ئەگەر داواکارییەکە هەڵبوەشێنیتەوە خاڵەکان ناگەڕێنەوە و بەرهەمەکە دەگەڕێتەوە بۆ دیارییەکانت.',
+  ],
+  'shop.product.done': [
+    'أصبح {item} في هداياك. تدفع أجرة التوصيل فقط عند طلبه.',
+    '{item} is in My gifts. You pay for delivery only when you order it.',
+    '{item} ئێستا لە دیارییەکانتدایە. لە کاتی داواکردنیدا تەنها کرێی گەیاندن دەدەیت.',
+  ],
+  'shop.product.added': [
+    'أُضيف إلى سلتك مجانًا. تدفع أجرة التوصيل فقط.',
+    'It is in your cart, free. You pay for delivery only.',
+    'بە خۆڕایی خرایە سەبەتەکەتەوە. تەنها کرێی گەیاندن دەدەیت.',
+  ],
+  'shop.product.err.holding': [
+    'لديك هذا المنتج في «هداياي» — اطلبه أولًا.',
+    'You already hold this product in «My gifts» — order it first.',
+    'ئەم بەرهەمەت لە «دیارییەکانم» هەیە — سەرەتا داوای بکە.',
+  ],
+  'shop.product.oneEach': [
+    'تحمل واحدًا من كل منتج حتى تطلبه، ثم تستطيع استبدال غيره.',
+    'You hold one of each product until you order it, and then you can swap for another.',
+    'لە هەر بەرهەمێک یەکێکت دەبێت تا داوای دەکەیت، پاشان دەتوانیت یەکێکی تر بگۆڕیتەوە.',
+  ],
   'shop.toCart': ['إلى السلة', 'Go to cart', 'بڕۆ بۆ عەرەبانە'],
   'shop.empty.title': ['لا عروض في متجر النقاط الآن', 'Nothing in the points shop right now', 'ئێستا هیچ شتێک لە فرۆشگای خاڵدا نییە'],
   'shop.empty.body': [
-    'نعلن هنا كل كوبون وسعره بالنقاط حين يعرضه المتجر. وحتى ذلك الحين تُصرف نقاطك عند الدفع: فعّل «استخدام النقاط» في السلة.',
-    'Each coupon and its price in points is announced here when the shop offers it. Until then, your points are spent at checkout: switch on «Use points» in your cart.',
-    'هەر کۆپۆنێک و نرخەکەی بە خاڵ لێرە ڕادەگەیەنرێت کاتێک فرۆشگا دەیخاتە ڕوو. تا ئەو کاتە، خاڵەکانت لە کاتی پارەداندا خەرج دەکرێن: لە عەرەبانەکەدا «بەکارهێنانی خاڵ» چالاک بکە.',
+    'نعلن هنا كل كوبون ومنتج وسعره بالنقاط حين يعرضه المتجر. وحتى ذلك الحين تُصرف نقاطك عند الدفع: فعّل «استخدام النقاط» في السلة.',
+    'Each coupon or product and its price in points is announced here when the shop offers it. Until then, your points are spent at checkout: switch on «Use points» in your cart.',
+    'هەر کۆپۆن و بەرهەمێک و نرخەکەی بە خاڵ لێرە ڕادەگەیەنرێت کاتێک فرۆشگا دەیخاتە ڕوو. تا ئەو کاتە، خاڵەکانت لە کاتی پارەداندا خەرج دەکرێن: لە عەرەبانەکەدا «بەکارهێنانی خاڵ» چالاک بکە.',
   ],
 
   // ------------------------------------------------------------ §8.6 «قيّم طابعتك»
@@ -760,6 +799,20 @@ export const COPY = {
     'ئەم هەنگاوە تەواو نەبوو. دیارییەکەت پارێزراوە، دووبارە هەوڵ بدەرەوە.',
   ],
   'reveal.sr.result': ['درجتك {score} من {max}. {opened}.', 'You scored {score} of {max}. {opened}.', '{score} لە {max} نمرەت هێنا. {opened}.'],
+  // ------------------------------------------------------------ «طابعاتك» on «كوبوناتي» (DECISIONS row 298)
+  'printers.title': ['طابعاتك', 'Your printers', 'چاپکەرەکانت'],
+  'printers.earning': ['تكسب كوبونات حتى {date}', 'Earns coupons until {date}', 'تا {date} کۆپۆن بەدەست دەهێنێت'],
+  'printers.next': ['الدفعة القادمة {date}', 'Next coupons {date}', 'کۆپۆنەکانی داهاتوو {date}'],
+  'printers.stopped.warranty_closed': ['توقفت كوبوناتها: أُغلق ضمانها', 'Its coupons stopped: the warranty was closed', 'کۆپۆنەکانی وەستان: گەرەنتییەکەی داخرا'],
+  'printers.stopped.warranty_over': ['انتهت مدة كوبوناتها', 'Its coupon period has ended', 'ماوەی کۆپۆنەکانی تەواو بووە'],
+  'printers.stopped.returned': ['توقفت كوبوناتها: أُرجعت الطابعة', 'Its coupons stopped: the printer was returned', 'کۆپۆنەکانی وەستان: چاپکەرەکە گەڕێنرایەوە'],
+  'printers.stopped.traded_in': ['توقفت كوبوناتها: استُبدلت الطابعة', 'Its coupons stopped: the printer was traded in', 'کۆپۆنەکانی وەستان: چاپکەرەکە گۆڕدرایەوە'],
+  'printers.stopped.in_shop': ['متوقفة وهي عندنا للاستبدال', 'Paused while it is with us for a trade-in', 'ڕاگیراوە تا لای ئێمەیە بۆ گۆڕینەوە'],
+  'printers.stopped.programme_off': ['برنامج الكوبونات متوقف الآن', 'The coupon programme is paused now', 'بەرنامەی کۆپۆن ئێستا ڕاگیراوە'],
+  'printers.showAll': ['عرض الكل ({n})', 'Show all ({n})', 'هەموویان پیشان بدە ({n})'],
+  'printers.showFewer': ['عرض أقل', 'Show fewer', 'کەمتر پیشان بدە'],
+  // No fixed word for «printer»: the shop's own names carry it («طابعة Bambu Lab …»), and the line doubled it.
+  'coupon.fromPrinterNamed': ['من {name} · الأسبوع {week}', 'From {name} · week {week}', 'لە {name} · هەفتەی {week}'],
 } as const satisfies Record<string, CopyRow>;
 
 /**
@@ -800,7 +853,7 @@ export function copyParts(key: CopyKey, lang: Language): CopyPart[] {
 }
 
 /** The keys marked † in spec §8: their `{points}` is the oblique `pointsObj` form, never `points`. */
-export const POINTS_OBJ_KEYS: ReadonlySet<CopyKey> = new Set<CopyKey>(['door.shop.from', 'shop.confirm.title', 'rate.noLevel', 'row.fee', 'cta.enterFee', 'sheet.sendFee']);
+export const POINTS_OBJ_KEYS: ReadonlySet<CopyKey> = new Set<CopyKey>(['door.shop.from', 'door.shop.fromBoth', 'door.shop.fromProducts', 'shop.confirm.title', 'shop.product.confirm.title', 'rate.noLevel', 'row.fee', 'cta.enterFee', 'sheet.sendFee']);
 
 /** Which counted form fills `{points}` in `key`. */
 export function pointsForm(key: CopyKey): 'points' | 'pointsObj' {
@@ -834,6 +887,11 @@ export const COUNTED = {
     ar: { zero: 'أقل من يوم', one: 'يومًا واحدًا', two: 'يومين', few: '{n} أيام', many: '{n} يومًا', hundred: '{n} يوم' },
     en: { zero: 'less than a day', one: '1 day', other: '{n} days' },
     ckb: { zero: 'کەمتر لە ڕۆژێک', other: '{n} ڕۆژ' },
+  },
+  swappedTimes: {
+    ar: { zero: 'لم يُستبدل بعد', one: 'استُبدل مرة واحدة', two: 'استُبدل مرتين', few: 'استُبدل {n} مرات', many: 'استُبدل {n} مرة', hundred: 'استُبدل {n} مرة' },
+    en: { zero: 'Not swapped yet', one: 'Swapped once', other: 'Swapped {n} times' },
+    ckb: { zero: 'هێشتا نەگۆڕدراوەتەوە', other: '{n} جار گۆڕدراوەتەوە' },
   },
   pieces: {
     ar: { zero: 'لا قطع', one: 'قطعة واحدة', two: 'قطعتين', few: '{n} قطع', many: '{n} قطعة', hundred: '{n} قطعة' },

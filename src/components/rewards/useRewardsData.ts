@@ -1,8 +1,10 @@
 /**
- * THE REWARDS AREA'S THREE READS (rewards spec §2.3).
+ * THE REWARDS AREA'S READS (rewards spec §2.3).
  *
  * - `useRewardsHub(enabled)`: GET /api/rewards/program, which feeds the hub,
  *   «كوبوناتي», «استبدل نقاطك» and «قيّم طابعتك».
+ * - `useRewardPrinters(enabled)`: GET /api/rewards/program/printers, «طابعاتك» on
+ *   «كوبوناتي» and nowhere else (DECISIONS row 298).
  * - `useCompetitionsList(enabled, view, mine)`: GET
  *   /api/rewards/program/competitions, one cache per view (`current`,
  *   `results`, `results:mine`), paged by `next_cursor` («عرض المزيد»).
@@ -39,7 +41,7 @@ import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from 'r
 import { useAuth } from '../../AuthContext';
 import { api, ApiError, isAborted } from '../../lib/api';
 import type { CompetitionsView } from './model';
-import type { Competition, CompetitionDetailResponse, CompetitionsPage, RewardsHubData } from './types';
+import type { Competition, CompetitionDetailResponse, CompetitionsPage, RewardPrintersData, RewardsHubData } from './types';
 
 // ------------------------------------------------------------ the shapes a screen reads
 
@@ -102,6 +104,7 @@ export interface CompetitionSeed {
 
 export const HUB_PATH = '/api/rewards/program';
 export const COMPETITIONS_PATH = '/api/rewards/program/competitions';
+export const PRINTERS_PATH = '/api/rewards/program/printers';
 /** A tab coming back to the front reads again when the last read settled longer ago than this. */
 export const STALE_AFTER_MS = 60_000;
 /** `reloadSoon()`: a countdown reaching zero reads the visible screen again this long after (crossings close together share one read). */
@@ -287,6 +290,10 @@ export class ReadStore<T extends Stamped, X> {
 export const HUB_KEY = 'hub';
 export const HUB_SPEC: ReadSpec<RewardsHubData, null> = { path: () => HUB_PATH, initial: null };
 
+// The customer's printers: one key.
+export const PRINTERS_KEY = 'printers';
+export const PRINTERS_SPEC: ReadSpec<RewardPrintersData, null> = { path: () => PRINTERS_PATH, initial: null };
+
 // A competition: one key per id, and whether the server said 404.
 export interface DetailExtra {
   notFound: boolean;
@@ -464,6 +471,17 @@ export function useRewardsHub(enabled: boolean): Read<RewardsHubData> {
   const store = useMemo(() => new ReadStore(HUB_SPEC, owner), [owner]);
   const { slot, reload, invalidate } = useDriven(store, HUB_KEY, enabled);
   return useMemo<Read<RewardsHubData>>(
+    () => ({ status: slot.status, data: slot.data, error: slot.error, stale: slot.stale, skewMs: slot.skewMs, reload, invalidate }),
+    [slot, reload, invalidate]
+  );
+}
+
+/** GET /api/rewards/program/printers. Enabled for a signed-in customer on «كوبوناتي». */
+export function useRewardPrinters(enabled: boolean): Read<RewardPrintersData> {
+  const owner = useOwner();
+  const store = useMemo(() => new ReadStore(PRINTERS_SPEC, owner), [owner]);
+  const { slot, reload, invalidate } = useDriven(store, PRINTERS_KEY, enabled);
+  return useMemo<Read<RewardPrintersData>>(
     () => ({ status: slot.status, data: slot.data, error: slot.error, stale: slot.stale, skewMs: slot.skewMs, reload, invalidate }),
     [slot, reload, invalidate]
   );

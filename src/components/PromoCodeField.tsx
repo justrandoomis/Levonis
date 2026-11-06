@@ -47,7 +47,8 @@ export function storePromo(code: string): void {
   }
 }
 
-interface CheckResult {
+/** POST /api/cart/coupon-check. The figures come with a valid code; the cart shows them where they land. */
+export interface CouponCheckResult {
   valid: boolean;
   code?: string;
   reason?: string;
@@ -55,6 +56,14 @@ interface CheckResult {
   min_total_iqd?: number | null;
   tier_required?: string | null;
   cart_total_iqd?: number;
+  lines?: Array<{ line_id: string; amount_iqd: number }>;
+  merchandise_iqd?: number;
+  delivery_iqd?: number;
+  /** It is a reward code: it opens the customer's whole pool. */
+  pool?: boolean;
+  pool_count?: number;
+  /** A refusal of the customer's own reward code. */
+  reward_code?: boolean;
 }
 
 const STRINGS = {
@@ -138,29 +147,41 @@ export default function PromoCodeField({
   showLabel = true,
   initialCode = '',
   appliedCode,
+  itemIds,
+  deliveryIqd,
+  holdOnRefusal = false,
 }: {
   lang: string;
   /**
-   * A code to show in the box, ready to apply — the cart passes the remembered
-   * one, so a reward coupon sent from the rewards area («استخدمه الآن» on
-   * /rewards, «كوبوناتي» or the points shop) is visible there instead of
-   * looking lost. Nothing is applied until the customer asks; the checkout
-   * re-validates whatever arrives.
+   * A code to show in the box, ready to apply: the cart passes a remembered typed
+   * code the server has not accepted. Nothing in the box is applied until the
+   * customer asks; the checkout re-validates whatever arrives. A reward code never
+   * comes here: the cart's own card applies those (DECISIONS row 298).
    */
   initialCode?: string;
   /**
-   * The code the checkout's quote is priced with; '' when none. The page is then
-   * the authority, not this box's memory: a code that came from the cart or the
-   * rewards area shows as applied, with its remove button, and one the quote
-   * refused stops showing. The cart passes nothing, and the box keeps its own state.
+   * The code the page's figures are priced with; '' when none. The page is then the
+   * authority, not this box's memory: a code that came from the cart or the rewards
+   * area shows as applied, with its remove button, and one the quote refused stops
+   * showing. The checkout passes its quote's code, the cart the typed code in force.
    */
   appliedCode?: string;
+  /** The ticked lines, when the page has ticks: the answer is about those. */
+  itemIds?: readonly string[];
+  /** The page's delivery estimate, when it shows one: a code that names the delivery answers on it. */
+  deliveryIqd?: number | null;
+  /**
+   * The page holds something else in force that only an ACCEPTED code replaces (the cart's
+   * reward coupons). A refused code then says why and takes nothing away: neither the
+   * remembered code nor what the page has applied (DECISIONS row 298).
+   */
+  holdOnRefusal?: boolean;
   // The formatter used to be a PROP, passed down from whichever page hosted
   // this field. It is a context now (src/CurrencyContext.tsx), so the field
   // follows the customer's chosen currency wherever it is mounted and no
   // caller can hand it a different one by mistake.
-  /** Told the accepted code, or '' when it was removed. */
-  onApplied?: (code: string) => void;
+  /** Told the accepted code with the server's answer, or '' when it was removed or refused. */
+  onApplied?: (code: string, result?: CouponCheckResult) => void;
   /**
    * False where the CALLER already names this control — checkout puts the
    * field behind a «استخدام كود خاص» disclosure, so the heading here would be
@@ -172,8 +193,8 @@ export default function PromoCodeField({
   const { money } = useMoney();
   const s = STRINGS[(lang as keyof typeof STRINGS) in STRINGS ? (lang as keyof typeof STRINGS) : 'ar'];
   const [input, setInput] = useState(initialCode);
-  const [checked, setApplied] = useState<CheckResult | null>(null);
-  const applied: CheckResult | null =
+  const [checked, setApplied] = useState<CouponCheckResult | null>(null);
+  const applied: CouponCheckResult | null =
     appliedCode === undefined ? checked : !appliedCode ? null : checked?.code === appliedCode ? checked : { valid: true, code: appliedCode };
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -184,7 +205,11 @@ export default function PromoCodeField({
     setBusy(true);
     setError('');
     try {
-      const res = await api.post<CheckResult>('/api/cart/coupon-check', { code });
+      const res = await api.post<CouponCheckResult>('/api/cart/coupon-check', {
+        code,
+        ...(itemIds?.length ? { item_ids: itemIds } : {}),
+        ...(typeof deliveryIqd === 'number' ? { delivery_iqd: deliveryIqd } : {}),
+      });
       if (!res.valid) {
         // The server's own reason, translated — never a generic "invalid".
         // A customer refused for a minimum spend needs to know the minimum.
@@ -195,8 +220,10 @@ export default function PromoCodeField({
             : reason
         );
         setApplied(null);
-        storePromo('');
-        onApplied?.('');
+        if (!holdOnRefusal) {
+          storePromo('');
+          onApplied?.('');
+        }
         // THE REQUEST SUCCEEDED AND THE THING THE USER WANTED DID NOT HAPPEN.
         // This route answers a refused code with a 200, so the client's blanket
         // «a mutation that returned is a success» rule cannot see the
@@ -208,7 +235,7 @@ export default function PromoCodeField({
       }
       setApplied(res);
       storePromo(res.code ?? code);
-      onApplied?.(res.code ?? code);
+      onApplied?.(res.code ?? code, res);
       mascot.outcome('saved');
     } catch (err) {
       const code2 = err instanceof ApiError ? err.code ?? '' : '';

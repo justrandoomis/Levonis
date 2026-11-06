@@ -161,7 +161,8 @@ test('copyText fills marks, keeps a mark it was not given, and copyParts cuts at
 });
 
 test('the † keys take the oblique «نقطتين», and each asks for {points}', () => {
-  assert.deepEqual([...POINTS_OBJ_KEYS].sort(), ['cta.enterFee', 'door.shop.from', 'rate.noLevel', 'row.fee', 'sheet.sendFee', 'shop.confirm.title']);
+  // Restated for the products of the points shop (DECISIONS row 299): the door's two new lines and their swap's title take the same oblique form.
+  assert.deepEqual([...POINTS_OBJ_KEYS].sort(), ['cta.enterFee', 'door.shop.from', 'door.shop.fromBoth', 'door.shop.fromProducts', 'rate.noLevel', 'row.fee', 'sheet.sendFee', 'shop.confirm.title', 'shop.product.confirm.title']);
   for (const k of POINTS_OBJ_KEYS) {
     assert.equal(pointsForm(k), 'pointsObj', k);
     for (const s of COPY[k]) assert.ok(s.includes('{points}'), `${k}: ${s}`);

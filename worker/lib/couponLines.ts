@@ -137,6 +137,8 @@ export interface CouponLineSource {
   member_line_discount_iqd: number;
   /** A membership price, an offer window or a bundle saving already discounted it. */
   already_discounted: boolean;
+  /** The cart line's id: what decides a tie the same way at the cart and at every quote. */
+  tie_key?: string;
 }
 
 /**
@@ -178,9 +180,12 @@ export function couponLinesOf(
       qty,
       unit_goods_iqd: Math.max(0, applied - memberPerUnit),
       already_discounted: l.already_discounted || l.member_line_discount_iqd > 0,
+      ...(l.tie_key ? { tie_key: l.tie_key } : {}),
     });
   }
-  return out;
+  // THE SAME LINES IN THE SAME ORDER AT EVERY DOOR: a coupon that names fewer pieces than the
+  // order holds takes them in this order, and the cart and the checkout read their rows apart.
+  return out.every((l) => l.tie_key) ? out.sort((a, b) => (a.tie_key! < b.tie_key! ? -1 : a.tie_key! > b.tie_key! ? 1 : 0)) : out;
 }
 
 /** The route a line's stored transport snapshot names, or ''. */

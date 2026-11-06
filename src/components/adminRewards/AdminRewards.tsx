@@ -1,29 +1,39 @@
 /**
  * ADMIN → المكافآت (migration 0220; docs/DECISIONS.md row 286).
  *
- * Three screens over /api/admin/rewards:
+ * Five screens over /api/admin/rewards:
+ *   نظرة عامة   what the programme does now and what it has given (./RewardsOverview).
+ *   الطابعات    every printer unit, earning or why not, and its coupons (./RewardsPrinters).
+ *   الكوبونات   every reward coupon issued, its customer and its state, with «منح كوبون»,
+ *               «سحب» and «تمديد» (./RewardsCoupons).
+ *   المسابقات   drafts, publishing (the owner), entries, winners and cancels.
  *   الإعدادات   the programme's terms: what a delivered printer earns, and for
  *               how many months of its warranty, every week (the free-delivery
  *               coupon — its amount and the order it needs — and the filament
  *               coupon — its percentage, its ceiling, how many pieces and the
  *               filaments it covers), how long a coupon lasts, and what the
- *               points shop charges. The owner's to save:
- *               the server refuses everyone else (OWNER_REQUIRED).
- *   الكوبونات   every reward coupon issued, its customer and its state, with
- *               «سحب» (any admin) and «تمديد» (the financial scope).
- *   المسابقات   drafts, publishing (the owner), entries, winners and cancels.
+ *               points shop charges and sells (./RewardsShopProducts). The owner's
+ *               to save: the server refuses everyone else (OWNER_REQUIRED).
  *   الإعلانات   the video ads of «شاهد إعلانًا» (AdminAds.tsx, migration 0227).
  *
  * Nothing here decides money: each figure is validated and applied by the
  * server, and a refusal is shown in the server's own words.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Gift, Ticket, Trophy, Settings2, Loader2, Check } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { Gift, Settings2, Loader2, Check, Info } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { useMoney } from '../../CurrencyContext';
+import { countText } from '../rewards/copy';
 import { Segmented } from '../ui/Segmented';
 import AdminCompetitions from './AdminCompetitions';
 import AdminAds from './AdminAds';
+import RewardsCoupons, { useRewardsRefusal, type CustomerFilter } from './RewardsCoupons';
+import RewardsOverview, { type RewardsView } from './RewardsOverview';
+import RewardsPrinters from './RewardsPrinters';
+import { shopProductRefusal, type ShopProductRow, type ShopProductView } from './shopProductWords';
+
+const RewardsShopProducts = lazy(() => import('./RewardsShopProducts'));
 
 type Tri = { ar: string; en: string; ckb: string };
 type Kind = 'free_shipping' | 'filament_discount';
@@ -33,34 +43,19 @@ interface Config {
   valid_days: number;
   weekly: { enabled: boolean; months: number };
   free_shipping: { enabled: boolean; amount_iqd: number; min_order_iqd: number };
-  filament: { enabled: boolean; percent: number; max_discount_iqd: number | null; product_ids: string[]; max_pieces: number; on_sale: boolean };
-  shop: Record<Kind, { enabled: boolean; points: number | null }>;
+  filament: { enabled: boolean; percent: number; max_discount_iqd: number | null; product_ids: string[]; max_pieces: number; on_offer?: boolean };
+  shop: Record<Kind, { enabled: boolean; points: number | null }> & { items?: ShopProductRow[] };
 }
 
-interface Filament { id: string; slug: string; name: Tri; status: string }
-
-interface Grant {
-  id: string;
-  kind: Kind;
-  source: 'printer' | 'points_shop' | 'admin';
-  state: 'active' | 'used' | 'expired' | 'revoked';
-  code: string;
-  percent: number;
-  issued_at: string;
-  expires_at: string;
-  order_id: string | null;
-  points_spent: number;
-  used_on_order_id: string | null;
-  revoke_reason: string;
-  user: { id: string; name: string; username: string; email: string };
-}
+interface Filament { id: string; slug: string; name: Tri; status: string; on_offer?: boolean }
 
 const label = 'block text-text-secondary text-[11px] font-bold mb-1.5';
-const day = (iso: string | null) => (iso ? iso.slice(0, 10) : '—');
 
 export default function AdminRewards() {
   const { loc } = useLanguage();
-  const [view, setView] = useState<'settings' | 'coupons' | 'competitions' | 'ads'>('settings');
+  const [view, setView] = useState<RewardsView>('overview');
+  // «كل كوبونات هذا الزبون» from a printer: the coupons tab, narrowed to them.
+  const [customer, setCustomer] = useState<CustomerFilter | null>(null);
   return (
     <div className="space-y-6" data-admin-rewards>
       <div>
@@ -70,42 +65,98 @@ export default function AdminRewards() {
         </h2>
         <p className="text-text-secondary text-xs mt-1">
           {loc(
-            'كوبونات الطابعة تصدر تلقائيًا عند تسليم كل طابعة، والزبون يراها ويستخدمها من صفحة المكافآت.',
-            'Printer coupons are issued automatically when each printer is delivered; the customer sees and uses them on the Rewards page.',
-            'کۆپۆنەکانی چاپکەر بە شێوەی خۆکار لە کاتی گەیاندنی هەر چاپکەرێک دەردەچن، و کڕیار لە پەڕەی خەڵاتەکان دەیانبینێت و بەکاریان دەهێنێت.'
+            'تصدر كل أسبوع لكل طابعة تحت الضمان، والزبون يراها في صفحة المكافآت ويطبّقها من سلته.',
+            'Issued every week for each printer under warranty; the customer sees them on the Rewards page and applies them from the cart.',
+            'هەموو هەفتەیەک بۆ هەر چاپکەرێکی ژێر گەرەنتی دەردەچن، و کڕیار لە پەڕەی خەڵاتەکان دەیانبینێت و لە سەبەتەکەیەوە جێبەجێیان دەکات.'
           )}
         </p>
       </div>
-      <Segmented
-        value={view}
-        onChange={(v) => setView(v as typeof view)}
-        group="admin-rewards"
-        items={[
-          // The Sorani is the short form: «ڕێکخستنەکان» does not fit a quarter of a 390 px strip.
-          { id: 'settings', label: loc('الإعدادات', 'Settings', 'ڕێکخستن') },
-          { id: 'coupons', label: loc('الكوبونات', 'Coupons', 'کۆپۆنەکان') },
-          { id: 'competitions', label: loc('المسابقات', 'Contests', 'پێشبڕکێکان') },
-          { id: 'ads', label: loc('الإعلانات', 'Ads', 'ڕیکلامەکان') },
-        ]}
-        label={loc('أقسام المكافآت', 'Rewards sections', 'بەشەکانی خەڵات')}
-      />
-      {view === 'settings' && <SettingsPanel />}
-      {view === 'coupons' && <CouponsPanel />}
+      {/* All six names show from a 360 px phone: the tabs give up side padding for it. On a narrower one the strip scrolls rather than cutting a name short. */}
+      <div className="overflow-x-auto py-1 [scrollbar-width:none] sm:overflow-visible">
+        <Segmented
+          value={view}
+          onChange={(v) => setView(v as typeof view)}
+          group="admin-rewards"
+          size="sm"
+          className="min-w-[25rem] sm:min-w-0 [&_[role=radio]]:px-0.5"
+          items={[
+            { id: 'overview', label: loc('نظرة عامة', 'Overview', 'پوختە') },
+            { id: 'printers', label: loc('الطابعات', 'Printers', 'چاپکەران') },
+            { id: 'coupons', label: loc('الكوبونات', 'Coupons', 'کۆپۆنەکان') },
+            { id: 'competitions', label: loc('المسابقات', 'Contests', 'پێشبڕکێ') },
+            { id: 'ads', label: loc('الإعلانات', 'Ads', 'ڕیکلام') },
+            { id: 'settings', label: loc('الإعدادات', 'Settings', 'ڕێکخستن') },
+          ]}
+          label={loc('أقسام المكافآت', 'Rewards sections', 'بەشەکانی خەڵات')}
+        />
+      </div>
+      {view === 'overview' && <RewardsOverview onGo={setView} />}
+      {view === 'printers' && (
+        <RewardsPrinters
+          onCustomerCoupons={(c) => {
+            setCustomer(c);
+            setView('coupons');
+          }}
+        />
+      )}
+      {view === 'coupons' && <RewardsCoupons customer={customer} onClearCustomer={() => setCustomer(null)} />}
       {view === 'competitions' && <AdminCompetitions />}
       {view === 'ads' && <AdminAds />}
+      {view === 'settings' && <SettingsPanel />}
     </div>
   );
 }
 
 // -------------------------------------------------------------- settings
 
+/**
+ * What one printer earns in a week, from the fields on screen, before anything is
+ * saved: the owner reads the sum of the form in one line. Pure, so a test reads it.
+ */
+export function weeklyEarnSummary(
+  cfg: Pick<Config, 'enabled' | 'weekly' | 'free_shipping' | 'filament' | 'valid_days'>,
+  lang: keyof Tri,
+  money: (iqd: number) => string
+): string {
+  const say = (ar: string, en: string, ckb: string) => ({ ar, en, ckb })[lang];
+  const parts: string[] = [];
+  if (cfg.free_shipping.enabled) {
+    const amount = money(cfg.free_shipping.amount_iqd);
+    const min = money(cfg.free_shipping.min_order_iqd);
+    parts.push(
+      cfg.free_shipping.min_order_iqd > 0
+        ? say(`كوبون توصيل بقيمة ${amount} للطلبات من ${min}`, `a ${amount} delivery coupon on orders from ${min}`, `کۆپۆنێکی گەیاندن بە بەهای ${amount} بۆ داواکارییەکانی ${min} و زیاتر`)
+        : say(`كوبون توصيل بقيمة ${amount}`, `a ${amount} delivery coupon`, `کۆپۆنێکی گەیاندن بە بەهای ${amount}`)
+    );
+  }
+  if (cfg.filament.enabled) {
+    const pieces = countText('pieces', cfg.filament.max_pieces, lang);
+    const cap = cfg.filament.max_discount_iqd ? say(` حتى ${money(cfg.filament.max_discount_iqd)}`, ` up to ${money(cfg.filament.max_discount_iqd)}`, ` تا ${money(cfg.filament.max_discount_iqd)}`) : '';
+    parts.push(say(`كوبون خصم ${cfg.filament.percent}% على ${pieces}${cap}`, `a ${cfg.filament.percent}% coupon on ${pieces}${cap}`, `کۆپۆنێکی ${cfg.filament.percent}% داشکاندن لەسەر ${pieces}${cap}`));
+  }
+  if (!cfg.enabled || parts.length === 0) return say('لا تصدر كوبونات بهذه الإعدادات.', 'No coupons are issued on these settings.', 'بەم ڕێکخستنانە هیچ کۆپۆنێک دەرناچێت.');
+  const what = parts.join(say(' و', ' and ', ' و '));
+  const days = countText('days', cfg.valid_days, lang);
+  if (!cfg.weekly.enabled) return say(`كل طابعة تكسب عند تسليمها فقط: ${what}، صالحة ${days}.`, `Each printer earns on delivery only: ${what}, valid ${days}.`, `هەر چاپکەرێک تەنها لە کاتی گەیاندن بەدەستی دەهێنێت: ${what}، ${days} بەکاردێت.`);
+  const months = countText('months', cfg.weekly.months, lang);
+  return say(
+    `كل طابعة تكسب كل أسبوع: ${what}، طوال ${months} من ضمانها، صالحة ${days}.`,
+    `Each printer earns every week: ${what}, for ${months} of its warranty, valid ${days}.`,
+    `هەر چاپکەرێک هەموو هەفتەیەک بەدەستی دەهێنێت: ${what}، بۆ ماوەی ${months} لە گەرەنتییەکەی، ${days} بەکاردێت.`
+  );
+}
+
 function SettingsPanel() {
   const { loc, lang } = useLanguage();
+  const { money } = useMoney();
+  const refusal = useRewardsRefusal();
   const l = (lang === 'en' || lang === 'ckb' ? lang : 'ar') as keyof Tri;
   const [cfg, setCfg] = useState<Config | null>(null);
   const [filaments, setFilaments] = useState<Filament[]>([]);
   const [summary, setSummary] = useState<Array<{ kind: string; source: string; used: number; issued: number; points_spent: number }>>([]);
   const [installed, setInstalled] = useState(true);
+  const [shopViews, setShopViews] = useState<ShopProductView[]>([]);
+  const [badRow, setBadRow] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -113,8 +164,9 @@ function SettingsPanel() {
 
   const load = useCallback(async () => {
     try {
-      const res = await api.get<{ config: Config; filaments: Filament[]; summary: typeof summary; installed: boolean }>('/api/admin/rewards/config');
+      const res = await api.get<{ config: Config; filaments: Filament[]; summary: typeof summary; installed: boolean; shop_products?: ShopProductView[] }>('/api/admin/rewards/config');
       setCfg(res.config);
+      setShopViews(res.shop_products ?? []);
       setFilaments(res.filaments);
       setSummary(res.summary);
       setInstalled(res.installed);
@@ -145,16 +197,25 @@ function SettingsPanel() {
     setSaving(true);
     setError('');
     setNotice('');
+    setBadRow(null);
     try {
-      const res = await api.put<{ config: Config }>('/api/admin/rewards/config', cfg);
+      const res = await api.put<{ config: Config; shop_products?: ShopProductView[] }>('/api/admin/rewards/config', cfg);
       setCfg(res.config);
+      setShopViews(res.shop_products ?? []);
       setNotice(loc('حُفظت الإعدادات. الكوبونات الجديدة تصدر بها، والقديمة تبقى على شروطها.', 'Saved. New coupons are issued on these terms; coupons already issued keep theirs.', 'پاشەکەوت کرا. کۆپۆنە نوێیەکان بەم مەرجانە دەردەچن، و کۆنەکان مەرجەکانی خۆیان دەپارێزن.'));
     } catch (err) {
       const code = err instanceof ApiError ? err.code : '';
+      // A refusal of one product names its row (DECISIONS row 299).
+      const at = err instanceof ApiError ? err.details?.item_index : undefined;
+      const row = typeof at === 'number' ? at : null;
+      setBadRow(row);
+      const words = shopProductRefusal(code, loc);
       setError(
         code === 'OWNER_REQUIRED'
           ? loc('حفظ شروط المكافآت للمالك وحده.', 'Only the owner can save the reward terms.', 'تەنها خاوەنەکە دەتوانێت مەرجەکانی خەڵات پاشەکەوت بکات.')
-          : err instanceof Error ? err.message : ''
+          : words
+            ? row === null ? words : loc(`المنتج ${row + 1}: ${words}`, `Product ${row + 1}: ${words}`, `بەرهەمی ${row + 1}: ${words}`)
+            : refusal(err)
       );
     } finally {
       setSaving(false);
@@ -162,6 +223,8 @@ function SettingsPanel() {
   };
 
   const issued = (kind: string, source: string) => summary.find((s) => s.kind === kind && s.source === source);
+  // The ticked filaments a live offer keeps this coupon off, while it is told not to join an offer.
+  const heldByOffer = cfg.filament.on_offer ? [] : filaments.filter((f) => f.on_offer && cfg.filament.product_ids.includes(f.id));
 
   return (
     <div className="space-y-4">
@@ -170,12 +233,11 @@ function SettingsPanel() {
           {loc('جداول المكافآت غير مثبّتة على هذه القاعدة بعد (الترحيل 0220).', 'The rewards tables are not on this database yet (migration 0220).', 'خشتەکانی خەڵات هێشتا لەم داتابەیسەدا نین (کۆچی 0220).')}
         </div>
       )}
-      {error && <div role="alert" className="lv-alert lv-alert-danger text-xs text-text-primary">{error}</div>}
-      {notice && (
-        <div role="status" className="lv-alert lv-alert-success text-xs text-text-primary flex items-center gap-2">
-          <Check className="w-4 h-4" aria-hidden /> {notice}
-        </div>
-      )}
+
+      <p data-rewards-weekly-summary className="lv-surface flex items-start gap-2 p-3 text-[13px] leading-6 text-text-primary">
+        <Info className="mt-1 w-4 h-4 shrink-0 text-text-secondary" aria-hidden />
+        <span className="min-w-0">{weeklyEarnSummary(cfg, l, money)}</span>
+      </p>
 
       <div className="lv-surface p-4 grid gap-4 sm:grid-cols-2">
         <label className="flex items-center gap-2 text-sm text-text-primary sm:col-span-2">
@@ -241,10 +303,29 @@ function SettingsPanel() {
           <input id="rw-pieces" className="lv-input text-sm" dir="ltr" type="number" min={1} max={100} value={cfg.filament.max_pieces}
             onChange={(e) => set((c) => ((c.filament.max_pieces = Math.min(100, Math.max(1, Math.trunc(Number(e.target.value) || 1)))), c))} />
         </div>
-        <label className="flex items-center gap-2 text-sm text-text-primary sm:col-span-3">
-          <input type="checkbox" checked={cfg.filament.on_sale} onChange={(e) => set((c) => ((c.filament.on_sale = e.target.checked), c))} />
-          {loc('يعمل أيضًا على الفلامنت المخفَّض (الخصم من سعر العرض)', 'Also works on filament already on sale (off the sale price)', 'لەسەر فیلامێنتی داشکێنراویش کار دەکات (لە نرخی ئۆفەرەکەوە)')}
+        <label className="flex items-start gap-2 text-sm text-text-primary sm:col-span-3">
+          <input type="checkbox" className="mt-1" checked={cfg.filament.on_offer === true} onChange={(e) => set((c) => ((c.filament.on_offer = e.target.checked), c))} data-rewards-filament-on-offer />
+          <span className="min-w-0">
+            {loc('يعمل أيضًا على القطع التي عليها عرض', 'Also works on items with an offer', 'لەسەر ئەو پارچانەش کار دەکات کە ئۆفەریان لەسەرە')}
+            <span className="block text-text-secondary text-[12px] leading-5">
+              {loc(
+                'مطفأ: لا يأخذ الكوبون شيئًا من قطعة عليها عرض أو خصم آخر. يسري على الكوبونات الجديدة، والقديمة تبقى على شروطها.',
+                'Off: the coupon takes nothing from an item with an offer or another discount. It applies to new coupons; coupons already issued keep their terms.',
+                'کوژاوە: کۆپۆنەکە هیچ لەو پارچەیە کەم ناکاتەوە کە ئۆفەر یان داشکاندنێکی تری لەسەرە. بۆ کۆپۆنە نوێیەکانە، و کۆنەکان مەرجەکانی خۆیان دەپارێزن.'
+              )}
+            </span>
+          </span>
         </label>
+        {heldByOffer.length > 0 && (
+          <p role="status" className="lv-alert lv-alert-warning text-xs text-text-primary sm:col-span-3" data-rewards-filament-offer-warning>
+            {loc(
+              'الفلامنت المختار عليه عرض الآن، فلا يأخذ منه الكوبون شيئًا: ',
+              'A selected filament has an offer now, so the coupon takes nothing from it: ',
+              'فیلامێنتی هەڵبژێردراو ئێستا ئۆفەری لەسەرە، بۆیە کۆپۆنەکە هیچی لێ کەم ناکاتەوە: '
+            )}
+            <bdi>{heldByOffer.map((f) => f.name[l] || f.name.ar).join(l === 'en' ? ', ' : '، ')}</bdi>
+          </p>
+        )}
         <div className="sm:col-span-3">
           <p className={label}>
             {loc('الفلامنت المشمول', 'Filaments covered', 'ئەو فیلامێنتانەی دەگرێتەوە')}{' '}
@@ -261,6 +342,7 @@ function SettingsPanel() {
               <label key={f.id} className="flex items-center gap-2 text-xs text-text-primary px-2 py-1.5 rounded hover:bg-surface-raised">
                 <input type="checkbox" checked={cfg.filament.product_ids.includes(f.id)} onChange={() => toggleFilament(f.id)} />
                 <span className="truncate">{f.name[l] || f.name.ar}</span>
+                {f.on_offer && <span className="shrink-0 text-text-muted">({loc('عليه عرض', 'has an offer', 'ئۆفەری لەسەرە')})</span>}
                 {f.status !== 'active' && <span className="text-text-muted">({loc('مخفي', 'hidden', 'شاراوە')})</span>}
               </label>
             ))}
@@ -271,7 +353,7 @@ function SettingsPanel() {
       <div className="lv-surface p-4 grid gap-4 sm:grid-cols-2">
         <p className="text-text-primary text-sm font-bold sm:col-span-2">{loc('متجر النقاط', 'Points shop', 'فرۆشگای خاڵ')}</p>
         <p className="text-text-secondary text-xs sm:col-span-2">
-          {loc('عند الدفع كل نقطة = 1 د.ع. ضع سعرًا بالنقاط لكل كوبون تريد بيعه، وإلا لا يظهر المتجر.', 'At checkout 1 point = 1 IQD. Set a price in points for each coupon you want to sell; without one, the shop stays hidden.', 'لە کاتی پارەدان هەر خاڵێک = 1 د.ع. بۆ هەر کۆپۆنێک کە دەتەوێت بیفرۆشیت نرخێک بە خاڵ دابنێ، ئەگینا فرۆشگاکە دەرناکەوێت.')}
+          {loc('عند الدفع كل نقطة = 1 د.ع. ضع سعرًا بالنقاط لكل ما تريد بيعه: ما لا سعر له لا يصل إلى الزبون.', 'At checkout 1 point = 1 IQD. Set a price in points for everything you want to sell: what has no price does not reach the customer.', 'لە کاتی پارەدان هەر خاڵێک = 1 د.ع. بۆ هەر شتێک کە دەتەوێت بیفرۆشیت نرخێک بە خاڵ دابنێ: ئەوەی نرخی نەبێت ناگاتە کڕیار.')}
         </p>
         {(['free_shipping', 'filament_discount'] as const).map((k) => (
           <div key={k} className="lv-well rounded-lg p-3 space-y-2">
@@ -283,7 +365,24 @@ function SettingsPanel() {
               value={cfg.shop[k].points ?? ''} onChange={(e) => set((c) => ((c.shop[k].points = num(e.target.value)), c))} />
           </div>
         ))}
+        <div className="sm:col-span-2 border-t border-border-subtle pt-4">
+          <Suspense fallback={<p className="text-text-secondary text-xs">{loc('جارٍ التحميل…', 'Loading…', 'بار دەکرێت…')}</p>}>
+            <RewardsShopProducts
+              items={cfg.shop.items ?? []}
+              views={shopViews}
+              badIndex={badRow}
+              onChange={(items) => set((c) => ((c.shop.items = items), c))}
+            />
+          </Suspense>
+        </div>
       </div>
+
+      {error && <div role="alert" className="lv-alert lv-alert-danger text-xs text-text-primary">{error}</div>}
+      {notice && (
+        <div role="status" className="lv-alert lv-alert-success text-xs text-text-primary flex items-center gap-2">
+          <Check className="w-4 h-4" aria-hidden /> {notice}
+        </div>
+      )}
 
       <div className="flex justify-end">
         <button type="button" onClick={() => void save()} disabled={saving} className="lv-button lv-button-primary">
@@ -291,144 +390,6 @@ function SettingsPanel() {
           {loc('حفظ الإعدادات', 'Save settings', 'ڕێکخستنەکان پاشەکەوت بکە')}
         </button>
       </div>
-    </div>
-  );
-}
-
-// -------------------------------------------------------------- coupons
-
-function CouponsPanel() {
-  const { loc } = useLanguage();
-  const [rows, setRows] = useState<Grant[] | null>(null);
-  const [state, setState] = useState('active');
-  const [kind, setKind] = useState('');
-  const [q, setQ] = useState('');
-  const [busy, setBusy] = useState('');
-  const [error, setError] = useState('');
-
-  const load = useCallback(async () => {
-    setError('');
-    try {
-      const p = new URLSearchParams();
-      if (state) p.set('state', state);
-      if (kind) p.set('kind', kind);
-      if (q.trim()) p.set('q', q.trim());
-      setRows((await api.get<{ grants: Grant[] }>(`/api/admin/rewards/grants?${p.toString()}`)).grants);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '');
-      setRows([]);
-    }
-  }, [state, kind, q]);
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  const act = async (g: Grant, what: 'revoke' | 'extend') => {
-    const reason = window.prompt(loc('السبب (يُحفظ في السجل):', 'Reason (kept in the audit log):', 'هۆکار (لە تۆماردا دەمێنێتەوە):'))?.trim();
-    if (!reason) return;
-    let days = 0;
-    if (what === 'extend') {
-      days = Math.trunc(Number(window.prompt(loc('كم يومًا؟ (1–30)', 'How many days? (1–30)', 'چەند ڕۆژ؟ (1–30)')) || 0));
-      if (!days) return;
-    }
-    setBusy(g.id);
-    setError('');
-    try {
-      await api.post(`/api/admin/rewards/grants/${encodeURIComponent(g.id)}/${what}`, what === 'extend' ? { days, reason } : { reason });
-      await load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : '');
-    } finally {
-      setBusy('');
-    }
-  };
-
-  const stateText = (s: Grant['state']) =>
-    s === 'active' ? loc('صالح', 'Active', 'چالاک') : s === 'used' ? loc('مستخدم', 'Used', 'بەکارهاتوو') : s === 'expired' ? loc('منتهٍ', 'Expired', 'بەسەرچوو') : loc('مسحوب', 'Withdrawn', 'کشاوەتەوە');
-
-  return (
-    <div className="space-y-3">
-      <div className="lv-surface p-3 grid gap-2 sm:grid-cols-4">
-        <select className="lv-input text-sm" value={state} onChange={(e) => setState(e.target.value)} aria-label={loc('الحالة', 'State', 'دۆخ')}>
-          <option value="">{loc('كل الحالات', 'All states', 'هەموو دۆخەکان')}</option>
-          <option value="active">{stateText('active')}</option>
-          <option value="used">{stateText('used')}</option>
-          <option value="expired">{stateText('expired')}</option>
-          <option value="revoked">{stateText('revoked')}</option>
-        </select>
-        <select className="lv-input text-sm" value={kind} onChange={(e) => setKind(e.target.value)} aria-label={loc('النوع', 'Kind', 'جۆر')}>
-          <option value="">{loc('كل الأنواع', 'All kinds', 'هەموو جۆرەکان')}</option>
-          <option value="free_shipping">{loc('توصيل مجاني', 'Free delivery', 'گەیاندنی بەخۆڕایی')}</option>
-          <option value="filament_discount">{loc('خصم الفلامنت', 'Filament discount', 'داشکاندنی فیلامێنت')}</option>
-        </select>
-        <input className="lv-input text-sm sm:col-span-2" value={q} onChange={(e) => setQ(e.target.value)} placeholder={loc('ابحث بالكود أو الزبون أو الطلب…', 'Search by code, customer or order…', 'بگەڕێ بە کۆد، کڕیار یان داواکاری…')} />
-      </div>
-      {error && <div role="alert" className="lv-alert lv-alert-danger text-xs text-text-primary">{error}</div>}
-      {rows === null ? (
-        <p className="text-text-secondary text-sm">{loc('جارٍ التحميل…', 'Loading…', 'بار دەکرێت…')}</p>
-      ) : rows.length === 0 ? (
-        <p className="text-text-secondary text-sm rounded-xl border border-dashed border-border-subtle p-6 text-center">{loc('لا كوبونات هنا.', 'No coupons here.', 'هیچ کۆپۆنێک لێرە نییە.')}</p>
-      ) : (
-        <div className="overflow-x-auto lv-surface">
-          <table className="w-full text-sm min-w-[820px]">
-            <thead className="bg-surface-raised text-text-secondary text-[11px]">
-              <tr>
-                <th className="text-start p-3">{loc('الزبون', 'Customer', 'کڕیار')}</th>
-                <th className="text-start p-3">{loc('الكوبون', 'Coupon', 'کۆپۆن')}</th>
-                <th className="text-start p-3">{loc('المصدر', 'Source', 'سەرچاوە')}</th>
-                <th className="text-start p-3">{loc('الصلاحية', 'Valid', 'ماوە')}</th>
-                <th className="text-start p-3">{loc('الحالة', 'State', 'دۆخ')}</th>
-                <th className="text-end p-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-subtle">
-              {rows.map((g) => (
-                <tr key={g.id} className="text-text-secondary">
-                  <td className="p-3">
-                    <div className="text-text-primary">{g.user.name || g.user.username}</div>
-                    <div className="text-[11px]" dir="ltr">{g.user.email}</div>
-                  </td>
-                  <td className="p-3">
-                    <div className="text-text-primary flex items-center gap-1.5">
-                      <Ticket className="w-3.5 h-3.5 text-gold" aria-hidden />
-                      {g.kind === 'free_shipping' ? loc('توصيل مجاني', 'Free delivery', 'گەیاندنی بەخۆڕایی') : loc(`خصم ${g.percent}% فلامنت`, `${g.percent}% filament`, `${g.percent}% فیلامێنت`)}
-                    </div>
-                    <div className="font-mono text-[11px]" dir="ltr">{g.code}</div>
-                  </td>
-                  <td className="p-3 text-[12px]">
-                    {g.source === 'printer'
-                      ? loc(`طابعة · ${g.order_id ?? ''}`, `Printer · ${g.order_id ?? ''}`, `چاپکەر · ${g.order_id ?? ''}`)
-                      : g.source === 'points_shop'
-                        ? loc(`متجر النقاط · ${g.points_spent}`, `Points shop · ${g.points_spent}`, `فرۆشگای خاڵ · ${g.points_spent}`)
-                        : loc('إدارة', 'Admin', 'بەڕێوەبەر')}
-                  </td>
-                  <td className="p-3 text-[12px]" dir="ltr">{day(g.issued_at)} → {day(g.expires_at)}</td>
-                  <td className="p-3 text-[12px]">
-                    {stateText(g.state)}
-                    {g.used_on_order_id ? <div className="text-[11px]" dir="ltr">{g.used_on_order_id}</div> : null}
-                  </td>
-                  <td className="p-3 text-end whitespace-nowrap">
-                    {g.state !== 'used' && g.state !== 'revoked' && (
-                      <>
-                        <button type="button" disabled={busy === g.id} onClick={() => void act(g, 'extend')} className="lv-button lv-button-secondary lv-button-sm me-1">
-                          {loc('تمديد', 'Extend', 'درێژکردنەوە')}
-                        </button>
-                        <button type="button" disabled={busy === g.id} onClick={() => void act(g, 'revoke')} className="lv-button lv-button-ghost lv-button-sm text-danger">
-                          {loc('سحب', 'Withdraw', 'کشاندنەوە')}
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-      <p className="text-text-muted text-[11px] flex items-center gap-1.5">
-        <Trophy className="w-3.5 h-3.5" aria-hidden />
-        {loc('كوبون استُخدم في طلب لا يُسحب منه أبدًا؛ إلغاء الطلب الأصلي أو إرجاع الطابعة يسحب الكوبونات غير المستخدمة تلقائيًا.', 'A coupon spent on an order is never taken back from it; cancelling the printer’s order or returning the printer withdraws the unused coupons by itself.', 'کۆپۆنێک کە لە داواکارییەکدا بەکارهاتبێت هەرگیز لێی ناسەندرێتەوە؛ هەڵوەشاندنەوەی داواکاریی چاپکەرەکە یان گەڕاندنەوەی چاپکەرەکە کۆپۆنە بەکارنەهاتووەکان خۆکارانە دەکشێنێتەوە.')}
-      </p>
     </div>
   );
 }

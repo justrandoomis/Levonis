@@ -17,13 +17,16 @@
  *     free shipping 5000», «للطلبات فوق 100 الف»;
  *   · the filament coupon is 15% off ONE PIECE, at most 25,000 IQD, on the
  *     filaments ticked in Admin → Rewards — and, until any is ticked, on every
- *     product in the FDM filament section: «the coupon is for 1 pic»;
- *   · it also works on a piece already on sale, off the sale price (owner,
- *     2026-11-06, for eSUN PLA+ at its $15: the filament coupon only, with a
- *     switch; DECISIONS row 302). Every other discount keeps row 223 #5;
+ *     product in the FDM filament section: «the coupon is for 1 pic». It also works on
+ *     a piece already on sale or otherwise discounted, off that price, while `on_offer`
+ *     is on (owner, 2026-11-06, for eSUN PLA+ at its $15: the filament coupon only, with
+ *     a switch; DECISIONS row 302). Every other discount keeps row 223 #5;
  *   · the POINTS SHOP sells the same two coupons for points, at prices the
  *     owner sets. NO PRICE IS INVENTED HERE: both items start switched off
- *     with no price, and the shop is not shown until the owner sets one.
+ *     with no price, and the shop is not shown until the owner sets one;
+ *   · and it sells PRODUCTS for points (owner, 2026-11-05; migration 0229;
+ *     DECISIONS row 299): `shop.items`, each one real store product, model and
+ *     colour at a price in points the owner sets. None exists until he adds it.
  *
  * Stored in `admin_settings` under `rewardProgramConfig`, written only by
  * PUT /api/admin/rewards/config (the owner: it decides what every printer
@@ -31,6 +34,8 @@
  * like the defaults, field by field, so it can never give away more than the
  * owner approved — only what the documented default says.
  */
+import { canonicalOptionValueIds } from '../cartSelectionIdentity';
+import { newId } from '../crypto';
 import { safeParse } from '../types';
 
 export const REWARD_CONFIG_KEY = 'rewardProgramConfig';
@@ -45,6 +50,23 @@ export interface ShopItemConfig {
   enabled: boolean;
   /** What the coupon costs in points; null until the owner sets it. */
   points: number | null;
+}
+
+/**
+ * One product the points shop sells: the store's own product, pinned the way a gift
+ * pins one (gifts/selection.ts), and its price in points. An item with no price can
+ * never be on sale, whatever its switch says.
+ */
+export interface ShopProductConfig {
+  id: string;
+  product_id: string;
+  option_value_ids: string[];
+  color_id: string;
+  qty: number;
+  sale_type: 'direct_sale' | 'pre_order';
+  transport_method: '' | 'air' | 'sea' | 'land';
+  points: number | null;
+  enabled: boolean;
 }
 
 export interface RewardProgramConfig {
@@ -75,10 +97,13 @@ export interface RewardProgramConfig {
     product_ids: string[];
     /** How many pieces one coupon discounts. */
     max_pieces: number;
-    /** It also takes its percentage off a piece already on sale, off the sale price. */
-    on_sale: boolean;
+    /** It also works on a piece that already has an offer or another discount, off that price. On unless the owner turns it off. */
+    on_offer: boolean;
   };
-  shop: Record<RewardCouponKind, ShopItemConfig>;
+  shop: Record<RewardCouponKind, ShopItemConfig> & {
+    /** The products for points. Absent from a stored row: none. */
+    items: ShopProductConfig[];
+  };
 }
 
 export const REWARD_PROGRAM_DEFAULT: RewardProgramConfig = Object.freeze({
@@ -86,10 +111,11 @@ export const REWARD_PROGRAM_DEFAULT: RewardProgramConfig = Object.freeze({
   valid_days: 7,
   weekly: { enabled: true, months: 12 },
   free_shipping: { enabled: true, amount_iqd: 5_000, min_order_iqd: 100_000 },
-  filament: { enabled: true, percent: 15, max_discount_iqd: 25_000, product_ids: [], max_pieces: 1, on_sale: true },
+  filament: { enabled: true, percent: 15, max_discount_iqd: 25_000, product_ids: [], max_pieces: 1, on_offer: true },
   shop: {
     free_shipping: { enabled: false, points: null },
     filament_discount: { enabled: false, points: null },
+    items: [],
   },
 }) as RewardProgramConfig;
 
@@ -99,6 +125,11 @@ export const MAX_DISCOUNT_IQD = 10_000_000;
 export const MAX_FILAMENTS = 200;
 export const MAX_WEEKLY_MONTHS = 60;
 export const MAX_PIECES = 100;
+/** The most products the shop sells at once. */
+export const MAX_SHOP_PRODUCTS = 50;
+/** The CHECK on `gift_entitlements.gift_qty` and the option cap of a selection (gifts/selection.ts, which this file must not import: it pulls the routes). */
+const MAX_SHOP_PRODUCT_QTY = 99;
+const MAX_SHOP_PRODUCT_OPTIONS = 12;
 
 const isPosInt = (v: unknown, max: number): v is number => Number.isSafeInteger(v) && (v as number) > 0 && (v as number) <= max;
 const isCount = (v: unknown, max: number): v is number => Number.isSafeInteger(v) && (v as number) >= 0 && (v as number) <= max;
@@ -110,6 +141,48 @@ function shopItem(raw: unknown, fallback: ShopItemConfig): ShopItemConfig {
   // An item with no price can never be on sale, whatever its switch says.
   const enabled = (typeof r.enabled === 'boolean' ? r.enabled : fallback.enabled) && points !== null;
   return { enabled, points };
+}
+
+const isItemId = (v: unknown): v is string => typeof v === 'string' && /^[A-Za-z0-9_-]{1,40}$/.test(v);
+const isSaleType = (v: unknown): v is ShopProductConfig['sale_type'] => v === 'direct_sale' || v === 'pre_order';
+const isRoute = (v: unknown): v is ShopProductConfig['transport_method'] => v === '' || v === 'air' || v === 'sea' || v === 'land';
+const isColorId = (v: unknown): v is string => typeof v === 'string' && v.length <= 80;
+const isOptionList = (v: unknown): v is string[] =>
+  Array.isArray(v) && v.length <= MAX_SHOP_PRODUCT_OPTIONS && v.every((x) => typeof x === 'string' && x.length > 0 && x.length <= 80);
+
+/** One stored row, or null when it is not one: a damaged row is not on sale, alone. */
+function shopProduct(raw: unknown): ShopProductConfig | null {
+  const r = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Record<string, unknown>;
+  if (!isItemId(r.id) || !isProductId(r.product_id) || !isSaleType(r.sale_type)) return null;
+  const qty = r.qty === undefined ? 1 : r.qty;
+  if (!isPosInt(qty, MAX_SHOP_PRODUCT_QTY)) return null;
+  const points = isPosInt(r.points, MAX_SHOP_POINTS) ? r.points : null;
+  return {
+    id: r.id,
+    product_id: r.product_id,
+    option_value_ids: isOptionList(r.option_value_ids) ? canonicalOptionValueIds(r.option_value_ids) : [],
+    color_id: isColorId(r.color_id) ? r.color_id : '',
+    qty,
+    sale_type: r.sale_type,
+    // A direct sale has no route, whatever a field says (the rule of the gift's own columns).
+    transport_method: r.sale_type === 'pre_order' && isRoute(r.transport_method) ? r.transport_method : '',
+    points,
+    enabled: r.enabled === true && points !== null,
+  };
+}
+
+function shopProducts(raw: unknown): ShopProductConfig[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const out: ShopProductConfig[] = [];
+  for (const row of raw) {
+    const item = shopProduct(row);
+    if (!item || seen.has(item.id)) continue;
+    seen.add(item.id);
+    out.push(item);
+    if (out.length === MAX_SHOP_PRODUCTS) break;
+  }
+  return out;
 }
 
 /** Tolerant read: every malformed field falls back to its default, alone. */
@@ -143,19 +216,76 @@ export function normalizeRewardConfig(raw: unknown): RewardProgramConfig {
         fl.max_discount_iqd === null ? null : isPosInt(fl.max_discount_iqd, MAX_DISCOUNT_IQD) ? (fl.max_discount_iqd as number) : d.filament.max_discount_iqd,
       product_ids: ids,
       max_pieces: isPosInt(fl.max_pieces, MAX_PIECES) ? (fl.max_pieces as number) : d.filament.max_pieces,
-      on_sale: typeof fl.on_sale === 'boolean' ? fl.on_sale : d.filament.on_sale,
+      // `on_sale` was this switch's name for one release; a row saved then keeps its answer.
+      on_offer: typeof fl.on_offer === 'boolean' ? fl.on_offer : typeof fl.on_sale === 'boolean' ? fl.on_sale : d.filament.on_offer,
     },
     shop: {
       free_shipping: shopItem(shop.free_shipping, d.shop.free_shipping),
       filament_discount: shopItem(shop.filament_discount, d.shop.filament_discount),
+      items: shopProducts(shop.items),
     },
   };
 }
 
-export type RewardConfigCheck = { ok: true; value: RewardProgramConfig } | { ok: false; error: string; code: string };
+type ConfigRefusal = { ok: false; error: string; code: string; details?: Record<string, unknown> };
+export type RewardConfigCheck = { ok: true; value: RewardProgramConfig } | ConfigRefusal;
 
-/** Strict validation for the owner's write: a typo is refused, never stored. */
-export function validateRewardConfig(raw: unknown): RewardConfigCheck {
+/**
+ * The products as the owner's screen sends them, strictly. A new row has no id yet: the
+ * server names it, and it keeps that name for good. Whether each one can be sold is the
+ * gift code's own judgement and needs the database: PUT /config asks it.
+ */
+function checkShopProducts(raw: unknown): { ok: true; items: ShopProductConfig[] } | ConfigRefusal {
+  if (!Array.isArray(raw)) return { ok: false, error: 'shop.items must be a list of products', code: 'REWARD_SHOP_ITEM_INVALID' };
+  if (raw.length > MAX_SHOP_PRODUCTS) return { ok: false, error: `The points shop sells at most ${MAX_SHOP_PRODUCTS} products`, code: 'REWARD_SHOP_ITEMS_TOO_MANY' };
+  const items: ShopProductConfig[] = [];
+  const ids = new Set<string>();
+  const onSale = new Set<string>();
+  for (const [index, entry] of raw.entries()) {
+    const refuse = (error: string, code = 'REWARD_SHOP_ITEM_INVALID'): ConfigRefusal => ({ ok: false, error: `shop.items[${index}]: ${error}`, code, details: { item_index: index } });
+    const r = (entry && typeof entry === 'object' && !Array.isArray(entry) ? entry : null) as Record<string, unknown> | null;
+    if (!r) return refuse('must be an object');
+    const id = r.id === undefined || r.id === null || r.id === '' ? newId('rsi') : r.id;
+    if (!isItemId(id) || ids.has(id)) return refuse('id must be a unique short name');
+    if (!isProductId(r.product_id)) return refuse('product_id must name a product');
+    if (!isSaleType(r.sale_type)) return refuse('sale_type must be direct_sale or pre_order');
+    const transport = r.transport_method ?? '';
+    if (!isRoute(transport)) return refuse('transport_method must be air, sea, land or empty');
+    const options = r.option_value_ids ?? [];
+    if (!isOptionList(options)) return refuse('option_value_ids must be a list of ids');
+    const color = r.color_id ?? '';
+    if (!isColorId(color)) return refuse('color_id must be an id');
+    const qty = r.qty ?? 1;
+    if (!isPosInt(qty, MAX_SHOP_PRODUCT_QTY)) return refuse(`qty must be a whole number from 1 to ${MAX_SHOP_PRODUCT_QTY}`);
+    if (typeof r.enabled !== 'boolean') return refuse('enabled must be true or false');
+    const points = r.points ?? null;
+    if (points !== null && !isPosInt(points, MAX_SHOP_POINTS)) return refuse('points must be a whole number of points, or null');
+    if (r.enabled && points === null) return refuse('cannot be on sale without a price in points', 'REWARD_SHOP_PRICE_REQUIRED');
+    const item: ShopProductConfig = {
+      id,
+      product_id: r.product_id,
+      option_value_ids: canonicalOptionValueIds(options),
+      color_id: color,
+      qty,
+      sale_type: r.sale_type,
+      transport_method: r.sale_type === 'pre_order' ? transport : '',
+      points,
+      enabled: r.enabled,
+    };
+    const selection = JSON.stringify([item.product_id, item.option_value_ids, item.color_id, item.qty, item.sale_type, item.transport_method]);
+    if (item.enabled && onSale.has(selection)) return refuse('this exact product is already on sale', 'REWARD_SHOP_ITEM_DUPLICATE');
+    if (item.enabled) onSale.add(selection);
+    ids.add(id);
+    items.push(item);
+  }
+  return { ok: true, items };
+}
+
+/**
+ * Strict validation for the owner's write: a typo is refused, never stored. A screen an
+ * older deploy loaded sends no `shop.items`: what it never saw keeps what is `stored`.
+ */
+export function validateRewardConfig(raw: unknown, stored?: RewardProgramConfig): RewardConfigCheck {
   const fail = (error: string, code = 'REWARD_CONFIG_INVALID'): RewardConfigCheck => ({ ok: false, error, code });
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return fail('The rewards settings must be an object');
   const r = raw as Record<string, unknown>;
@@ -181,7 +311,7 @@ export function validateRewardConfig(raw: unknown): RewardConfigCheck {
     return fail(`filament.product_ids must be a list of at most ${MAX_FILAMENTS} product ids`);
   }
   if (fl.max_pieces !== undefined && !isPosInt(fl.max_pieces, MAX_PIECES)) return fail(`filament.max_pieces must be a whole number from 1 to ${MAX_PIECES}`);
-  if (fl.on_sale !== undefined && typeof fl.on_sale !== 'boolean') return fail('filament.on_sale must be true or false');
+  if (fl.on_offer !== undefined && typeof fl.on_offer !== 'boolean') return fail('filament.on_offer must be true or false');
   const shop = r.shop as Record<string, unknown> | undefined;
   if (!shop || typeof shop !== 'object') return fail('shop must be an object');
   for (const kind of REWARD_COUPON_KINDS) {
@@ -190,7 +320,15 @@ export function validateRewardConfig(raw: unknown): RewardConfigCheck {
     if (item.points !== null && !isPosInt(item.points, MAX_SHOP_POINTS)) return fail(`shop.${kind}.points must be a whole number of points, or null`);
     if (item.enabled && item.points === null) return fail(`shop.${kind} cannot be on sale without a price in points`, 'REWARD_SHOP_PRICE_REQUIRED');
   }
-  return { ok: true, value: normalizeRewardConfig(r) };
+  let items = stored?.shop.items ?? [];
+  if (shop.items !== undefined) {
+    const checked = checkShopProducts(shop.items);
+    if (!checked.ok) return checked;
+    items = checked.items;
+  }
+  // What an older screen never saw keeps what is stored, here too.
+  const onOffer = fl.on_offer ?? stored?.filament.on_offer ?? false;
+  return { ok: true, value: normalizeRewardConfig({ ...r, filament: { ...fl, on_offer: onOffer }, shop: { ...shop, items } }) };
 }
 
 /** The stored terms, or the defaults when nothing is stored (or the table is missing). */

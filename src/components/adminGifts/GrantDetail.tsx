@@ -10,6 +10,7 @@ import { Loader2 } from 'lucide-react';
 import { api, failureText } from '../../lib/api';
 import { Sheet } from '../ui/Overlay';
 import { formatDateTime, statusLabel } from '../orders/format';
+import { formatFigure } from '../../lib/localeNumber';
 import { Banner, Field, Select, TextArea } from '../adminProducts/form/formUi';
 import * as T from '../adminProducts/theme';
 import { GiftStatusChip, ItemRow, triOf } from './ui';
@@ -147,6 +148,12 @@ export default function GrantDetail({
                   <span className="text-[var(--ap-text-3)]">· {statusLabel(lang, grant.order.status)}</span>
                 </Fact>
               )}
+              {grant.shop && (
+                <Fact label={t('shopFact')}>
+                  {adminText(lang, 'shopPaid', { points: formatFigure(grant.shop.points_spent, lang) })}
+                  {grant.shop.points_returned ? ` ${t('shopReturned')}` : ''}
+                </Fact>
+              )}
               {grant.cancelled_at && (
                 <Fact label={t('cancelledBy')}>
                   {formatDateTime(grant.cancelled_at, lang)}
@@ -234,6 +241,11 @@ export default function GrantDetail({
                   (cancelOpen ? (
                     <div className="space-y-2 rounded-[var(--ap-radius-md)] border border-[var(--ap-danger-border)] p-3">
                       <p className="text-[12.5px] text-[var(--ap-text-2)]">{t('cancelConsequence')}</p>
+                      {grant.shop && grant.shop.points_spent > 0 && (
+                        <p className="text-[12.5px] text-[var(--ap-text-2)]" data-gift-cancel-points>
+                          {adminText(lang, 'cancelPointsBack', { points: formatFigure(grant.shop.points_spent, lang) })}
+                        </p>
+                      )}
                       <Field ar={t('cancelReason')} en="Reason">
                         <TextArea dir="auto" rows={2} maxLength={1000} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} disabled={busy} />
                       </Field>

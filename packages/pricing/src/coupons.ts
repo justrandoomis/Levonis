@@ -112,6 +112,21 @@ export interface CouponLine {
   unit_goods_iqd: number;
   /** True when a membership rule or an offer already discounted this line. */
   already_discounted: boolean;
+  /**
+   * WHO GOES FIRST WHEN TWO LINES TIE, in words every door shares: the cart line's own
+   * id. The checkout's `line_id` is a new random id on every quote, so a tie broken on
+   * it answered differently from press to press and from the cart's read (DECISIONS
+   * row 298). Absent: `line_id`, which is what a caller with one set of ids has.
+   */
+  tie_key?: string;
+}
+
+/** The order of two lines that tie: their shared name first, then their own id, so it is total. */
+function byTie(a: Pick<CouponLine, 'line_id' | 'tie_key'>, b: Pick<CouponLine, 'line_id' | 'tie_key'>): number {
+  const x = a.tie_key ?? a.line_id;
+  const y = b.tie_key ?? b.line_id;
+  if (x !== y) return x < y ? -1 : 1;
+  return a.line_id < b.line_id ? -1 : a.line_id > b.line_id ? 1 : 0;
 }
 
 export interface CouponContext {
@@ -324,17 +339,18 @@ function spreadAcross(
   if (total <= 0) return [];
   const weights = eligible.map((e) => ({
     line_id: e.line.line_id,
+    tie_key: e.line.tie_key,
     weight: dinars(e.line.unit_goods_iqd) * e.units,
   }));
   const basis = weights.reduce((s, w) => s + w.weight, 0);
   if (basis <= 0) return [];
   const exact = weights.map((w) => ({ ...w, raw: (total * w.weight) / basis }));
-  const out = exact.map((e) => ({ line_id: e.line_id, amount_iqd: Math.floor(e.raw), rem: e.raw - Math.floor(e.raw) }));
+  const out = exact.map((e) => ({ line_id: e.line_id, tie_key: e.tie_key, amount_iqd: Math.floor(e.raw), rem: e.raw - Math.floor(e.raw) }));
   let left = total - out.reduce((s, o) => s + o.amount_iqd, 0);
-  // Ties resolve by line id so two identical carts always allocate identically.
+  // Ties resolve by the line's shared name so two identical carts always allocate identically.
   out
     .slice()
-    .sort((a, b) => b.rem - a.rem || (a.line_id < b.line_id ? -1 : 1))
+    .sort((a, b) => b.rem - a.rem || byTie(a, b))
     .forEach((o) => {
       if (left <= 0) return;
       const target = out.find((x) => x.line_id === o.line_id)!;
@@ -397,6 +413,8 @@ export interface PoolAllocation extends CouponAllocation {
   blocked_min_total_iqd: number | null;
   /** The delivery is not known yet (the cart) and a delivery coupon is waiting for it. */
   delivery_waiting: boolean;
+  /** Per coupon, the lines its goods part landed on: each sums to that coupon's `merchandise_iqd`. */
+  lines_by_coupon: ReadonlyMap<string, ReadonlyArray<{ line_id: string; amount_iqd: number }>>;
 }
 
 export function allocateCouponPool(
@@ -408,10 +426,12 @@ export function allocateCouponPool(
   const namesGoods = (r: CouponRule) => r.applies_to === 'merchandise' || r.applies_to === 'both';
   const namesDelivery = (r: CouponRule) => r.applies_to === 'delivery' || r.applies_to === 'both';
 
-  // Rule 2: the dearest piece first; ties by line id, so one cart always allocates one way.
-  const dearest = [...lines].sort((a, b) => dinars(b.unit_goods_iqd) - dinars(a.unit_goods_iqd) || (a.line_id < b.line_id ? -1 : 1));
+  // Rule 2: the dearest piece first; ties by the line's shared name (`tie_key`), so one
+  // cart allocates one way at the cart, at every quote and on the order.
+  const dearest = [...lines].sort((a, b) => dinars(b.unit_goods_iqd) - dinars(a.unit_goods_iqd) || byTie(a, b));
   const piecesLeft = new Map(lines.map((l) => [l.line_id, Math.max(0, Math.trunc(l.qty))]));
   const onLine = new Map<string, number>();
+  const linesByCoupon = new Map<string, Array<{ line_id: string; amount_iqd: number }>>();
   const used = new Map<string, PoolUse>();
   const use = (c: PoolCoupon): PoolUse => {
     const u = used.get(c.coupon_id) ?? { coupon_id: c.coupon_id, code: c.code, merchandise_iqd: 0, delivery_iqd: 0, total_iqd: 0 };
@@ -435,6 +455,7 @@ export function allocateCouponPool(
     u.total_iqd += a.merchandise_iqd;
     goods += a.merchandise_iqd;
     for (const l of a.lines) onLine.set(l.line_id, (onLine.get(l.line_id) ?? 0) + l.amount_iqd);
+    linesByCoupon.set(c.coupon_id, a.lines);
     // The pieces this coupon spent are gone: the resolver's own quota, in its own order.
     let quota = c.rule.max_quantity === null ? Infinity : Math.max(0, Math.trunc(c.rule.max_quantity));
     for (const l of view) {
@@ -485,5 +506,149 @@ export function allocateCouponPool(
     goods_after_discount_iqd: goodsAfter,
     blocked_min_total_iqd: blocked,
     delivery_waiting: waiting,
+    lines_by_coupon: linesByCoupon,
+  };
+}
+
+// ============================ WHAT EACH COUPON DOES HERE ============================
+//
+// The cart lays the customer's coupons out one row at a time: what each takes off
+// this basket and, when it takes nothing, why (owner, 2026-11-05: «from user side
+// with apply on cart product»; DECISIONS row 298). None of this is a second sum:
+// `allocateCouponPool` decides the money, and this only reads its answer back per
+// coupon, so a row can never say what the order would not do.
+
+/**
+ *   applies      it takes something off this order now;
+ *   waiting      a delivery coupon whose fee is not known yet;
+ *   min_not_met  a delivery coupon whose order is short of its minimum (`short_of_iqd`);
+ *   no_fee       a delivery coupon with nothing left to take: the fee came out free or
+ *                other coupons used it up. It stays for the next order;
+ *   no_piece     a goods coupon whose lines are all taken by other coupons. It stays too;
+ *   on_offer     a goods coupon whose only lines already carry an offer or another discount,
+ *                and it was minted not to join one (`stacks = 0`);
+ *   no_gain      it would take something, but the pool brings back more of the delivery fee
+ *                than it takes (`couponPoolOffer`), so it is not offered and it stays;
+ *   no_target    no line of this order is one it names.
+ */
+export type PoolCouponState = 'applies' | 'waiting' | 'min_not_met' | 'no_fee' | 'no_piece' | 'on_offer' | 'no_gain' | 'no_target';
+
+export interface PoolCouponFact {
+  coupon_id: string;
+  code: string;
+  state: PoolCouponState;
+  /** What it takes off this order. 0 unless `applies`. */
+  take_iqd: number;
+  merchandise_iqd: number;
+  delivery_iqd: number;
+  /** The lines its goods part lands on. */
+  lines: ReadonlyArray<{ line_id: string; amount_iqd: number }>;
+  /** What the goods are short of its minimum. 0 unless `min_not_met`. */
+  short_of_iqd: number;
+}
+
+export interface PoolFacts {
+  allocation: PoolAllocation;
+  /** In the pool's own order: the soonest to end first. */
+  facts: PoolCouponFact[];
+  /** The code that opens this pool at the checkout: the first coupon that takes something, else the first coupon. */
+  code: string | null;
+  /** How many coupons this order would spend: those that take something and those waiting for the fee. */
+  count: number;
+}
+
+export function couponPoolFacts(
+  coupons: readonly PoolCoupon[],
+  lines: readonly CouponLine[],
+  ctx: CouponContext,
+  options: { deliveryPending?: boolean } = {}
+): PoolFacts {
+  const allocation = allocateCouponPool(coupons, lines, ctx, options);
+  const usedBy = new Map(allocation.used.map((u) => [u.coupon_id, u]));
+  const facts = coupons.map((c): PoolCouponFact => {
+    const use = usedBy.get(c.coupon_id);
+    const fact: PoolCouponFact = {
+      coupon_id: c.coupon_id,
+      code: c.code,
+      state: 'no_target',
+      take_iqd: use?.total_iqd ?? 0,
+      merchandise_iqd: use?.merchandise_iqd ?? 0,
+      delivery_iqd: use?.delivery_iqd ?? 0,
+      lines: allocation.lines_by_coupon.get(c.coupon_id) ?? [],
+      short_of_iqd: 0,
+    };
+    if (use && use.total_iqd > 0) return { ...fact, state: 'applies' };
+    const named = lines.some((l) => couponMatchesLine(c.rule, l, ctx));
+    if (c.rule.applies_to === 'merchandise') {
+      if (named) return { ...fact, state: 'no_piece' };
+      // The line is here and only its offer keeps the coupon off: not the same as no such line.
+      const onOffer = !c.rule.stacks && lines.some((l) => l.already_discounted && couponMatchesLine({ ...c.rule, stacks: true }, l, ctx));
+      return { ...fact, state: onOffer ? 'on_offer' : 'no_target' };
+    }
+    // The delivery's own order of tests (`allocateCouponPool`): its minimum, then the fee.
+    const short = dinars(c.min_total_iqd) - allocation.goods_after_discount_iqd;
+    if (short > 0) return { ...fact, state: 'min_not_met', short_of_iqd: short };
+    if (!named) return fact;
+    return { ...fact, state: options.deliveryPending ? 'waiting' : 'no_fee' };
+  });
+  const opener = facts.find((f) => f.state === 'applies') ?? facts[0] ?? null;
+  return {
+    allocation,
+    facts,
+    code: opener ? opener.code : null,
+    count: facts.filter((f) => f.state === 'applies' || f.state === 'waiting').length,
+  };
+}
+
+// ============================== WHAT THE POOL IS WORTH ==============================
+//
+// The coupons' goods part can bring the delivery fee back. A member's free delivery is
+// tested on the goods AFTER the coupons (row 223 #4), so a 3,600 coupon on a 76,000 order
+// over a 75,000 line takes 3,600 and brings a 5,000 fee back: the order comes out 1,400
+// dearer. So the offer is worked out in the checkout's own order (the goods, then the fee
+// on what is left of them, then the delivery coupons on that fee), and what the customer
+// is told is the difference it makes to what they pay.
+
+export interface PoolOffer extends PoolFacts {
+  /** The fee on the goods as they are. */
+  fee_before_iqd: number;
+  /** The fee on the goods after the coupons: what the delivery coupons draw on. */
+  fee_after_iqd: number;
+  /** What the coupons bring back of the fee. */
+  fee_back_iqd: number;
+  /** What the customer saves: everything the pool takes, less the fee it brings back. */
+  net_iqd: number;
+  /** It would take something and save nothing: every such coupon reads `no_gain`, and nothing opens. */
+  no_gain: boolean;
+}
+
+export function couponPoolOffer(
+  coupons: readonly PoolCoupon[],
+  lines: readonly CouponLine[],
+  ctx: CouponContext,
+  options: {
+    deliveryPending?: boolean;
+    /** The goods the fee is tested on, before the coupons. */
+    goodsIqd: number;
+    /** What this customer is charged for delivery on goods of this value. */
+    feeAt: (goodsIqd: number) => number;
+  }
+): PoolOffer {
+  const pending = options.deliveryPending === true;
+  const fee = (goods: number) => (pending ? 0 : dinars(options.feeAt(Math.max(0, goods))));
+  const goodsPart = allocateCouponPool(coupons, lines, { ...ctx, delivery_iqd: 0 }).merchandise_iqd;
+  const before = fee(options.goodsIqd);
+  const after = fee(options.goodsIqd - goodsPart);
+  const pool = couponPoolFacts(coupons, lines, { ...ctx, delivery_iqd: after }, { deliveryPending: pending });
+  const feeBack = Math.max(0, after - before);
+  const net = pool.allocation.total_iqd - feeBack;
+  const worth = { fee_before_iqd: before, fee_after_iqd: after, fee_back_iqd: feeBack, net_iqd: Math.max(0, net) };
+  if (pending || pool.allocation.total_iqd <= 0 || net > 0) return { ...pool, ...worth, no_gain: false };
+  return {
+    ...pool,
+    ...worth,
+    no_gain: true,
+    count: 0,
+    facts: pool.facts.map((f): PoolCouponFact => (f.state === 'applies' ? { ...f, state: 'no_gain', take_iqd: 0, merchandise_iqd: 0, delivery_iqd: 0, lines: [] } : f)),
   };
 }

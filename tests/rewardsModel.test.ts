@@ -451,8 +451,10 @@ test('doorLines «قيّم طابعتك» and «استبدل نقاطك»: to ra
 });
 
 test('doorLines with no hub (it could not load): the how-lines and no badges', () => {
+  // The owner's screenshot (2026-11-05): «تصلك مع كل طابعة تستلمها من Levonis» is stale while weekly
+  // is on, and weekly is the programme (DECISIONS rows 295, 298): this tile now says so with no answer to read.
   assert.deepEqual(doorLines(null), {
-    coupons: { lines: [{ key: 'door.coupons.how' }], badge: 0 },
+    coupons: { lines: [{ key: 'door.coupons.howWeekly' }], badge: 0 },
     competitions: { lines: [], badge: 0 },
     rate: { lines: [{ key: 'door.rate.how' }], badge: 0 },
     shop: { lines: [{ key: 'door.shop.checkout' }], badge: 0 },

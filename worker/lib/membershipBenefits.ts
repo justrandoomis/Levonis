@@ -537,6 +537,11 @@ export interface BenefitLineInput {
    * Absent or null: no offer lowered the line.
    */
   offer_before_unit_iqd?: number | null;
+  /**
+   * The cart line's id. Two lines whose savings tie draw on a rule's shared budget in this
+   * order, so the cart, every quote and the order name the same line (DECISIONS row 298).
+   */
+  tie_key?: string;
 }
 
 export interface ResolvedBenefits {
@@ -624,9 +629,9 @@ export function resolveProductBenefits(input: {
     input.lines.map((line, i) => {
       const rule = ruleOf[i] ?? null;
       const saving = offerSavingOf[i]!;
-      if (saving <= 0) return { regularUnitIqd: line.regular_unit_iqd, qty: line.qty, rule };
+      if (saving <= 0) return { regularUnitIqd: line.regular_unit_iqd, qty: line.qty, rule, tieKey: line.tie_key };
       const before = Math.trunc(line.offer_before_unit_iqd as number);
-      return { regularUnitIqd: before, qty: line.qty, rule: unitDiscountIqd(before, rule) > saving ? rule : null };
+      return { regularUnitIqd: before, qty: line.qty, rule: unitDiscountIqd(before, rule) > saving ? rule : null, tieKey: line.tie_key };
     })
   );
   const lines = input.lines.map((line, i) => {

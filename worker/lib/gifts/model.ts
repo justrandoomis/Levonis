@@ -7,6 +7,7 @@
  *     gift code, row 301): one of the items of every level from 1 to `level`,
  *     `chosen_level` saying which
  *   product grant (admin pinned one product) starts at ready_to_redeem
+ *   a product swapped for points (rewards/shopItems.ts, 0229) starts at redeemed
  *   ready_to_redeem ──customer «استرداد الهدية»──► redeemed
  *   redeemed + a cart line names the gift ──► ADDED_TO_ORDER        (DERIVED, never stored)
  *   redeemed ──the checkout batch──► ordered                         (order_id, order_item_id, order_seq + 1)
@@ -158,6 +159,8 @@ export interface GiftView {
   ordered_at: string | null;
   fulfilled_at: string | null;
   cancelled_at: string | null;
+  /** What the customer swapped for this product in the points shop; 0 on every other gift. */
+  points_spent: number;
   /** Legacy review boxes only — the old card, read as it always was. */
   legacy: (ReturnType<typeof legacyEntitlementView> & { levels: LegacyLevelAvailability[] }) | null;
 }
@@ -372,7 +375,8 @@ export function giftViewFrom(g: Record<string, unknown>, ctx: ViewContext): Gift
   const status = giftStatusOf(g);
   const mode = (text(g.grant_mode) || 'legacy') as GiftMode;
   const n = Number(g.level);
-  const level = Number.isInteger(n) && n >= 1 && n <= 5 ? ctx.levels.get(n)?.view ?? levelViewFrom(undefined, n) : null;
+  // A product from the points shop belongs to no level: its row says 1 only because the column must say something.
+  const level = !text(g.shop_item_id) && Number.isInteger(n) && n >= 1 && n <= 5 ? ctx.levels.get(n)?.view ?? levelViewFrom(undefined, n) : null;
   const canChange = mode === 'level' && (g.state === 'granted' || g.state === 'ready_to_redeem');
   const scope = giftChoiceScope(g);
   const choices = canChange
@@ -423,6 +427,7 @@ export function giftViewFrom(g: Record<string, unknown>, ctx: ViewContext): Gift
     ordered_at: orNull(g.ordered_at),
     fulfilled_at: orNull(g.fulfilled_at),
     cancelled_at: orNull(g.cancelled_at),
+    points_spent: Math.max(0, Math.trunc(Number(g.points_spent) || 0)),
     legacy: legacyBlock,
   };
 }

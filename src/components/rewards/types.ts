@@ -39,8 +39,8 @@ export interface RewardCoupon {
   max_discount_iqd: number | null;
   /** How many pieces it discounts; null or absent: every piece it names. */
   max_quantity?: number | null;
-  /** It also works on a piece already on sale; absent from an older server. */
-  stacks?: boolean;
+  /** It also works on a piece that already has an offer: this coupon's own term. An older server sends none. */
+  on_offer?: boolean;
   scope: string;
   category_id: string | null;
   product_ids: string[];
@@ -52,6 +52,44 @@ export interface RewardCoupon {
   revoke_reason: string;
   /** What a live filament coupon covers; null for free delivery and every past coupon; absent from an older server. */
   targets?: CouponTargets | null;
+  /** The printer that earned it; null for the points shop's and the team's; absent from an older server. */
+  printer?: RewardCouponPrinter | null;
+}
+
+/** Which printer earned a coupon, and which of its weeks (0 is the first; the page counts from 1). */
+export interface RewardCouponPrinter {
+  name: Tri;
+  image: string;
+  unit_index: number;
+  week: number;
+  product_slug: string;
+}
+
+/** Why a printer earns nothing: the server's own list (worker/lib/rewards/earning.ts). */
+export type PrinterStopped = 'warranty_closed' | 'warranty_over' | 'returned' | 'traded_in' | 'in_shop' | 'programme_off';
+
+/** One of the customer's printers and what it earns: GET /api/rewards/program/printers. */
+export interface RewardPrinter {
+  order_item_id: string;
+  unit_index: number;
+  product_slug: string;
+  name: Tri;
+  image: string;
+  delivered_at: string | null;
+  warranty_start_at: string | null;
+  earning: boolean;
+  stopped: PrinterStopped | null;
+  week: number;
+  weeks_total: number;
+  next_at: string | null;
+  ends_at: string | null;
+  this_week: Array<{ kind: RewardKind; state: RewardCoupon['state']; expires_at: string }>;
+}
+
+export interface RewardPrintersData {
+  installed: boolean;
+  server_time: string;
+  printers: RewardPrinter[];
 }
 
 /**
@@ -123,6 +161,28 @@ export interface ShopItem {
   holding?: boolean;
   /** How many more points this coupon needs; 0 when affordable. */
   points_short?: number;
+}
+
+/** A product for points (DECISIONS row 299): one entry of `shop_items`, only what is on sale. */
+export interface ShopProductItem {
+  id: string;
+  points: number;
+  affordable: boolean;
+  points_short: number;
+  /** An un-ordered gift of this product is held: the swap would refuse it. */
+  holding: boolean;
+  /** Orderable right now. */
+  available: boolean;
+  product: {
+    id: string;
+    slug: string;
+    name: Tri;
+    image: string;
+    option: Tri | null;
+    color: Tri | null;
+    color_hex?: string;
+    qty?: number;
+  };
 }
 
 export interface CompetitionEntry {
@@ -203,6 +263,8 @@ export interface RewardsHubData {
     no_level_points?: number | null;
   };
   shop: ShopItem[];
+  /** The products for points; absent from an older server. */
+  shop_items?: ShopProductItem[];
   competitions: Competition[];
   /** Published competitions by window, at the server's now; `open_to_enter` is open, not entered, eligible and below the cap. */
   competition_counts?: { open: number; upcoming: number; closed: number; open_to_enter: number };

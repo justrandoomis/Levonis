@@ -278,7 +278,7 @@ export type DoorText =
     }
   | { key: 'door.coupons.soonest' | 'door.competitions.upcoming'; date: string }
   | { key: 'door.competitions.won'; place: number }
-  | { key: 'door.shop.from'; points: number };
+  | { key: 'door.shop.from' | 'door.shop.fromBoth' | 'door.shop.fromProducts'; points: number };
 
 export interface Door {
   lines: DoorText[];
@@ -356,10 +356,13 @@ function rateDoor(hub: RewardsHubData): Door {
   return door([{ key: 'door.rate.how' }]);
 }
 
+/** What the shop sells, from its cheapest. A product out of stock is not what the door promises. */
 function shopDoor(hub: RewardsHubData): Door {
-  const shop = hub.shop ?? [];
-  if (!shop.length) return door([{ key: 'door.shop.checkout' }]);
-  return door([{ key: 'door.shop.from', points: Math.min(...shop.map((s) => s.points)) }]);
+  const coupons = (hub.shop ?? []).map((s) => s.points);
+  const products = (hub.shop_items ?? []).filter((s) => s.available).map((s) => s.points);
+  if (!coupons.length && !products.length) return door([{ key: 'door.shop.checkout' }]);
+  const key = !products.length ? 'door.shop.from' : coupons.length ? 'door.shop.fromBoth' : 'door.shop.fromProducts';
+  return door([{ key, points: Math.min(...coupons, ...products) }]);
 }
 
 /**
@@ -373,7 +376,8 @@ function shopDoor(hub: RewardsHubData): Door {
 export function doorLines(hub: RewardsHubData | null | undefined): Doors {
   if (!hub) {
     return {
-      coupons: door([{ key: 'door.coupons.how' }]),
+      // Weekly is the owner's programme (DECISIONS row 295): with no answer to read, the tile says so.
+      coupons: door([{ key: 'door.coupons.howWeekly' }]),
       competitions: door([]),
       rate: door([{ key: 'door.rate.how' }]),
       shop: door([{ key: 'door.shop.checkout' }]),
@@ -392,6 +396,8 @@ export function doorText(line: DoorText, lang: Language, serverTime: string): st
     case 'door.competitions.won':
       return copyText(line.key, lang, { place: ordinal(line.place, lang) });
     case 'door.shop.from':
+    case 'door.shop.fromBoth':
+    case 'door.shop.fromProducts':
       return copyText(line.key, lang, { points: countText(pointsForm(line.key), line.points, lang) });
     default:
       return copyText(line.key, lang);

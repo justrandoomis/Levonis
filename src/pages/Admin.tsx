@@ -215,7 +215,7 @@ type AdminTab =
  * `?tab=offers` is «فتح في العروض الخاصة» on the product form's «تخفيض السعر»
  * card (docs/ux/PRODUCT-DISCOUNT.md §6.4).
  */
-const DEEP_LINK_TABS: readonly AdminTab[] = ['orders', 'wallet_requests', 'trade_in', 'price_protection', 'print_cloud', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security', 'delivery_pricing', 'rewards'];
+const DEEP_LINK_TABS: readonly AdminTab[] = ['reviews', 'gifts', 'orders', 'wallet_requests', 'trade_in', 'price_protection', 'print_cloud', 'finance', 'inventory', 'earnings', 'pricing', 'products', 'offers', 'security', 'delivery_pricing', 'rewards'];
 
 function initialAdminTab(): AdminTab {
   try {

@@ -68,6 +68,8 @@ export interface Level {
 }
 
 export interface AdminGift {
+  /** The points shop (DECISIONS row 299): what the customer paid, and whether a cancel gave it back. Absent from an older server. */
+  shop?: { item_id: string; points_spent: number; points_returned: boolean } | null;
   id: string;
   status: GiftStatus;
   state: string;

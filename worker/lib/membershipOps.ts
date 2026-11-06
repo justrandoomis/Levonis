@@ -307,6 +307,11 @@ export interface CouponCheck {
   min_total_iqd?: number;
   tier_required?: string | null;
   /**
+   * A refusal of this customer's OWN reward code: the cart forgets one that opens
+   * nothing (DECISIONS row 298). Never set on a code they cannot see.
+   */
+  reward_code?: boolean;
+  /**
    * THE CODE IS A REWARD COUPON (DECISIONS row 295): what the customer's whole
    * pool takes off these lines. `allocation` and `rule` stay unset, so a reader
    * of one coupon's figures cannot take this for one coupon.
@@ -384,16 +389,17 @@ export async function validateCoupon(
   // opens this week's coupons when they take something off this order; when they
   // do not, the customer hears what is wrong with the code they gave. A database
   // without 0225 has no pool, and the code goes the ordinary way.
+  const ownReward = coupon.reward_grant_id && coupon.assigned_user_id === userId ? { reward_code: true } : {};
   if (coupon.reward_grant_id && coupon.assigned_user_id === userId) {
     const pooled = await rewardPoolCheck(env, userId, coupon, target ?? wholeOrderTarget(totalIqd));
-    if (pooled) return pooled;
+    if (pooled) return pooled.ok ? pooled : { ...pooled, ...ownReward };
   }
 
-  if (!coupon.active) return { ok: false, reason: 'INACTIVE' };
+  if (!coupon.active) return { ok: false, reason: 'INACTIVE', ...ownReward };
 
   // From here on the code is live and this customer's to see.
   const facts = { min_total_iqd: Number(coupon.min_total_iqd) || 0, tier_required: coupon.tier_required ?? null };
-  const refuse = (reason: string): CouponCheck => ({ ok: false, reason, ...facts });
+  const refuse = (reason: string): CouponCheck => ({ ok: false, reason, ...facts, ...ownReward });
 
   const nowMs = Date.now();
   if (coupon.starts_at && nowMs < Date.parse(coupon.starts_at)) return refuse('NOT_STARTED');

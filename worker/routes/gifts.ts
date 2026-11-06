@@ -76,6 +76,7 @@ import {
 import { GIFT_COPY, notifyGiftGranted, planGrant } from '../lib/gifts/grant';
 import { giftAuditTimeline, listGrants, loadAdminGift, parseGrantFilters } from '../lib/gifts/admin';
 import { canViewCost } from '../lib/adminScope';
+import { pointsBackStatements } from '../lib/rewards/shopItems';
 import {
   LEGACY_POOL_FILTER,
   legacyEntitlementView,
@@ -673,6 +674,10 @@ giftRoutes.patch('/admin/grants/:id', async (c) => {
  * «إلغاء الهدية» — a gift not ordered yet. Its cart line goes in the same
  * batch. An ORDERED gift is never cancelled here: cancel the order, and the
  * order trigger returns the gift; a delivered gift is history.
+ *
+ * A gift the customer paid points for (the points shop, DECISIONS row 299) gives
+ * them back in this batch, once: the fence holds a lost race off, and the
+ * withdrawal's twin is keyed by the gift.
  */
 async function cancelGift(c: Context<AppContext>, id: string, reasonText: string) {
   const admin = c.get('user')!;
@@ -692,6 +697,7 @@ async function cancelGift(c: Context<AppContext>, id: string, reasonText: string
     from: state,
     reason: reasonText,
     product_id: g.gift_product_id ?? null,
+    ...(Number(g.points_spent) > 0 ? { points_returned: Number(g.points_spent), points_tx_id: g.points_tx_id ?? null } : {}),
   });
   try {
     await c.env.DB.batch([
@@ -702,6 +708,7 @@ async function cancelGift(c: Context<AppContext>, id: string, reasonText: string
       ).bind(now, admin.id, reasonText, now, id, state, Number(g.version)),
       ...changedExactlyOne(c.env.DB),
       c.env.DB.prepare('DELETE FROM cart_items WHERE gift_entitlement_id = ?').bind(id),
+      ...pointsBackStatements(c.env.DB, g, now),
       ...audit.statements,
     ]);
   } catch (e) {

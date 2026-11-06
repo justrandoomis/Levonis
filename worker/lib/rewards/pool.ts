@@ -37,6 +37,11 @@ export const SPENT_ON_SQL = (coupon: string): string =>
   `COALESCE((SELECT sr.order_id FROM coupon_redemptions sr WHERE sr.coupon_id = ${coupon} AND sr.state = 'active' LIMIT 1),
             (SELECT sx.order_id FROM coupon_redemption_extras sx WHERE sx.coupon_id = ${coupon} AND sx.state = 'active' LIMIT 1))`;
 
+/** What this coupon took off the order that spent it, or 0. One scalar SQL expression. */
+export const SPENT_AMOUNT_SQL = (coupon: string): string =>
+  `COALESCE((SELECT sr.amount_iqd FROM coupon_redemptions sr WHERE sr.coupon_id = ${coupon} AND sr.state = 'active' LIMIT 1),
+            (SELECT sx.amount_iqd FROM coupon_redemption_extras sx WHERE sx.coupon_id = ${coupon} AND sx.state = 'active' LIMIT 1), 0)`;
+
 /** Was this coupon spent beside another, on a live order? False on a database without 0225. */
 export async function spentAsExtra(db: D1Database, couponId: string): Promise<boolean> {
   try {

@@ -68,6 +68,7 @@ import {
   useCompetition,
   useCompetitionsList,
   useReloadSoon,
+  useRewardPrinters,
   useRewardsHub,
   type CompetitionSeed,
   type LoadStatus,
@@ -137,6 +138,7 @@ export default function RewardsArea() {
 
   // THE THREE READS, each enabled only for a signed-in customer on its pages.
   const hub = useRewardsHub(authed && HUB_SECTIONS.has(section));
+  const printers = useRewardPrinters(authed && section === 'coupons');
   const list = useCompetitionsList(authed && onList, view, mine);
   // The row the customer tapped draws the competition at once (§2.3).
   const seed = useMemo<CompetitionSeed | null>(() => {
@@ -302,7 +304,7 @@ export default function RewardsArea() {
   } else if (!isAuthenticated) screen = section === 'home' ? <HubGuest /> : <SectionGuest section={section} />;
   else if (section === 'competition' && detail.notFound) screen = <CompetitionNotFound />;
   else if (section === 'home') screen = <HubScreen hub={hub} walletPoints={walletLoaded ? pointBalance : null} reloadSoon={reloadSoon} />;
-  else if (section === 'coupons') screen = <CouponsScreen hub={hub} reloadSoon={reloadSoon} />;
+  else if (section === 'coupons') screen = <CouponsScreen hub={hub} printers={printers} reloadSoon={reloadSoon} />;
   else if (section === 'shop') screen = <ShopScreen hub={hub} onSwapped={onSwapped} />;
   else if (section === 'rate') screen = <RateScreen hub={hub} />;
   else if (section === 'competitions') {

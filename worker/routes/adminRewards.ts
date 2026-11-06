@@ -14,22 +14,35 @@
  *     back) and writing a draft give nothing away: any admin;
  *   · A VIDEO AD (0227): creating, editing and switching one on is the owner's
  *     ('coupon_issue'), switching one off is any admin's.
+ *   · GRANTING one customer a coupon gives value to that person: the financial
+ *     scope ('gift_grant'), and the owner when the admin is that person (four eyes).
+ *
+ * The overview and the printers (DECISIONS row 298) read no cost: any admin.
  */
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
-import { requireAdmin, badRequest, conflict, notFound, int, str, HttpError } from '../lib/http';
-import { audit } from '../lib/audit';
+import { requireAdmin, badRequest, conflict, notFound, int, oneOf, str, HttpError } from '../lib/http';
+import { audit, auditStatements } from '../lib/audit';
 import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
+import { rateLimit } from '../lib/ratelimit';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
+import { newId, sha256Hex } from '../lib/crypto';
+import { notifyStatement } from '../lib/notifications';
 import {
   FILAMENT_SECTION_ID,
+  MAX_VALID_DAYS,
+  REWARD_COUPON_KINDS,
   getRewardConfig,
   saveRewardConfigStatement,
   validateRewardConfig,
 } from '../lib/rewards/config';
-import { DAY_MS, GRANT_SELECT, grantSelect, grantView } from '../lib/rewards/coupons';
-import { SPENT_SQL } from '../lib/rewards/pool';
+import { DAY_MS, GRANT_SELECT, grantSelect, grantView, mintStatements, rewardCouponCode, termsFor } from '../lib/rewards/coupons';
+import { SPENT_AMOUNT_SQL, SPENT_SQL } from '../lib/rewards/pool';
+import { adminPrintersPage, type AdminPrinterState } from '../lib/rewards/printers';
+import { emptyOverview, LIVE_OFFER_SQL, rewardsOverview } from '../lib/rewards/overview';
+import { firstShopItemRefusal, shopItemsForAdmin } from '../lib/rewards/shopItems';
+import { rewardText } from '../lib/rewards/strings';
 import {
   cancelCompetition,
   createCompetition,
@@ -70,13 +83,13 @@ const emptyBeforeInstall = <T>(empty: T, flag: { installed: boolean }) => (e: un
 // ------------------------------------------------------------- the terms
 
 /** Products in the FDM filament section (by section or by placement), for the owner's ticks. */
-async function filamentCatalogue(db: D1Database) {
+async function filamentCatalogue(db: D1Database, nowIso: string) {
   const { results } = await db
     .prepare(
       `WITH RECURSIVE branch(id) AS (
          SELECT ?1 UNION SELECT c.id FROM catalogs c JOIN branch b ON c.parent_id = b.id
        )
-       SELECT p.id, p.slug, p.name, p.name_ar, p.name_ku, p.status
+       SELECT p.id, p.slug, p.name, p.name_ar, p.name_ku, p.status, ${LIVE_OFFER_SQL('p.id', '?2')} AS on_offer
          FROM products p
         WHERE (p.category_id IN (SELECT id FROM branch) OR p.sub_category_id IN (SELECT id FROM branch)
                OR EXISTS (SELECT 1 FROM product_catalogs pc WHERE pc.product_id = p.id AND pc.catalog_id IN (SELECT id FROM branch)))
@@ -84,16 +97,17 @@ async function filamentCatalogue(db: D1Database) {
         ORDER BY p.name
         LIMIT 400`
     )
-    .bind(FILAMENT_SECTION_ID)
-    .all<{ id: string; slug: string; name: string; name_ar: string; name_ku: string; status: string }>();
-  return (results ?? []).map((p) => ({ id: p.id, slug: p.slug, name: { ar: p.name_ar || p.name, en: p.name, ckb: p.name_ku || p.name }, status: p.status }));
+    .bind(FILAMENT_SECTION_ID, nowIso)
+    .all<{ id: string; slug: string; name: string; name_ar: string; name_ku: string; status: string; on_offer: number }>();
+  return (results ?? []).map((p) => ({ id: p.id, slug: p.slug, name: { ar: p.name_ar || p.name, en: p.name, ckb: p.name_ku || p.name }, status: p.status, on_offer: Number(p.on_offer) === 1 }));
 }
 
 adminRewardsRoutes.get('/config', async (c) => {
   const db = c.env.DB;
-  const [config, filaments, summary] = await Promise.all([
-    getRewardConfig(db),
-    filamentCatalogue(db),
+  const config = await getRewardConfig(db);
+  const [filaments, shopProducts, summary] = await Promise.all([
+    filamentCatalogue(db, new Date().toISOString()),
+    shopItemsForAdmin(c.env, config.shop.items),
     db
       .prepare(
         `SELECT g.kind, g.source,
@@ -109,21 +123,31 @@ adminRewardsRoutes.get('/config', async (c) => {
         throw e;
       }),
   ]);
-  return c.json({ success: true, config, filaments, filament_section_id: FILAMENT_SECTION_ID, installed: summary.installed, summary: summary.rows });
+  return c.json({ success: true, config, filaments, shop_products: shopProducts, filament_section_id: FILAMENT_SECTION_ID, installed: summary.installed, summary: summary.rows });
 });
 
 adminRewardsRoutes.put('/config', requireMoneyAuthority('coupon_issue'), async (c) => {
   const admin = c.get('user')!;
   const body = await c.req.json().catch(() => null);
-  const check = validateRewardConfig(body);
-  if (!check.ok) throw badRequest(check.error, check.code);
   const before = await getRewardConfig(c.env.DB);
+  const check = validateRewardConfig(body, before);
+  if (!check.ok) throw badRequest(check.error, check.code, check.details);
+  // The products this save names (DECISIONS row 299): each one on sale must be something the
+  // store can sell, whatever today's stock, or a typo would reach a customer. An older screen
+  // that sends no list does not answer for rows it never saw.
+  if ((body as { shop?: { items?: unknown } }).shop?.items !== undefined) {
+    const refused = await firstShopItemRefusal(c.env, check.value.shop.items);
+    if (refused) throw badRequest(`This product cannot be sold for points (${refused.code}).`, refused.code, { item_id: refused.item_id, item_index: refused.item_index, errors: refused.errors });
+  }
   await c.env.DB.batch([saveRewardConfigStatement(c.env.DB, check.value)]);
   await audit(c.env.DB, admin.id, 'rewards.config', 'rewardProgramConfig', { before, after: check.value });
-  return c.json({ success: true, config: check.value });
+  return c.json({ success: true, config: check.value, shop_products: await shopItemsForAdmin(c.env, check.value.shop.items) });
 });
 
 // ------------------------------------------------------------- the coupons
+
+/** A page of the coupons list: enough to scroll, and the cursor brings the next. */
+const GRANTS_PAGE = 50;
 
 adminRewardsRoutes.get('/grants', async (c) => {
   const nowIso = new Date().toISOString();
@@ -136,32 +160,153 @@ adminRewardsRoutes.get('/grants', async (c) => {
   const binds: unknown[] = [nowIso];
   if (['free_shipping', 'filament_discount'].includes(kind)) { binds.push(kind); where.push(`g.kind = ?${binds.length}`); }
   if (['printer', 'points_shop', 'admin'].includes(source)) { binds.push(source); where.push(`g.source = ?${binds.length}`); }
+  const orderItemId = c.req.query('order_item_id') ?? '';
+  if (orderItemId) { binds.push(orderItemId); where.push(`g.order_item_id = ?${binds.length}`); }
+  const unitIndex = c.req.query('unit_index') ?? '';
+  if (unitIndex) { binds.push(int(unitIndex, 'unit_index', { min: 1, max: 1000 })); where.push(`g.unit_index = ?${binds.length}`); }
+  const userId = c.req.query('user_id') ?? '';
+  if (userId) { binds.push(userId); where.push(`g.user_id = ?${binds.length}`); }
   if (pattern) {
     binds.push(pattern);
     where.push(`(${sqlLikeClause(['c.code', 'g.order_id', 'u.name', 'u.username', 'u.email'], `?${binds.length}`)})`);
   }
-  let stateFilter = '';
+  const outer: string[] = [];
   if (['active', 'used', 'expired', 'revoked'].includes(state)) {
     binds.push(state);
-    stateFilter = `WHERE state = ?${binds.length}`;
+    outer.push(`state = ?${binds.length}`);
   }
-  const inner = grantSelect('?1', { columns: 'u.name AS user_name, u.username, u.email', joins: 'JOIN users u ON u.id = g.user_id' });
+  const cursor = c.req.query('cursor') ?? '';
+  if (cursor) {
+    const m = /^([^|]+)\|([^|]+)$/.exec(cursor);
+    if (!m) throw badRequest('That page of coupons does not exist', 'BAD_CURSOR');
+    binds.push(m[1], m[2]);
+    outer.push(`(issued_at < ?${binds.length - 1} OR (issued_at = ?${binds.length - 1} AND id < ?${binds.length}))`);
+  }
+  const inner = grantSelect('?1', {
+    columns: `u.name AS user_name, u.username, u.email, ${SPENT_AMOUNT_SQL('g.coupon_id')} AS amount_spent_iqd`,
+    joins: 'JOIN users u ON u.id = g.user_id',
+  });
   const sql = `SELECT * FROM (${inner} ${where.length ? `WHERE ${where.join(' AND ')}` : ''})
-     ${stateFilter}
-     ORDER BY issued_at DESC LIMIT 200`;
+     ${outer.length ? `WHERE ${outer.join(' AND ')}` : ''}
+     ORDER BY issued_at DESC, id DESC LIMIT ${GRANTS_PAGE + 1}`;
   const flag = { installed: true };
   const { results } = await c.env.DB.prepare(sql)
     .bind(...binds)
     .all<Record<string, unknown>>()
     .catch(emptyBeforeInstall({ results: [] as Record<string, unknown>[] } as D1Result<Record<string, unknown>>, flag));
+  const rows = results ?? [];
+  const page = rows.slice(0, GRANTS_PAGE);
+  const last = page[page.length - 1];
   return c.json({
     success: true,
     installed: flag.installed,
-    grants: (results ?? []).map((r) => ({
+    grants: page.map((r) => ({
       ...grantView(r as never),
+      amount_spent_iqd: Math.max(0, Math.trunc(Number(r.amount_spent_iqd) || 0)),
       user: { id: String(r.user_id ?? ''), name: String(r.user_name ?? ''), username: String(r.username ?? ''), email: String(r.email ?? '') },
     })),
+    next_cursor: rows.length > GRANTS_PAGE && last ? `${String(last.issued_at)}|${String(last.id)}` : null,
   });
+});
+
+// ------------------------------------------------- the whole programme (DECISIONS row 298)
+
+/** «نظرة عامة»: what the programme does now and what it has given. No cost. Zeros before 0220/0225. */
+adminRewardsRoutes.get('/overview', async (c) => {
+  const nowIso = new Date().toISOString();
+  const overview = await rewardsOverview(c.env.DB, nowIso).catch((e: unknown) => {
+    if (isSchemaMissing(e)) return emptyOverview(nowIso);
+    throw e;
+  });
+  return c.json({ success: true, ...overview });
+});
+
+/** «الطابعات»: every printer unit, earning or why not, paged and searched by customer, order or serial. */
+adminRewardsRoutes.get('/printers', async (c) => {
+  const raw = c.req.query('state') ?? 'all';
+  const state: AdminPrinterState = raw === 'earning' || raw === 'stopped' ? raw : 'all';
+  const flag = { installed: true };
+  const page = await adminPrintersPage(c.env.DB, { state, q: c.req.query('q'), cursor: c.req.query('cursor') }).catch(
+    emptyBeforeInstall({ printers: [], next_cursor: null } as Awaited<ReturnType<typeof adminPrintersPage>>, flag)
+  );
+  return c.json({ success: true, installed: flag.installed, ...page });
+});
+
+/**
+ * «منح كوبون»: one coupon to one customer, on today's terms, from the team. It gives
+ * value to a person, so the financial scope grants it, and the owner when the admin is
+ * that person (four eyes), with a reason on the audit row. One batch: the coupon, its
+ * grant, the customer's notice and the audit row stand or fall together. A repeated
+ * request with the same key, customer and kind is the same coupon: one opening of the
+ * dialog keeps its key, so changing the customer after a lost answer is a new grant,
+ * never a «granted» that names the wrong person.
+ */
+adminRewardsRoutes.post('/grants', requireMoneyAuthority('gift_grant'), async (c) => {
+  await rateLimit(c, 'reward_admin_grant', 60, 300);
+  const admin = c.get('user')!;
+  const db = c.env.DB;
+  const body = ((await c.req.json().catch(() => ({}))) ?? {}) as Record<string, unknown>;
+  const userId = str(body.user_id, 'user_id', { min: 1, max: 80 });
+  const kind = oneOf(body.kind, 'kind', REWARD_COUPON_KINDS);
+  const reason = str(body.reason, 'reason', { min: 3, max: 200 });
+  const authority = assertMoneyAuthority(c, { act: 'gift_grant', beneficiaryUserId: userId, reason });
+  const key = str(body.idempotency_key, 'idempotency_key', { max: 80, required: false });
+  const grantId = key ? `rwg_${(await sha256Hex(`reward-admin-grant:${admin.id}:${key}:${userId}:${kind}`)).slice(0, 24)}` : newId('rwg');
+  const nowIso = new Date().toISOString();
+  const readBack = () => db.prepare(`${GRANT_SELECT('?2')} WHERE g.id = ?1`).bind(grantId, nowIso).first<Record<string, unknown>>();
+  // The same read answers a repeated press, and refuses before anything is written on a database without 0220/0225.
+  const prior = await readBack().catch(installedOr503);
+  if (prior) return c.json({ success: true, replay: true, coupon: grantView(prior as never) });
+  const customer = await db.prepare('SELECT id FROM users WHERE id = ?').bind(userId).first();
+  if (!customer) throw new HttpError(404, 'Customer not found', 'USER_NOT_FOUND');
+  const config = await getRewardConfig(db);
+  const validDays = int(body.valid_days, 'valid_days', { min: 1, max: MAX_VALID_DAYS, def: config.valid_days });
+  const expiresAt = new Date(Date.parse(nowIso) + validDays * DAY_MS).toISOString();
+  const text = rewardText({
+    kind: 'team_coupon',
+    until: expiresAt.slice(0, 10),
+    percent: config.filament.percent,
+    amount: config.free_shipping.amount_iqd,
+    min: config.free_shipping.min_order_iqd,
+    pieces: config.filament.max_pieces,
+    kinds: [kind],
+  });
+  const audited = await auditStatements(db, admin.id, 'rewards.grant', grantId, { user_id: userId, kind, valid_days: validDays, reason, authority: authority.audit });
+  await db
+    .batch([
+      ...mintStatements(db, {
+        grantId,
+        couponId: newId('cpn'),
+        code: rewardCouponCode(kind),
+        userId,
+        source: 'admin',
+        sourceRef: `admin:${grantId}`,
+        orderId: null,
+        orderItemId: null,
+        unitIndex: null,
+        terms: { ...termsFor(kind, config), valid_days: validDays },
+        issuedAt: nowIso,
+        expiresAt,
+        createdBy: admin.id,
+      }),
+      notifyStatement(db, {
+        userId,
+        kind: 'reward',
+        title_ar: text.title.ar,
+        title_en: text.title.en,
+        body_ar: text.body.ar,
+        body_en: text.body.en,
+        link: '/rewards/coupons',
+        entity_type: 'reward_grant',
+        entity_id: grantId,
+        meta: { title_ckb: text.title.ckb, body_ckb: text.body.ckb, expires_at: expiresAt },
+        eventKey: `reward:team:${grantId}`,
+      }).stmt,
+      ...audited.statements,
+    ])
+    .catch(installedOr503);
+  const row = await readBack();
+  return c.json({ success: true, coupon: row ? grantView(row as never) : null }, 201);
 });
 
 adminRewardsRoutes.post('/grants/:id/revoke', async (c) => {

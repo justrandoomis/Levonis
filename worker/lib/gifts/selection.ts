@@ -107,6 +107,8 @@ export interface GiftSnapshot {
   regular_unit_iqd: number;
   /** regular_unit_iqd × qty: what the gift is worth, shown beside its 0 IQD line. */
   value_iqd: number;
+  /** Swapped for points in the shop: it belongs to no level, whatever the row's `level` column must say. */
+  points_shop?: boolean;
   lead_time_text: string;
   /** The route's (or model's) lead time in days, when the store states it — the screens word it per language. */
   lead_time_min_days?: number | null;

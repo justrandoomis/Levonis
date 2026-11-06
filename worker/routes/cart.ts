@@ -55,6 +55,9 @@ import type { ProductRelationsView } from '../lib/productOverlay';
 import { validateSelection } from '../lib/productRelations';
 import { validateCoupon } from '../lib/membershipOps';
 import { couponLinesOf, productCouponFacts } from '../lib/couponLines';
+import { couponPoolFacts, couponPoolOffer } from '@levonis/pricing/coupons';
+import { grantViewsOfCoupons, couponTargets } from '../lib/rewards/coupons';
+import { livePool } from '../lib/rewards/pool';
 import { rateLimit } from '../lib/ratelimit';
 import { lineOrderType, saleAvailability, unusableOrderType } from './products';
 import {
@@ -97,7 +100,7 @@ import {
   type ResolvedPrice,
   type Tier,
 } from '../lib/pricing';
-import { pricingTierContext, type TierStatus } from '../lib/entitlements';
+import { pricingTierContext, shippingEntitlementContext, type TierStatus } from '../lib/entitlements';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, offerPriceRefusal, subjectOf, type OfferView } from '../lib/offers';
 import {
   activeBenefitRules,
@@ -106,6 +109,8 @@ import {
   degradeIfSchemaMissing,
   fallbackFor,
   resolveMembershipBenefits,
+  resolveProductBenefits,
+  shippingAfterBenefit,
   resolveOrderBenefits,
 } from '../lib/membershipBenefits';
 import type { BenefitLineInput } from '../lib/membershipBenefits';
@@ -186,14 +191,14 @@ export const CART_WARRANTY_CONFLICT = 'CART_WARRANTY_CONFLICT';
  * customer's default address: an active PRO whose default address is not the
  * approved one sees the surcharge here exactly as the door will charge it.
  */
-async function cartTier(c: Context<AppContext>): Promise<{ tier: Tier; active: boolean; status: TierStatus }> {
+async function cartTier(c: Context<AppContext>): Promise<{ tier: Tier; active: boolean; status: TierStatus; atApprovedDefault: boolean }> {
   const user = c.get('user')!;
   const ctx = await pricingTierContext(c.env.DB, user.id);
   // The whole TierStatus rides along because `offerEligible` (§9) needs the
   // tier, whether it is active AND which benefits an admin restriction case
   // has paused — and `getTierStatus` performs two writes per call, so it is
   // resolved once per request and passed down, never once per line (§14).
-  return { tier: ctx.tierStatus.tier, active: ctx.pricingTierActive, status: ctx.tierStatus };
+  return { tier: ctx.tierStatus.tier, active: ctx.pricingTierActive, status: ctx.tierStatus, atApprovedDefault: ctx.atApprovedDefault };
 }
 
 /**
@@ -351,7 +356,7 @@ async function loadPricingParts(db: D1Database) {
  */
 export async function cartPricing(
   c: Context<AppContext>
-): Promise<{ tier: Tier; active: boolean; status: TierStatus; ctx: PricingContext }> {
+): Promise<{ tier: Tier; active: boolean; status: TierStatus; atApprovedDefault: boolean; ctx: PricingContext }> {
   const [t, parts] = await Promise.all([cartTier(c), loadPricingParts(c.env.DB)]);
   return {
     ...t,
@@ -902,7 +907,7 @@ function deliveryTariffFor(policy: DeliveryPolicy, governorate: string) {
 
 async function loadCart(c: Context<AppContext>) {
   const user = c.get('user')!;
-  const { tier, active: tierActive, status, ctx } = await cartPricing(c);
+  const { tier, active: tierActive, status, atApprovedDefault, ctx } = await cartPricing(c);
   const results = await cartLineRows(c.env.DB, user.id);
   // A line whose product the owner's «hide incomplete» switch holds is read
   // exactly as a hidden product's (worker/lib/listing.ts) — it drops out of the
@@ -1042,6 +1047,17 @@ async function loadCart(c: Context<AppContext>) {
    * rule inside them.
    */
   const benefitLines: BenefitLineInput[] = [];
+  /** The cart line behind each entry of `benefitLines`: the resolver answers in input order. */
+  const benefitLineIds: string[] = [];
+  /**
+   * WHAT THE COUPON RESOLVER MUST KNOW ABOUT A LINE, INTERNAL (never in a JSON answer):
+   * already discounted, and the membership saving still to come off it. The same four
+   * tests as the checkout's `couponLines` (worker/routes/orders.ts), so the cart can
+   * never promise a filament coupon on a line the checkout refuses it on. This map holds
+   * what does not depend on the other lines; `couponFactsOver` below adds the membership,
+   * which does.
+   */
+  const couponLineFacts = new Map<string, CouponLineFact>();
   const unavailableDelivery = {
     standard: new Set<string>(),
     personal: new Set<string>(),
@@ -1121,6 +1137,8 @@ async function loadCart(c: Context<AppContext>) {
       // rule in orders.ts.
       if (b.doc.composition === 'mystery') constrainDelivery(b.doc);
       else b.components.filter((k) => k.included).forEach((k) => constrainDelivery(k.doc));
+      // The checkout's test on a composition parent: a saving on the bundle is a discount.
+      couponLineFacts.set(String(row.cart_item_id), { already_discounted: Number(b.pricing.saving_percent ?? 0) > 0, member_line_discount_iqd: 0 });
       items.push(
         compositionCartItem(row, b, bundlePrinterIds, mysteryCtxs.get(String(row.cart_item_id)), user.locale ?? 'ar', deliveryGroupOf)
       );
@@ -1133,7 +1151,7 @@ async function loadCart(c: Context<AppContext>) {
     const offerView = lineOffers.get(offerKey(subjectOf(String(row.id)))) ?? null;
     const offerCheck = offerEligible(status, offerView, nowMs);
     const offerInput = { view: offerView, eligible: offerCheck.ok, nowMs };
-    const { doc, resolved, variantLabel, selectionErrors, colorTag, optionsLabel } = resolveCartLine(
+    const { doc, resolved, variantLabel, selectionErrors, offerId, colorTag, optionsLabel } = resolveCartLine(
       row,
       sel,
       tier,
@@ -1157,6 +1175,13 @@ async function loadCart(c: Context<AppContext>) {
       continue;
     }
     constrainDelivery(doc);
+    // An offer window priced it, or a membership rule set this price below regular.
+    // The saving a rule applies at the line joins it below, once the rules have answered.
+    couponLineFacts.set(String(row.cart_item_id), {
+      already_discounted: (!!offerId && !!offerView?.window) || resolved.applied_iqd < resolved.regular_iqd,
+      member_line_discount_iqd: 0,
+    });
+    benefitLineIds.push(String(row.cart_item_id));
     benefitLines.push({
       product_id: String(row.id),
       category_id: doc.category_id ?? null,
@@ -1171,6 +1196,7 @@ async function loadCart(c: Context<AppContext>) {
       // D10: a line-applied rule is worked out on the price before a live offer, never on top of it.
       offer_before_unit_iqd: typeof resolved.offer_before_iqd === 'number' ? resolved.offer_before_iqd : null,
       qty: Number(row.qty) || 0,
+      tie_key: String(row.cart_item_id),
     });
     // Would cash on delivery change THIS line's price? Only when the product
     // carries a direct premium this customer pays — the same rule the checkout
@@ -1328,12 +1354,51 @@ async function loadCart(c: Context<AppContext>) {
       })()
     : null;
 
+  /**
+   * THE MEMBERSHIP OVER THE LINES BEING BOUGHT. A rule's quantity limit, per-order ceiling and
+   * minimum belong to the ORDER, and the order is the ticked lines: the checkout resolves them
+   * over exactly those, so the same must be done here, or a line the whole cart's budget passed
+   * over reads as free for a coupon the checkout then refuses (and the other way round).
+   */
+  const couponFactsOver = (ticked: ReadonlySet<string>): ReadonlyMap<string, CouponLineFact> => {
+    const facts = new Map([...couponLineFacts].map(([id, fact]) => [id, { ...fact }]));
+    if (!ctx.benefitStatus) return facts;
+    const picked = benefitLines.flatMap((line, i) => (ticked.has(benefitLineIds[i]) ? [{ id: benefitLineIds[i], line }] : []));
+    resolveProductBenefits({ rules: ctx.benefitRules, status: ctx.benefitStatus, lines: picked.map((p) => p.line), nowIso: ctx.nowIso }).lines.forEach((member, i) => {
+      const fact = facts.get(picked[i].id);
+      if (!fact) return;
+      if (member.applied_at === 'line') fact.member_line_discount_iqd = member.total_iqd;
+      if (member.total_iqd > 0) fact.already_discounted = true;
+    });
+    return facts;
+  };
+
+  /**
+   * WHAT THIS CUSTOMER IS CHARGED FOR DELIVERY ON GOODS OF THIS VALUE: the fee, less what their
+   * membership waives on them (standard delivery at the default address: what the page's estimate
+   * prices). The tests are the final quote's (`quoteShipping`): PRO at the approved default address,
+   * PREMIUM anywhere, and the rule's own line, which the coupons can push the goods under. PREMIUM's
+   * line is tested after the points as well (§5): the customer's own toggle, if they switched it on.
+   */
+  const memberFeeAt = (feeIqd: number, goodsIqd: number, pointsIqd: number): number => {
+    const member = ctx.benefitStatus;
+    if (!member) return feeIqd;
+    const entitled = shippingEntitlementContext(member);
+    const holds = member.tier === 'pro' ? entitled.proShippingEntitled && atApprovedDefault : member.tier === 'prime' && entitled.premiumShippingEntitled;
+    if (!holds) return feeIqd;
+    const basis = member.tier === 'prime' ? Math.max(0, goodsIqd - pointsIqd) : goodsIqd;
+    const { shipping } = resolveOrderBenefits({ rules: ctx.benefitRules, status: member, shippingBasisIqd: basis, deliveryMethod: 'standard', nowIso: ctx.nowIso });
+    return shippingAfterBenefit(feeIqd, shipping).paid_iqd;
+  };
+
   return {
     items,
     unavailable_lines: unavailableLines,
     tier,
     tierActive,
     membership,
+    couponFactsOver,
+    memberFeeAt,
     delivery_methods: {
       standard: { available: unavailableDelivery.standard.size === 0, unavailable_product_ids: [...unavailableDelivery.standard] },
       personal: { available: unavailableDelivery.personal.size === 0, unavailable_product_ids: [...unavailableDelivery.personal] },
@@ -1346,6 +1411,97 @@ async function loadCart(c: Context<AppContext>) {
      */
     delivery_tariff: deliveryTariffFor(deliveryPolicy, defaultGovernorate),
   };
+}
+
+/** What `loadCart` knows about a line that its JSON never says: see `couponFactsOver` there. */
+export interface CouponLineFact {
+  already_discounted: boolean;
+  member_line_discount_iqd: number;
+}
+
+/** A cart line as the coupon lines read it. */
+interface CartCouponItem {
+  id?: unknown;
+  kind?: unknown;
+  productId?: unknown;
+  qty?: unknown;
+  unit_price_iqd?: unknown;
+  option_value_ids?: unknown;
+  color_id?: unknown;
+  transport_method?: unknown;
+  breakdown?: { applied_iqd?: unknown } | null;
+}
+
+/** The ticked line ids a request names: a list (a body) or comma-separated (a query). */
+function itemIdsFrom(raw: unknown): ReadonlySet<string> {
+  const list = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split(',') : [];
+  return new Set(list.filter((x): x is string => typeof x === 'string' && x !== '').slice(0, 200));
+}
+
+/** The ticked lines. An id not in the cart is ignored; none (absent, empty, or all unknown) means every line. */
+function tickedLines(items: readonly CartCouponItem[], ids: ReadonlySet<string>): CartCouponItem[] {
+  const picked = items.filter((it) => ids.has(String(it.id ?? '')));
+  return picked.length > 0 ? picked : [...items];
+}
+
+/** The page's delivery estimate, whole dinars 0…10,000,000. Anything else: the fee is pending (null). */
+function deliveryEstimateFrom(raw: unknown): number | null {
+  const n = typeof raw === 'number' ? raw : typeof raw === 'string' && raw.trim() !== '' ? Number(raw) : NaN;
+  return Number.isSafeInteger(n) && n >= 0 && n <= 10_000_000 ? n : null;
+}
+
+/**
+ * THE ONE BUILDER OF A CART'S COUPON LINES, for the code check and the coupons read,
+ * so the two can never differ. A price here is the line's goods price as the checkout
+ * reads it, and what `loadCart` learned about each line is what the checkout's
+ * `couponLines` works out: offers, membership prices and bundle savings are discounts.
+ * The membership is resolved over THESE lines, the ones being bought.
+ */
+async function cartCouponLines(
+  db: D1Database,
+  views: readonly CartCouponItem[],
+  factsOver: (ticked: ReadonlySet<string>) => ReadonlyMap<string, CouponLineFact>
+) {
+  const lineFacts = factsOver(new Set(views.map((it) => String(it.id ?? ''))));
+  const [facts, ancestry] = await Promise.all([
+    productCouponFacts(db, views.map((it) => String(it.productId ?? ''))),
+    catalogAncestry(db),
+  ]);
+  const preorder = views.some((it) => typeof it.transport_method === 'string' && it.transport_method !== '');
+  return couponLinesOf(
+    views.map((it) => {
+      const fact = lineFacts.get(String(it.id ?? ''));
+      return {
+        id: String(it.id ?? ''),
+        product_id: String(it.productId ?? ''),
+        option_value_ids: Array.isArray(it.option_value_ids) ? it.option_value_ids.map(String) : [],
+        color_id: String(it.color_id ?? ''),
+        qty: Number(it.qty) || 0,
+        applied_iqd: Number(it.breakdown?.applied_iqd ?? it.unit_price_iqd ?? 0) || 0,
+        transport_method: String(it.transport_method ?? ''),
+        is_parent: it.kind === 'bundle' || it.kind === 'mystery',
+        is_component: false,
+        is_gift: it.kind === 'gift',
+        member_line_discount_iqd: fact?.member_line_discount_iqd ?? 0,
+        already_discounted: fact?.already_discounted ?? false,
+        tie_key: String(it.id ?? ''),
+      };
+    }),
+    facts,
+    ancestry,
+    preorder ? 'pre_order' : 'direct_sale'
+  );
+}
+
+/** The goods a free-delivery line is tested on: the prices, less what the membership takes at the line. A gift pays nothing. */
+function cartGoodsBasis(views: readonly CartCouponItem[], factsOver: (ticked: ReadonlySet<string>) => ReadonlyMap<string, CouponLineFact>): number {
+  const facts = factsOver(new Set(views.map((it) => String(it.id ?? ''))));
+  const goods = views.reduce((sum, it) => {
+    if (it.kind === 'gift') return sum;
+    const applied = Number(it.breakdown?.applied_iqd ?? it.unit_price_iqd ?? 0) || 0;
+    return sum + applied * (Number(it.qty) || 0) - (facts.get(String(it.id ?? ''))?.member_line_discount_iqd ?? 0);
+  }, 0);
+  return Math.max(0, goods);
 }
 
 /**
@@ -1363,6 +1519,10 @@ async function loadCart(c: Context<AppContext>) {
  * this cart only clears once delivery is added reads as "minimum not met"
  * here rather than being promised and then refused at checkout.
  *
+ * The cart also shows an accepted code where it lands (DECISIONS row 298): it may
+ * name the ticked lines (`item_ids`) and its delivery estimate (`delivery_iqd`), and
+ * a valid answer says what the code takes from each line and from the delivery.
+ *
  * It redeems nothing, and it says nothing about a code the customer did not
  * type: the minimum spend is only returned for a code that exists and is
  * live, because returning it for one that does not would confirm which codes
@@ -1374,47 +1534,22 @@ cartRoutes.post('/coupon-check', async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const code = str(body.code, 'code', { max: 60 });
 
-  const { items } = await loadCart(c);
+  const { items, couponFactsOver } = await loadCart(c);
   if (items.length === 0) throw badRequest('Your cart is empty', 'CART_EMPTY');
-  type CartItemView = {
-    id?: unknown; kind?: unknown; productId?: unknown; qty?: unknown; unit_price_iqd?: unknown;
-    option_value_ids?: unknown; color_id?: unknown; transport_method?: unknown;
-    breakdown?: { applied_iqd?: unknown } | null;
-  };
-  const views = items as unknown as CartItemView[];
+  // The ticked lines, when the page names them; every line otherwise.
+  const views = tickedLines(items as unknown as CartCouponItem[], itemIdsFrom(body.item_ids));
   const merchandise = views.reduce((sum, it) => sum + Number(it.unit_price_iqd ?? 0) * Number(it.qty ?? 0), 0);
 
   // The same resolver the checkout runs, over the cart's own lines: what a
-  // scoped code names, on the goods alone. The delivery is not chosen yet, so
+  // scoped code names, on the goods alone. Without the page's delivery estimate
   // a delivery code is valid here and worth what the checkout says.
-  const [facts, ancestry] = await Promise.all([
-    productCouponFacts(c.env.DB, views.map((it) => String(it.productId ?? ''))),
-    catalogAncestry(c.env.DB),
-  ]);
-  const preorder = views.some((it) => typeof it.transport_method === 'string' && it.transport_method !== '');
-  const lines = couponLinesOf(
-    views.map((it) => ({
-      id: String(it.id ?? ''),
-      product_id: String(it.productId ?? ''),
-      option_value_ids: Array.isArray(it.option_value_ids) ? it.option_value_ids.map(String) : [],
-      color_id: String(it.color_id ?? ''),
-      qty: Number(it.qty) || 0,
-      applied_iqd: Number(it.breakdown?.applied_iqd ?? it.unit_price_iqd ?? 0) || 0,
-      transport_method: String(it.transport_method ?? ''),
-      is_parent: it.kind === 'bundle' || it.kind === 'mystery',
-      is_component: false,
-      is_gift: it.kind === 'gift',
-      member_line_discount_iqd: 0,
-      already_discounted: false,
-    })),
-    facts,
-    ancestry,
-    preorder ? 'pre_order' : 'direct_sale'
-  );
+  const lines = await cartCouponLines(c.env.DB, views, couponFactsOver);
+  const delivery = deliveryEstimateFrom(body.delivery_iqd);
+  const ctx = { delivery_method: null, delivery_iqd: delivery ?? 0 };
   const check = await validateCoupon(c.env, user.id, code, merchandise, {
     lines,
-    ctx: { delivery_method: null, delivery_iqd: 0 },
-    deliveryPending: true,
+    ctx,
+    deliveryPending: delivery === null,
   });
   if (!check.ok) {
     // ONE ANSWER FOR EVERY CODE THIS CUSTOMER CANNOT SEE (offers B4): the
@@ -1428,8 +1563,14 @@ cartRoutes.post('/coupon-check', async (c) => {
       min_total_iqd: check.min_total_iqd ?? null,
       tier_required: check.tier_required ?? null,
       cart_total_iqd: merchandise,
+      // Only for this customer's own reward code: the page forgets one that opens nothing.
+      ...(check.reward_code ? { reward_code: true } : {}),
     });
   }
+  // What the code does to these lines, for the cart to show it where it lands. A
+  // trade-in credit (payment in kind) has no lines: the checkout caps it at one unit
+  // of its own line, so only the box's estimate names it here.
+  const allocation = check.pool?.allocation ?? check.allocation ?? null;
   return c.json({
     success: true,
     valid: true,
@@ -1439,7 +1580,122 @@ cartRoutes.post('/coupon-check', async (c) => {
     // no goods part, so it carries no figure here rather than a misleading 0.
     ...(check.discount_iqd ? { estimated_discount_iqd: check.discount_iqd } : {}),
     cart_total_iqd: merchandise,
+    lines: allocation?.lines ?? [],
+    merchandise_iqd: allocation?.merchandise_iqd ?? 0,
+    delivery_iqd: allocation?.delivery_iqd ?? 0,
+    pool: !!check.pool,
+    pool_count: check.pool ? couponPoolFacts(check.pool.coupons, lines, ctx, { deliveryPending: delivery === null }).count : 0,
   });
+});
+
+/**
+ * THE CUSTOMER'S REWARD COUPONS ON THIS CART (owner, 2026-11-05: «from user side
+ * with apply on cart product»; DECISIONS row 298): what each takes off these lines,
+ * and why not when it takes nothing. A preview: it spends nothing, and the checkout
+ * quote stays the authority.
+ *
+ *   ?item_ids=a,b       the ticked lines; an id not in the cart is ignored, and none
+ *                       means every line.
+ *   ?delivery_iqd=5000  the delivery estimate the page already shows, whole dinars.
+ *                       Absent, empty or invalid: the fee is pending, so a delivery
+ *                       coupon waits. The cart's estimate is the raw fee, so the
+ *                       member's free-delivery line is tested here, on the goods
+ *                       after the coupons: a coupon that brings the fee back says so,
+ *                       and one that saves nothing is not offered.
+ *   ?delivery_final=1   the fee is a quote's, every waiver already in it (the checkout).
+ *   ?points_iqd=3000    the points the customer has switched on: PREMIUM's line is tested
+ *                       after them.
+ *
+ * A CUSTOMER WHO HOLDS NO COUPON COSTS ONE QUERY. The pool is read first and an empty
+ * pool answers at once: no limiter write and no `loadCart`, on a read every cart
+ * view makes. Before 0220/0225 it answers the same, with `installed: false`.
+ */
+cartRoutes.get('/reward-coupons', async (c) => {
+  const user = c.get('user')!;
+  const db = c.env.DB;
+  const nowIso = new Date().toISOString();
+  const answer = (installed: boolean, coupons: unknown[], preview: unknown) =>
+    c.json({ success: true, installed, server_time: nowIso, coupons, preview });
+
+  let pool: Awaited<ReturnType<typeof livePool>>;
+  try {
+    pool = await livePool(db, user.id, nowIso);
+  } catch (e) {
+    if (isSchemaMissing(e)) return answer(false, [], null);
+    throw e;
+  }
+  if (pool.length === 0) return answer(true, [], null);
+
+  await rateLimit(c, 'cart_reward_coupons', 120, 300);
+  const { items, couponFactsOver, memberFeeAt, tier } = await loadCart(c);
+  const views = tickedLines(items as unknown as CartCouponItem[], itemIdsFrom(c.req.query('item_ids')));
+  const lines = await cartCouponLines(db, views, couponFactsOver);
+  const delivery = deliveryEstimateFrom(c.req.query('delivery_iqd'));
+  const deliveryPending = delivery === null;
+  const feeIsFinal = c.req.query('delivery_final') === '1';
+  const points = deliveryEstimateFrom(c.req.query('points_iqd')) ?? 0;
+  const goodsIqd = cartGoodsBasis(views, couponFactsOver);
+  // The owner can test PRO's line on the goods before the coupons (`threshold_basis`): then no coupon can bring its fee back.
+  const proBeforeCoupon = tier === 'pro' && !feeIsFinal && (await getSetting(db, 'shippingPolicy') as { threshold_basis?: unknown } | null)?.threshold_basis === 'merchandise_before_coupon';
+  const { allocation, facts, code, count, fee_back_iqd, net_iqd, no_gain } = couponPoolOffer(
+    pool,
+    lines,
+    { delivery_method: null, delivery_iqd: delivery ?? 0 },
+    { deliveryPending, goodsIqd, feeAt: (goods) => (feeIsFinal ? delivery ?? 0 : memberFeeAt(delivery ?? 0, proBeforeCoupon ? goodsIqd : goods, points)) }
+  );
+
+  const grants = await grantViewsOfCoupons(db, pool.map((p) => p.coupon_id), nowIso);
+  const stateOf = new Map(facts.map((f) => [f.coupon_id, f.state]));
+  const targets = await couponTargets(db, pool.flatMap((p) => {
+    const grant = grants.get(p.coupon_id);
+    return grant && stateOf.get(p.coupon_id) === 'no_target' ? [grant] : [];
+  }));
+  const coupons = facts.flatMap((f) => {
+    const g = grants.get(f.coupon_id);
+    if (!g) return [];
+    return [
+      {
+        id: g.id,
+        code: f.code,
+        kind: g.kind,
+        percent: g.percent,
+        amount_iqd: g.amount_iqd,
+        min_total_iqd: g.min_total_iqd,
+        max_discount_iqd: g.max_discount_iqd,
+        max_quantity: g.max_quantity,
+        on_offer: g.on_offer,
+        expires_at: g.expires_at,
+        printer: g.printer,
+        take_iqd: f.take_iqd,
+        lines: f.lines,
+        state: f.state,
+        short_of_iqd: f.short_of_iqd,
+        ...(targets.has(g.id) ? { targets: targets.get(g.id) } : {}),
+      },
+    ];
+  });
+  const opens = !no_gain && (allocation.total_iqd > 0 || allocation.delivery_waiting);
+  return answer(
+    true,
+    coupons,
+    opens
+      ? {
+          code,
+          count,
+          merchandise_iqd: allocation.merchandise_iqd,
+          delivery_iqd: allocation.delivery_iqd,
+          total_iqd: allocation.total_iqd,
+          // What it takes is not always what it saves: it can bring the delivery fee back.
+          fee_back_iqd,
+          net_iqd,
+          lines: allocation.lines,
+          goods_after_discount_iqd: allocation.goods_after_discount_iqd,
+          blocked_min_total_iqd: allocation.blocked_min_total_iqd,
+          short_of_iqd: allocation.blocked_min_total_iqd === null ? 0 : Math.max(0, allocation.blocked_min_total_iqd - allocation.goods_after_discount_iqd),
+          delivery_waiting: allocation.delivery_waiting,
+        }
+      : null
+  );
 });
 
 cartRoutes.get('/', async (c) => {
@@ -2160,7 +2416,7 @@ function giftCartItem(
       breakdown: publicBreakdown(doc.sku_strict === true ? facts.zeroed : unpricedGiftResolved(facts.zeroed, giftUnitValueOf(false, 0, verdict?.frozenValueIqd, sel.qty))),
       gift: {
         id: giftEntitlementIdOf(row),
-        level: verdict?.level ?? 0,
+        level: verdict?.fromPointsShop ? 0 : (verdict?.level ?? 0),
         value_iqd: giftUnitValueOf(doc.sku_strict === true, facts.resolved.regular_iqd, verdict?.frozenValueIqd, sel.qty) * sel.qty,
       },
       stock: input.coarseStock ? null : row.stock,

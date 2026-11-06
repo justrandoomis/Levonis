@@ -26,6 +26,7 @@ import SafeImage from '../../ui/SafeImage';
 import { Button } from '../../ui/Button';
 import { StatusChip } from '../../ui/Badge';
 import { formatDate } from '../../orders/format';
+import { formatFigure } from '../../../lib/localeNumber';
 import { giftText, type GiftLang, type GiftStringKey } from './giftStrings';
 
 // ------------------------------------------------------------------ the view
@@ -90,6 +91,8 @@ export interface GiftView {
   ordered_at: string | null;
   fulfilled_at: string | null;
   cancelled_at: string | null;
+  /** What the customer swapped for this product in the points shop; 0 on any other gift, absent from an older server. */
+  points_spent?: number;
   legacy: unknown;
 }
 
@@ -395,6 +398,7 @@ export default function GiftCard({ lang, gift, money, busy = false, error, notic
     : '';
   const levelDescription = gift.level && !upTo ? pick(lang, gift.level.description) : '';
   const reasonKey = REASON_KEY[gift.reason];
+  const paid = gift.points_spent && gift.points_spent > 0 ? gift.points_spent : 0;
   const choosing = status === 'GRANTED' || (status === 'READY_TO_REDEEM' && gift.can_change_choice && changing);
   const chosen = gift.chosen;
   const blocked = !!chosen && chosen.available === false && (status === 'READY_TO_REDEEM' || status === 'REDEEMED');
@@ -429,7 +433,13 @@ export default function GiftCard({ lang, gift, money, busy = false, error, notic
         <p className="text-[13px] leading-relaxed text-text-secondary">
           {choosing && levelDescription ? levelDescription : choosing && upTo ? giftText(lang, 'bodyGrantedUpTo') : giftText(lang, bodyKey)}
         </p>
-        {reasonKey && <p className="text-[12px] leading-relaxed text-text-muted">{giftText(lang, reasonKey)}</p>}
+        {paid > 0 ? (
+          <p className="text-[12px] leading-relaxed text-text-muted" data-gift-points={paid}>
+            {giftText(lang, status === 'CANCELLED' ? 'reasonShopBack' : 'reasonShop', { points: formatFigure(paid, lang) })}
+          </p>
+        ) : (
+          reasonKey && <p className="text-[12px] leading-relaxed text-text-muted">{giftText(lang, reasonKey)}</p>
+        )}
       </header>
 
       {choosing ? (

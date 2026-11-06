@@ -9,19 +9,23 @@
  *                                   what rating earns, the points shop, the
  *                                   competitions and how many are open to me,
  *                                   my pending points
+ *   GET  /printers                  every printer of mine and what it earns: only
+ *                                   «كوبوناتي» asks (DECISIONS row 298)
  *   GET  /competitions              the competitions page (DECISIONS row 290):
  *                                   ?view=current, or ?view=results[&mine=1]&cursor=…
  *   GET  /competitions/:id          one competition's own page
  *   POST /shop/:kind                swap points for a reward coupon
+ *   POST /shop/items/:id            swap points for a product: it lands in «هداياي»
+ *                                   (DECISIONS row 299)
  *   POST /competitions/:id/enter    enter a competition
  *   POST /gift-code                 the customer writes the code the team gave
  *                                   them for an approved review (row 301): the
  *                                   analysis, the levels, the gift
  *   GET  /gift-reveal/:giftId       the same answer later, without the code
  *
- * EVERY FIGURE IS THE SERVER'S. The shop route reads no body at all: which
- * coupon is the path, and what it costs, how long it lasts and what it takes
- * off are the programme's settings (worker/lib/rewards/config.ts). The only
+ * EVERY FIGURE IS THE SERVER'S. The shop routes read no body at all: which
+ * coupon or product is the path, and what it costs, how long it lasts and what it
+ * takes off are the programme's settings (worker/lib/rewards/config.ts). The only
  * body read here is a competition entry's own answer and photo. The page
  * decides nothing either: whether a competition can be entered and why not
  * (`gate`), what a swap is short of, whether a shop coupon is held and what a
@@ -61,8 +65,10 @@ import {
 } from '../lib/rewards/competitions';
 import { readPendingPoints } from '../lib/rewards/pending';
 import { giftRevealFor, redeemGiftCode, rewardCodeFacts } from '../lib/gifts/reviewCode';
-import { GIFT_ROW_SELECT, giftChoiceScope, giftStatusOf } from '../lib/gifts/model';
+import { GIFT_ROW_SELECT, giftChoiceScope, giftStatusOf, loadCustomerGift } from '../lib/gifts/model';
 import { giftLevelThreshold, maxGiftLevel } from '../../packages/contracts/src/giftScore';
+import { customerPrinters } from '../lib/rewards/printers';
+import { buyShopItem, shopItemsForCustomer } from '../lib/rewards/shopItems';
 
 export const rewardProgramRoutes = new Hono<AppContext>();
 rewardProgramRoutes.use('*', requireAuth);
@@ -253,6 +259,8 @@ rewardProgramRoutes.get('/', async (c) => {
     ]);
   // What each live filament coupon can be spent on, from its own frozen terms (none before 0220: no coupons).
   const targets = await couponTargets(db, coupons);
+  // The products for points (DECISIONS row 299): no read at all while none is on sale.
+  const shopItems = await shopItemsForCustomer(c.env, user.id, config.shop.items, balances.points);
 
   return c.json({
     success: true,
@@ -289,9 +297,28 @@ rewardProgramRoutes.get('/', async (c) => {
         points_short: Math.max(0, price - balances.points),
       };
     }),
+    shop_items: shopItems,
     competitions: withGates(competitions, balances.points),
     competition_counts: windowCounts,
   });
+});
+
+/**
+ * «طابعاتك» (owner, 2026-11-05: «coupons with every printer»; DECISIONS row 298): what
+ * each printer earns, until when, when its next pair comes, or why it stopped. One read,
+ * asked by the coupons page alone. Who earns is the sweep's own definition. Before
+ * 0220/0225 the same 200, with an empty list and `installed: false`.
+ */
+rewardProgramRoutes.get('/printers', async (c) => {
+  const user = c.get('user')!;
+  const nowIso = new Date().toISOString();
+  let installed = true;
+  const printers = await customerPrinters(c.env.DB, user.id, nowIso).catch((e: unknown) => {
+    if (!isSchemaMissing(e)) throw e;
+    installed = false;
+    return [] as Awaited<ReturnType<typeof customerPrinters>>;
+  });
+  return c.json({ success: true, installed, server_time: nowIso, printers });
 });
 
 /**
@@ -384,6 +411,26 @@ rewardProgramRoutes.post('/gift-code', async (c) => {
 rewardProgramRoutes.get('/gift-reveal/:giftId', async (c) => {
   const user = c.get('user')!;
   return c.json({ success: true, ...(await giftRevealFor(c.env, user.id, c.req.param('giftId') ?? '')) });
+});
+
+/**
+ * A product for points (DECISIONS row 299): one batch, the gift born redeemed and the
+ * points gone, and the answer is the gift, for «أضف إلى السلة». The same bucket and the
+ * same refusals as the coupon swap, and no figure from the client. An item id is a row of
+ * the owner's list: anything else is that it is not on sale.
+ */
+rewardProgramRoutes.post('/shop/items/:id', async (c) => {
+  await rateLimit(c, 'reward_shop', 20, 3600);
+  const user = c.get('user')!;
+  const id = c.req.param('id') ?? '';
+  try {
+    const giftId = await buyShopItem(c.env, user.id, id);
+    return c.json({ success: true, gift: await loadCustomerGift(c.env, user.id, giftId) });
+  } catch (e) {
+    if (e instanceof RewardShopError) throw new HttpError(409, e.message, e.code);
+    if (isSchemaMissing(e)) throw new HttpError(503, 'Rewards are being set up', 'REWARDS_NOT_INSTALLED');
+    throw e;
+  }
 });
 
 rewardProgramRoutes.post('/competitions/:id/enter', async (c) => {

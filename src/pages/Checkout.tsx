@@ -49,6 +49,7 @@ import { baghdadDay } from '../../worker/lib/baghdadTime';
 import { dayLabel, deliveryWindow, resolveDeliveryDayPolicy } from '../../worker/lib/deliveryDay';
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
+import { CheckoutCouponsRow } from '../components/rewards/CartCoupons';
 import Note from '../components/ui/Note';
 import SummaryInfo from '../components/ui/SummaryInfo';
 /**
@@ -1588,6 +1589,37 @@ export default function Checkout() {
    * can open it, and a live coupon opens it for them.
    */
   const promoOpen = showPromoField || !!quote?.coupon || !!couponCode;
+  /**
+   * What the order would come to with this code on it: the page's own question, asked aside.
+   * Silent, and it touches neither the page's quote nor its busy state.
+   */
+  const quoteWithCoupon = async (code: string, signal: AbortSignal) => {
+    const { quote: withCode } = await api.post<{ quote: CheckoutQuoteDto }>(
+      '/api/orders/quote',
+      {
+        addressId: selectedAddressId,
+        deliveryMethodId: deliveryMethod,
+        paymentMethodId: paymentMethod || undefined,
+        itemIds: items.map((i) => i.id),
+        usePoints,
+        useWallet: useWalletBalance,
+        protectedDelivery,
+        supportCode: supportRef || undefined,
+        couponCode: code,
+      },
+      { signal, mascot: 'silent' }
+    );
+    return { total_iqd: withCode.total_iqd, count: withCode.coupon?.pool?.length ?? 1 };
+  };
+  /** A code reaches the order here, from the box or from the reward coupons' row: the customer asked for that quote. */
+  const applyCouponCode = (code: string) => {
+    setCouponError('');
+    // Only a code that CHANGES the quote marks it: re-applying
+    // the code already in force starts no request, and a mark
+    // left standing would be taken by the next background one.
+    if (code !== couponCode) customerQuote.mark();
+    setCouponCode(code);
+  };
 
   const isPrepaidMethod = paymentMethod === 'wallet' || paymentMethod === 'full_advance';
   const isBnplMethod = paymentMethod === 'bnpl';
@@ -3583,6 +3615,22 @@ export default function Checkout() {
               has a code on it, so a customer who wants to remove one finds it
               open, not hidden.
             */}
+            {/* «لديك 3 كوبونات — وفّر X»: the customer's reward coupons, one press away, only while no
+                code is on the order (DECISIONS row 298). The press does what the box does; the quote prices it. */}
+            {quote && (
+              <CheckoutCouponsRow
+                enabled={!couponCode && !quoteLoading}
+                itemIds={items.map((i) => i.id)}
+                signature={[itemIdsKey, selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, protectedDelivery, supportRef].join('~')}
+                deliveryIqd={shippingIqd}
+                plainTotalIqd={quote.total_iqd}
+                quoteWith={quoteWithCoupon}
+                onApply={(code) => {
+                  storePromo(code);
+                  applyCouponCode(code);
+                }}
+              />
+            )}
             <div className="pt-1">
               {promoOpen ? (
                 <div id="checkout-promo-field">
@@ -3590,14 +3638,7 @@ export default function Checkout() {
                     lang={lang}
                     showLabel={false}
                     appliedCode={couponCode}
-                    onApplied={(code) => {
-                      setCouponError('');
-                      // Only a code that CHANGES the quote marks it: re-applying
-                      // the code already in force starts no request, and a mark
-                      // left standing would be taken by the next background one.
-                      if (code !== couponCode) customerQuote.mark();
-                      setCouponCode(code);
-                    }}
+                    onApplied={applyCouponCode}
                   />
                   {couponError && (
                     <p role="alert" className="text-blush text-[11px] mt-2">

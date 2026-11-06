@@ -88,6 +88,8 @@ const ar = {
 
   reasonReview: 'تقديرًا لمراجعتك',
   reasonReward: 'مكافأة من Levonis',
+  reasonShop: 'استبدلتها بـ {points} نقطة من متجر النقاط',
+  reasonShopBack: 'أعدنا إلى رصيدك {points} نقطة دفعتها مقابلها',
   reasonCompensation: 'تعويض من Levonis',
   reasonAdminGift: 'هدية من Levonis',
 
@@ -186,6 +188,8 @@ const en: Record<GiftStringKey, string> = {
 
   reasonReview: 'Thanks for your review',
   reasonReward: 'A reward from Levonis',
+  reasonShop: 'You swapped {points} points for this in the points shop',
+  reasonShopBack: 'The {points} points you paid for it are back in your balance',
   reasonCompensation: 'A make-good from Levonis',
   reasonAdminGift: 'A gift from Levonis',
 
@@ -282,6 +286,8 @@ const ckb: Record<GiftStringKey, string> = {
 
   reasonReview: 'سوپاس بۆ هەڵسەنگاندنەکەت',
   reasonReward: 'خەڵاتێک لە Levonis ـەوە',
+  reasonShop: '{points} خاڵت لە فرۆشگای خاڵ بەمە گۆڕیوەتەوە',
+  reasonShopBack: 'ئەو {points} خاڵەی بۆی دابووت گەڕێنرایەوە بۆ باڵانسەکەت',
   reasonCompensation: 'قەرەبوویەک لە Levonis ـەوە',
   reasonAdminGift: 'دیارییەک لە Levonis ـەوە',
 

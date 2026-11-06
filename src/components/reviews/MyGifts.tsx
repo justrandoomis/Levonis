@@ -11,6 +11,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import GiftCard, { sortGifts, type GiftView } from './gifts/GiftCard';
 import LegacyGiftCard, { type LegacyGift } from './gifts/LegacyGiftCard';
 import { giftLang, giftText, type GiftStringKey } from './gifts/giftStrings';
+import { useGiftCartAdd, useGiftRefusalSentence } from './gifts/useGiftCartAdd';
 
 /**
  * /gifts — «هداياي» (owner brief 2026-10-06 §1; docs/GIFTS_QUICK_BUY.md §1.3).
@@ -26,13 +27,9 @@ import { giftLang, giftText, type GiftStringKey } from './gifts/giftStrings';
  *
  * Nothing here decides a status, a price or a permission. A double press is
  * answered by the server as a replay; the buttons are busy meanwhile. The
- * refusal sentences live in src/lib/refusalStrings.ts and are loaded on the
- * first refusal only, so the page does not carry that table up front.
+ * cart's door and the refusal sentences are shared with the points shop
+ * (./gifts/useGiftCartAdd).
  */
-
-type Refusals = typeof import('../../lib/refusalStrings');
-
-type Conflict = { kind: 'shipping' | 'seller'; gift: GiftView };
 
 /** A refusal that means the card on screen is out of date — the next read shows the truth. */
 const STALE_CODES = new Set([
@@ -65,27 +62,12 @@ export default function MyGifts() {
   const [busy, setBusy] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [notices, setNotices] = useState<Record<string, string>>({});
-  const [conflict, setConflict] = useState<Conflict | null>(null);
   const [confirming, setConfirming] = useState<GiftView | null>(null);
 
   const busyRef = useRef(new Set<string>());
   const loadSeq = useRef(0);
   const aborter = useRef<AbortController | null>(null);
-  const refusalsLoad = useRef<Promise<Refusals | null> | null>(null);
-
-  /** The refusal table, fetched once, on the first refusal. */
-  const loadRefusals = useCallback((): Promise<Refusals | null> => {
-    if (!refusalsLoad.current) {
-      refusalsLoad.current = import('../../lib/refusalStrings').then(
-        (m) => m,
-        () => {
-          refusalsLoad.current = null;
-          return null;
-        }
-      );
-    }
-    return refusalsLoad.current;
-  }, []);
+  const sentence = useGiftRefusalSentence(lang);
 
   const load = useCallback(async (opts?: { silent?: boolean }) => {
     const seq = ++loadSeq.current;
@@ -131,17 +113,6 @@ export default function MyGifts() {
       setBusy((b) => without(b, id));
     }
   }, []);
-
-  /** A refusal as the customer's sentence: network and rate first, then the code's own sentence. */
-  const sentence = useCallback(
-    async (err: unknown): Promise<string> => {
-      if (err instanceof ApiError && err.status === 0) return t('networkError');
-      if (err instanceof ApiError && err.status === 429) return t('tooManyTries');
-      const table = await loadRefusals();
-      return table ? table.apiRefusal(err, lang, t('actionFailed')) || t('actionFailed') : t('actionFailed');
-    },
-    [lang, loadRefusals, t]
-  );
 
   const putGift = useCallback((gift: GiftView) => {
     setGifts((list) => (list ? list.map((g) => (g.id === gift.id ? gift : g)) : list));
@@ -205,38 +176,17 @@ export default function MyGifts() {
     [fail, load, run]
   );
 
-  const addToCart = useCallback(
-    async (gift: GiftView, replaceCart = false): Promise<void> => {
-      await run(gift.id, async () => {
-        try {
-          // Nothing but the gift travels: the server derives the product, the
-          // selection, the sale type and the price (0) itself. The answer is
-          // the cart, so the badge updates on its own.
-          await api.post('/api/cart/gift-items', replaceCart ? { giftId: gift.id, replaceCart: true } : { giftId: gift.id });
-          setConflict(null);
-          setNotices((n) => ({ ...n, [gift.id]: t('added') }));
-          await load({ silent: true });
-        } catch (err) {
-          const code = err instanceof ApiError ? err.code ?? '' : '';
-          if (!replaceCart && code === 'CART_SHIPPING_CONFLICT') {
-            setConflict({ kind: 'shipping', gift });
-            return;
-          }
-          if (!replaceCart && code === 'CART_SELLER_CONFLICT') {
-            setConflict({ kind: 'seller', gift });
-            return;
-          }
-          setConflict(null);
-          await fail(gift.id, err);
-        }
-      });
+  const onAdded = useCallback(
+    async (id: string) => {
+      setNotices((n) => ({ ...n, [id]: t('added') }));
+      await load({ silent: true });
     },
-    [fail, load, run, t]
+    [load, t]
   );
+  const cart = useGiftCartAdd({ lang, run, onAdded, onRefused: fail });
 
   const sorted = gifts ? sortGifts(gifts) : [];
   const empty = !!gifts && gifts.length === 0;
-  const conflictBusy = conflict ? !!busy[conflict.gift.id] : false;
 
   return (
     <div dir={dir} className="mx-auto w-full max-w-3xl space-y-4" data-my-gifts>
@@ -299,7 +249,7 @@ export default function MyGifts() {
             notice={notices[gift.id]}
             onChoose={choose}
             onRedeem={(g) => setConfirming(g)}
-            onAddToCart={(g) => addToCart(g)}
+            onAddToCart={(g) => cart.add(g.id)}
           />
         )
       )}
@@ -316,21 +266,7 @@ export default function MyGifts() {
         testId="gift-redeem-confirm"
       />
 
-      {/* The server refused the add (CART_SHIPPING_CONFLICT / CART_SELLER_CONFLICT):
-          the cart is emptied only when the customer says so here. One dialog for
-          both, already loaded for the redeem confirmation. */}
-      <ConfirmDialog
-        open={!!conflict}
-        title={t(conflict?.kind === 'seller' ? 'sellerConflictTitle' : 'shippingConflictTitle')}
-        consequence={t(conflict?.kind === 'seller' ? 'sellerConflictBody' : 'shippingConflictBody')}
-        confirmLabel={t('replaceCart')}
-        cancelLabel={t('cancel')}
-        destructive
-        busy={conflictBusy}
-        onConfirm={() => (conflict ? addToCart(conflict.gift, true) : undefined)}
-        onCancel={() => setConflict(null)}
-        testId={conflict?.kind === 'seller' ? 'gift-seller-conflict' : 'gift-shipping-conflict'}
-      />
+      {cart.dialog}
     </div>
   );
 }

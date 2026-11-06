@@ -78,14 +78,14 @@ test('with the switch on (the default), 15% comes off the sale price and the ord
 });
 
 test('with the switch off, a new coupon keeps off the sale line', async () => {
-  const { raw, code } = await world({ on_sale: false });
+  const { raw, code } = await world({ on_offer: false });
   assert.equal(row<{ stacks: number }>(raw, 'SELECT stacks FROM coupons WHERE code = ?', code)!.stacks, 0);
   const res = await post(appOf(raw), '/api/orders/quote', quoteBody({ couponCode: code, ...pickup }));
   assert.equal(res.status, 400);
 });
 
 test('0226 turns on every filament coupon already out, and no other coupon', async () => {
-  const { raw } = await world({ on_sale: false });
+  const { raw } = await world({ on_offer: false });
   raw.exec("INSERT INTO coupons (id,code,kind,value,active,stacks) VALUES ('cpn_promo','PROMO10','percent',10,1,0)");
   const sql = readFileSync(new URL('../migrations/0226_filament_coupon_on_sale.sql', import.meta.url), 'utf8');
   const off = (where: string) => row<{ n: number }>(raw, `SELECT COUNT(*) AS n FROM coupons WHERE stacks = 0 AND ${where}`)!.n;

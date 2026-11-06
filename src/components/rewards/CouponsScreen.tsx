@@ -17,6 +17,7 @@
  *   newest first) and `hub.data.coupon_counts`.
  *
  * THE SCREEN, top to bottom:
+ * 0. «طابعاتك» (./PrintersBlock), when the customer has printers: what each earns.
  * 1. The active coupons. The FOCAL one — the first `usable` active coupon,
  *    the soonest the customer can actually spend — is this screen's one
  *    raised card and holds its one primary button, «استخدمه الآن». Every other
@@ -59,13 +60,16 @@ import { CouponsSkeleton, ForwardChevron, ICON_DISC, INLINE_LINK, SetupState } f
 import type { CopyKey } from './copy';
 import { useCouponAction, useShipDetail } from './couponUse';
 import { SEP, couponDestination, nearDate, revokeKey, toDeviceTarget, underADay, usable, wholeDaysLeft } from './model';
-import type { RewardCoupon, RewardsHubData } from './types';
+import { PrintersBlock } from './PrintersBlock';
+import type { RewardCoupon, RewardPrintersData, RewardsHubData } from './types';
 import type { Read } from './useRewardsData';
 import { useRewardsT } from './useT';
 
 export interface CouponsScreenProps {
   /** GET /api/rewards/program (useRewardsHub): `coupons`, `coupon_counts`, `program`, `shop`, `server_time`. */
   hub: Read<RewardsHubData>;
+  /** GET /api/rewards/program/printers (useRewardPrinters): «طابعاتك». Only this page asks. */
+  printers?: Read<RewardPrintersData>;
   /** For Countdown.onZero: reads the hub again 1.5 s later (crossings close together share one read). */
   reloadSoon: () => void;
 }
@@ -75,7 +79,7 @@ const NAMES_SHOWN = 2;
 /** How long the tick and «نُسخ الكود» stay after a copy. */
 const COPIED_MS = 2_000;
 
-export function CouponsScreen({ hub, reloadSoon }: CouponsScreenProps) {
+export function CouponsScreen({ hub, printers, reloadSoon }: CouponsScreenProps) {
   const { t, lang } = useRewardsT();
   const coupon = useCouponAction();
   // null: the past list follows the data (open when nothing is active); a
@@ -101,6 +105,8 @@ export function CouponsScreen({ hub, reloadSoon }: CouponsScreenProps) {
 
   return (
     <>
+      {printers && <PrintersBlock read={printers} />}
+
       {ordered.length > 0 ? (
         <ul className="space-y-3">
           {ordered.map((c) => (
@@ -173,10 +179,11 @@ function useCouponTitle() {
 }
 
 function CouponCard({ c, focal, serverTime, skewMs, reloadSoon, onUse }: CouponCardProps) {
-  const { t, count, lang } = useRewardsT();
+  const { t, count, tri, lang } = useRewardsT();
   const title = useCouponTitle();
   const ship = c.kind === 'free_shipping';
   const canUse = couponDestination(c).kind !== 'none';
+  const printerName = c.printer ? tri(c.printer.name) : '';
   const left = wholeDaysLeft(c.expires_at, serverTime);
   const days = Number.isFinite(left) ? Math.max(0, left) : 0;
   const surface = focal ? 'lv-surface-raised' : 'lv-surface';
@@ -185,7 +192,10 @@ function CouponCard({ c, focal, serverTime, skewMs, reloadSoon, onUse }: CouponC
       ? t('coupon.fromShop', { points: count('points', c.points_spent) })
       : c.source === 'admin'
         ? t('coupon.fromTeam')
-        : t('coupon.fromPrinter');
+        : c.printer && printerName
+          ? // The week counts from 1; the name sits in an isolate, so a Latin name keeps its place in an Arabic line.
+            t('coupon.fromPrinterNamed', { name: `\u2068${printerName}\u2069`, week: formatFigure(c.printer.week + 1, lang) })
+          : t('coupon.fromPrinter');
 
   return (
     <li className={`${surface} p-4 space-y-3`} data-testid="reward-coupon" data-focal={focal || undefined}>
@@ -217,8 +227,7 @@ function CouponCard({ c, focal, serverTime, skewMs, reloadSoon, onUse }: CouponC
         </p>
         <p className="text-[12px] leading-5 text-text-muted">
           {!ship && c.max_quantity ? `${t('coupon.pieces', { pieces: count('pieces', c.max_quantity) })} · ` : ''}
-          {t('coupon.ruleStack')}
-          {ship ? ` · ${t('coupon.ruleShip')}` : c.stacks ? '' : ` · ${t('coupon.ruleNoOffer')}`}
+          {t('coupon.ruleStack')} · {t(ship ? 'coupon.ruleShip' : c.on_offer ? 'coupon.ruleOnOffer' : 'coupon.ruleNoOffer')}
         </p>
       </div>
 

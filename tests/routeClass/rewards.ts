@@ -9,6 +9,8 @@
  * competition's prizes give value to a person: `money` ('gift_grant').
  * Withdrawing a coupon, cancelling a competition (every entry fee comes back)
  * and writing a draft give nothing away: `op`. No route here reads a cost.
+ * The products of the points shop (DECISIONS row 299) add no route: their rows are in
+ * `PUT /config`, the owner's, and `GET /config` says what each is, at its retail value.
  */
 import type { RouteClassFile } from './_types';
 import { adminRewardsRoutes } from '../../worker/routes/adminRewards';
@@ -25,6 +27,11 @@ export default {
         'GET /config': 'op',
         'PUT /config': 'owner',
         'GET /grants': 'op',
+        // DECISIONS row 298. What the coupons took off orders and how many printers earn: no cost, any admin.
+        'GET /overview': 'op',
+        'GET /printers': 'op',
+        // One coupon to one customer: value given to a person, and four eyes on the admin's own account.
+        'POST /grants': 'money',
         'POST /grants/:id/revoke': { cls: 'op', noBody: 'withdraws one unused reward coupon by id; needs a grant the role fixture does not seed' },
         'POST /grants/:id/extend': 'money',
         'GET /competitions': 'op',

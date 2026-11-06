@@ -29,7 +29,7 @@
  *                      selected filaments (`max_quantity`): scope 'products'
  *                      over the ticked list, or 'category' over the FDM filament
  *                      section while nothing is ticked. On a line already on sale
- *                      too, off the sale price, while `filament.on_sale` is on
+ *                      too, off the sale price, while `filament.on_offer` is on
  *                      (`stacks`; owner, 2026-11-06).
  *
  * A coupon keeps the terms it was minted with. Its row says what it does, so a
@@ -61,8 +61,17 @@ import {
   type RewardCouponKind,
   type RewardProgramConfig,
 } from './config';
-import { MAX_REPLACEMENT_HOPS, tradedInSql } from '../deviceCustody';
-import { inShopSql } from '../services/myDevices';
+import {
+  SLOT_IS_PRINTER_SQL,
+  SLOT_SOLD_HERE_SQL,
+  slotInShopSql,
+  slotInsideMonthsSql,
+  slotJoins,
+  slotNotRefundedSql,
+  slotOpenSql,
+  slotTradedInSql,
+  slotWeekSql,
+} from './earning';
 import { SPENT_ON_SQL, SPENT_SQL } from './pool';
 import { rewardNotice, rewardText, type Trilingual } from './strings';
 
@@ -130,7 +139,7 @@ export function termsFor(kind: RewardCouponKind, config: RewardProgramConfig): R
     product_ids: [...picked],
     category_id: picked.length ? null : FILAMENT_SECTION_ID,
     applies_to: 'merchandise',
-    stacks: config.filament.on_sale,
+    stacks: config.filament.on_offer,
     valid_days: config.valid_days,
   };
 }
@@ -262,8 +271,19 @@ export async function printerUnitsOfOrder(db: D1Database, orderId: string): Prom
 export const printerSourceRef = (u: Pick<PrinterUnit, 'order_item_id' | 'unit_index'>, kind: RewardCouponKind, week = 0) =>
   `printer:${u.order_item_id}:${u.unit_index}:${kind}${week > 0 ? `:w${week}` : ''}`;
 
+/**
+ * `printerSourceRef` read back: the slot, the kind and the week (0 for the key of
+ * the delivery's own pair). Null for a key of anything else: a coupon of the points
+ * shop or of the team has no printer.
+ */
+export function parsePrinterSourceRef(ref: string | null | undefined): { order_item_id: string; unit_index: number; kind: RewardCouponKind; week: number } | null {
+  const m = /^printer:(.+):(\d+):(free_shipping|filament_discount)(?::w(\d+))?$/.exec(String(ref ?? ''));
+  if (!m) return null;
+  return { order_item_id: m[1], unit_index: Number(m[2]), kind: m[3] as RewardCouponKind, week: m[4] ? Number(m[4]) : 0 };
+}
+
 /** A week's key in SQL, the same as `printerSourceRef` writes it, over a row's order_item_id, unit_index and week. */
-const printerSourceRefSql = (kind: RewardCouponKind, row: string) =>
+export const printerSourceRefSql = (kind: RewardCouponKind, row: string) =>
   `'printer:' || ${row}.order_item_id || ':' || ${row}.unit_index || ':${kind}' || CASE WHEN ${row}.week > 0 THEN ':w' || ${row}.week ELSE '' END`;
 
 // ------------------------------------------------------------- issuing
@@ -401,20 +421,6 @@ export interface WeeklyIssueReport {
 export const WEEKLY_UNIT_LIMIT = 20;
 
 /**
- * THE END OF A SLOT'S WARRANTY-REPLACEMENT CHAIN, joined to `d`, the unit the
- * customer bought. A replacement sits on the same line under a new unit_index, so
- * the slot keeps earning for the device in the customer's hands, and stops when
- * that device's warranty closes (worker/lib/deviceCustody.ts `liveUnitOfSlot`).
- */
-const chainHops = () => Array.from({ length: MAX_REPLACEMENT_HOPS }, (_, i) => i + 1);
-const chainJoins = (root = 'd', hop = 'r') =>
-  chainHops().map((h) => `LEFT JOIN order_item_units ${hop}${h} ON ${hop}${h}.id = ${h === 1 ? root : `${hop}${h - 1}`}.replaced_by_unit_id`).join('\n         ');
-/** Still open. A unit closed by a cancel whose order was then delivered again stays open (serialAssignments.ts REDELIVERED); the query only reads delivered orders. */
-const OPEN = (a: string) => `(${a}.warranty_closed_at IS NULL OR ${a}.warranty_closed_reason = 'order_cancelled')`;
-const chainEndOpen = (root = 'd', hop = 'r') =>
-  `CASE ${chainHops().reverse().map((h) => `WHEN ${hop}${h}.id IS NOT NULL THEN ${OPEN(`${hop}${h}`)}`).join(' ')} ELSE ${OPEN(root)} END`;
-
-/**
  * THE WEEKLY COUPONS (owner, 2026-11-05; 0225; DECISIONS rows 223 #4 and 295).
  *
  *   «كل اسبوع كوبون خصم على الفلمنت واحد وكوبون توصيل مجاني للطلبات فوق 100 الف.
@@ -449,10 +455,8 @@ export async function issueWeeklyRewards(env: Env, startedAt: string, nowIso: st
   if (config.filament.enabled) kinds.push('filament_discount');
   if (!config.enabled || !config.weekly.enabled || kinds.length === 0) return report;
 
-  const week = `CAST((julianday(?1) - MAX(
-                  julianday(COALESCE(u.warranty_start_at, u.delivered_at)),
-                  julianday(COALESCE(u.delivered_at, u.warranty_start_at)),
-                  julianday(?2))) / 7 AS INTEGER)`;
+  // Who earns is one definition (./earning.ts), read by the customer's and the admin's printers too.
+  const binds = { now: '?1', started: '?2', months: '?3' };
   const missing = kinds.map((k) => `NOT EXISTS (SELECT 1 FROM reward_grants g WHERE g.source_ref = ${printerSourceRefSql(k, 'd')})`).join(' OR ');
   // This runs every quarter hour over every printer in its warranty, and almost all of
   // them already hold this week's coupons. So the cheap tests come first: the dates,
@@ -462,35 +466,19 @@ export async function issueWeeklyRewards(env: Env, startedAt: string, nowIso: st
   const { results } = await db
     .prepare(
       `SELECT d.order_id, d.order_item_id, d.unit_index, o.user_id, d.week
-         FROM (SELECT u.*, ${week} AS week
+         FROM (SELECT u.*, ${slotWeekSql(binds)} AS week
                  FROM order_item_units u
                 WHERE u.replacement_of_unit_id IS NULL
-                  AND julianday(COALESCE(u.warranty_start_at, u.delivered_at), '+' || MIN(COALESCE(u.warranty_base_months, 12), ?3) || ' months') > julianday(?1)) AS d
-         JOIN orders o ON o.id = d.order_id
-         JOIN order_items oi ON oi.id = d.order_item_id
-         ${chainJoins()}
+                  AND ${slotInsideMonthsSql(binds)}) AS d
+         ${slotJoins()}
         WHERE d.week >= 0
-          AND o.status = 'delivered'
-          AND COALESCE(o.seller_type, 'levonis') <> 'merchant'
-          AND oi.product_id IS NOT NULL
-          AND oi.gift_entitlement_id IS NULL
+          AND ${SLOT_SOLD_HERE_SQL}
           AND (${missing})
-          AND ${chainEndOpen()}
-          AND ${tradedInSql('d')} IS NULL
-          AND ${inShopSql('d')} IS NULL
-          -- A refund the case could not pin on a unit still takes a printer off
-          -- the line: the highest slots still open stop, as revokeRewardsForReturn
-          -- does. A lower slot counts by the end of its own chain: one whose
-          -- replacement went back is already the printer that refund took.
-          AND (SELECT COUNT(*) FROM order_item_units low
-                 ${chainJoins('low', 'lr')}
-                WHERE low.order_item_id = d.order_item_id AND low.replacement_of_unit_id IS NULL AND low.unit_index < d.unit_index
-                  AND ${chainEndOpen('low', 'lr')})
-              < oi.qty - COALESCE((SELECT SUM(rc.qty) FROM return_cases rc
-                                    WHERE rc.order_item_id = oi.id AND rc.state = 'resolved' AND rc.resolution = 'refund'), 0)
-          AND NOT EXISTS (SELECT 1 FROM order_items k WHERE k.bundle_parent_item_id = oi.id)
-          AND EXISTS (SELECT 1 FROM product_catalogs pc JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
-                       WHERE pc.product_id = oi.product_id)
+          AND ${slotOpenSql()}
+          AND ${slotTradedInSql()} IS NULL
+          AND ${slotInShopSql()} IS NULL
+          AND ${slotNotRefundedSql()}
+          AND ${SLOT_IS_PRINTER_SQL}
         LIMIT ?4`
     )
     .bind(nowIso, startedAt, config.weekly.months, WEEKLY_UNIT_LIMIT)
@@ -659,8 +647,8 @@ export interface RewardCouponView {
   max_discount_iqd: number | null;
   /** How many pieces it discounts. Null is every piece it names (a coupon from before 0225). */
   max_quantity: number | null;
-  /** It also works on a piece already on sale. */
-  stacks: boolean;
+  /** It also works on a piece that already has an offer: its own frozen term. */
+  on_offer: boolean;
   scope: string;
   category_id: string | null;
   product_ids: string[];
@@ -671,6 +659,17 @@ export interface RewardCouponView {
   /** The order that spent it, when it is spent. */
   used_on_order_id: string | null;
   revoke_reason: string;
+  /** The printer that earned it: null for a coupon of the points shop or the team. */
+  printer: RewardCouponPrinter | null;
+}
+
+/** Which printer earned a coupon, and which of its weeks (0 is the first). */
+export interface RewardCouponPrinter {
+  name: Trilingual;
+  image: string;
+  unit_index: number;
+  week: number;
+  product_slug: string;
 }
 
 interface GrantRow {
@@ -684,7 +683,7 @@ interface GrantRow {
   min_total_iqd: number | null;
   max_discount_iqd: number | null;
   max_quantity: number | null;
-  stacks: number | null;
+  stacks?: number | null;
   scope: string | null;
   category_id: string | null;
   product_ids: string | null;
@@ -695,14 +694,31 @@ interface GrantRow {
   points_spent: number;
   used_on_order_id: string | null;
   revoke_reason: string;
+  source_ref?: string | null;
+  unit_index?: number | null;
+  printer_slug?: string | null;
+  printer_name?: string | null;
+  printer_name_ar?: string | null;
+  printer_name_ku?: string | null;
+  printer_images?: string | null;
+  printer_name_snapshot?: string | null;
+  printer_image_snapshot?: string | null;
 }
 
-/** A grant with its coupon and its derived state; `extra` adds columns and joins (the admin list's customer). */
-export const grantSelect = (now: string, extra: { columns?: string; joins?: string } = {}) => `SELECT g.id, g.user_id, g.kind, g.source, g.issued_at, g.expires_at, g.order_id, g.points_spent, g.revoke_reason,
+/**
+ * A grant with its coupon, the printer that earned it and its derived state; `extra`
+ * adds columns and joins (the admin list's customer). The printer's two joins are by
+ * primary key and find nothing for a coupon of the shop or the team.
+ */
+export const grantSelect = (now: string, extra: { columns?: string; joins?: string } = {}) => `SELECT g.id, g.user_id, g.kind, g.source, g.source_ref, g.issued_at, g.expires_at, g.order_id, g.order_item_id, g.unit_index, g.coupon_id, g.points_spent, g.revoke_reason,
          c.code, c.kind AS coupon_kind, c.value, c.min_total_iqd, c.max_discount_iqd, c.max_quantity, c.stacks, c.scope, c.category_id, c.product_ids, c.ends_at,
+         gi.name_snapshot AS printer_name_snapshot, gi.image_snapshot AS printer_image_snapshot,
+         gp.slug AS printer_slug, gp.name AS printer_name, gp.name_ar AS printer_name_ar, gp.name_ku AS printer_name_ku, gp.images AS printer_images,
          ${SPENT_ON_SQL('g.coupon_id')} AS used_on_order_id,
          ${GRANT_STATE_SQL(now)} AS state${extra.columns ? `, ${extra.columns}` : ''}
-    FROM reward_grants g LEFT JOIN coupons c ON c.id = g.coupon_id${extra.joins ? ` ${extra.joins}` : ''}`;
+    FROM reward_grants g LEFT JOIN coupons c ON c.id = g.coupon_id
+    LEFT JOIN order_items gi ON gi.id = g.order_item_id
+    LEFT JOIN products gp ON gp.id = gi.product_id${extra.joins ? ` ${extra.joins}` : ''}`;
 
 export const GRANT_SELECT = (now: string) => grantSelect(now);
 
@@ -710,6 +726,21 @@ const stringList = (raw: string | null): string[] => {
   const parsed = safeParse<unknown>(raw ?? '[]', []);
   return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === 'string') : [];
 };
+
+/** The printer on a grant's row, by its key. Null for anything but a printer's coupon. */
+function printerOfRow(r: GrantRow): RewardCouponPrinter | null {
+  const ref = parsePrinterSourceRef(r.source_ref);
+  if (!ref) return null;
+  const images = safeParse<unknown>(r.printer_images ?? '[]', []);
+  const name = String(r.printer_name ?? r.printer_name_snapshot ?? '');
+  return {
+    name: { ar: r.printer_name_ar || name, en: name, ckb: r.printer_name_ku || name },
+    image: (Array.isArray(images) && typeof images[0] === 'string' ? images[0] : '') || String(r.printer_image_snapshot ?? ''),
+    unit_index: ref.unit_index,
+    week: ref.week,
+    product_slug: String(r.printer_slug ?? ''),
+  };
+}
 
 export function grantView(r: GrantRow): RewardCouponView {
   const value = Math.max(0, Math.trunc(Number(r.value) || 0));
@@ -724,7 +755,7 @@ export function grantView(r: GrantRow): RewardCouponView {
     min_total_iqd: Math.max(0, Math.trunc(Number(r.min_total_iqd) || 0)),
     max_discount_iqd: r.max_discount_iqd === null || r.max_discount_iqd === undefined ? null : Number(r.max_discount_iqd),
     max_quantity: r.max_quantity === null || r.max_quantity === undefined ? null : Number(r.max_quantity),
-    stacks: r.stacks === null || r.stacks === undefined ? true : Number(r.stacks) !== 0,
+    on_offer: Number(r.stacks) === 1,
     scope: String(r.scope ?? ''),
     category_id: r.category_id ?? null,
     product_ids: stringList(r.product_ids),
@@ -734,7 +765,18 @@ export function grantView(r: GrantRow): RewardCouponView {
     points_spent: Math.max(0, Number(r.points_spent) || 0),
     used_on_order_id: r.used_on_order_id ?? null,
     revoke_reason: String(r.revoke_reason ?? ''),
+    printer: printerOfRow(r),
   };
+}
+
+/** The grants behind a set of coupons, by coupon id: the cart's read of the pool it just took. */
+export async function grantViewsOfCoupons(db: D1Database, couponIds: readonly string[], nowIso = new Date().toISOString()): Promise<Map<string, RewardCouponView>> {
+  if (!couponIds.length) return new Map();
+  const { results } = await db
+    .prepare(`${GRANT_SELECT('?2')} WHERE g.coupon_id IN (SELECT value FROM json_each(?1))`)
+    .bind(JSON.stringify(couponIds), nowIso)
+    .all<GrantRow & { coupon_id: string }>();
+  return new Map((results ?? []).map((r) => [String(r.coupon_id), grantView(r)]));
 }
 
 /** A customer's reward coupons, live first, then the most recent. */

@@ -61,6 +61,8 @@ export interface GiftLineVerdict {
    * figure of the ladder (the clean start, DECISIONS row 222). Null when the snapshot carries none.
    */
   frozenValueIqd?: number | null;
+  /** Swapped for points (DECISIONS row 299): it belongs to no level, so its line names none. */
+  fromPointsShop?: boolean;
 }
 
 /** The gift columns every reader of the cart and the checkout names. */
@@ -82,6 +84,16 @@ export function frozenGiftValueOf(g: Record<string, unknown> | null | undefined)
     return typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.round(v) : null;
   } catch {
     return null;
+  }
+}
+
+/** Was this gift swapped for points? Read from its frozen snapshot, which every database has. */
+export function giftFromPointsShop(g: Record<string, unknown> | null | undefined): boolean {
+  if (!g || typeof g.gift_snapshot !== 'string') return false;
+  try {
+    return (JSON.parse(g.gift_snapshot) as { points_shop?: unknown } | null)?.points_shop === true;
+  } catch {
+    return false;
   }
 }
 
@@ -144,6 +156,7 @@ export async function verifyGiftCartLines(
       nextOrderSeq: (Number(g.order_seq) || 0) + 1,
       selection: sel,
       frozenValueIqd: frozenGiftValueOf(g),
+      fromPointsShop: giftFromPointsShop(g),
     };
     const state = String(g.state ?? '');
     if (state === 'ordered' || state === 'fulfilled') verdict.code = 'GIFT_ALREADY_ORDERED';

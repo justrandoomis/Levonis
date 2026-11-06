@@ -3338,6 +3338,7 @@ export async function computeCheckout(
             applied_rule_id: l.benefit.applied_rule_id,
             offer_before_unit_iqd: l.benefit.offer_before_unit_iqd ?? null,
             qty: l.qty,
+            tie_key: l.cart_item_id,
           }]
         : []
     );
@@ -3551,6 +3552,8 @@ export async function computeCheckout(
             (!!l.benefit && l.applied_iqd < l.benefit.regular_unit_iqd) ||
             (member?.total_iqd ?? 0) > 0 ||
             (parentLineIds.has(l.id) && Number(l.composition_saving_percent ?? 0) > 0),
+          // Not `l.id`: that is a new random id on every quote, and a tie decided on it flips.
+          tie_key: l.cart_item_id,
         };
       }),
       couponProductFacts,
