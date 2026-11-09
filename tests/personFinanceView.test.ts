@@ -73,6 +73,10 @@ test('the three screens draw the one-person card, and the old capital grid is go
   const staff = codeOf('src/components/financePeople/PeoplePanel.tsx');
   assert.match(staff, /<WorkStatus /);
   assert.match(staff, /<WorkHolds /);
+  // One «waiting» figure for wages everywhere: a paid wage whose order is redone is not waiting (second review 7).
+  assert.match(staff, /wagesWaiting\(person\.balance\)/);
+  assert.doesNotMatch(staff, /staff_pending_settlement_reserve_iqd/);
+  assert.match(codeOf('src/components/financePeople/StaffBalanceBreakdown.tsx'), /wagesWaiting\(balance\)/);
   assert.match(staff, /<PersonSheet /);
   const own = codeOf('src/components/financePeople/MyEarnings.tsx');
   assert.match(own, /<PersonCard person=\{person\} own /);

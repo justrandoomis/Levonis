@@ -14,19 +14,19 @@ import { Button, Dialog, Money, dateLabel, useLanguage } from './shared';
  */
 export type HoldReason = HoldReasonKey;
 export type HeldSale = { order_id: string; day: string | null; reasons: HoldReason[]; profit_iqd: number; capital_iqd: number; profit_unknown: boolean };
-export type HeldRest = { reason: HoldReason; sales: number; profit_iqd?: number; capital_iqd?: number };
+export type HeldRest = { reason: HoldReason; profit_iqd?: number; capital_iqd?: number };
 export type AgreementFinance = {
   id: string; name: string; product_name: string | null; product_name_ar: string | null; label: string | null; created_at: string;
   principal_iqd: number; funded_iqd: number; profit_share_bps: number; loss_share_bps: number;
   units: { ordered: number; received: number; in_stock: number; in_orders: number; sold: number };
-  capital: { back_from_sales_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; held_iqd: number; loss_iqd: number };
+  capital: { back_from_sales_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; held_iqd: number; loss_iqd: number; not_recovered_iqd: number };
   profit: { earned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; held_iqd: number; sales: number; sales_unknown: number };
   held_whole: boolean; held_sales: HeldSale[]; held_sales_more: number; held_rest: HeldRest | null;
 };
 export type PersonWork = { staff_id: string; name: string; role: string; status: 'active' | 'paused' | 'archived'; start_work_date: string | null; paused_from: string | null; resumes_at: string | null; working_since: string | null; pauses: { from: string; to: string | null }[] };
 type Investor = {
   state: string; default_profit_share_bps: number | null;
-  capital: { agreed_iqd: number; put_in_iqd: number; in_agreements_iqd: number; in_goods_iqd: number; sold_held_iqd: number; at_work_iqd: number; returned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; unused_returned_iqd: number; awaiting_rest_of_funding_iqd: number; loss_iqd: number };
+  capital: { agreed_iqd: number; put_in_iqd: number; in_agreements_iqd: number; in_goods_iqd: number; sold_held_iqd: number; at_work_iqd: number; returned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; debt_iqd: number; not_recovered_iqd: number; unused_returned_iqd: number; awaiting_rest_of_funding_iqd: number; loss_iqd: number };
   profit: { earned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; held_iqd: number; debt_iqd: number };
   share: { agreements_bps: number[]; min_bps: number | null; max_bps: number | null; earned_bps: number | null };
   roi_bps: number | null;
@@ -67,7 +67,8 @@ export function CapitalBar({ capital, s }: { capital: Investor['capital']; s: Pe
   const parts = [
     { key: 'stock', label: s.inGoods, value: capital.in_goods_iqd },
     { key: 'sold', label: s.soldHeld, value: capital.sold_held_iqd },
-    { key: 'returned', label: s.returned, value: capital.returned_iqd },
+    { key: 'returned', label: s.returned, value: Math.max(0, capital.returned_iqd - capital.debt_iqd) },
+    { key: 'unrecovered', label: s.notRecovered, value: capital.not_recovered_iqd },
     { key: 'loss', label: s.capitalLoss, value: capital.loss_iqd },
   ].filter((p) => p.value > 0);
   const total = Math.max(capital.put_in_iqd, parts.reduce((n, p) => n + p.value, 0));
@@ -75,7 +76,8 @@ export function CapitalBar({ capital, s }: { capital: Investor['capital']; s: Pe
     {total > 0 && <div className="fp-capbar" aria-hidden="true">{parts.map((p) => <span key={p.key} className={`fp-capbar-${p.key}`} style={{ width: `${Math.max(1.5, (p.value / total) * 100)}%` }} />)}</div>}
     <ul className="fp-legend">{parts.map((p) => <li key={p.key}><i className={`fp-dot fp-capbar-${p.key}`} aria-hidden="true" /><span>{p.label}</span><Money value={p.value} />
       {p.key === 'returned' && capital.available_iqd > 0 && <small className="fp-row-meta">{s.availableOf}: <Money value={capital.available_iqd} /></small>}
-      {p.key === 'returned' && capital.unused_returned_iqd > 0 && <small className="fp-row-meta">{s.unusedReturned}: <Money value={capital.unused_returned_iqd} /></small>}</li>)}</ul>
+      {p.key === 'returned' && capital.unused_returned_iqd > 0 && <small className="fp-row-meta">{s.unusedReturned}: <Money value={capital.unused_returned_iqd} /></small>}</li>)}
+      {capital.debt_iqd > 0 && <li className="fp-negative"><span>{s.capitalDebt}</span><Money value={capital.debt_iqd} /></li>}</ul>
   </div>;
 }
 
@@ -90,7 +92,7 @@ function Holds({ items, s }: { items: HoldItem[]; s: PersonFinanceStrings }) {
 
 /** Why investment money is held, in words. `owner` adds amounts and what to do. */
 export function InvestmentHolds({ investor, owner, s }: { investor: Investor; owner: boolean; s: PersonFinanceStrings }) {
-  const items: HoldItem[] = investor.holds.map((h) => ({ key: h.reason, text: s.hold[h.reason](h.sales), profit: owner ? h.profit_iqd : undefined, capital: owner ? h.capital_iqd : undefined, action: owner ? s.holdAction[h.reason] : undefined }));
+  const items: HoldItem[] = investor.holds.map((h) => ({ key: h.reason, text: h.sales > 0 ? s.hold[h.reason](h.sales) : s.holdGroup[h.reason], profit: owner ? h.profit_iqd : undefined, capital: owner ? h.capital_iqd : undefined, action: owner ? s.holdAction[h.reason] : undefined }));
   const unknown = investor.holds.reduce((n, h) => n + h.profit_unknown, 0);
   if (unknown) items.push({ key: 'unknown', text: s.profitUnknown(unknown) });
   if (investor.agreements.some((a) => a.held_whole)) items.push({ key: 'whole', text: s.wholeAgreement });
@@ -175,7 +177,7 @@ function AgreementRow({ a, s, owner, openOrder }: { a: AgreementFinance; s: Pers
       {a.capital.back_from_sales_iqd > 0 && <Stat label={s.backFromSales} value={a.capital.back_from_sales_iqd} hint={a.capital.held_iqd > 0 ? <>{s.heldOf} <Money value={a.capital.held_iqd} /></> : undefined} />}
       <Stat label={s.profitEarned} value={a.profit.earned_iqd} hint={a.profit.held_iqd > 0 ? <>{s.heldOf} <Money value={a.profit.held_iqd} /></> : undefined} />
     </div>
-    {owner && (a.held_sales.length > 0 || rest) && <details className="fp-detail" open><summary>{s.heldSales} ({a.held_sales.length + a.held_sales_more + (rest?.sales ?? 0)})</summary><div className="fp-rows">
+    {owner && (a.held_sales.length > 0 || rest) && <details className="fp-detail" open><summary>{s.heldSales}{a.held_sales.length > 0 && ` (${a.held_sales.length + a.held_sales_more})`}</summary><div className="fp-rows">
       {a.held_sales.map((h) => <div className="fp-row" key={h.order_id}>
         <div className="min-w-0">{openOrder ? <button type="button" className="fp-link" onClick={() => openOrder(h.order_id)} dir="ltr">{h.order_id}</button> : <bdi dir="ltr">{h.order_id}</bdi>}
           {h.day && <span className="fp-row-meta"> · {dateLabel(h.day, lang)}</span>}
@@ -183,7 +185,7 @@ function AgreementRow({ a, s, owner, openOrder }: { a: AgreementFinance; s: Pers
         <div className="text-end">{h.profit_unknown ? <span className="fp-row-meta">{s.profitUnknown(1)}</span> : <Money value={h.profit_iqd} />}<p className="fp-row-meta">{s.capital}: <Money value={h.capital_iqd} /></p></div>
       </div>)}
       {a.held_sales_more > 0 && <p className="fp-row-meta">{s.moreSales(a.held_sales_more)}</p>}
-      {rest && <div className="fp-row"><p className="fp-row-meta min-w-0">{s.hold[rest.reason](rest.sales)}</p>
+      {rest && <div className="fp-row"><p className="fp-row-meta min-w-0">{s.holdGroup[rest.reason]}</p>
         <div className="text-end">{!!rest.profit_iqd && <Money value={rest.profit_iqd} />}{!!rest.capital_iqd && <p className="fp-row-meta">{s.capital}: <Money value={rest.capital_iqd} /></p>}</div></div>}
     </div>{a.held_whole && <p className="fp-note">{s.wholeAgreement}</p>}</details>}
   </div>;

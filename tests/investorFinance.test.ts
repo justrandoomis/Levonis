@@ -229,7 +229,11 @@ test('an investor awaiting an unrelated cost cannot stop staff reconciliation or
   assert.equal(job?.processed_orders,2,'the later known order is not starved by missing investor evidence');
   assert.equal(wage.summary.staff_iqd,5000);
   assert.equal(wage.summary.staff_available_iqd,5000);
-  assert.equal((await participantOverview(s.db,'investor')).summary.available_earnings_iqd,0);
+  // Only the unresolved sale waits (owner 2026-11-09, DECISIONS row 305): the
+  // collected, fully costed sale's 35% of 2,400 is the investor's to withdraw.
+  const investor=await participantOverview(s.db,'investor');
+  assert.equal(investor.summary.available_earnings_iqd,840);
+  assert.equal(investor.summary.investor_profit_iqd,840,'the unresolved sale adds no profit until its cost is known');
   assert.ok(count(s.raw,"SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='investor-pending:mixed-unknown'"),'the owner still sees the unresolved investor cost');
 });
 test('an investor bears only the wages assigned to the funded product, including per-order scoped pay',async()=>{

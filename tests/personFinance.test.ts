@@ -61,10 +61,10 @@ async function agreement(s: Setup, incoming: string, principal: number) {
 }
 
 /** One X2D unit from the funded lot; `extra` adds a filament line with no recorded cost; a non-delivered status leaves it on a confirmed order. */
-async function sale(s: Setup, id: string, opts: { extra?: boolean; status?: string } = {}) {
-  const total = 500 + (opts.extra ? 50 : 0), now = new Date().toISOString(), status = opts.status ?? 'delivered';
+async function sale(s: Setup, id: string, opts: { extra?: boolean; status?: string; unit?: number } = {}) {
+  const unit = opts.unit ?? 500, total = unit + (opts.extra ? 50 : 0), now = new Date().toISOString(), status = opts.status ?? 'delivered';
   s.raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at) VALUES (?,'buyer',?,'{}','standard','{}','cash',?,1500,?,?,0,?,?)`).run(id, status, total, total, total, now, status === 'delivered' ? now : null);
-  s.raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES (?,?,'x2d','X2D',1,500,500,200,'snapshot')`).run(`${id}-item`, id);
+  s.raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES (?,?,'x2d','X2D',1,?,?,200,'snapshot')`).run(`${id}-item`, id, unit, unit);
   s.raw.prepare(`INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key) VALUES (?,?,?,'lot-x2d','base','',1,200,200,?)`).run(`${id}-a0`, id, `${id}-item`, `${id}:lot-x2d`);
   s.raw.prepare("UPDATE inventory_lots SET qty_remaining=qty_remaining-1 WHERE id='lot-x2d'").run();
   if (opts.extra) s.raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_basis) VALUES (?,?,'esun','eSUN PLA+',1,50,50,'unrecorded')`).run(`${id}-esun`, id);
@@ -122,7 +122,7 @@ test('capital, share, profit, return and wages of an investor who also works, fr
   assert.equal(inv.roi_bps, Math.floor(540 * 10000 / 1300));
   const sold = inv.agreements.find((a) => a.id === x2d)!, stock = inv.agreements.find((a) => a.id === a1)!;
   assert.deepEqual(sold.units, { ordered: 5, received: 5, in_stock: 0, in_orders: 0, sold: 5 });
-  assert.equal(sold.held_whole, true, 'the uncosted sale holds the whole agreement under today\'s rule');
+  assert.equal(sold.held_whole, false, 'the uncosted sale holds only itself (DECISIONS row 305)');
   assert.deepEqual(sold.profit, { earned_iqd: 540, available_iqd: 0, reserved_iqd: 0, paid_iqd: 0, held_iqd: 540, sales: 5, sales_unknown: 1 });
   assert.deepEqual(sold.held_sales.map((h) => [h.order_id, h.reasons, h.profit_iqd, h.capital_iqd, h.profit_unknown]), [
     ['x1', ['collection'], 135, 200, false], ['x2', ['collection'], 135, 200, false], ['x3', ['collection'], 135, 200, false],
@@ -140,15 +140,16 @@ test('capital, share, profit, return and wages of an investor who also works, fr
   assert.equal(p.combined.paid_iqd + p.combined.reserved_iqd + p.combined.held_iqd + p.combined.available_earnings_iqd, p.combined.earned_iqd, 'the earnings row adds up');
 });
 
-test('recorded courier cash leaves the settled sales waiting only for the uncosted one; completing it releases everything', async () => {
+test('recorded courier cash releases the settled sales; only the uncosted one waits, and completing it releases the rest (DECISIONS row 305)', async () => {
   const { s, x2d } = await sajjadCase();
   for (const id of ['x1', 'x2', 'x3', 'x4']) { collect(s, id); await syncInvestorOrder(s.db, id); }
   let p = await personFinance(s.db, 'sajjad', { owner: true });
   let sold = p.investor!.agreements.find((a) => a.id === x2d)!;
   assert.deepEqual(sold.held_sales.map((h) => [h.order_id, h.reasons, h.capital_iqd]), [['x5', ['cost', 'collection'], 200]]);
-  assert.deepEqual(sold.held_rest, { reason: 'agreement', sales: 4, profit_iqd: 540, capital_iqd: 800 });
-  assert.equal(sold.profit.available_iqd, 0, 'today\'s rule: the whole agreement waits for the one unresolved sale');
-  assert.deepEqual(p.investor!.holds.map((h) => [h.reason, h.sales, h.profit_iqd, h.capital_iqd]), [['cost', 1, 0, 200], ['agreement', 4, 540, 800]]);
+  assert.deepEqual([sold.held_rest, sold.held_whole], [null, false], 'one unresolved sale no longer holds the whole agreement');
+  assert.deepEqual([sold.profit.available_iqd, sold.capital.available_iqd, sold.capital.held_iqd], [540, 800, 200]);
+  assert.deepEqual(p.investor!.holds.map((h) => [h.reason, h.sales, h.profit_iqd, h.capital_iqd]), [['cost', 1, 0, 200]]);
+  assert.deepEqual([p.combined.available_earnings_iqd, p.combined.available_capital_iqd], [4000 + 540, 800]);
   // The filament line gets its cost and the cash is recorded: every sale settles.
   // As in tests/investorFinance.test.ts: a zero-cost lot proves the line's cost without changing the posted COGS.
   s.raw.exec(`INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,total_cost_iqd,cost_basis,received_at) VALUES('esun-proof','esun','base','',1,0,0,0,'received','2026-10-25');
@@ -262,6 +263,77 @@ test('the owner\'s people list: every investor and employee once, owner-only, sa
   const audit = count(s.raw, 'SELECT COUNT(*) n FROM audit_log');
   assert.equal((await get(s.self, '/a/people')).status, 403);
   assert.equal(count(s.raw, 'SELECT COUNT(*) n FROM audit_log'), audit);
+});
+
+test('a cancelled order\'s restocked unit is back in stock, not «on an undelivered order» (second review 1)', async () => {
+  const s = setup();
+  await agreement(s, 'inc-x2d', 1000);
+  await sale(s, 'shipped', { status: 'shipped' });
+  await sale(s, 'cancelled', { status: 'shipped' });
+  // A cancellation restocks through a separate release row; the original allocation stays as it was.
+  s.raw.exec(`UPDATE orders SET status='cancelled' WHERE id='cancelled';
+    INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,released_at,idempotency_key) VALUES ('cancelled-release','cancelled','cancelled-item','lot-x2d','base','',1,200,200,'2026-11-09T10:00:00Z','cancelled:release');
+    UPDATE inventory_lots SET qty_remaining=qty_remaining+1 WHERE id='lot-x2d';`);
+  const p = await personFinance(s.db, 'sajjad', { owner: true });
+  assert.deepEqual(p.investor!.units, { ordered: 5, received: 5, in_stock: 4, in_orders: 1, sold: 0 });
+});
+
+test('held money goes to the sale that was never paid, not to a paid one being redone (second review 2)', async () => {
+  const s = setup();
+  const c = await agreement(s, 'inc-x2d', 1000);
+  await sale(s, 'x1'); collect(s, 'x1'); await syncInvestorOrder(s.db, 'x1');
+  withdrawal(s, 'w1', 'paid', [['investor_profit', `invprofit:${c}`, 135, 135], ['investor_capital', `invcapital:${c}`, 200, 200]]);
+  await sale(s, 'x2'); await syncInvestorOrder(s.db, 'x2');
+  s.raw.exec("INSERT INTO finance_posting_errors(event_key,order_id,message,last_attempt_at) VALUES ('delivered:x1','x1','retry','2026-11-09')");
+  const a = (await personFinance(s.db, 'sajjad', { owner: true })).investor!.agreements[0];
+  assert.deepEqual([a.profit.held_iqd, a.capital.held_iqd], [135, 200]);
+  assert.deepEqual(a.held_sales.map((h) => [h.order_id, h.reasons, h.profit_iqd, h.capital_iqd]), [['x2', ['collection'], 135, 200]]);
+});
+
+test('capital paid beyond what is recovered is owed back, and the goods are not reduced by it (second review 4)', async () => {
+  const s = setup();
+  const c = await agreement(s, 'inc-x2d', 1000);
+  await sale(s, 'x1'); collect(s, 'x1'); await syncInvestorOrder(s.db, 'x1');
+  withdrawal(s, 'w1', 'paid', [['investor_capital', `invcapital:${c}`, 400, 400]]);
+  const k = (await personFinance(s.db, 'sajjad', { owner: true })).investor!.capital;
+  assert.deepEqual({ goods: k.in_goods_iqd, returned: k.returned_iqd, debt: k.debt_iqd, sold: k.sold_held_iqd }, { goods: 800, returned: 400, debt: 200, sold: 0 });
+  assert.equal(k.in_goods_iqd + k.sold_held_iqd + (k.returned_iqd - k.debt_iqd) + k.loss_iqd + k.not_recovered_iqd, k.put_in_iqd);
+});
+
+test('principal a below-cost sale did not bring back is shown apart, beyond the loss the investor bears (second review 5)', async () => {
+  for (const [lossShare, notRecovered, loss] of [[0, 50, 0], [10000, 0, 50]] as const) {
+    const s = setup();
+    const body = { operation_id: crypto.randomUUID(), incoming_id: 'inc-x2d', user_id: 'sajjad', name: 'X2D', principal_iqd: 1000, capital_share_bps: 10000, profit_share_bps: 4500, loss_share_bps: lossShare };
+    assert.equal((await post(s.owner, '/i/contracts', body)).status, 200);
+    assert.equal((await post(s.owner, `/i/contracts/${body.operation_id}/funding`, { operation_id: crypto.randomUUID(), amount_iqd: 1000, payment_day: baghdadDay(), reference: 'cash' })).status, 200);
+    await sale(s, 'below', { unit: 150 }); collect(s, 'below', 150); await syncInvestorOrder(s.db, 'below');
+    const k = (await personFinance(s.db, 'sajjad', { owner: true })).investor!.capital;
+    assert.deepEqual({ goods: k.in_goods_iqd, notRecovered: k.not_recovered_iqd, loss: k.loss_iqd, returned: k.returned_iqd }, { goods: 800, notRecovered, loss, returned: 150 }, `loss share ${lossShare}`);
+    assert.equal(k.in_goods_iqd + k.sold_held_iqd + (k.returned_iqd - k.debt_iqd) + k.loss_iqd + k.not_recovered_iqd, k.put_in_iqd);
+  }
+});
+
+test('one agreement\'s overpayment nets against another\'s held money: the reasons never exceed the person\'s total (second review 6)', async () => {
+  const s = setup();
+  const a = await agreement(s, 'inc-x2d', 1000);
+  s.raw.exec(`INSERT INTO incoming_inventory(id,product_id,scope,scope_id,qty_ordered,qty_received,purchase_unit_iqd,shipping_total_iqd,internal_delivery_total_iqd,supplier_id,status,created_by) VALUES ('inc-b','x2d','base','',5,5,200,0,0,'supplier','received','admin');
+    INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,total_cost_iqd,cost_basis,received_at,incoming_id,supplier_id) VALUES ('lot-b','x2d','base','',5,5,200,1000,'received','2026-10-12','inc-b','supplier');`);
+  await agreement(s, 'inc-b', 1000);
+  await sale(s, 'xa'); collect(s, 'xa'); await syncInvestorOrder(s.db, 'xa');
+  withdrawal(s, 'w1', 'paid', [['investor_profit', `invprofit:${a}`, 170, 170]]);
+  // A second sale from lot-b, then redone.
+  const now = new Date().toISOString();
+  s.raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at) VALUES ('xb','buyer','delivered','{}','standard','{}','cash',500,1500,500,500,0,?,?)`).run(now, now);
+  s.raw.exec(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES ('xb-item','xb','x2d','X2D',1,500,500,200,'snapshot');
+    INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key) VALUES ('xb-a0','xb','xb-item','lot-b','base','',1,200,200,'xb:lot-b');
+    UPDATE inventory_lots SET qty_remaining=qty_remaining-1 WHERE id='lot-b';`);
+  await s.db.batch([...journalPlan(s.db, { key: 'sale:xb', day: baghdadDay(), title: 'Sale', source: 'order', sourceId: 'xb', actor: 'admin' }, [{ account: '1100', debit: 500 }, { account: '4000', credit: 500 }]).statements,
+    ...journalPlan(s.db, { key: 'cogs:xb', day: baghdadDay(), title: 'COGS', source: 'order', sourceId: 'xb', actor: 'admin' }, [{ account: '5000', debit: 200 }, { account: '1200', credit: 200 }]).statements]);
+  collect(s, 'xb'); await syncInvestorOrder(s.db, 'xb');
+  s.raw.exec("INSERT INTO finance_posting_errors(event_key,order_id,message,last_attempt_at) VALUES ('delivered:xb','xb','retry','2026-11-09')");
+  const inv = (await personFinance(s.db, 'sajjad', { owner: true })).investor!;
+  assert.equal(inv.profit.held_iqd, 270 - 170);
+  assert.equal(inv.holds.reduce((n, h) => n + (h.profit_iqd ?? 0), 0), inv.profit.held_iqd);
 });
 
 test('work status follows the saved pause intervals, including a scheduled resumption', () => {

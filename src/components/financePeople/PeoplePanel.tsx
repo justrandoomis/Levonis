@@ -1,4 +1,4 @@
-import StaffBalanceBreakdown, { type StaffBalance } from './StaffBalanceBreakdown';
+import StaffBalanceBreakdown, { wagesWaiting, type StaffBalance } from './StaffBalanceBreakdown';
 import { useEffect, useRef, useState } from 'react';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { Check, Pencil, Plus, RotateCcw, Trash2, Users, X } from 'lucide-react';
@@ -115,7 +115,7 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
               <div className="fp-stat"><span>{s.wagesEarned}</span><Money value={person.balance.staff_iqd ?? null} /></div>
               <div className="fp-stat"><span>{s.wagesPaid}</span><Money value={person.balance.staff_paid_iqd ?? null} /></div>
               <div className={`fp-stat${person.balance.staff_available_iqd > 0 ? ' fp-stat-good' : ''}`}><span>{s.availableNow}</span><Money value={person.balance.staff_available_iqd} /></div>
-              {!!person.balance.staff_pending_settlement_reserve_iqd && <div className="fp-stat fp-stat-wait"><span>{s.wagesHeld}</span><Money value={person.balance.staff_pending_settlement_reserve_iqd} /></div>}
+              {wagesWaiting(person.balance) > 0 && <div className="fp-stat fp-stat-wait"><span>{s.wagesHeld}</span><Money value={wagesWaiting(person.balance)} /></div>}
               {!!person.balance.staff_debt_iqd && <div className="fp-stat"><span>{loc('الدين المتبقي', 'Remaining debt', 'قەرزی ماوە')}</span><Money value={person.balance.staff_debt_iqd} /></div>}
             </div>}
             {pf?.work && <WorkHolds work={pf.work} owner s={s} />}

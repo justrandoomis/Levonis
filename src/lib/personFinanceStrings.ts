@@ -66,6 +66,10 @@ export interface PersonFinanceStrings {
   unitsLine: (stock: number, orders: number, sold: number, notReceived: number) => string;
   moreSales: (n: number) => string;
   hold: Record<HoldReasonKey, (n: number) => string>;
+  /** The same reasons for a group of settled sales, without a count. */
+  holdGroup: Record<HoldReasonKey, string>;
+  capitalDebt: string;
+  notRecovered: string;
   holdAction: Partial<Record<HoldReasonKey, string>>;
   wageAction: Partial<Record<HoldReasonKey, string>>;
   wageHold: Partial<Record<HoldReasonKey, (n: number) => string>>;
@@ -138,6 +142,16 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
       cancelled: ar('بيع واحد أُلغي بعد التسليم', 'مبيعات أُلغيت بعد التسليم'),
       funding: () => 'تمويل الاتفاق لم يكتمل بعد',
     },
+    holdGroup: {
+      collection: 'مبيعات تنتظر تسجيل استلام نقد المندوب',
+      cost: 'مبيعات تنقصها تكلفة البضاعة',
+      agreement: 'رأس مال مبيعات مكتملة ينتظر بيعًا آخر في الاتفاق نفسه',
+      recalculation: 'مبيعات يُعاد حسابها الآن',
+      cancelled: 'مبيعات أُلغيت بعد التسليم',
+      funding: 'تمويل الاتفاق لم يكتمل بعد',
+    },
+    capitalDebt: 'دين رأس مال: سُحب أكثر مما استُرد الآن',
+    notRecovered: 'لم يُسترد من مبيعات بأقل من التكلفة',
     holdAction: {
       collection: 'يُسجَّل من «المالية ← التحصيل وشركات التوصيل».',
       cost: 'تُدخل التكلفة من تفاصيل الطلب أو دفعة المخزون.',
@@ -155,7 +169,7 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
       recalculation: ar('أجر يُعاد حسابه', 'أجور يُعاد حسابها'),
     },
     profitUnknown: ar('ربح بيع واحد لم يُحسب بعد', 'أرباح مبيعات لم تُحسب بعد'),
-    wholeAgreement: 'بالقاعدة الحالية يبقى الاتفاق كله محجوزًا حتى يُحل هذا البيع.',
+    wholeAgreement: 'رأس مال هذا الاتفاق يتحمّل الخسارة، فيبقى كله محجوزًا حتى يُحل هذا البيع.',
   },
   en: {
     peopleHint: 'For each person: their capital and where it is now, their profit share, what they earned from investing and working, and what they can withdraw now.',
@@ -217,6 +231,16 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
       cancelled: en('sale', 'cancelled after delivery'),
       funding: () => 'Agreement funding not complete yet',
     },
+    holdGroup: {
+      collection: 'Sales waiting for the courier cash to be recorded',
+      cost: 'Sales missing a cost of goods',
+      agreement: 'Capital of settled sales waiting for another sale in the same agreement',
+      recalculation: 'Sales being recalculated',
+      cancelled: 'Sales cancelled after delivery',
+      funding: 'Agreement funding not complete yet',
+    },
+    capitalDebt: 'Capital owed back: more withdrawn than is recovered now',
+    notRecovered: 'Not recovered from sales below cost',
     holdAction: {
       collection: 'Recorded in Finance → Collections and couriers.',
       cost: 'Enter the cost in the order details or the stock batch.',
@@ -234,7 +258,7 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
       recalculation: en('wage', 'being recalculated'),
     },
     profitUnknown: (n) => `Profit of ${n} sale${n === 1 ? '' : 's'} not calculated yet`,
-    wholeAgreement: 'Under the current rule the whole agreement stays held until this sale is resolved.',
+    wholeAgreement: 'This agreement\'s capital shares losses, so all of it waits until this sale is resolved.',
   },
   ckb: {
     peopleHint: 'بۆ هەر کەسێک: سەرمایەکەی و ئێستا لە کوێیە، بەشی قازانجەکەی، ئەوەی لە وەبەرهێنان و کار بەدەستی هێناوە، و ئەوەی ئێستا دەتوانێت ڕایبکێشێت.',
@@ -296,6 +320,16 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
       cancelled: (n) => `${n} فرۆشتن دوای گەیاندن هەڵوەشێنرایەوە`,
       funding: () => 'پارەدارکردنی ڕێککەوتنەکە هێشتا تەواو نەبووە',
     },
+    holdGroup: {
+      collection: 'فرۆشتنەکان چاوەڕێی تۆمارکردنی وەرگرتنی پارەی گەیەنەرن',
+      cost: 'فرۆشتنەکان تێچووی کاڵایان تەواو نییە',
+      agreement: 'سەرمایەی فرۆشتنە تەواوەکان چاوەڕێی فرۆشتنێکی تری هەمان ڕێککەوتنە',
+      recalculation: 'فرۆشتنەکان ئێستا دووبارە حیساب دەکرێنەوە',
+      cancelled: 'فرۆشتنەکان دوای گەیاندن هەڵوەشێنرانەوە',
+      funding: 'پارەدارکردنی ڕێککەوتنەکە هێشتا تەواو نەبووە',
+    },
+    capitalDebt: 'قەرزی سەرمایە: زیاتر لەوەی ئێستا گەڕاوەتەوە ڕاکێشراوە',
+    notRecovered: 'لە فرۆشتنی خوار تێچوو نەگەڕاوەتەوە',
     holdAction: {
       collection: 'لە «دارایی ← کۆکردنەوەی پارە و گەیەنەرەکان» تۆمار دەکرێت.',
       cost: 'تێچووەکە لە وردەکاریی داواکارییەکە یان لە بەشی کۆگا دەنووسرێت.',
@@ -313,7 +347,7 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
       recalculation: (n) => `${n} کرێ دووبارە حیساب دەکرێتەوە`,
     },
     profitUnknown: (n) => `قازانجی ${n} فرۆشتن هێشتا حیساب نەکراوە`,
-    wholeAgreement: 'بەپێی یاسای ئێستا هەموو ڕێککەوتنەکە ڕادەگیرێت تا ئەم فرۆشتنە چارەسەر دەکرێت.',
+    wholeAgreement: 'سەرمایەی ئەم ڕێککەوتنە بەشداری زیان دەکات، بۆیە هەمووی ڕادەگیرێت تا ئەم فرۆشتنە چارەسەر دەکرێت.',
   },
 };
 

@@ -6,6 +6,10 @@ export type StaffBalance = {
   advance_balance_iqd?: number;
 };
 
+/** Wages earned and not yet paid, reserved or withdrawable: the same «waiting» the person picture shows
+ * (worker/lib/personFinance.ts). A paid wage whose order is later redone is not waiting. */
+export const wagesWaiting = (b: StaffBalance) => Math.max(0, (b.staff_iqd ?? 0) - (b.staff_paid_iqd ?? 0) - (b.staff_held_iqd ?? 0) - b.staff_available_iqd);
+
 export default function StaffBalanceBreakdown({ balance }: { balance: StaffBalance }) {
   const { loc } = useLanguage();
   // Optional during an asset/worker rollout; never print a missing field as 0.
@@ -14,7 +18,7 @@ export default function StaffBalanceBreakdown({ balance }: { balance: StaffBalan
     [loc('إجمالي المستحقات المحسوبة', 'Total calculated earnings', 'کۆی شایستە ژمێردراوەکان'), balance.staff_iqd],
     [loc('إجمالي المدفوعات والسلف', 'Total payments and advances', 'کۆی پارەدان و پێشەکییەکان'), balance.staff_paid_iqd],
     [loc('من المدفوعات: سلف لم تُسوّ بعد', 'Of payments: unsettled advances', 'لە پارەدانەکان: پێشەکیی یەکلانەکراوە'), balance.advance_balance_iqd],
-    [loc('موقوف لحين اكتمال الحساب', 'Held pending calculation', 'ڕاگیراو تا تەواوبوونی ژمێریاری'), balance.staff_pending_settlement_reserve_iqd],
+    [loc('موقوف لحين اكتمال الحساب', 'Held pending calculation', 'ڕاگیراو تا تەواوبوونی ژمێریاری'), wagesWaiting(balance)],
     [loc('محجوز لطلبات السحب', 'Reserved for withdrawals', 'گیراو بۆ داواکاریی ڕاکێشان'), balance.staff_held_iqd],
   ] as const;
   return <details className="fp-detail"><summary>{loc('مطابقة الرصيد التراكمي', 'Reconcile cumulative balance', 'پشکنینی کۆی باڵانس')}</summary>

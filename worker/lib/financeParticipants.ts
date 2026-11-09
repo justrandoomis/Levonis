@@ -1,7 +1,7 @@
 import { investorAccountProgress } from './financeInvestorAccount';
 import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 import { reconcileEffectiveWages } from './financeWageCalculation';
-import { investorProjectionStaleSql } from './investorFinance';
+import { investorHeldPartSql, investorWholeHoldSql } from './investorFinance';
 import { getOrderProfitBase } from './orderProfit';
 import { participantNetFingerprintSql, participantNetProfit } from './participantProfit';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
@@ -14,7 +14,7 @@ import { auditStatements } from './audit';
 import { notifyStatement } from './notifications';
 import { PRIVATE_DELEGATION_ENABLED, canViewCost, isOwner } from './adminScope';
 import type { Env, SessionUser } from './types';
-import { employmentInstalled, investorEmploymentPendingSql, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
+import { employmentInstalled, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
 import { inactiveAtSql } from './financeEmploymentIntervals';
 import { SURPLUS_PREFIX, SURPLUS_ROWS_SQL, surplusInstalled } from './investorSurplus';
 
@@ -59,7 +59,12 @@ export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id'
 
 const pendingPaymentCoverSql=(cost='c.id')=>`COALESCE((SELECT MIN(${staffPaidSql(cost)},COALESCE(t.amount_iqd,0)) FROM finance_wage_pending_targets t JOIN finance_wage_changes wc ON wc.id=t.change_id JOIN finance_order_costs ec ON ec.id=t.cost_id JOIN finance_staff_reconciliations j ON j.staff_id=ec.staff_id AND j.operation_id=t.change_id WHERE t.cost_id=${cost} AND j.state<>'complete' AND ec.order_id>j.cursor ORDER BY wc.created_at DESC LIMIT 1),0)`;
 
-const investorReconciliationBlockedSql=(contractSql='e.contract_id')=>`(${investorEmploymentPendingSql(contractSql)} OR ${investorProjectionStaleSql(contractSql)} OR EXISTS(SELECT 1 FROM finance_posting_errors pe JOIN order_item_inventory_allocations ia ON ia.order_id=pe.order_id JOIN inventory_lots il ON il.id=ia.lot_id JOIN investment_contracts ic ON ic.incoming_id=il.incoming_id WHERE ic.id=${contractSql}))`;
+// ONE UNRESOLVED SALE HOLDS ONLY ITSELF (owner 2026-11-09; DECISIONS row 305).
+// A sale being redone (stale projection, posting error, wage job) holds its own
+// eligible amount; only a loss-sharing contract's capital still waits as a
+// whole. The page and the payout fence read these same two expressions.
+const investorAmountSql=`MAX(0,e.amount_iqd-${investorHeldPartSql()})`;
+const investorBlockedSql=investorWholeHoldSql();
 const active = (state: string) => ['requested', 'approved', 'part_paid'].includes(state);
 /**
  * THE INVESTMENT REMAINDER IN «أرباحي» (worker/lib/investorSurplus.ts): returned
@@ -83,8 +88,8 @@ export async function participantSources(db: D1Database, userId: string, scope: 
     ORDER BY c.cost_day,c.id`).bind(userId).all<ParticipantSource>();
   let sources = staff.results ?? [];
   if (installed && scope === 'account') {
-    const investor = await db.prepare(`SELECT e.id,e.kind,e.title,e.order_id,e.day,e.amount_iqd,e.accrued_iqd,
-      ${paidSourceSql('e.kind', 'e.id')} AS paid_iqd,${heldSourceSql('e.kind', 'e.id')} AS held_iqd,e.state,e.version,${investorReconciliationBlockedSql()} AS blocked,
+    const investor = await db.prepare(`SELECT e.id,e.kind,e.title,e.order_id,e.day,${investorAmountSql} AS amount_iqd,e.accrued_iqd,
+      ${paidSourceSql('e.kind', 'e.id')} AS paid_iqd,${heldSourceSql('e.kind', 'e.id')} AS held_iqd,e.state,e.version,${investorBlockedSql} AS blocked,
       CASE WHEN e.state='available' THEN 1 ELSE 0 END AS eligible
       FROM finance_investor_earnings e WHERE e.user_id=? ORDER BY e.day,e.id`).bind(userId).all<ParticipantSource>();
     sources = [...sources, ...(investor.results ?? [])];
@@ -246,7 +251,7 @@ async function sourceSetFence(db: D1Database, userId: string, sources: Participa
   const staffSql=`SELECT c.id AS id,'staff' AS kind,COALESCE(${effectiveStaffCostSql()},0) AS amount,${pendingPaymentCoverSql()} AS cover,${staffPaidSql()} AS paid,${heldSourceSql("'staff'",'c.id')} AS held,c.state,${staffReconciliationBlockedSql('c.order_id','c.id',!!investorInstalled)} AS blocked,
     (SELECT COUNT(*) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id) AS version
     FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id WHERE ${scope==='staff'?'s.id':'s.user_id'}=? AND c.state<>'reversed'`;
-  const investorSql=`SELECT e.id,e.kind,e.amount_iqd AS amount,0 AS cover,${paidSourceSql('e.kind','e.id')} AS paid,${heldSourceSql('e.kind','e.id')} AS held,e.state,${investorReconciliationBlockedSql()} AS blocked,e.version FROM finance_investor_earnings e WHERE e.user_id=?`;
+  const investorSql=`SELECT e.id,e.kind,${investorAmountSql} AS amount,0 AS cover,${paidSourceSql('e.kind','e.id')} AS paid,${heldSourceSql('e.kind','e.id')} AS held,e.state,${investorBlockedSql} AS blocked,e.version FROM finance_investor_earnings e WHERE e.user_id=?`;
   const expected=JSON.stringify([...sources].sort((a,b)=>a.kind===b.kind?(a.id<b.id?-1:a.id>b.id?1:0):(a.kind<b.kind?-1:1)).map((s)=>[s.id,s.kind,s.amount_iqd,s.paid_iqd,s.held_iqd,s.state,s.version,s.blocked?1:0,s.pending_payment_cover_iqd??0]));
   // One snapshot fence covers both changed rows and newly added sources. A
   // large staff history does not turn one payout into thousands of queries.

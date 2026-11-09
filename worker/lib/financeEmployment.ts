@@ -17,12 +17,15 @@ export const publicReconciliation=(job:StaffReconciliation|null)=>job?{staff_id:
 export const employmentInstalled=(db:D1Database)=>db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_staff_reconciliations'").first();
 /** A queued retrospective wage can alter both investor profit and, for
  * loss-sharing contracts, recovered principal. Read and payout fences share
- * this predicate so a job created after the balance read also invalidates it. */
-export const investorEmploymentPendingSql=(contractSql='e.contract_id',kindSql='e.kind')=>`EXISTS(
+ * this predicate so a job created after the balance read also invalidates it.
+ * With `orderSql`, only that order of the contract is asked about: a job holds
+ * the money of the sales it may still change, not the whole agreement
+ * (DECISIONS row 305). */
+export const investorEmploymentPendingSql=(contractSql='e.contract_id',kindSql='e.kind',orderSql?:string)=>`EXISTS(
   SELECT 1 FROM investment_contracts ec JOIN inventory_lots el ON el.incoming_id=ec.incoming_id
   JOIN order_item_inventory_allocations ea ON ea.lot_id=el.id JOIN orders eo ON eo.id=ea.order_id
   JOIN finance_staff_reconciliations ej JOIN finance_staff es ON es.id=ej.staff_id
-  WHERE ec.id=${contractSql} AND ej.state<>'complete' AND eo.id>ej.cursor AND (ej.affected_from IS NULL OR date(eo.delivered_at,'+3 hours')>=ej.affected_from) AND (ej.affected_until IS NULL OR date(eo.delivered_at,'+3 hours')<ej.affected_until)
+  WHERE ec.id=${contractSql}${orderSql?` AND eo.id=${orderSql}`:''} AND ej.state<>'complete' AND eo.id>ej.cursor AND (ej.affected_from IS NULL OR date(eo.delivered_at,'+3 hours')>=ej.affected_from) AND (ej.affected_until IS NULL OR date(eo.delivered_at,'+3 hours')<ej.affected_until)
   AND (${kindSql}='investor_profit' OR ec.loss_share_bps>0 OR EXISTS(SELECT 1 FROM finance_withdrawal_allocations pa WHERE pa.source_id='invprofit:'||ec.id AND pa.source_kind='investor_profit' AND pa.paid_iqd>0))
   AND (EXISTS(SELECT 1 FROM finance_order_costs cost WHERE cost.order_id=eo.id AND cost.staff_id=es.id AND cost.state<>'reversed')
     OR (es.start_work_date IS NOT NULL AND eo.status='delivered' AND date(eo.delivered_at,'+3 hours')>es.start_work_date

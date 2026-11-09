@@ -135,3 +135,4 @@
   .fp-person .fp-stat .fp-money, .fp-person .fp-big { font-size:16px; }
   .fp-person-combined>.fp-stat:first-child { grid-column:1 / -1; }
 }
+.fp-capbar-unrecovered { background:var(--ap-danger); opacity:.55; }
