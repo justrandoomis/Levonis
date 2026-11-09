@@ -84,6 +84,8 @@ test('the three screens draw the one-person card, and the old capital grid is go
   // What can be withdrawn now sits right under the card; the older figures are details.
   assert.ok(own.indexOf('<PersonCard ') < own.indexOf('fp-hero') && own.indexOf('fp-hero') < own.indexOf('<EarningsSources '));
   const view = codeOf('src/components/financePeople/PersonFinanceView.tsx');
+  // Any debt the server reports is drawn (profit, wages, capital) — the old grid showed them (final review).
+  for (const debt of [/s\.profitDebt/, /s\.wageDebt/, /s\.capitalDebt/]) assert.match(view, debt);
   // The person's own page never offers the owner's actions or order links.
   assert.match(view, /owner=\{!own\}/);
   assert.match(view, /owner \? s\.holdAction\[h\.reason\] : undefined/);

@@ -1,6 +1,4 @@
 import { participantAdvanceState, participantSources, participantSummary, participantWithdrawableSources, type ParticipantSource } from './financeParticipants';
-import { investorProjectionStaleSql } from './investorFinance';
-import { employmentInstalled, investorEmploymentPendingSql } from './financeEmployment';
 import { inactiveAt, type EmploymentInterval } from './financeEmploymentIntervals';
 import { PENDING_SURPLUS_SQL, SURPLUS_PREFIX, surplusInstalled } from './investorSurplus';
 import { investorReportedAllocationsSql } from './investorCapitalReporting';
@@ -140,7 +138,7 @@ export function workStatus(staff: { archived_at: string | null; active: number; 
 
 type Contract = { id: string; name: string; incoming_id: string; principal_iqd: number; profit_share_bps: number; loss_share_bps: number; created_at: string; qty_ordered: number; qty_received: number; product_name: string | null; product_name_ar: string | null; label: string | null; funded_iqd: number; in_stock: number; loss_iqd: number };
 type SaleRow = { contract_id: string; order_id: string; status: string; day: string | null; profit: number; capital: number; pending: number; eligible: number; collected: number; cost_error: number; other_error: number };
-type Totals = { contract_id: string; sales: number; sales_unknown: number; sold: number; basis: number; earned_known: number; shortfall: number };
+type Totals = { contract_id: string; sales: number; sales_unknown: number; sold: number; basis: number; earned_known: number; shortfall: number; sale_loss: number };
 
 /** Spread `total` over `items` in order, each up to its own amount. */
 function spread<T>(items: T[], own: (x: T) => number, total: number) {
@@ -170,7 +168,8 @@ async function investorPart(db: D1Database, userId: string, sources: Participant
         -- Principal a settled sale did not bring back (sold below cost): its
         -- assigned principal less what it recovered (investorOrderSplit's rule).
         COALESCE(SUM(CASE WHEN r.pending=1 THEN 0 ELSE MAX(0,COALESCE(lc.unit_principal_iqd*COALESCE(json_extract(r.snapshot,'$.qty'),0),
-          CAST(COALESCE(json_extract(r.snapshot,'$.cost'),0)*c.capital_share_bps/10000 AS INTEGER))-r.capital_iqd) END),0) AS shortfall
+          CAST(COALESCE(json_extract(r.snapshot,'$.cost'),0)*c.capital_share_bps/10000 AS INTEGER))-r.capital_iqd) END),0) AS shortfall,
+        COALESCE(SUM(r.loss_iqd),0) AS sale_loss
       FROM investor_allocation_results r JOIN investment_contracts c ON c.id=r.contract_id JOIN order_item_inventory_allocations a ON a.id=r.allocation_id
       LEFT JOIN purchase_investor_lot_capital lc ON lc.lot_id=a.lot_id AND lc.contract_id=r.contract_id
       WHERE c.user_id=? AND c.state='active' GROUP BY r.contract_id`).bind(userId).all<Totals>().then((r) => r.results ?? []),
@@ -193,19 +192,26 @@ async function investorPart(db: D1Database, userId: string, sources: Participant
       WHERE c.user_id=? AND c.state='active' AND a.released_at IS NULL AND o.status NOT IN ('delivered','cancelled')
         AND NOT EXISTS(SELECT 1 FROM investor_allocation_results r WHERE r.allocation_id=a.id AND r.contract_id=c.id) GROUP BY c.id`).bind(userId).all<{ contract_id: string; qty: number }>().then((r) => r.results ?? []),
   ]) : [[], [], []] as [Totals[], SaleRow[], { contract_id: string; qty: number }[]];
-  const employment = await employmentInstalled(db);
+  // The person's real held totals come from the ledgers, which net one
+  // agreement's overpayment against another's money; each agreement's row
+  // takes its share of them in order, so no row shows more than the card.
+  const capitalLedger = summary.ledgers.investor_capital, profitLedger = summary.ledgers.investor_profit;
+  const profitHeld = unpaid(summary.investor_profit_iqd, profitLedger.paid_iqd, profitLedger.held_iqd, profitLedger.available_iqd);
+  const capitalHeld = unpaid(summary.capital_iqd, capitalLedger.paid_iqd, capitalLedger.held_iqd, capitalLedger.available_iqd);
+  let profitLeft = profitHeld, capitalLeft = capitalHeld;
 
   const agreements: AgreementFinance[] = [];
   /** Every held sale with its share of the unpaid amount, before the owner list is capped. */
   const listedBy = new Map<string, HeldSale[]>();
   for (const c of contracts) {
-    const t = totals.find((x) => x.contract_id === c.id) ?? { sales: 0, sales_unknown: 0, sold: 0, basis: 0, earned_known: 0, shortfall: 0 };
+    const t = totals.find((x) => x.contract_id === c.id) ?? { sales: 0, sales_unknown: 0, sold: 0, basis: 0, earned_known: 0, shortfall: 0, sale_loss: 0 };
     const profitSource = sources.find((s) => s.id === `invprofit:${c.id}`), capitalSource = sources.find((s) => s.id === `invcapital:${c.id}`);
-    const money = (s: ParticipantSource | undefined, id: string) => {
+    const money = (s: ParticipantSource | undefined, id: string, left: number) => {
       const earned = s?.accrued_iqd ?? 0, paid = s?.paid_iqd ?? 0, reserved = s?.held_iqd ?? 0, available = budgets.get(id) ?? 0;
-      return { earned, paid, reserved, available, held: unpaid(earned, paid, reserved, available) };
+      return { earned, paid, reserved, available, held: Math.min(left, unpaid(earned, paid, reserved, available)) };
     };
-    const profit = money(profitSource, `invprofit:${c.id}`), capital = money(capitalSource, `invcapital:${c.id}`);
+    const profit = money(profitSource, `invprofit:${c.id}`, profitLeft), capital = money(capitalSource, `invcapital:${c.id}`, capitalLeft);
+    profitLeft -= profit.held; capitalLeft -= capital.held;
     const own = saleRows.filter((r) => r.contract_id === c.id).map((r) => {
       const reasons: HoldReason[] = [];
       if (r.status !== 'delivered') reasons.push('cancelled');
@@ -225,21 +231,13 @@ async function investorPart(db: D1Database, userId: string, sources: Participant
     const restProfit = profit.held - sum(ownProfit, (n) => n), restCapital = capital.held - sum(ownCapital, (n) => n);
     // One unresolved sale holds only itself (DECISIONS row 305). The one whole
     // hold left: a loss-sharing contract's capital, while any sale is unresolved.
-    const blocked = !!profitSource?.blocked || !!capitalSource?.blocked;
     const unresolved = own.some((r) => r.reasons.some((x) => x === 'cost' || x === 'cancelled' || x === 'recalculation'));
     const heldWhole = !!capitalSource?.blocked && c.loss_share_bps > 0 && unresolved && capital.held > 0;
-    // Settled sales still waiting as a group: why?
-    let restReason: HoldReason | null = null;
-    if (restProfit > 0 || restCapital > 0) {
-      if (c.funded_iqd < c.principal_iqd) restReason = 'funding';
-      else if (heldWhole) restReason = 'agreement';
-      else {
-        // Unexplained by any sale: a recalculation is under way. Ask only now (one read each).
-        const stale = !!(await db.prepare(`SELECT ${investorProjectionStaleSql('?1')} AS n`).bind(c.id).first<{ n: number }>())?.n;
-        const wages = employment && !!(await db.prepare(`SELECT ${investorEmploymentPendingSql('?', "'investor_profit'")} AS n`).bind(c.id).first<{ n: number }>())?.n;
-        restReason = stale || wages || blocked ? 'recalculation' : own.length ? 'agreement' : 'recalculation';
-      }
-    }
+    // Settled sales still waiting as a group: unfunded agreement, the
+    // loss-sharing capital hold, or else a sale being redone (a stale
+    // projection or a wage job, which no sale row names).
+    const restReason: HoldReason | null = restProfit > 0 || restCapital > 0
+      ? (c.funded_iqd < c.principal_iqd ? 'funding' : heldWhole ? 'agreement' : 'recalculation') : null;
     const listed = own.map((r, i) => ({ order_id: r.order_id, day: r.day, reasons: r.reasons, profit_iqd: ownProfit[i], capital_iqd: ownCapital[i], profit_unknown: r.pending === 1 }))
       .filter((h) => h.profit_iqd > 0 || h.capital_iqd > 0 || h.profit_unknown || h.reasons.includes('cancelled'));
     agreements.push({
@@ -247,7 +245,8 @@ async function investorPart(db: D1Database, userId: string, sources: Participant
       principal_iqd: c.principal_iqd, funded_iqd: c.funded_iqd, profit_share_bps: c.profit_share_bps, loss_share_bps: c.loss_share_bps,
       units: { ordered: c.qty_ordered, received: c.qty_received, in_stock: c.in_stock, in_orders: inOrders.find((x) => x.contract_id === c.id)?.qty ?? 0, sold: t.sold },
       capital: { back_from_sales_iqd: capital.earned, available_iqd: capital.available, reserved_iqd: capital.reserved, paid_iqd: capital.paid, held_iqd: capital.held, loss_iqd: c.loss_iqd,
-        not_recovered_iqd: Math.max(0, t.shortfall - c.loss_iqd) },
+        // A physical write-off is part of the loss account too; only the loss the sales themselves carried offsets their shortfall.
+        not_recovered_iqd: Math.max(0, t.shortfall - Math.min(c.loss_iqd, t.sale_loss)) },
       profit: { earned_iqd: profit.earned, available_iqd: profit.available, reserved_iqd: profit.reserved, paid_iqd: profit.paid, held_iqd: profit.held, sales: t.sales, sales_unknown: t.sales_unknown },
       held_whole: heldWhole,
       held_sales: owner ? listed.slice(0, HELD_SALES_LISTED) : [],
@@ -264,18 +263,19 @@ async function investorPart(db: D1Database, userId: string, sources: Participant
       ${purchases ? 'COALESCE((SELECT SUM(agreed_iqd) FROM purchase_investor_agreements WHERE user_id=?1),0)' : '0'} AS purchase_agreed`).bind(userId).first<{ funded: number; direct_agreed: number; purchase_agreed: number }>();
   const unused = sum(surplusRows, (s) => s.accrued_iqd);
   const awaitingRest = await surplusInstalled(db) ? (await db.prepare(PENDING_SURPLUS_SQL).bind(userId).first<{ n: number }>())?.n ?? 0 : 0;
-  const capitalLedger = summary.ledgers.investor_capital, profitLedger = summary.ledgers.investor_profit;
   const putIn = (funds?.funded ?? 0) + unused;
-  const soldHeld = sum(agreements, (a) => a.capital.held_iqd);
+  const soldHeld = capitalHeld;
   const returned = capitalLedger.available_iqd + capitalLedger.held_iqd + capitalLedger.paid_iqd;
   // Capital paid beyond what is now recovered (a paid sale refunded later) is
-  // owed back: it is not «returned» twice, and the goods are not reduced by it.
+  // owed back (the ledger's own netting): «returned» less this debt is what
+  // came back, and the goods never depend on payouts at all.
   const debt = capitalLedger.debt_iqd;
   const loss = sum(contracts, (c) => c.loss_iqd);
   const notRecovered = sum(agreements, (a) => a.capital.not_recovered_iqd);
-  const inGoods = Math.max(0, putIn - soldHeld - (returned - debt) - loss - notRecovered);
+  // Still in goods = what was put in less what came back (capital accrued,
+  // with the unused remainder), less losses and principal no sale recovered.
+  const inGoods = Math.max(0, putIn - summary.capital_iqd - loss - notRecovered);
   const earned = summary.investor_profit_iqd;
-  const profitHeld = unpaid(earned, profitLedger.paid_iqd, profitLedger.held_iqd, profitLedger.available_iqd);
   const earnedKnown = sum(totals, (t) => t.earned_known), basis = sum(totals, (t) => t.basis);
   const shares = [...new Set(contracts.map((c) => c.profit_share_bps))].sort((a, b) => a - b);
   const holds = new Map<HoldReason, HoldSummary>();
@@ -288,8 +288,7 @@ async function investorPart(db: D1Database, userId: string, sources: Participant
     for (const h of listed) add(h.reasons[0], 1, h.profit_iqd, h.capital_iqd, h.profit_unknown ? 1 : 0);
     if (a.held_rest) add(a.held_rest.reason, 0, a.profit.held_iqd - sum(listed, (h) => h.profit_iqd), a.capital.held_iqd - sum(listed, (h) => h.capital_iqd), 0);
   }
-  // One agreement's overpayment nets against another's held money in the
-  // ledger: the reasons never add up to more than the person's real total.
+  // The reasons never add up to more than the person's real totals.
   const holdList = sortReasons(holds.keys()).map((r) => holds.get(r)!);
   spread(holdList, (h) => h.profit_iqd!, profitHeld).forEach((n, i) => { holdList[i].profit_iqd = n; });
   spread(holdList, (h) => h.capital_iqd!, soldHeld).forEach((n, i) => { holdList[i].capital_iqd = n; });

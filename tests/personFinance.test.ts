@@ -334,6 +334,44 @@ test('one agreement\'s overpayment nets against another\'s held money: the reaso
   const inv = (await personFinance(s.db, 'sajjad', { owner: true })).investor!;
   assert.equal(inv.profit.held_iqd, 270 - 170);
   assert.equal(inv.holds.reduce((n, h) => n + (h.profit_iqd ?? 0), 0), inv.profit.held_iqd);
+  // Each agreement's row takes its share of that total, so no row shows more than the card (final review 2).
+  assert.equal(inv.agreements.reduce((n, x) => n + x.profit.held_iqd, 0), inv.profit.held_iqd);
+});
+
+test('capital overpaid on one agreement nets against another\'s: the goods count every unit on the shelf, and nothing reads as waiting (final review 1)', async () => {
+  const s = setup();
+  const a = await agreement(s, 'inc-x2d', 1000);
+  s.raw.exec(`INSERT INTO incoming_inventory(id,product_id,scope,scope_id,qty_ordered,qty_received,purchase_unit_iqd,shipping_total_iqd,internal_delivery_total_iqd,supplier_id,status,created_by) VALUES ('inc-b','x2d','base','',5,5,200,0,0,'supplier','received','admin');
+    INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,total_cost_iqd,cost_basis,received_at,incoming_id,supplier_id) VALUES ('lot-b','x2d','base','',5,5,200,1000,'received','2026-10-12','inc-b','supplier');`);
+  await agreement(s, 'inc-b', 1000);
+  await sale(s, 'xa'); collect(s, 'xa'); await syncInvestorOrder(s.db, 'xa');
+  // 400 of capital paid from agreement A, which has recovered only 200.
+  withdrawal(s, 'w1', 'paid', [['investor_capital', `invcapital:${a}`, 400, 400]]);
+  const now = new Date().toISOString();
+  s.raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at) VALUES ('xb','buyer','delivered','{}','standard','{}','cash',500,1500,500,500,0,?,?)`).run(now, now);
+  s.raw.exec(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES ('xb-item','xb','x2d','X2D',1,500,500,200,'snapshot');
+    INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key) VALUES ('xb-a0','xb','xb-item','lot-b','base','',1,200,200,'xb:lot-b');
+    UPDATE inventory_lots SET qty_remaining=qty_remaining-1 WHERE id='lot-b';`);
+  await s.db.batch([...journalPlan(s.db, { key: 'sale:xb', day: baghdadDay(), title: 'Sale', source: 'order', sourceId: 'xb', actor: 'admin' }, [{ account: '1100', debit: 500 }, { account: '4000', credit: 500 }]).statements,
+    ...journalPlan(s.db, { key: 'cogs:xb', day: baghdadDay(), title: 'COGS', source: 'order', sourceId: 'xb', actor: 'admin' }, [{ account: '5000', debit: 200 }, { account: '1200', credit: 200 }]).statements]);
+  collect(s, 'xb'); await syncInvestorOrder(s.db, 'xb');
+  const inv = (await personFinance(s.db, 'sajjad', { owner: true })).investor!;
+  const k = inv.capital;
+  // 8 units on the shelves at 200: 1,600. B's 200 covers A's overpayment in the ledger: not «waiting», no debt left.
+  assert.deepEqual({ goods: k.in_goods_iqd, sold: k.sold_held_iqd, debt: k.debt_iqd, returned: k.returned_iqd }, { goods: 1600, sold: 0, debt: 0, returned: 400 });
+  assert.equal(k.in_goods_iqd + k.sold_held_iqd + (k.returned_iqd - k.debt_iqd) + k.loss_iqd + k.not_recovered_iqd, k.put_in_iqd);
+  assert.deepEqual(inv.holds, []);
+  assert.equal(inv.agreements.reduce((n, x) => n + x.capital.held_iqd, 0), 0);
+});
+
+test('a settled sale being recalculated without loss sharing waits as «being recalculated», never «for another sale» (final review 3)', async () => {
+  const s = setup();
+  await agreement(s, 'inc-x2d', 1000);
+  await sale(s, 'x1'); collect(s, 'x1'); await syncInvestorOrder(s.db, 'x1');
+  s.raw.exec("UPDATE orders SET cod_tax_iqd=cod_tax_iqd+1 WHERE id='x1'");
+  const a = (await personFinance(s.db, 'sajjad', { owner: true })).investor!.agreements[0];
+  assert.deepEqual([a.held_whole, a.held_sales, a.held_rest?.reason], [false, [], 'recalculation']);
+  assert.ok((a.held_rest?.profit_iqd ?? 0) > 0 && a.held_rest?.capital_iqd === 200);
 });
 
 test('work status follows the saved pause intervals, including a scheduled resumption', () => {

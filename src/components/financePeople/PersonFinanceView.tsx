@@ -144,6 +144,7 @@ export function PersonCard({ person, onOpen, actions, own = false }: { person: P
           <Stat label={s.profitEarned} value={inv.profit.earned_iqd} />
           <div className="fp-stat"><span>{s.roi}</span><strong className="fp-big"><Pct bps={inv.roi_bps} decimals={1} /></strong><p className="fp-row-meta">{s.roiHint}</p></div>
           <ShareStat investor={inv} s={s} />
+          {inv.profit.debt_iqd > 0 && <Stat label={s.profitDebt} value={inv.profit.debt_iqd} />}
         </div>
         <CapitalBar capital={inv.capital} s={s} />
         {inv.units.received + inv.units.ordered > 0 && <p className="fp-row-meta">{s.unitsLine(inv.units.in_stock, inv.units.in_orders, inv.units.sold, Math.max(0, inv.units.ordered - inv.units.received))}</p>}
@@ -158,6 +159,7 @@ export function PersonCard({ person, onOpen, actions, own = false }: { person: P
         <Stat label={s.wagesPaid} value={work.paid_iqd} />
         <Stat label={s.wagesAvailable} value={work.available_iqd} />
         {work.held_iqd > 0 && <Stat label={s.wagesHeld} value={work.held_iqd} />}
+        {work.debt_iqd > 0 && <Stat label={s.wageDebt} value={work.debt_iqd} />}
       </div>
       <WorkHolds work={work} owner={!own} s={s} />
     </section>}

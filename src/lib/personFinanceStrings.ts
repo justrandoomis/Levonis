@@ -69,6 +69,8 @@ export interface PersonFinanceStrings {
   /** The same reasons for a group of settled sales, without a count. */
   holdGroup: Record<HoldReasonKey, string>;
   capitalDebt: string;
+  profitDebt: string;
+  wageDebt: string;
   notRecovered: string;
   holdAction: Partial<Record<HoldReasonKey, string>>;
   wageAction: Partial<Record<HoldReasonKey, string>>;
@@ -151,6 +153,8 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
       funding: 'تمويل الاتفاق لم يكتمل بعد',
     },
     capitalDebt: 'دين رأس مال: سُحب أكثر مما استُرد الآن',
+    profitDebt: 'دين أرباح متبقٍ',
+    wageDebt: 'الدين المتبقي',
     notRecovered: 'لم يُسترد من مبيعات بأقل من التكلفة',
     holdAction: {
       collection: 'يُسجَّل من «المالية ← التحصيل وشركات التوصيل».',
@@ -240,6 +244,8 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
       funding: 'Agreement funding not complete yet',
     },
     capitalDebt: 'Capital owed back: more withdrawn than is recovered now',
+    profitDebt: 'Profit owed back',
+    wageDebt: 'Remaining debt',
     notRecovered: 'Not recovered from sales below cost',
     holdAction: {
       collection: 'Recorded in Finance → Collections and couriers.',
@@ -329,6 +335,8 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
       funding: 'پارەدارکردنی ڕێککەوتنەکە هێشتا تەواو نەبووە',
     },
     capitalDebt: 'قەرزی سەرمایە: زیاتر لەوەی ئێستا گەڕاوەتەوە ڕاکێشراوە',
+    profitDebt: 'قەرزی ماوەی قازانج',
+    wageDebt: 'قەرزی ماوە',
     notRecovered: 'لە فرۆشتنی خوار تێچوو نەگەڕاوەتەوە',
     holdAction: {
       collection: 'لە «دارایی ← کۆکردنەوەی پارە و گەیەنەرەکان» تۆمار دەکرێت.',
