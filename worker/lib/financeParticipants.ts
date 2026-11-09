@@ -177,9 +177,13 @@ export async function participantOverview(db: D1Database, userId: string, opts: 
   const summary=participantSummary(entries,advance.balance);
   summary.reconciliation_pending ||= employment.some((s)=>s.reconciliation_state!==null&&s.reconciliation_state!=='complete');
   const investment=await investorAccountProgress(db,userId,entries,participantWithdrawableSources(entries,advance.balance));
+  // The same one-person picture the owner reads (worker/lib/personFinance.ts),
+  // from these same sources, without order ids or purchase labels.
+  const {personFinance}=await import('./personFinance');
+  const person=await personFinance(db,userId,{sources:entries,advance});
   // No movements log («سجل الحركات»): the owner removed it from «أرباحي» on
   // 2026-10-10. Balances come from the same sources; no ledger row changed.
-  return { summary, employment, investment, entries: participantEntries(entries, fold, advance.balance), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
+  return { summary, employment, investment, person, entries: participantEntries(entries, fold, advance.balance), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };
 }
 /**
  * What the participant reads of their own sources (DECISIONS row 220). A

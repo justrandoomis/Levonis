@@ -17,6 +17,7 @@ import { employmentDate, publicReconciliation, queueStaffReconciliation, readSta
 import { effectiveWageRules, wageVersions } from '../lib/financeWageTimeline';
 import { applyWageChange, previewWageChangePage, type WageChangeInput } from '../lib/financeWageChanges';
 import { continueStaffReconciliation } from '../lib/financeStaffAccrual';
+import { peopleFinance } from '../lib/personFinance';
 
 export const adminFinancePeopleRoutes = new Hono<AppContext>();
 adminFinancePeopleRoutes.use('*',requireAdmin);
@@ -141,6 +142,14 @@ adminFinancePeopleRoutes.post('/staff/:id/recheck',async(c)=>{
     const reconciliation=await queueStaffReconciliation(db,id,actor.id,statements,true,undefined,{from:null,until:null,reason,operationId});
     return c.json({success:true,already:false,reconciliation});
   }catch(e){if(/CHECK constraint|UNIQUE constraint/.test(String(e)))throw conflict('تغير حساب الموظف أثناء بدء الفحص؛ حدّث البيانات');throw e;}
+});
+/** «الأشخاص» — every person the owner pays, one picture each: capital, share,
+ * profit and why any of it is held, return, wages, and the combined total
+ * (worker/lib/personFinance.ts). The period adds what was earned in it. */
+adminFinancePeopleRoutes.get('/people',async(c)=>{
+  await requireCapability(c.env,c.get('user')!,'accounting');
+  const range=financeRange(c.req.query());
+  return c.json({success:true,range,people:await peopleFinance(c.env.DB,range.from||range.to?range:undefined)});
 });
 adminFinancePeopleRoutes.get('/accounts/:id/earnings',async(c)=>{
   await requireCapability(c.env,c.get('user')!,'pay');

@@ -3,32 +3,59 @@ import { useState } from 'react';
 import { ChevronLeft, Plus, Pencil } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { Select } from '../ui/Field';
-import { api, Button, Dialog, Empty, Feedback, Field, Loading, Money, Surface, useLanguage, useMutation, useRemote, type Account, type PanelProps } from './shared';
+import { api, Button, Dialog, Empty, Feedback, Field, Loading, Money, PEOPLE, Surface, useLanguage, useMutation, useRemote, type Account, type PanelProps } from './shared';
 import { investmentReturnStrings } from '../../lib/investmentReturn';
+import { personFinanceStrings } from '../../lib/personFinanceStrings';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
+import { PersonCard, PersonSheet, type PersonFinance } from './PersonFinanceView';
 
 const API = '/api/admin/investment-finance';
-type Profile = { user_id: string; name: string; email: string; state: string; version: number; default_profit_share_bps: number; default_capital_share_bps: number; default_loss_share_bps: number; capital: { agreed_iqd: number; received_iqd: number; used_iqd: number | null; inventory_iqd?: number | null; allocated_iqd: number; unallocated_iqd: number; returned_surplus_iqd?: number; loss_iqd: number; recovered_iqd: number; paid_iqd: number; contracts_count: number }; balance: { reconciliation_pending?: boolean; capital_pending_iqd?: number; capital_held_iqd?: number; capital_debt_iqd?: number; available_iqd: number; capital_available_iqd: number; investor_profit_iqd: number; investor_profit_available_iqd: number; earnings_paid_iqd: number; investor_profit_pending_iqd: number; investor_profit_debt_iqd: number }; period: { earned_iqd: number; paid_iqd: number; adjustments_iqd: number; recovered_capital_iqd: number } };
+type Profile = { user_id: string; name: string; email: string; state: string; version: number; default_profit_share_bps: number; default_capital_share_bps: number; default_loss_share_bps: number };
 type Batch = { purchase_id: string; agreed_iqd: number; received_iqd: number; allocated_iqd: number; unallocated_iqd: number; returned_iqd?: number; funding_shortfall_iqd: number; profit_share_bps: number };
 type Contract = { id: string; name: string; label: string; purchase_id: string; qty_ordered: number; qty_received: number; remaining_qty: number; delivered_qty: number; principal_iqd: number; profit_share_bps: number; state: string };
-type List = { profiles: Profile[]; accounts: Account[]; totals: { agreed_iqd: number; received_iqd: number; available_profit_iqd: number; period_profit_iqd: number } };
+type List = { profiles: Profile[]; accounts: Account[] };
 
-export default function InvestorProfiles({ from, to, month, onChanged, openContract }: PanelProps & { openContract: (id: string) => void }) {
-  const { loc, dir } = useLanguage();
+/**
+ * «حسابات المستثمرين» — one card per investor from the one-person picture
+ * (worker/lib/personFinance.ts; DECISIONS row 304): capital put in and where
+ * it is, the share of each agreement, profit earned and why it is held, the
+ * return so far, and — for an investor who also works — wages and the
+ * combined total. Replaces the thirteen-card capital grid of 2026-10.
+ */
+export default function InvestorProfiles({ from, to, month, onChanged, openContract, openOrder }: PanelProps & { openContract: (id: string) => void }) {
+  const { loc, lang, dir } = useLanguage();
+  const s = personFinanceStrings(lang);
   const query = new URLSearchParams(from || to ? { from: from || '', to: to || '' } : month ? { month } : {});
   const remote = useRemote<List>(`${API}/profiles?${query}`);
-  const [editing, setEditing] = useState<Profile | 'new' | null>(null), [selected, setSelected] = useState<Profile | null>(null);
+  const people = useRemote<{ people: PersonFinance[] }>(`${PEOPLE}/people?${query}`);
+  const [editing, setEditing] = useState<Profile | 'new' | null>(null), [selected, setSelected] = useState<string | null>(null);
   const data = remote.data;
-  useFreshOnReturn(remote.load,{pollWhileVisibleMs:30_000,minIntervalMs:5_000,enabled:!remote.loading&&!editing});
-  const saved = async () => { setEditing(null); await remote.load(); onChanged?.(); };
+  const investors = people.data?.people.filter((p) => p.investor) ?? [];
+  const reload = async () => { await Promise.all([remote.load(), people.load()]); };
+  useFreshOnReturn(reload, { pollWhileVisibleMs: 30_000, minIntervalMs: 5_000, enabled: !remote.loading && !people.loading && !editing && !selected });
+  const saved = async () => { setEditing(null); await reload(); onChanged?.(); };
+  const sum = (f: (p: NonNullable<PersonFinance['investor']>) => number) => investors.reduce((n, p) => n + f(p.investor!), 0);
+  const person = (id: string) => people.data?.people.find((p) => p.user_id === id);
+  const open = selected ? person(selected) : undefined;
   return <div className="ap fp fp-stack" dir={dir}>
-    <Surface title={loc('حسابات المستثمرين', 'Investor accounts')} hint={loc('حساب واحد لكل مستثمر، وشروط مستقلة لكل دفعة. أرصدة الحساب تراكمية، ونتيجة الفترة حسب تاريخ التسليم.', 'One account per investor, with independent batch terms. Balances are cumulative; period earnings follow delivery dates.')} action={<Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing('new')}>{loc('إضافة مستثمر', 'Add investor')}</Button>}>
-      {!data ? <Loading error={remote.error} retry={remote.load} /> : <><Feedback error={remote.error} /><div className="fp-stats">{[[loc('رأس المال المتفق عليه', 'Agreed capital'), data.totals.agreed_iqd], [loc('المستلم فعليًا', 'Actually received'), data.totals.received_iqd], [loc('أرباح الفترة', 'Period earnings'), data.totals.period_profit_iqd], [loc('متاح للسحب الآن', 'Available now', 'ئێستا بەردەست بۆ ڕاکێشان'), data.profiles.reduce((sum, p) => sum + p.balance.available_iqd, 0)]].map(([title, n]) => <div className="fp-stat" key={String(title)}><span>{title}</span><Money value={typeof n === 'number' ? n : null} /></div>)}</div>
-      {!data.profiles.length ? <Empty>{loc('اختر حساب مساعد لإضافة مستثمر، ثم اختره في خطوة تمويل الشراء.', 'Choose an assistant account to register an investor, then select it when funding a purchase.')}</Empty> : <div className="fp-stack">{data.profiles.map((p) => <article className="fp-rule" key={p.user_id}><header className="fp-rule-heading fp-staff-heading"><button type="button" className="fp-account flex-1 text-start" onClick={() => setSelected(p)}><span className="fp-avatar">{(p.name || p.email).slice(0, 1)}</span><div><h3>{p.name || p.email}</h3><p>{p.state === 'archived' ? loc('مؤرشف · السجل محفوظ', 'Archived · history retained') : `${loc('نسبة الربح الافتراضية', 'Default profit share')} ${p.default_profit_share_bps / 100}%`} · {p.capital.contracts_count} {loc('اتفاق', 'agreements')}</p></div><ChevronLeft size={18} /></button><Button variant="ghost" size="sm" icon={<Pencil size={15} />} onClick={() => setEditing(p)}>{loc('تعديل', 'Edit')}</Button></header><InvestorReconciliationNotice pending={p.balance.reconciliation_pending} /><div className="fp-stats">{[[loc('أرباح الفترة', 'Period earnings'), p.period.earned_iqd], [loc('المسدد في الفترة', 'Period payments'), p.period.paid_iqd], [loc('المتاح التراكمي', 'Cumulative available', 'کۆی بەردەست'), p.balance.available_iqd], [loc('رأس المال المتبقي في الحساب', 'Remaining account capital'), Math.max(0, p.capital.received_iqd - p.capital.paid_iqd - p.capital.loss_iqd)]].map(([title, n]) => <div className="fp-stat" key={String(title)}><span>{title}</span><Money value={typeof n === 'number' ? n : null} /></div>)}</div><Button variant="ghost" onClick={() => setSelected(p)}>{loc('الدفعات ورأس المال والحركات', 'Batches, capital and activity')}</Button></article>)}</div>}</>}
+    <Surface title={loc('حسابات المستثمرين', 'Investor accounts', 'هەژماری وەبەرهێنەران')} hint={s.peopleHint} action={<Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing('new')}>{loc('إضافة مستثمر', 'Add investor', 'زیادکردنی وەبەرهێنەر')}</Button>}>
+      {!data || !people.data ? <Loading error={remote.error || people.error} retry={reload} /> : <><Feedback error={remote.error || people.error} />
+        <div className="fp-stats">
+          <div className="fp-stat"><span>{s.capitalPutIn}</span><Money value={sum((i) => i.capital.put_in_iqd)} /></div>
+          <div className="fp-stat"><span>{s.profitEarned}</span><Money value={sum((i) => i.profit.earned_iqd)} /></div>
+          <div className="fp-stat fp-stat-good"><span>{s.availableNow}</span><Money value={sum((i) => i.profit.available_iqd + i.capital.available_iqd)} /></div>
+          <div className="fp-stat"><span>{s.heldNow}</span><Money value={sum((i) => i.profit.held_iqd + i.capital.sold_held_iqd)} /></div>
+        </div>
+        {!data.profiles.length ? <Empty>{loc('اختر حساب مساعد لإضافة مستثمر، ثم اختره في خطوة تمويل الشراء.', 'Choose an assistant account to register an investor, then select it when funding a purchase.', 'هەژمارێکی یاریدەدەر هەڵبژێرە بۆ تۆمارکردنی وەبەرهێنەر، پاشان لە هەنگاوی پارەدارکردنی کڕیندا هەڵیبژێرە.')}</Empty> : <div className="fp-stack">{data.profiles.map((p) => {
+          const pf = person(p.user_id);
+          const settings = <Button variant="ghost" size="sm" icon={<Pencil size={15} />} onClick={() => setEditing(p)}>{s.settings}</Button>;
+          return pf ? <PersonCard key={p.user_id} person={pf} onOpen={() => setSelected(p.user_id)} actions={settings} />
+            : <article className="fp-person" key={p.user_id}><header className="fp-rule-heading fp-staff-heading"><h3>{p.name || p.email}</h3>{settings}</header></article>;
+        })}</div>}</>}
     </Surface>
     <LegacyInvestmentHistory admin />
     {editing && data && <ProfileEditor profile={editing === 'new' ? undefined : editing} accounts={data.accounts.filter((a) => editing !== 'new' || !data.profiles.some((p) => p.user_id === a.id))} onClose={() => setEditing(null)} onSaved={saved} />}
-    {selected && <ProfileDetail profile={data?.profiles.find(p=>p.user_id===selected.user_id)??selected} onClose={() => setSelected(null)} openContract={openContract} />}
+    {open && <PersonSheet person={open} onClose={() => setSelected(null)} openOrder={openOrder ? (id) => { setSelected(null); openOrder(id); } : undefined}><FundingRecord userId={open.user_id!} openContract={openContract} /></PersonSheet>}
   </div>;
 }
 
@@ -43,24 +70,16 @@ function ProfileEditor({ profile, accounts, onClose, onSaved }: { profile?: Prof
   </div><footer className="fp-footer"><Button variant="ghost" onClick={onClose} disabled={op.busy}>{loc('رجوع', 'Back')}</Button><Button variant="primary" loading={op.busy} disabled={!user || profit == null || loss == null || capital == null} onClick={() => op.run(async () => { await api.post(`${API}/profiles`, { user_id: user, version: profile?.version, default_profit_share_bps: Math.round(profit! * 100), default_capital_share_bps: Math.round(capital! * 100), default_loss_share_bps: Math.round(loss! * 100), state }); await onSaved(); })}>{loc('حفظ', 'Save')}</Button></footer></Dialog>;
 }
 
-function ProfileDetail({ profile, onClose, openContract }: { profile: Profile; onClose: () => void; openContract: (id: string) => void }) {
-  const { loc, lang } = useLanguage(), remote = useRemote<{ contracts: Contract[]; batches: Batch[] }>(`${API}/profiles/${profile.user_id}`);
-  return <Dialog open onClose={onClose} title={profile.name || profile.email}><div className="fp-stack">
-    <InvestorReconciliationNotice pending={profile.balance.reconciliation_pending} />
-    <Surface title={loc('رأس المال · تراكمي', 'Capital · cumulative')}><div className="fp-stats">{[[loc('متفق عليه', 'Agreed'), profile.capital.agreed_iqd], [loc('مستلم', 'Received'), profile.capital.received_iqd], [loc('مخصص', 'Allocated'), profile.capital.allocated_iqd], [loc('موّل مخزونًا مستلمًا (تراكمي)', 'Funded received inventory (cumulative)', 'کۆی کۆگای وەرگیراوی پارەدارکراو'), profile.capital.used_iqd], [loc('حصة رأس المال المخصصة للمخزون المتبقي', 'Principal allocated to remaining inventory', 'بەشی سەرمایەی تەرخانکراو بۆ کۆگای ماوە'), profile.capital.inventory_iqd], [investmentReturnStrings(lang).profilesReturned, profile.capital.returned_surplus_iqd ?? profile.capital.unallocated_iqd], [loc('مسترد من المبيعات', 'Recovered from sales'), profile.capital.recovered_iqd], [loc('رأس مال متاح للسحب', 'Capital available to withdraw', 'سەرمایەی بەردەست بۆ ڕاکێشان'), profile.balance.capital_available_iqd], [investmentReturnStrings(lang).capitalPending, profile.balance.capital_pending_iqd], [loc('رأس مال محجوز لطلبات السحب', 'Capital reserved for withdrawals', 'سەرمایەی گیراو بۆ داواکاریی ڕاکێشان'), profile.balance.capital_held_iqd], [loc('دين رأس مال متبقٍ', 'Remaining capital debt', 'قەرزی ماوەی سەرمایە'), profile.balance.capital_debt_iqd], [loc('مسحوب كرأس مال', 'Paid as capital'), profile.capital.paid_iqd], [loc('خسارة رأس المال', 'Capital loss'), profile.capital.loss_iqd]].map(([title, n]) => <div className="fp-stat" key={String(title)}><span>{title}</span><Money value={typeof n === 'number' ? n : null} /></div>)}</div></Surface>
-    <Surface title={loc('الأرباح · تراكمي', 'Profit · cumulative')}><div className="fp-stats">{[[loc('مستحقة', 'Accrued'), profile.balance.investor_profit_iqd], [loc('متاحة', 'Available'), profile.balance.investor_profit_available_iqd], [loc('معلقة', 'Pending'), profile.balance.investor_profit_pending_iqd], [loc('مسحوبة', 'Paid'), profile.balance.earnings_paid_iqd], [loc('دين أرباح متبقٍ', 'Remaining profit debt'), profile.balance.investor_profit_debt_iqd]].map(([title, n]) => <div className="fp-stat" key={String(title)}><span>{title}</span><Money value={typeof n === 'number' ? n : null} /></div>)}</div></Surface>
-    {!remote.data ? <Loading error={remote.error} retry={remote.load} /> : <>{remote.data.batches.map((b) => <Surface key={b.purchase_id} title={`${loc('دفعة', 'Batch')} ${b.purchase_id.slice(-8)}`} hint={`${loc('حصة الربح', 'Profit share')} ${b.profit_share_bps / 100}%`}><div className="fp-rows"><div className="fp-row"><span>{loc('التمويل المتفق / المستلم', 'Agreed / received funding')}</span><span><Money value={b.agreed_iqd} /> / <Money value={b.received_iqd} /></span></div>{b.funding_shortfall_iqd > 0 && <p className="fp-note">{loc('تمويل ينتظر الاستلام', 'Funding pending receipt')}: <Money value={b.funding_shortfall_iqd} /></p>}{(b.returned_iqd ?? b.unallocated_iqd) > 0 && <p className="fp-note">{investmentReturnStrings(lang).returned}: <Money value={b.returned_iqd ?? b.unallocated_iqd} /></p>}{remote.data!.contracts.filter((c) => c.purchase_id === b.purchase_id).map((c) => <ContractRow key={c.id} contract={c} onClick={() => openContract(c.id)} />)}</div></Surface>)}
-    {remote.data.contracts.filter((c) => !remote.data!.batches.some((b) => b.purchase_id === c.purchase_id)).map((c) => <ContractRow key={c.id} contract={c} onClick={() => openContract(c.id)} />)}{!remote.data.contracts.length && <Empty>{loc('لا دفعات بعد. اختر هذا المستثمر أثناء إنشاء الشراء.', 'No batches yet. Select this investor when creating a purchase.')}</Empty>}</>}
-    <p className="fp-note">{loc('رأس المال المسترد مستقل عن الربح. شروط التحصيل وتثبيت التكلفة تحدد ما يصبح متاحًا للسحب.', 'Recovered principal is separate from profit. Collection and verified costs determine withdrawal availability.')}</p>
-  </div></Dialog>;
+/** The purchases this investor funded and their agreements, as recorded. */
+function FundingRecord({ userId, openContract }: { userId: string; openContract: (id: string) => void }) {
+  const { loc, lang } = useLanguage(), remote = useRemote<{ contracts: Contract[]; batches: Batch[] }>(`${API}/profiles/${userId}`);
+  return <details className="fp-detail"><summary>{loc('سجل التمويل والدفعات', 'Funding record and batches', 'تۆماری پارەدارکردن و بارەکان')}</summary>
+    {!remote.data ? <Loading error={remote.error} retry={remote.load} /> : <div className="fp-stack">{remote.data.batches.map((b) => <Surface key={b.purchase_id} title={`${loc('دفعة', 'Batch', 'بار')} ${b.purchase_id.slice(-8)}`} hint={`${loc('حصة الربح', 'Profit share', 'بەشی قازانج')} ${b.profit_share_bps / 100}%`}><div className="fp-rows"><div className="fp-row"><span>{loc('التمويل المتفق / المستلم', 'Agreed / received funding', 'پارەدارکردنی ڕێککەوتوو / وەرگیراو')}</span><span><Money value={b.agreed_iqd} /> / <Money value={b.received_iqd} /></span></div>{b.funding_shortfall_iqd > 0 && <p className="fp-note">{investmentReturnStrings(lang).shortfall}: <Money value={b.funding_shortfall_iqd} /></p>}{(b.returned_iqd ?? b.unallocated_iqd) > 0 && <p className="fp-note">{investmentReturnStrings(lang).returned}: <Money value={b.returned_iqd ?? b.unallocated_iqd} /></p>}{remote.data!.contracts.filter((c) => c.purchase_id === b.purchase_id).map((c) => <ContractRow key={c.id} contract={c} onClick={() => openContract(c.id)} />)}</div></Surface>)}
+      {remote.data.contracts.filter((c) => !remote.data!.batches.some((b) => b.purchase_id === c.purchase_id)).map((c) => <ContractRow key={c.id} contract={c} onClick={() => openContract(c.id)} />)}{!remote.data.contracts.length && <Empty>{loc('لا دفعات بعد. اختر هذا المستثمر أثناء إنشاء الشراء.', 'No batches yet. Select this investor when creating a purchase.', 'هێشتا هیچ بارێک نییە. لە کاتی دروستکردنی کڕیندا ئەم وەبەرهێنەرە هەڵبژێرە.')}</Empty>}
+      <p className="fp-note">{loc('رأس المال المسترد مستقل عن الربح. التحصيل وتثبيت التكلفة يحددان ما يصبح متاحًا للسحب.', 'Recovered capital is separate from profit. Collection and verified costs decide what becomes withdrawable.', 'سەرمایەی گەڕاوە جیاوازە لە قازانج. کۆکردنەوەی پارە و پشتڕاستکردنەوەی تێچوو دیاری دەکەن چی بەردەست دەبێت بۆ ڕاکێشان.')}</p></div>}
+  </details>;
 }
 function ContractRow({ contract: c, onClick }: { contract: Contract; onClick: () => void }) {
   const { loc } = useLanguage();
-  return <button type="button" className="fp-rule text-start" onClick={onClick}><div className="fp-rule-heading"><strong>{c.label || c.name}</strong><ChevronLeft size={17} /></div><p className="fp-muted">{loc('مستلم / مباع مسلّم / متبقٍ', 'Received / sold and delivered / remaining')}: {c.qty_received} / {c.delivered_qty} / {c.remaining_qty}</p><div className="fp-row"><span>{loc('رأس المال', 'Principal')}: <Money value={c.principal_iqd} /></span><span>{c.profit_share_bps / 100}% · {c.state === 'void' ? loc('مبطل', 'Voided') : loc('نشط', 'Active')}</span></div></button>;
-}
-
-function InvestorReconciliationNotice({ pending }: { pending?: boolean }) {
-  const { loc } = useLanguage();
-  if (!pending) return null;
-  return <p className="fp-note" role="status">{loc('توجد تسويات لم يكتمل حسابها. الأرقام المسجلة لا تشمل أرباحًا لم تُثبت بعد، وقد تتغير بعد تثبيت التكاليف. المبالغ المعلقة غير متاحة للسحب.', 'Some settlements are incomplete. Recorded figures exclude unverified profit and may change when costs are confirmed. Pending amounts cannot be withdrawn.', 'هەندێک یەکلایی هێشتا تەواو نەبووە. ژمارە تۆمارکراوەکان قازانجی پشتڕاستنەکراوە ناگرنەوە و لەوانەیە دوای پشتڕاستکردنەوەی تێچوو بگۆڕێن. بڕە ڕاگیراوەکان بۆ ڕاکێشان بەردەست نین.')}</p>;
+  return <button type="button" className="fp-rule text-start" onClick={onClick}><div className="fp-rule-heading"><strong>{c.label || c.name}</strong><ChevronLeft size={17} /></div><p className="fp-muted">{loc('مستلم / مباع مسلّم / متبقٍ', 'Received / sold and delivered / remaining', 'وەرگیراو / فرۆشراو و گەیەندراو / ماوە')}: {c.qty_received} / {c.delivered_qty} / {c.remaining_qty}</p><div className="fp-row"><span>{loc('رأس المال', 'Principal', 'سەرمایە')}: <Money value={c.principal_iqd} /></span><span>{c.profit_share_bps / 100}% · {c.state === 'void' ? loc('مبطل', 'Voided', 'هەڵوەشاوە') : loc('نشط', 'Active', 'چالاک')}</span></div></button>;
 }

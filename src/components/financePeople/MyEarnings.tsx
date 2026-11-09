@@ -5,6 +5,7 @@ import { NumberInput } from '../ui/NumberInput';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { investmentReturnStrings, investorReturnView } from '../../lib/investmentReturn';
 import { api, Button, dateLabel, Dialog, EARNINGS, Empty, Feedback, Field, Loading, Money, StateBadge, Surface, useLanguage, useMutation, useRemote, type Withdrawal } from './shared';
+import { PersonCard, PersonSheet, type PersonFinance } from './PersonFinanceView';
 
 type Entry = { id: string; kind: 'staff' | 'investor_profit' | 'investor_capital'; title: string; order_id?: string; day: string; amount_iqd: number; accrued_iqd?: number; paid_iqd: number; held_iqd: number; available_iqd: number; state: string };
 export type EarningsData = {
@@ -12,6 +13,8 @@ export type EarningsData = {
   entries: Entry[]; withdrawals: Withdrawal[];
   investment?: {unallocated_iqd:number;returned_surplus_iqd?:number;pending_surplus_iqd?:number;batches:{id:string;name:string;state:string;principal_iqd:number;received_iqd:number;qty_received:number;delivered_qty:number;remaining_qty:number;earned_iqd:number;available_iqd:number;paid_iqd:number;recovered_capital_iqd:number;capital_paid_iqd:number}[]};
   employment?: { start_work_date: string | null; first_earning_day: string | null; active: number; archived: number; has_rules: number; reconciliation_state: string | null; processed_orders: number }[];
+  /** The same one-person picture the owner reads (worker/lib/personFinance.ts), without order ids. */
+  person?: PersonFinance;
 };
 
 /** The spendable total includes returned principal; withdrawal ledgers stay separate. */
@@ -48,8 +51,10 @@ export default function MyEarnings() {
   const ir = investmentReturnStrings(lang);
   const remote = useRemote<EarningsData>(EARNINGS), op = useMutation();
   const [open, setOpen] = useState(false), [amount, setAmount] = useState<number | null>(null), [balanceType, setBalanceType] = useState<'earnings' | 'capital'>('earnings');
+  const [details, setDetails] = useState(false);
   const operationId = useRef('');
   const data = remote.data, s = data?.summary;
+  const person = data?.person && (data.person.investor || data.person.work) ? data.person : null;
   const returnView = investorReturnView(s, data?.investment);
   const calculating = data?.employment?.some((e) => ['pending', 'running'].includes(e.reconciliation_state ?? '')) ?? false;
   // The owner can change the start date from another device after this screen
@@ -72,13 +77,11 @@ export default function MyEarnings() {
     <Feedback error={op.error} notice={op.notice} />
     {!data || !s ? <Loading error={remote.error} retry={remote.load} /> : <>
       <Feedback error={remote.error} />
-      <section className="fp-hero"><div><p className="flex items-center gap-2"><Wallet size={17} aria-hidden="true" />{(s.net_balance_iqd ?? 0) < 0 ? loc('عليك', 'You owe') : loc('لك', 'Your balance')}</p><Money value={Math.abs(s.net_balance_iqd ?? balance('earnings'))} className={(s.net_balance_iqd ?? 0) < 0 ? 'fp-negative' : ''} /><p className="text-xs mt-1">{loc('رصيد الأرباح التراكمي بعد التسديد والسلف', 'Cumulative earnings after payments and advances')}</p>{returnView.hero_capital_iqd > 0 && <p className="text-xs mt-1">{ir.heroCapital}: <Money value={returnView.hero_capital_iqd} /></p>}</div><Button variant="primary" icon={<ArrowDownToLine size={17} />} disabled={balance('earnings') <= 0} onClick={() => startWithdrawal('earnings')}>{loc('طلب سحب الأرباح', 'Request withdrawal')}</Button></section>
-      <div className="fp-stats">
-        <EarningsAvailable earnings={balance('earnings')} capital={balance('capital')} />
-        <div className="fp-stat"><span>{loc('قيد الاستحقاق', 'Pending')}</span><Money value={s.earnings_pending_iqd ?? 0} /></div>
-        <div className="fp-stat"><span>{loc('محجوز للسحب', 'Reserved')}</span><Money value={s.earnings_held_iqd ?? s.held_iqd} /></div>
-        <div className="fp-stat"><span>{loc('المدفوعات والسلف', 'Payments and advances', 'پارەدان و پێشەکییەکان')}</span><Money value={s.earnings_paid_iqd ?? s.paid_iqd} /></div>
-      </div>
+      {/* The one picture the owner also reads (DECISIONS row 304), then what can be withdrawn now. */}
+      {person && <PersonCard person={person} own onOpen={person.investor?.agreements.length ? () => setDetails(true) : undefined} />}
+      <section className="fp-hero"><div><p className="flex items-center gap-2"><Wallet size={17} aria-hidden="true" />{loc('متاح للسحب الآن', 'Available to withdraw now', 'ئێستا بەردەستە بۆ ڕاکێشان')}</p><Money value={balance('earnings') + balance('capital')} />
+        {returnView.hero_capital_iqd > 0 && <p className="text-xs mt-1">{loc('أرباح', 'Earnings', 'قازانج')} <Money value={balance('earnings')} /> · {ir.heroCapital}: <Money value={returnView.hero_capital_iqd} /></p>}</div>
+        <div className="fp-row-actions"><Button variant="primary" icon={<ArrowDownToLine size={17} />} disabled={balance('earnings') <= 0} onClick={() => startWithdrawal('earnings')}>{loc('طلب سحب الأرباح', 'Request withdrawal')}</Button>{balance('capital') > 0 && <Button onClick={() => startWithdrawal('capital')}>{loc('سحب رأس المال', 'Withdraw capital', 'ڕاکێشانی سەرمایە')}</Button>}</div></section>
       {data.employment?.filter((e) => !e.archived && (e.first_earning_day || !e.active || !e.has_rules || (e.reconciliation_state && e.reconciliation_state !== 'complete'))).map((employment, index) => <div className="fp-note" key={index} role="status">
         {employment.first_earning_day && <p>{loc('تُحتسب أجورك على الطلبات المسلّمة من ', 'Delivery earnings start on ')}<strong>{dateLabel(employment.first_earning_day, lang)}</strong>{loc(' بتوقيت بغداد، ضمن الأقسام والمنتجات المحددة لك.', ' in Baghdad time, for your assigned categories and products.')}</p>}
         {!employment.active ? <p>{loc('احتساب الأجور الجديدة متوقف حاليًا. مستحقاتك السابقة محفوظة.', 'New work earnings are paused. Your past earnings are preserved.')}</p>
@@ -87,24 +90,35 @@ export default function MyEarnings() {
           : employment.reconciliation_state === 'failed' ? <p>{loc('تحتاج إعادة حساب المستحقات إلى متابعة من الإدارة. تاريخ بدايتك محفوظ.', 'The administrator needs to resume your earnings calculation. Your start date is saved.')}</p>
           : employment.first_earning_day && employment.reconciliation_state === 'complete' && employment.processed_orders === 0 && !s.staff_iqd ? <p>{loc('لم يجد آخر احتساب طلبات مسلّمة بعد تاريخ بدء عملك. يظهر الأجر عند تسليم طلب مشمول.', 'The last calculation found no deliveries after your work start date. Earnings appear when an eligible order is delivered.')}</p> : null}
       </div>)}
-      {!!s.reconciliation_pending && !calculating && <p className="fp-note">{loc('بعض المستحقات تنتظر إكمال تسويتها المالية؛ الرصيد المتاح أعلاه قابل لطلب السحب.', 'Some earnings await reconciliation. The available balance above can be requested for withdrawal.')}</p>}
+      {!!s.reconciliation_pending && !calculating && !person && <p className="fp-note">{loc('بعض المستحقات تنتظر إكمال تسويتها المالية؛ الرصيد المتاح أعلاه قابل لطلب السحب.', 'Some earnings await reconciliation. The available balance above can be requested for withdrawal.')}</p>}
       {!!s.advance_balance_iqd && <p className="fp-note">{loc('حُسمت السلف غير المسواة من المبلغ المتاح: ', 'Unsettled advances deducted from available earnings: ')}<Money value={s.advance_balance_iqd} /></p>}
-      {!!s.pending_costs && <p className="fp-note">{loc(`يوجد ${s.pending_costs} استحقاق لم يكتمل حسابه. إن كانت له قيمة سابقة فهي ضمن الرصيد المحسوب، لكنها غير متاحة للسحب حتى تثبيت الحساب.`, `${s.pending_costs} earnings have incomplete calculations. Any previously recorded amount remains in the calculated balance but is unavailable until verified.`, `${s.pending_costs} شایستە ژمێریارییەکەی تەواو نەبووە. ئەگەر بڕێکی پێشوو تۆمار کرابێت لە باڵانسی ژمێردراودایە، بەڵام تا پشتڕاستکردنەوە بەردەست نییە بۆ ڕاکێشان.`)}</p>}
+      {!!s.pending_costs && !person?.work && <p className="fp-note">{loc(`يوجد ${s.pending_costs} استحقاق لم يكتمل حسابه. إن كانت له قيمة سابقة فهي ضمن الرصيد المحسوب، لكنها غير متاحة للسحب حتى تثبيت الحساب.`, `${s.pending_costs} earnings have incomplete calculations. Any previously recorded amount remains in the calculated balance but is unavailable until verified.`, `${s.pending_costs} شایستە ژمێریارییەکەی تەواو نەبووە. ئەگەر بڕێکی پێشوو تۆمار کرابێت لە باڵانسی ژمێردراودایە، بەڵام تا پشتڕاستکردنەوە بەردەست نییە بۆ ڕاکێشان.`)}</p>}
       {!!s.debt_iqd && <p className="fp-note">{loc('الدين المتبقي الآن: ', 'Remaining debt now: ')}<Money value={s.debt_iqd} /> · {loc('ينخفض تلقائيًا من الأرباح الجديدة في الحساب نفسه، دون خصم إضافي أو مساس برأس المال.', 'Covered by future earnings in the same account, without another deduction or use of investment principal.')}</p>}
+      <Surface title={loc('طلبات السحب', 'Withdrawal requests')} hint={loc('طلب السحب يحجز الرصيد إلى أن تسدده الإدارة.', 'A withdrawal reserves your balance until the administrator pays it.')}>
+        {!data.withdrawals.length ? <Empty>{loc('لا توجد طلبات سحب بعد.', 'No withdrawal requests yet.')}</Empty> : <div className="fp-rows">{data.withdrawals.map((w) => <div className="fp-row" key={w.id}><div className="min-w-0"><StateBadge state={w.state} /><div className="fp-row-meta">{dateLabel(w.created_at, lang)}</div>{w.reference && <div className="fp-row-meta">{loc('مرجع التسديد: ', 'Payment reference: ')}<bdi>{w.reference}</bdi></div>}{w.state === 'requested' && <Button size="sm" variant="ghost" loading={op.busy} onClick={() => op.run(async () => { await api.post(`${EARNINGS}/withdrawals/${encodeURIComponent(w.id)}/cancel`, {}); await remote.load(); }, loc('ألغي الطلب وأعيد المبلغ إلى المتاح.', 'Request cancelled and funds released.'))}>{loc('إلغاء الطلب', 'Cancel request')}</Button>}</div><div className="text-end"><Money value={w.amount_iqd} />{w.paid_iqd > 0 && w.state !== 'paid' && <p className="fp-row-meta">{loc('المسدد: ', 'Paid: ')}<Money value={w.paid_iqd} /></p>}</div></div>)}</div>}
+      </Surface>
+      {/* The earlier detail, kept for the record: cumulative balance, sources and batches. */}
+      <details className="fp-detail" open={!person || undefined}><summary>{loc('تفاصيل الأرصدة والدفعات', 'Balance and batch details', 'وردەکاریی باڵانس و بارەکان')}</summary><div className="fp-stack">
+      <p className="fp-note">{(s.net_balance_iqd ?? 0) < 0 ? loc('عليك', 'You owe') : loc('رصيد الأرباح التراكمي بعد التسديد والسلف', 'Cumulative earnings after payments and advances')}: <Money value={Math.abs(s.net_balance_iqd ?? balance('earnings'))} className={(s.net_balance_iqd ?? 0) < 0 ? 'fp-negative' : ''} /></p>
+      <div className="fp-stats">
+        <EarningsAvailable earnings={balance('earnings')} capital={balance('capital')} />
+        <div className="fp-stat"><span>{loc('قيد الاستحقاق', 'Pending')}</span><Money value={s.earnings_pending_iqd ?? 0} /></div>
+        <div className="fp-stat"><span>{loc('محجوز للسحب', 'Reserved')}</span><Money value={s.earnings_held_iqd ?? s.held_iqd} /></div>
+        <div className="fp-stat"><span>{loc('المدفوعات والسلف', 'Payments and advances', 'پارەدان و پێشەکییەکان')}</span><Money value={s.earnings_paid_iqd ?? s.paid_iqd} /></div>
+      </div>
       <EarningsSources summary={s} capitalAvailable={balance('capital')} onWithdrawCapital={() => startWithdrawal('capital')} />
       {returnView.show_batches && data.investment && <Surface title={loc('دفعات استثماري', 'My investment batches')} hint={loc('رأس المال مستقل عن الأرباح. الإتاحة تتطلب التسليم والتحصيل وتثبيت التكلفة والتمويل.', 'Principal is separate from profit. Availability requires delivery, collection, verified costs and funding.')}>
         {returnView.batches_returned_iqd > 0 && <p className="fp-note">{ir.batchesReturned}: <Money value={returnView.batches_returned_iqd} /></p>}
         {returnView.batches_pending_iqd > 0 && <p className="fp-note">{ir.batchesPending}: <Money value={returnView.batches_pending_iqd} /></p>}
         <div className="fp-stack">{data.investment.batches.map(b=><details className="fp-rule" key={b.id}><summary><strong>{b.name}</strong><p className="fp-muted">{({settlement:loc('بانتظار تثبيت التكلفة أو إكمال التسوية','Awaiting verified costs or settlement'),funding:loc('بانتظار إكمال التمويل','Awaiting funding'),incoming:loc('بانتظار وصول المخزون','Awaiting inventory'),delivery:loc('بانتظار البيع والتسليم','Awaiting sale and delivery'),collection:loc('تم التسليم وبانتظار التحصيل','Delivered, awaiting collection'),available:loc('متاح للسحب','Available to withdraw'),reserved:loc('محجوز للسحب','Reserved for withdrawal'),paid:loc('تم سحب الأرباح المستحقة','Accrued profit paid')} as Record<string,string>)[b.state]}</p></summary><div className="fp-stats">{[[loc('رأس المال المتفق / المستلم','Agreed / received principal'),b.principal_iqd,b.received_iqd],[loc('أرباح مستحقة / متاحة','Accrued / available profit'),b.earned_iqd,b.available_iqd],[loc('رأس مال مسترد / مسحوب','Recovered / paid principal'),b.recovered_capital_iqd,b.capital_paid_iqd]].map(([title,n,k])=><div className="fp-stat" key={String(title)}><span>{title}</span><Money value={Number(n)}/><Money value={Number(k)}/></div>)}</div><p className="fp-muted">{loc('مستلم / مباع مسلّم / متبقٍ','Received / sold and delivered / remaining')}: {b.qty_received} / {b.delivered_qty} / {b.remaining_qty}</p></details>)}</div>
       </Surface>}
-      <Surface title={loc('طلبات السحب', 'Withdrawal requests')} hint={loc('طلب السحب يحجز الرصيد إلى أن تسدده الإدارة.', 'A withdrawal reserves your balance until the administrator pays it.')}>
-        {!data.withdrawals.length ? <Empty>{loc('لا توجد طلبات سحب بعد.', 'No withdrawal requests yet.')}</Empty> : <div className="fp-rows">{data.withdrawals.map((w) => <div className="fp-row" key={w.id}><div className="min-w-0"><StateBadge state={w.state} /><div className="fp-row-meta">{dateLabel(w.created_at, lang)}</div>{w.reference && <div className="fp-row-meta">{loc('مرجع التسديد: ', 'Payment reference: ')}<bdi>{w.reference}</bdi></div>}{w.state === 'requested' && <Button size="sm" variant="ghost" loading={op.busy} onClick={() => op.run(async () => { await api.post(`${EARNINGS}/withdrawals/${encodeURIComponent(w.id)}/cancel`, {}); await remote.load(); }, loc('ألغي الطلب وأعيد المبلغ إلى المتاح.', 'Request cancelled and funds released.'))}>{loc('إلغاء الطلب', 'Cancel request')}</Button>}</div><div className="text-end"><Money value={w.amount_iqd} />{w.paid_iqd > 0 && w.state !== 'paid' && <p className="fp-row-meta">{loc('المسدد: ', 'Paid: ')}<Money value={w.paid_iqd} /></p>}</div></div>)}</div>}
-      </Surface>
+      </div></details>
     </>}
     <Dialog open={open} onClose={() => setOpen(false)} title={balanceType === 'capital' ? loc('طلب سحب رأس المال المسترد', 'Withdraw recovered capital') : loc('طلب سحب الأرباح', 'Request withdrawal')} busy={op.busy}>
       <div className="fp-stack"><p className="fp-muted">{loc('اختر المبلغ. تُبلّغ الإدارة بطلبك ويُحجز من الرصيد المتاح لحين التسديد.', 'Choose an amount. Your administrator is notified and the balance is reserved until payment.')}</p><Field label={loc('مبلغ السحب', 'Withdrawal amount')}><NumberInput kind="money" min={1} max={balance(balanceType)} value={amount} onValueChange={(n, valid) => setAmount(valid ? n : null)} /></Field><div className="flex justify-between items-center gap-3"><span className="fp-muted">{loc('المتاح: ', 'Available: ')}<Money value={balance(balanceType)} /></span><Button size="sm" variant="ghost" onClick={() => setAmount(balance(balanceType))}>{loc('سحب الكل', 'Withdraw all')}</Button></div><Feedback error={op.error} /></div>
       <footer className="fp-footer"><Button variant="ghost" disabled={op.busy} onClick={() => setOpen(false)}>{loc('رجوع', 'Back')}</Button><Button variant="primary" loading={op.busy} disabled={amount == null || amount <= 0 || amount > balance(balanceType)} onClick={request}>{loc('إرسال طلب السحب', 'Send withdrawal request')}</Button></footer>
     </Dialog>
+  {details && person && <PersonSheet person={person} own onClose={() => setDetails(false)} />}
   <LegacyInvestmentHistory /></div>;
 }
 export { MyEarnings };

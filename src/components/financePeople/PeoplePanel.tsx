@@ -11,6 +11,8 @@ import ProductPicker from '../adminProducts/form/ProductPicker';
 import { NumberInput } from '../ui/NumberInput';
 import { Select } from '../ui/Field';
 import { AccountPicker, api, Button, dateLabel, Dialog, Empty, Feedback, Field, Input, Loading, Money, PEOPLE, Surface, useLanguage, useMutation, useRemote, type Account, type PanelProps } from './shared';
+import { PersonSheet, WorkHolds, WorkStatus, type PersonFinance } from './PersonFinanceView';
+import { personFinanceStrings } from '../../lib/personFinanceStrings';
 
 type Named = { id: string; name?: string; name_ar?: string; name_en?: string; parent_id?: string | null };
 type Scope = { catalog_ids: string[]; product_ids: string[]; excluded_product_ids: string[] };
@@ -24,10 +26,17 @@ const todayInBaghdad = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/
 const firstEarningDay = (value: string) => { const day = new Date(`${value}T00:00:00Z`); day.setUTCDate(day.getUTCDate() + 1); return Number.isNaN(day.getTime()) ? '' : day.toISOString().slice(0, 10); };
 function ruleScope(rule: Rule): Scope { return rule.scope ?? { catalog_ids: rule.target_type === 'catalog' && rule.target_id ? [rule.target_id] : [], product_ids: rule.target_type === 'product' && rule.target_id ? [rule.target_id] : [], excluded_product_ids: [] }; }
 
-export default function PeoplePanel({ onChanged, from, to, month }: PanelProps = {}) {
+export default function PeoplePanel({ onChanged, from, to, month, openOrder }: PanelProps = {}) {
   const { loc, lang, dir } = useLanguage();
+  const s = personFinanceStrings(lang);
   const query = new URLSearchParams(from || to ? {from: from || '', to: to || ''} : month ? {month} : {});
-  const remote = useRemote<Config>(`${PEOPLE}/staff?${query}`), op = useMutation();
+  const staffRemote = useRemote<Config>(`${PEOPLE}/staff?${query}`), op = useMutation();
+  // The one-person picture (worker/lib/personFinance.ts): work status, why
+  // wages wait, and — for someone who also invests — the full account.
+  const people = useRemote<{ people: PersonFinance[] }>(`${PEOPLE}/people?${query}`);
+  const remote = { ...staffRemote, load: async () => { await Promise.all([staffRemote.load(), people.load()]); } };
+  const personOf = (staffId: string) => people.data?.people.find((p) => p.staff_id === staffId || p.work?.roles.some((r) => r.staff_id === staffId));
+  const [sheet, setSheet] = useState<PersonFinance | null>(null);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [editor, setEditor] = useState<{ rule?: Rule; staff: Staff } | null>(null);
@@ -93,13 +102,23 @@ export default function PeoplePanel({ onChanged, from, to, month }: PanelProps =
         {remote.error && <div className="fp-row-actions"><p className="fp-muted" role="status">{loc('تعذر تحديث الأرصدة المعروضة. أعد تحميلها لمعرفة آخر نتيجة محفوظة.', 'Displayed balances could not refresh. Reload to see the latest saved result.')}</p><Button size="sm" loading={remote.loading} onClick={remote.load}>{loc('تحديث الأرصدة', 'Refresh balances')}</Button></div>}
         {!live.length ? <Empty><Users size={26} className="mb-3" aria-hidden="true" />{loc('أضف أول موظف ليبدأ إعداد أجره.', 'Add your first employee to set up their pay.')}</Empty> : <div className="fp-stack">{live.map((person) => {
           const rules = config.rules.filter((rule) => rule.staff_id === person.id);
+          const pf = personOf(person.id), role = pf?.work?.roles.find((r) => r.staff_id === person.id);
           return <article className="fp-rule" key={person.id}>
             <div className="fp-rule-heading fp-staff-heading"><div className="flex items-center gap-3 min-w-0"><span className="fp-avatar" aria-hidden="true">{person.name.slice(0, 1)}</span><div className="min-w-0"><h3>{person.name}</h3><p className="fp-muted">{person.role || loc('موظف', 'Staff')}</p></div></div><span className={`fp-status ${person.active ? 'fp-status-available' : ''}`}>{person.active ? loc('نشط', 'Active') : loc('متوقف', 'Paused')}</span></div>
-            {person.start_work_date && <p className="fp-row-meta">{loc('بدء العمل: ', 'Started: ')}{dateLabel(person.start_work_date, lang)} · {loc('الاستحقاق من ', 'Eligible from ')}{dateLabel(firstEarningDay(person.start_work_date), lang)}</p>}
+            {role && <WorkStatus role={role} s={s} />}
+            {person.start_work_date && <p className="fp-row-meta">{loc('بدء العمل: ', 'Started: ', 'دەستپێکی کار: ')}{dateLabel(person.start_work_date, lang)} · {loc('الاستحقاق من ', 'Eligible from ', 'شایستەبوون لە: ')}{dateLabel(firstEarningDay(person.start_work_date), lang)}</p>}
+            {pf?.investor && <div className="fp-row-actions"><span className="fp-status fp-status-approved">{s.investor}</span><Button size="sm" variant="ghost" onClick={() => setSheet(pf)}>{loc('حسابه الكامل: العمل والاستثمار', 'Full account: work and investment', 'هەژماری تەواو: کار و وەبەرهێنان')}</Button></div>}
             {person.cutoff_earnings && <p className="fp-note" role="status">{loc(`هناك ${person.cutoff_earnings.orders} طلبات بأجور سابقة أُلغيت وأصبحت خارج تاريخ بدء العمل الحالي، أقدمها ${dateLabel(person.cutoff_earnings.first_day, lang)}. إذا استُخدم تاريخ الإيقاف أو العودة كتاريخ بداية، صحّح تاريخ التعيين وسجّل فترة التوقف من «البيانات والإيقاف والاستئناف».`, `${person.cutoff_earnings.orders} previously earned orders are now excluded by the current work start date, beginning ${dateLabel(person.cutoff_earnings.first_day, lang)}. If a pause or return date was entered as the start date, correct the hiring date and record the pause under Details, pause and resume.`)}</p>}
-            {person.period && <p className="fp-note">{loc('نتيجة الفترة: مستحق', 'Period: earned')} <Money value={person.period.earned_iqd} /> · {loc('مسدد في الفترة', 'Paid during period')} <Money value={person.period.paid_iqd} /> · {loc('تعديلات الفترة (مشمولة في الإجمالي التراكمي)', 'Period adjustments (included in cumulative earnings)', 'ڕێکخستنەوە تۆمارکراوەکان لە ماوەدا (لە شایستەکاندا هەن)')} <Money value={person.period.adjustments_iqd} />{person.period.pending_costs > 0 && <span> · {person.period.pending_costs} {loc('بند أجر بانتظار اكتمال الحساب', 'wage entries awaiting calculation')}</span>}</p>}
-            {!!person.period?.adjustments_iqd && <p className="fp-muted">{loc('التعديل ليس رصيدًا مستقلًا للسحب. الرصيد بعد احتساب التسويات والمدفوعات يظهر أدناه، وأي دين فعلي يظهر في «الدين المتبقي».', 'An adjustment is not a separate withdrawable balance. The balance below includes adjustments and payments; any actual debt appears under Remaining debt.', 'ڕێکخستنەوە باڵانسێکی سەربەخۆ بۆ ڕاکێشان نییە. باڵانسی خوارەوە ڕێکخستنەوە و پارەدان دەگرێتەوە؛ قەرزی ڕاستەقینە لە «قەرزی ماوە» دەردەکەوێت.')}</p>}
-            {person.balance && <div className="fp-stats"><div className="fp-stat"><span>{loc('الرصيد التراكمي','Cumulative balance')}</span><Money value={person.balance.staff_net_iqd} /></div><div className="fp-stat"><span>{loc('متاح للسحب','Available')}</span><Money value={person.balance.staff_available_iqd} /></div><div className="fp-stat"><span>{loc('الدين المتبقي','Remaining debt')}</span><Money value={person.balance.staff_debt_iqd} /></div></div>}{person.balance && <StaffBalanceBreakdown balance={person.balance} />}<div className="fp-staff-actions"><Button size="sm" onClick={() => setHistory(person)}>{loc('السجل والتفاصيل','History and details')}</Button><Button size="sm" icon={<Pencil size={14} />} disabled={!canManage || op.busy} onClick={() => { op.clear(); setPersonEditor({ person }); }}>{loc('البيانات والإيقاف والاستئناف', 'Details, pause and resume')}</Button><Button size="sm" icon={<Plus size={15} />} disabled={!canManage || op.busy || !person.active} onClick={() => setEditor({ staff: person })}>{loc('إضافة أجر', 'Add earning rule')}</Button><Button size="sm" variant="ghost" icon={<Trash2 size={14} />} disabled={!canManage || op.busy} onClick={() => { op.clear(); setRemoving(person); }}>{loc('حذف الموظف', 'Delete employee')}</Button></div>
+            {person.balance && <div className="fp-stats">
+              <div className="fp-stat"><span>{s.wagesEarned}</span><Money value={person.balance.staff_iqd ?? null} /></div>
+              <div className="fp-stat"><span>{s.wagesPaid}</span><Money value={person.balance.staff_paid_iqd ?? null} /></div>
+              <div className={`fp-stat${person.balance.staff_available_iqd > 0 ? ' fp-stat-good' : ''}`}><span>{s.availableNow}</span><Money value={person.balance.staff_available_iqd} /></div>
+              {!!person.balance.staff_pending_settlement_reserve_iqd && <div className="fp-stat fp-stat-wait"><span>{s.wagesHeld}</span><Money value={person.balance.staff_pending_settlement_reserve_iqd} /></div>}
+              {!!person.balance.staff_debt_iqd && <div className="fp-stat"><span>{loc('الدين المتبقي', 'Remaining debt', 'قەرزی ماوە')}</span><Money value={person.balance.staff_debt_iqd} /></div>}
+            </div>}
+            {pf?.work && <WorkHolds work={pf.work} owner s={s} />}
+            {person.period && (person.period.earned_iqd !== 0 || person.period.paid_iqd !== 0) && <p className="fp-row-meta">{s.period}: {loc('مستحق', 'earned', 'شایستە')} <Money value={person.period.earned_iqd} /> · {loc('مسدد', 'paid', 'دراوە')} <Money value={person.period.paid_iqd} />{!!person.period.adjustments_iqd && <> · {loc('منها تعديلات', 'of which adjustments', 'لەوە ڕێکخستنەوە')} <Money value={person.period.adjustments_iqd} /></>}</p>}
+            {person.balance && <StaffBalanceBreakdown balance={person.balance} />}<div className="fp-staff-actions"><Button size="sm" onClick={() => setHistory(person)}>{loc('السجل والتفاصيل','History and details')}</Button><Button size="sm" icon={<Pencil size={14} />} disabled={!canManage || op.busy} onClick={() => { op.clear(); setPersonEditor({ person }); }}>{loc('البيانات والإيقاف والاستئناف', 'Details, pause and resume')}</Button><Button size="sm" icon={<Plus size={15} />} disabled={!canManage || op.busy || !person.active} onClick={() => setEditor({ staff: person })}>{loc('إضافة أجر', 'Add earning rule')}</Button><Button size="sm" variant="ghost" icon={<Trash2 size={14} />} disabled={!canManage || op.busy} onClick={() => { op.clear(); setRemoving(person); }}>{loc('حذف الموظف', 'Delete employee')}</Button></div>
             {!person.user_id && <div className="fp-rule-heading fp-staff-heading"><p className="fp-muted">{loc('اربط حسابه ليشاهد أرباحه ويطلب السحب.', 'Link an account for earnings and withdrawals.')}</p><Button size="sm" disabled={!canManage || op.busy} onClick={() => { setLinking(person); setLinkAccount(null); op.clear(); }}>{loc('ربط الحساب', 'Link account')}</Button></div>}
             {jobNotice(person)}
             {!!(person.period?.pending_costs || person.balance?.pending_costs) && <p className="fp-note">{loc('تُحتسب الأجور تلقائيًا وفق القواعد وتواريخ الاستحقاق المحفوظة. تظهر البيانات الناقصة، إن وجدت، في تفاصيل الطلب؛ وتتحدث الأرصدة هنا تلقائيًا.', 'Wages are calculated automatically from the saved rules and earning dates. Any missing inputs appear in order details; balances refresh here automatically.')}</p>}
@@ -114,6 +133,7 @@ export default function PeoplePanel({ onChanged, from, to, month }: PanelProps =
     </Surface>
     {personEditor && <StaffEditor person={personEditor.person} onClose={() => setPersonEditor(null)} onSaved={saved} />}
     {history && <StaffHistorySheet staff={history} onClose={() => setHistory(null)} />}
+    {sheet && <PersonSheet person={people.data?.people.find((p) => p.user_id === sheet.user_id) ?? sheet} onClose={() => setSheet(null)} openOrder={openOrder ? (id) => { setSheet(null); openOrder(id); } : undefined} />}
     {editor && config && (editor.rule ? <WageChangeDialog rule={editor.rule} staff={editor.staff} catalogs={config.catalogs} products={config.scope_products} onClose={() => setEditor(null)} onSaved={(result) => saved(result, loc('تم تسجيل تغيير الأجر والتسوية.', 'Pay change and adjustment recorded.'))} /> : <RuleBuilder config={config} initial={editor} onClose={() => setEditor(null)} onSaved={(result) => saved(result, loc('تم حفظ الأجر.', 'Pay saved.'))} />)}
     <Dialog open={!!removing} onClose={() => setRemoving(null)} title={loc('حذف الموظف', 'Delete employee')} busy={op.busy}>
       <p className="fp-note">{loc(`سيُزال ${removing?.name ?? ''} من الموظفين النشطين وتتوقف مستحقاته الجديدة. تبقى الأرباح والسحوبات السابقة وحسابه محفوظة، ويمكنك إعادته لاحقًا.`, `${removing?.name ?? ''} will leave the active list and stop earning new pay. Past earnings, withdrawals and the user account are preserved. You can restore this employee later.`)}</p><Feedback error={op.error} />

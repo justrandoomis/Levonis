@@ -130,8 +130,8 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
       {section === 'products' && (busy && !data ? <Loading text={loc('تحميل المنتجات…', 'Loading products…')} /> : data && <Products data={data} onOpenOrders={() => setSection('orders')} />)}
       {section === 'monthly' && <MonthlyCosts key={month} month={month} onChanged={refresh} />}
       <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}>
-        {section === 'staff' && <PeoplePanel from={range.from} to={range.to} onChanged={refresh} />}
-        {section === 'investors' && <InvestorPanel from={range.from} to={range.to} onChanged={refresh} />}
+        {section === 'staff' && <PeoplePanel from={range.from} to={range.to} onChanged={refresh} openOrder={setOrderId} />}
+        {section === 'investors' && <InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={setOrderId} />}
         {section === 'settlements' && <WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} />}
         {section === 'accounting' && <>
           <Surface title={loc('المحاسبة', 'Accounting')} subtitle={loc('الأرصدة والقيود والتسويات المعتمدة', 'Balances, journals and verified settlements')}>
