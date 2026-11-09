@@ -4,6 +4,7 @@ import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance
 import { staffBasisFingerprintSql } from './financeParticipants';
 import { investorOrderProjectionStaleSql } from './investorFinance';
 import { membershipDiscountAtLineSql } from './orderMembership';
+import { settledCostSql } from './staffSettledSql';
 
 // An internal checkpoint, deliberately absent from SETTING_KEYS and
 // PUBLIC_SETTING_KEYS. No customer or admin setting API exposes this value.
@@ -38,7 +39,7 @@ const candidate = `o.seller_type='levonis' AND o.status='delivered' AND o.delive
   (EXISTS(SELECT 1 FROM order_items oi WHERE oi.order_id=o.id)
     AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id))
   OR
-  EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.order_id=o.id AND c.staff_id IS NOT NULL AND c.state<>'reversed' AND (
+  EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.order_id=o.id AND c.staff_id IS NOT NULL AND c.state<>'reversed' AND NOT ${settledCostSql('c.id')} AND (
     c.state='pending_cost' OR EXISTS(SELECT 1 FROM finance_wage_targets t WHERE t.cost_id=c.id AND t.amount_iqd IS NULL)
     OR (COALESCE((SELECT basis FROM finance_wage_targets t WHERE t.cost_id=c.id),CASE WHEN json_valid(c.snapshot) THEN json_extract(c.snapshot,'$.rule.basis') END) IN ('profit_percent','revenue_percent')
       AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id AND b.basis_fingerprint=(${staffBasisFingerprintSql('o.id')}))

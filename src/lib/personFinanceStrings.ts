@@ -77,6 +77,11 @@ export interface PersonFinanceStrings {
   wageHold: Partial<Record<HoldReasonKey, (n: number) => string>>;
   profitUnknown: (n: number) => string;
   wholeAgreement: string;
+  /** Wage settlement (DECISIONS row 306): «wages settled through <day> · agreed still owed <amount>». */
+  settledThrough: string;
+  agreedOwed: string;
+  stillOwed: string;
+  nothingOwed: string;
 }
 
 /** «بيع واحد ينتظر …» / «مبيعات تنتظر … (4)»: singular and plural agree, the count follows. */
@@ -174,6 +179,10 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     },
     profitUnknown: ar('ربح بيع واحد لم يُحسب بعد', 'أرباح مبيعات لم تُحسب بعد'),
     wholeAgreement: 'رأس مال هذا الاتفاق يتحمّل الخسارة، فيبقى كله محجوزًا حتى يُحل هذا البيع.',
+    settledThrough: 'سُوّيت الأجور حتى',
+    agreedOwed: 'المتبقي المتفق عليه',
+    stillOwed: 'المتبقي له الآن',
+    nothingOwed: 'لا شيء متبقٍ له',
   },
   en: {
     peopleHint: 'For each person: their capital and where it is now, their profit share, what they earned from investing and working, and what they can withdraw now.',
@@ -265,6 +274,10 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     },
     profitUnknown: (n) => `Profit of ${n} sale${n === 1 ? '' : 's'} not calculated yet`,
     wholeAgreement: 'This agreement\'s capital shares losses, so all of it waits until this sale is resolved.',
+    settledThrough: 'Wages settled through',
+    agreedOwed: 'agreed still owed',
+    stillOwed: 'Still owed now',
+    nothingOwed: 'Nothing owed',
   },
   ckb: {
     peopleHint: 'بۆ هەر کەسێک: سەرمایەکەی و ئێستا لە کوێیە، بەشی قازانجەکەی، ئەوەی لە وەبەرهێنان و کار بەدەستی هێناوە، و ئەوەی ئێستا دەتوانێت ڕایبکێشێت.',
@@ -356,6 +369,10 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     },
     profitUnknown: (n) => `قازانجی ${n} فرۆشتن هێشتا حیساب نەکراوە`,
     wholeAgreement: 'سەرمایەی ئەم ڕێککەوتنە بەشداری زیان دەکات، بۆیە هەمووی ڕادەگیرێت تا ئەم فرۆشتنە چارەسەر دەکرێت.',
+    settledThrough: 'کرێکان یەکلاکرانەوە تا',
+    agreedOwed: 'بڕی ڕێککەوتوو کە ماوە',
+    stillOwed: 'ئێستا ماوە بۆی',
+    nothingOwed: 'هیچی بۆ نەماوە',
   },
 };
 

@@ -23,7 +23,7 @@ export type AgreementFinance = {
   profit: { earned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; held_iqd: number; sales: number; sales_unknown: number };
   held_whole: boolean; held_sales: HeldSale[]; held_sales_more: number; held_rest: HeldRest | null;
 };
-export type PersonWork = { staff_id: string; name: string; role: string; status: 'active' | 'paused' | 'archived'; start_work_date: string | null; paused_from: string | null; resumes_at: string | null; working_since: string | null; pauses: { from: string; to: string | null }[] };
+export type PersonWork = { staff_id: string; name: string; role: string; status: 'active' | 'paused' | 'archived'; start_work_date: string | null; paused_from: string | null; resumes_at: string | null; working_since: string | null; pauses: { from: string; to: string | null }[]; settlement?: { through_day: string; owed_iqd: number; settlement_day: string } | null };
 type Investor = {
   state: string; default_profit_share_bps: number | null;
   capital: { agreed_iqd: number; put_in_iqd: number; in_agreements_iqd: number; in_goods_iqd: number; sold_held_iqd: number; at_work_iqd: number; returned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; debt_iqd: number; not_recovered_iqd: number; unused_returned_iqd: number; awaiting_rest_of_funding_iqd: number; loss_iqd: number };
@@ -54,13 +54,16 @@ function Stat({ label, value, hint, tone }: { label: string; value: number | nul
 export function WorkStatus({ role, s }: { role: PersonWork; s: PersonFinanceStrings }) {
   const { lang } = useLanguage();
   const tone = role.status === 'active' ? 'fp-status-available' : role.status === 'paused' ? 'fp-status-pending' : '';
-  return <p className="fp-person-status"><span className={`fp-status ${tone}`}>{role.status === 'active' ? s.active : role.status === 'paused' ? s.paused : s.archived}</span>
+  return <><p className="fp-person-status"><span className={`fp-status ${tone}`}>{role.status === 'active' ? s.active : role.status === 'paused' ? s.paused : s.archived}</span>
     <span>{role.role || role.name}</span>
     {role.status === 'paused' && role.paused_from && <span className="fp-row-meta">{s.since} {dateLabel(role.paused_from, lang)}</span>}
     {role.status === 'paused' && role.resumes_at && <span className="fp-row-meta">· {s.resumesOn} {dateLabel(role.resumes_at, lang)}</span>}
     {role.status === 'active' && role.working_since && <span className="fp-row-meta">{s.since} {dateLabel(role.working_since, lang)}</span>}
-  </p>;
+  </p>
+    {role.settlement && <p className="fp-row-meta">{s.settledThrough} {dateLabel(dayBefore(role.settlement.through_day), lang)} · {s.agreedOwed} <Money value={role.settlement.owed_iqd} /></p>}</>;
 }
+/** A settlement covers orders delivered BEFORE its day: the last settled day is the one before. */
+const dayBefore = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
 
 /** Where the capital put in is now. The parts always add up to it. */
 export function CapitalBar({ capital, s }: { capital: Investor['capital']; s: PersonFinanceStrings }) {

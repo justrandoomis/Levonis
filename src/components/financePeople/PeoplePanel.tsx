@@ -26,6 +26,15 @@ const todayInBaghdad = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/
 const firstEarningDay = (value: string) => { const day = new Date(`${value}T00:00:00Z`); day.setUTCDate(day.getUTCDate() + 1); return Number.isNaN(day.getTime()) ? '' : day.toISOString().slice(0, 10); };
 function ruleScope(rule: Rule): Scope { return rule.scope ?? { catalog_ids: rule.target_type === 'catalog' && rule.target_id ? [rule.target_id] : [], product_ids: rule.target_type === 'product' && rule.target_id ? [rule.target_id] : [], excluded_product_ids: [] }; }
 
+/** A removed employee is still paid what is owed: show it, and any wage settlement (DECISIONS row 306). */
+function ArchivedBalance({ pf, staffId, s }: { pf: PersonFinance | undefined; staffId: string; s: ReturnType<typeof personFinanceStrings> }) {
+  const role = pf?.work?.roles.find((r) => r.staff_id === staffId);
+  // The balance is the person's; show it here only when no live role carries it.
+  if (!pf?.work || !role || pf.work.roles.some((r) => r.status !== 'archived')) return null;
+  return <>{role.settlement && <WorkStatus role={role} s={s} />}
+    <p className="fp-row-meta">{pf.work.balance_iqd > 0 ? <>{s.stillOwed}: <Money value={pf.work.balance_iqd} /></> : s.nothingOwed}</p></>;
+}
+
 export default function PeoplePanel({ onChanged, from, to, month, openOrder }: PanelProps = {}) {
   const { loc, lang, dir } = useLanguage();
   const s = personFinanceStrings(lang);
@@ -130,7 +139,7 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
             })}
           </article>;
         })}</div>}
-        {archived.length > 0 && <details className="fp-detail"><summary>{loc(`موظفون محذوفون (${archived.length})`, `Deleted employees (${archived.length})`)}</summary><div className="fp-stack">{archived.map((person) => <article key={person.id} className="fp-rule"><div className="fp-rule-heading fp-staff-heading"><div><h3>{person.name}</h3><p className="fp-muted">{loc('السجل والمستحقات السابقة محفوظة.', 'Previous earnings and history are preserved.')}</p></div><Button size="sm" icon={<RotateCcw size={14} />} loading={op.busy} disabled={!canManage} onClick={() => { let background = false; return op.run(async () => { const result = await api.patch<StaffWrite>(`${PEOPLE}/staff/${encodeURIComponent(person.id)}`, { active: true, restore: true }); await refresh(); if (result.reconciliation) { background = !await reconcile(result.reconciliation); if (mounted.current) await refresh(); } }, () => background ? backgroundNotice() : loc('تمت إعادة الموظف.', 'Employee restored.')); }}>{loc('إعادة الموظف', 'Restore employee')}</Button></div>{jobNotice(person)}</article>)}</div></details>}
+        {archived.length > 0 && <details className="fp-detail"><summary>{loc(`موظفون محذوفون (${archived.length})`, `Deleted employees (${archived.length})`)}</summary><div className="fp-stack">{archived.map((person) => <article key={person.id} className="fp-rule"><div className="fp-rule-heading fp-staff-heading"><div><h3>{person.name}</h3><p className="fp-muted">{loc('السجل والمستحقات السابقة محفوظة.', 'Previous earnings and history are preserved.')}</p><ArchivedBalance pf={personOf(person.id)} staffId={person.id} s={s} /></div><Button size="sm" icon={<RotateCcw size={14} />} loading={op.busy} disabled={!canManage} onClick={() => { let background = false; return op.run(async () => { const result = await api.patch<StaffWrite>(`${PEOPLE}/staff/${encodeURIComponent(person.id)}`, { active: true, restore: true }); await refresh(); if (result.reconciliation) { background = !await reconcile(result.reconciliation); if (mounted.current) await refresh(); } }, () => background ? backgroundNotice() : loc('تمت إعادة الموظف.', 'Employee restored.')); }}>{loc('إعادة الموظف', 'Restore employee')}</Button></div>{jobNotice(person)}</article>)}</div></details>}
       </>}
     </Surface>
     {personEditor && <StaffEditor person={personEditor.person} onClose={() => setPersonEditor(null)} onSaved={saved} />}

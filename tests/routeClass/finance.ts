@@ -116,6 +116,7 @@ export default {
         'GET /staff/:id/reconcile': 'cost_read',
         'POST /staff/:id/reconcile': 'cost_write',
         'POST /staff/:id/recheck': 'cost_write',
+        'POST /staff/:id/settle': 'cost_write',
         'GET /people': 'cost_read',
         'GET /accounts/:id/earnings': 'cost_read',
         'GET /withdrawals': 'cost_read',

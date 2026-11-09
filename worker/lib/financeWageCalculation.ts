@@ -8,6 +8,7 @@ import { snapshotFor, costAmount } from './orderFinance';
 import { nextEmploymentDay, staffCanAccrue, staffDateEligible, type EmploymentStaff } from './financeEmployment';
 import { effectiveWageRules, wageVersions, type EffectiveWageRule, type WageVersion } from './financeWageTimeline';
 import { readRuleScope } from './financeRuleScopes';
+import { settledCostSql } from './staffSettledSql';
 import { readNeverLinkedLines } from './financeDeletedProductScope';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { participantNetProfit } from './participantProfit';
@@ -17,6 +18,8 @@ export interface WageCost {
   id:string;order_item_id:string|null;rule_id:string;staff_id:string;state:string;snapshot:string;
   amount_iqd:number|null;effective_iqd:number|null;paid_iqd:number;held_iqd:number;
   manual_iqd:number|null;category_id:string;rule_name:string;group_key:string;milestone:string;
+  /** Inside a wage settlement (DECISIONS row 306): never re-planned. */
+  settled?:number;
 }
 export interface WageTarget {
   cost:WageCost|null;rule:EffectiveWageRule;line_id:string|null;amount:number|null;
@@ -26,7 +29,8 @@ export const wageCostQuery=`SELECT c.*,
  c.amount_iqd+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments WHERE cost_id=c.id),0) AS effective_iqd,
  (SELECT COALESCE(SUM(amount_iqd),0) FROM finance_payment_allocations WHERE cost_id=c.id) AS paid_iqd,
  (SELECT COALESCE(SUM(a.amount_iqd-a.paid_iqd),0) FROM finance_withdrawal_allocations a JOIN finance_withdrawals w ON w.id=a.withdrawal_id WHERE a.source_kind='staff' AND a.source_id=c.id AND w.state IN('requested','approved','part_paid')) AS held_iqd,
- (SELECT after_iqd FROM finance_cost_adjustments WHERE cost_id=c.id AND kind='manual' ORDER BY created_at DESC,id DESC LIMIT 1) AS manual_iqd
+ (SELECT after_iqd FROM finance_cost_adjustments WHERE cost_id=c.id AND kind='manual' ORDER BY created_at DESC,id DESC LIMIT 1) AS manual_iqd,
+ ${settledCostSql('c.id')} AS settled
  FROM finance_order_costs c WHERE c.order_id=? AND c.staff_id=? AND c.state<>'reversed' ORDER BY c.order_item_id,c.id`;
 const key=(rule:string,line:string|null)=>JSON.stringify([rule,line]);
 export function deliveryDay(order:Record<string,unknown>):string|null {
@@ -41,6 +45,9 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
   const managed=new Set(versions.map(v=>v.rule_id));
   const day=deliveryDay(base.order);
   if(!day)return [];
+  // A settled period is closed (DECISIONS row 306): its agreed rows stay as they
+  // are and no new row is created for an order delivered inside it.
+  if(await db.prepare('SELECT 1 FROM finance_staff_settlements WHERE staff_id=? AND through_day>? LIMIT 1').bind(staff.id,day).first())return [];
   const eligible=staffCanAccrue(staff,base.order);
   const rules=eligible?effectiveWageRules(versions,staff,day):[];
   // Pre-timeline revisions do not prove when an old value was agreed to start.
@@ -124,7 +131,9 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
     const rule=(JSON.parse(cost.snapshot) as {rule:EffectiveWageRule}).rule;
     result.push({cost,rule,line_id:cost.order_item_id,amount:0,qty:0,base_iqd:0,manual:false,line_ids:cost.order_item_id?[cost.order_item_id]:[]});
   }
-  return result;
+  // A settled row keeps its agreed amount even if its order later moves out of
+  // the settled period; its target is dropped, so no duplicate row is created.
+  return result.filter(t=>!t.cost?.settled);
 }
 
 export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:{actor?:string;day?:string}={}) {

@@ -27,6 +27,7 @@ import { wageVersionStatement } from '../lib/financeWageTimeline';
 import { nextEmploymentDay, queueStaffReconciliation, readStaff, updateStaffEmployment } from '../lib/financeEmployment';
 
 import { staffActiveAt } from '../lib/financeEmploymentIntervals';
+import { settledCostSql } from '../lib/staffSettledSql';
 
 export const adminFinanceOperationsRoutes = new Hono<AppContext>();
 adminFinanceOperationsRoutes.use('*', requireAdmin);
@@ -302,6 +303,8 @@ adminFinanceOperationsRoutes.post('/costs/:id/reverse', async (c) => {
     .first<{ state: string; amount_iqd: number; expense_id: string | null; staff_id: string | null }>();
   if (!cost) throw notFound('Cost not found');
   if (cost.state === 'reversed') return c.json({ success: true, already: true });
+  if (await db.prepare(`SELECT ${settledCostSql('?')} AS settled`).bind(id).first<{ settled: number }>().then((r) => !!r?.settled))
+    throw conflict('هذا الأجر ضمن تسوية نهائية متفق عليها؛ لا يُعكس');
   if (
     await db
       .prepare('SELECT cost_id FROM finance_payment_allocations WHERE cost_id=? LIMIT 1')

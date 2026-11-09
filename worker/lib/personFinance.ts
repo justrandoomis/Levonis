@@ -5,6 +5,7 @@ import { investorReportedAllocationsSql } from './investorCapitalReporting';
 import { staffPeriodReport } from './financeParticipantReports';
 import { financeRangeArgs, inFinanceRangeSql, type FinanceRange } from './financeRange';
 import { remainingAllocationQtySql } from './inventoryAllocationQuantity';
+import { latestSettlements } from './staffSettlement';
 
 /**
  * ONE PERSON, ONE PICTURE (owner request 2026-11-09: «he doesnot show his
@@ -75,6 +76,9 @@ export interface PersonWork {
   working_since: string | null;
   /** Owner view only (empty for the person). */
   pauses: EmploymentInterval[];
+  /** The latest wage settlement (DECISIONS row 306): orders delivered before
+   * `through_day` are settled at `owed_iqd` still owed. The person sees their own. */
+  settlement: { through_day: string; owed_iqd: number; settlement_day: string } | null;
 }
 
 export type HoldSummary = { reason: HoldReason; sales: number; profit_iqd?: number; capital_iqd?: number; profit_unknown: number };
@@ -317,7 +321,8 @@ type StaffRow = { id: string; name: string; role: string; user_id: string | null
 
 async function workPart(db: D1Database, staffRows: StaffRow[], sources: ParticipantSource[], summary: ReturnType<typeof participantSummary>, owner: boolean): Promise<PersonFinance['work']> {
   if (!staffRows.length) return null;
-  const roles = staffRows.map((s) => ({ staff_id: s.id, name: s.name, role: s.role, start_work_date: s.start_work_date, ...workStatus(s) })).map((r) => owner ? r : { ...r, pauses: [] });
+  const settled = await latestSettlements(db, staffRows.map((s) => s.id));
+  const roles = staffRows.map((s) => ({ staff_id: s.id, name: s.name, role: s.role, start_work_date: s.start_work_date, ...workStatus(s), settlement: settled.get(s.id) ?? null })).map((r) => owner ? r : { ...r, pauses: [] });
   const earned = summary.staff_iqd, paid = summary.staff_paid_iqd, reserved = summary.staff_held_iqd, available = summary.staff_available_iqd;
   const held = unpaid(earned, paid, reserved, available);
   const blocked = sources.filter((s) => s.kind === 'staff' && s.blocked && s.accrued_iqd - s.paid_iqd > 0);
