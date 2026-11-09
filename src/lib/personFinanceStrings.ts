@@ -25,8 +25,12 @@ export interface PersonFinanceStrings {
   heldNow: string;
   investmentTitle: string;
   capitalPutIn: string;
-  inStock: string;
-  inTransit: string;
+  inGoods: string;
+  backFromSales: string;
+  heldOf: string;
+  availableOf: string;
+  reservedNow: string;
+  earningsPart: string;
   soldHeld: string;
   returned: string;
   unusedReturned: string;
@@ -59,9 +63,11 @@ export interface PersonFinanceStrings {
   settings: string;
   allAgreements: (n: number) => string;
   agreementUnits: (received: number, sold: number, stock: number) => string;
-  unitsLine: (sold: number, stock: number) => string;
+  unitsLine: (stock: number, orders: number, sold: number, notReceived: number) => string;
+  moreSales: (n: number) => string;
   hold: Record<HoldReasonKey, (n: number) => string>;
   holdAction: Partial<Record<HoldReasonKey, string>>;
+  wageAction: Partial<Record<HoldReasonKey, string>>;
   wageHold: Partial<Record<HoldReasonKey, (n: number) => string>>;
   profitUnknown: (n: number) => string;
   wholeAgreement: string;
@@ -84,8 +90,12 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     heldNow: 'محجوز مؤقتًا',
     investmentTitle: 'الاستثمار',
     capitalPutIn: 'رأس المال المدفوع',
-    inStock: 'في المخزون (لم يُبع بعد)',
-    inTransit: 'في الطريق (لم يصل المخزن)',
+    inGoods: 'في المخزون أو في طلبات لم تُسلَّم',
+    backFromSales: 'رجع من المبيعات',
+    heldOf: 'منه محجوز',
+    availableOf: 'منه متاح للسحب',
+    reservedNow: 'محجوز لطلب سحب',
+    earningsPart: 'أرباح',
     soldHeld: 'بيع وينتظر الإفراج',
     returned: 'أُعيد إلى الحساب',
     unusedReturned: 'منه مبلغ لم يُستخدم في الشراء',
@@ -118,7 +128,8 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     settings: 'الإعدادات',
     allAgreements: (n) => (n === 1 ? 'في الاتفاق' : `في كل الاتفاقات (${n})`),
     agreementUnits: (received, sold, stock) => `مستلم ${received} · مباع ${sold} · في المخزون ${stock}`,
-    unitsLine: (sold, stock) => `مباع ${sold} · في المخزون ${stock}`,
+    unitsLine: (stock, orders, sold, notReceived) => `في المخزون ${stock} · في طلبات لم تُسلَّم ${orders} · مباع ${sold}${notReceived ? ` · لم يصل ${notReceived}` : ''}`,
+    moreSales: (n) => `و${n} أخرى`,
     hold: {
       collection: ar('بيع واحد ينتظر تسجيل استلام نقد المندوب', 'مبيعات تنتظر تسجيل استلام نقد المندوب'),
       cost: ar('بيع واحد تنقصه تكلفة البضاعة', 'مبيعات تنقصها تكلفة البضاعة'),
@@ -130,6 +141,11 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     holdAction: {
       collection: 'يُسجَّل من «المالية ← التحصيل وشركات التوصيل».',
       cost: 'تُدخل التكلفة من تفاصيل الطلب أو دفعة المخزون.',
+      cancelled: 'يُحسم الإلغاء أو المرتجع من تفاصيل الطلب.',
+      recalculation: 'يكتمل تلقائيًا خلال دقائق.',
+    },
+    wageAction: {
+      cost: 'تُدخل تكلفة الطلب من تفاصيله.',
       cancelled: 'يُصحَّح الأجر من «السجل والتفاصيل».',
       recalculation: 'يكتمل تلقائيًا خلال دقائق.',
     },
@@ -153,8 +169,12 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     heldNow: 'Held for now',
     investmentTitle: 'Investment',
     capitalPutIn: 'Capital put in',
-    inStock: 'In stock (not sold yet)',
-    inTransit: 'On the way (not received yet)',
+    inGoods: 'In stock or on undelivered orders',
+    backFromSales: 'Back from sales',
+    heldOf: 'of which held',
+    availableOf: 'of which available to withdraw',
+    reservedNow: 'Reserved for a withdrawal request',
+    earningsPart: 'Earnings',
     soldHeld: 'Sold, waiting to be released',
     returned: 'Returned to the account',
     unusedReturned: 'of which never used in a purchase',
@@ -187,7 +207,8 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     settings: 'Settings',
     allAgreements: (n) => (n === 1 ? 'on the agreement' : `on all ${n} agreements`),
     agreementUnits: (received, sold, stock) => `Received ${received} · sold ${sold} · in stock ${stock}`,
-    unitsLine: (sold, stock) => `Sold ${sold} · in stock ${stock}`,
+    unitsLine: (stock, orders, sold, notReceived) => `In stock ${stock} · on undelivered orders ${orders} · sold ${sold}${notReceived ? ` · not received ${notReceived}` : ''}`,
+    moreSales: (n) => `and ${n} more`,
     hold: {
       collection: en('sale', 'waiting for the courier cash to be recorded'),
       cost: en('sale', 'missing a cost of goods'),
@@ -199,6 +220,11 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     holdAction: {
       collection: 'Recorded in Finance → Collections and couriers.',
       cost: 'Enter the cost in the order details or the stock batch.',
+      cancelled: 'Settle the cancellation or return in the order details.',
+      recalculation: 'Finishes by itself within minutes.',
+    },
+    wageAction: {
+      cost: 'Enter the order cost in its details.',
       cancelled: 'Correct the wage under History and details.',
       recalculation: 'Finishes by itself within minutes.',
     },
@@ -222,8 +248,12 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     heldNow: 'بۆ ئێستا ڕاگیراوە',
     investmentTitle: 'وەبەرهێنان',
     capitalPutIn: 'سەرمایەی دانراو',
-    inStock: 'لە کۆگادایە (هێشتا نەفرۆشراوە)',
-    inTransit: 'لە ڕێگادایە (هێشتا نەگەیشتووە)',
+    inGoods: 'لە کۆگادایە یان لە داواکاریی نەگەیەندراودا',
+    backFromSales: 'لە فرۆشتنەوە گەڕاوەتەوە',
+    heldOf: 'لەوە ڕاگیراوە',
+    availableOf: 'لەوە بەردەستە بۆ ڕاکێشان',
+    reservedNow: 'گیراوە بۆ داواکاریی ڕاکێشان',
+    earningsPart: 'قازانجەکان',
     soldHeld: 'فرۆشراوە و چاوەڕێی ئازادکردنە',
     returned: 'گەڕایەوە بۆ هەژمارەکە',
     unusedReturned: 'لەوە بڕێک لە کڕیندا بەکارنەهاتووە',
@@ -256,7 +286,8 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     settings: 'ڕێکخستنەکان',
     allAgreements: (n) => (n === 1 ? 'لە ڕێککەوتنەکەدا' : `لە هەموو ${n} ڕێککەوتنەکەدا`),
     agreementUnits: (received, sold, stock) => `وەرگیراو ${received} · فرۆشراو ${sold} · لە کۆگا ${stock}`,
-    unitsLine: (sold, stock) => `فرۆشراو ${sold} · لە کۆگا ${stock}`,
+    unitsLine: (stock, orders, sold, notReceived) => `لە کۆگا ${stock} · لە داواکاریی نەگەیەندراو ${orders} · فرۆشراو ${sold}${notReceived ? ` · نەگەیشتوو ${notReceived}` : ''}`,
+    moreSales: (n) => `و ${n} فرۆشتنی تر`,
     hold: {
       collection: (n) => `${n} فرۆشتن چاوەڕێی تۆمارکردنی وەرگرتنی پارەی گەیەنەرە`,
       cost: (n) => `${n} فرۆشتن تێچووی کاڵاکەی تەواو نییە`,
@@ -268,6 +299,11 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     holdAction: {
       collection: 'لە «دارایی ← کۆکردنەوەی پارە و گەیەنەرەکان» تۆمار دەکرێت.',
       cost: 'تێچووەکە لە وردەکاریی داواکارییەکە یان لە بەشی کۆگا دەنووسرێت.',
+      cancelled: 'هەڵوەشاندنەوە یان گەڕاندنەوەکە لە وردەکاریی داواکارییەکەدا یەکلا دەکرێتەوە.',
+      recalculation: 'لە ماوەی چەند خولەکێکدا خۆی تەواو دەبێت.',
+    },
+    wageAction: {
+      cost: 'تێچووی داواکارییەکە لە وردەکارییەکەیدا دەنووسرێت.',
       cancelled: 'کرێکە لە «تۆمار و وردەکاری» ڕاست دەکرێتەوە.',
       recalculation: 'لە ماوەی چەند خولەکێکدا خۆی تەواو دەبێت.',
     },

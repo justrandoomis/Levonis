@@ -14,6 +14,7 @@
 .fp-money { display:inline-flex; align-items:baseline; gap:5px; font-weight:650; white-space:nowrap; }
 .fp-money small { color:var(--ap-text-2); font-size:11px; font-weight:400; }
 .fp-stat .fp-money { font-size:19px; }
+.fp .fp-stat .fp-row-meta .fp-money { font-size:12px; }
 .fp-hero { padding:24px; border-radius:var(--radius-xl); border:1px solid var(--ap-border); background:var(--ap-surface-1); display:flex; gap:20px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
 .fp-hero .fp-money { font-size:clamp(25px,6vw,36px); }
 .fp-hero .fp-money small { font-size:13px; }

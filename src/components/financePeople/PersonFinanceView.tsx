@@ -9,36 +9,37 @@ import { Button, Dialog, Money, dateLabel, useLanguage } from './shared';
  * person's own «أرباحي»: what was earned from investing and working, what can
  * be withdrawn now, where the capital is, the share of each agreement, the
  * return so far, and why anything is held. Display only: every figure is the
- * server's. The person's own page (`own`) shows no order ids and none of the
- * owner's instructions.
+ * server's. The person's own page (`own`) receives no order ids and no amount
+ * per sale or per reason, and shows none of the owner's instructions.
  */
 export type HoldReason = HoldReasonKey;
-export type HeldSale = { order_id?: string; day?: string | null; reasons: HoldReason[]; profit_iqd: number; capital_iqd: number; profit_unknown: boolean };
+export type HeldSale = { order_id: string; day: string | null; reasons: HoldReason[]; profit_iqd: number; capital_iqd: number; profit_unknown: boolean };
+export type HeldRest = { reason: HoldReason; sales: number; profit_iqd?: number; capital_iqd?: number };
 export type AgreementFinance = {
   id: string; name: string; product_name: string | null; product_name_ar: string | null; label: string | null; created_at: string;
   principal_iqd: number; funded_iqd: number; profit_share_bps: number; loss_share_bps: number;
-  units: { received: number; sold: number; in_stock: number };
-  capital: { in_stock_iqd: number | null; in_transit_iqd: number; back_from_sales_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; held_iqd: number; loss_iqd: number };
+  units: { ordered: number; received: number; in_stock: number; in_orders: number; sold: number };
+  capital: { back_from_sales_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; held_iqd: number; loss_iqd: number };
   profit: { earned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; held_iqd: number; sales: number; sales_unknown: number };
-  held_whole: boolean; held_sales: HeldSale[];
+  held_whole: boolean; held_sales: HeldSale[]; held_sales_more: number; held_rest: HeldRest | null;
 };
 export type PersonWork = { staff_id: string; name: string; role: string; status: 'active' | 'paused' | 'archived'; start_work_date: string | null; paused_from: string | null; resumes_at: string | null; working_since: string | null; pauses: { from: string; to: string | null }[] };
 type Investor = {
   state: string; default_profit_share_bps: number | null;
-  capital: { agreed_iqd: number; put_in_iqd: number; in_agreements_iqd: number; in_stock_iqd: number | null; in_transit_iqd: number; sold_held_iqd: number; at_work_iqd: number | null; unused_returned_iqd: number; awaiting_rest_of_funding_iqd: number; returned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; loss_iqd: number };
+  capital: { agreed_iqd: number; put_in_iqd: number; in_agreements_iqd: number; in_goods_iqd: number; sold_held_iqd: number; at_work_iqd: number; returned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; unused_returned_iqd: number; awaiting_rest_of_funding_iqd: number; loss_iqd: number };
   profit: { earned_iqd: number; available_iqd: number; reserved_iqd: number; paid_iqd: number; held_iqd: number; debt_iqd: number };
   share: { agreements_bps: number[]; min_bps: number | null; max_bps: number | null; earned_bps: number | null };
   roi_bps: number | null;
-  units: { received: number; sold: number; in_stock: number };
+  units: { ordered: number; received: number; in_stock: number; in_orders: number; sold: number };
   agreements: AgreementFinance[];
-  holds: { reason: HoldReason; sales: number; profit_iqd: number; capital_iqd: number; profit_unknown: number }[];
+  holds: { reason: HoldReason; sales: number; profit_iqd?: number; capital_iqd?: number; profit_unknown: number }[];
 };
-type Work = { roles: PersonWork[]; earned_iqd: number; paid_iqd: number; available_iqd: number; reserved_iqd: number; held_iqd: number; debt_iqd: number; balance_iqd: number; pending_costs: number; holds: { reason: HoldReason; entries: number; amount_iqd: number }[] };
+type Work = { roles: PersonWork[]; earned_iqd: number; paid_iqd: number; available_iqd: number; reserved_iqd: number; held_iqd: number; debt_iqd: number; balance_iqd: number; pending_costs: number; holds: { reason: HoldReason; entries: number; amount_iqd?: number }[] };
 export type PersonFinance = {
   user_id: string | null; staff_id?: string; name: string;
   investor: null | Investor;
   work: null | Work;
-  combined: { earned_iqd: number; paid_iqd: number; available_iqd: number; held_iqd: number };
+  combined: { earned_iqd: number; paid_iqd: number; reserved_iqd: number; held_iqd: number; available_earnings_iqd: number; available_capital_iqd: number; available_iqd: number };
   period?: { wages_iqd: number; profit_iqd: number };
 };
 
@@ -61,11 +62,10 @@ export function WorkStatus({ role, s }: { role: PersonWork; s: PersonFinanceStri
   </p>;
 }
 
-/** Where the capital is now: one bar, and the same figures in words. */
+/** Where the capital put in is now. The parts always add up to it. */
 export function CapitalBar({ capital, s }: { capital: Investor['capital']; s: PersonFinanceStrings }) {
   const parts = [
-    { key: 'stock', label: s.inStock, value: capital.in_stock_iqd ?? 0 },
-    { key: 'transit', label: s.inTransit, value: capital.in_transit_iqd },
+    { key: 'stock', label: s.inGoods, value: capital.in_goods_iqd },
     { key: 'sold', label: s.soldHeld, value: capital.sold_held_iqd },
     { key: 'returned', label: s.returned, value: capital.returned_iqd },
     { key: 'loss', label: s.capitalLoss, value: capital.loss_iqd },
@@ -74,8 +74,8 @@ export function CapitalBar({ capital, s }: { capital: Investor['capital']; s: Pe
   return <div className="fp-stack fp-capital">
     {total > 0 && <div className="fp-capbar" aria-hidden="true">{parts.map((p) => <span key={p.key} className={`fp-capbar-${p.key}`} style={{ width: `${Math.max(1.5, (p.value / total) * 100)}%` }} />)}</div>}
     <ul className="fp-legend">{parts.map((p) => <li key={p.key}><i className={`fp-dot fp-capbar-${p.key}`} aria-hidden="true" /><span>{p.label}</span><Money value={p.value} />
-      {p.key === 'returned' && capital.unused_returned_iqd > 0 && <small className="fp-row-meta">{s.unusedReturned}: <Money value={capital.unused_returned_iqd} /></small>}</li>)}
-      {capital.in_stock_iqd === null && <li><span>{s.inStock}</span><Money value={null} /></li>}</ul>
+      {p.key === 'returned' && capital.available_iqd > 0 && <small className="fp-row-meta">{s.availableOf}: <Money value={capital.available_iqd} /></small>}
+      {p.key === 'returned' && capital.unused_returned_iqd > 0 && <small className="fp-row-meta">{s.unusedReturned}: <Money value={capital.unused_returned_iqd} /></small>}</li>)}</ul>
   </div>;
 }
 
@@ -88,18 +88,18 @@ function Holds({ items, s }: { items: HoldItem[]; s: PersonFinanceStrings }) {
     {i.action && <small className="fp-row-meta">{i.action}</small>}</li>)}</ul></div>;
 }
 
-/** Why investment money is held, in words. `owner` adds what to do about it. */
+/** Why investment money is held, in words. `owner` adds amounts and what to do. */
 export function InvestmentHolds({ investor, owner, s }: { investor: Investor; owner: boolean; s: PersonFinanceStrings }) {
-  const items: HoldItem[] = investor.holds.map((h) => ({ key: h.reason, text: s.hold[h.reason](h.sales), profit: h.profit_iqd, capital: h.capital_iqd, action: owner ? s.holdAction[h.reason] : undefined }));
+  const items: HoldItem[] = investor.holds.map((h) => ({ key: h.reason, text: s.hold[h.reason](h.sales), profit: owner ? h.profit_iqd : undefined, capital: owner ? h.capital_iqd : undefined, action: owner ? s.holdAction[h.reason] : undefined }));
   const unknown = investor.holds.reduce((n, h) => n + h.profit_unknown, 0);
   if (unknown) items.push({ key: 'unknown', text: s.profitUnknown(unknown) });
-  if (investor.agreements.some((a) => a.held_whole && a.held_sales.some((h) => h.reasons.includes('agreement')))) items.push({ key: 'whole', text: s.wholeAgreement });
+  if (investor.agreements.some((a) => a.held_whole)) items.push({ key: 'whole', text: s.wholeAgreement });
   return <Holds items={items} s={s} />;
 }
 
-/** Why wages are held, in words. `owner` adds what to do about it. */
+/** Why wages are held, in words. `owner` adds amounts and what to do. */
 export function WorkHolds({ work, owner, s }: { work: Work; owner: boolean; s: PersonFinanceStrings }) {
-  return <Holds s={s} items={work.holds.map((h) => ({ key: h.reason, text: (s.wageHold[h.reason] ?? s.wageHold.recalculation!)(h.entries), amount: h.amount_iqd, action: owner ? s.holdAction[h.reason] : undefined }))} />;
+  return <Holds s={s} items={work.holds.map((h) => ({ key: h.reason, text: (s.wageHold[h.reason] ?? s.wageHold.recalculation!)(Math.max(1, h.entries)), amount: owner ? h.amount_iqd : undefined, action: owner ? s.wageAction[h.reason] : undefined }))} />;
 }
 
 function ShareStat({ investor: inv, s }: { investor: Investor; s: PersonFinanceStrings }) {
@@ -110,10 +110,10 @@ function ShareStat({ investor: inv, s }: { investor: Investor; s: PersonFinanceS
       {fallback != null && fallback !== max && <>{min != null && ' · '}{s.defaultShare} <Pct bps={fallback} /></>}</p></div>;
 }
 
-/** The at-a-glance card. `own` is the person's own page: no settings, no owner actions. */
+/** The at-a-glance card. `own` is the person's own page: no settings, no owner amounts or actions. */
 export function PersonCard({ person, onOpen, actions, own = false }: { person: PersonFinance; onOpen?: () => void; actions?: ReactNode; own?: boolean }) {
   const { lang } = useLanguage(), s = strings(lang);
-  const inv = person.investor, work = person.work, roles = work?.roles.filter((r) => r.status !== 'archived') ?? [];
+  const inv = person.investor, work = person.work, roles = work?.roles.filter((r) => r.status !== 'archived') ?? [], c = person.combined;
   const totalLabel = inv && work ? s.earnedTotal : inv ? s.profitEarned : s.wagesEarned;
   const invested = !!inv && (inv.capital.put_in_iqd > 0 || inv.agreements.length > 0);
   return <article className="fp-person" aria-label={person.name}>
@@ -123,14 +123,16 @@ export function PersonCard({ person, onOpen, actions, own = false }: { person: P
       {actions}
     </header>
     <section className="fp-person-total" aria-label={totalLabel}>
-      <span>{totalLabel}</span><Money value={person.combined.earned_iqd} />
+      <span>{totalLabel}</span><Money value={c.earned_iqd} />
       {inv && work && <p className="fp-row-meta">{s.fromInvesting} <Money value={inv.profit.earned_iqd} /> · {s.fromWork} <Money value={work.earned_iqd} /></p>}
       {person.period && (person.period.profit_iqd > 0 || person.period.wages_iqd > 0) && <p className="fp-row-meta">{s.period}: {inv && <>{s.periodProfit} <Money value={person.period.profit_iqd} /></>}{inv && work && ' · '}{work && <>{s.periodWages} <Money value={person.period.wages_iqd} /></>}</p>}
     </section>
     <div className="fp-stats fp-person-combined">
-      <Stat label={s.availableNow} value={person.combined.available_iqd} tone={person.combined.available_iqd > 0 ? 'good' : undefined} />
-      <Stat label={s.paidOut} value={person.combined.paid_iqd} />
-      <Stat label={s.heldNow} value={person.combined.held_iqd} tone={person.combined.held_iqd > 0 ? 'wait' : undefined} />
+      <Stat label={s.availableNow} value={c.available_iqd} tone={c.available_iqd > 0 ? 'good' : undefined}
+        hint={c.available_capital_iqd > 0 ? <>{s.earningsPart} <Money value={c.available_earnings_iqd} /> · {s.capital} <Money value={c.available_capital_iqd} /></> : undefined} />
+      <Stat label={s.paidOut} value={c.paid_iqd} />
+      <Stat label={s.heldNow} value={c.held_iqd} tone={c.held_iqd > 0 ? 'wait' : undefined} />
+      {c.reserved_iqd > 0 && <Stat label={s.reservedNow} value={c.reserved_iqd} />}
     </div>
     {inv && <section className="fp-person-block" aria-label={s.investmentTitle}>
       <h4>{s.investmentTitle}</h4>
@@ -142,7 +144,7 @@ export function PersonCard({ person, onOpen, actions, own = false }: { person: P
           <ShareStat investor={inv} s={s} />
         </div>
         <CapitalBar capital={inv.capital} s={s} />
-        {inv.units.received > 0 && <p className="fp-row-meta">{s.unitsLine(inv.units.sold, inv.units.in_stock)}</p>}
+        {inv.units.received + inv.units.ordered > 0 && <p className="fp-row-meta">{s.unitsLine(inv.units.in_stock, inv.units.in_orders, inv.units.sold, Math.max(0, inv.units.ordered - inv.units.received))}</p>}
         <InvestmentHolds investor={inv} owner={!own} s={s} />
       </> : <div className="fp-stats"><ShareStat investor={inv} s={s} /><p className="fp-muted">{s.noAgreements}</p></div>}
     </section>}
@@ -164,25 +166,30 @@ export function PersonCard({ person, onOpen, actions, own = false }: { person: P
 function AgreementRow({ a, s, owner, openOrder }: { a: AgreementFinance; s: PersonFinanceStrings; owner: boolean; openOrder?: (id: string) => void }) {
   const { lang } = useLanguage();
   const title = (lang === 'en' ? a.product_name : a.product_name_ar || a.product_name) || a.label || a.name;
+  const rest = a.held_rest;
   return <div className="fp-rule">
     <div className="fp-rule-heading"><strong>{title}</strong><span className="fp-status"><Pct bps={a.profit_share_bps} /></span></div>
-    <p className="fp-row-meta">{s.agreementUnits(a.units.received, a.units.sold, a.units.in_stock)}</p>
+    <p className="fp-row-meta">{s.unitsLine(a.units.in_stock, a.units.in_orders, a.units.sold, Math.max(0, a.units.ordered - a.units.received))}</p>
     <div className="fp-stats">
       <Stat label={s.capital} value={a.principal_iqd} />
-      {!!a.capital.in_stock_iqd && <Stat label={s.inStock} value={a.capital.in_stock_iqd} />}
-      {!!a.capital.back_from_sales_iqd && <Stat label={s.soldHeld} value={a.capital.held_iqd} />}
-      <Stat label={s.profitEarned} value={a.profit.earned_iqd} />
+      {a.capital.back_from_sales_iqd > 0 && <Stat label={s.backFromSales} value={a.capital.back_from_sales_iqd} hint={a.capital.held_iqd > 0 ? <>{s.heldOf} <Money value={a.capital.held_iqd} /></> : undefined} />}
+      <Stat label={s.profitEarned} value={a.profit.earned_iqd} hint={a.profit.held_iqd > 0 ? <>{s.heldOf} <Money value={a.profit.held_iqd} /></> : undefined} />
     </div>
-    {a.held_sales.length > 0 && <details className="fp-detail" open={owner || undefined}><summary>{s.heldSales} ({a.held_sales.length})</summary><div className="fp-rows">{a.held_sales.map((h, i) => <div className="fp-row" key={h.order_id ?? i}>
-      <div className="min-w-0">{owner && h.order_id && (openOrder ? <button type="button" className="fp-link" onClick={() => openOrder(h.order_id!)} dir="ltr">{h.order_id}</button> : <bdi dir="ltr">{h.order_id}</bdi>)}
-        {h.day && <span className="fp-row-meta"> · {dateLabel(h.day, lang)}</span>}
-        <p className="fp-row-meta">{h.reasons.map((r) => s.hold[r](1)).join(' · ')}</p></div>
-      <div className="text-end">{h.profit_unknown ? <span className="fp-row-meta">{s.profitUnknown(1)}</span> : <Money value={h.profit_iqd} />}<p className="fp-row-meta">{s.capital}: <Money value={h.capital_iqd} /></p></div>
-    </div>)}</div>{a.held_whole && <p className="fp-note">{s.wholeAgreement}</p>}</details>}
+    {owner && (a.held_sales.length > 0 || rest) && <details className="fp-detail" open><summary>{s.heldSales} ({a.held_sales.length + a.held_sales_more + (rest?.sales ?? 0)})</summary><div className="fp-rows">
+      {a.held_sales.map((h) => <div className="fp-row" key={h.order_id}>
+        <div className="min-w-0">{openOrder ? <button type="button" className="fp-link" onClick={() => openOrder(h.order_id)} dir="ltr">{h.order_id}</button> : <bdi dir="ltr">{h.order_id}</bdi>}
+          {h.day && <span className="fp-row-meta"> · {dateLabel(h.day, lang)}</span>}
+          <p className="fp-row-meta">{h.reasons.map((r) => s.hold[r](1)).join(' · ')}</p></div>
+        <div className="text-end">{h.profit_unknown ? <span className="fp-row-meta">{s.profitUnknown(1)}</span> : <Money value={h.profit_iqd} />}<p className="fp-row-meta">{s.capital}: <Money value={h.capital_iqd} /></p></div>
+      </div>)}
+      {a.held_sales_more > 0 && <p className="fp-row-meta">{s.moreSales(a.held_sales_more)}</p>}
+      {rest && <div className="fp-row"><p className="fp-row-meta min-w-0">{s.hold[rest.reason](rest.sales)}</p>
+        <div className="text-end">{!!rest.profit_iqd && <Money value={rest.profit_iqd} />}{!!rest.capital_iqd && <p className="fp-row-meta">{s.capital}: <Money value={rest.capital_iqd} /></p>}</div></div>}
+    </div>{a.held_whole && <p className="fp-note">{s.wholeAgreement}</p>}</details>}
   </div>;
 }
 
-/** The details sheet: the card, then every agreement and its held sales. */
+/** The details sheet: the card, then every agreement and, for the owner, its held sales. */
 export function PersonSheet({ person, onClose, own = false, openOrder, children }: { person: PersonFinance; onClose: () => void; own?: boolean; openOrder?: (id: string) => void; children?: ReactNode }) {
   const { lang } = useLanguage(), s = strings(lang);
   return <Dialog open onClose={onClose} title={person.name}><div className="fp-stack">

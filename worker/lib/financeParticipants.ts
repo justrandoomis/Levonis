@@ -179,8 +179,10 @@ export async function participantOverview(db: D1Database, userId: string, opts: 
   const investment=await investorAccountProgress(db,userId,entries,participantWithdrawableSources(entries,advance.balance));
   // The same one-person picture the owner reads (worker/lib/personFinance.ts),
   // from these same sources, without order ids or purchase labels.
-  const {personFinance}=await import('./personFinance');
-  const person=await personFinance(db,userId,{sources:entries,advance});
+  // A failure here must never cost the person their balance or withdrawals.
+  let person:Awaited<ReturnType<typeof import('./personFinance').personFinance>>|null=null;
+  try{const {personFinance}=await import('./personFinance');person=await personFinance(db,userId,{sources:entries,advance});}
+  catch(e){console.error('personFinance',userId,e instanceof Error?e.message:e);}
   // No movements log («سجل الحركات»): the owner removed it from «أرباحي» on
   // 2026-10-10. Balances come from the same sources; no ledger row changed.
   return { summary, employment, investment, person, entries: participantEntries(entries, fold, advance.balance), withdrawals: (withdrawals.results ?? []).map((w)=>({id:w.id,amount_iqd:w.amount_iqd,paid_iqd:w.paid_iqd,state:w.state,balance_type:w.balance_type,created_at:w.created_at,reference:w.reference,receipt_url:w.receipt_url,note:w.note})) };

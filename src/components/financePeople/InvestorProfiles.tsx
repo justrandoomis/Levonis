@@ -32,25 +32,26 @@ export default function InvestorProfiles({ from, to, month, onChanged, openContr
   const data = remote.data;
   const investors = people.data?.people.filter((p) => p.investor) ?? [];
   const reload = async () => { await Promise.all([remote.load(), people.load()]); };
-  useFreshOnReturn(reload, { pollWhileVisibleMs: 30_000, minIntervalMs: 5_000, enabled: !remote.loading && !people.loading && !editing && !selected });
+  // One poll a minute: two finance reads share the owner's hourly read budget with every finance screen.
+  useFreshOnReturn(reload, { pollWhileVisibleMs: 60_000, minIntervalMs: 10_000, enabled: !remote.loading && !people.loading && !editing && !selected });
   const saved = async () => { setEditing(null); await reload(); onChanged?.(); };
   const sum = (f: (p: NonNullable<PersonFinance['investor']>) => number) => investors.reduce((n, p) => n + f(p.investor!), 0);
   const person = (id: string) => people.data?.people.find((p) => p.user_id === id);
   const open = selected ? person(selected) : undefined;
   return <div className="ap fp fp-stack" dir={dir}>
     <Surface title={loc('حسابات المستثمرين', 'Investor accounts', 'هەژماری وەبەرهێنەران')} hint={s.peopleHint} action={<Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing('new')}>{loc('إضافة مستثمر', 'Add investor', 'زیادکردنی وەبەرهێنەر')}</Button>}>
-      {!data || !people.data ? <Loading error={remote.error || people.error} retry={reload} /> : <><Feedback error={remote.error || people.error} />
+      {!data ? <Loading error={remote.error} retry={reload} /> : <><Feedback error={remote.error || people.error} />
         <div className="fp-stats">
-          <div className="fp-stat"><span>{s.capitalPutIn}</span><Money value={sum((i) => i.capital.put_in_iqd)} /></div>
-          <div className="fp-stat"><span>{s.profitEarned}</span><Money value={sum((i) => i.profit.earned_iqd)} /></div>
-          <div className="fp-stat fp-stat-good"><span>{s.availableNow}</span><Money value={sum((i) => i.profit.available_iqd + i.capital.available_iqd)} /></div>
-          <div className="fp-stat"><span>{s.heldNow}</span><Money value={sum((i) => i.profit.held_iqd + i.capital.sold_held_iqd)} /></div>
+          <div className="fp-stat"><span>{s.capitalPutIn}</span><Money value={people.data ? sum((i) => i.capital.put_in_iqd) : null} /></div>
+          <div className="fp-stat"><span>{s.profitEarned}</span><Money value={people.data ? sum((i) => i.profit.earned_iqd) : null} /></div>
+          <div className="fp-stat fp-stat-good"><span>{s.availableNow}</span><Money value={people.data ? sum((i) => i.profit.available_iqd + i.capital.available_iqd) : null} /></div>
+          <div className="fp-stat"><span>{s.heldNow}</span><Money value={people.data ? sum((i) => i.profit.held_iqd) : null} /></div>
         </div>
         {!data.profiles.length ? <Empty>{loc('اختر حساب مساعد لإضافة مستثمر، ثم اختره في خطوة تمويل الشراء.', 'Choose an assistant account to register an investor, then select it when funding a purchase.', 'هەژمارێکی یاریدەدەر هەڵبژێرە بۆ تۆمارکردنی وەبەرهێنەر، پاشان لە هەنگاوی پارەدارکردنی کڕیندا هەڵیبژێرە.')}</Empty> : <div className="fp-stack">{data.profiles.map((p) => {
           const pf = person(p.user_id);
           const settings = <Button variant="ghost" size="sm" icon={<Pencil size={15} />} onClick={() => setEditing(p)}>{s.settings}</Button>;
           return pf ? <PersonCard key={p.user_id} person={pf} onOpen={() => setSelected(p.user_id)} actions={settings} />
-            : <article className="fp-person" key={p.user_id}><header className="fp-rule-heading fp-staff-heading"><h3>{p.name || p.email}</h3>{settings}</header></article>;
+            : <article className="fp-person" key={p.user_id}><header className="fp-rule-heading fp-staff-heading"><h3>{p.name || p.email}</h3>{settings}</header>{people.loading && <p className="fp-muted" role="status">{loc('جارٍ تحميل الأرقام…', 'Loading figures…', 'ژمارەکان بار دەکرێن…')}</p>}</article>;
         })}</div>}</>}
     </Surface>
     <LegacyInvestmentHistory admin />

@@ -34,7 +34,9 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
   // The one-person picture (worker/lib/personFinance.ts): work status, why
   // wages wait, and — for someone who also invests — the full account.
   const people = useRemote<{ people: PersonFinance[] }>(`${PEOPLE}/people?${query}`);
-  const remote = { ...staffRemote, load: async () => { await Promise.all([staffRemote.load(), people.load()]); } };
+  // Background reads (the 30-second poll, each reconciliation page) refresh the
+  // staff list only; the people read follows saves and the final page.
+  const remote = staffRemote;
   const personOf = (staffId: string) => people.data?.people.find((p) => p.staff_id === staffId || p.work?.roles.some((r) => r.staff_id === staffId));
   const [sheet, setSheet] = useState<PersonFinance | null>(null);
   const mounted = useRef(true);
@@ -45,7 +47,7 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
   const [removing, setRemoving] = useState<Staff | null>(null);
   const [linking, setLinking] = useState<Staff | null>(null), [linkAccount, setLinkAccount] = useState<Account | null>(null);
   const [jobs, setJobs] = useState<Record<string, Reconciliation>>({});
-  const refresh = async () => { await remote.load(); if (mounted.current) onChanged?.(); };
+  const refresh = async () => { await Promise.all([remote.load(), people.load()]); if (mounted.current) onChanged?.(); };
   const config = remote.data;
   const canManage = config?.can_manage_staff === true;
   useFreshOnReturn(async () => { await remote.load(); if (mounted.current) onChanged?.(); }, {
@@ -57,13 +59,13 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
   const describe = (rule: Rule) => rule.basis.endsWith('percent') ? `${rule.amount / 100}% ${rule.basis === 'profit_percent' ? loc('من الربح', 'of profit') : loc('من البيع', 'of sales')}` : `${rule.amount.toLocaleString('en-US')} ${loc('د.ع', 'IQD')} ${rule.basis === 'unit' ? loc('لكل قطعة', 'per unit') : loc('لكل طلب', 'per order')}`;
   const backgroundNotice = () => loc('حُفظ التعديل. تظهر حالة احتساب المستحقات أدناه وتتحدث تلقائيًا.', 'Your change is saved. Calculation progress appears below and updates automatically.');
   const [activities, setActivities] = useState<Record<string, ReconciliationActivity>>({});
-  const runtime = useRef({ load: remote.load, onChanged });
-  runtime.current = { load: remote.load, onChanged };
+  const runtime = useRef({ load: remote.load, loadPeople: people.load, onChanged });
+  runtime.current = { load: remote.load, loadPeople: people.load, onChanged };
   const runner = useRef<ReturnType<typeof createStaffReconciliationRunner> | null>(null);
   if (!runner.current) runner.current = createStaffReconciliationRunner({
     advance: async (job) => (await api.post<{ reconciliation: Reconciliation }>(`${PEOPLE}/staff/${encodeURIComponent(job.staff_id)}/reconcile`, { revision: job.revision }, { mascot: 'silent' })).reconciliation,
     read: async (staffId) => (await api.get<{ reconciliation: Reconciliation }>(`${PEOPLE}/staff/${encodeURIComponent(staffId)}/reconcile`, { mascot: 'silent' })).reconciliation,
-    refresh: async (final) => { await runtime.current.load(); if (final && mounted.current) runtime.current.onChanged?.(); },
+    refresh: async (final) => { await runtime.current.load(); if (final) await runtime.current.loadPeople(); if (final && mounted.current) runtime.current.onChanged?.(); },
     onJob: (job) => setJobs((old) => ({ ...old, [job.staff_id]: job })),
     onActivity: (staffId, activity) => setActivities((old) => ({ ...old, [staffId]: activity })),
   });
