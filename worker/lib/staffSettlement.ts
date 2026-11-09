@@ -21,8 +21,9 @@ import { badRequest, conflict, notFound } from './http';
 import { auditStatements } from './audit';
 import { newId } from './crypto';
 import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './operations';
-import { nextEmploymentDay, readStaff } from './financeEmployment';
-import { settledCostSql, settledThroughSql } from './staffSettledSql';
+import { readStaff } from './financeEmployment';
+import { staffAdvanceSql } from './financeParticipants';
+import { settledCostSql, settledThroughSql, settlementInstalled } from './staffSettledSql';
 
 const effectiveSql = 'c.amount_iqd+COALESCE((SELECT SUM(ca.delta_iqd) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id),0)';
 const paidSql = '(SELECT COALESCE(SUM(pa.amount_iqd),0) FROM finance_payment_allocations pa WHERE pa.cost_id=c.id)';
@@ -30,12 +31,12 @@ const heldSql = `(SELECT COALESCE(SUM(wa.amount_iqd-wa.paid_iqd),0) FROM finance
   WHERE wa.source_kind='staff' AND wa.source_id=c.id AND w.state IN ('requested','approved','part_paid'))`;
 const deliveredDaySql = "CASE WHEN o.status='delivered' AND o.delivered_at IS NOT NULL THEN date(o.delivered_at,'+3 hours') END";
 /** The rows a settlement of staff `?` through day `?` takes: every live, unsettled row of an
- * order delivered before that day — by its delivery time, kept when an order is later cancelled
- * — or, with no delivery time, recorded before it. Plain `?` placeholders (staff, day): `fence`
- * binds its own id first. */
+ * order delivered before that day — by its delivery time, which an order keeps when it is later
+ * cancelled. A wage on an order not delivered yet belongs to the work still to come and is left
+ * alone. Plain `?` placeholders (staff, day): `fence` binds its own id first. */
 const periodRowsSql = `SELECT c.id,c.order_id,c.state,c.cost_day,${effectiveSql} AS effective_iqd,${paidSql} AS paid_iqd,${heldSql} AS held_iqd,${deliveredDaySql} AS delivered_day
   FROM finance_order_costs c JOIN orders o ON o.id=c.order_id
-  WHERE c.staff_id=? AND c.state<>'reversed' AND NOT ${settledCostSql('c.id')} AND COALESCE(date(o.delivered_at,'+3 hours'),c.cost_day)<?`;
+  WHERE c.staff_id=? AND c.state<>'reversed' AND NOT ${settledCostSql('c.id', true)} AND o.delivered_at IS NOT NULL AND date(o.delivered_at,'+3 hours')<?`;
 /** The whole period as one string: any change between the plan and the write misses the fence. */
 const fingerprintSql = `(SELECT COALESCE(group_concat(x,'|'),'') FROM (SELECT id||':'||state||':'||COALESCE(effective_iqd,'n')||':'||paid_iqd||':'||held_iqd AS x FROM (${periodRowsSql}) ORDER BY id))`;
 
@@ -59,11 +60,18 @@ export async function planStaffSettlement(db: D1Database, staffId: string, throu
   if (!staff) throw notFound('الموظف غير موجود');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(throughDay) || Number.isNaN(Date.parse(`${throughDay}T00:00:00Z`))) throw badRequest('اختر يوم بداية الفترة الجديدة');
   if (!Number.isSafeInteger(owedIqd) || owedIqd < 0) throw badRequest('المبلغ المتفق عليه غير صحيح');
-  if (throughDay > nextEmploymentDay(baghdadDay())) throw badRequest('لا تُسوّى أيام لم تأتِ بعد');
-  const previous = await db.prepare(`SELECT ${settledThroughSql('?')} AS through_day`).bind(staffId).first<{ through_day: string | null }>();
+  // Through today at most: a later day would close orders still to be delivered today.
+  if (throughDay > baghdadDay()) throw badRequest('لا تُسوّى أيام لم تأتِ بعد');
+  if (!await settlementInstalled(db)) throw conflict('جدول التسويات غير موجود بعد؛ انتظر اكتمال النشر');
+  // The ledger nets an unspent cash advance against wages; settle it first so the agreed amount is the whole truth.
+  const advance = (await db.prepare(`SELECT ${staffAdvanceSql('?')} AS balance`).bind(staffId).first<{ balance: number }>())?.balance ?? 0;
+  if (advance > 0) throw conflict('للموظف سلفة غير مسوّاة؛ سوِّها من الأجور أولًا ثم سوِّ الأجور');
+  const previous = await db.prepare(`SELECT ${settledThroughSql('?', true)} AS through_day`).bind(staffId).first<{ through_day: string | null }>();
   if (previous?.through_day && throughDay <= previous.through_day) throw conflict('هذه الفترة سُوّيت من قبل؛ اختر يومًا بعد آخر تسوية');
-  const rows = (await db.prepare(`${periodRowsSql} ORDER BY delivered_day IS NULL,COALESCE(delivered_day,c.cost_day),c.order_id,c.id`).bind(staffId, throughDay).all<PeriodRow>()).results ?? [];
+  // The fingerprint is read FIRST: a write landing before the rows are read then makes the
+  // plan's fingerprint stale and the fence refuses, instead of passing on an older plan.
   const fingerprint = (await db.prepare(`SELECT ${fingerprintSql} AS f`).bind(staffId, throughDay).first<{ f: string }>())?.f ?? '';
+  const rows = (await db.prepare(`${periodRowsSql} ORDER BY delivered_day IS NULL,COALESCE(delivered_day,c.cost_day),c.order_id,c.id`).bind(staffId, throughDay).all<PeriodRow>()).results ?? [];
   if (rows.some((r) => r.held_iqd > 0)) throw conflict('طلب سحب مفتوح يحجز جزءًا من هذه الأجور؛ ادفعه أو ارفضه أولًا');
   if (rows.some((r) => r.state === 'pending_cost' && r.paid_iqd > 0)) throw conflict('أجر مدفوع ما زال ينتظر تكلفته؛ صحّحه قبل التسوية');
   const accrued = (r: PeriodRow) => (r.state === 'pending_cost' ? 0 : Math.max(0, r.effective_iqd ?? 0));
@@ -111,27 +119,40 @@ function orderChanges(rows: PeriodRow[], lines: SettlementLine[]) {
   return [...byOrder].map(([order_id, v]) => ({ order_id, ...v }));
 }
 
-export async function settleStaffWages(db: D1Database, input: { staffId: string; throughDay: string; owedIqd: number; reason?: string; actor: string; expectedOwedBefore?: number }) {
+export async function settleStaffWages(db: D1Database, input: { staffId: string; throughDay: string; owedIqd: number; reason?: string; actor: string; expectedOwedBefore?: number; operationId?: string }) {
   const staff = await readStaff(db, input.staffId);
   if (!staff) throw notFound('الموظف غير موجود');
+  // A retried request (a timeout after the write) answers with the settlement it already made.
+  const id = input.operationId ? `wagesettle_${input.operationId}` : newId('wagesettle');
+  if (input.operationId && await settlementInstalled(db)) {
+    const prior = await db.prepare('SELECT * FROM finance_staff_settlements WHERE id=?').bind(id).first<{ staff_id: string; through_day: string; owed_iqd: number }>();
+    if (prior) {
+      if (prior.staff_id !== staff.id || prior.through_day !== input.throughDay || prior.owed_iqd !== input.owedIqd) throw conflict('رقم العملية مستخدم لتسوية أخرى');
+      return { already: true, settlement: prior };
+    }
+  }
   const job = await db.prepare('SELECT state FROM finance_staff_reconciliations WHERE staff_id=?').bind(staff.id).first<{ state: string }>();
   if (job && job.state !== 'complete') throw conflict('أجور الموظف قيد إعادة الحساب؛ انتظر حتى تكتمل ثم سوِّها');
   const plan = await planStaffSettlement(db, staff.id, input.throughDay, input.owedIqd);
   if (input.expectedOwedBefore !== undefined && input.expectedOwedBefore !== plan.owed_before_iqd) throw conflict('تغيرت الأجور منذ المعاينة؛ حدّث ثم أعد المحاولة');
   const day = baghdadDay();
   await periodOpen(db, day);
-  const id = newId('wagesettle'), now = new Date().toISOString();
+  const now = new Date().toISOString();
   const reason = (input.reason ?? '').trim().slice(0, 300) || 'تسوية أجور نهائية متفق عليها';
   const statements: D1PreparedStatement[] = [
     ...fence(db, 'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?)', [staff.id, staff.employment_version]),
     ...fence(db, "NOT EXISTS(SELECT 1 FROM finance_staff_reconciliations WHERE staff_id=? AND state<>'complete')", [staff.id]),
-    ...fence(db, `COALESCE(${settledThroughSql('?')},'')<?`, [staff.id, plan.through_day]),
+    ...fence(db, `COALESCE(${settledThroughSql('?', true)},'')<?`, [staff.id, plan.through_day]),
+    ...fence(db, `${staffAdvanceSql('?')}=0`, [staff.id]),
     ...fence(db, `${fingerprintSql}=?`, [staff.id, plan.through_day, plan.fingerprint]),
     db.prepare('INSERT INTO finance_staff_settlements(id,staff_id,through_day,owed_iqd,earned_before_iqd,paid_before_iqd,owed_before_iqd,rows_settled,reason,settlement_day,actor_id,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
       .bind(id, staff.id, plan.through_day, plan.owed_iqd, plan.earned_before_iqd, plan.paid_before_iqd, plan.owed_before_iqd, plan.rows, reason, day, input.actor, now),
   ];
   for (const line of plan.lines) {
     statements.push(db.prepare('INSERT INTO finance_staff_settled_costs(cost_id,settlement_id,before_iqd,paid_iqd,after_iqd) VALUES (?,?,?,?,?)').bind(line.id, id, line.before_iqd, line.paid_iqd, line.after_iqd));
+    // A target still waiting for an amount would keep the order's profit «pending» for ever
+    // (orderProfit, the recovery scan): the agreed amount is that amount now.
+    statements.push(db.prepare('UPDATE finance_wage_targets SET amount_iqd=?,updated_at=? WHERE cost_id=? AND amount_iqd IS NULL').bind(line.reverse ? 0 : line.after_iqd ?? 0, now, line.id));
     if (line.reverse) {
       statements.push(db.prepare("UPDATE finance_order_costs SET state='reversed' WHERE id=? AND state='pending_cost'").bind(line.id));
       if ((line.before_iqd ?? 0) > 0) statements.push(db.prepare('INSERT INTO finance_cost_reversals(id,cost_id,amount_iqd,reversal_day,reason,actor_id) VALUES (?,?,?,?,?,?)').bind(newId('rev'), line.id, line.before_iqd, day, reason, input.actor));
@@ -157,7 +178,7 @@ export async function settleStaffWages(db: D1Database, input: { staffId: string;
 /** The latest settlement of each of these employees (for the people picture). */
 export async function latestSettlements(db: D1Database, staffIds: string[]) {
   const out = new Map<string, { through_day: string; owed_iqd: number; settlement_day: string }>();
-  if (!staffIds.length) return out;
+  if (!staffIds.length || !await settlementInstalled(db)) return out;
   const rows = (await db.prepare(`SELECT staff_id,through_day,owed_iqd,settlement_day FROM finance_staff_settlements
     WHERE staff_id IN (SELECT value FROM json_each(?)) ORDER BY through_day DESC,id DESC`).bind(JSON.stringify(staffIds)).all<{ staff_id: string; through_day: string; owed_iqd: number; settlement_day: string }>()).results ?? [];
   for (const r of rows) if (!out.has(r.staff_id)) out.set(r.staff_id, { through_day: r.through_day, owed_iqd: r.owed_iqd, settlement_day: r.settlement_day });

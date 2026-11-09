@@ -250,6 +250,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // Effective wage timelines, resumable previews and immutable adjustment/payment evidence.
     'finance_wage_versions', 'finance_wage_targets', 'finance_wage_changes', 'finance_withdrawal_reviews',
     'finance_mutation_clock', 'finance_withdrawal_payment_lines', 'finance_wage_preview_jobs', 'finance_wage_pending_targets',
+    // Agreed wage settlements and the rows they closed (DECISIONS row 306).
+    'finance_staff_settlements', 'finance_staff_settled_costs',
     // Investor defaults are separate from immutable funded-purchase agreements.
     'investment_profiles', 'investment_profile_history', 'investment_legacy_links',
     'purchase_investor_agreements', 'purchase_investor_allocations', 'purchase_investor_receipts', 'purchase_investor_lot_capital',

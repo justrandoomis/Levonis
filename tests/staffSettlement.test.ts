@@ -16,13 +16,17 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { all, count, freshDb, failingD1, get, json, patch, post, row, send, stubApp } from './fixtures/app';
+import { all, asD1, count, dbThrough, freshDb, failingD1, get, json, patch, post, row, send, stubApp } from './fixtures/app';
 import { adminFinancePeopleRoutes } from '../worker/routes/adminFinancePeople';
 import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOperations';
 import { financeEarningsRoutes } from '../worker/routes/financeEarnings';
 import { planOrderFinanceSnapshot, runOrderFinancialEffects } from '../worker/lib/orderFinance';
 import { reconcileFinanceOrder } from '../worker/lib/financeReconcile';
 import { personFinance } from '../worker/lib/personFinance';
+import { getOrderProfitBase } from '../worker/lib/orderProfit';
+import { participantSources } from '../worker/lib/financeParticipants';
+import { staffPeriodReport } from '../worker/lib/financeParticipantReports';
+import { drainOrderFinanceRecovery } from '../worker/lib/financeOrderRecovery';
 import type { Env } from '../worker/lib/types';
 
 function setup() {
@@ -42,7 +46,7 @@ function setup() {
   });
   const boss = app('boss', 'full');
   const env = { DB: db } as Env;
-  async function order(id: string, delivered: string, opts: { unrecorded?: boolean } = {}) {
+  async function order(id: string, delivered: string, opts: { unrecorded?: boolean; effects?: boolean; snapshotAt?: string } = {}) {
     const created = '2026-09-01T10:00:00.000Z';
     raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at)
       VALUES (?,'buyer','delivered','{}','standard','{}','cash',50000,1500,55000,55000,5000,?,?)`).run(id, created, delivered);
@@ -54,10 +58,13 @@ function setup() {
       raw.prepare(`INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,qty,unit_cost_iqd,cogs_iqd,idempotency_key)
         VALUES (?,?,?,?,'base',1,20000,20000,?)`).run(`alloc:${id}`, id, `line:${id}`, `lot:${id}`, `consumed:${id}`);
     }
-    await db.batch(await planOrderFinanceSnapshot(db, id, [{ id: `line:${id}`, product_id: 'printer' }], created));
+    // An undated employee's rules are frozen into the order when it is created: a rule made
+    // today reaches only an order snapshotted after it (tests/financeEmployment.test.ts).
+    await db.batch(await planOrderFinanceSnapshot(db, id, [{ id: `line:${id}`, product_id: 'printer' }], opts.snapshotAt ?? created));
+    if (opts.effects) await runOrderFinancialEffects(env, id, 'delivered');
   }
-  async function staff() {
-    const response = await post(boss, '/people/staff', { user_id: 'employee', start_work_date: '2026-09-20' });
+  async function staff(extra: Record<string, unknown> = { start_work_date: '2026-09-20' }) {
+    const response = await post(boss, '/people/staff', { user_id: 'employee', ...extra });
     const data = await json(response); assert.equal(response.status, 200, JSON.stringify(data));
     return data.id as string;
   }
@@ -198,4 +205,66 @@ test('a settlement refuses an open withdrawal, wages being redone and anyone but
   assert.equal((await post(self, `/people/staff/${id}/settle`, { through_day: '2026-10-01', owed_iqd: 999999 })).status, 403);
   assert.equal((await balance()).staff_iqd, 5000);
   assert.equal((await settle(id, { through_day: '2026-10-01', owed_iqd: 0 })).status, 200);
+});
+
+test('an undated employee\'s settled wages stay settled: the employment cutoff and the old wage writer leave the period alone (review 1)', async () => {
+  const { raw, db, env, order, staff, rule, drain, costs, settle } = setup();
+  const id = await staff({});
+  await rule(id, { effective_from: '2026-09-01' });
+  for (const d of [21, 22, 23, 24]) await order(`u${d}`, `2026-09-${d}T10:00:00.000Z`, { effects: true, snapshotAt: new Date(Date.now() + 1000).toISOString() });
+  assert.deepEqual(costs(id).map((c) => c.effective_iqd), [2500, 2500, 2500, 2500]);
+  await drain(id);
+  assert.deepEqual(costs(id).map((c) => c.effective_iqd), [2500, 2500, 2500, 2500]);
+  const done = await settle(id, { through_day: '2026-10-01', owed_iqd: 4000 });
+  assert.equal(done.status, 200, JSON.stringify(await json(done)));
+  assert.deepEqual(costs(id).map((c) => c.effective_iqd), [1000, 1000, 1000, 1000]);
+  for (const d of [21, 22, 23, 24]) { await reconcileFinanceOrder(db, `u${d}`, { actor: 'boss' }); await runOrderFinancialEffects(env, `u${d}`, 'delivered'); }
+  assert.deepEqual(costs(id).map((c) => c.effective_iqd), [1000, 1000, 1000, 1000]);
+  assert.equal(count(raw, `SELECT COUNT(*) n FROM finance_order_costs WHERE staff_id='${id}' AND state<>'reversed'`), 4);
+  // A delivery after the settled day earns as usual.
+  await order('u-new', '2026-10-03T10:00:00.000Z', { effects: true, snapshotAt: new Date(Date.now() + 1000).toISOString() });
+  assert.ok(costs(id).some((c) => c.order_id === 'u-new' && c.effective_iqd === 2500), JSON.stringify(costs(id)));
+});
+
+test('a settled row waiting for a cost no longer keeps its order\'s profit pending (review 2)', async () => {
+  const { raw, db, order, staff, rule, drain, costs, settle } = setup();
+  await order('waiting', '2026-09-25T10:00:00.000Z', { unrecorded: true });
+  await order('known', '2026-09-26T10:00:00.000Z');
+  const id = await staff(); await rule(id, { basis: 'profit_percent', amount: 1000 }); await drain(id);
+  assert.equal(costs(id).find((c) => c.order_id === 'waiting')?.state, 'pending_cost');
+  assert.equal((await settle(id, { through_day: '2026-10-01', owed_iqd: 0 })).status, 200);
+  const base = await getOrderProfitBase(db, 'waiting');
+  assert.ok(base.costs.every((c) => c.state !== 'pending_cost'), JSON.stringify(base.costs.map((c) => c.state)));
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_wage_targets t JOIN finance_staff_settled_costs s ON s.cost_id=t.cost_id WHERE t.amount_iqd IS NULL'), 0);
+});
+
+test('a database without migration 0230 still reads wages, the period report, the people picture and the recovery scan (CLAUDE.md rule 2)', async () => {
+  const raw = dbThrough('0229');
+  const db = asD1(raw);
+  raw.exec("INSERT INTO users(id,email,name,role,admin_scope) VALUES ('employee','e@example.test','E','admin','assistant')");
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM sqlite_master WHERE name='finance_staff_settled_costs'"), 0);
+  assert.deepEqual(await participantSources(db, 'employee'), []);
+  await staffPeriodReport(db, { from: '2026-10-01', to: '2026-10-31' });
+  await personFinance(db, 'employee', { owner: true });
+  await drainOrderFinanceRecovery({ DB: db } as Env);
+});
+
+test('a settlement waits for an open cash advance, and a retried request answers with the settlement it made', async () => {
+  const first = setup();
+  await first.order('o21', '2026-09-21T10:00:00.000Z');
+  const a = await first.staff(); await first.rule(a); await first.drain(a);
+  assert.equal((await post(first.boss, `/operations/staff/${a}/payments`, { operation_id: 'advance-0001', amount_iqd: 1000, kind: 'advance' })).status, 200);
+  assert.equal((await first.settle(a, { through_day: '2026-10-01', owed_iqd: 0 })).status, 409);
+  assert.equal(count(first.raw, 'SELECT COUNT(*) n FROM finance_staff_settlements'), 0);
+
+  const second = setup();
+  await second.order('o21', '2026-09-21T10:00:00.000Z');
+  const b = await second.staff(); await second.rule(b); await second.drain(b);
+  const body = { through_day: '2026-10-01', owed_iqd: 1000, operation_id: 'settle-once-0001' };
+  const once = await second.settle(b, body);
+  assert.equal(once.status, 200, JSON.stringify(await json(once)));
+  const again = await json(await second.settle(b, body));
+  assert.equal(again.already, true);
+  assert.equal(count(second.raw, 'SELECT COUNT(*) n FROM finance_staff_settlements'), 1);
+  assert.equal((await second.settle(b, { ...body, owed_iqd: 999 })).status, 409);
 });

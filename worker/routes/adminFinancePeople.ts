@@ -19,7 +19,7 @@ import { applyWageChange, previewWageChangePage, type WageChangeInput } from '..
 import { continueStaffReconciliation } from '../lib/financeStaffAccrual';
 import { peopleFinance } from '../lib/personFinance';
 import { planStaffSettlement, settleStaffWages } from '../lib/staffSettlement';
-import { settledCostSql } from '../lib/staffSettledSql';
+import { settledCostSql, settlementInstalled } from '../lib/staffSettledSql';
 
 export const adminFinancePeopleRoutes = new Hono<AppContext>();
 adminFinancePeopleRoutes.use('*',requireAdmin);
@@ -156,7 +156,8 @@ adminFinancePeopleRoutes.post('/staff/:id/settle',async(c)=>{
   if(b.preview===true){const {lines:_lines,fingerprint:_fingerprint,...preview}=await planStaffSettlement(db,id,through,owed);return c.json({success:true,preview});}
   const expected=b.expected_owed_before_iqd===undefined?undefined:Number(b.expected_owed_before_iqd);
   if(expected!==undefined&&!Number.isSafeInteger(expected))throw badRequest('الرصيد المتوقع غير صحيح');
-  return c.json({success:true,...await settleStaffWages(db,{staffId:id,throughDay:through,owedIqd:owed,reason:typeof b.reason==='string'?b.reason:'',actor:actor.id,expectedOwedBefore:expected})});
+  const operation=b.operation_id===undefined?undefined:str(b.operation_id,'operation_id',{min:8,max:80});
+  return c.json({success:true,...await settleStaffWages(db,{staffId:id,throughDay:through,owedIqd:owed,reason:typeof b.reason==='string'?b.reason:'',actor:actor.id,expectedOwedBefore:expected,operationId:operation})});
 });
 /** «الأشخاص» — every person the owner pays, one picture each: capital, share,
  * profit and why any of it is held, return, wages, and the combined total
@@ -197,7 +198,7 @@ adminFinancePeopleRoutes.patch('/costs/:id',async(c)=>{
   const b=await c.req.json<Record<string,unknown>>(),amount=whole(b.amount_iqd,'المبلغ'),db=c.env.DB,id=c.req.param('id');
   const old=await db.prepare(`SELECT c.*,${effectiveStaffCostSql()} AS effective_iqd,${staffPaidSql()} AS paid_iqd,${heldSourceSql("'staff'",'c.id')} AS held_iqd FROM finance_order_costs c WHERE c.id=?`).bind(id).first<{state:string;effective_iqd:number|null;paid_iqd:number;held_iqd:number;staff_id:string|null;order_id:string}>();
   if(!old)throw notFound('الاستحقاق غير موجود');
-  if(await db.prepare(`SELECT ${settledCostSql('?')} AS settled`).bind(id).first<{settled:number}>().then(r=>!!r?.settled))throw conflict('هذا الأجر ضمن تسوية نهائية متفق عليها؛ لا يُعدّل');
+  if(await settlementInstalled(db)&&await db.prepare(`SELECT ${settledCostSql('?',true)} AS settled`).bind(id).first<{settled:number}>().then(r=>!!r?.settled))throw conflict('هذا الأجر ضمن تسوية نهائية متفق عليها؛ لا يُعدّل');
   if(!['due','approved'].includes(old.state)||old.effective_iqd===null)throw conflict('الاستحقاق ينتظر تثبيت التكلفة أو تم عكسه');
   const employee=old.staff_id?await readStaff(db,old.staff_id):null;
   const delivery=await db.prepare('SELECT status,delivered_at FROM orders WHERE id=?').bind(old.order_id).first<{status:string;delivered_at:string|null}>();

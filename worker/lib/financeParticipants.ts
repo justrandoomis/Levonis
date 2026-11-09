@@ -16,7 +16,7 @@ import { PRIVATE_DELEGATION_ENABLED, canViewCost, isOwner } from './adminScope';
 import type { Env, SessionUser } from './types';
 import { employmentInstalled, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
 import { inactiveAtSql } from './financeEmploymentIntervals';
-import { settledCostSql } from './staffSettledSql';
+import { settledCostSql, settlementInstalled } from './staffSettledSql';
 import { SURPLUS_PREFIX, SURPLUS_ROWS_SQL, surplusInstalled } from './investorSurplus';
 
 export type BalanceType = 'earnings' | 'capital' | 'all';
@@ -58,7 +58,7 @@ const staffReconciliationBlockedCoreSql=(orderSql='c.order_id',costSql='c.id',in
   AND NOT EXISTS(SELECT 1 FROM finance_cost_adjustments ca WHERE ca.cost_id=sc.id AND ca.kind='manual')
   AND (${unknownWageRefundSql(orderSql,'sc.order_item_id')} OR NOT EXISTS(SELECT 1 FROM finance_staff_basis sb WHERE sb.order_id=${orderSql} AND sb.basis_fingerprint=(${staffBasisFingerprintSql(orderSql,includeLate)})))))`;
 /** A settled wage (DECISIONS row 306) is agreed, not calculated: nothing holds it again. */
-export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true)=>`(NOT ${settledCostSql(costSql)} AND ${staffReconciliationBlockedCoreSql(orderSql,costSql,includeLate)})`;
+export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true,settled=false)=>settled?`(NOT ${settledCostSql(costSql,true)} AND ${staffReconciliationBlockedCoreSql(orderSql,costSql,includeLate)})`:staffReconciliationBlockedCoreSql(orderSql,costSql,includeLate);
 
 const pendingPaymentCoverSql=(cost='c.id')=>`COALESCE((SELECT MIN(${staffPaidSql(cost)},COALESCE(t.amount_iqd,0)) FROM finance_wage_pending_targets t JOIN finance_wage_changes wc ON wc.id=t.change_id JOIN finance_order_costs ec ON ec.id=t.cost_id JOIN finance_staff_reconciliations j ON j.staff_id=ec.staff_id AND j.operation_id=t.change_id WHERE t.cost_id=${cost} AND j.state<>'complete' AND ec.order_id>j.cursor ORDER BY wc.created_at DESC LIMIT 1),0)`;
 
@@ -81,9 +81,10 @@ const fenceSurplusSql = `SELECT s.id,s.kind,s.amount_iqd AS amount,0 AS cover,${
 /** Only the participant's payable amounts. No customer, margin, cost base or other people's accounts. */
 export async function participantSources(db: D1Database, userId: string, scope: 'account' | 'staff' = 'account'): Promise<ParticipantSource[]> {
   const installed = await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_investor_earnings'").first();
+  const settled = await settlementInstalled(db);
   const staff = await db.prepare(`SELECT c.id,'staff' AS kind,c.rule_name AS title,c.order_id,c.cost_day AS day,
     COALESCE(${effectiveStaffCostSql()},0) AS amount_iqd,COALESCE(${effectiveStaffCostSql()},0) AS accrued_iqd,
-    ${pendingPaymentCoverSql()} AS pending_payment_cover_iqd,${staffPaidSql()} AS paid_iqd,${heldSourceSql("'staff'", 'c.id')} AS held_iqd,c.state,c.staff_id,(NOT ${settledCostSql('c.id')} AND EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=c.id AND wt.amount_iqd IS NULL)) AS pending_cost,${staffReconciliationBlockedSql('c.order_id','c.id',!!installed)} AS blocked,
+    ${pendingPaymentCoverSql()} AS pending_payment_cover_iqd,${staffPaidSql()} AS paid_iqd,${heldSourceSql("'staff'", 'c.id')} AS held_iqd,c.state,c.staff_id,(NOT ${settledCostSql('c.id',settled)} AND EXISTS(SELECT 1 FROM finance_wage_targets wt WHERE wt.cost_id=c.id AND wt.amount_iqd IS NULL)) AS pending_cost,${staffReconciliationBlockedSql('c.order_id','c.id',!!installed,settled)} AS blocked,
     CASE WHEN c.state IN ('due','approved') THEN 1 ELSE 0 END AS eligible,
     (SELECT COUNT(*) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id) AS version,
     CASE WHEN json_valid(c.snapshot) THEN json_extract(c.snapshot,'$.rule.basis') END AS basis
@@ -251,7 +252,8 @@ async function sourceSetFence(db: D1Database, userId: string, sources: Participa
   const investorInstalled=await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_investor_earnings'").first();
   const includeInvestors=!!investorInstalled&&scope==='account';
   const includeSurplus=scope==='account'&&await surplusInstalled(db);
-  const staffSql=`SELECT c.id AS id,'staff' AS kind,COALESCE(${effectiveStaffCostSql()},0) AS amount,${pendingPaymentCoverSql()} AS cover,${staffPaidSql()} AS paid,${heldSourceSql("'staff'",'c.id')} AS held,c.state,${staffReconciliationBlockedSql('c.order_id','c.id',!!investorInstalled)} AS blocked,
+  const settled=await settlementInstalled(db);
+  const staffSql=`SELECT c.id AS id,'staff' AS kind,COALESCE(${effectiveStaffCostSql()},0) AS amount,${pendingPaymentCoverSql()} AS cover,${staffPaidSql()} AS paid,${heldSourceSql("'staff'",'c.id')} AS held,c.state,${staffReconciliationBlockedSql('c.order_id','c.id',!!investorInstalled,settled)} AS blocked,
     (SELECT COUNT(*) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id) AS version
     FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id WHERE ${scope==='staff'?'s.id':'s.user_id'}=? AND c.state<>'reversed'`;
   const investorSql=`SELECT e.id,e.kind,${investorAmountSql} AS amount,0 AS cover,${paidSourceSql('e.kind','e.id')} AS paid,${heldSourceSql('e.kind','e.id')} AS held,e.state,${investorBlockedSql} AS blocked,e.version FROM finance_investor_earnings e WHERE e.user_id=?`;
@@ -424,6 +426,7 @@ export function staffBasisFingerprintSql(orderSql:string,includeLate=true) {
 export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, opts: {actor?:string;day?:string}={}) {
   if(!await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_cost_adjustments'").first())return {adjusted:0};
   const temporal=await reconcileEffectiveWages(db,orderId,opts);
+  const settled=await settlementInstalled(db);
   // Fixed wages can change in the same employment/rule correction. Percentage
   // wages must see those newly recorded costs before we certify the basis.
   if(temporal.netCostsChanged)temporal.adjusted+=(await reconcileEffectiveWages(db,orderId,opts)).adjusted;
@@ -438,7 +441,7 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
   const costs=(await db.prepare(`SELECT c.*,${effectiveStaffCostSql()} AS effective_iqd,${staffPaidSql()} AS paid_iqd,
     ${heldSourceSql("'staff'",'c.id')} AS held_iqd,
     EXISTS(SELECT 1 FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id AND ca.kind='manual') AS manual_override
-    FROM finance_order_costs c WHERE c.order_id=? AND c.state IN ('due','approved','pending_cost') AND NOT ${settledCostSql('c.id')} ORDER BY c.order_item_id,c.id`)
+    FROM finance_order_costs c WHERE c.order_id=? AND c.state IN ('due','approved','pending_cost') AND NOT ${settledCostSql('c.id',settled)} ORDER BY c.order_item_id,c.id`)
     .bind(orderId).all<{id:string;order_item_id:string|null;rule_id:string;state:string;snapshot:string;effective_iqd:number|null;paid_iqd:number;held_iqd:number;manual_override:number;category_id:string;staff_id:string|null;rule_name:string;group_key:string;milestone:string}>()).results??[];
   if(!costs.some(cost=>!temporal.managed.has(cost.rule_id))){
     // Timeline-managed wages are already current. Orders without employees

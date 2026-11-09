@@ -1,6 +1,7 @@
 import { badRequest, conflict } from './http';
 import { fence, journalPlan, periodOpen } from './operations';
 import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, staffReconciliationBlockedSql } from './financeParticipants';
+import { settlementInstalled } from './staffSettledSql';
 
 /** Apply an existing cash advance to approved earnings; no new cash or expense. */
 export async function settleAdvance(
@@ -17,6 +18,7 @@ export async function settleAdvance(
     return;
   }
   await periodOpen(db, input.day);
+  const settled = await settlementInstalled(db);
   const [advances, costs] = await Promise.all([
     db
       .prepare(
@@ -28,7 +30,7 @@ export async function settleAdvance(
     db
       .prepare(
         `SELECT c.id,${effectiveStaffCostSql()}-COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.cost_id=c.id),0)-${heldSourceSql("'staff'",'c.id')} AS balance
-      FROM finance_order_costs c WHERE c.staff_id=? AND c.state='approved' AND NOT ${staffReconciliationBlockedSql()} ORDER BY c.cost_day,c.id`,
+      FROM finance_order_costs c WHERE c.staff_id=? AND c.state='approved' AND NOT ${staffReconciliationBlockedSql('c.order_id', 'c.id', true, settled)} ORDER BY c.cost_day,c.id`,
       )
       .bind(input.staffId)
       .all<{ id: string; balance: number }>(),
@@ -53,7 +55,7 @@ export async function settleAdvance(
     statements.push(
       ...fence(
         db,
-        `EXISTS(SELECT 1 FROM finance_order_costs c WHERE id=? AND state='approved' AND NOT ${staffReconciliationBlockedSql()} AND ${effectiveStaffCostSql()}-COALESCE((SELECT SUM(amount_iqd) FROM finance_payment_allocations WHERE cost_id=?),0)-${heldSourceSql("'staff'",'c.id')}=?)`,
+        `EXISTS(SELECT 1 FROM finance_order_costs c WHERE id=? AND state='approved' AND NOT ${staffReconciliationBlockedSql('c.order_id', 'c.id', true, settled)} AND ${effectiveStaffCostSql()}-COALESCE((SELECT SUM(amount_iqd) FROM finance_payment_allocations WHERE cost_id=?),0)-${heldSourceSql("'staff'",'c.id')}=?)`,
         [c.id, c.id, c.balance],
       ),
     );

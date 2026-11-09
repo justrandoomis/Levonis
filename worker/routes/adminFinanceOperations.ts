@@ -27,7 +27,7 @@ import { wageVersionStatement } from '../lib/financeWageTimeline';
 import { nextEmploymentDay, queueStaffReconciliation, readStaff, updateStaffEmployment } from '../lib/financeEmployment';
 
 import { staffActiveAt } from '../lib/financeEmploymentIntervals';
-import { settledCostSql } from '../lib/staffSettledSql';
+import { settledCostSql, settlementInstalled } from '../lib/staffSettledSql';
 
 export const adminFinanceOperationsRoutes = new Hono<AppContext>();
 adminFinanceOperationsRoutes.use('*', requireAdmin);
@@ -303,7 +303,7 @@ adminFinanceOperationsRoutes.post('/costs/:id/reverse', async (c) => {
     .first<{ state: string; amount_iqd: number; expense_id: string | null; staff_id: string | null }>();
   if (!cost) throw notFound('Cost not found');
   if (cost.state === 'reversed') return c.json({ success: true, already: true });
-  if (await db.prepare(`SELECT ${settledCostSql('?')} AS settled`).bind(id).first<{ settled: number }>().then((r) => !!r?.settled))
+  if (await settlementInstalled(db) && await db.prepare(`SELECT ${settledCostSql('?', true)} AS settled`).bind(id).first<{ settled: number }>().then((r) => !!r?.settled))
     throw conflict('هذا الأجر ضمن تسوية نهائية متفق عليها؛ لا يُعكس');
   if (
     await db
@@ -421,6 +421,7 @@ adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
       .bind(id, staff, amount, kind, day, text(b.note, 500), user.id, new Date().toISOString()),
   ];
   if (kind === 'payment') {
+    const settled = await settlementInstalled(db);
     const budget=await staffPaymentBudget(db,staff);
     if(budget.available_iqd<amount)throw badRequest('المبلغ يتجاوز صافي الأجور المتاح بعد التسويات والسلف والحجوزات');
     // Guard the canonical whole wage ledger BEFORE inserting this payment.
@@ -431,14 +432,14 @@ adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
       (
         await db
           .prepare(
-            `SELECT c.id,${effectiveStaffCostSql()}-COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.cost_id=c.id),0)-${heldSourceSql("'staff'", 'c.id')} AS balance FROM finance_order_costs c WHERE c.staff_id=? AND c.state='approved' AND NOT ${staffReconciliationBlockedSql()} ORDER BY c.cost_day,c.id`,
+            `SELECT c.id,${effectiveStaffCostSql()}-COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.cost_id=c.id),0)-${heldSourceSql("'staff'", 'c.id')} AS balance FROM finance_order_costs c WHERE c.staff_id=? AND c.state='approved' AND NOT ${staffReconciliationBlockedSql('c.order_id', 'c.id', true, settled)} ORDER BY c.cost_day,c.id`,
           )
           .bind(staff)
           .all<{ id: string; balance: number }>()
       ).results ?? [];
     if (costs.reduce((s, c) => s + c.balance, 0)-advance < amount)
       throw badRequest('المبلغ يتجاوز المستحقات المتاحة بعد خصم السلف وطلبات السحب');
-    statements.push(...fence(db,`${staffAdvanceSql('?')}=? AND (SELECT COALESCE(SUM(${effectiveStaffCostSql()}-COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.cost_id=c.id),0)-${heldSourceSql("'staff'",'c.id')}),0) FROM finance_order_costs c WHERE staff_id=? AND state='approved' AND NOT ${staffReconciliationBlockedSql()})=?`,[staff,advance,staff,costs.reduce((sum,c)=>sum+c.balance,0)]));
+    statements.push(...fence(db,`${staffAdvanceSql('?')}=? AND (SELECT COALESCE(SUM(${effectiveStaffCostSql()}-COALESCE((SELECT SUM(a.amount_iqd) FROM finance_payment_allocations a WHERE a.cost_id=c.id),0)-${heldSourceSql("'staff'",'c.id')}),0) FROM finance_order_costs c WHERE staff_id=? AND state='approved' AND NOT ${staffReconciliationBlockedSql('c.order_id', 'c.id', true, settled)})=?`,[staff,advance,staff,costs.reduce((sum,c)=>sum+c.balance,0)]));
     let left = amount;
     for (const cost of costs) {
       if (left === 0) break;
@@ -447,7 +448,7 @@ adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
       statements.push(
         ...fence(
           db,
-          `EXISTS(SELECT 1 FROM finance_order_costs c WHERE id=? AND state='approved' AND NOT ${staffReconciliationBlockedSql()} AND ${effectiveStaffCostSql()}-COALESCE((SELECT SUM(amount_iqd) FROM finance_payment_allocations WHERE cost_id=?),0)-${heldSourceSql("'staff'", 'c.id')}=?)`,
+          `EXISTS(SELECT 1 FROM finance_order_costs c WHERE id=? AND state='approved' AND NOT ${staffReconciliationBlockedSql('c.order_id', 'c.id', true, settled)} AND ${effectiveStaffCostSql()}-COALESCE((SELECT SUM(amount_iqd) FROM finance_payment_allocations WHERE cost_id=?),0)-${heldSourceSql("'staff'", 'c.id')}=?)`,
           [cost.id, cost.id, cost.balance],
         ),
         db

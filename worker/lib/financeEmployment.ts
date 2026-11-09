@@ -3,6 +3,7 @@ import { baghdadDay, dateValue, fence, journalPlan, periodOpen } from './operati
 import { auditStatements } from './audit';
 import { newId } from './crypto';
 import { employmentIntervals, inactiveAt, inactiveAtSql, staffActiveAt, type EmploymentInterval } from './financeEmploymentIntervals';
+import { settledCostSql, settlementInstalled } from './staffSettledSql';
 
 export interface EmploymentStaff {
   id:string; name:string; role:string; user_id:string|null; active:number;
@@ -132,11 +133,13 @@ async function updateWithLegacyRules(db:D1Database,id:string,actor:string,statem
  * cash settlements and manual corrections remain immutable. */
 export async function reconcileEmploymentCutoff(db:D1Database,orderId:string,actor?:string,day=baghdadDay()) {
   if(!await employmentInstalled(db))return 0;
+  // A settled row is final (DECISIONS row 306): no cutoff moves its agreed amount.
+  const settled=await settlementInstalled(db);
   const rows=(await db.prepare(`SELECT c.id,c.rule_id,c.staff_id,c.amount_iqd,c.state,s.start_work_date,s.employment_version,s.active,s.archived_at,s.inactive_periods_json,o.status AS order_status,o.delivered_at,
     COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0) AS effective,
     COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id AND a.employment_version IS NULL),0) AS intended,
     (SELECT COALESCE(SUM(a.amount_iqd-a.paid_iqd),0) FROM finance_withdrawal_allocations a JOIN finance_withdrawals w ON w.id=a.withdrawal_id WHERE a.source_kind='staff' AND a.source_id=c.id AND w.state IN ('requested','approved','part_paid')) AS held
-    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id WHERE c.order_id=? AND c.state IN ('due','approved')`).bind(orderId).all<EmploymentStaff&{id:string;rule_id:string;staff_id:string;amount_iqd:number;state:string;order_status:string;delivered_at:string|null;effective:number;intended:number;held:number}>()).results??[];
+    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id WHERE c.order_id=? AND c.state IN ('due','approved') AND NOT ${settledCostSql('c.id',settled)}`).bind(orderId).all<EmploymentStaff&{id:string;rule_id:string;staff_id:string;amount_iqd:number;state:string;order_status:string;delivered_at:string|null;effective:number;intended:number;held:number}>()).results??[];
   const timeline=await db.prepare("SELECT 1 FROM sqlite_master WHERE name='finance_wage_versions'").first();
   const managed=timeline?new Set(((await db.prepare("SELECT DISTINCT v.rule_id FROM finance_wage_versions v JOIN finance_staff s ON s.id=v.staff_id WHERE s.start_work_date IS NOT NULL OR EXISTS(SELECT 1 FROM finance_wage_versions revised WHERE revised.rule_id=v.rule_id AND revised.revision>1 AND revised.id NOT LIKE 'wage:baseline:%')").all<{rule_id:string}>()).results??[]).map(r=>r.rule_id)):new Set<string>();
   const statements:D1PreparedStatement[]=[];let changed=0;
