@@ -40,7 +40,7 @@ export default function InvestorProfiles({ from, to, month, onChanged, openContr
   const open = selected ? person(selected) : undefined;
   return <div className="ap fp fp-stack" dir={dir}>
     <Surface title={loc('حسابات المستثمرين', 'Investor accounts', 'هەژماری وەبەرهێنەران')} hint={s.peopleHint} action={<Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing('new')}>{loc('إضافة مستثمر', 'Add investor', 'زیادکردنی وەبەرهێنەر')}</Button>}>
-      {!data ? <Loading error={remote.error} retry={reload} /> : <><Feedback error={remote.error || people.error} />
+      {!data ? <Loading error={remote.error} retry={reload} /> : <div className="fp-stack"><Feedback error={remote.error || people.error} />
         <div className="fp-stats">
           <div className="fp-stat"><span>{s.capitalPutIn}</span><Money value={people.data ? sum((i) => i.capital.put_in_iqd) : null} /></div>
           <div className="fp-stat"><span>{s.profitEarned}</span><Money value={people.data ? sum((i) => i.profit.earned_iqd) : null} /></div>
@@ -52,7 +52,7 @@ export default function InvestorProfiles({ from, to, month, onChanged, openContr
           const settings = <Button variant="ghost" size="sm" icon={<Pencil size={15} />} onClick={() => setEditing(p)}>{s.settings}</Button>;
           return pf ? <PersonCard key={p.user_id} person={pf} onOpen={() => setSelected(p.user_id)} actions={settings} />
             : <article className="fp-person" key={p.user_id}><header className="fp-rule-heading fp-staff-heading"><h3>{p.name || p.email}</h3>{settings}</header>{people.loading && <p className="fp-muted" role="status">{loc('جارٍ تحميل الأرقام…', 'Loading figures…', 'ژمارەکان بار دەکرێن…')}</p>}</article>;
-        })}</div>}</>}
+        })}</div>}</div>}
     </Surface>
     <LegacyInvestmentHistory admin />
     {editing && data && <ProfileEditor profile={editing === 'new' ? undefined : editing} accounts={data.accounts.filter((a) => editing !== 'new' || !data.profiles.some((p) => p.user_id === a.id))} onClose={() => setEditing(null)} onSaved={saved} />}
