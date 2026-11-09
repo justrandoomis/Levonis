@@ -89,8 +89,12 @@ const CSS_BUDGET = 60 * KB;
  * Three new authenticated operations sheets, only after their lazy routes open.
  * 7 KB → 7.5 KB (2026-10-09): the profit page's IQD/USD display toggle (P-A)
  * measured 7,310 B over the three sheets; owner-only, lazy, never on a storefront.
+ * 7.5 KB → 8.5 KB (2026-11-10): the one-person money card on the Investors and
+ * Staff tabs and «أرباحي» (capital bar, why money is held, work status;
+ * DECISIONS row 304) measured 8,204 B over the three sheets; the owner's and
+ * the person's own pages, lazy, never on a storefront.
  */
-const OPERATIONS_CSS_BUDGET = 7.5 * KB;
+const OPERATIONS_CSS_BUDGET = 8.5 * KB;
 
 const gz = (path: string) => gzipSync(readFileSync(path), { level: 9 }).length;
 const kb = (n: number) => `${(n / KB).toFixed(1)} KB`;

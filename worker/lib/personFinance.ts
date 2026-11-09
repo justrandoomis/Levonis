@@ -395,10 +395,11 @@ async function periodProfit(db: D1Database, range: FinanceRange) {
 
 /** Every person the owner pays: investors, linked staff, then active staff with no account. */
 export async function peopleFinance(db: D1Database, range?: FinanceRange) {
-  const ids: string[] = ['SELECT user_id AS id FROM finance_staff WHERE user_id IS NOT NULL'];
+  // One IN per source, OR'ed: no compound SELECT for D1 to count (tests/d1CompoundLimit.test.ts).
+  const ids: string[] = ['SELECT user_id FROM finance_staff WHERE user_id IS NOT NULL'];
   if (await tableExists(db, 'investment_contracts')) ids.push('SELECT user_id FROM investment_contracts');
   if (await tableExists(db, 'investment_profiles')) ids.push('SELECT user_id FROM investment_profiles');
-  const users = (await db.prepare(`SELECT u.id,COALESCE(NULLIF(u.name,''),u.email) AS name FROM users u WHERE u.id IN (${ids.join(' UNION ')}) ORDER BY u.name,u.id`).all<{ id: string; name: string }>()).results ?? [];
+  const users = (await db.prepare(`SELECT u.id,COALESCE(NULLIF(u.name,''),u.email) AS name FROM users u WHERE ${ids.map((sql) => `u.id IN (${sql})`).join(' OR ')} ORDER BY u.name,u.id`).all<{ id: string; name: string }>()).results ?? [];
   const [wages, profitByUser] = range ? await Promise.all([staffPeriodReport(db, range), periodProfit(db, range)]) : [undefined, undefined];
   const people: Array<PersonFinance & { staff_id?: string }> = [];
   for (const u of users) people.push(await personFinance(db, u.id, { owner: true, name: u.name, range, wages, profitByUser }));
