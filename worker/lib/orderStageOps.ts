@@ -49,7 +49,7 @@ import {
   stageForLegacyStatus,
   stagesFor,
 } from './orderStages';
-import { deductOrderStock, planOrderReturn, stockReturnNote } from './orderInventory';
+import { deductOrderStock, planOrderReopen, planOrderReturn, stockReturnNote, type ReopenRefusal } from './orderInventory';
 import { cancelledOrderRefundStatements } from './orderCancelOps';
 import { emitEvent, eventsEnabled } from './eventBus';
 import { OrderStatusChangedV1 } from '@levonis/contracts/events/v1/OrderStatusChanged';
@@ -129,7 +129,9 @@ export interface MoveResult {
     /** An estimated line waits for its final price: the order stays at «تم الاستلام» (0218, T8). */
     | 'PRICE_ESTIMATE_UNCONFIRMED'
     /** A cancelled order that held estimated lines is never re-opened (0218, T9). */
-    | 'PRICE_ESTIMATE_REOPEN_REFUSED';
+    | 'PRICE_ESTIMATE_REOPEN_REFUSED'
+    /** Its units were taken and put back on the shelf, or are no longer free to hold again (DECISIONS row 310). */
+    | ReopenRefusal;
 }
 
 /**
@@ -407,6 +409,12 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   // always was, and by the day patch — and both mean the same thing: the
   // order was cancelled and is coming back.
   const reopening = legacyFrom === 'cancelled' && legacyTo !== 'cancelled';
+  // Its stock (DECISIONS row 310): units only held are held again in the flip's
+  // batch, under their own fence; units taken and put back refuse the re-open.
+  const reopenStock = reopening ? await planOrderReopen(env.DB, order.id, opts.changedBy || null) : null;
+  if (reopenStock?.refused) {
+    return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: reopenStock.refused };
+  }
   const dayPatch = await deliveryDayPatch(env, row, opts.to, reopening, nowIso);
 
   // Conditional on BOTH the stage AND the status we read. Two movers arriving
@@ -503,10 +511,16 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   }
   if (stamp) moveStatements.push(stamp);
   if (reopening) moveStatements.push(reclaimOrderRedemptionsStatement(env.DB, order.id));
+  if (reopenStock?.plan) moveStatements.push(...reopenStock.plan.statements);
   let flipResult;
   try {
     [flipResult] = await env.DB.batch(moveStatements);
   } catch (e) {
+    // The units were taken between the plan and the commit: the fence rolled it all back.
+    if (reopenStock?.plan && String(e instanceof Error ? e.message : e).includes('actual = expected')) {
+      return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_REOPEN_STOCK_UNAVAILABLE' };
+    }
     if (reopening && await env.DB.prepare(refundedSql).bind(String(row.user_id), order.id).first()) {
       return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
         next_stage: null, next_stage_at: null, notes: [], reason: 'REFUNDED_ORDER' };

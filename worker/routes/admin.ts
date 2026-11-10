@@ -45,7 +45,7 @@ import { putMediaObject } from '../lib/mediaStorage';
 import { scheduleVariantWarm } from '../lib/imageVariants';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { sniff } from './uploads';
-import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
+import { deductOrderStock, planOrderReopen, planOrderReturn, stockReturnNote, type ReopenRefusal } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
 import { voidReviewGiftsOfOrder } from '../lib/gifts/reviewCode';
 import { cancelStoreOrder, notifyMerchantOfStoreOrder, storeCancelMovesMoney } from '../lib/storeOrderOps';
@@ -2682,6 +2682,23 @@ function giftReopenRefusal(): HttpError {
 }
 
 /**
+ * 409 for every admin door that would re-open a cancelled order whose stock
+ * cannot come back with it (owner 2026-11-10; DECISIONS row 310,
+ * worker/lib/orderInventory.ts planOrderReopen): its units were taken and put
+ * back on the shelf, so a re-open would be a new sale; or its units were only
+ * held, and are no longer free to hold again. The order stays cancelled.
+ */
+function reopenStockRefusal(reason: ReopenRefusal): HttpError {
+  return reason === 'ORDER_REOPEN_STOCK_RETURNED'
+    ? new HttpError(409,
+      'أُعيدت قطع هذا الطلب إلى المخزون بعد خصمها عند الإلغاء؛ لا يُعاد فتحه. أنشئ طلباً جديداً. / This order\'s units went back on the shelf when it was cancelled; it cannot be re-opened. Create a new order. / پارچەکانی ئەم داواکارییە لە کاتی هەڵوەشاندنەوەدا گەڕێنرانەوە بۆ کۆگا؛ دووبارە ناکرێتەوە. داواکارییەکی نوێ دروست بکە.',
+      'ORDER_REOPEN_STOCK_RETURNED')
+    : new HttpError(409,
+      'لم تعد قطع هذا الطلب متوفرة لحجزها من جديد؛ يبقى ملغى. / This order\'s units are no longer free to hold again; it stays cancelled. / پارچەکانی ئەم داواکارییە ئیتر بەردەست نین بۆ دووبارە گلدانەوە؛ هەڵوەشاوە دەمێنێتەوە.',
+      'ORDER_REOPEN_STOCK_UNAVAILABLE');
+}
+
+/**
  * 409 for every admin door that would re-open a cancelled order whose coupon
  * use came back at the cancellation (0191, trg_coupon_redemption_reclaim) and
  * has since been spent again or switched off — re-opening would hand the order
@@ -3611,6 +3628,7 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     if (res.reason === 'REFUNDED_ORDER') throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
     if (res.reason === 'GIFT_ORDER_REOPEN_REFUSED') throw giftReopenRefusal();
     if (res.reason === 'ORDER_REOPEN_COUPON_SPENT') throw couponSpentReopenRefusal();
+    if (res.reason === 'ORDER_REOPEN_STOCK_RETURNED' || res.reason === 'ORDER_REOPEN_STOCK_UNAVAILABLE') throw reopenStockRefusal(res.reason);
     if (res.reason === 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED') throw tradeInNotReceivedReopenRefusal();
     if (res.reason === 'TRADE_IN_ORDER_DELIVERED') throw tradeInDeliveredRefusal();
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
@@ -3768,6 +3786,10 @@ adminRoutes.patch('/orders/:id', async (c) => {
     // prepaid amounts unusable: create a new order instead of treating money
     // already returned to the buyer as a payment. The guard shares the flip's
     // transaction so a concurrent historical repair cannot slip past it.
+    // Its stock (DECISIONS row 310): units only held are held again in this
+    // batch, under its own fence; units taken and put back refuse the re-open.
+    const reopenStock = await planOrderReopen(c.env.DB, id, adminUser.id);
+    if (reopenStock.refused) throw reopenStockRefusal(reopenStock.refused);
     try {
       const res = await c.env.DB.batch([
         flipStmt,
@@ -3777,10 +3799,13 @@ adminRoutes.patch('/orders/:id', async (c) => {
             AND t.id IN ('wtx_refund_'||orders.id||'_usd','wtx_refund_'||orders.id||'_pts')
           ) THEN status ELSE NULL END WHERE id=?`).bind(id),
         reclaimOrderRedemptionsStatement(c.env.DB, id),
+        ...(reopenStock.plan?.statements ?? []),
       ]);
       flipped = res[0]?.meta.changes ?? 0;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
+      // The units were taken between the plan and the commit: the fence rolled it all back.
+      if (reopenStock.plan && msg.includes('actual = expected')) throw reopenStockRefusal('ORDER_REOPEN_STOCK_UNAVAILABLE');
       if (msg.includes('NOT NULL constraint failed: orders.status')) {
         throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
       }

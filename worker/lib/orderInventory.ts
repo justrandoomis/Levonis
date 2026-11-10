@@ -44,8 +44,29 @@ interface LedgerRow {
   idempotency_key: string;
 }
 
-/** Reconstructs the moves recorded for one order under a given ledger kind. */
-async function movesFor(db: D1Database, orderId: string, kind: string): Promise<StockMove[]> {
+/**
+ * A HOLD CYCLE (owner 2026-11-10; DECISIONS row 310). Checkout holds an order's
+ * units under the order's own id: `<kind>:<order>:<line>:…`. A cancelled order
+ * that was only HELD can be re-opened, and the re-open holds its units again as
+ * the next cycle, `<kind>:<order>~2:…`, `~3` after that. Confirmation deducts
+ * the current cycle's hold and a cancellation releases or restores the current
+ * cycle — the first cycle's keys are spent, which is exactly why a re-confirmed
+ * order used to take nothing. An order whose units were TAKEN and put back on
+ * the shelf is never re-opened, so its FIFO lots are consumed and restored once.
+ * 0: a row of this order that is not one of its hold cycles (a return's).
+ */
+function cycleOf(key: string, orderId: string): number {
+  const op = key.split(':')[1] ?? '';
+  if (op === orderId) return 1;
+  if (!op.startsWith(`${orderId}~`)) return 0;
+  const n = Number(op.slice(orderId.length + 1));
+  return Number.isSafeInteger(n) && n > 1 ? n : 0;
+}
+/** The operation id a hold cycle's ledger keys carry. */
+export const holdOperation = (orderId: string, cycle: number) => (cycle > 1 ? `${orderId}~${cycle}` : orderId);
+
+/** Reconstructs the moves recorded for one order under a given ledger kind (of one hold cycle, when given). */
+async function movesFor(db: D1Database, orderId: string, kind: string, cycle?: number): Promise<StockMove[]> {
   const { results } = await db
     .prepare(
       `SELECT product_id, scope, scope_id, qty, idempotency_key
@@ -54,7 +75,7 @@ async function movesFor(db: D1Database, orderId: string, kind: string): Promise<
     .bind(orderId, kind)
     .all<LedgerRow>();
 
-  return results.map((r) => ({
+  return results.filter((r) => cycle === undefined || cycleOf(r.idempotency_key, orderId) === cycle).map((r) => ({
     product_id: r.product_id,
     qty: r.qty,
     // `r.scope` is replayed VERBATIM, including 'preorder' and
@@ -106,6 +127,16 @@ export async function restoreMovesForItem(
   return moves.filter((m) => m.line_id === orderItemId).map((m) => ({ ...m, qty }));
 }
 
+/** The order's current hold: its newest cycle and that cycle's held moves. */
+async function currentHold(db: D1Database, orderId: string): Promise<{ cycle: number; moves: StockMove[] }> {
+  const { results } = await db
+    .prepare(`SELECT idempotency_key FROM inventory_ledger WHERE order_id = ? AND kind = 'reserve'`)
+    .bind(orderId)
+    .all<{ idempotency_key: string }>();
+  const cycle = Math.max(1, ...results.map((r) => cycleOf(r.idempotency_key, orderId)));
+  return { cycle, moves: await movesFor(db, orderId, 'reserve', cycle) };
+}
+
 export async function hasLedgerKind(db: D1Database, orderId: string, kind: string): Promise<boolean> {
   const row = await db
     .prepare('SELECT 1 AS x FROM inventory_ledger WHERE order_id = ? AND kind = ? LIMIT 1')
@@ -127,11 +158,11 @@ export async function planOrderDeduction(
   orderId: string,
   actorUserId: string | null
 ): Promise<InventoryPlan | null> {
-  const moves = await movesFor(db, orderId, 'reserve');
+  const { cycle, moves } = await currentHold(db, orderId);
   if (moves.length === 0) return null;
   const plan = await planInventory(db, moves, {
     kind: 'deduct',
-    operationId: orderId,
+    operationId: holdOperation(orderId, cycle),
     orderId,
     actorUserId,
     reason: 'order confirmed',
@@ -216,9 +247,10 @@ export async function planOrderReturn(
   orderId: string,
   actorUserId: string | null
 ): Promise<OrderReturnPlan> {
-  const reserved = await movesFor(db, orderId, 'reserve');
+  // The current hold cycle only: a re-opened order's earlier cycle was released already.
+  const { cycle, moves: reserved } = await currentHold(db, orderId);
   if (reserved.length === 0) return { kind: 'none', plan: null, parts: [] };
-  const deducted = new Set((await movesFor(db, orderId, 'deduct')).map(moveSig));
+  const deducted = new Set((await movesFor(db, orderId, 'deduct', cycle)).map(moveSig));
 
   const split: Array<[LedgerKind & ('restore' | 'release'), StockMove[]]> = [
     ['restore', reserved.filter((m) => deducted.has(moveSig(m)))],
@@ -230,7 +262,7 @@ export async function planOrderReturn(
     if (moves.length === 0) continue;
     const plan = await planInventory(db, moves, {
       kind,
-      operationId: orderId,
+      operationId: holdOperation(orderId, cycle),
       orderId,
       actorUserId,
       reason: 'order cancelled',
@@ -267,6 +299,48 @@ export async function planOrderReturn(
     plannedLedgerRows: parts.reduce((n, p) => n + p.plan.plannedLedgerRows, 0),
   };
   return { kind: parts.length === 2 ? 'mixed' : parts[0].kind, plan: combined, parts };
+}
+
+/**
+ * RE-OPENING A CANCELLED ORDER TAKES ITS STOCK AGAIN — OR IS REFUSED (owner
+ * 2026-11-10; DECISIONS row 310). Before this, a re-opened order replayed its
+ * first hold's keys, which the cancellation had spent: one whose units had been
+ * TAKEN and put back confirmed again taking nothing; one that was only HELD
+ * failed to deduct («Stock could not be deducted») or deducted another order's
+ * hold. The owner chose:
+ *   - units taken and returned to the shelf (any `restore` of this order): the
+ *     re-open is refused — it is a new sale; create a new order;
+ *   - units only held, then released: the re-open holds them again as the next
+ *     hold cycle, in the re-open's own batch with its fence, and is refused
+ *     when they are no longer free (as checkout refuses);
+ *   - nothing released (an untracked product, or a hold or deduction that
+ *     still stands): nothing to do.
+ * The caller puts `plan.statements` in the batch that re-opens the order.
+ */
+export type ReopenRefusal = 'ORDER_REOPEN_STOCK_RETURNED' | 'ORDER_REOPEN_STOCK_UNAVAILABLE';
+export async function planOrderReopen(
+  db: D1Database,
+  orderId: string,
+  actorUserId: string | null
+): Promise<{ refused: ReopenRefusal | null; plan: InventoryPlan | null }> {
+  const { results } = await db
+    .prepare(`SELECT kind, idempotency_key FROM inventory_ledger WHERE order_id = ? AND kind IN ('reserve','release','restore')`)
+    .bind(orderId)
+    .all<{ kind: string; idempotency_key: string }>();
+  if (results.some((r) => r.kind === 'restore')) return { refused: 'ORDER_REOPEN_STOCK_RETURNED', plan: null };
+  const { cycle, moves } = await currentHold(db, orderId);
+  const released = results.some((r) => r.kind === 'release' && cycleOf(r.idempotency_key, orderId) === cycle);
+  if (moves.length === 0 || !released) return { refused: null, plan: null };
+  const plan = await planInventory(db, moves, {
+    kind: 'reserve',
+    operationId: holdOperation(orderId, cycle + 1),
+    orderId,
+    actorUserId,
+    reason: 'order re-opened',
+  });
+  if (plan.rejected.length > 0) return { refused: 'ORDER_REOPEN_STOCK_UNAVAILABLE', plan: null };
+  plan.statements.push(await planReservationFence(db, orderId, 'reserve', plan.plannedLedgerRows));
+  return { refused: null, plan };
 }
 
 /** Puts an order's units back in a batch of its own. Idempotent (see planOrderReturn). */
