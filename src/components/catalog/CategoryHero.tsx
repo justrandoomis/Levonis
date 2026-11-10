@@ -6,7 +6,7 @@ import CropPhoto from './CropPhoto';
 import { IMAGE_SIZES, cropHeroCompactSizes } from '../../../packages/contracts/src/imageSizes';
 import { compareHref, compareTray } from '../../lib/compareTray';
 import { isPrinterNode, nodeDescription, nodeName } from '../../lib/catalog/categoryPageModel';
-import { countWord, nounKindFor } from '../../lib/catalog/copy';
+import { countWord, nounKindFor, unavailableLabel } from '../../lib/catalog/copy';
 import type { BannerPhoto } from '../../lib/catalog/explorerModel';
 import type { CategoryPayload } from '../../lib/catalog/types';
 
@@ -131,6 +131,14 @@ const CategoryHero = forwardRef<HTMLElement, {
               <dt className="sr-only">{loc('متوفرة الآن', 'Available now')}</dt>
               <dd className="font-bold tabular-nums text-text-primary">{avail}</dd>
               <dd aria-hidden="true">{loc('متوفرة الآن', 'available now')}</dd>
+            </div>
+          ) : null}
+          {/* Products, none in stock: the section stays and says so (owner, 2026-11-10; row 309). */}
+          {avail === 0 && node.product_count > 0 ? (
+            <div data-hero-unavailable="" className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="text-text-muted">·</span>
+              <dt className="sr-only">{loc('التوفر', 'Availability', 'بەردەستبوون')}</dt>
+              <dd>{unavailableLabel(avail, node.product_count, kind, lang)}</dd>
             </div>
           ) : null}
         </dl>

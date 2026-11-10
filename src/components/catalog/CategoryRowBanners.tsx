@@ -6,7 +6,7 @@ import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
 import { ArrowGlyph } from '../home/v2/SectionHead';
 import { prefetchProps } from '../../lib/catalog/prefetch';
 import { nodeDescription, nodeName } from '../../lib/catalog/categoryPageModel';
-import { availableLabel, countNoun, nounKindFor } from '../../lib/catalog/copy';
+import { availableLabel, countNoun, nounKindFor, unavailableLabel } from '../../lib/catalog/copy';
 import { bannerCta, type BannerPhoto, type BannerRow } from '../../lib/catalog/explorerModel';
 
 /**
@@ -127,7 +127,10 @@ export function CategoryNodeBanner({ row, eager = false }: { row: BannerRow; eag
   const { lang, loc } = useLanguage();
   const { node } = row;
   const kind = nounKindFor(node.product_type, node.is_printer_catalog);
-  const avail = availableLabel(node.available_count, node.product_count, lang);
+  // «4 متوفرة الآن», or «غير متوفرة حالياً» when the section has products but none in stock (row 309).
+  const avail =
+    availableLabel(node.available_count, node.product_count, lang) ??
+    unavailableLabel(node.available_count, node.product_count, kind, lang);
   const line = [countNoun(node.product_count, kind, lang), avail].filter(Boolean).join(' · ');
   // OWNER: Sorani to be written by hand (both calls to action).
   const cta = bannerCta(node) === 'explore' ? loc('استكشف', 'Explore') : loc('تسوق الآن', 'Shop now');

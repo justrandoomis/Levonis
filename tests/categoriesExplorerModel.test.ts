@@ -33,7 +33,7 @@ import {
   authoredPhoto,
   authoredSrc,
 } from '../src/lib/catalog/explorerModel';
-import { availableLabel, categoriesCount, countNoun, countWord, explorerSubline, resultCountLabel, showCountLabel } from '../src/lib/catalog/copy';
+import { availableLabel, categoriesCount, countNoun, countWord, explorerSubline, resultCountLabel, showCountLabel, unavailableLabel } from '../src/lib/catalog/copy';
 import { LanguageProvider } from '../src/LanguageContext';
 import CategoryRowBanners from '../src/components/catalog/CategoryRowBanners';
 import type { CatalogTreeNode, CatalogTreeResponse } from '../src/lib/catalog/types';
@@ -147,6 +147,18 @@ test('counted words: dual, plural, and the 11–99 singular', () => {
   assert.equal(availableLabel(2, 2, 'ar'), 'كلها متوفرة');
   assert.equal(availableLabel(0, 3, 'ar'), null, 'the pill is omitted at zero');
   assert.equal(availableLabel(null, 3, 'ar'), null, 'an unknown count is never guessed');
+  // Products, none in stock (owner, 2026-11-10; DECISIONS row 309): the section says so, in three languages.
+  assert.equal(unavailableLabel(0, 4, 'product', 'ar'), 'غير متوفرة حالياً');
+  assert.equal(unavailableLabel(0, 1, 'product', 'ar'), 'غير متوفر حالياً');
+  assert.equal(unavailableLabel(0, 1, 'printer', 'ar'), 'غير متوفرة حالياً', 'a printer agrees in the feminine');
+  assert.equal(unavailableLabel(0, 4, 'product', 'en'), 'Out of stock');
+  assert.equal(unavailableLabel(0, 1, 'product', 'en'), 'Out of stock');
+  assert.equal(unavailableLabel(0, 4, 'product', 'ckb'), 'ئێستا بەردەست نییە');
+  assert.equal(unavailableLabel(0, 1, 'product', 'ckb'), 'ئێستا بەردەست نییە');
+  for (const n of [1, 4]) assert.doesNotMatch(unavailableLabel(0, n, 'product', 'ckb')!, /[ةىيك]/, 'no Arabic-only letter in the Sorani');
+  assert.equal(unavailableLabel(2, 4, 'product', 'ar'), null, 'something is in stock: availableLabel speaks');
+  assert.equal(unavailableLabel(null, 4, 'product', 'ar'), null, 'an unknown count is never read as none');
+  assert.equal(unavailableLabel(0, 0, 'product', 'ar'), null, 'an empty section is not marked');
 });
 
 test('the explorer’s sub-line carries live counts up to ten categories, then only the instruction', () => {
