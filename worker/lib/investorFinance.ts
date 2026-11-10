@@ -277,7 +277,8 @@ export async function syncInvestorOrder(db: D1Database, orderId: string, opts: {
       OR c.id IN (SELECT value FROM json_each(?))`).bind(orderId,JSON.stringify(capital.map(a=>a.contract_id))).all<InvestmentContract>()).results ?? [];
     const principal = await planPendingInvestorCapital(db,orderId,capital,day,opts.actor);
     await db.batch([...fence(db,`(SELECT ${fingerprintSql.replace(/\?1/g, '?2')})=?3`,[orderId,split.source_fingerprint]),...principal,
-      db.prepare(`UPDATE investor_allocation_results SET pending=1,eligible=0,version=version+1 WHERE allocation_id IN (SELECT id FROM order_item_inventory_allocations WHERE order_id=?) AND pending=0`).bind(orderId),...contracts.flatMap(c=>planInvestorSources(db,c,day))]);
+      // A delivered sale waiting for its evidence is a sale again: a taken-back zero's flag goes (DECISIONS row 308).
+      db.prepare(`UPDATE investor_allocation_results SET pending=1,eligible=0,version=version+1,snapshot=json_remove(snapshot,'$.lost_delivery') WHERE allocation_id IN (SELECT id FROM order_item_inventory_allocations WHERE order_id=?) AND pending=0`).bind(orderId),...contracts.flatMap(c=>planInvestorSources(db,c,day))]);
     throw conflict('أرباح المستثمر معلقة حتى تثبيت التكلفة وأصل المرتجع','INVESTOR_PENDING');
   }
   await periodOpen(db, day);

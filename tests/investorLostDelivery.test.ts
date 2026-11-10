@@ -257,6 +257,21 @@ test('review: re-delivered while its profit waits for a cost, the sale is a sale
   assert.deepEqual([a.profit.sales, a.profit.sales_unknown, a.units.sold], [1, 1, 1]);
 });
 
+test('re-review: re-delivered while the funded unit\'s own cost is unknown, the flag goes too (no capital to prove)', async () => {
+  const s = setup();
+  await s.contract();
+  await s.sale('ORD-NOCOST');
+  s.cancel('ORD-NOCOST');
+  assert.equal((await drainOrderFinanceRecovery(s.env)).completed, 1);
+  // The unit's lot cost is unknown now: nothing proves its capital, so only the pending mark is written.
+  s.raw.exec(`DELETE FROM order_item_inventory_allocations WHERE id='ORD-NOCOST-release';
+    UPDATE order_item_inventory_allocations SET cogs_iqd=NULL,unit_cost_iqd=NULL WHERE id='ORD-NOCOST-a';
+    UPDATE orders SET status='delivered' WHERE id='ORD-NOCOST';`);
+  await runOrderDeliveredEffects(s.env, 'ORD-NOCOST');
+  const result = row<{ pending: number; capital_iqd: number; snapshot: string }>(s.raw, "SELECT pending,capital_iqd,snapshot FROM investor_allocation_results WHERE allocation_id='ORD-NOCOST-a'")!;
+  assert.deepEqual([result.pending, result.capital_iqd, JSON.parse(result.snapshot).lost_delivery ?? null], [1, 0, null]);
+});
+
 test('review: the recovery limit bounds two cancelled five-line orders with wages and five funded agreements each', async (context) => {
   const raw = freshDb();
   raw.exec(`INSERT INTO users(id,email,name,role,admin_scope) VALUES ('admin','boss@x.co','Owner','admin','full'),('investor','investor@x.co','Investor','admin','assistant'),('buyer','buyer@x.co','Buyer','customer',NULL);

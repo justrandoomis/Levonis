@@ -46,9 +46,11 @@ export async function reconcileFinanceOrder(db:D1Database,orderId:string,opts:{a
     // posting or sale cost left to wait for: its wages and investor shares are
     // settled above. Left behind, those markers would hold its employees' rows
     // and a loss-sharing agreement's whole capital for ever. A re-delivery
-    // records them again if they still hold.
+    // records them again if they still hold; the status is asked again at the
+    // delete, so one landing meanwhile keeps the markers it wrote.
     if(basis.order.status!=='delivered'&&basis.order.delivered_at)
-      await db.prepare('DELETE FROM finance_posting_errors WHERE event_key IN (?,?)').bind(`delivered:${orderId}`,`cogs:${orderId}`).run();
+      await db.prepare(`DELETE FROM finance_posting_errors WHERE event_key IN (?1,?2)
+        AND EXISTS(SELECT 1 FROM orders WHERE id=?3 AND status<>'delivered' AND delivered_at IS NOT NULL)`).bind(`delivered:${orderId}`,`cogs:${orderId}`,orderId).run();
     return workspacePending?{complete:false,staff_complete:true,pending:true}:{complete:true,staff_complete:true,pending:false};
   }catch(e){
     await recordFinancialFailure(db,orderId,'investor',e);
