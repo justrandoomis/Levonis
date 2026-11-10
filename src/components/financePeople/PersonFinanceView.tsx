@@ -1,7 +1,7 @@
 import { ChevronLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { personFinanceStrings, percentText, type HoldReasonKey, type PersonFinanceStrings } from '../../lib/personFinanceStrings';
-import { Button, Dialog, Money, dateLabel, useLanguage } from './shared';
+import { Button, Dialog, Money, dateLabel, useLanguage, type OpenOrder } from './shared';
 
 /**
  * «الأشخاص» — one person, one picture (worker/lib/personFinance.ts; DECISIONS
@@ -66,7 +66,9 @@ export function WorkStatus({ role, s }: { role: PersonWork; s: PersonFinanceStri
 const dayBefore = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) - 86400000).toISOString().slice(0, 10);
 
 /** Where the capital put in is now. The parts always add up to it. */
-export function CapitalBar({ capital, s }: { capital: Investor['capital']; s: PersonFinanceStrings }) {
+export function CapitalBar({ capital, holds = [], s }: { capital: Investor['capital']; holds?: Investor['holds']; s: PersonFinanceStrings }) {
+  // Why the sold money waits, in the words of the holds below (the person's own page has no amounts).
+  const soldWhy = holds.filter((h) => h.sales > 0 && (h.capital_iqd === undefined || h.capital_iqd > 0)).map((h) => s.hold[h.reason](h.sales)).join(' · ');
   const parts = [
     { key: 'stock', label: s.inGoods, value: capital.in_goods_iqd },
     { key: 'sold', label: s.soldHeld, value: capital.sold_held_iqd },
@@ -78,6 +80,7 @@ export function CapitalBar({ capital, s }: { capital: Investor['capital']; s: Pe
   return <div className="fp-stack fp-capital">
     {total > 0 && <div className="fp-capbar" aria-hidden="true">{parts.map((p) => <span key={p.key} className={`fp-capbar-${p.key}`} style={{ width: `${Math.max(1.5, (p.value / total) * 100)}%` }} />)}</div>}
     <ul className="fp-legend">{parts.map((p) => <li key={p.key}><i className={`fp-dot fp-capbar-${p.key}`} aria-hidden="true" /><span>{p.label}</span><Money value={p.value} />
+      {p.key === 'sold' && soldWhy && <small className="fp-row-meta">{soldWhy}</small>}
       {p.key === 'returned' && capital.available_iqd > 0 && <small className="fp-row-meta">{s.availableOf}: <Money value={capital.available_iqd} /></small>}
       {p.key === 'returned' && capital.unused_returned_iqd > 0 && <small className="fp-row-meta">{s.unusedReturned}: <Money value={capital.unused_returned_iqd} /></small>}</li>)}
       {capital.debt_iqd > 0 && <li className="fp-negative"><span>{s.capitalDebt}</span><Money value={capital.debt_iqd} /></li>}</ul>
@@ -93,13 +96,35 @@ function Holds({ items, s }: { items: HoldItem[]; s: PersonFinanceStrings }) {
     {i.action && <small className="fp-row-meta">{i.action}</small>}</li>)}</ul></div>;
 }
 
-/** Why investment money is held, in words. `owner` adds amounts and what to do. */
-export function InvestmentHolds({ investor, owner, s }: { investor: Investor; owner: boolean; s: PersonFinanceStrings }) {
+/** One held sale: its order, why it waits, and — when the owner can open orders — one button per
+ * missing step: the purchase price first (the profit is worked out from it), then the cash. */
+function HeldSaleRow({ h, s, openOrder }: { h: HeldSale; s: PersonFinanceStrings; openOrder?: OpenOrder }) {
+  const { lang } = useLanguage();
+  return <div className="fp-row fp-held-sale">
+    <div className="min-w-0">{openOrder ? <button type="button" className="fp-link" onClick={() => openOrder(h.order_id)} dir="ltr">{h.order_id}</button> : <bdi dir="ltr">{h.order_id}</bdi>}
+      {h.day && <span className="fp-row-meta"> · {dateLabel(h.day, lang)}</span>}
+      <p className="fp-row-meta">{h.reasons.map((r) => s.hold[r](1)).join(' · ')}</p>
+      {openOrder && (h.reasons.includes('cost') || h.reasons.includes('collection')) && <div className="fp-row-actions">
+        {h.reasons.includes('cost') && <Button size="sm" variant="primary" onClick={() => openOrder(h.order_id, 'cost')}>{s.enterCost}</Button>}
+        {h.reasons.includes('collection') && <Button size="sm" variant={h.reasons.includes('cost') ? 'ghost' : 'primary'} onClick={() => openOrder(h.order_id, 'collection')}>{s.recordCash}</Button>}
+      </div>}</div>
+    <div className="text-end">{h.profit_unknown ? <span className="fp-row-meta">{s.profitUnknown(1)}</span> : <Money value={h.profit_iqd} />}<p className="fp-row-meta">{s.capital}: <Money value={h.capital_iqd} /></p></div>
+  </div>;
+}
+
+/** Why investment money is held, in words. `owner` adds amounts and what to do; with `openOrder`
+ * the owner also gets every held sale with the button that releases it. */
+export function InvestmentHolds({ investor, owner, s, openOrder }: { investor: Investor; owner: boolean; s: PersonFinanceStrings; openOrder?: OpenOrder }) {
   const items: HoldItem[] = investor.holds.map((h) => ({ key: h.reason, text: h.sales > 0 ? s.hold[h.reason](h.sales) : s.holdGroup[h.reason], profit: owner ? h.profit_iqd : undefined, capital: owner ? h.capital_iqd : undefined, action: owner ? s.holdAction[h.reason] : undefined }));
   const unknown = investor.holds.reduce((n, h) => n + h.profit_unknown, 0);
   if (unknown) items.push({ key: 'unknown', text: s.profitUnknown(unknown) });
   if (investor.agreements.some((a) => a.held_whole)) items.push({ key: 'whole', text: s.wholeAgreement });
-  return <Holds items={items} s={s} />;
+  const sales = owner && openOrder ? investor.agreements.flatMap((a) => a.held_sales).sort((x, y) => (x.day ?? '').localeCompare(y.day ?? '') || x.order_id.localeCompare(y.order_id)) : [];
+  return <>
+    <Holds items={items} s={s} />
+    {sales.length > 0 && <section className="fp-stack" aria-label={s.heldSalesSteps}><h4>{s.heldSalesSteps}</h4><div className="fp-rows">
+      {sales.map((h) => <HeldSaleRow key={h.order_id} h={h} s={s} openOrder={openOrder} />)}</div></section>}
+  </>;
 }
 
 /** Why wages are held, in words. `owner` adds amounts and what to do. */
@@ -116,7 +141,7 @@ function ShareStat({ investor: inv, s }: { investor: Investor; s: PersonFinanceS
 }
 
 /** The at-a-glance card. `own` is the person's own page: no settings, no owner amounts or actions. */
-export function PersonCard({ person, onOpen, actions, own = false }: { person: PersonFinance; onOpen?: () => void; actions?: ReactNode; own?: boolean }) {
+export function PersonCard({ person, onOpen, actions, own = false, openOrder }: { person: PersonFinance; onOpen?: () => void; actions?: ReactNode; own?: boolean; openOrder?: OpenOrder }) {
   const { lang } = useLanguage(), s = strings(lang);
   const inv = person.investor, work = person.work, roles = work?.roles.filter((r) => r.status !== 'archived') ?? [], c = person.combined;
   const totalLabel = inv && work ? s.earnedTotal : inv ? s.profitEarned : s.wagesEarned;
@@ -149,9 +174,9 @@ export function PersonCard({ person, onOpen, actions, own = false }: { person: P
           <ShareStat investor={inv} s={s} />
           {inv.profit.debt_iqd > 0 && <Stat label={s.profitDebt} value={inv.profit.debt_iqd} />}
         </div>
-        <CapitalBar capital={inv.capital} s={s} />
+        <CapitalBar capital={inv.capital} holds={inv.holds} s={s} />
         {inv.units.received + inv.units.ordered > 0 && <p className="fp-row-meta">{s.unitsLine(inv.units.in_stock, inv.units.in_orders, inv.units.sold, Math.max(0, inv.units.ordered - inv.units.received))}</p>}
-        <InvestmentHolds investor={inv} owner={!own} s={s} />
+        <InvestmentHolds investor={inv} owner={!own} s={s} openOrder={own ? undefined : openOrder} />
       </> : <div className="fp-stats"><ShareStat investor={inv} s={s} /><p className="fp-muted">{s.noAgreements}</p></div>}
     </section>}
     {work && <section className="fp-person-block" aria-label={s.workTitle}>
@@ -170,7 +195,7 @@ export function PersonCard({ person, onOpen, actions, own = false }: { person: P
   </article>;
 }
 
-function AgreementRow({ a, s, owner, openOrder }: { a: AgreementFinance; s: PersonFinanceStrings; owner: boolean; openOrder?: (id: string) => void }) {
+function AgreementRow({ a, s, owner, openOrder }: { a: AgreementFinance; s: PersonFinanceStrings; owner: boolean; openOrder?: OpenOrder }) {
   const { lang } = useLanguage();
   const title = (lang === 'en' ? a.product_name : a.product_name_ar || a.product_name) || a.label || a.name;
   const rest = a.held_rest;
@@ -183,12 +208,7 @@ function AgreementRow({ a, s, owner, openOrder }: { a: AgreementFinance; s: Pers
       <Stat label={s.profitEarned} value={a.profit.earned_iqd} hint={a.profit.held_iqd > 0 ? <>{s.heldOf} <Money value={a.profit.held_iqd} /></> : undefined} />
     </div>
     {owner && (a.held_sales.length > 0 || rest) && <details className="fp-detail" open><summary>{s.heldSales}{a.held_sales.length > 0 && ` (${a.held_sales.length + a.held_sales_more})`}</summary><div className="fp-rows">
-      {a.held_sales.map((h) => <div className="fp-row" key={h.order_id}>
-        <div className="min-w-0">{openOrder ? <button type="button" className="fp-link" onClick={() => openOrder(h.order_id)} dir="ltr">{h.order_id}</button> : <bdi dir="ltr">{h.order_id}</bdi>}
-          {h.day && <span className="fp-row-meta"> · {dateLabel(h.day, lang)}</span>}
-          <p className="fp-row-meta">{h.reasons.map((r) => s.hold[r](1)).join(' · ')}</p></div>
-        <div className="text-end">{h.profit_unknown ? <span className="fp-row-meta">{s.profitUnknown(1)}</span> : <Money value={h.profit_iqd} />}<p className="fp-row-meta">{s.capital}: <Money value={h.capital_iqd} /></p></div>
-      </div>)}
+      {a.held_sales.map((h) => <HeldSaleRow key={h.order_id} h={h} s={s} openOrder={openOrder} />)}
       {a.held_sales_more > 0 && <p className="fp-row-meta">{s.moreSales(a.held_sales_more)}</p>}
       {rest && <div className="fp-row"><p className="fp-row-meta min-w-0">{s.holdGroup[rest.reason]}</p>
         <div className="text-end">{!!rest.profit_iqd && <Money value={rest.profit_iqd} />}{!!rest.capital_iqd && <p className="fp-row-meta">{s.capital}: <Money value={rest.capital_iqd} /></p>}</div></div>}
@@ -197,7 +217,7 @@ function AgreementRow({ a, s, owner, openOrder }: { a: AgreementFinance; s: Pers
 }
 
 /** The details sheet: the card, then every agreement and, for the owner, its held sales. */
-export function PersonSheet({ person, onClose, own = false, openOrder, children }: { person: PersonFinance; onClose: () => void; own?: boolean; openOrder?: (id: string) => void; children?: ReactNode }) {
+export function PersonSheet({ person, onClose, own = false, openOrder, children }: { person: PersonFinance; onClose: () => void; own?: boolean; openOrder?: OpenOrder; children?: ReactNode }) {
   const { lang } = useLanguage(), s = strings(lang);
   return <Dialog open onClose={onClose} title={person.name}><div className="fp-stack">
     <PersonCard person={person} own={own} />

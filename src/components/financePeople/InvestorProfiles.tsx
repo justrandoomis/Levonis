@@ -50,13 +50,13 @@ export default function InvestorProfiles({ from, to, month, onChanged, openContr
         {!data.profiles.length ? <Empty>{loc('اختر حساب مساعد لإضافة مستثمر، ثم اختره في خطوة تمويل الشراء.', 'Choose an assistant account to register an investor, then select it when funding a purchase.', 'هەژمارێکی یاریدەدەر هەڵبژێرە بۆ تۆمارکردنی وەبەرهێنەر، پاشان لە هەنگاوی پارەدارکردنی کڕیندا هەڵیبژێرە.')}</Empty> : <div className="fp-stack">{data.profiles.map((p) => {
           const pf = person(p.user_id);
           const settings = <Button variant="ghost" size="sm" icon={<Pencil size={15} />} onClick={() => setEditing(p)}>{s.settings}</Button>;
-          return pf ? <PersonCard key={p.user_id} person={pf} onOpen={() => setSelected(p.user_id)} actions={settings} />
+          return pf ? <PersonCard key={p.user_id} person={pf} onOpen={() => setSelected(p.user_id)} actions={settings} openOrder={openOrder} />
             : <article className="fp-person" key={p.user_id}><header className="fp-rule-heading fp-staff-heading"><h3>{p.name || p.email}</h3>{settings}</header>{people.loading && <p className="fp-muted" role="status">{loc('جارٍ تحميل الأرقام…', 'Loading figures…', 'ژمارەکان بار دەکرێن…')}</p>}</article>;
         })}</div>}</div>}
     </Surface>
     <LegacyInvestmentHistory admin />
     {editing && data && <ProfileEditor profile={editing === 'new' ? undefined : editing} accounts={data.accounts.filter((a) => editing !== 'new' || !data.profiles.some((p) => p.user_id === a.id))} onClose={() => setEditing(null)} onSaved={saved} />}
-    {open && <PersonSheet person={open} onClose={() => setSelected(null)} openOrder={openOrder ? (id) => { setSelected(null); openOrder(id); } : undefined}><FundingRecord userId={open.user_id!} openContract={openContract} /></PersonSheet>}
+    {open && <PersonSheet person={open} onClose={() => setSelected(null)} openOrder={openOrder ? (id, focus) => { setSelected(null); openOrder(id, focus); } : undefined}><FundingRecord userId={open.user_id!} openContract={openContract} /></PersonSheet>}
   </div>;
 }
 

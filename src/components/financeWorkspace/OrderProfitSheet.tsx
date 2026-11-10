@@ -17,8 +17,11 @@ const FinanceOperationsPanel = lazy(() => import('../adminOperations/FinanceOper
 type EditableField = 'net_goods_iqd' | 'cogs_iqd' | 'shipping_iqd' | 'cod_tax_iqd' | 'courier_fee_iqd' | 'payment_fee_iqd' | 'manual_direct_iqd' | 'staff_cost';
 type Edit = { field: EditableField; label: string; line_id?: string; cost_id?: string; value: string };
 
-export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
-  orderId: string; onClose: () => void; onChanged: () => void;
+/** The step an order is opened at: recording its cash, or entering a missing purchase price. */
+export type OrderFocus = 'collection' | 'cost';
+
+export default function OrderProfitSheet({ orderId, onClose, onChanged, focus }: {
+  orderId: string; onClose: () => void; onChanged: () => void; focus?: OrderFocus;
 }) {
   const { loc } = useLanguage();
   // «عملة العرض» (design P-A §8): the workspace's choice; display only, edits stay in dinars.
@@ -32,7 +35,9 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
   const [notice, setNotice] = useState('');
   const [noticePending, setNoticePending] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [advanced, setAdvanced] = useState<'collections' | 'payroll' | null>(null);
+  const [advanced, setAdvanced] = useState<'collections' | 'payroll' | null>(focus === 'collection' ? 'collections' : null);
+  const collectionRef = useRef<HTMLDetailsElement>(null);
+  const focused = useRef(false);
   const requestId = useRef<string>(crypto.randomUUID());
   const saveLock = useRef(false);
   const readGeneration = useRef(0);
@@ -90,6 +95,19 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { saveLock.current = false; setSaving(false); }
   };
+  // Opened from a held investor sale: land on the step it needs, once, after the order loads.
+  useEffect(() => {
+    if (!focus || !data || focused.current) return;
+    focused.current = true;
+    if (focus === 'collection') {
+      requestAnimationFrame(() => collectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
+      return;
+    }
+    const line = data.lines.find((l) => !['fifo', 'manual_verified', 'recorded_snapshot'].includes(l.cost_confidence));
+    if (!line) return;
+    beginEdit('cogs_iqd', `${loc('إجمالي تكلفة القطع', 'Total goods cost')} · ${line.name_snapshot}`, line.id);
+    requestAnimationFrame(() => document.getElementById(`fw-line-${line.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+  }, [focus, data, beginEdit, loc]);
   const verifyCost = (line: ProfitLine, total: number) => {
     const key = `${orderId}:${data?.version}:${line.id}:${total}`;
     let operationId = verificationIds.current.get(key);
@@ -175,7 +193,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
       </div>
       {data.order.status === 'delivered' && <ReportDeductions totals={data.totals} net={data.totals.net_after_report_adjustments_iqd} cents={usd ? { coupon: orderCents('coupon_iqd'), credit: orderCents('price_protection_iqd'), net: orderCents('net_after_report_adjustments_iqd') } : undefined} />}
       {data.lines.map((line) => <Surface className="fw-line-item" key={line.id}>
-        <div className="fw-line-heading">
+        <div className="fw-line-heading" id={`fw-line-${line.id}`}>
           {line.image_snapshot || line.product_image || line.image_url ? <VariantImg sizes="48px" className="fw-product-image" src={line.image_snapshot || line.product_image || line.image_url} alt="" /> : <span className="fw-order-icon"><Package size={20} /></span>}
           <div><h3>{line.name_snapshot}</h3><p>{[line.option_snapshot, line.color_snapshot, line.sku_snapshot].filter(Boolean).join(' · ')}</p>
             <p>{loc('الكمية', 'Quantity')}: {line.qty}{line.returned_qty > 0 ? ` · ${loc('مرتجع', 'Returned')}: ${line.returned_qty}` : ''}</p></div>
@@ -233,7 +251,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged }: {
           })}
         </details>)}
       </Surface>}
-      <details className="fw-advanced"><summary>{loc('التحصيل وإسناد الموظف', 'Collection and task assignment')}</summary>
+      <details className="fw-advanced" ref={collectionRef} open={focus === 'collection' ? true : undefined}><summary>{loc('التحصيل وإسناد الموظف', 'Collection and task assignment')}</summary>
         <div className="fw-toolbar"><Button onClick={() => setAdvanced('collections')}>{loc('تسجيل تحصيل للطلب', 'Record order collection')}</Button>
           <Button onClick={() => setAdvanced('payroll')}>{loc('إسناد مهمة للموظف', 'Assign staff task')}</Button></div>
         {advanced && <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}><FinanceOperationsPanel key={advanced}

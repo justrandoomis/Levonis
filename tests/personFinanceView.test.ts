@@ -90,3 +90,33 @@ test('the three screens draw the one-person card, and the old capital grid is go
   assert.match(view, /owner=\{!own\}/);
   assert.match(view, /owner \? s\.holdAction\[h\.reason\] : undefined/);
 });
+
+test('held investment money says why in plain words, and the owner can release each sale from its row (owner 2026-11-10)', () => {
+  // «بيع وينتظر الإفراج what he mean ? … make it easy and solved it»
+  assert.equal(PERSON_FINANCE_STRINGS.ar.soldHeld, 'بيعت، والمبلغ بانتظار تسجيله');
+  const view = codeOf('src/components/financePeople/PersonFinanceView.tsx');
+  // Under the sold amount: why it waits, in the hold reasons' own words.
+  assert.match(view, /<CapitalBar capital=\{inv\.capital\} holds=\{inv\.holds\} s=\{s\} \/>/);
+  assert.match(view, /p\.key === 'sold' && soldWhy/);
+  // Each held sale, with one button per missing step: the purchase price, then the cash.
+  assert.match(view, /openOrder\(h\.order_id, 'cost'\)/);
+  assert.match(view, /openOrder\(h\.order_id, 'collection'\)/);
+  assert.match(view, /s\.enterCost/);
+  assert.match(view, /s\.recordCash/);
+  // Only the owner: the person's own page never gets order ids or buttons (DECISIONS row 220).
+  assert.match(view, /openOrder=\{own \? undefined : openOrder\}/);
+  assert.match(view, /const sales = owner && openOrder \?/);
+  assert.match(codeOf('src/components/financePeople/InvestorProfiles.tsx'), /<PersonCard key=\{p\.user_id\}[^\n]*openOrder=\{openOrder\} \/>/);
+  assert.doesNotMatch(codeOf('src/components/financePeople/MyEarnings.tsx'), /openOrder/);
+  // The order opens at that step; the cash form starts at what the order still owes and saves nothing by itself.
+  const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
+  assert.match(workspace, /<InvestorPanel [^>]*openOrder=\{openOrderAt\}/);
+  assert.match(workspace, /focus=\{orderFocus\}/);
+  const sheet = codeOf('src/components/financeWorkspace/OrderProfitSheet.tsx');
+  assert.match(sheet, /focus === 'collection' \? 'collections' : null/);
+  assert.match(sheet, /beginEdit\('cogs_iqd'/);
+  const panel = codeOf('src/components/adminOperations/FinanceOperationsPanel.tsx');
+  const prefill = panel.slice(panel.indexOf('const prefilled = useRef(false);'), panel.indexOf('const prefilled = useRef(false);') + 500);
+  assert.match(prefill, /setAmount\(\(current\) => current \|\| String\(due\.balance_iqd\)\)/);
+  assert.doesNotMatch(prefill, /api\.(post|patch|put)/);
+});

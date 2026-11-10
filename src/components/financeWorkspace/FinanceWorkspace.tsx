@@ -6,7 +6,7 @@ import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { useLanguage } from '../../LanguageContext';
 import { Button, Empty, Loading, Row, Sheet, Status, Surface, formatMoney } from './ui';
 import { currentMonth, financeDay, financePreset, financeRangeFromSearch, validFinanceRange, statusName, WORKSPACE_API, type DisplayUsdOrders, type FinanceOrder, type FinanceProduct, type FinanceSection, type FinanceSummary, type UsdOrderCents } from './types';
-import OrderProfitSheet from './OrderProfitSheet';
+import OrderProfitSheet, { type OrderFocus } from './OrderProfitSheet';
 import MonthlyCosts from './MonthlyCosts';
 import './finance-workspace.css';
 import { orderFinancePresentation } from './orderFinancePresentation';
@@ -53,6 +53,9 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   const summaryGeneration = useRef(0);
   const [orderId, setOrderId] = useState<string | null>(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('order'));
   const [collections, setCollections] = useState(false);
+  // A held investor sale opens its order at the step that releases it (PersonFinanceView «سجّل استلام النقد» / «أدخل سعر الشراء»).
+  const [orderFocus, setOrderFocus] = useState<OrderFocus | undefined>(undefined);
+  const openOrderAt = (id: string, focus?: OrderFocus) => { setOrderId(id); setOrderFocus(focus); };
   const [advanced, setAdvanced] = useState(false);
   const [legacyOpen, setLegacyOpen] = useState(false);
   // «عملة العرض» (design P-A §8): IQD on every load, never stored, display only.
@@ -130,8 +133,8 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
       {section === 'products' && (busy && !data ? <Loading text={loc('تحميل المنتجات…', 'Loading products…')} /> : data && <Products data={data} onOpenOrders={() => setSection('orders')} />)}
       {section === 'monthly' && <MonthlyCosts key={month} month={month} onChanged={refresh} />}
       <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}>
-        {section === 'staff' && <PeoplePanel from={range.from} to={range.to} onChanged={refresh} openOrder={setOrderId} />}
-        {section === 'investors' && <InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={setOrderId} />}
+        {section === 'staff' && <PeoplePanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} />}
+        {section === 'investors' && <InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} />}
         {section === 'settlements' && <WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} />}
         {section === 'accounting' && <>
           <Surface title={loc('المحاسبة', 'Accounting')} subtitle={loc('الأرصدة والقيود والتسويات المعتمدة', 'Balances, journals and verified settlements')}>
@@ -143,7 +146,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
         </>}
       </Suspense>
     </div>
-    {orderId && <OrderProfitSheet orderId={orderId} onClose={() => setOrderId(null)} onChanged={refresh} />}
+    {orderId && <OrderProfitSheet key={`${orderId}:${orderFocus ?? ''}`} orderId={orderId} focus={orderFocus} onClose={() => { setOrderId(null); setOrderFocus(undefined); }} onChanged={refresh} />}
     {collections && <Sheet title={loc('التحصيل وشركات التوصيل', 'Collections and couriers')} onClose={() => setCollections(false)}>
       <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}><FinanceOperationsPanel from={range.from} to={range.to} initialTab="collections" onChanged={refresh} /></Suspense>
     </Sheet>}

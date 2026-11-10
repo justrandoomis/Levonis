@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import ProductPicker from '../adminProducts/form/ProductPicker';
 import {
   api,
@@ -804,6 +804,15 @@ function Collections({ config, onChanged, initialOrderId = '' }: { config: Confi
   useEffect(() => {
     run(load);
   }, [load, run]);
+  // Opened for one order (a held investor sale): start at what it still owes. Nothing is saved until the owner presses save.
+  const prefilled = useRef(false);
+  useEffect(() => {
+    if (prefilled.current || !initialOrderId) return;
+    const due = rows.find((r) => r.id === initialOrderId);
+    if (!due) return;
+    prefilled.current = true;
+    if (due.balance_iqd > 0) setAmount((current) => current || String(due.balance_iqd));
+  }, [rows, initialOrderId]);
   return (
     <div>
       {op.feedback}
