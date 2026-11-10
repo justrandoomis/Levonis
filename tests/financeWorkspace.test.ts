@@ -222,3 +222,30 @@ test('participant charts use actual Baghdad period filters, separate capital and
  assert.equal((await get(x.assistant,`/f/participant-report?${period()}`)).status,403);
  assert.equal((await get(x.app,'/f/participant-report?from=2026-10-06&to=2026-10-01')).status,400);
 });
+
+test('«الحساب يحتاج مراجعة»: the summary shows what complete orders say and names what is missing; the missing-costs list closes once a price is confirmed (owner 2026-11-10)', async () => {
+  const {raw,app}=setup();
+  const at=new Date().toISOString();
+  raw.exec(`INSERT INTO products(id,name,slug,price_iqd,stock) VALUES ('magnet','Round Magnet','workspace-magnet',500,0)`);
+  raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at)
+    VALUES ('magnets','buyer','delivered','{}','standard','{}','cash',15000,1400,20000,20000,5000,?,?)`).run(at,at);
+  raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,option_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES ('magnets:line','magnets','magnet','Round Magnet','D8x3 mm',30,500,15000,NULL,'unpriced')`).run();
+  let summary=await json(await get(app,`/f/summary?${period()}`));
+  assert.equal(summary.totals.owner_net_iqd,null,'one line without a price still blanks the full total');
+  assert.equal(summary.known.orders_count,1);assert.equal(summary.known.incomplete_orders,1);
+  assert.notEqual(summary.known.owner_net_iqd,null);assert.notEqual(summary.known.cost_iqd,null);
+  assert.equal(summary.missing_costs.unknown_lines,1);assert.equal(summary.missing_costs.orders,1);
+  assert.deepEqual(summary.missing_costs.unknown_products,[{product_id:'magnet',name:'Round Magnet',qty:30,lines:1}]);
+  let missing=await json(await get(app,`/f/missing-costs?${period()}`));
+  assert.equal(missing.lines.length,1);
+  assert.deepEqual({order:missing.lines[0].order_id,line:missing.lines[0].line_id,qty:missing.lines[0].qty,option:missing.lines[0].option,cogs:missing.lines[0].cogs_iqd},{order:'magnets',line:'magnets:line',qty:30,option:'D8x3 mm',cogs:null});
+  assert.deepEqual(missing.stocked,[],'no stock batch: the list says so');
+  // The owner confirms 150 per piece: the same per-line correction the order sheet uses.
+  const fixed=await post(app,'/f/orders/magnets/adjustments',{operation_id:'missingcost:magnets:line:150',field:'cogs_iqd',value_iqd:150*30,line_id:'magnets:line',version:missing.lines[0].version});
+  assert.equal(fixed.status,200,JSON.stringify(await json(fixed)));
+  missing=await json(await get(app,`/f/missing-costs?${period()}`));
+  assert.equal(missing.lines.length,0);
+  summary=await json(await get(app,`/f/summary?${period()}`));
+  assert.equal(summary.missing_costs.lines,0);assert.equal(summary.known.incomplete_orders,0);
+  assert.notEqual(summary.totals.owner_net_iqd,null);
+});

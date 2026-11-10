@@ -68,7 +68,7 @@ const dayBefore = (day: string) => new Date(Date.parse(`${day}T00:00:00Z`) - 864
 /** Where the capital put in is now. The parts always add up to it. */
 export function CapitalBar({ capital, holds = [], s }: { capital: Investor['capital']; holds?: Investor['holds']; s: PersonFinanceStrings }) {
   // Why the sold money waits, in the words of the holds below (the person's own page has no amounts).
-  const soldWhy = holds.filter((h) => h.sales > 0 && (h.capital_iqd === undefined || h.capital_iqd > 0)).map((h) => s.hold[h.reason](h.sales)).join(' · ');
+  const soldWhy = holds.filter((h) => h.capital_iqd === undefined || h.capital_iqd > 0).map((h) => (h.sales > 0 ? s.hold[h.reason](h.sales) : s.holdGroup[h.reason])).join(' · ');
   const parts = [
     { key: 'stock', label: s.inGoods, value: capital.in_goods_iqd },
     { key: 'sold', label: s.soldHeld, value: capital.sold_held_iqd },
@@ -104,7 +104,7 @@ function HeldSaleRow({ h, s, openOrder }: { h: HeldSale; s: PersonFinanceStrings
     <div className="min-w-0">{openOrder ? <button type="button" className="fp-link" onClick={() => openOrder(h.order_id)} dir="ltr">{h.order_id}</button> : <bdi dir="ltr">{h.order_id}</bdi>}
       {h.day && <span className="fp-row-meta"> · {dateLabel(h.day, lang)}</span>}
       <p className="fp-row-meta">{h.reasons.map((r) => s.hold[r](1)).join(' · ')}</p>
-      {openOrder && (h.reasons.includes('cost') || h.reasons.includes('collection')) && <div className="fp-row-actions">
+      {openOrder && !h.reasons.includes('cancelled') && (h.reasons.includes('cost') || h.reasons.includes('collection')) && <div className="fp-row-actions">
         {h.reasons.includes('cost') && <Button size="sm" variant="primary" onClick={() => openOrder(h.order_id, 'cost')}>{s.enterCost}</Button>}
         {h.reasons.includes('collection') && <Button size="sm" variant={h.reasons.includes('cost') ? 'ghost' : 'primary'} onClick={() => openOrder(h.order_id, 'collection')}>{s.recordCash}</Button>}
       </div>}</div>
@@ -119,11 +119,19 @@ export function InvestmentHolds({ investor, owner, s, openOrder }: { investor: I
   const unknown = investor.holds.reduce((n, h) => n + h.profit_unknown, 0);
   if (unknown) items.push({ key: 'unknown', text: s.profitUnknown(unknown) });
   if (investor.agreements.some((a) => a.held_whole)) items.push({ key: 'whole', text: s.wholeAgreement });
-  const sales = owner && openOrder ? investor.agreements.flatMap((a) => a.held_sales).sort((x, y) => (x.day ?? '').localeCompare(y.day ?? '') || x.order_id.localeCompare(y.order_id)) : [];
+  // One row per order: an order drawing on two agreements is one sale to release.
+  const byOrder = new Map<string, HeldSale>();
+  for (const h of owner && openOrder ? investor.agreements.flatMap((a) => a.held_sales) : []) {
+    const prev = byOrder.get(h.order_id);
+    byOrder.set(h.order_id, prev ? { ...prev, reasons: [...new Set([...prev.reasons, ...h.reasons])], profit_iqd: prev.profit_iqd + h.profit_iqd, capital_iqd: prev.capital_iqd + h.capital_iqd, profit_unknown: prev.profit_unknown || h.profit_unknown } : h);
+  }
+  const sales = [...byOrder.values()].sort((x, y) => (x.day ?? '').localeCompare(y.day ?? '') || x.order_id.localeCompare(y.order_id));
+  const more = owner && openOrder ? investor.agreements.reduce((n, a) => n + a.held_sales_more, 0) : 0;
   return <>
     <Holds items={items} s={s} />
-    {sales.length > 0 && <section className="fp-stack" aria-label={s.heldSalesSteps}><h4>{s.heldSalesSteps}</h4><div className="fp-rows">
-      {sales.map((h) => <HeldSaleRow key={h.order_id} h={h} s={s} openOrder={openOrder} />)}</div></section>}
+    {sales.length > 0 && <details className="fp-detail" open={sales.length <= 6}><summary>{s.heldSalesSteps} ({sales.length + more})</summary><div className="fp-rows">
+      {sales.map((h) => <HeldSaleRow key={h.order_id} h={h} s={s} openOrder={openOrder} />)}
+      {more > 0 && <p className="fp-row-meta">{s.moreSales(more)}</p>}</div></details>}
   </>;
 }
 

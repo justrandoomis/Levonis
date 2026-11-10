@@ -105,7 +105,10 @@ test('held investment money says why in plain words, and the owner can release e
   assert.match(view, /s\.recordCash/);
   // Only the owner: the person's own page never gets order ids or buttons (DECISIONS row 220).
   assert.match(view, /openOrder=\{own \? undefined : openOrder\}/);
-  assert.match(view, /const sales = owner && openOrder \?/);
+  assert.match(view, /for \(const h of owner && openOrder \?/);
+  // One row per order, with the count beyond the server's cap.
+  assert.match(view, /byOrder\.set\(h\.order_id/);
+  assert.match(view, /s\.moreSales\(more\)/);
   assert.match(codeOf('src/components/financePeople/InvestorProfiles.tsx'), /<PersonCard key=\{p\.user_id\}[^\n]*openOrder=\{openOrder\} \/>/);
   assert.doesNotMatch(codeOf('src/components/financePeople/MyEarnings.tsx'), /openOrder/);
   // The order opens at that step; the cash form starts at what the order still owes and saves nothing by itself.
@@ -116,7 +119,33 @@ test('held investment money says why in plain words, and the owner can release e
   assert.match(sheet, /focus === 'collection' \? 'collections' : null/);
   assert.match(sheet, /beginEdit\('cogs_iqd'/);
   const panel = codeOf('src/components/adminOperations/FinanceOperationsPanel.tsx');
-  const prefill = panel.slice(panel.indexOf('const prefilled = useRef(false);'), panel.indexOf('const prefilled = useRef(false);') + 500);
-  assert.match(prefill, /setAmount\(\(current\) => current \|\| String\(due\.balance_iqd\)\)/);
+  const prefill = panel.slice(panel.indexOf('const prefilled = useRef(false);'), panel.indexOf('const touch = () =>'));
+  // The door part from the courier, else the Gini part from the bank; for that order only; never a write.
+  assert.match(prefill, /receivables\?order_id=/);
+  assert.match(prefill, /door_balance_iqd > 0\) \{ setPayer\('courier'\)/);
+  assert.match(prefill, /bank_balance_iqd > 0\) \{ setPayer\('bank'\)/);
   assert.doesNotMatch(prefill, /api\.(post|patch|put)/);
+  // The Staff tab keeps the step; a cancelled sale gets no step buttons.
+  assert.match(codeOf('src/components/financePeople/PeoplePanel.tsx'), /\(id, focus\) => \{ setSheet\(null\); openOrder\(id, focus\); \}/);
+  assert.match(view, /!h\.reasons\.includes\('cancelled'\)/);
+});
+
+test('the missing-costs sheet groups by product and size, no-price groups first, and writes only after the owner confirms (owner 2026-11-10)', async () => {
+  const { groupMissing } = await import('../src/components/financeWorkspace/MissingCostsSheet');
+  const line = (order: string, product: string, option: string | null, qty: number, cogs: number | null, estimate: number | null) => ({ order_id: order, version: 1, delivered_at: '2026-11-05T10:00:00Z', customer_name: null, line_id: `${order}:${product}:${option}`, product_id: product, name: product, option, color: null, qty, confidence: cogs == null ? 'unknown' : 'estimated', estimate_unit_iqd: estimate, cogs_iqd: cogs });
+  const groups = groupMissing([line('a', 'esun', 'BLACK', 1, 15271, 15271), line('b', 'esun', 'BLACK', 2, 30542, 15271), line('a', 'magnet', 'D8', 30, null, null), line('c', 'magnet', 'D6', 30, null, null)]);
+  assert.deepEqual(groups.map((g) => [g.name, g.variant, g.qty, g.orders]), [['magnet', 'D8', 30, 1], ['magnet', 'D6', 30, 1], ['esun', 'BLACK', 3, 2]]);
+  assert.deepEqual(groups[2].estimates, [15271]);
+  const sheet = codeOf('src/components/financeWorkspace/MissingCostsSheet.tsx');
+  // The only write is the order's own per-line correction, behind the confirm step.
+  assert.match(sheet, /\/orders\/\$\{encodeURIComponent\(l\.order_id\)\}\/adjustments/);
+  assert.match(sheet, /field: 'cogs_iqd', value_iqd: unit \* l\.qty/);
+  assert.equal((sheet.match(/api\.post/g) ?? []).length, 1);
+  assert.match(sheet, /onClick=\{\(\) => void apply\(\)\}/);
+  assert.match(sheet, /setConfirming\(true\)/);
+  const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
+  // No bare dash for an incomplete total: what complete orders say, and what is missing.
+  assert.match(workspace, /fullNet \?\? \(netFromKnown \? known!\.owner_net_iqd : null\)/);
+  assert.match(workspace, /missing && missing\.lines > 0/);
+  assert.match(workspace, /onMissing=\{\(\) => setMissingOpen\(true\)\}/);
 });

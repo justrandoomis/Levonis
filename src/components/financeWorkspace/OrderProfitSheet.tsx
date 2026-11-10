@@ -103,9 +103,12 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, focus }:
       requestAnimationFrame(() => collectionRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' }));
       return;
     }
-    const line = data.lines.find((l) => !['fifo', 'manual_verified', 'recorded_snapshot'].includes(l.cost_confidence));
-    if (!line) return;
-    beginEdit('cogs_iqd', `${loc('إجمالي تكلفة القطع', 'Total goods cost')} · ${line.name_snapshot}`, line.id);
+    const unconfirmed = data.lines.filter((l) => !['fifo', 'manual_verified', 'recorded_snapshot'].includes(l.cost_confidence));
+    // No cost at all first, then a line the review flags, then any unconfirmed line.
+    const line = unconfirmed.find((l) => l.cogs_iqd == null) ?? unconfirmed.find((l) => (l.cost_review?.issues.length ?? 0) > 0) ?? unconfirmed[0];
+    if (!line) { requestAnimationFrame(() => document.getElementById('fw-order-warnings')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); return; }
+    // The field takes the whole line's cost: say how many pieces it covers.
+    beginEdit('cogs_iqd', `${loc('إجمالي تكلفة القطع', 'Total goods cost')} · ${line.name_snapshot} · ${loc('لكل القطع', 'for all pieces', 'بۆ هەموو پارچەکان')} (${line.qty})`, line.id);
     requestAnimationFrame(() => document.getElementById(`fw-line-${line.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
   }, [focus, data, beginEdit, loc]);
   const verifyCost = (line: ProfitLine, total: number) => {
@@ -182,7 +185,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, focus }:
     {notice && <p className={noticePending ? 'fw-note' : 'fw-success'} role="status">{noticePending ? <Status tone="warning">{loc('التسوية معلقة', 'Reconciliation pending')}</Status> : <Check size={16} />}{notice}</p>}
     {data && <>
       {data.order.status !== 'delivered' && <p className="fw-note"><Status>{statusName(data.order.status, loc)}</Status> {view?.expectsDelivery ? loc('توقع قبل المصاريف وليس ربحًا مستحقًا. يُعتمد الربح بعد التسليم وتثبيت التكاليف واستيفاء شروط التحصيل.', 'A forecast before expenses, not earned profit. Profit is recognised after delivery, confirmed costs and collection requirements.') : view?.hasFinancialActivity ? loc('تظهر الحركات المالية السابقة وتسوياتها؛ لا يُنشأ توقع بيع جديد لهذا الطلب.', 'Prior financial activity and its adjustments remain visible; this order creates no new sale forecast.') : loc('لا ربح متوقع أو مستحق من هذا الطلب.', 'This order has no expected or earned profit.')}</p>}
-      {warnings.length > 0 && <div className="fw-error">{warnings.some((w) => w.startsWith('cost:')) && <p>{loc('بعض التكاليف تحتاج تثبيتًا. يظهر الحقل الناقص ومصدر التكلفة وخيار تصحيحه تحت المنتج المعني.', 'Some costs need verification. Missing fields, cost sources and correction actions appear under the affected product.')}</p>}{warnings.filter((w) => !w.startsWith('cost:')).map((w) => <p key={w}>{w === 'investor:pending' ? loc('توزيع حصة المستثمر بانتظار تثبيت التكلفة وتسوية الطلب.', 'Investor distribution is awaiting verified costs and order reconciliation.') : w}</p>)}</div>}
+      {warnings.length > 0 && <div className="fw-error" id="fw-order-warnings">{warnings.some((w) => w.startsWith('cost:')) && <p>{loc('بعض التكاليف تحتاج تثبيتًا. يظهر الحقل الناقص ومصدر التكلفة وخيار تصحيحه تحت المنتج المعني.', 'Some costs need verification. Missing fields, cost sources and correction actions appear under the affected product.')}</p>}{warnings.filter((w) => !w.startsWith('cost:')).map((w) => <p key={w}>{w === 'investor:pending' ? loc('توزيع حصة المستثمر بانتظار تثبيت التكلفة وتسوية الطلب.', 'Investor distribution is awaiting verified costs and order reconciliation.') : w}</p>)}</div>}
       {currency === 'USD' && data.display_usd && <UsdBasisNote available={data.display_usd.available} todayRate={data.display_usd.today_rate}
         single={data.display_usd.usd_basis && data.display_usd.fx_rate_snapshot ? { usd_basis: data.display_usd.usd_basis, fx_rate_snapshot: data.display_usd.fx_rate_snapshot } : undefined} batchLines={data.display_usd.batch_cost_lines} />}
       <div className="fw-metrics">

@@ -46,6 +46,32 @@ function sumRows(rows:Row[]):Row {
   for(const key of sumFields)totals[key]=rows.some((r)=>r[key]===null)?null:rows.reduce((v,r)=>v+n(r[key]),0);
   return totals;
 }
+/**
+ * WHAT IS MISSING (owner 2026-11-10: «الحساب يحتاج مراجعة fix all them»).
+ * Every delivered line whose goods cost is not confirmed (FIFO from a priced
+ * stock batch, verified by the owner, or a recorded pre-cut-over snapshot):
+ * the sale-time estimate, if any, is only a hint — the owner confirms a price.
+ */
+type MissingCostLine={order_id:string;version:number;delivered_at:string|null;customer_name:string|null;line_id:string;product_id:string|null;name:string;option:string|null;color:string|null;qty:number;confidence:string;estimate_unit_iqd:number|null;cogs_iqd:number|null};
+function missingCostLines(bases:OrderProfitBase[]):MissingCostLine[]{
+  return bases.flatMap((b)=>b.lines.filter((l)=>!isConfirmedOrderCost(l.cost_confidence)).map((l)=>({order_id:b.order_id,version:b.version,delivered_at:b.order.delivered_at==null?null:s(b.order.delivered_at),customer_name:b.order.customer_name==null?null:s(b.order.customer_name),
+    line_id:l.id,product_id:l.product_id??null,name:s(l.name_snapshot),option:l.option_snapshot==null?null:s(l.option_snapshot),color:l.color_snapshot==null?null:s(l.color_snapshot),qty:n(l.qty),confidence:s(l.cost_confidence),
+    estimate_unit_iqd:typeof l.estimated_cost_iqd==='number'?l.estimated_cost_iqd:null,cogs_iqd:l.cogs_iqd==null?null:n(l.cogs_iqd)})));
+}
+/** The period's figures over the orders whose every amount is known, and what the rest lack. */
+function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean){
+  const complete=bases.filter((b)=>b.totals.owner_net_iqd!=null&&b.totals.profit_basis_iqd!=null);
+  const known=sumRows(complete.map((b)=>b.totals));known.orders_count=complete.length;
+  const amounts=chartAmounts(known,general,unallocated,truncated);
+  const lines=missingCostLines(bases),unknown=lines.filter((l)=>l.cogs_iqd===null);
+  const products=new Map<string,{product_id:string|null;name:string;qty:number;lines:number}>();
+  for(const l of unknown){const key=l.product_id??l.name,p=products.get(key)??{product_id:l.product_id,name:l.name,qty:0,lines:0};p.qty+=l.qty;p.lines++;products.set(key,p);}
+  return {
+    known:{orders_count:complete.length,incomplete_orders:bases.length-complete.length,revenue_iqd:amounts.revenue_iqd,cost_iqd:amounts.cost_iqd,owner_net_iqd:amounts.owner_net_iqd},
+    missing_costs:{lines:lines.length,orders:new Set(lines.map((l)=>l.order_id)).size,unknown_lines:unknown.length,estimated_lines:lines.length-unknown.length,
+      unknown_products:[...products.values()].sort((a,b)=>b.qty-a.qty)},
+  };
+}
 function orderRow(base:OrderProfitBase){return {...base.order,...base.totals,id:base.order_id,order_id:base.order_id,version:base.version,
   has_financial_activity:base.has_financial_activity,projected_finance:base.projected_finance,
   review_reasons:[...base.lines.flatMap(l=>l.cost_review?.issues??[]),...base.costs.flatMap(c=>Array.isArray(c.review_reasons)?c.review_reasons:[])],
@@ -284,9 +310,18 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   for(const b of bases)for(const warning of b.warnings)exceptions.push({id:`${b.order_id}:${warning}`,order_id:b.order_id,type:warning.split(':')[0],message:warning.startsWith('cost:')?'تكلفة البضاعة تحتاج تثبيت FIFO أو تحققًا ماليًا خاصًا':warning==='investor:pending'?'توزيع المستثمر ينتظر التسوية':'يوجد بند مالي يحتاج مراجعة'});
   for(const b of bases)if(n(b.totals.pending_costs)>0)exceptions.push({id:`${b.order_id}:pending_cost`,order_id:b.order_id,type:'pending_cost',message:'الأجور أو المواد تنتظر تثبيت التكلفة'});
   const lines=bases.flatMap((b)=>b.lines);
-  const answer={success:true,range:r,totals,orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sold_units'};
+  const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated),orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sold_units'};
   if(display==='IQD')return c.json(answer);
   return c.json({...answer,display_usd:await summaryInUsd(db,bases,r,expenseDays,unallocatedDays,truncated,n(totals.pending_costs)>0)});
+});
+adminFinanceWorkspaceRoutes.get('/missing-costs',async(c)=>{
+  const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to'));
+  const {bases,truncated}=await selectOrders(db,r,{summary:true});
+  const lines=missingCostLines(bases);
+  const ids=[...new Set(lines.map((l)=>l.product_id).filter((id):id is string=>!!id))];
+  // A product with no stock batch cannot cost its next sale either: say so beside it.
+  const stocked=ids.length?((await db.prepare('SELECT DISTINCT product_id FROM inventory_lots WHERE product_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(ids)).all<{product_id:string}>()).results??[]).map((x)=>x.product_id):[];
+  return c.json({success:true,range:r,truncated,lines,stocked});
 });
 adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
   const r=range(c.req.query('from'),c.req.query('to')),offset=whole(c.req.query('offset')??0,'الصفحة',0,100000);

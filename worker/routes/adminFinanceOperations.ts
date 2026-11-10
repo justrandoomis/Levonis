@@ -662,6 +662,8 @@ adminFinanceOperationsRoutes.post('/collections', async (c) => {
 });
 adminFinanceOperationsRoutes.get('/receivables', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'pay');
+  // `order_id`: that one order's balances (the collection form opened for a held investor sale).
+  const only = (c.req.query('order_id') ?? '').trim().slice(0, 80);
   const { results } = await c.env.DB.prepare(
     `WITH collected AS (
       SELECT order_id,SUM(amount_iqd) AS collected_iqd,SUM(fee_iqd) AS courier_fee_iqd,
@@ -680,12 +682,12 @@ adminFinanceOperationsRoutes.get('/receivables', async (c) => {
         o.due_on_delivery_iqd-COALESCE(c.door_collected_iqd,0) AS door_balance_iqd,
         CAST(julianday('now')-julianday(o.delivered_at) AS INTEGER) AS overdue_days
       FROM orders o LEFT JOIN collected c ON c.order_id=o.id LEFT JOIN refunds r ON r.order_id=o.id
-      WHERE o.status='delivered' AND o.seller_type='levonis'
+      WHERE o.status='delivered' AND o.seller_type='levonis' AND (?1='' OR o.id=?1)
     ) SELECT *,bank_balance_iqd+door_balance_iqd AS balance_iqd,
       MAX(0,bank_balance_iqd) AS bank_receivable_iqd,MAX(0,-bank_balance_iqd) AS bank_credit_balance_iqd,
       MAX(0,door_balance_iqd)+MAX(0,bank_balance_iqd) AS receivable_iqd
       FROM balances WHERE door_balance_iqd>0 OR bank_balance_iqd<>0 ORDER BY delivered_at LIMIT 100`,
-  ).all();
+  ).bind(only).all();
   return c.json({ success: true, orders: results ?? [] });
 });
 adminFinanceOperationsRoutes.get('/journal', async (c) => {

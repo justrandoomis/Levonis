@@ -90,6 +90,7 @@ export default {
       routes: {
         'GET /participant-report': 'cost_read',
         'GET /summary': 'cost_read',
+        'GET /missing-costs': 'cost_read',
         'GET /orders': 'cost_read',
         'GET /orders/:id': 'cost_read',
         'POST /orders/:id/adjustments': 'cost_write',

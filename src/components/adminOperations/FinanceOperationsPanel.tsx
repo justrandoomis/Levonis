@@ -804,25 +804,33 @@ function Collections({ config, onChanged, initialOrderId = '' }: { config: Confi
   useEffect(() => {
     run(load);
   }, [load, run]);
-  // Opened for one order (a held investor sale): start at what it still owes. Nothing is saved until the owner presses save.
+  // Opened for one order (a held investor sale): start at what it still owes, as the table's own buttons do —
+  // the door part from the courier, else the Gini part from the bank. Read for that order alone; never once
+  // the owner has touched the order, payer or amount; nothing is saved until the owner presses save.
   const prefilled = useRef(false);
   useEffect(() => {
-    if (prefilled.current || !initialOrderId) return;
-    const due = rows.find((r) => r.id === initialOrderId);
-    if (!due) return;
-    prefilled.current = true;
-    if (due.balance_iqd > 0) setAmount((current) => current || String(due.balance_iqd));
-  }, [rows, initialOrderId]);
+    if (!initialOrderId) return;
+    let active = true;
+    void api.get<{ orders: typeof rows }>(`${FINANCE}/receivables?order_id=${encodeURIComponent(initialOrderId)}`).then((r) => {
+      const due = r.orders.find((x) => x.id === initialOrderId);
+      if (!active || !due || prefilled.current) return;
+      prefilled.current = true;
+      if (due.door_balance_iqd > 0) { setPayer('courier'); setAmount(String(due.door_balance_iqd)); }
+      else if (due.bank_balance_iqd > 0) { setPayer('bank'); setAmount(String(due.bank_balance_iqd)); }
+    }).catch(() => undefined);
+    return () => { active = false; };
+  }, [initialOrderId]);
+  const touch = () => { prefilled.current = true; };
   return (
     <div>
       {op.feedback}
       <Card title={loc('تحصيل فعلي أو دفعة عميل مقدمة', 'Actual collection or customer prepayment')}>
         <div className="grid gap-3 sm:grid-cols-3">
-          <Input label={loc('رقم الطلب', 'Order ID')} value={order} onChange={setOrder} />
+          <Input label={loc('رقم الطلب', 'Order ID')} value={order} onChange={(v) => { touch(); setOrder(v); }} />
           <Select
             label={loc('جهة الدفع', 'Payer')}
             value={payer}
-            onChange={setPayer}
+            onChange={(v) => { touch(); setPayer(v); }}
             options={[
               { id: 'courier', name: loc('شركة التوصيل', 'Courier') },
               { id: 'customer', name: loc('العميل', 'Customer') },
@@ -833,7 +841,7 @@ function Collections({ config, onChanged, initialOrderId = '' }: { config: Confi
             label={loc('الإجمالي شاملاً أجرة الشركة', 'Gross collected including courier fee')}
             type="number"
             value={amount}
-            onChange={setAmount}
+            onChange={(v) => { touch(); setAmount(v); }}
           />
           <Input
             label={loc('الأجرة المحتجزة للشركة', 'Withheld courier fee')}
