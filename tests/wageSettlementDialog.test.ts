@@ -27,7 +27,6 @@ import { adminFinancePeopleRoutes } from '../worker/routes/adminFinancePeople';
 import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOperations';
 import { financeEarningsRoutes } from '../worker/routes/financeEarnings';
 import { planOrderFinanceSnapshot } from '../worker/lib/orderFinance';
-import { baghdadDay } from '../worker/lib/operations';
 import { settleStaffWages } from '../worker/lib/staffSettlement';
 import { ApiError } from '../src/lib/api';
 import { PERSON_FINANCE_STRINGS } from '../src/lib/personFinanceStrings';
@@ -199,7 +198,8 @@ test('apply: the preview\'s owed-before and one operation id are sent; a retried
   });
   // The staff list carries it (the dialog's lower bound, for an employee with no linked account too).
   const listed = (await json(await get(boss, `${PEOPLE}/staff`))).staff.find((s: { id: string }) => s.id === id);
-  assert.deepEqual(listed.settlement, { through_day: '2026-10-01', owed_iqd: 3000, settlement_day: baghdadDay() });
+  const stored = row<{ settlement_day: string }>(raw, 'SELECT settlement_day FROM finance_staff_settlements')!;
+  assert.deepEqual(listed.settlement, { through_day: '2026-10-01', owed_iqd: 3000, settlement_day: stored.settlement_day });
 });
 
 test('each refusal comes back by code and is said in ar, en and ckb: an open withdrawal, a recalculation still running, a period already settled, wages changed since the preview', async () => {
@@ -257,6 +257,14 @@ test('an open cash advance is refused by code until it is applied to the wages; 
     const s = PERSON_FINANCE_STRINGS[lang];
     const shown = text(renderToStaticMarkup(createElement(SettlementRefusalBox, { kind: 'advance', s, lang })));
     assert.ok(shown.includes(s.settle.refusal.advance) && shown.includes(s.settle.refusalAction.advance), lang);
+  }
+  // What to do names the screens as the reader sees them, in each language (the tabs carry ckb labels).
+  const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx'), operations = codeOf('src/components/adminOperations/FinanceOperationsPanel.tsx');
+  const tabs = { withdrawals: /loc\('([^']+)', '([^']+)', '([^']+)'\), icon: Wallet/.exec(workspace), payroll: /id: 'payroll', name: loc\('([^']+)', '([^']+)', '([^']+)'\)/.exec(operations), apply: /id: 'settlement', name: loc\('([^']+)', '([^']+)', '([^']+)'\)/.exec(operations) };
+  for (const [i, lang] of LANGS.entries()) {
+    const action = PERSON_FINANCE_STRINGS[lang].settle.refusalAction;
+    assert.ok(action.withdrawal.includes(tabs.withdrawals![i + 1]), `${lang}: «${tabs.withdrawals![i + 1]}» in ${action.withdrawal}`);
+    for (const label of [tabs.payroll![i + 1], tabs.apply![i + 1]]) assert.ok(action.advance.includes(label), `${lang}: «${label}» in ${action.advance}`);
   }
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_staff_settlements'), 0);
   // What the refusal says to do — apply the advance to the wages — opens the settlement; the advance counts as paid.

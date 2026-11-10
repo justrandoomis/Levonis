@@ -97,7 +97,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
     { id: 'monthly', label: loc('تكاليف الشهر', 'Monthly costs'), icon: Megaphone },
     { id: 'staff', label: loc('الموظفون', 'Staff'), icon: Users },
     { id: 'investors', label: loc('المستثمرون', 'Investors'), icon: CircleDollarSign },
-    { id: 'settlements', label: loc('السحب والتسويات', 'Withdrawals'), icon: Wallet },
+    { id: 'settlements', label: loc('السحب والتسويات', 'Withdrawals', 'ڕاکێشان و یەکلاکردنەوەکان'), icon: Wallet },
     { id: 'accounting', label: loc('المحاسبة', 'Accounting'), icon: BookOpen },
   ] as const;
   if (mustVerify) return <OwnerCostVerifyCard />;

@@ -131,7 +131,7 @@ export default function FinanceOperationsPanel({
         onChange={setTab}
         items={[
           { id: 'rules', name: loc('قواعد التكاليف والموظفون', 'Cost rules and staff') },
-          { id: 'payroll', name: loc('الاستحقاقات والرواتب', 'Dues and payroll') },
+          { id: 'payroll', name: loc('الاستحقاقات والرواتب', 'Dues and payroll', 'شایستەکان و مووچە') },
           { id: 'collections', name: loc('التحصيل وشركات التوصيل', 'Collections and couriers') },
           { id: 'reports', name: loc('ربح الطلب ومراكز التكلفة', 'Order profit and cost centers') },
           { id: 'accounting', name: loc('المحاسبة وإغلاق الفترات', 'Accounting and closing') },
@@ -554,7 +554,7 @@ function Payroll({ config, onChanged, initialOrderId = '' }: { config: Config; o
             options={[
               { id: 'payment', name: loc('تسديد مستحق معتمد', 'Settle approved dues') },
               { id: 'advance', name: loc('سلفة مقدمة', 'Advance') },
-              { id: 'settlement', name: loc('خصم سلفة من الأجور', 'Apply advance to dues') },
+              { id: 'settlement', name: loc('خصم سلفة من الأجور', 'Apply advance to dues', 'بڕینی پێشەکی لە کرێ') },
             ]}
           />
           <Input
