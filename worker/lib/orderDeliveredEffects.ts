@@ -97,14 +97,17 @@ export async function runOrderDeliveredEffects(
     console.error('seller lookup failed for delivered order', orderId, e instanceof Error ? e.message : String(e));
   }
 
-  // A delivery whose sale is already in the books is a RE-delivery: the order
-  // was cancelled or walked back and comes back (DECISIONS row 307). All it
-  // posts now are corrections, the wages it restores above all, and those
-  // belong to today's open period — where the cut went, and where the recovery
-  // scan posts. A first delivery still posts on its delivery day.
+  // A delivery already in the books is a RE-delivery: the order was cancelled
+  // or walked back and comes back (DECISIONS row 307). All it posts now are
+  // corrections, the wages it restores above all, and those belong to today's
+  // open period — where the cut went, and where the recovery scan posts. In the
+  // books means its sale or cost entry, or its wage targets (a free order has
+  // no sale entry). A first delivery still posts on its delivery day.
   try {
-    // A database without the books (no posting yet) reads as a first delivery.
-    const again = await env.DB.prepare('SELECT 1 FROM accounting_entries WHERE event_key = ?').bind(`sale:${orderId}`).first().catch(() => null);
+    // A database without these tables (no posting yet) reads as a first delivery.
+    const again = await env.DB.prepare(`SELECT 1 WHERE EXISTS(SELECT 1 FROM accounting_entries WHERE event_key IN (?1,?2))
+      OR EXISTS(SELECT 1 FROM finance_wage_targets t JOIN finance_order_costs c ON c.id = t.cost_id WHERE c.order_id = ?3)`)
+      .bind(`sale:${orderId}`, `cogs:${orderId}`, orderId).first().catch(() => null);
     await runOrderFinancialEffects(env, orderId, 'delivered', again ? baghdadDay() : undefined);
   }
   catch (e) { console.error('order financial posting pending', orderId, e instanceof Error ? e.message : String(e)); await recordFinancialFailure(env.DB,orderId,'delivered',e).catch(()=>undefined); }

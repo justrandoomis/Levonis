@@ -156,16 +156,24 @@ test('cancelled after delivery: the wage comes to 0 with a recalculation and its
   assert.equal((await drainOrderFinanceRecovery(x.env)).scanned, 0);
 });
 
-test('a re-delivery after the delivery month closed restores the wage today instead of failing', async () => {
+test('a re-delivery after the delivery month closed restores the wage today instead of failing, a free order too', async () => {
   const x = await setup();
   await x.delivered('ORD-OCTOBER');
-  x.cancel('ORD-OCTOBER');
-  assert.equal((await drainOrderFinanceRecovery(x.env)).completed, 1);
+  // A free order (a replacement, a 100% coupon) books no sale and here no cost
+  // either: only its wage says it was delivered before.
+  x.raw.exec(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,delivered_at)
+      VALUES ('ORD-OCTOBER-FREE','buyer','delivered','{}','standard','{}','cash',0,1500,0,0,'2026-10-01T10:00:00.000Z','2026-10-16T12:00:00.000Z');
+    INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES ('line:ORD-OCTOBER-FREE','ORD-OCTOBER-FREE','p','Printer',1,0,0,0,'snapshot');`);
+  await runOrderFinancialEffects(x.env, 'ORD-OCTOBER-FREE', 'delivered');
+  assert.equal(count(x.raw, "SELECT COUNT(*) n FROM accounting_entries WHERE event_key IN ('sale:ORD-OCTOBER-FREE','cogs:ORD-OCTOBER-FREE')"), 0);
+  assert.deepEqual(x.wages('ORD-OCTOBER-FREE').map((w) => w.effective), [2500]);
+  x.cancel('ORD-OCTOBER'); x.cancel('ORD-OCTOBER-FREE');
+  assert.equal((await drainOrderFinanceRecovery(x.env)).completed, 2);
   x.raw.prepare('INSERT INTO accounting_periods(month,closed_at,closed_by) VALUES (?,?,?)').run('2026-10', new Date().toISOString(), 'boss');
-  await x.redeliver('ORD-OCTOBER');
-  assert.deepEqual(x.wages('ORD-OCTOBER').map((w) => w.effective), [2500]);
-  assert.equal(count(x.raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE order_id='ORD-OCTOBER'"), 0);
-  assert.deepEqual(x.wageExpenseByDay(), [{ day: '2026-10-16', n: 2500 }, { day: baghdadDay(), n: 0 }]);
+  await x.redeliver('ORD-OCTOBER'); await x.redeliver('ORD-OCTOBER-FREE');
+  assert.deepEqual([x.wages('ORD-OCTOBER').map((w) => w.effective), x.wages('ORD-OCTOBER-FREE').map((w) => w.effective)], [[2500], [2500]]);
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM finance_posting_errors'), 0);
+  assert.deepEqual(x.wageExpenseByDay(), [{ day: '2026-10-16', n: 5000 }, { day: baghdadDay(), n: 0 }]);
 });
 
 test('a recalculation of the order or of the employee does the same, and a walk-back short of cancelling is a lost delivery too', async () => {
