@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ChevronLeft, Plus, Pencil } from 'lucide-react';
 import { NumberInput } from '../ui/NumberInput';
 import { Select } from '../ui/Field';
-import { api, Button, Dialog, Empty, Feedback, Field, Loading, Money, PEOPLE, Surface, useLanguage, useMutation, useRemote, type Account, type PanelProps } from './shared';
+import { api, Button, Dialog, Empty, Feedback, Field, Loading, Money, PEOPLE, Surface, useLanguage, useMutation, useReloadOn, useRemote, type Account, type PanelProps } from './shared';
 import { investmentReturnStrings } from '../../lib/investmentReturn';
 import { personFinanceStrings } from '../../lib/personFinanceStrings';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
@@ -22,12 +22,13 @@ type List = { profiles: Profile[]; accounts: Account[] };
  * return so far, and — for an investor who also works — wages and the
  * combined total. Replaces the thirteen-card capital grid of 2026-10.
  */
-export default function InvestorProfiles({ from, to, month, onChanged, openContract, openOrder }: PanelProps & { openContract: (id: string) => void }) {
+export default function InvestorProfiles({ from, to, month, onChanged, openContract, openOrder, revision }: PanelProps & { openContract: (id: string) => void }) {
   const { loc, lang, dir } = useLanguage();
   const s = personFinanceStrings(lang);
   const query = new URLSearchParams(from || to ? { from: from || '', to: to || '' } : month ? { month } : {});
   const remote = useRemote<List>(`${API}/profiles?${query}`);
   const people = useRemote<{ people: PersonFinance[] }>(`${PEOPLE}/people?${query}`);
+  useReloadOn(revision, people.load);
   const [editing, setEditing] = useState<Profile | 'new' | null>(null), [selected, setSelected] = useState<string | null>(null);
   const data = remote.data;
   const investors = people.data?.people.filter((p) => p.investor) ?? [];

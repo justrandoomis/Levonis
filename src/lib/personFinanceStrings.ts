@@ -359,7 +359,7 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     unitsLine: (stock, orders, sold, notReceived) => `In stock ${stock} · on undelivered orders ${orders} · sold ${sold}${notReceived ? ` · not received ${notReceived}` : ''}`,
     moreSales: (n) => `and ${n} more`,
     hold: {
-      collection: en('sale', 'delivered; its cash has not been recorded as received yet'),
+      collection: en('sale', 'delivered; cash not yet recorded as received'),
       cost: en('sale', 'whose goods cost is not confirmed yet'),
       agreement: en('settled sale', 'waiting for another sale in the same agreement'),
       recalculation: en('sale', 'being recalculated'),

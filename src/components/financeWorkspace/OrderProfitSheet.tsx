@@ -20,8 +20,13 @@ type Edit = { field: EditableField; label: string; line_id?: string; cost_id?: s
 /** The step an order is opened at: recording its cash, or entering a missing purchase price. */
 export type OrderFocus = 'collection' | 'cost';
 
-export default function OrderProfitSheet({ orderId, onClose, onChanged, focus }: {
-  orderId: string; onClose: () => void; onChanged: () => void; focus?: OrderFocus;
+/**
+ * `onChanged`: the order may have changed (a save, or the background refresh found
+ * news) — refresh the period. `onSaved`: the owner saved something here.
+ * `focusLine`: with focus 'cost', the line to land on.
+ */
+export default function OrderProfitSheet({ orderId, onClose, onChanged, onSaved, focus, focusLine }: {
+  orderId: string; onClose: () => void; onChanged: () => void; onSaved?: () => void; focus?: OrderFocus; focusLine?: string;
 }) {
   const { loc } = useLanguage();
   // «عملة العرض» (design P-A §8): the workspace's choice; display only, edits stay in dinars.
@@ -91,7 +96,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, focus }:
       }
       setNoticePending(reconciliationPending);
       setEdit(null); setNotice(reconciliationPending ? loc('حُفظت القيمة، وتسوية الاستحقاقات ما زالت معلقة. راجع تنبيهات المحاسبة.', 'Value saved; entitlement reconciliation is still pending. Review the accounting alerts.') : carryforward > 0 ? `${loc('حُفظ الأجر، وسيُسوّى المبلغ المدفوع الزائد من الاستحقاقات التالية:', 'Wage saved; the overpayment will be settled from future earnings:')} ${formatMoney(carryforward)}` : loc('تم الحفظ وإعادة حساب الأرباح', 'Saved and profits recalculated'));
-      setRevision((v) => v + 1); onChanged();
+      setRevision((v) => v + 1); onChanged(); onSaved?.();
     } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
     finally { saveLock.current = false; setSaving(false); }
   };
@@ -104,13 +109,15 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, focus }:
       return;
     }
     const unconfirmed = data.lines.filter((l) => !['fifo', 'manual_verified', 'recorded_snapshot'].includes(l.cost_confidence));
-    // No cost at all first, then a line the review flags, then any unconfirmed line.
-    const line = unconfirmed.find((l) => l.cogs_iqd == null) ?? unconfirmed.find((l) => (l.cost_review?.issues.length ?? 0) > 0) ?? unconfirmed[0];
+    // The line asked for; else no cost at all first, then a line the review flags, then any unconfirmed line.
+    const line = data.lines.find((l) => l.id === focusLine) ?? unconfirmed.find((l) => l.cogs_iqd == null) ?? unconfirmed.find((l) => (l.cost_review?.issues.length ?? 0) > 0) ?? unconfirmed[0];
     if (!line) { requestAnimationFrame(() => document.getElementById('fw-order-warnings')?.scrollIntoView({ block: 'start', behavior: 'smooth' })); return; }
-    // The field takes the whole line's cost: say how many pieces it covers.
-    beginEdit('cogs_iqd', `${loc('إجمالي تكلفة القطع', 'Total goods cost')} · ${line.name_snapshot} · ${loc('لكل القطع', 'for all pieces', 'بۆ هەموو پارچەکان')} (${line.qty})`, line.id);
+    // The field takes the whole line's cost: say how many pieces it covers — the ones the customer kept.
+    const restocked = Number((line as { restocked_qty?: number }).restocked_qty ?? 0);
+    const kept = Math.max(0, line.qty - restocked);
+    beginEdit('cogs_iqd', `${loc('إجمالي تكلفة القطع', 'Total goods cost')} · ${line.name_snapshot} · ${loc('لكل القطع', 'for all pieces')} (${kept})${restocked > 0 ? ` · ${loc('بعد', 'after')} ${restocked} ${loc('مُرجَعة إلى المخزون', 'returned to stock')}` : ''}`, line.id);
     requestAnimationFrame(() => document.getElementById(`fw-line-${line.id}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
-  }, [focus, data, beginEdit, loc]);
+  }, [focus, focusLine, data, beginEdit, loc]);
   const verifyCost = (line: ProfitLine, total: number) => {
     const key = `${orderId}:${data?.version}:${line.id}:${total}`;
     let operationId = verificationIds.current.get(key);

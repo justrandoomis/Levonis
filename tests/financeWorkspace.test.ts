@@ -224,7 +224,7 @@ test('participant charts use actual Baghdad period filters, separate capital and
 });
 
 test('«الحساب يحتاج مراجعة»: the summary shows what complete orders say and names what is missing; the missing-costs list closes once a price is confirmed (owner 2026-11-10)', async () => {
-  const {raw,app}=setup();
+  const {raw,db,app}=setup();
   const at=new Date().toISOString();
   raw.exec(`INSERT INTO products(id,name,slug,price_iqd,stock) VALUES ('magnet','Round Magnet','workspace-magnet',500,0)`);
   raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at)
@@ -238,14 +238,137 @@ test('«الحساب يحتاج مراجعة»: the summary shows what complete 
   assert.deepEqual(summary.missing_costs.unknown_products,[{product_id:'magnet',name:'Round Magnet',qty:30,lines:1}]);
   let missing=await json(await get(app,`/f/missing-costs?${period()}`));
   assert.equal(missing.lines.length,1);
-  assert.deepEqual({order:missing.lines[0].order_id,line:missing.lines[0].line_id,qty:missing.lines[0].qty,option:missing.lines[0].option,cogs:missing.lines[0].cogs_iqd},{order:'magnets',line:'magnets:line',qty:30,option:'D8x3 mm',cogs:null});
+  assert.deepEqual({order:missing.lines[0].order_id,line:missing.lines[0].line_id,qty:missing.lines[0].qty,cost_qty:missing.lines[0].cost_qty,stock_qty:missing.lines[0].stock_qty,option:missing.lines[0].option,cogs:missing.lines[0].cogs_iqd},{order:'magnets',line:'magnets:line',qty:30,cost_qty:30,stock_qty:0,option:'D8x3 mm',cogs:null});
   assert.deepEqual(missing.stocked,[],'no stock batch: the list says so');
-  // The owner confirms 150 per piece: the same per-line correction the order sheet uses.
-  const fixed=await post(app,'/f/orders/magnets/adjustments',{operation_id:'missingcost:magnets:line:150',field:'cogs_iqd',value_iqd:150*30,line_id:'magnets:line',version:missing.lines[0].version});
+  // The owner confirms 150 per piece: the server prices the 30 kept pieces through the order's own correction.
+  const fixed=await post(app,'/f/missing-costs/lines',{operation_id:'missingcost:magnets:line:150:30',order_id:'magnets',line_id:'magnets:line',unit_iqd:150,cost_qty:30});
   assert.equal(fixed.status,200,JSON.stringify(await json(fixed)));
+  const line=(await getOrderProfitBase(db,'magnets')).lines[0];
+  assert.deepEqual({cogs:line.cogs_iqd,confidence:line.cost_confidence},{cogs:4500,confidence:'manual_verified'});
   missing=await json(await get(app,`/f/missing-costs?${period()}`));
   assert.equal(missing.lines.length,0);
   summary=await json(await get(app,`/f/summary?${period()}`));
   assert.equal(summary.missing_costs.lines,0);assert.equal(summary.known.incomplete_orders,0);
   assert.notEqual(summary.totals.owner_net_iqd,null);
+});
+
+/**
+ * «التكاليف الناقصة», review of 2026-11-11: what one typed price per piece may and may
+ * not write. Lines as the owner's November products: delivered, never received into stock.
+ */
+function missingSetup(){
+  const s=setup();
+  s.raw.exec(`INSERT INTO products(id,name,slug,price_iqd,stock) VALUES ('magnet','Round Magnet','missing-magnet',500,0),('esun','eSUN PLA+','missing-esun',20000,0)`);
+  const sell=async(id:string,lines:Array<{id:string;product:string;qty:number;unit:number;estimate?:number}>)=>{
+    const at=new Date().toISOString(),sub=lines.reduce((v,l)=>v+l.qty*l.unit,0);
+    s.raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at)
+      VALUES (?,'buyer','delivered','{}','standard','{}','cash',?,1400,?,?,0,?,?)`).run(id,sub,sub,sub,at,at);
+    for(const l of lines){
+      s.raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,option_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES (?,?,?,?,'',?,?,?,NULL,'unpriced')`).run(l.id,id,l.product,l.product,l.qty,l.unit,l.qty*l.unit);
+      if(l.estimate!==undefined)s.raw.prepare('UPDATE order_items SET estimated_cost_iqd=? WHERE id=?').run(l.estimate,l.id);
+    }
+    await runOrderFinancialEffects(s.env,id,'delivered');
+  };
+  const restock=async(order:string,item:string,qty:number,caseId:string)=>{
+    s.raw.prepare("INSERT INTO return_cases(id,order_id,order_item_id,user_id,qty,reason,state,resolution,decided_at) VALUES (?,?,?,'buyer',?,'defective','resolved','refund',?)").run(caseId,order,item,qty,new Date().toISOString());
+    await recordReturnFinancials(s.env,{caseId,orderId:order,itemId:item,refundIqd:500*qty,qty,restocked:true,actor:'admin',day:baghdadDay()});
+  };
+  type MissingLine={line_id:string;qty:number;restocked_qty:number;cost_qty:number;stock_qty:number;confidence:string;cogs_iqd:number|null;estimate_unit_iqd:number|null};
+  const list=async()=>(await json(await get(s.app,`/f/missing-costs?${period()}`))) as {lines:MissingLine[];stocked:string[]};
+  const line=async(id:string)=>(await list()).lines.find((l)=>l.line_id===id)!;
+  const price=(order:string,lineId:string,unit:number,costQty:number)=>post(s.app,'/f/missing-costs/lines',{operation_id:`missingcost:${lineId}:${unit}:${costQty}`,order_id:order,line_id:lineId,unit_iqd:unit,cost_qty:costQty});
+  return {...s,sell,restock,list,line,price};
+}
+
+test('a price per piece covers only the pieces the customer kept: a return put back in stock is not a cost of the sale; a list read before a return is refused (review 2026-11-11)',async()=>{
+  const {db,sell,restock,line,price}=missingSetup();
+  await sell('m',[{id:'m:line',product:'magnet',qty:2,unit:500}]);
+  await sell('f',[{id:'f:line',product:'magnet',qty:3,unit:500}]);
+  const before=await line('m:line');assert.equal(before.cost_qty,2);
+  await restock('m','m:line',1,'r1');await restock('f','f:line',3,'r2');
+  const m=await line('m:line'),f=await line('f:line');
+  assert.deepEqual([m.qty,m.restocked_qty,m.cost_qty],[2,1,1]);assert.deepEqual([f.qty,f.restocked_qty,f.cost_qty],[3,3,0]);
+  const stale=await price('m','m:line',150,before.cost_qty);
+  assert.equal(stale.status,409);assert.equal((await json(stale)).code,'MISSING_COST_LINE_CHANGED');
+  assert.equal((await getOrderProfitBase(db,'m')).lines[0].cogs_iqd,null,'nothing written from the stale list');
+  for(const [order,id,kept] of [['m','m:line',1],['f','f:line',0]] as const){const r=await price(order,id,150,kept);assert.equal(r.status,200,JSON.stringify(await json(r)));}
+  assert.equal((await getOrderProfitBase(db,'m')).lines[0].cogs_iqd,150,'one piece kept: 150, not 300');
+  assert.equal((await getOrderProfitBase(db,'f')).lines[0].cogs_iqd,0,'nothing kept: no goods cost, not 450');
+});
+
+test('a line with pieces from a stock batch is not priced from the list: its batch cost is known, so it is set in its order (review 2026-11-11)',async()=>{
+  const {raw,db,sell,list,line,price}=missingSetup();
+  await sell('p',[{id:'p:line',product:'esun',qty:3,unit:20000}]);
+  raw.prepare(`INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,cost_basis,received_at) VALUES ('p:lot','esun','base','',2,0,10000,'opening',?)`).run(new Date().toISOString());
+  raw.prepare(`INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key) VALUES ('p:alloc','p','p:line','p:lot','base','',2,10000,20000,'p:alloc')`).run();
+  assert.equal((await line('p:line')).stock_qty,2);
+  assert.deepEqual((await list()).stocked,['esun'],'a priced batch exists');
+  const refused=await price('p','p:line',7000,3);
+  assert.equal(refused.status,409);assert.equal((await json(refused)).code,'MISSING_COST_HAS_STOCK');
+  assert.equal((await getOrderProfitBase(db,'p')).lines[0].cogs_iqd,null,'the known 20,000 of the batch pieces is not overwritten by 7,000 × 3');
+});
+
+test('a price typed for an estimated line is the cost itself: a batch linked later never shifts it by the estimate\'s error (review 2026-11-11)',async()=>{
+  const {raw,db,sell,line,price}=missingSetup();
+  await sell('pre',[{id:'pre:line',product:'esun',qty:2,unit:20000,estimate:15271}]);
+  const l=await line('pre:line');
+  assert.deepEqual([l.confidence,l.cogs_iqd,l.estimate_unit_iqd],['estimated',30542,15271]);
+  assert.equal((await price('pre','pre:line',14000,2)).status,200);
+  const stored=JSON.parse(row<{allocations_json:string}>(raw,"SELECT allocations_json FROM finance_order_adjustments WHERE order_id='pre'")!.allocations_json);
+  assert.deepEqual([stored[0].delta_iqd,stored[0].value_iqd],[null,28000],'a value, not a change of −2,542 to the estimate');
+  assert.equal((await getOrderProfitBase(db,'pre')).lines[0].cogs_iqd,28000);
+  // What «اربط بالدفعة الواصلة» writes when the batch arrives (allowed on a delivered order).
+  raw.prepare(`INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,cost_basis,received_at) VALUES ('pre:lot','esun','base','',2,0,13500,'opening',?)`).run(new Date().toISOString());
+  raw.prepare(`INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key,link_kind) VALUES ('pre:alloc','pre','pre:line','pre:lot','base','',2,13500,27000,'pre:alloc','preorder_batch')`).run();
+  const after=(await getOrderProfitBase(db,'pre')).lines[0];
+  assert.deepEqual([after.cogs_iqd,after.cost_confidence],[28000,'manual_verified'],'the owner\'s 28,000 — not 24,458 (27,000 − 2,542)');
+});
+
+test('two products of one order priced one after the other from the same list: no version refusal, and a half-priced order waits instead of failing (review 2026-11-11)',async()=>{
+  const {raw,app,sell,line,price}=missingSetup();
+  await sell('two',[{id:'two:a',product:'magnet',qty:1,unit:500},{id:'two:b',product:'esun',qty:1,unit:20000}]);
+  const a=await line('two:a'),b=await line('two:b');
+  const first=await price('two',a.line_id,150,a.cost_qty),firstBody=await json(first);
+  assert.equal(first.status,200,JSON.stringify(firstBody));
+  assert.equal(firstBody.reconciliation_pending,true,'the other product still has no cost');
+  assert.equal(count(raw,"SELECT COUNT(*) n FROM finance_posting_errors WHERE event_key='investor:two'"),0,'waiting is not a posting failure');
+  const summary=await json(await get(app,`/f/summary?${period()}`));
+  assert.equal(summary.exceptions.some((e:{id:string})=>e.id==='investor:two'),false);
+  const second=await price('two',b.line_id,9000,b.cost_qty),secondBody=await json(second);
+  assert.equal(second.status,200,JSON.stringify(secondBody));assert.equal(secondBody.reconciliation_pending,false);
+  assert.equal((await price('two',b.line_id,9000,b.cost_qty)).status,200,'a replay answers again');
+  assert.equal(count(raw,"SELECT COUNT(*) n FROM finance_order_adjustments WHERE order_id='two'"),2,'written once each');
+});
+
+test('a line priced in its order meanwhile is left as it is by the list (review 2026-11-11)',async()=>{
+  const {db,app,sell,line,price}=missingSetup();
+  await sell('done',[{id:'done:line',product:'magnet',qty:4,unit:500}]);
+  const l=await line('done:line');
+  assert.equal((await post(app,'/f/orders/done/adjustments',{field:'cogs_iqd',value_iqd:1000,line_id:'done:line'})).status,200);
+  const r=await price('done','done:line',150,l.cost_qty);
+  assert.equal(r.status,200);assert.equal((await json(r)).skipped,true);
+  assert.equal((await getOrderProfitBase(db,'done')).lines[0].cogs_iqd,1000);
+});
+
+test('the complete orders carry only their share of the period\'s general expenses, by sold units; with no complete order there is nothing to show (review 2026-11-11)',async()=>{
+  const {raw,app,sell}=missingSetup();
+  await sell('miss',[{id:'miss:a',product:'magnet',qty:2,unit:2000}]);
+  // setup()'s own order: 2 units with a FIFO cost. The period: 4 units, 2 of them complete.
+  raw.prepare(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent1','rent',30000,?,'Rent','admin')`).run(baghdadDay());
+  const summary=await json(await get(app,`/f/summary?${period()}`)),order=summary.orders.find((o:{id:string})=>o.id==='order');
+  assert.equal(summary.known.orders_count,1);assert.equal(summary.known.incomplete_orders,1);
+  assert.equal(summary.known.overhead_share_iqd,15000,'half the units, half the rent');
+  assert.equal(summary.known.owner_net_iqd,order.owner_net_iqd-15000,'not the whole 30,000 against one order');
+  raw.exec("UPDATE order_item_inventory_allocations SET cogs_iqd=NULL,unit_cost_iqd=NULL WHERE order_id='order'");
+  const none=await json(await get(app,`/f/summary?${period()}`));
+  assert.equal(none.known,null,'no complete order: the tiles keep their dash, never a zero');
+});
+
+test('pricing a long list spends its own budget, never the owner\'s shared finance write budget (review 2026-11-11)',async()=>{
+  const {raw,sell,line,price}=missingSetup();
+  await sell('budget',[{id:'budget:line',product:'magnet',qty:1,unit:500}]);
+  assert.equal((await price('budget','budget:line',150,(await line('budget:line')).cost_qty)).status,200);
+  const spent=(key:string)=>row<{count:number}>(raw,'SELECT count FROM rate_limits WHERE key=?',key)?.count??0;
+  assert.equal(spent('finance-missing-costs:u:admin'),1);
+  assert.equal(spent('finance-write:u:admin'),0);
 });

@@ -12,7 +12,7 @@ import { createStaffReconciliationRunner, type ReconciliationActivity, type Staf
 import ProductPicker from '../adminProducts/form/ProductPicker';
 import { NumberInput } from '../ui/NumberInput';
 import { Select } from '../ui/Field';
-import { AccountPicker, api, Button, dateLabel, Dialog, Empty, Feedback, Field, Input, Loading, Money, PEOPLE, Surface, useLanguage, useMutation, useRemote, type Account, type PanelProps } from './shared';
+import { AccountPicker, api, Button, dateLabel, Dialog, Empty, Feedback, Field, Input, Loading, Money, PEOPLE, Surface, useLanguage, useMutation, useReloadOn, useRemote, type Account, type PanelProps } from './shared';
 import { PersonSheet, WorkHolds, WorkStatus, type PersonFinance } from './PersonFinanceView';
 import { personFinanceStrings } from '../../lib/personFinanceStrings';
 
@@ -37,7 +37,7 @@ function ArchivedBalance({ pf, staffId, s }: { pf: PersonFinance | undefined; st
     <p className="fp-row-meta">{pf.work.balance_iqd > 0 ? <>{s.stillOwed}: <Money value={pf.work.balance_iqd} /></> : s.nothingOwed}</p></>;
 }
 
-export default function PeoplePanel({ onChanged, from, to, month, openOrder }: PanelProps = {}) {
+export default function PeoplePanel({ onChanged, from, to, month, openOrder, revision }: PanelProps = {}) {
   const { loc, lang, dir } = useLanguage();
   const s = personFinanceStrings(lang);
   const query = new URLSearchParams(from || to ? {from: from || '', to: to || ''} : month ? {month} : {});
@@ -45,6 +45,7 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
   // The one-person picture (worker/lib/personFinance.ts): work status, why
   // wages wait, and — for someone who also invests — the full account.
   const people = useRemote<{ people: PersonFinance[] }>(`${PEOPLE}/people?${query}`);
+  useReloadOn(revision, people.load);
   // Background reads (the 30-second poll, each reconciliation page) refresh the
   // staff list only; the people read follows saves and the final page.
   const remote = staffRemote;

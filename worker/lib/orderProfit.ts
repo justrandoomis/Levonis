@@ -165,11 +165,18 @@ export function planProfitAdjustment(base: OrderProfitBase, lineId: string | nul
   const key = fieldKey(field);
   const previous = lines.some((l) => l[key] === null) ? null : lines.reduce((sum, l) => sum + n(l[key]), 0);
   const delta = previous === null ? null : value - previous;
+  // A goods cost typed for lines that have no confirmed cost (an estimate, a legacy
+  // snapshot or nothing) is the cost itself, not a change to the estimate: stored as
+  // a value, so a batch linked later cannot shift it by the estimate's error. Like
+  // any verified cost it then stays the owner's (the batch's actual cost is shown
+  // beside it), and the accounts reconcile the difference (planWorkspaceAccounting).
+  const verifiesEstimate = field === 'cogs_iqd' && lines.every((l) => !isConfirmedOrderCost(l.cost_confidence));
+  const absolute = delta === null || verifiesEstimate;
   const moneyWeights = lines.map((l) => Math.max(0, n(l[key])));
   // A reduction cannot take money from a zero-valued line. Positive and
   // unknown-value edits use quantities only when no monetary basis exists.
-  const shares = spread(delta ?? value, moneyWeights.some((v) => v > 0) ? moneyWeights : lines.map((l) => l.qty));
-  const allocations:AdjustmentAllocation[] = lines.map((l, i) => ({ line_id: l.id, delta_iqd: delta === null ? null : shares[i], ...(delta === null ? { value_iqd: shares[i] } : {}),...(field==='cogs_iqd'?{quantity_basis:Math.max(0,l.qty-n(l.restocked_qty)),restocked_qty_basis:n(l.restocked_qty)}:{}) }));
+  const shares = spread(absolute ? value : delta ?? value, moneyWeights.some((v) => v > 0) ? moneyWeights : lines.map((l) => l.qty));
+  const allocations:AdjustmentAllocation[] = lines.map((l, i) => ({ line_id: l.id, delta_iqd: absolute ? null : shares[i], ...(absolute ? { value_iqd: shares[i] } : {}),...(field==='cogs_iqd'?{quantity_basis:Math.max(0,l.qty-n(l.restocked_qty)),restocked_qty_basis:n(l.restocked_qty)}:{}) }));
   return { previous, delta, allocations };
 }
 

@@ -21,9 +21,9 @@ dialog.fw-sheet{position:fixed;inset:0;margin:auto;width:min(680px,calc(100vw - 
 .fw-money-dual{display:inline-grid;gap:2px;justify-items:end}.fw-money-accounting{font-size:10px;color:var(--fw-muted);font-weight:400}.fw-currency-toggle{display:flex;align-items:center;gap:6px}.fw-currency-toggle-label{font-size:11px;color:var(--fw-muted)}@media(max-width:600px){.fw-currency-toggle-label{display:none}}
 
 /* «التكاليف الناقصة» (owner 2026-11-10). */
-.fw-missing-box{display:grid;gap:6px}.fw-missing-box p{margin:0}.fw-missing-box .lv-button{justify-self:start}
-.fw-missing-group{display:grid;gap:8px;padding:12px 0;border-bottom:1px solid var(--ap-border)}
+.fw-missing-box{display:grid;gap:6px}.fw-missing-box p{margin:0}.fw-missing-box .fw-button{justify-self:start}
+.fw-missing-group{display:grid;gap:8px;padding:12px 0;border-bottom:1px solid var(--fw-line)}
 .fw-missing-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}.fw-missing-head h3{margin:0;font-size:15px}
 .fw-missing-price{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px}.fw-missing-price .fw-field{flex:1 1 180px}
 .fw-confirm{flex-basis:100%;display:grid;gap:6px}.fw-confirm p{margin:0}
-.fw-link{background:none;border:0;padding:0;color:var(--ap-accent-text);text-decoration:underline;cursor:pointer;font:inherit}
+.fw-link{background:none;border:0;padding:0;color:var(--fw-accent);text-decoration:underline;cursor:pointer;font:inherit}

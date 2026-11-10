@@ -929,6 +929,7 @@ function Collections({ config, onChanged, initialOrderId = '' }: { config: Confi
                   type="button"
                   className={T.btnSecondary}
                   onClick={() => {
+                    touch();
                     setOrder(r.id);
                     setPayer('courier');
                     setAmount(String(r.door_balance_iqd));
@@ -940,6 +941,7 @@ function Collections({ config, onChanged, initialOrderId = '' }: { config: Confi
                   type="button"
                   className={T.btnSecondary}
                   onClick={() => {
+                    touch();
                     setOrder(r.id);
                     setPayer('bank');
                     setAmount(String(r.bank_balance_iqd));

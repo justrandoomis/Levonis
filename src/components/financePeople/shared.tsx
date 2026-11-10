@@ -14,7 +14,17 @@ export const EARNINGS = '/api/finance-earnings';
 /** Which step an order opens at: recording its cash, or entering a missing purchase price. */
 export type OrderFocus = 'collection' | 'cost';
 export type OpenOrder = (id: string, focus?: OrderFocus) => void;
-export type PanelProps = { month?: string; from?: string; to?: string; onChanged?: () => void; openOrder?: OpenOrder };
+/** `revision`: a change of it re-reads the people's figures in place (an order changed elsewhere). */
+export type PanelProps = { month?: string; from?: string; to?: string; onChanged?: () => void; openOrder?: OpenOrder; revision?: number };
+/** Re-read on a later `revision` (never on mount: the panel has just read). */
+export function useReloadOn(revision: number | undefined, load: () => Promise<void>) {
+  const seen = useRef(revision);
+  useEffect(() => {
+    if (revision === seen.current) return;
+    seen.current = revision;
+    void load();
+  }, [revision, load]);
+}
 export type Account = { id: string; name: string; email: string; role: string; admin_scope?: string };
 export type Withdrawal = {
   id: string; amount_iqd: number; paid_iqd: number; state: string; created_at: string;

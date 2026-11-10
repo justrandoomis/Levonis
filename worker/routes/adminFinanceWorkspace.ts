@@ -5,7 +5,7 @@ import type { AppContext } from '../lib/types';
 import { badRequest, conflict, notFound, requireAdmin, str, unavailable } from '../lib/http';
 import { canViewCost, isOwner } from '../lib/adminScope';
 import { requireCostRead } from '../lib/costAccess';
-import { limitByMethod } from '../lib/ratelimit';
+import { limitByMethod, limitInstead } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
 import { auditStatements } from '../lib/audit';
 import { baghdadDay, dateValue, decimal, fence, periodOpen, requireCapability, whole } from '../lib/operations';
@@ -26,6 +26,11 @@ const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
 const text=(v:unknown,max=200)=>str(v,'النص',{max,required:false})??'';
 export const adminFinanceWorkspaceRoutes=new Hono<AppContext>();
 adminFinanceWorkspaceRoutes.use('*',requireAdmin);
+// «التكاليف الناقصة» prices one line per request: on the shared write budget (120 an
+// hour, per user, shared by every finance router) a long list would lock the owner out
+// of withdrawals, payments, expenses and closing a period until the hour turned. It
+// spends its own bucket INSTEAD (registered before the door, as the staff reconcile).
+adminFinanceWorkspaceRoutes.on('POST','/missing-costs/lines',limitInstead('finance-missing-costs',600,['finance-write']));
 // THE DOOR (owner decision 2): payroll, withdrawals and profit are cost — the
 // owner's alone, full-scope admins included. The rate limit runs before the
 // guard, so a refused caller still spends budget.
@@ -51,23 +56,41 @@ function sumRows(rows:Row[]):Row {
  * Every delivered line whose goods cost is not confirmed (FIFO from a priced
  * stock batch, verified by the owner, or a recorded pre-cut-over snapshot):
  * the sale-time estimate, if any, is only a hint — the owner confirms a price.
+ * `cost_qty` is what a line's goods cost covers: the pieces the customer kept
+ * (a return put back in stock is not a cost of this sale). `stock_qty` counts
+ * pieces that came from a stock batch: such a line is priced in its order.
  */
-type MissingCostLine={order_id:string;version:number;delivered_at:string|null;customer_name:string|null;line_id:string;product_id:string|null;name:string;option:string|null;color:string|null;qty:number;confidence:string;estimate_unit_iqd:number|null;cogs_iqd:number|null};
+type MissingCostLine={order_id:string;version:number;delivered_at:string|null;customer_name:string|null;line_id:string;product_id:string|null;name:string;option:string|null;color:string|null;qty:number;restocked_qty:number;cost_qty:number;stock_qty:number;confidence:string;estimate_unit_iqd:number|null;cogs_iqd:number|null};
+const keptQty=(l:ProfitLine)=>Math.max(0,n(l.qty)-n(l.restocked_qty));
 function missingCostLines(bases:OrderProfitBase[]):MissingCostLine[]{
   return bases.flatMap((b)=>b.lines.filter((l)=>!isConfirmedOrderCost(l.cost_confidence)).map((l)=>({order_id:b.order_id,version:b.version,delivered_at:b.order.delivered_at==null?null:s(b.order.delivered_at),customer_name:b.order.customer_name==null?null:s(b.order.customer_name),
-    line_id:l.id,product_id:l.product_id??null,name:s(l.name_snapshot),option:l.option_snapshot==null?null:s(l.option_snapshot),color:l.color_snapshot==null?null:s(l.color_snapshot),qty:n(l.qty),confidence:s(l.cost_confidence),
+    line_id:l.id,product_id:l.product_id??null,name:s(l.name_snapshot),option:l.option_snapshot==null?null:s(l.option_snapshot),color:l.color_snapshot==null?null:s(l.color_snapshot),qty:n(l.qty),restocked_qty:n(l.restocked_qty),cost_qty:keptQty(l),
+    stock_qty:(l.allocations??[]).reduce((v,a)=>v+n(a.qty),0),confidence:s(l.cost_confidence),
     estimate_unit_iqd:typeof l.estimated_cost_iqd==='number'?l.estimated_cost_iqd:null,cogs_iqd:l.cogs_iqd==null?null:n(l.cogs_iqd)})));
 }
-/** The period's figures over the orders whose every amount is known, and what the rest lack. */
-function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean){
+/**
+ * The orders whose every amount is known, and their share of the period's sold
+ * units — the basis the summary spreads promotion by (`allocation_basis`). General
+ * expenses and an unallocated promotion belong to the whole period, so the complete
+ * orders carry only that share of them, never all of it.
+ */
+function completeOrders(bases:OrderProfitBase[]){
   const complete=bases.filter((b)=>b.totals.owner_net_iqd!=null&&b.totals.profit_basis_iqd!=null);
+  const units=(rows:OrderProfitBase[])=>rows.reduce((v,b)=>v+n(b.totals.units),0),all=units(bases);
+  return {complete,share:all>0?units(complete)/all:bases.length?complete.length/bases.length:0};
+}
+/** The period's figures over the orders whose every amount is known (none: null), and what the rest lack. */
+function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean){
+  const {complete,share}=completeOrders(bases);
+  const overhead={general:Math.round(general*share),unallocated:Math.round(unallocated*share)};
   const known=sumRows(complete.map((b)=>b.totals));known.orders_count=complete.length;
-  const amounts=chartAmounts(known,general,unallocated,truncated);
+  const amounts=chartAmounts(known,overhead.general,overhead.unallocated,truncated);
   const lines=missingCostLines(bases),unknown=lines.filter((l)=>l.cogs_iqd===null);
   const products=new Map<string,{product_id:string|null;name:string;qty:number;lines:number}>();
-  for(const l of unknown){const key=l.product_id??l.name,p=products.get(key)??{product_id:l.product_id,name:l.name,qty:0,lines:0};p.qty+=l.qty;p.lines++;products.set(key,p);}
+  for(const l of unknown){const key=l.product_id??l.name,p=products.get(key)??{product_id:l.product_id,name:l.name,qty:0,lines:0};p.qty+=l.cost_qty;p.lines++;products.set(key,p);}
   return {
-    known:{orders_count:complete.length,incomplete_orders:bases.length-complete.length,revenue_iqd:amounts.revenue_iqd,cost_iqd:amounts.cost_iqd,owner_net_iqd:amounts.owner_net_iqd},
+    known:complete.length?{orders_count:complete.length,incomplete_orders:bases.length-complete.length,revenue_iqd:amounts.revenue_iqd,cost_iqd:amounts.cost_iqd,owner_net_iqd:amounts.owner_net_iqd,
+      overhead_share_iqd:overhead.general+overhead.unallocated}:null,
     missing_costs:{lines:lines.length,orders:new Set(lines.map((l)=>l.order_id)).size,unknown_lines:unknown.length,estimated_lines:lines.length-unknown.length,
       unknown_products:[...products.values()].sort((a,b)=>b.qty-a.qty)},
   };
@@ -241,7 +264,7 @@ function groupedCents(lines:ProfitLine[],kind:'product'|'main'|'sub',orders:Map<
     const key=id||'unclassified',rows=groups.get(key)??[];rows.push(orders.get(s(l.order_id))?.lines.get(l.id)??{});groups.set(key,rows);}
   return Object.fromEntries([...groups].map(([id,rows])=>[id,sumCents(rows)]));
 }
-async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocatedDays:Map<string,number>,truncated:boolean,pendingCosts:boolean){
+async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocatedDays:Map<string,number>,truncated:boolean,pendingCosts:boolean,done=completeOrders(bases)){
   const expenseStarts=expenses.map((e)=>baghdadDayStart(s(e.expense_day))),monthStarts=[...unallocatedDays.keys()].map((d)=>baghdadDayStart(d));
   const steps=await usdSteps(db,[...bases.map((b)=>instantOf(b.order.created_at)),...expenseStarts,...monthStarts]);
   const orders=ordersInUsd(bases,steps,await lotRatesOf(db,bases));if(!orders||(!steps?.today&&!steps?.steps.length))return unavailableUsd();
@@ -261,7 +284,9 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
     daily[day]=chartCents(sumCents(byDay.get(day)??[]),generalByDay.get(day)??0,unallocatedByDay.get(day)??0,truncated);}
   const kinds=Object.fromEntries(ORDER_KINDS.map((kind)=>[kind,sumCents(bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal').map((b)=>orders.get(b.order_id)!.cents))]));
   const lines=bases.flatMap((b)=>b.lines.map((l)=>({...l,order_id:b.order_id})));
-  return {available:true as const,today_rate:steps?.today??null,...basisCounts(orders),approximate,
+  // `known` (the complete orders, with their share of the period's overhead) in cents, as /summary's IQD `known`.
+  const known=done.complete.length?chartCents(sumCents(done.complete.map((b)=>orders.get(b.order_id)!.cents)),Math.round(general*done.share),Math.round(unallocated*done.share),truncated):null;
+  return {available:true as const,today_rate:steps?.today??null,...basisCounts(orders),approximate,known,
     orders:orderBlock(orders),kinds,products:groupedCents(lines,'product',orders),
     categories:{main:groupedCents(lines,'main',orders),sub:groupedCents(lines,'sub',orders)},
     chart:{...chartCents(totals,general,unallocated,truncated),daily,expense_composition:expenseCompositionCents(totals,general,unallocated,pendingCosts,truncated)},
@@ -320,7 +345,7 @@ adminFinanceWorkspaceRoutes.get('/missing-costs',async(c)=>{
   const lines=missingCostLines(bases);
   const ids=[...new Set(lines.map((l)=>l.product_id).filter((id):id is string=>!!id))];
   // A product with no stock batch cannot cost its next sale either: say so beside it.
-  const stocked=ids.length?((await db.prepare('SELECT DISTINCT product_id FROM inventory_lots WHERE product_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(ids)).all<{product_id:string}>()).results??[]).map((x)=>x.product_id):[];
+  const stocked=ids.length?((await db.prepare('SELECT DISTINCT product_id FROM inventory_lots WHERE product_id IN (SELECT value FROM json_each(?)) AND unit_cost_iqd IS NOT NULL').bind(JSON.stringify(ids)).all<{product_id:string}>()).results??[]).map((x)=>x.product_id):[];
   return c.json({success:true,range:r,truncated,lines,stocked});
 });
 adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
@@ -362,35 +387,74 @@ adminFinanceWorkspaceRoutes.get('/orders/:id',async(c)=>{
   const order=ordersInUsd([answer],steps,await lotRatesOf(c.env.DB,[answer]))?.get(answer.order_id);
   return c.json({...answer,display_usd:!order?unavailableUsd():{available:true,today_rate:steps?.today??null,usd_basis:order.usd_basis,fx_rate_snapshot:order.fx_rate_snapshot,cents:order.cents,lines:Object.fromEntries(order.lines),batch_cost_lines:order.batch_lines}});
 });
-adminFinanceWorkspaceRoutes.post('/orders/:id/adjustments',async(c)=>{
-  const db=c.env.DB,actor=c.get('user')!,id=c.req.param('id');await requireCapability(c.env,actor,'accounting');
-  const body=await c.req.json<Row>(),field=text(body.field,40) as ProfitField,value=whole(body.value_iqd,'القيمة الجديدة'),lineId=text(body.line_id,100)||null;
-  if(!profitFields.includes(field))throw badRequest('الحقل المالي غير صحيح');
-  const operationId=body.operation_id===undefined?newId('profitop'):str(body.operation_id,'رقم العملية',{min:8,max:100});
+/**
+ * One per-order correction (a goods cost, a fee, …): replay-safe by operation id,
+ * versioned, fenced against a source change, posted and audited. `check` sees the
+ * order as it is now, before anything is planned: it may refuse, or answer 'skip'.
+ */
+async function writeAdjustment(db:D1Database,actor:string,input:{id:string;field:ProfitField;value:number;lineId:string|null;operationId:string;version?:unknown;check?:(current:OrderProfitBase)=>'skip'|void}){
+  const {id,field,value,lineId,operationId}=input;
   const old=await db.prepare('SELECT * FROM finance_order_adjustments WHERE operation_id=?').bind(operationId).first<ProfitAdjustment&{actor_id:string}>();
-  if(old){if(old.order_id!==id||old.field!==field||old.order_item_id!==lineId||old.new_value_iqd!==value||old.actor_id!==actor.id)throw conflict('رقم العملية مستخدم لتعديل آخر');const pending=await reconcileWorkspace(db,id,actor.id,baghdadDay());return c.json({success:true,already:true,reconciliation_pending:pending,...await detail(db,id)});}
+  if(old){if(old.order_id!==id||old.field!==field||old.order_item_id!==lineId||old.new_value_iqd!==value||old.actor_id!==actor)throw conflict('رقم العملية مستخدم لتعديل آخر');return {already:true,skipped:false,accounting_pending:false};}
   const source=await profitSourceFingerprint(db,id);
   const [current,plain]=await Promise.all([getOrderProfitBase(db,id),getOrderProfitBases(db,[id],{skipAdjustments:true})]);
   if(current.order.seller_type!=='levonis')throw notFound('Order not found');
   if(['cancelled','returned'].includes(s(current.order.status)))throw conflict('لا يمكن تعديل طلب ملغى');
-  const expected=body.version===undefined?current.version:whole(body.version,'نسخة الحساب');
+  const expected=input.version===undefined?current.version:whole(input.version,'نسخة الحساب');
   if(expected!==current.version)throw conflict('تغيرت نسخة الحساب؛ حدّث الطلب');
+  if(input.check?.(current)==='skip')return {already:false,skipped:true,accounting_pending:false};
   const plan=planProfitAdjustment(current,lineId,field,value),next=current.version+1,now=new Date().toISOString(),day=baghdadDay();await periodOpen(db,day);
   const before=JSON.stringify(current),after=JSON.parse(before) as OrderProfitBase;
   const revision:ProfitAdjustment={order_id:id,order_item_id:lineId,field,version:next,old_value_iqd:plan.previous,new_value_iqd:value,allocations_json:JSON.stringify(plan.allocations)};
   applyProfitAdjustment(after,revision);
-  const posting=await planWorkspaceAccounting(db,plain[0],after,{actor:actor.id,day});
+  const posting=await planWorkspaceAccounting(db,plain[0],after,{actor,day});
   const adjustmentId=newId('profitfix');
   try{await db.batch([
     ...fence(db,`(${source.sql.replace(/\?1/g,'?2')})=? AND COALESCE((SELECT version FROM finance_order_versions WHERE order_id=?),0)=?`,[id,source.value,id,expected]),
     db.prepare('INSERT INTO finance_order_versions(order_id,version) VALUES (?,?) ON CONFLICT(order_id) DO UPDATE SET version=excluded.version').bind(id,next),
     ...posting.statements,
-    db.prepare('INSERT INTO finance_order_adjustments(id,operation_id,order_id,order_item_id,field,old_value_iqd,new_value_iqd,delta_iqd,version,actor_id,created_at,journal_id,allocations_json,before_json,after_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(adjustmentId,operationId,id,lineId,field,plan.previous,value,plan.delta,next,actor.id,now,posting.journalIds[0]??null,revision.allocations_json,before,JSON.stringify(after)),
-    db.prepare('INSERT INTO finance_order_calculations(order_id,version,snapshot,actor_id,created_at) VALUES (?,?,?,?,?)').bind(id,next,JSON.stringify(after),actor.id,now),
-    ...(await auditStatements(db,actor.id,'finance.order_adjusted',id,{field,line_id:lineId,before:plan.previous,after:value,version:next,operation_id:operationId})).statements]);}
+    db.prepare('INSERT INTO finance_order_adjustments(id,operation_id,order_id,order_item_id,field,old_value_iqd,new_value_iqd,delta_iqd,version,actor_id,created_at,journal_id,allocations_json,before_json,after_json) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(adjustmentId,operationId,id,lineId,field,plan.previous,value,plan.delta,next,actor,now,posting.journalIds[0]??null,revision.allocations_json,before,JSON.stringify(after)),
+    db.prepare('INSERT INTO finance_order_calculations(order_id,version,snapshot,actor_id,created_at) VALUES (?,?,?,?,?)').bind(id,next,JSON.stringify(after),actor,now),
+    ...(await auditStatements(db,actor,'finance.order_adjusted',id,{field,line_id:lineId,before:plan.previous,after:value,version:next,operation_id:operationId})).statements]);}
   catch(e){if(/CHECK constraint|UNIQUE constraint/.test(String(e)))throw conflict('تغير الطلب أثناء الحفظ؛ حدّث الحساب وأعد المحاولة');throw e;}
-  const reconciliationPending=await reconcileWorkspace(db,id,actor.id,day);
-  return c.json({success:true,reconciliation_pending:reconciliationPending,accounting_pending:posting.pending,...await detail(db,id)});
+  return {already:false,skipped:false,accounting_pending:posting.pending};
+}
+adminFinanceWorkspaceRoutes.post('/orders/:id/adjustments',async(c)=>{
+  const db=c.env.DB,actor=c.get('user')!,id=c.req.param('id');await requireCapability(c.env,actor,'accounting');
+  const body=await c.req.json<Row>(),field=text(body.field,40) as ProfitField,value=whole(body.value_iqd,'القيمة الجديدة'),lineId=text(body.line_id,100)||null;
+  if(!profitFields.includes(field))throw badRequest('الحقل المالي غير صحيح');
+  const operationId=body.operation_id===undefined?newId('profitop'):str(body.operation_id,'رقم العملية',{min:8,max:100});
+  const result=await writeAdjustment(db,actor.id,{id,field,value,lineId,operationId,version:body.version});
+  const reconciliationPending=await reconcileWorkspace(db,id,actor.id,baghdadDay());
+  return c.json(result.already?{success:true,already:true,reconciliation_pending:reconciliationPending,...await detail(db,id)}
+    :{success:true,reconciliation_pending:reconciliationPending,accounting_pending:result.accounting_pending,...await detail(db,id)});
+});
+/**
+ * «التكاليف الناقصة»: the owner's price of ONE PIECE for one line (owner 2026-11-10).
+ * The server decides what it covers — the pieces the customer kept; a return put back
+ * in stock is not a cost of the sale — and writes it through the same correction as
+ * the order sheet, as the line's cost itself (planProfitAdjustment), never as a
+ * change to its sale-time estimate.
+ * Refused: a line with pieces from a stock batch (their batch cost is known; it is set
+ * in the order itself) and a line whose pieces changed since the list was read.
+ * Left as it is: a line priced meanwhile (a batch linked, a cost set in its order).
+ * The order's version is read here, so two products of one order can be priced from
+ * the same list one after the other. Its own rate bucket (`limitInstead` above).
+ */
+adminFinanceWorkspaceRoutes.post('/missing-costs/lines',async(c)=>{
+  const db=c.env.DB,actor=c.get('user')!;await requireCapability(c.env,actor,'accounting');
+  const body=await c.req.json<Row>(),id=str(body.order_id,'رقم الطلب',{min:1,max:100}),lineId=str(body.line_id,'رقم البند',{min:1,max:100});
+  const unit=whole(body.unit_iqd,'سعر القطعة'),costQty=whole(body.cost_qty,'عدد القطع',0,1e6),value=unit*costQty;
+  if(!Number.isSafeInteger(value)||value>1e12)throw badRequest('القيمة المالية غير صحيحة');
+  const operationId=str(body.operation_id,'رقم العملية',{min:8,max:100});
+  const result=await writeAdjustment(db,actor.id,{id,field:'cogs_iqd',value,lineId,operationId,check:(current)=>{
+    const line=current.lines.find((l)=>l.id===lineId);if(!line)throw notFound('Order line not found');
+    if(isConfirmedOrderCost(line.cost_confidence))return 'skip';
+    if((line.allocations??[]).length>0)throw conflict('بعض قطع هذا البند من دفعة مخزون؛ ثبّت تكلفته من الطلب نفسه','MISSING_COST_HAS_STOCK');
+    if(keptQty(line)!==costQty)throw conflict('تغيّرت قطع هذا البند منذ فُتحت القائمة؛ حدّثها وراجعها','MISSING_COST_LINE_CHANGED');
+  }});
+  const reconciliationPending=result.skipped?false:await reconcileWorkspace(db,id,actor.id,baghdadDay());
+  return c.json({success:true,already:result.already,skipped:result.skipped,reconciliation_pending:reconciliationPending,accounting_pending:result.accounting_pending});
 });
 adminFinanceWorkspaceRoutes.get('/promotions',async(c)=>{
   const month=text(c.req.query('month'),7)||baghdadDay().slice(0,7),allocation=await monthlyPromotionShares(c.env.DB,month);

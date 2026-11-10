@@ -114,10 +114,18 @@ test('held investment money says why in plain words, and the owner can release e
   // The order opens at that step; the cash form starts at what the order still owes and saves nothing by itself.
   const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
   assert.match(workspace, /<InvestorPanel [^>]*openOrder=\{openOrderAt\}/);
-  assert.match(workspace, /focus=\{orderFocus\}/);
+  assert.match(workspace, /focus=\{orderFocus\.step\} focusLine=\{orderFocus\.line\}/);
+  // The people screens re-read in place after a SAVE in the order sheet (not after its background refresh), keeping scroll and open lists.
+  assert.match(workspace, /onSaved=\{\(\) => \{ orderChanged\.current = true; \}\}/);
+  assert.match(workspace, /<InvestorPanel [^>]*revision=\{peopleRevision\}/);
+  assert.doesNotMatch(workspace, /key=\{`(staff|investors):\$\{peopleRevision\}`\}/);
+  assert.match(codeOf('src/components/financePeople/InvestorProfiles.tsx'), /useReloadOn\(revision, people\.load\)/);
+  assert.match(codeOf('src/components/financePeople/PeoplePanel.tsx'), /useReloadOn\(revision, people\.load\)/);
   const sheet = codeOf('src/components/financeWorkspace/OrderProfitSheet.tsx');
   assert.match(sheet, /focus === 'collection' \? 'collections' : null/);
   assert.match(sheet, /beginEdit\('cogs_iqd'/);
+  assert.match(sheet, /data\.lines\.find\(\(l\) => l\.id === focusLine\)/);
+  assert.match(sheet, /onChanged\(\); onSaved\?\.\(\);/);
   const panel = codeOf('src/components/adminOperations/FinanceOperationsPanel.tsx');
   const prefill = panel.slice(panel.indexOf('const prefilled = useRef(false);'), panel.indexOf('const touch = () =>'));
   // The door part from the courier, else the Gini part from the bank; for that order only; never a write.
@@ -125,6 +133,8 @@ test('held investment money says why in plain words, and the owner can release e
   assert.match(prefill, /door_balance_iqd > 0\) \{ setPayer\('courier'\)/);
   assert.match(prefill, /bank_balance_iqd > 0\) \{ setPayer\('bank'\)/);
   assert.doesNotMatch(prefill, /api\.(post|patch|put)/);
+  // A table button the owner pressed is never overwritten by a late pre-fill.
+  assert.equal((panel.match(/touch\(\);\s*setOrder\(r\.id\);/g) ?? []).length, 2);
   // The Staff tab keeps the step; a cancelled sale gets no step buttons.
   assert.match(codeOf('src/components/financePeople/PeoplePanel.tsx'), /\(id, focus\) => \{ setSheet\(null\); openOrder\(id, focus\); \}/);
   assert.match(view, /!h\.reasons\.includes\('cancelled'\)/);
@@ -132,20 +142,31 @@ test('held investment money says why in plain words, and the owner can release e
 
 test('the missing-costs sheet groups by product and size, no-price groups first, and writes only after the owner confirms (owner 2026-11-10)', async () => {
   const { groupMissing } = await import('../src/components/financeWorkspace/MissingCostsSheet');
-  const line = (order: string, product: string, option: string | null, qty: number, cogs: number | null, estimate: number | null) => ({ order_id: order, version: 1, delivered_at: '2026-11-05T10:00:00Z', customer_name: null, line_id: `${order}:${product}:${option}`, product_id: product, name: product, option, color: null, qty, confidence: cogs == null ? 'unknown' : 'estimated', estimate_unit_iqd: estimate, cogs_iqd: cogs });
+  const line = (order: string, product: string, option: string | null, qty: number, cogs: number | null, estimate: number | null, extra: { restocked_qty?: number; cost_qty?: number; stock_qty?: number } = {}) => ({ order_id: order, version: 1, delivered_at: '2026-11-05T10:00:00Z', customer_name: null, line_id: `${order}:${product}:${option}`, product_id: product, name: product, option, color: null, qty, confidence: cogs == null ? 'unknown' : 'estimated', estimate_unit_iqd: estimate, cogs_iqd: cogs, ...extra });
   const groups = groupMissing([line('a', 'esun', 'BLACK', 1, 15271, 15271), line('b', 'esun', 'BLACK', 2, 30542, 15271), line('a', 'magnet', 'D8', 30, null, null), line('c', 'magnet', 'D6', 30, null, null)]);
   assert.deepEqual(groups.map((g) => [g.name, g.variant, g.qty, g.orders]), [['magnet', 'D8', 30, 1], ['magnet', 'D6', 30, 1], ['esun', 'BLACK', 3, 2]]);
   assert.deepEqual(groups[2].estimates, [15271]);
+  // Pieces put back in stock are not sold; a line with stock-batch pieces is priced in its order, not here (review 2026-11-11).
+  const [returned] = groupMissing([line('r', 'magnet', 'D8', 3, null, null, { restocked_qty: 1, cost_qty: 2 }), line('s', 'magnet', 'D8', 4, null, null, { cost_qty: 4, stock_qty: 2 })]);
+  assert.deepEqual([returned.qty, returned.returned, returned.ready.map((l) => l.order_id), returned.stock.map((l) => l.order_id)], [6, 1, ['r'], ['s']]);
   const sheet = codeOf('src/components/financeWorkspace/MissingCostsSheet.tsx');
-  // The only write is the order's own per-line correction, behind the confirm step.
-  assert.match(sheet, /\/orders\/\$\{encodeURIComponent\(l\.order_id\)\}\/adjustments/);
-  assert.match(sheet, /field: 'cogs_iqd', value_iqd: unit \* l\.qty/);
+  // The only write is the server's per-line pricing, behind the confirm step; the server multiplies by the kept pieces.
+  assert.match(sheet, /api\.post<[^>]*>\(`\$\{WORKSPACE_API\}\/missing-costs\/lines`/);
+  assert.match(sheet, /unit_iqd: unit, cost_qty: costQty\(l\)/);
+  assert.doesNotMatch(sheet, /value_iqd/);
   assert.equal((sheet.match(/api\.post/g) ?? []).length, 1);
+  assert.match(sheet, /for \(const l of g\.ready\)/);
   assert.match(sheet, /onClick=\{\(\) => void apply\(\)\}/);
   assert.match(sheet, /setConfirming\(true\)/);
+  // While one group writes, and until the list is read again, the others wait (two groups can share an order).
+  assert.match(sheet, /locked=\{stale \|\| \(running !== null && running !== g\.key\)\}/);
+  assert.match(sheet, /openOrder\(l\.order_id, 'cost', l\.line_id\)/);
   const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
   // No bare dash for an incomplete total: what complete orders say, and what is missing.
   assert.match(workspace, /fullNet \?\? \(netFromKnown \? known!\.owner_net_iqd : null\)/);
   assert.match(workspace, /missing && missing\.lines > 0/);
   assert.match(workspace, /onMissing=\{\(\) => setMissingOpen\(true\)\}/);
+  // In dollars the complete orders' figures are the server's cents, never dinars among dollars.
+  assert.match(workspace, /netFromKnown \? uk\?\.owner_net_cents \?\? null/);
+  assert.match(workspace, /costFromKnown \? uk\?\.cost_cents \?\? null/);
 });

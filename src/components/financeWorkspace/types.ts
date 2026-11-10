@@ -104,19 +104,21 @@ export interface DisplayUsdSummary {
     daily: Record<string, { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; investor_cents: number | null }>;
     expense_composition: Array<{ key: string; amount_cents: number | null }> };
   totals?: UsdCents;
+  /** `known` in cents (null: no complete order); absent from a server that predates it. */
+  known?: { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null } | null;
 }
 /** `display_usd` of `GET /orders?display=USD`. */
 export interface DisplayUsdOrders { available: boolean; today_rate?: string | null; at_time_count?: number; today_count?: number; batch_cost_lines?: number; orders?: Record<string, UsdOrderCents> }
 /** `display_usd` of `GET /orders/:id?display=USD`. */
 export interface DisplayUsdOrder { available: boolean; today_rate?: string | null; usd_basis?: 'at_time' | 'today'; fx_rate_snapshot?: string; cents?: UsdCents; lines?: Record<string, UsdCents>; batch_cost_lines?: number }
 
-/** The period over the orders whose every amount is known (owner 2026-11-10). */
-export type FinanceKnown = { orders_count: number; incomplete_orders: number; revenue_iqd: number | null; cost_iqd: number | null; owner_net_iqd: number | null };
+/** The period over the orders whose every amount is known (owner 2026-11-10), with their share of the period's general expenses by sold units. */
+export type FinanceKnown = { orders_count: number; incomplete_orders: number; revenue_iqd: number | null; cost_iqd: number | null; owner_net_iqd: number | null; overhead_share_iqd?: number };
 /** What keeps the period from being complete: lines without a confirmed purchase price. */
 export type FinanceMissingCosts = { lines: number; orders: number; unknown_lines: number; estimated_lines: number; unknown_products: { product_id: string | null; name: string; qty: number; lines: number }[] };
 export interface FinanceSummary {
-  /** Absent from a server that predates them. */
-  known?: FinanceKnown;
+  /** Absent from a server that predates them; null when no order of the period is complete. */
+  known?: FinanceKnown | null;
   missing_costs?: FinanceMissingCosts;
   /** Present only with `?display=USD`. */
   display_usd?: DisplayUsdSummary;

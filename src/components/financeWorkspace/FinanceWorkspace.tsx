@@ -54,11 +54,13 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   const summaryGeneration = useRef(0);
   const [orderId, setOrderId] = useState<string | null>(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('order'));
   const [collections, setCollections] = useState(false);
-  // A held investor sale opens its order at the step that releases it (PersonFinanceView «سجّل استلام النقد» / «أدخل سعر الشراء»).
-  const [orderFocus, setOrderFocus] = useState<OrderFocus | undefined>(undefined);
-  const openOrderAt = (id: string, focus?: OrderFocus) => { setOrderId(id); setOrderFocus(focus); };
+  // A held investor sale opens its order at the step that releases it (PersonFinanceView «سجّل استلام النقد» / «أدخل تكلفة القطع»);
+  // a line of «التكاليف الناقصة» opens on that line.
+  const [orderFocus, setOrderFocus] = useState<{ step?: OrderFocus; line?: string }>({});
+  const openOrderAt = (id: string, step?: OrderFocus, line?: string) => { setOrderId(id); setOrderFocus({ step, line }); };
   const [missingOpen, setMissingOpen] = useState(false);
-  // The people screens reload after an order sheet that changed something closes (a held sale released).
+  // The people screens re-read their figures in place (scroll, open lists kept) after an
+  // order sheet in which the owner saved something closes (a held sale released).
   const [peopleRevision, setPeopleRevision] = useState(0);
   const orderChanged = useRef(false);
   const [advanced, setAdvanced] = useState(false);
@@ -138,8 +140,8 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
       {section === 'products' && (busy && !data ? <Loading text={loc('تحميل المنتجات…', 'Loading products…')} /> : data && <Products data={data} onOpenOrders={() => setSection('orders')} />)}
       {section === 'monthly' && <MonthlyCosts key={month} month={month} onChanged={refresh} />}
       <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}>
-        {section === 'staff' && <PeoplePanel key={`staff:${peopleRevision}`} from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} />}
-        {section === 'investors' && <InvestorPanel key={`investors:${peopleRevision}`} from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} />}
+        {section === 'staff' && <PeoplePanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} />}
+        {section === 'investors' && <InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} />}
         {section === 'settlements' && <WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} />}
         {section === 'accounting' && <>
           <Surface title={loc('المحاسبة', 'Accounting')} subtitle={loc('الأرصدة والقيود والتسويات المعتمدة', 'Balances, journals and verified settlements')}>
@@ -151,9 +153,11 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
         </>}
       </Suspense>
     </div>
-    {orderId && <OrderProfitSheet key={`${orderId}:${orderFocus ?? ''}`} orderId={orderId} focus={orderFocus} onClose={() => { setOrderId(null); setOrderFocus(undefined); if (orderChanged.current) { orderChanged.current = false; setPeopleRevision((v) => v + 1); } }} onChanged={() => { orderChanged.current = true; refresh(); }} />}
+    {orderId && <OrderProfitSheet key={`${orderId}:${orderFocus.step ?? ''}:${orderFocus.line ?? ''}`} orderId={orderId} focus={orderFocus.step} focusLine={orderFocus.line}
+      onClose={() => { setOrderId(null); setOrderFocus({}); if (orderChanged.current) { orderChanged.current = false; setPeopleRevision((v) => v + 1); } }}
+      onChanged={refresh} onSaved={() => { orderChanged.current = true; }} />}
     {missingOpen && <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}><MissingCostsSheet from={range.from} to={range.to} onClose={() => setMissingOpen(false)} onChanged={refresh}
-      openOrder={(id, focus) => { setMissingOpen(false); openOrderAt(id, focus); }} /></Suspense>}
+      openOrder={(id, step, line) => { setMissingOpen(false); openOrderAt(id, step, line); }} /></Suspense>}
     {collections && <Sheet title={loc('التحصيل وشركات التوصيل', 'Collections and couriers')} onClose={() => setCollections(false)}>
       <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}><FinanceOperationsPanel from={range.from} to={range.to} initialTab="collections" onChanged={refresh} /></Suspense>
     </Sheet>}
@@ -173,19 +177,23 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
   const fullNet = t.owner_period_net_iqd !== undefined ? t.owner_period_net_iqd : t.owner_net_iqd;
   const revenue = data.chart_data?.revenue_iqd;
   // An incomplete total shows what the complete orders say, and says so — never a bare dash.
-  const known = data.known, missing = data.missing_costs;
+  // `known` is null when no order of the period is complete: the tiles keep the dash and its note.
+  const known = data.known ?? undefined, missing = data.missing_costs;
   const knownOnly = (value: number | null | undefined) => value == null && !!known && known.incomplete_orders > 0;
   const netFromKnown = knownOnly(fullNet) && known!.owner_net_iqd != null;
   const net = fullNet ?? (netFromKnown ? known!.owner_net_iqd : null);
+  // The margin of the complete orders is over their own revenue, as their net carries only their share of the overhead.
   const marginBase = netFromKnown ? known!.revenue_iqd : revenue;
   const margin = net != null && marginBase != null && marginBase > 0 ? `${(net / marginBase * 100).toFixed(1)}%` : '—';
   const costFromKnown = knownOnly(data.chart_data?.cost_iqd) && known!.cost_iqd != null;
   const cost = data.chart_data?.cost_iqd ?? (costFromKnown ? known!.cost_iqd : null);
-  const knownNote = known ? `${loc('من الطلبات المكتملة فقط', 'From complete orders only', 'تەنها لە داواکارییە تەواوەکان')} (${known.orders_count}/${t.orders_count ?? data.orders.length})` : '';
+  // In dollars, the complete orders' figures come from the server's cents too (none: a dash, never dinars among dollars).
+  const uk = u ? u.known ?? null : undefined;
+  const knownNote = known ? `${loc('من الطلبات المكتملة فقط', 'From complete orders only')} (${known.orders_count}/${t.orders_count ?? data.orders.length})${(known.overhead_share_iqd ?? 0) > 0 ? loc('، مع حصتها من المصاريف العامة حسب القطع المباعة', ', with their share of general expenses by units sold') : ''}` : '';
   const metrics = [
-    { label: loc('صافي حصتك', 'Your net share'), value: net, cents: ut && !netFromKnown ? (t.owner_period_net_iqd !== undefined ? ut.owner_period_net_cents : ut.owner_net_cents) ?? null : undefined, note: `${loc('هامش حصتك', 'Your share margin')} ${margin}${netFromKnown ? ` · ${knownNote}` : ''}`, primary: true },
+    { label: loc('صافي حصتك', 'Your net share'), value: net, cents: ut ? netFromKnown ? uk?.owner_net_cents ?? null : (t.owner_period_net_iqd !== undefined ? ut.owner_period_net_cents : ut.owner_net_cents) ?? null : undefined, note: `${loc('هامش حصتك', 'Your share margin')} ${margin}${netFromKnown ? ` · ${knownNote}` : ''}`, primary: true },
     { label: loc('الإيراد', 'Revenue'), value: revenue, cents: u?.chart ? u.chart.revenue_cents : undefined, note: loc('بعد المرتجعات، مع إيراد التوصيل والدفع', 'After refunds, including delivery and payment income') },
-    { label: loc('إجمالي التكاليف', 'Total costs'), value: cost, cents: u?.chart && !costFromKnown ? u.chart.cost_cents : undefined, note: `${loc('البضاعة والتشغيل والترويج والمصاريف العامة', 'Goods, operations, promotion and general expenses')}${costFromKnown ? ` · ${knownNote}` : ''}` },
+    { label: loc('إجمالي التكاليف', 'Total costs'), value: cost, cents: u?.chart ? costFromKnown ? uk?.cost_cents ?? null : u.chart.cost_cents : undefined, note: `${loc('البضاعة والتشغيل والترويج والمصاريف العامة', 'Goods, operations, promotion and general expenses')}${costFromKnown ? ` · ${knownNote}` : ''}` },
   ];
   const sum = (a: number | null | undefined, b: number | null | undefined) => a == null || b == null ? null : a + b;
   return <>
@@ -197,11 +205,11 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
     {data.truncated && <p className="fw-error" role="alert">{loc('عدد الطلبات يتجاوز حد التقرير؛ راجع الفترة قبل اعتماد الإجمالي.', 'Order count exceeds the report limit. Review the period before accepting totals.')}</p>}
     {missing && missing.lines > 0 && <div className="fw-note fw-missing-box" role="note">
       <strong>{loc('ما ينقص لاكتمال الحساب', 'What the figures still lack', 'ئەوەی بۆ تەواوبوونی حیسابەکە ماوە')}</strong>
-      {missing.unknown_lines > 0 && <p>{loc('بنود بلا سعر شراء', 'Lines with no purchase price', 'بڕگەی بێ نرخی کڕین')}: {missing.unknown_lines} — {missing.unknown_products.map((p) => `${p.name} (${p.qty})`).join('، ')}. {loc('بسببها لا يكتمل صافي هذه الطلبات.', 'Because of them those orders have no complete net.', 'بەهۆیانەوە سافی ئەو داواکاریانە تەواو نابێت.')}</p>}
+      {missing.unknown_lines > 0 && <p>{loc('بنود بلا سعر شراء', 'Lines with no purchase price', 'بڕگەی بێ نرخی کڕین')}: {missing.unknown_lines} — {missing.unknown_products.map((p) => `⁨${p.name}⁩ (${p.qty})`).join(loc('، ', ', ', '، '))}. {loc('بسببها لا يكتمل صافي هذه الطلبات.', 'Because of them those orders have no complete net.', 'بەهۆیانەوە سافی ئەو داواکاریانە تەواو نابێت.')}</p>}
       {missing.estimated_lines > 0 && <p>{loc('بنود بسعر تقديري من وقت البيع، غير مثبت', 'Lines priced only by a sale-time estimate, not confirmed', 'بڕگەی تەنها بە خەمڵاندنی کاتی فرۆشتن نرخدراو، جێگیرنەکراو')}: {missing.estimated_lines}</p>}
       <Button onClick={onMissing}>{loc('أكمل التكاليف الناقصة', 'Complete the missing costs', 'تێچووە کەمەکان تەواو بکە')} ({missing.lines})</Button>
     </div>}
-    {needsReview && (net == null || cost == null) && <p className="fw-note">{loc('الشرطة (—) تعني قيمة لم تكتمل، ولا تعني صفرًا. راجع التكاليف أو توزيع الأرباح قبل اعتماد الصافي.', 'A dash (—) means an incomplete value, not zero. Review costs or profit distribution before accepting the net figure.')}</p>}
+    {needsReview && (net == null || cost == null || (!!u && ((netFromKnown && uk?.owner_net_cents == null) || (costFromKnown && uk?.cost_cents == null)))) && <p className="fw-note">{loc('الشرطة (—) تعني قيمة لم تكتمل، ولا تعني صفرًا. راجع التكاليف أو توزيع الأرباح قبل اعتماد الصافي.', 'A dash (—) means an incomplete value, not zero. Review costs or profit distribution before accepting the net figure.')}</p>}
     <Suspense fallback={<Loading text={loc('تحميل الرسوم المالية…', 'Loading financial charts…')} />}><OverviewCharts data={data} usd={u} /><ParticipantCharts from={from} to={to} revision={revision} /></Suspense>
     <details className="fw-advanced"><summary>{loc('تفصيل الحساب: من البيع إلى حصتك', 'Calculation breakdown: from sales to your share')}</summary><Surface>
       <Row label={loc('ربح البضاعة', 'Goods profit')} value={<DisplayMoney iqd={t.gross_profit_iqd} cents={c('gross_profit_iqd')} />} />

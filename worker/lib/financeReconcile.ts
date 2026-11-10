@@ -13,7 +13,12 @@ export async function reconcileFinanceOrder(db:D1Database,orderId:string,opts:{a
       await recognizeLateCosts(db,orderId,opts.day,opts.actor);
     await reconcileEmploymentCutoff(db,orderId,opts.actor,opts.day);
     await reconcileStaffOrderCosts(db,orderId,opts);
-    await syncOrderWorkspaceAccounting(db,orderId,opts);
+    // One line's goods cost set by hand while another line of the order still waits
+    // for its own (a second product of the order not priced yet): the settlement waits
+    // too. The order's own cost warnings already show that line; it is not a failure.
+    let workspacePending=false;
+    try{await syncOrderWorkspaceAccounting(db,orderId,opts);}
+    catch(e){if((e as {code?:string}).code!=='WORKSPACE_COGS_PENDING')throw e;workspacePending=true;}
     // A known cost is not proof that its expense reached the journal. Staff
     // rechecks deliberately skip native sale/COGS posting. Only a posted COGS
     // entry, a reconciled manual overlay or a genuine zero can clear this error.
@@ -37,7 +42,7 @@ export async function reconcileFinanceOrder(db:D1Database,orderId:string,opts:{a
       return {complete:false,staff_complete:true,pending:true};
     }
     await db.prepare('DELETE FROM finance_posting_errors WHERE event_key IN (?,?)').bind(`investor:${orderId}`,`investor-pending:${orderId}`).run();
-    return {complete:true,staff_complete:true,pending:false};
+    return workspacePending?{complete:false,staff_complete:true,pending:true}:{complete:true,staff_complete:true,pending:false};
   }catch(e){
     await recordFinancialFailure(db,orderId,'investor',e);
     return {complete:false,staff_complete:false,pending:false};
