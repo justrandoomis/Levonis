@@ -1329,7 +1329,9 @@ export default function ProductForm({
                   <option value="">— بدون —</option>
                   {children.map((c) => (
                     <option key={c.id} value={c.id} data-depth={c.depth}>
-                      {c.label_ar} · {c.label_en}
+                      {/* Each language in its own direction isolate (U+2068 … U+2069): a path like «مواد FDM ← PLA»
+                          beside «FDM Materials › PLA» otherwise runs together in a right-to-left select. */}
+                      {`⁨${c.label_ar}⁩ · ⁨${c.label_en}⁩`}
                     </option>
                   ))}
                 </Select>
