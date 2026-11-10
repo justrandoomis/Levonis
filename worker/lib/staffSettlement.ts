@@ -58,22 +58,26 @@ export interface SettlementPlan {
 export async function planStaffSettlement(db: D1Database, staffId: string, throughDay: string, owedIqd: number): Promise<SettlementPlan> {
   const staff = await readStaff(db, staffId);
   if (!staff) throw notFound('الموظف غير موجود');
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(throughDay) || Number.isNaN(Date.parse(`${throughDay}T00:00:00Z`))) throw badRequest('اختر يوم بداية الفترة الجديدة');
-  if (!Number.isSafeInteger(owedIqd) || owedIqd < 0) throw badRequest('المبلغ المتفق عليه غير صحيح');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(throughDay) || Number.isNaN(Date.parse(`${throughDay}T00:00:00Z`))) throw badRequest('اختر يوم بداية الفترة الجديدة', 'SETTLE_DAY');
+  if (!Number.isSafeInteger(owedIqd) || owedIqd < 0) throw badRequest('المبلغ المتفق عليه غير صحيح', 'SETTLE_AMOUNT');
   // Through today at most: a later day would close orders still to be delivered today.
-  if (throughDay > baghdadDay()) throw badRequest('لا تُسوّى أيام لم تأتِ بعد');
-  if (!await settlementInstalled(db)) throw conflict('جدول التسويات غير موجود بعد؛ انتظر اكتمال النشر');
+  if (throughDay > baghdadDay()) throw badRequest('لا تُسوّى أيام لم تأتِ بعد', 'SETTLE_FUTURE_DAY');
+  if (!await settlementInstalled(db)) throw conflict('جدول التسويات غير موجود بعد؛ انتظر اكتمال النشر', 'SETTLE_NOT_INSTALLED');
+  // Wages being redone would change under the plan: the preview waits for the recalculation too.
+  // Refusal codes (SETTLE_*) let the owner's screen say each refusal in ar/en/ckb (wageSettlement.ts).
+  const job = await db.prepare('SELECT state FROM finance_staff_reconciliations WHERE staff_id=?').bind(staff.id).first<{ state: string }>();
+  if (job && job.state !== 'complete') throw conflict('أجور الموظف قيد إعادة الحساب؛ انتظر حتى تكتمل ثم سوِّها', 'SETTLE_RECALCULATING');
   // The ledger nets an unspent cash advance against wages; settle it first so the agreed amount is the whole truth.
   const advance = (await db.prepare(`SELECT ${staffAdvanceSql('?')} AS balance`).bind(staffId).first<{ balance: number }>())?.balance ?? 0;
-  if (advance > 0) throw conflict('للموظف سلفة غير مسوّاة؛ سوِّها من الأجور أولًا ثم سوِّ الأجور');
+  if (advance > 0) throw conflict('للموظف سلفة غير مسوّاة؛ سوِّها من الأجور أولًا ثم سوِّ الأجور', 'SETTLE_ADVANCE_OPEN');
   const previous = await db.prepare(`SELECT ${settledThroughSql('?', true)} AS through_day`).bind(staffId).first<{ through_day: string | null }>();
-  if (previous?.through_day && throughDay <= previous.through_day) throw conflict('هذه الفترة سُوّيت من قبل؛ اختر يومًا بعد آخر تسوية');
+  if (previous?.through_day && throughDay <= previous.through_day) throw conflict('هذه الفترة سُوّيت من قبل؛ اختر يومًا بعد آخر تسوية', 'SETTLE_ALREADY_SETTLED');
   // The fingerprint is read FIRST: a write landing before the rows are read then makes the
   // plan's fingerprint stale and the fence refuses, instead of passing on an older plan.
   const fingerprint = (await db.prepare(`SELECT ${fingerprintSql} AS f`).bind(staffId, throughDay).first<{ f: string }>())?.f ?? '';
   const rows = (await db.prepare(`${periodRowsSql} ORDER BY delivered_day IS NULL,COALESCE(delivered_day,c.cost_day),c.order_id,c.id`).bind(staffId, throughDay).all<PeriodRow>()).results ?? [];
-  if (rows.some((r) => r.held_iqd > 0)) throw conflict('طلب سحب مفتوح يحجز جزءًا من هذه الأجور؛ ادفعه أو ارفضه أولًا');
-  if (rows.some((r) => r.state === 'pending_cost' && r.paid_iqd > 0)) throw conflict('أجر مدفوع ما زال ينتظر تكلفته؛ صحّحه قبل التسوية');
+  if (rows.some((r) => r.held_iqd > 0)) throw conflict('طلب سحب مفتوح يحجز جزءًا من هذه الأجور؛ ادفعه أو ارفضه أولًا', 'SETTLE_WITHDRAWAL_OPEN');
+  if (rows.some((r) => r.state === 'pending_cost' && r.paid_iqd > 0)) throw conflict('أجر مدفوع ما زال ينتظر تكلفته؛ صحّحه قبل التسوية', 'SETTLE_PAID_UNPRICED');
   const accrued = (r: PeriodRow) => (r.state === 'pending_cost' ? 0 : Math.max(0, r.effective_iqd ?? 0));
   const earned = rows.reduce((n, r) => n + accrued(r), 0), paid = rows.reduce((n, r) => n + r.paid_iqd, 0);
   // The agreed amount rides on the payable rows of delivered orders IN PROPORTION
@@ -86,16 +90,16 @@ export async function planStaffSettlement(db: D1Database, staffId: string, throu
   const shares = totalRoom === 0 ? room.map(() => 0) : allocateExact(Math.min(owedIqd, totalRoom), room);
   const after = new Map(carriers.map((r, i) => [r.id, r.paid_iqd + shares[i]] as const));
   if (owedIqd > totalRoom) {
-    if (!carriers.length) throw conflict('لا يوجد أجر مسجّل في هذه الفترة يحمل المبلغ المتفق عليه');
+    if (!carriers.length) throw conflict('لا يوجد أجر مسجّل في هذه الفترة يحمل المبلغ المتفق عليه', 'SETTLE_NO_WAGES');
     after.set(carriers[0].id, after.get(carriers[0].id)! + owedIqd - totalRoom);
   }
   const lines: SettlementLine[] = rows.map((r) => r.state === 'pending_cost'
     ? { id: r.id, before_iqd: r.effective_iqd, paid_iqd: r.paid_iqd, after_iqd: null, reverse: true }
     : { id: r.id, before_iqd: r.effective_iqd, paid_iqd: r.paid_iqd, after_iqd: r.effective_iqd === null ? null : after.get(r.id) ?? r.paid_iqd, reverse: false });
   // A row with no amount cannot be adjusted (NULL+delta stays NULL); only a paid one would matter.
-  if (lines.some((l) => !l.reverse && l.after_iqd === null && l.paid_iqd > 0)) throw conflict('أجر مدفوع بلا مبلغ مسجّل؛ صحّحه قبل التسوية');
+  if (lines.some((l) => !l.reverse && l.after_iqd === null && l.paid_iqd > 0)) throw conflict('أجر مدفوع بلا مبلغ مسجّل؛ صحّحه قبل التسوية', 'SETTLE_PAID_UNPRICED');
   const owedAfter = lines.reduce((n, l) => n + (l.reverse || l.after_iqd === null ? 0 : l.after_iqd - l.paid_iqd), 0);
-  if (owedAfter !== owedIqd) throw conflict('تعذر توزيع المبلغ المتفق عليه على أجور الفترة');
+  if (owedAfter !== owedIqd) throw conflict('تعذر توزيع المبلغ المتفق عليه على أجور الفترة', 'SETTLE_SPLIT');
   const change = lines.reduce((n, l) => n + (l.reverse ? -Math.max(0, l.before_iqd ?? 0) : l.after_iqd === null || l.before_iqd === null ? 0 : l.after_iqd - l.before_iqd), 0);
   return {
     staff_id: staffId, through_day: throughDay, owed_iqd: owedIqd,
@@ -127,14 +131,13 @@ export async function settleStaffWages(db: D1Database, input: { staffId: string;
   if (input.operationId && await settlementInstalled(db)) {
     const prior = await db.prepare('SELECT * FROM finance_staff_settlements WHERE id=?').bind(id).first<{ staff_id: string; through_day: string; owed_iqd: number }>();
     if (prior) {
-      if (prior.staff_id !== staff.id || prior.through_day !== input.throughDay || prior.owed_iqd !== input.owedIqd) throw conflict('رقم العملية مستخدم لتسوية أخرى');
+      if (prior.staff_id !== staff.id || prior.through_day !== input.throughDay || prior.owed_iqd !== input.owedIqd) throw conflict('رقم العملية مستخدم لتسوية أخرى', 'SETTLE_OPERATION_REUSED');
       return { already: true, settlement: prior };
     }
   }
-  const job = await db.prepare('SELECT state FROM finance_staff_reconciliations WHERE staff_id=?').bind(staff.id).first<{ state: string }>();
-  if (job && job.state !== 'complete') throw conflict('أجور الموظف قيد إعادة الحساب؛ انتظر حتى تكتمل ثم سوِّها');
+  // The plan refuses wages being redone (SETTLE_RECALCULATING), as the preview does.
   const plan = await planStaffSettlement(db, staff.id, input.throughDay, input.owedIqd);
-  if (input.expectedOwedBefore !== undefined && input.expectedOwedBefore !== plan.owed_before_iqd) throw conflict('تغيرت الأجور منذ المعاينة؛ حدّث ثم أعد المحاولة');
+  if (input.expectedOwedBefore !== undefined && input.expectedOwedBefore !== plan.owed_before_iqd) throw conflict('تغيرت الأجور منذ المعاينة؛ حدّث ثم أعد المحاولة', 'SETTLE_CHANGED');
   const day = baghdadDay();
   await periodOpen(db, day);
   const now = new Date().toISOString();
@@ -170,11 +173,47 @@ export async function settleStaffWages(db: D1Database, input: { staffId: string;
     paid_before_iqd: plan.paid_before_iqd, rows: plan.rows, adjusted: plan.adjusted, reversed: plan.reversed, change_iqd: plan.change_iqd, reason,
   })).statements);
   try { await db.batch(statements); } catch (e) {
-    if (/CHECK constraint|UNIQUE constraint|FOREIGN KEY/i.test(String(e))) throw conflict('تغيرت أجور الموظف أثناء التسوية؛ حدّث ثم أعد المحاولة');
+    if (/CHECK constraint|UNIQUE constraint|FOREIGN KEY/i.test(String(e))) throw conflict('تغيرت أجور الموظف أثناء التسوية؛ حدّث ثم أعد المحاولة', 'SETTLE_CHANGED');
     throw e;
   }
   const { lines: _lines, fingerprint: _fingerprint, ...summary } = plan;
   return { settlement: { id, ...summary, reason, settlement_day: day } };
+}
+
+export interface SettlementInvestor {
+  user_id: string; name: string;
+  /** The profit shares of the investor's agreements whose goods these orders sold. */
+  share_bps: number[];
+  order_ids: string[];
+  /** The wage change on those orders (after − before; negative: a cut). */
+  wage_change_iqd: number;
+  /** The investor's share of the opposite move in those orders' profit, at their agreed
+   * share: the most it can be (less when an order also sold goods that are not theirs). */
+  profit_change_iqd: number;
+}
+
+/** Owner, preview only: the investors whose goods were sold on the orders whose wage moves.
+ * A wage cut raises the order's profit by the same amount, and an investor takes their agreed
+ * share of the profit on their own goods (worker/lib/investorFinance.ts). Read-only. */
+export async function settlementInvestors(db: D1Database, changes: SettlementPlan['order_changes']): Promise<SettlementInvestor[]> {
+  if (!changes.length || !await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='investment_contracts'").first()) return [];
+  const rows = (await db.prepare(`SELECT a.order_id,c.user_id,COALESCE(NULLIF(u.name,''),u.email) AS name,MAX(c.profit_share_bps) AS share_bps
+    FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id
+    JOIN investment_contracts c ON c.incoming_id=l.incoming_id AND c.state='active' JOIN users u ON u.id=c.user_id
+    WHERE a.order_id IN (SELECT value FROM json_each(?)) AND a.released_at IS NULL
+    GROUP BY a.order_id,c.user_id ORDER BY name,c.user_id,a.order_id`).bind(JSON.stringify(changes.map((o) => o.order_id)))
+    .all<{ order_id: string; user_id: string; name: string; share_bps: number }>()).results ?? [];
+  const byOrder = new Map(changes.map((o) => [o.order_id, o.after_iqd - o.before_iqd] as const));
+  const out = new Map<string, SettlementInvestor>();
+  for (const r of rows) {
+    const delta = byOrder.get(r.order_id) ?? 0;
+    const v = out.get(r.user_id) ?? { user_id: r.user_id, name: r.name, share_bps: [], order_ids: [], wage_change_iqd: 0, profit_change_iqd: 0 };
+    if (!v.share_bps.includes(r.share_bps)) v.share_bps = [...v.share_bps, r.share_bps].sort((a, b) => a - b);
+    v.order_ids.push(r.order_id); v.wage_change_iqd += delta;
+    v.profit_change_iqd += Math.trunc(-delta * r.share_bps / 10000);
+    out.set(r.user_id, v);
+  }
+  return [...out.values()];
 }
 
 /** The latest settlement of each of these employees (for the people picture). */

@@ -18,7 +18,7 @@ import { effectiveWageRules, wageVersions } from '../lib/financeWageTimeline';
 import { applyWageChange, previewWageChangePage, type WageChangeInput } from '../lib/financeWageChanges';
 import { continueStaffReconciliation } from '../lib/financeStaffAccrual';
 import { peopleFinance } from '../lib/personFinance';
-import { planStaffSettlement, settleStaffWages } from '../lib/staffSettlement';
+import { planStaffSettlement, settleStaffWages, settlementInvestors } from '../lib/staffSettlement';
 import { settledCostSql, settlementInstalled } from '../lib/staffSettledSql';
 
 export const adminFinancePeopleRoutes = new Hono<AppContext>();
@@ -148,12 +148,13 @@ adminFinancePeopleRoutes.post('/staff/:id/recheck',async(c)=>{
 /** WAGE SETTLEMENT (owner 2026-11-10; DECISIONS row 306): one agreed amount still
  * owed for every order an employee earned on before `through_day`
  * (worker/lib/staffSettlement.ts). `preview: true` answers what would change
- * and writes nothing. */
+ * and writes nothing; it also names the investors whose goods those orders sold
+ * (a wage cut raises their profit). The owner's screen: WageSettlementDialog.tsx. */
 adminFinancePeopleRoutes.post('/staff/:id/settle',async(c)=>{
   const actor=c.get('user')!;await requireCapability(c.env,actor,'pay');if(!isOwner(c.env,actor))throw forbidden('تسوية الأجور للأدمن الرئيسي فقط');
   const b=await c.req.json<Record<string,unknown>>(),id=c.req.param('id'),db=c.env.DB;
   const through=dateValue(b.through_day),owed=whole(b.owed_iqd,'المبلغ المتفق عليه',0);
-  if(b.preview===true){const {lines:_lines,fingerprint:_fingerprint,...preview}=await planStaffSettlement(db,id,through,owed);return c.json({success:true,preview});}
+  if(b.preview===true){const {lines:_lines,fingerprint:_fingerprint,...preview}=await planStaffSettlement(db,id,through,owed);return c.json({success:true,preview:{...preview,investors:await settlementInvestors(db,preview.order_changes)}});}
   const expected=b.expected_owed_before_iqd===undefined?undefined:Number(b.expected_owed_before_iqd);
   if(expected!==undefined&&!Number.isSafeInteger(expected))throw badRequest('الرصيد المتوقع غير صحيح');
   const operation=b.operation_id===undefined?undefined:str(b.operation_id,'operation_id',{min:8,max:80});

@@ -82,6 +82,55 @@ export interface PersonFinanceStrings {
   agreedOwed: string;
   stillOwed: string;
   nothingOwed: string;
+  /** The owner's «تسوية الأجور» dialog (DECISIONS row 306; WageSettlementDialog.tsx). */
+  settle: SettleStrings;
+}
+
+/** The server's settlement refusals the dialog says itself (SETTLE_* codes, worker/lib/staffSettlement.ts). */
+export type SettleRefusalKey = 'withdrawal' | 'advance' | 'recalculation' | 'settled' | 'changed' | 'future' | 'noWages' | 'unpriced' | 'reused';
+
+export interface SettleStrings {
+  action: string;
+  title: string;
+  intro: string;
+  stepAgree: string;
+  stepReview: string;
+  dayLabel: string;
+  dayHint: string;
+  settledToday: string;
+  owedLabel: string;
+  owedHint: string;
+  reasonLabel: string;
+  reasonPlaceholder: string;
+  reasonShort: string;
+  preview: string;
+  ordersThrough: string;
+  rowsLine: (rows: number, adjusted: number, reversed: number) => string;
+  earned: string;
+  paid: string;
+  owedBefore: string;
+  agreed: string;
+  change: string;
+  paidStays: string;
+  investorTitle: string;
+  investorWhy: string;
+  investorShare: string;
+  investorOrders: (n: number) => string;
+  investorWages: string;
+  investorUp: string;
+  investorDown: string;
+  investorLess: string;
+  ordersTitle: (n: number) => string;
+  noOrders: string;
+  final: string;
+  apply: string;
+  back: string;
+  cancel: string;
+  again: string;
+  done: (name: string, day: string, amount: string) => string;
+  refusedTitle: string;
+  refusal: Record<SettleRefusalKey, string>;
+  refusalAction: Record<SettleRefusalKey, string>;
 }
 
 /** «بيع واحد ينتظر …» / «مبيعات تنتظر … (4)»: singular and plural agree, the count follows. */
@@ -183,6 +232,69 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     agreedOwed: 'المتبقي المتفق عليه',
     stillOwed: 'المتبقي له الآن',
     nothingOwed: 'لا شيء متبقٍ له',
+    settle: {
+      action: 'تسوية الأجور',
+      title: 'تسوية الأجور بمبلغ متفق عليه',
+      intro: 'مبلغ واحد نهائي متفق عليه عن كل الطلبات المسلّمة قبل يوم تختاره. ما دُفع يبقى مدفوعًا، وما يُسلَّم من ذلك اليوم يُستحق كالمعتاد.',
+      stepAgree: 'الاتفاق',
+      stepReview: 'المراجعة والتطبيق',
+      dayLabel: 'يوم بداية الفترة الجديدة',
+      dayHint: 'تُسوّى كل الطلبات المسلّمة قبل هذا اليوم بتوقيت بغداد. اليوم نفسه وما بعده يُستحق كالمعتاد.',
+      settledToday: 'سُوّيت الأجور حتى أمس، فلا يوم يمكن اختياره اليوم. تُتاح تسوية جديدة ابتداءً من الغد.',
+      owedLabel: 'المبلغ المتفق عليه المتبقي له',
+      owedHint: 'الصافي النهائي لأجور الفترة بعد ما دُفع له. اكتب 0 إن لم يبقَ له شيء.',
+      reasonLabel: 'سبب التسوية',
+      reasonPlaceholder: 'مثال: اتفاق نهائي عند ترك العمل',
+      reasonShort: 'اكتب سببًا من ثلاثة أحرف على الأقل.',
+      preview: 'معاينة التسوية',
+      ordersThrough: 'الطلبات المسلّمة حتى',
+      rowsLine: (rows, adjusted, reversed) => `أجور الفترة ${rows} · يتغيّر منها ${adjusted}${reversed ? ` · وتُلغى ${reversed} كانت تنتظر تكلفة طلبها` : ''}`,
+      earned: 'المكتسب',
+      paid: 'المدفوع',
+      owedBefore: 'المتبقي قبل التسوية',
+      agreed: 'المتبقي المتفق عليه',
+      change: 'التغيير في الأجور',
+      paidStays: 'ما دُفع يبقى مدفوعًا. يُوزَّع المبلغ المتفق عليه على أجور الطلبات بالنسبة نفسها، ويُسجَّل الفرق في الحسابات بقيد واحد.',
+      investorTitle: 'ربح المستثمر يتغيّر',
+      investorWhy: 'تخفيض أجر الطلب يرفع ربحه بالمبلغ نفسه، ويأخذ المستثمر حصته المتفق عليها من الربح على بضاعته.',
+      investorShare: 'حصته من الربح',
+      investorOrders: ar('طلب واحد باع من بضاعته', 'طلبات باعت من بضاعته'),
+      investorWages: 'أجورها',
+      investorUp: 'يرتفع ربحه نحو',
+      investorDown: 'ينخفض ربحه نحو',
+      investorLess: 'أو أقل إن باع الطلب أيضًا بضاعة ليست له.',
+      ordersTitle: (n) => `الطلبات التي يتغيّر أجرها (${n})`,
+      noOrders: 'لا يتغيّر أجر أي طلب.',
+      final: 'التسوية نهائية: لا تُعدَّل ولا تُحذف بعد تطبيقها.',
+      apply: 'تطبيق التسوية',
+      back: 'السابق',
+      cancel: 'إلغاء',
+      again: 'إعادة المعاينة',
+      done: (name, day, amount) => `سُوّيت أجور ${name} حتى ${day} · المتبقي المتفق عليه ${amount}`,
+      refusedTitle: 'لا يمكن التسوية الآن',
+      refusal: {
+        withdrawal: 'طلب سحب مفتوح يحجز جزءًا من هذه الأجور.',
+        advance: 'على الموظف سلفة نقدية لم تُسوَّ بعد.',
+        recalculation: 'أجور الموظف يُعاد حسابها الآن.',
+        settled: 'هذه الفترة سُوّيت من قبل.',
+        changed: 'تغيّرت الأجور منذ المعاينة.',
+        future: 'لا يُسوّى يوم بعد اليوم.',
+        noWages: 'لا يوجد في هذه الفترة أجر مسجّل يحمل المبلغ المتفق عليه.',
+        unpriced: 'أجر مدفوع في هذه الفترة ما زال ينتظر تكلفة طلبه.',
+        reused: 'رقم هذه العملية استُخدم لتسوية أخرى.',
+      },
+      refusalAction: {
+        withdrawal: 'ادفعه أو ارفضه من «السحب والتسويات»، ثم أعد المعاينة.',
+        advance: 'اخصم السلفة من أجوره أولًا («الاستحقاقات والرواتب» ← «خصم سلفة من الأجور»)، ثم أعد المعاينة.',
+        recalculation: 'انتظر حتى يكتمل الحساب (يظهر تقدمه في بطاقة الموظف)، ثم أعد المعاينة.',
+        settled: 'اختر يومًا بعد آخر تسوية.',
+        changed: 'أعد المعاينة لترى الأرقام الجديدة قبل التطبيق.',
+        future: 'اختر اليوم أو يومًا قبله.',
+        noWages: 'اختر يومًا يشمل طلبات مسلّمة لها أجر، أو اكتب 0.',
+        unpriced: 'أدخل تكلفة الطلب من تفاصيله، ثم أعد المعاينة.',
+        reused: 'أعد المعاينة ثم طبّق التسوية من جديد.',
+      },
+    },
   },
   en: {
     peopleHint: 'For each person: their capital and where it is now, their profit share, what they earned from investing and working, and what they can withdraw now.',
@@ -278,6 +390,69 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     agreedOwed: 'agreed still owed',
     stillOwed: 'Still owed now',
     nothingOwed: 'Nothing owed',
+    settle: {
+      action: 'Settle wages',
+      title: 'Settle wages at an agreed amount',
+      intro: 'One final agreed amount for every order delivered before the day you choose. What was paid stays paid, and deliveries from that day earn as usual.',
+      stepAgree: 'Agreement',
+      stepReview: 'Review and apply',
+      dayLabel: 'First day of the new period',
+      dayHint: 'Every order delivered before this day (Baghdad time) is settled. The day itself and later earn as usual.',
+      settledToday: 'Wages are settled through yesterday, so no day can be chosen today. A new settlement is possible from tomorrow.',
+      owedLabel: 'Agreed amount still owed',
+      owedHint: 'The final net for the period after what was paid. Enter 0 if nothing is owed.',
+      reasonLabel: 'Reason for the settlement',
+      reasonPlaceholder: 'e.g. Final agreement on leaving',
+      reasonShort: 'Write a reason of at least three characters.',
+      preview: 'Preview settlement',
+      ordersThrough: 'Orders delivered through',
+      rowsLine: (rows, adjusted, reversed) => `${rows} wages in the period · ${adjusted} change${reversed ? ` · ${reversed} waiting for an order cost are cancelled` : ''}`,
+      earned: 'Earned',
+      paid: 'Paid',
+      owedBefore: 'Owed before',
+      agreed: 'Agreed still owed',
+      change: 'Change in wages',
+      paidStays: 'What was paid stays paid. The agreed amount is spread over the orders\' wages in the same proportion, and the difference is posted to the books as one entry.',
+      investorTitle: 'Investor profit changes',
+      investorWhy: 'Cutting an order\'s wage raises its profit by the same amount, and the investor takes their agreed share of the profit on their goods.',
+      investorShare: 'Profit share',
+      investorOrders: (n) => (n === 1 ? '1 order sold their goods' : `${n} orders sold their goods`),
+      investorWages: 'their wages',
+      investorUp: 'Their profit rises by about',
+      investorDown: 'Their profit falls by about',
+      investorLess: 'or less if an order also sold goods that are not theirs.',
+      ordersTitle: (n) => `Orders whose wage changes (${n})`,
+      noOrders: 'No order\'s wage changes.',
+      final: 'A settlement is final: it cannot be edited or deleted once applied.',
+      apply: 'Apply settlement',
+      back: 'Back',
+      cancel: 'Cancel',
+      again: 'Preview again',
+      done: (name, day, amount) => `${name}'s wages settled through ${day} · agreed still owed ${amount}`,
+      refusedTitle: 'Cannot settle now',
+      refusal: {
+        withdrawal: 'An open withdrawal request holds part of these wages.',
+        advance: 'The employee has a cash advance that is not settled yet.',
+        recalculation: 'The employee\'s wages are being recalculated.',
+        settled: 'This period has already been settled.',
+        changed: 'Wages changed since the preview.',
+        future: 'A day after today cannot be settled.',
+        noWages: 'No recorded wage in this period can carry the agreed amount.',
+        unpriced: 'A paid wage in this period is still waiting for its order cost.',
+        reused: 'This operation number was used for another settlement.',
+      },
+      refusalAction: {
+        withdrawal: 'Pay or reject it under Withdrawals, then preview again.',
+        advance: 'First apply the advance to their wages (Dues and payroll → Apply advance to dues), then preview again.',
+        recalculation: 'Wait until the calculation finishes (its progress shows on the employee\'s card), then preview again.',
+        settled: 'Choose a day after the last settlement.',
+        changed: 'Preview again to see the new figures before applying.',
+        future: 'Choose today or an earlier day.',
+        noWages: 'Choose a day that includes delivered orders with a wage, or enter 0.',
+        unpriced: 'Enter the order cost in its details, then preview again.',
+        reused: 'Preview again, then apply the settlement.',
+      },
+    },
   },
   ckb: {
     peopleHint: 'بۆ هەر کەسێک: سەرمایەکەی و ئێستا لە کوێیە، بەشی قازانجەکەی، ئەوەی لە وەبەرهێنان و کار بەدەستی هێناوە، و ئەوەی ئێستا دەتوانێت ڕایبکێشێت.',
@@ -373,6 +548,69 @@ export const PERSON_FINANCE_STRINGS: Readonly<Record<Language, PersonFinanceStri
     agreedOwed: 'بڕی ڕێککەوتوو کە ماوە',
     stillOwed: 'ئێستا ماوە بۆی',
     nothingOwed: 'هیچی بۆ نەماوە',
+    settle: {
+      action: 'یەکلاکردنەوەی کرێ',
+      title: 'یەکلاکردنەوەی کرێ بە بڕێکی ڕێککەوتوو',
+      intro: 'یەک بڕی کۆتایی ڕێککەوتوو بۆ هەموو ئەو داواکارییانەی پێش ئەو ڕۆژەی هەڵیدەبژێریت گەیەندراون. ئەوەی دراوە وەک خۆی دەمێنێتەوە، و ئەوەی لەو ڕۆژەوە دەگەیەندرێت وەک هەمیشە کرێی بۆ حیساب دەکرێت.',
+      stepAgree: 'ڕێککەوتن',
+      stepReview: 'پێداچوونەوە و جێبەجێکردن',
+      dayLabel: 'یەکەم ڕۆژی ماوەی نوێ',
+      dayHint: 'هەموو ئەو داواکارییانەی پێش ئەم ڕۆژە بە کاتی بەغدا گەیەندراون یەکلا دەکرێنەوە. خودی ئەم ڕۆژە و دوای ئەو وەک هەمیشە حیساب دەکرێن.',
+      settledToday: 'کرێکان تا دوێنێ یەکلاکراونەتەوە، بۆیە ئەمڕۆ هیچ ڕۆژێک هەڵنابژێردرێت. یەکلاکردنەوەی نوێ لە سبەینێوە دەکرێت.',
+      owedLabel: 'بڕی ڕێککەوتوو کە بۆی ماوە',
+      owedHint: 'بڕی کۆتایی کرێی ماوەکە دوای ئەوەی پێی دراوە. ئەگەر هیچی بۆ نەماوە 0 بنووسە.',
+      reasonLabel: 'هۆکاری یەکلاکردنەوە',
+      reasonPlaceholder: 'نموونە: ڕێککەوتنی کۆتایی لە کاتی جێهێشتنی کار',
+      reasonShort: 'هۆکارێک بنووسە کە لانیکەم سێ پیت بێت.',
+      preview: 'پێشبینینی یەکلاکردنەوە',
+      ordersThrough: 'داواکارییە گەیەندراوەکان تا',
+      rowsLine: (rows, adjusted, reversed) => `${rows} کرێ لە ماوەکەدا · ${adjusted} دەگۆڕێن${reversed ? ` · ${reversed} کە چاوەڕێی تێچووی داواکارییەکەیان بوون هەڵدەوەشێنرێنەوە` : ''}`,
+      earned: 'بەدەستهاتوو',
+      paid: 'دراوە',
+      owedBefore: 'ماوە پێش یەکلاکردنەوە',
+      agreed: 'ماوەی ڕێککەوتوو',
+      change: 'گۆڕانی کرێکان',
+      paidStays: 'ئەوەی دراوە وەک خۆی دەمێنێتەوە. بڕی ڕێککەوتوو بە هەمان ڕێژە بەسەر کرێی داواکارییەکاندا دابەش دەکرێت، و جیاوازییەکە بە یەک تۆمار لە حیساباتدا دەنووسرێت.',
+      investorTitle: 'قازانجی وەبەرهێنەر دەگۆڕێت',
+      investorWhy: 'کەمکردنەوەی کرێی داواکارییەک قازانجەکەی بە هەمان بڕ زیاد دەکات، و وەبەرهێنەر بەشە ڕێککەوتووەکەی خۆی لە قازانجی کاڵاکانی وەردەگرێت.',
+      investorShare: 'بەشی قازانج',
+      investorOrders: (n) => `${n} داواکاری لە کاڵاکانی ئەوی فرۆشتووە`,
+      investorWages: 'کرێکانیان',
+      investorUp: 'زیادبوونی قازانجەکەی: نزیکەی',
+      investorDown: 'کەمبوونەوەی قازانجەکەی: نزیکەی',
+      investorLess: 'یان کەمتر، ئەگەر داواکارییەکە کاڵای تریشی فرۆشتبێت کە هی ئەو نییە.',
+      ordersTitle: (n) => `ئەو داواکارییانەی کرێیان دەگۆڕێت (${n})`,
+      noOrders: 'کرێی هیچ داواکارییەک ناگۆڕێت.',
+      final: 'یەکلاکردنەوە کۆتاییە: دوای جێبەجێکردن دەستکاری ناکرێت و ناسڕدرێتەوە.',
+      apply: 'جێبەجێکردنی یەکلاکردنەوە',
+      back: 'گەڕانەوە',
+      cancel: 'هەڵوەشاندنەوە',
+      again: 'دووبارە پێشبینین',
+      done: (name, day, amount) => `کرێکانی ${name} یەکلاکرانەوە تا ${day} · ماوەی ڕێککەوتوو ${amount}`,
+      refusedTitle: 'ئێستا یەکلاکردنەوە ناکرێت',
+      refusal: {
+        withdrawal: 'داواکارییەکی ڕاکێشانی کراوە بەشێک لەم کرێیانە دەگرێت.',
+        advance: 'کارمەندەکە پێشەکییەکی نەختینەی هەیە کە هێشتا یەکلا نەکراوەتەوە.',
+        recalculation: 'کرێکانی کارمەندەکە ئێستا دووبارە حیساب دەکرێنەوە.',
+        settled: 'ئەم ماوەیە پێشتر یەکلاکراوەتەوە.',
+        changed: 'کرێکان لە دوای پێشبینینەکەوە گۆڕاون.',
+        future: 'ڕۆژێکی دوای ئەمڕۆ یەکلا ناکرێتەوە.',
+        noWages: 'لەم ماوەیەدا هیچ کرێیەکی تۆمارکراو نییە کە بڕی ڕێککەوتوو هەڵبگرێت.',
+        unpriced: 'کرێیەکی دراو لەم ماوەیەدا هێشتا چاوەڕێی تێچووی داواکارییەکەیەتی.',
+        reused: 'ژمارەی ئەم کردارە بۆ یەکلاکردنەوەیەکی تر بەکارهاتووە.',
+      },
+      refusalAction: {
+        withdrawal: 'لە بەشی ڕاکێشانەکانی داراییدا بیدە یان ڕەتی بکەرەوە، پاشان دووبارە پێشبینی بکە.',
+        advance: 'سەرەتا پێشەکییەکە لە کرێکانی ببڕە (لە بەشی شایستەکان و مووچەدا)، پاشان دووبارە پێشبینی بکە.',
+        recalculation: 'چاوەڕێ بکە تا حیسابەکە تەواو دەبێت (پێشکەوتنەکەی لە کارتی کارمەندەکەدا دەردەکەوێت)، پاشان دووبارە پێشبینی بکە.',
+        settled: 'ڕۆژێک دوای کۆتا یەکلاکردنەوە هەڵبژێرە.',
+        changed: 'دووبارە پێشبینی بکە بۆ بینینی ژمارە نوێیەکان پێش جێبەجێکردن.',
+        future: 'ئەمڕۆ یان ڕۆژێکی پێشتر هەڵبژێرە.',
+        noWages: 'ڕۆژێک هەڵبژێرە کە داواکاریی گەیەندراوی خاوەن کرێ بگرێتەوە، یان 0 بنووسە.',
+        unpriced: 'تێچووی داواکارییەکە لە وردەکارییەکەیدا بنووسە، پاشان دووبارە پێشبینی بکە.',
+        reused: 'دووبارە پێشبینی بکە، پاشان یەکلاکردنەوەکە جێبەجێ بکە.',
+      },
+    },
   },
 };
 

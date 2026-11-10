@@ -1,8 +1,10 @@
 import StaffBalanceBreakdown, { wagesWaiting, type StaffBalance } from './StaffBalanceBreakdown';
 import { useEffect, useRef, useState } from 'react';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
-import { Check, Pencil, Plus, RotateCcw, Trash2, Users, X } from 'lucide-react';
+import { Check, Handshake, Pencil, Plus, RotateCcw, Trash2, Users, X } from 'lucide-react';
 import WageChangeDialog from './WageChangeDialog';
+import WageSettlementDialog from './WageSettlementDialog';
+import { dayText, lastSettledDay, moneyText } from './wageSettlement';
 import WageBasisFields from './WageBasisFields';
 import StaffHistorySheet from './StaffHistorySheet';
 import EmploymentPeriodsFields, { readEmploymentPeriods, validEmploymentPeriods } from './EmploymentPeriodsFields';
@@ -55,13 +57,17 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
   const [history, setHistory] = useState<Staff | null>(null);
   const [removing, setRemoving] = useState<Staff | null>(null);
   const [linking, setLinking] = useState<Staff | null>(null), [linkAccount, setLinkAccount] = useState<Account | null>(null);
+  // «تسوية الأجور» (owner only; DECISIONS row 306), for a live or a removed employee.
+  const [settling, setSettling] = useState<Staff | null>(null);
   const [jobs, setJobs] = useState<Record<string, Reconciliation>>({});
   const refresh = async () => { await Promise.all([remote.load(), people.load()]); if (mounted.current) onChanged?.(); };
   const config = remote.data;
   const canManage = config?.can_manage_staff === true;
+  const lastSettlement = (staffId: string) => personOf(staffId)?.work?.roles.find((r) => r.staff_id === staffId)?.settlement ?? null;
+  const settleButton = (person: Staff) => canManage && <Button size="sm" icon={<Handshake size={14} />} disabled={op.busy} onClick={() => { op.clear(); setSettling(person); }}>{s.settle.action}</Button>;
   useFreshOnReturn(async () => { await remote.load(); if (mounted.current) onChanged?.(); }, {
     pollWhileVisibleMs: 30_000, minIntervalMs: 30_000,
-    enabled: !!config?.staff.some(person => person.period?.pending_costs || person.balance?.pending_costs || person.balance?.reconciliation_pending) && !remote.loading && !op.busy && !editor && !personEditor && !history && !removing && !linking,
+    enabled: !!config?.staff.some(person => person.period?.pending_costs || person.balance?.pending_costs || person.balance?.reconciliation_pending) && !remote.loading && !op.busy && !editor && !personEditor && !history && !removing && !linking && !settling,
   });
   const live = config?.staff.filter((person) => !person.archived_at) ?? [];
   const archived = config?.staff.filter((person) => person.archived_at) ?? [];
@@ -129,7 +135,7 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
             </div>}
             {pf?.work && <WorkHolds work={pf.work} owner s={s} />}
             {person.period && (person.period.earned_iqd !== 0 || person.period.paid_iqd !== 0) && <p className="fp-row-meta">{s.period}: {loc('مستحق', 'earned', 'شایستە')} <Money value={person.period.earned_iqd} /> · {loc('مسدد', 'paid', 'دراوە')} <Money value={person.period.paid_iqd} />{!!person.period.adjustments_iqd && <> · {loc('منها تعديلات', 'of which adjustments', 'لەوە ڕێکخستنەوە')} <Money value={person.period.adjustments_iqd} /></>}</p>}
-            {person.balance && <StaffBalanceBreakdown balance={person.balance} />}<div className="fp-staff-actions"><Button size="sm" onClick={() => setHistory(person)}>{loc('السجل والتفاصيل','History and details')}</Button><Button size="sm" icon={<Pencil size={14} />} disabled={!canManage || op.busy} onClick={() => { op.clear(); setPersonEditor({ person }); }}>{loc('البيانات والإيقاف والاستئناف', 'Details, pause and resume')}</Button><Button size="sm" icon={<Plus size={15} />} disabled={!canManage || op.busy || !person.active} onClick={() => setEditor({ staff: person })}>{loc('إضافة أجر', 'Add earning rule')}</Button><Button size="sm" variant="ghost" icon={<Trash2 size={14} />} disabled={!canManage || op.busy} onClick={() => { op.clear(); setRemoving(person); }}>{loc('حذف الموظف', 'Delete employee')}</Button></div>
+            {person.balance && <StaffBalanceBreakdown balance={person.balance} />}<div className="fp-staff-actions"><Button size="sm" onClick={() => setHistory(person)}>{loc('السجل والتفاصيل','History and details')}</Button><Button size="sm" icon={<Pencil size={14} />} disabled={!canManage || op.busy} onClick={() => { op.clear(); setPersonEditor({ person }); }}>{loc('البيانات والإيقاف والاستئناف', 'Details, pause and resume')}</Button><Button size="sm" icon={<Plus size={15} />} disabled={!canManage || op.busy || !person.active} onClick={() => setEditor({ staff: person })}>{loc('إضافة أجر', 'Add earning rule')}</Button>{settleButton(person)}<Button size="sm" variant="ghost" icon={<Trash2 size={14} />} disabled={!canManage || op.busy} onClick={() => { op.clear(); setRemoving(person); }}>{loc('حذف الموظف', 'Delete employee')}</Button></div>
             {!person.user_id && <div className="fp-rule-heading fp-staff-heading"><p className="fp-muted">{loc('اربط حسابه ليشاهد أرباحه ويطلب السحب.', 'Link an account for earnings and withdrawals.')}</p><Button size="sm" disabled={!canManage || op.busy} onClick={() => { setLinking(person); setLinkAccount(null); op.clear(); }}>{loc('ربط الحساب', 'Link account')}</Button></div>}
             {jobNotice(person)}
             {!!(person.period?.pending_costs || person.balance?.pending_costs) && <p className="fp-note">{loc('تُحتسب الأجور تلقائيًا وفق القواعد وتواريخ الاستحقاق المحفوظة. تظهر البيانات الناقصة، إن وجدت، في تفاصيل الطلب؛ وتتحدث الأرصدة هنا تلقائيًا.', 'Wages are calculated automatically from the saved rules and earning dates. Any missing inputs appear in order details; balances refresh here automatically.')}</p>}
@@ -139,11 +145,12 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
             })}
           </article>;
         })}</div>}
-        {archived.length > 0 && <details className="fp-detail"><summary>{loc(`موظفون محذوفون (${archived.length})`, `Deleted employees (${archived.length})`)}</summary><div className="fp-stack">{archived.map((person) => <article key={person.id} className="fp-rule"><div className="fp-rule-heading fp-staff-heading"><div><h3>{person.name}</h3><p className="fp-muted">{loc('السجل والمستحقات السابقة محفوظة.', 'Previous earnings and history are preserved.')}</p><ArchivedBalance pf={personOf(person.id)} staffId={person.id} s={s} /></div><Button size="sm" icon={<RotateCcw size={14} />} loading={op.busy} disabled={!canManage} onClick={() => { let background = false; return op.run(async () => { const result = await api.patch<StaffWrite>(`${PEOPLE}/staff/${encodeURIComponent(person.id)}`, { active: true, restore: true }); await refresh(); if (result.reconciliation) { background = !await reconcile(result.reconciliation); if (mounted.current) await refresh(); } }, () => background ? backgroundNotice() : loc('تمت إعادة الموظف.', 'Employee restored.')); }}>{loc('إعادة الموظف', 'Restore employee')}</Button></div>{jobNotice(person)}</article>)}</div></details>}
+        {archived.length > 0 && <details className="fp-detail"><summary>{loc(`موظفون محذوفون (${archived.length})`, `Deleted employees (${archived.length})`)}</summary><div className="fp-stack">{archived.map((person) => <article key={person.id} className="fp-rule"><div className="fp-rule-heading fp-staff-heading"><div><h3>{person.name}</h3><p className="fp-muted">{loc('السجل والمستحقات السابقة محفوظة.', 'Previous earnings and history are preserved.')}</p><ArchivedBalance pf={personOf(person.id)} staffId={person.id} s={s} />{canManage && <div className="fp-row-actions">{settleButton(person)}</div>}</div><Button size="sm" icon={<RotateCcw size={14} />} loading={op.busy} disabled={!canManage} onClick={() => { let background = false; return op.run(async () => { const result = await api.patch<StaffWrite>(`${PEOPLE}/staff/${encodeURIComponent(person.id)}`, { active: true, restore: true }); await refresh(); if (result.reconciliation) { background = !await reconcile(result.reconciliation); if (mounted.current) await refresh(); } }, () => background ? backgroundNotice() : loc('تمت إعادة الموظف.', 'Employee restored.')); }}>{loc('إعادة الموظف', 'Restore employee')}</Button></div>{jobNotice(person)}</article>)}</div></details>}
       </>}
     </Surface>
     {personEditor && <StaffEditor person={personEditor.person} onClose={() => setPersonEditor(null)} onSaved={saved} />}
     {history && <StaffHistorySheet staff={history} onClose={() => setHistory(null)} />}
+    {settling && <WageSettlementDialog staff={settling} last={lastSettlement(settling.id)} onClose={() => setSettling(null)} onDone={(done) => { const name = `⁨${settling.name}⁩`; setSettling(null); void op.run(refresh, () => s.settle.done(name, dayText(lastSettledDay(done.through_day), lang), moneyText(done.owed_iqd, lang))); }} />}
     {sheet && <PersonSheet person={people.data?.people.find((p) => p.user_id === sheet.user_id) ?? sheet} onClose={() => setSheet(null)} openOrder={openOrder ? (id) => { setSheet(null); openOrder(id); } : undefined} />}
     {editor && config && (editor.rule ? <WageChangeDialog rule={editor.rule} staff={editor.staff} catalogs={config.catalogs} products={config.scope_products} onClose={() => setEditor(null)} onSaved={(result) => saved(result, loc('تم تسجيل تغيير الأجر والتسوية.', 'Pay change and adjustment recorded.'))} /> : <RuleBuilder config={config} initial={editor} onClose={() => setEditor(null)} onSaved={(result) => saved(result, loc('تم حفظ الأجر.', 'Pay saved.'))} />)}
     <Dialog open={!!removing} onClose={() => setRemoving(null)} title={loc('حذف الموظف', 'Delete employee')} busy={op.busy}>
