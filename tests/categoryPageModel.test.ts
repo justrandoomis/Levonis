@@ -35,7 +35,6 @@ import {
   shelfTitle,
 } from '../src/lib/catalog/categoryPageModel';
 import { bannerRows, type PhotoCandidate } from '../src/lib/catalog/explorerModel';
-import { countNoun } from '../src/lib/catalog/copy';
 import CategoryRowBanners from '../src/components/catalog/CategoryRowBanners';
 import { LanguageProvider } from '../src/LanguageContext';
 import CategoryHero from '../src/components/catalog/CategoryHero';
@@ -193,53 +192,6 @@ test('a section with no children draws no banner section', () => {
     createElement(LanguageProvider, { children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows: [], label: 'x', heading: 'y' })) })
   );
   assert.equal(html, '');
-});
-
-/**
- * PRODUCTS, NONE IN STOCK: THE SECTION STAYS AND SAYS SO (owner, 2026-11-10: «Show it, marked»; DECISIONS row
- * 309). Live's «مواد FDM» children all read «0 available» and showed only their count. Through the real route:
- * the stock is emptied, the payload counts 0 available, and the row under the parent and the section's own hero
- * both say «غير متوفرة حالياً»; with stock back, they say «متوفرة الآن» and never both.
- */
-test('a section whose products are all out of stock keeps its row and its count, marked «غير متوفرة حالياً»', async () => {
-  const empty = `UPDATE products SET stock = 0, stock_reserved = 0; UPDATE product_variants SET stock = 0`;
-  const materials = (await page('printing-materials', empty)).body;
-  const fdm = materials.children.find((c) => c.slug === 'fdm-materials');
-  assert.ok(fdm && fdm.product_count > 0, 'the seed files products under «مواد FDM»');
-  assert.equal(fdm.available_count, 0, 'the page counts stock, and none is left');
-  const rows = bannerRows(materials.children, []);
-  const html = renderToStaticMarkup(
-    createElement(LanguageProvider, { children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows, label: 'x' })) })
-  );
-  assert.match(html, /href="\/categories\/printing-materials\/fdm-materials"/, 'the row stays');
-  const line = html.match(/<p class="line-clamp-1[^"]*">([^<]*)<\/p>/)?.[1] ?? '';
-  // One product reads «غير متوفر», more read «غير متوفرة» (the seed files one product here).
-  const word = fdm.product_count === 1 ? 'غير متوفر حالياً' : 'غير متوفرة حالياً';
-  assert.equal(line, `${countNoun(fdm.product_count, 'product', 'ar')} · ${word}`);
-
-  const own = (await page('fdm-materials', empty)).body;
-  assert.equal(own.node.available_count, 0);
-  const hero = renderHero(own);
-  assert.match(hero, /data-hero-unavailable=""/);
-  assert.ok(hero.includes(own.node.product_count === 1 ? 'غير متوفر حالياً' : 'غير متوفرة حالياً'));
-  assert.doesNotMatch(hero, /متوفرة الآن/);
-
-  // In stock again: the usual line, and no «غير متوفر…».
-  const stocked = (await page('printing-materials')).body;
-  const fdmStocked = stocked.children.find((c) => c.slug === 'fdm-materials')!;
-  assert.ok((fdmStocked.available_count ?? 0) > 0, 'the seed stocks the «مواد FDM» product');
-  const back = renderToStaticMarkup(
-    createElement(LanguageProvider, { children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows: bannerRows(stocked.children, []), label: 'x' })) })
-  );
-  assert.doesNotMatch(back, /غير متوفر/);
-  assert.match(back, /متوفر الآن|متوفرة الآن|كلها متوفرة/);
-  // An unknown count (the catalogue map does not count stock) is never read as none.
-  const unknown = renderToStaticMarkup(
-    createElement(LanguageProvider, {
-      children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows: bannerRows([{ ...fdm, available_count: null }], []), label: 'x' })),
-    })
-  );
-  assert.doesNotMatch(unknown, /غير متوفر/);
 });
 
 test('the hero is part of the page: no card, no border, no ring — breadcrumb, name, one line each, the doors', async () => {

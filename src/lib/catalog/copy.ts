@@ -146,24 +146,6 @@ export function availableLabel(available: number | null, total: number, lang: Ca
   return `${available} متوفرة الآن`;
 }
 
-/**
- * A SECTION WITH PRODUCTS BUT NONE IN STOCK STAYS, AND SAYS SO (owner, 2026-11-10: «Show it, marked»;
- * docs/DECISIONS.md row 309). «4 منتجات · غير متوفرة حالياً»: the section keeps its row and its count,
- * so a customer can still browse it or ask the team, and is not left to find out on every card. One
- * product reads «غير متوفر حالياً» (a printer «غير متوفرة حالياً»). `null` when something is in stock
- * (then `availableLabel` speaks), when the section is empty, or when the count is unknown: the
- * catalogue map does not count stock, and an unknown count is never read as none.
- * Written in Sorani too, unlike the catalogue's other words here: the owner asked for this line in all
- * three languages.
- */
-export function unavailableLabel(available: number | null, total: number, kind: NounKind, lang: CatalogLang): string | null {
-  if (available !== 0 || total <= 0) return null;
-  // Short on purpose: the row's line is one clamped line beside the count, on a phone too.
-  if (lang === 'en') return 'Out of stock';
-  if (lang === 'ckb') return 'ئێستا بەردەست نییە';
-  return total === 1 && kind === 'product' ? 'غير متوفر حالياً' : 'غير متوفرة حالياً';
-}
-
 const FEMININE_WORDS = ['', 'واحدة', 'فئتان', 'ثلاث', 'أربع', 'خمس', 'ست', 'سبع', 'ثماني', 'تسع', 'عشر'];
 
 /**
