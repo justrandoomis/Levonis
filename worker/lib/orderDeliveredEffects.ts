@@ -47,6 +47,7 @@ import { createUnitsOnDelivery, type CreateUnitsResult } from './deviceOps';
 import { awardOrderPoints } from './pointsOps';
 import { onOrderDelivered } from './membershipOps';
 import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
+import { baghdadDay } from './operations';
 import { completeTradeInsForOrder } from './tradeInStock';
 import { issuePrinterRewards } from './rewards/coupons';
 
@@ -96,7 +97,16 @@ export async function runOrderDeliveredEffects(
     console.error('seller lookup failed for delivered order', orderId, e instanceof Error ? e.message : String(e));
   }
 
-  try { await runOrderFinancialEffects(env, orderId, 'delivered'); }
+  // A delivery whose sale is already in the books is a RE-delivery: the order
+  // was cancelled or walked back and comes back (DECISIONS row 307). All it
+  // posts now are corrections, the wages it restores above all, and those
+  // belong to today's open period — where the cut went, and where the recovery
+  // scan posts. A first delivery still posts on its delivery day.
+  try {
+    // A database without the books (no posting yet) reads as a first delivery.
+    const again = await env.DB.prepare('SELECT 1 FROM accounting_entries WHERE event_key = ?').bind(`sale:${orderId}`).first().catch(() => null);
+    await runOrderFinancialEffects(env, orderId, 'delivered', again ? baghdadDay() : undefined);
+  }
   catch (e) { console.error('order financial posting pending', orderId, e instanceof Error ? e.message : String(e)); await recordFinancialFailure(env.DB,orderId,'delivered',e).catch(()=>undefined); }
 
   // Mandate §4: one device record per PHYSICAL unit of every serialized

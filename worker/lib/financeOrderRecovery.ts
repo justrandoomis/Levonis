@@ -1,8 +1,8 @@
 import type { Env } from './types';
 import { baghdadDay, periodOpen } from './operations';
 import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
-import { reconcileStaffOrderCosts, staffBasisFingerprintSql } from './financeParticipants';
-import { reconcileEmploymentCutoff } from './financeEmployment';
+import { staffBasisFingerprintSql } from './financeParticipants';
+import { reconcileFinanceOrder } from './financeReconcile';
 import { investorOrderProjectionStaleSql } from './investorFinance';
 import { membershipDiscountAtLineSql } from './orderMembership';
 import { settledCostSql, settledThroughSql, settlementInstalled } from './staffSettledSql';
@@ -56,10 +56,11 @@ const deliveredCandidateSql = (settled: boolean) => `o.seller_type='levonis' AND
 // to keep counting, held for ever. It is a candidate while such a live,
 // unsettled wage is not 0 — exactly the rows reconcileEffectiveWages brings to
 // 0: a rule with a wage version of this employee who is dated or whose rule was
-// revised, on an order delivered on or after the employee's settled day. An
-// open withdrawal on any of the order's unsettled wages makes the writers refuse
-// the cut, so the order waits, unselected, until that withdrawal is paid or
-// released, instead of failing every minute.
+// revised, on an order delivered on or after the employee's settled day. A wage
+// an open withdrawal holds is left as it is (and an older rule's cutoff refuses
+// outright), so while any of the order's unsettled wages is held the order
+// waits, unselected, until that withdrawal is paid or released — instead of
+// being picked every minute for a wage that cannot move.
 const lostDeliverySql = (settled: boolean) => `o.seller_type='levonis' AND o.status<>'delivered' AND o.delivered_at IS NOT NULL
   AND EXISTS(SELECT 1 FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id
     WHERE c.order_id=o.id AND c.state<>'reversed' AND NOT ${settledCostSql('c.id', settled)}
@@ -135,13 +136,17 @@ export async function drainOrderFinanceRecovery(env: Env, opts: { maxOrders?: nu
         const day = baghdadDay();
         await periodOpen(db, day);
         writerStarted = true;
-        // An order that lost its delivery has no sale to post: only its wages
-        // move, to 0 (DECISIONS row 307), through the same two wage writers
-        // reconcileFinanceOrder runs, in the same order.
+        // An order that lost its delivery has no sale to post: it gets the
+        // reconciliation every recalculation runs, which brings its wages to 0
+        // (DECISIONS row 307) and, done, clears the order's stale `investor:`
+        // marker; a failed one is recorded there and fails here too.
         if (order.status === 'delivered') await runOrderFinancialEffects(env, order.id, 'delivered', day);
         else {
-          await reconcileEmploymentCutoff(db, order.id, undefined, day);
-          await reconcileStaffOrderCosts(db, order.id, { day });
+          const done = await reconcileFinanceOrder(db, order.id, { day });
+          if (!done.complete && !done.pending) {
+            const failure = await db.prepare('SELECT message FROM finance_posting_errors WHERE event_key=?').bind(`investor:${order.id}`).first<{ message: string }>();
+            throw new Error(failure?.message || 'تعذر تصفير أجور طلب لم يعد مُسلَّمًا');
+          }
         }
         // These markers describe the same full reconciliation just completed.
         // COGS/unknown/refund failures are owned by their original writers.

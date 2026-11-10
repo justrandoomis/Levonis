@@ -170,11 +170,17 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
     statements.push(...fence(db,'EXISTS(SELECT 1 FROM finance_staff WHERE id=? AND employment_version=?)',[staff.id,staff.employment_version]));
     for(const target of targets){
       const {cost,rule,amount}=target;
+      // An open withdrawal holds this wage of an order that lost its delivery:
+      // the wage stays as it is until that withdrawal is paid or released, and
+      // the recovery scan cuts it then. The order's other wages, and an
+      // employee's recalculation walking past it, do not wait for it.
+      if(!delivered&&cost&&cost.held_iqd>0&&amount!==null&&amount<cost.paid_iqd+cost.held_iqd)continue;
       const previous=base.costs.find(c=>c.id===cost?.id);
       const previousRule=JSON.parse(String(previous?.wage_rule_snapshot??'null'))??JSON.parse(String(previous?.snapshot??'{}')).rule;
       const previousBasis=previous?previousRule?.basis:rule.basis;
       const scopeChanged=!!previous&&JSON.stringify(financialCostLines(previous,base.lines).map(l=>l.id).sort())!==JSON.stringify([...target.line_ids].sort());
-      if(scopeChanged&&!scopeInstalled)throw conflict(serverMessage('NET_PROFIT_UPDATE_REQUIRED'),'NET_PROFIT_UPDATE_REQUIRED');
+      // A wage cut to 0 has no scope left to record (nor a column to record it in).
+      if(scopeChanged&&!scopeInstalled&&delivered)throw conflict(serverMessage('NET_PROFIT_UPDATE_REQUIRED'),'NET_PROFIT_UPDATE_REQUIRED');
       if((rule.basis!=='profit_percent'||previousBasis!=='profit_percent')&&
         (!cost||amount!==cost.effective_iqd||(cost.state==='pending_cost'&&amount!==null)||previousBasis!==rule.basis||scopeChanged))netCostsChanged=true;
       const id=cost?.id??newId('oc'),liability='2100';

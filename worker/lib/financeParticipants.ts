@@ -1,6 +1,6 @@
 import { investorAccountProgress } from './financeInvestorAccount';
 import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
-import { reconcileEffectiveWages } from './financeWageCalculation';
+import { lostDeliveryDay, reconcileEffectiveWages } from './financeWageCalculation';
 import { investorHeldPartSql, investorWholeHoldSql } from './investorFinance';
 import { getOrderProfitBase } from './orderProfit';
 import { participantNetFingerprintSql, participantNetProfit } from './participantProfit';
@@ -459,9 +459,13 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
   const snapshot=frozen?JSON.parse(frozen.rules_json) as Array<{line_id:string;rules:Array<{id:string}>}>:[];
   const plans:Array<{cost:typeof costs[number];amount:number;base_iqd:number}>=[],caps=new Map<string,number>();
   for(const cost of costs.filter((c)=>c.manual_override))caps.set(cost.rule_id,(caps.get(cost.rule_id)??0)+(cost.effective_iqd??0));
+  // An order that lost its delivery earns no new pay (DECISIONS row 307): its
+  // timeline wages went to 0 above, and these older percentages stay exactly as
+  // they were — recalculated now, they would rise by the wages just cut.
+  const lostDelivery=lostDeliveryDay(base.order)!==null;
   // Resolve independent revenue/material costs before calculating the staff
   // percentages that depend on them. Both phases commit under one source fence.
-  for(const profitPhase of [false,true]) {
+  for(const profitPhase of lostDelivery?[]:[false,true]) {
     if(profitPhase){
       const projected={...base,costs:base.costs.map(cost=>{
         const plan=plans.find(p=>p.cost.id===cost.id);

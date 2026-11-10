@@ -22,9 +22,10 @@ import { all, count, failingD1, freshDb, json, post, row, stubApp } from './fixt
 import { drainOrderFinanceRecovery } from '../worker/lib/financeOrderRecovery';
 import { continueStaffReconciliation } from '../worker/lib/financeStaffAccrual';
 import { queueStaffReconciliation } from '../worker/lib/financeEmployment';
-import { participantOverview, reconcileStaffOrderCosts } from '../worker/lib/financeParticipants';
+import { participantOverview, participantSources } from '../worker/lib/financeParticipants';
 import { reconcileFinanceOrder } from '../worker/lib/financeReconcile';
 import { runOrderFinancialEffects } from '../worker/lib/orderFinance';
+import { runOrderDeliveredEffects } from '../worker/lib/orderDeliveredEffects';
 import { investorOrderSplit } from '../worker/lib/investorFinance';
 import { baghdadDay, journalPlan } from '../worker/lib/operations';
 import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOperations';
@@ -75,10 +76,10 @@ async function setup(rules: Array<Record<string, unknown>> = [{ basis: 'order', 
   // keeps `delivered_at` (worker/routes/admin.ts, worker/lib/orderStageOps.ts);
   // neither runs a financial hook.
   const cancel = (id: string, status = 'cancelled') => raw.prepare('UPDATE orders SET status=? WHERE id=?').run(status, id);
-  /** A re-delivery keeps the first `delivered_at` and runs the delivery hook again. */
+  /** A re-delivery keeps the first `delivered_at` and runs the delivery door's effects again. */
   async function redeliver(id: string) {
     raw.prepare("UPDATE orders SET status='delivered' WHERE id=?").run(id);
-    await runOrderFinancialEffects(env, id, 'delivered');
+    await runOrderDeliveredEffects(env, id);
   }
   const wages = (id: string) => all<{ id: string; state: string; basis: string; effective: number | null }>(raw,
     `SELECT c.id,c.state,json_extract(c.snapshot,'$.rule.basis') basis,
@@ -86,8 +87,10 @@ async function setup(rules: Array<Record<string, unknown>> = [{ basis: 'order', 
       FROM finance_order_costs c WHERE c.order_id=? AND c.staff_id='staff_hussein' ORDER BY basis,c.id`, id);
   const me = async () => (await participantOverview(db, 'hussein')).summary;
   const wageExpense = () => count(raw, "SELECT COALESCE(SUM(debit_iqd-credit_iqd),0) n FROM accounting_lines WHERE account_code='5100'");
+  const wageExpenseByDay = () => all(raw, `SELECT e.entry_day day,SUM(l.debit_iqd-l.credit_iqd) n FROM accounting_lines l JOIN accounting_entries e ON e.id=l.entry_id
+    WHERE l.account_code='5100' GROUP BY e.entry_day ORDER BY e.entry_day`).map((r) => ({ ...r }));
   const balanced = () => count(raw, 'SELECT COALESCE(SUM(debit_iqd-credit_iqd),0) n FROM accounting_lines');
-  return { raw, db, failing, env, boss, self, finishJob, delivered, cancel, redeliver, wages, me, wageExpense, balanced };
+  return { raw, db, failing, env, boss, self, finishJob, delivered, cancel, redeliver, wages, me, wageExpense, wageExpenseByDay, balanced };
 }
 
 test('cancelled after delivery: the wage comes to 0 with a recalculation and its journal, stops counting, and returns on re-delivery', async () => {
@@ -142,7 +145,27 @@ test('cancelled after delivery: the wage comes to 0 with a recalculation and its
   assert.deepEqual([me.staff_iqd, me.staff_available_iqd, me.reconciliation_pending], [3050, 3050, false]);
   assert.equal(x.wageExpense(), 3050);
   assert.equal(x.balanced(), 0);
+  // The restore is today's, like the cut: the delivery's month keeps exactly
+  // the wage it had (its own -50 is the delivery's second pass correcting the
+  // profit share for the fixed wage; the restore makes the same two passes).
+  assert.deepEqual(all(x.raw, `SELECT a.adjustment_day day,SUM(a.delta_iqd) delta FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id
+    WHERE c.order_id='ORD-LOST' GROUP BY a.adjustment_day ORDER BY a.adjustment_day`).map((a) => ({ ...a })),
+  [{ day: '2026-10-16', delta: -50 }, { day: baghdadDay(), delta: 0 }]);
+  assert.equal(count(x.raw, "SELECT COUNT(*) n FROM finance_cost_adjustments WHERE earning_day IS NOT '2026-10-16'"), 0);
+  assert.deepEqual(x.wageExpenseByDay(), [{ day: '2026-10-16', n: 3050 }, { day: baghdadDay(), n: 0 }]);
   assert.equal((await drainOrderFinanceRecovery(x.env)).scanned, 0);
+});
+
+test('a re-delivery after the delivery month closed restores the wage today instead of failing', async () => {
+  const x = await setup();
+  await x.delivered('ORD-OCTOBER');
+  x.cancel('ORD-OCTOBER');
+  assert.equal((await drainOrderFinanceRecovery(x.env)).completed, 1);
+  x.raw.prepare('INSERT INTO accounting_periods(month,closed_at,closed_by) VALUES (?,?,?)').run('2026-10', new Date().toISOString(), 'boss');
+  await x.redeliver('ORD-OCTOBER');
+  assert.deepEqual(x.wages('ORD-OCTOBER').map((w) => w.effective), [2500]);
+  assert.equal(count(x.raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE order_id='ORD-OCTOBER'"), 0);
+  assert.deepEqual(x.wageExpenseByDay(), [{ day: '2026-10-16', n: 2500 }, { day: baghdadDay(), n: 0 }]);
 });
 
 test('a recalculation of the order or of the employee does the same, and a walk-back short of cancelling is a lost delivery too', async () => {
@@ -183,25 +206,61 @@ test('a paid wage stays paid and becomes debt; a re-delivery clears the debt', a
   assert.equal(x.balanced(), 0);
 });
 
-test('an open withdrawal blocks the cut: the scan waits, a recalculation refuses, and the release lets it through', async () => {
+test('an open withdrawal holds only its own wage: the scan waits, a recalculation walks past it, the release lets the cut through', async () => {
   const x = await setup();
   await x.delivered('ORD-HELD');
   const request = await post(x.self, '/earnings/withdrawals', { operation_id: 'lost-delivery-withdrawal', amount_iqd: 2500 });
   const requested = await json(request);
   assert.equal(request.status, 200, JSON.stringify(requested));
-  x.cancel('ORD-HELD');
-  // Not paid either: the order is not delivered, so the row is not payable.
-  assert.equal((await x.me()).staff_available_iqd, 0);
+  await x.delivered('ORD-UNHELD', '2026-10-18T10:00:00.000Z'); await x.delivered('ORD-Z-STILL-DELIVERED', '2026-10-20T10:00:00.000Z');
+  x.cancel('ORD-HELD'); x.cancel('ORD-UNHELD');
+  // Not paid either: the order is not delivered, so the held row is not payable.
+  const held = (await participantSources(x.db, 'hussein')).find((s) => s.order_id === 'ORD-HELD')!;
+  assert.deepEqual([held.held_iqd, held.eligible], [2500, false]);
+  // The scan leaves the order with the held wage alone, rather than failing on it every minute.
   const report = await drainOrderFinanceRecovery(x.env);
-  assert.equal(report.scanned, 0, 'the scan does not fail on it every minute');
+  assert.deepEqual([report.scanned, report.completed], [1, 1], JSON.stringify(report));
+  assert.deepEqual(x.wages('ORD-UNHELD').map((w) => w.effective), [0]);
   assert.deepEqual(x.wages('ORD-HELD').map((w) => w.effective), [2500]);
-  await assert.rejects(reconcileStaffOrderCosts(x.db, 'ORD-HELD'), /طلب سحب مفتوح/);
+  // An employee's recalculation walks past it: it finishes, nothing is marked
+  // failed, and the employee's other wages are not held behind it.
+  await queueStaffReconciliation(x.db, 'staff_hussein', 'boss');
+  await x.finishJob();
+  assert.equal((await reconcileFinanceOrder(x.db, 'ORD-HELD')).staff_complete, true);
   assert.deepEqual(x.wages('ORD-HELD').map((w) => w.effective), [2500]);
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM finance_posting_errors'), 0);
+  assert.equal((await participantSources(x.db, 'hussein')).find((s) => s.order_id === 'ORD-Z-STILL-DELIVERED')?.eligible, true);
+  // Released: the scan cuts it.
   assert.equal((await post(x.boss, `/people/withdrawals/${requested.id}/reject`, { note: 'الطلب أُلغي' })).status, 200);
   assert.equal((await drainOrderFinanceRecovery(x.env)).completed, 1);
   assert.deepEqual(x.wages('ORD-HELD').map((w) => w.effective), [0]);
   const me = await x.me();
-  assert.deepEqual([me.staff_iqd, me.staff_held_iqd, me.staff_net_iqd], [0, 0, 0]);
+  assert.deepEqual([me.staff_iqd, me.staff_held_iqd, me.staff_net_iqd, me.staff_available_iqd], [2500, 0, 2500, 2500]);
+});
+
+test('a lost delivery does not raise an undated colleague\'s older profit share on the same order', async () => {
+  const x = await setup();
+  // Sajjad has no start date and his rule is never revised: the old writer keeps it.
+  const rule = await post(x.boss, '/operations/rules', { staff_id: 'staff_sajjad', milestone: 'delivered', basis: 'profit_percent', amount: 1000, effective_from: '2026-09-01' });
+  assert.equal(rule.status, 200, JSON.stringify(await json(rule)));
+  // Created after that rule, so the order's frozen rules carry it.
+  const now = new Date().toISOString();
+  x.raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
+    subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,delivered_at)
+    VALUES ('ORD-MIXED','buyer','delivered','{}','standard','{}','cash',50000,1500,50000,50000,?,?)`).run(now, now);
+  x.raw.exec("INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES ('line:ORD-MIXED','ORD-MIXED','p','Printer',1,50000,50000,20000,'snapshot')");
+  await runOrderFinancialEffects(x.env, 'ORD-MIXED', 'delivered');
+  const sajjad = () => all<{ effective: number }>(x.raw, `SELECT c.amount_iqd+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0) effective
+    FROM finance_order_costs c WHERE c.order_id='ORD-MIXED' AND c.staff_id='staff_sajjad'`).map((c) => c.effective);
+  // 10% of (50,000 - 20,000 - Hussein's 2,500).
+  assert.deepEqual([x.wages('ORD-MIXED').map((w) => w.effective), sajjad()], [[2500], [2750]]);
+  x.cancel('ORD-MIXED');
+  assert.equal((await drainOrderFinanceRecovery(x.env)).completed, 1);
+  assert.deepEqual([x.wages('ORD-MIXED').map((w) => w.effective), sajjad()], [[0], [2750]], 'not 3,000: the cut is not his profit');
+  assert.equal(count(x.raw, "SELECT COUNT(*) n FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.staff_id='staff_sajjad'"), 0);
+  await x.redeliver('ORD-MIXED');
+  assert.deepEqual([x.wages('ORD-MIXED').map((w) => w.effective), sajjad()], [[2500], [2750]]);
+  assert.equal(count(x.raw, "SELECT COUNT(*) n FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.staff_id='staff_sajjad'"), 0);
 });
 
 test('a settled row keeps its agreed amount; an order delivered after the settled day is cut as usual', async () => {
