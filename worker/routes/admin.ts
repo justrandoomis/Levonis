@@ -3806,6 +3806,8 @@ adminRoutes.patch('/orders/:id', async (c) => {
       const msg = e instanceof Error ? e.message : String(e);
       // The units were taken between the plan and the commit: the fence rolled it all back.
       if (reopenStock.plan && msg.includes('actual = expected')) throw reopenStockRefusal('ORDER_REOPEN_STOCK_UNAVAILABLE');
+      // A second, concurrent re-open planned the same next hold: the first one won.
+      if (reopenStock.plan && msg.includes('UNIQUE constraint failed: inventory_ledger')) throw badRequest('The order changed while you were editing — reload and retry');
       if (msg.includes('NOT NULL constraint failed: orders.status')) {
         throw badRequest('تم إرجاع رصيد هذا الطلب؛ لا يمكن إعادة فتحه. أنشئ طلباً جديداً ليتم احتساب الدفعة من جديد.', 'REFUNDED_ORDER');
       }

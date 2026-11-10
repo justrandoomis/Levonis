@@ -521,6 +521,11 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
       return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
         next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_REOPEN_STOCK_UNAVAILABLE' };
     }
+    // A second, concurrent re-open planned the same next hold: the first one won.
+    if (reopenStock?.plan && String(e instanceof Error ? e.message : e).includes('UNIQUE constraint failed: inventory_ledger')) {
+      return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'RACED' };
+    }
     if (reopening && await env.DB.prepare(refundedSql).bind(String(row.user_id), order.id).first()) {
       return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
         next_stage: null, next_stage_at: null, notes: [], reason: 'REFUNDED_ORDER' };

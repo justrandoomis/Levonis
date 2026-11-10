@@ -19,7 +19,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { all, asD1, count, failingD1, json, row } from './fixtures/app';
-import { appsFor, giftWorld, paidLine, patch, placeOrder, type Apps } from './fixtures/giftWorld';
+import { appsFor, giftWorld, paidLine, patch, placeOrder, post, type Apps } from './fixtures/giftWorld';
 import { deductOrderStock } from '../worker/lib/orderInventory';
 
 type Door = 'status' | 'stage';
@@ -80,6 +80,38 @@ for (const door of ['status', 'stage'] as const) {
     assert.deepEqual(w.stock(), { stock: 3, reserved: 0 });
     assert.deepEqual(w.ledger(id), before, 'nothing was held or taken');
   });
+
+  test(`${door} door: a double-clicked re-open holds once; the losing click is told the order changed`, async () => {
+    // D1 runs one batch at a time: the first click is paused just before its
+    // batch, the second plans the same next hold and commits, then the first
+    // commits — its flip finds the order already re-opened, its hold's key taken.
+    let gate: { entered: () => void; resumed: Promise<void> } | undefined;
+    const w = world((raw) => {
+      const f = failingD1(raw);
+      const batch = f.failing.batch.bind(f.failing);
+      f.failing.batch = async (statements: Parameters<typeof batch>[0]) => {
+        const g = gate;
+        if (g && statements.some((s) => String((s as unknown as { sql?: string }).sql ?? '').includes('INSERT INTO inventory_ledger'))) { gate = undefined; g.entered(); await g.resumed; }
+        return batch(statements);
+      };
+      return f;
+    });
+    const id = await w.order('ci_1');
+    assert.equal((await w.move(door, id, 'cancelled')).http, 200);
+    let entered!: () => void, resume!: () => void;
+    const waiting = new Promise<void>((r) => { entered = r; });
+    gate = { entered, resumed: new Promise<void>((r) => { resume = r; }) };
+    const first = w.move(door, id, 'pending');
+    await waiting;
+    const second = await w.move(door, id, 'pending');
+    resume();
+    const loser = await first;
+    assert.deepEqual([second.http, loser.http], [200, 400], JSON.stringify([second.body, loser.body]));
+    assert.match(String(loser.body.error), /changed while you were editing/);
+    assert.equal(w.status(id), 'pending');
+    assert.deepEqual(w.stock(), { stock: 3, reserved: 1 });
+    assert.deepEqual(w.ledger(id), [`reserve@${id}`, `release@${id}`, `reserve@${id}~2`]);
+  });
 }
 
 test('a re-open whose units are no longer free is refused, and the order stays cancelled', async () => {
@@ -111,6 +143,19 @@ test('units taken between the plan and the commit: the fence rolls the whole re-
   assert.deepEqual([refused.http, refused.code], [409, 'ORDER_REOPEN_STOCK_UNAVAILABLE'], JSON.stringify(refused.body));
   assert.equal(w.status(id), 'cancelled', 'the flip rolled back with the hold');
   assert.deepEqual(w.ledger(id), [`reserve@${id}`, `release@${id}`]);
+});
+
+test('the customer can cancel a re-opened order, and its new hold comes back', async () => {
+  const w = world();
+  const id = await w.order('ci_1');
+  assert.equal((await w.move('status', id, 'cancelled')).http, 200);
+  assert.equal((await w.move('stage', id, 'pending')).http, 200);
+  assert.deepEqual(w.stock(), { stock: 3, reserved: 1 });
+  const res = await post(w.a.buyer, `/api/orders/${id}/cancel`, {});
+  assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
+  assert.equal(w.status(id), 'cancelled');
+  assert.deepEqual(w.stock(), { stock: 3, reserved: 0 });
+  assert.deepEqual(w.ledger(id), [`reserve@${id}`, `release@${id}`, `reserve@${id}~2`, `release@${id}~2`]);
 });
 
 test('hold cycles: cancelled and re-opened twice, then confirmed once, takes one unit and its FIFO cost; a last cancellation puts it back and closes re-opening', async () => {

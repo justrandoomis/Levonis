@@ -1973,6 +1973,17 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This order cannot be re-opened: the trade-in credit it used cannot be spent before the old device is received. Create a new order once it is.',
     ckb: 'ناتوانرێت ئەم داواکارییە دووبارە بکرێتەوە: ئەو باڵانسی گۆڕینەوەیەی بەکاری هێناوە پێش وەرگرتنی ئامێرە کۆنەکە بەکارنایەت. دوای وەرگرتن داواکارییەکی نوێ دروست بکە.',
   },
+  // Row 310: a re-opened order takes its stock again, or is refused. The order stays cancelled.
+  ORDER_REOPEN_STOCK_RETURNED: {
+    ar: 'لا يمكن إعادة فتح هذا الطلب: أُعيدت قطعه إلى المخزون بعد خصمها عند الإلغاء. أنشئ طلباً جديداً.',
+    en: 'This order cannot be re-opened: its units went back on the shelf when it was cancelled. Create a new order.',
+    ckb: 'ناتوانرێت ئەم داواکارییە دووبارە بکرێتەوە: پارچەکانی لە کاتی هەڵوەشاندنەوەدا گەڕێنرانەوە بۆ کۆگا. داواکارییەکی نوێ دروست بکە.',
+  },
+  ORDER_REOPEN_STOCK_UNAVAILABLE: {
+    ar: 'لا يمكن إعادة فتح هذا الطلب: لم تعد قطعه متوفرة لحجزها من جديد، فيبقى ملغى.',
+    en: 'This order cannot be re-opened: its units are no longer free to hold again, so it stays cancelled.',
+    ckb: 'ناتوانرێت ئەم داواکارییە دووبارە بکرێتەوە: پارچەکانی ئیتر بەردەست نین بۆ دووبارە گلدانەوە، بۆیە هەڵوەشاوە دەمێنێتەوە.',
+  },
   // W-3 (row 237): one open warranty case per device. The customer cannot close a
   // claim, so this sentence never asks them to; the desk has its own (AdminSerials).
   CLAIM_ALREADY_OPEN: {
