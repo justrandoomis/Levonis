@@ -52,11 +52,15 @@ export default function MissingCostsSheet({ from, to, onClose, onChanged, openOr
     {!data && !error && <Loading text={loc('تحميل البنود الناقصة…', 'Loading missing lines…', 'بارکردنی بڕگە کەمەکان…')} />}
     {data && !groups.length && <p className="fw-success" role="status"><Check size={16} />{loc('كل تكاليف هذه الفترة مثبتة.', 'Every cost in this period is confirmed.', 'هەموو تێچووەکانی ئەم ماوەیە جێگیرکراون.')}</p>}
     {data && groups.length > 0 && <p className="fw-note">{loc('اكتب سعر شراء القطعة الواحدة مرة واحدة لكل منتج؛ بعد تأكيدك يُثبَّت على كل بنوده هنا ويُعاد حساب كل طلب (الربح وحصة المستثمر والأجور). التقدير المعروض تلميح فقط.', 'Type the purchase price of one piece once per product; after you confirm, it is set on each of its lines here and every order is recalculated (profit, investor share, wages). The estimate shown is only a hint.', 'نرخی کڕینی یەک پارچە یەک جار بۆ هەر بەرهەمێک بنووسە؛ دوای پشتڕاستکردنەوەت لەسەر هەموو بڕگەکانی لێرە جێگیر دەکرێت و هەموو داواکارییەک دووبارە حیساب دەکرێتەوە (قازانج، بەشی وەبەرهێنەر، کرێ). خەمڵاندنەکە تەنها ئاماژەیە.')}</p>}
-    {groups.map((g) => <MissingGroup key={g.key} g={g} stocked={!!g.product_id && data!.stocked.includes(g.product_id)} onDone={refresh} openOrder={openOrder} />)}
+    {groups.map((g, i) => {
+      // The «no stock batch» note once per product, on its first size or colour.
+      const first = groups.findIndex((x) => (x.product_id ?? x.name) === (g.product_id ?? g.name)) === i;
+      return <MissingGroup key={g.key} g={g} stockNote={first && !(g.product_id && data!.stocked.includes(g.product_id))} onDone={refresh} openOrder={openOrder} />;
+    })}
   </Sheet>;
 }
 
-function MissingGroup({ g, stocked, onDone, openOrder }: { g: Group; stocked: boolean; onDone: () => void; openOrder: (id: string, focus?: 'cost') => void }) {
+function MissingGroup({ g, stockNote, onDone, openOrder }: { g: Group; stockNote: boolean; onDone: () => void; openOrder: (id: string, focus?: 'cost') => void }) {
   const { loc, lang } = useLanguage();
   const [price, setPrice] = useState('');
   const [confirming, setConfirming] = useState(false);
@@ -90,7 +94,7 @@ function MissingGroup({ g, stocked, onDone, openOrder }: { g: Group; stocked: bo
     </div>
     <p className="fw-note">{loc('مُباع', 'Sold', 'فرۆشراو')} {g.qty} · {loc('في', 'in', 'لە')} {g.orders} {loc('طلبات', 'orders', 'داواکاری')}
       {g.estimates.length > 0 && <> · {loc('تقدير وقت البيع للقطعة', 'Sale-time estimate per piece', 'خەمڵاندنی کاتی فرۆشتن بۆ هەر پارچەیەک')}: {g.estimates.map((e, i) => <span key={e}>{i > 0 && ' – '}<Money value={e} /></span>)}</>}</p>
-    {!stocked && <p className="fw-note"><PackagePlus size={14} aria-hidden="true" /> {loc('لا توجد دفعة مخزون مسعّرة لهذا المنتج، فلا يُحسب سعر مبيعاته القادمة أيضًا. سجّل شراءه في المخزون.', 'This product has no priced stock batch, so its next sales cannot cost themselves either. Record its purchase in Inventory.', 'ئەم بەرهەمە هیچ بارێکی کۆگای نرخدار نییە، بۆیە فرۆشتنەکانی داهاتووشی تێچوویان بۆ حیساب ناکرێت. کڕینەکەی لە کۆگا تۆمار بکە.')}{' '}
+    {stockNote && <p className="fw-note"><PackagePlus size={14} aria-hidden="true" /> {loc('لا توجد دفعة مخزون مسعّرة لهذا المنتج، فلا يُحسب سعر مبيعاته القادمة أيضًا. سجّل شراءه في المخزون.', 'This product has no priced stock batch, so its next sales cannot cost themselves either. Record its purchase in Inventory.', 'ئەم بەرهەمە هیچ بارێکی کۆگای نرخدار نییە، بۆیە فرۆشتنەکانی داهاتووشی تێچوویان بۆ حیساب ناکرێت. کڕینەکەی لە کۆگا تۆمار بکە.')}{' '}
       <a className="fw-link" href={INVENTORY_PURCHASES}>{loc('سجّل الشراء في المخزون', 'Record the purchase in Inventory', 'کڕینەکە لە کۆگا تۆمار بکە')}</a></p>}
     <div className="fw-missing-price">
       <label className="fw-field"><span>{loc('سعر شراء القطعة الواحدة (د.ع)', 'Purchase price of one piece (IQD)', 'نرخی کڕینی یەک پارچە (د.ع)')}</span>
