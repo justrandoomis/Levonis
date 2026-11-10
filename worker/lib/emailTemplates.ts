@@ -124,6 +124,11 @@ interface Copy {
   dueLabel: string;
   statusLabel: string;
   status: Record<InvoicePaymentStatus, string>;
+  /** The printable document of an order cancelled after its invoice was issued. */
+  invoiceCancelled: string;
+  invoiceCancelledStatus: string;
+  refundedWalletLabel: string;
+  refundedPointsLabel: string;
   invoiceFooter: string;
   viewOrders: string;
 }
@@ -203,6 +208,10 @@ const COPY_AR: Copy = {
     unpaid: 'غير مدفوعة',
     bnpl_due: 'مستحقة (اشترِ الآن وادفع لاحقًا)',
   },
+  invoiceCancelled: 'أُلغي هذا الطلب، ولا يُطلب بهذه الفاتورة أي مبلغ.',
+  invoiceCancelledStatus: 'ملغية',
+  refundedWalletLabel: 'أُعيد إلى محفظتك',
+  refundedPointsLabel: 'نقاط أُعيدت إليك',
   invoiceFooter:
     'هذه فاتورة تلقائية من LEVONIS. رسائل الطلبات تقتصر على الفواتير فقط — لا رسائل تسويقية. للاستفسار تواصل مع دعم LEVONIS من داخل حسابك.',
   viewOrders: 'عرض طلباتي',
@@ -284,6 +293,10 @@ const COPY_EN: Copy = {
     unpaid: 'Unpaid',
     bnpl_due: 'Due (Buy Now, Pay Later)',
   },
+  invoiceCancelled: 'This order was cancelled. Nothing is due on this invoice.',
+  invoiceCancelledStatus: 'Cancelled',
+  refundedWalletLabel: 'Returned to your wallet',
+  refundedPointsLabel: 'Points returned to you',
   invoiceFooter:
     'This is an automatic invoice from LEVONIS. Order emails are limited to invoices only — no marketing mail. For questions, contact LEVONIS support from your account.',
   viewOrders: 'View my orders',
@@ -368,6 +381,10 @@ const COPY_CKB: Copy = {
     unpaid: 'نەدراوە',
     bnpl_due: 'قەرزارە (ئێستا بکڕە، دواتر بدە)',
   },
+  invoiceCancelled: 'ئەم داواکارییە هەڵوەشێنرایەوە، و هیچ بڕێک بەم پسوولەیە داوا ناکرێت.',
+  invoiceCancelledStatus: 'هەڵوەشێنراوەتەوە',
+  refundedWalletLabel: 'گەڕێنرایەوە بۆ جزدانەکەت',
+  refundedPointsLabel: 'خاڵی گەڕێنراوە بۆت',
   invoiceFooter:
     'ئەمە پسوولەیەکی خۆکارە لە LEVONIS. ئیمەیڵی داواکارییەکان تەنها پسوولەیە — هیچ پەیامێکی بازرگانی نانێردرێت. بۆ پرسیار، لە ناو هەژمارەکەتەوە پەیوەندی بە پشتگیری LEVONIS بکە.',
   viewOrders: 'بینینی داواکارییەکانم',
@@ -787,11 +804,24 @@ export function renderOrderInvoiceEmail(lang: EmailLang, inv: InvoiceEmailData, 
 }
 
 /**
+ * What became of the order after its invoice was issued. The issued snapshot is never rewritten
+ * («an invoice is what it was when it was issued»); the document that prints it today says the
+ * order was cancelled, what came back, and that nothing is due: «مدفوعة بالكامل» on a cancelled and
+ * refunded order was the only thing on the page that was no longer true.
+ */
+export interface InvoiceCancellation {
+  /** Dinars that came back to the wallet; 0 when the order took none. */
+  refunded_wallet_iqd: number;
+  /** Points that came back; 0 when the order took none. */
+  refunded_points: number;
+}
+
+/**
  * Full printable invoice document (GET /api/invoices/:id/html). Standalone
  * HTML — no scripts, no external assets; served with Cache-Control: no-store
  * behind owner/admin authorization only.
  */
-export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData): string {
+export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData, cancelled: InvoiceCancellation | null = null): string {
   const t = COPY[lang];
   const dir = dirOf(lang);
   const issued = inv.issued_at.slice(0, 10);
@@ -861,7 +891,11 @@ export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData
   totals += totalRow(t.totalLabel, iqd(inv.total_iqd), 'grand');
   if (inv.wallet_applied_iqd > 0) totals += totalRow(t.walletLabel, iqd(inv.wallet_applied_iqd));
   totals += totalRow(t.paidLabel, iqd(inv.amount_paid_iqd));
-  totals += totalRow(t.dueLabel, iqd(inv.amount_due_iqd), inv.amount_due_iqd > 0 ? 'due-open' : 'due-clear');
+  if (cancelled && cancelled.refunded_wallet_iqd > 0) totals += totalRow(t.refundedWalletLabel, iqd(cancelled.refunded_wallet_iqd));
+  if (cancelled && cancelled.refunded_points > 0) totals += totalRow(t.refundedPointsLabel, cancelled.refunded_points.toLocaleString('en-US'));
+  totals += cancelled
+    ? totalRow(t.dueLabel, iqd(0), 'due-clear')
+    : totalRow(t.dueLabel, iqd(inv.amount_due_iqd), inv.amount_due_iqd > 0 ? 'due-open' : 'due-clear');
 
   const css =
     printBaseCss(14) +
@@ -896,6 +930,7 @@ export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData
   .totals .due-open td { font-weight: 800; color: #8a6d00; }
   .totals .due-clear td { font-weight: 800; color: #1a7f37; }
   .status { margin-top: 4mm; text-align: end; font-size: 10pt; font-weight: 700; }
+  .cancelled { margin: 0 0 5mm; padding: 2.5mm 3mm; border: 1.5px solid #b42318; border-radius: 2mm; color: #b42318; font-size: 10.5pt; font-weight: 700; }
   .foot { margin-top: 8mm; padding-top: 3mm; border-top: 1px solid #e6e8ec; font-size: 8.5pt; color: #6b7280; line-height: 1.7; }
 `;
 
@@ -906,6 +941,7 @@ export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData
     `<div class="doc-title"><span class="kind">${escapeHtml(t.invoiceTitle)}</span>` +
     `<span class="no ltr">${escapeHtml(inv.invoice_no)}</span></div>` +
     `</header>` +
+    (cancelled ? `<p class="cancelled" data-invoice-cancelled>${escapeHtml(t.invoiceCancelled)}</p>` : '') +
     `<section class="meta avoid-break">${metaHtml}</section>` +
     `<table class="lines"><thead><tr>` +
     `<th>${escapeHtml(t.itemLabel)}</th>` +
@@ -914,7 +950,7 @@ export function renderInvoiceHtmlDocument(lang: EmailLang, inv: InvoiceEmailData
     `<th class="money">${escapeHtml(t.lineTotalLabel)}</th>` +
     `</tr></thead><tbody>${linesHtml}</tbody></table>` +
     `<table class="totals avoid-break"><tbody>${totals}</tbody></table>` +
-    `<p class="status">${escapeHtml(t.statusLabel)}: ${escapeHtml(t.status[inv.payment_status])}</p>` +
+    `<p class="status">${escapeHtml(t.statusLabel)}: ${escapeHtml(cancelled ? t.invoiceCancelledStatus : t.status[inv.payment_status])}</p>` +
     `<footer class="foot">${escapeHtml(t.invoiceFooter)}</footer>` +
     `</div>`;
 

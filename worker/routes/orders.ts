@@ -51,6 +51,7 @@ import {
   giftCheckoutRefusalCode,
   giftEntitlementIdOf,
   giftPricingBlock,
+  giftShelfUnitIqd,
   giftTransportSnapshot,
   giftUnitValueOf,
   unpricedGiftResolved,
@@ -58,6 +59,7 @@ import {
   verifyGiftCartLines,
   type GiftPricingBlock,
 } from '../lib/gifts/cartLine';
+import { voidReviewGiftsOfOrder } from '../lib/gifts/reviewCode';
 import { compositionUsdTwins, type ResolvedBundle } from '../lib/bundleRead';
 import {
   allocateComponentValue,
@@ -2454,6 +2456,16 @@ export async function computeCheckout(
     () => loadOffers(c.env.DB, ordinaryRows.map((r) => subjectOf(String(r.id)))),
     new Map<string, Awaited<ReturnType<typeof loadOffers>> extends Map<string, infer V> ? V : never>()
   );
+  // A gift line's offer prices nothing: it says only what the gift is worth today, frozen on its line (row 303,
+  // `giftShelfUnitIqd`). One read, only when the order holds a gift.
+  const giftOfferRows = rows.filter((r) => !!giftEntitlementIdOf(r));
+  const giftOffers = giftOfferRows.length
+    ? await degradeIfSchemaMissing(
+        'offers (migration 0060)',
+        () => loadOffers(c.env.DB, giftOfferRows.map((r) => subjectOf(String(r.id)))),
+        new Map<string, Awaited<ReturnType<typeof loadOffers>> extends Map<string, infer V> ? V : never>()
+      )
+    : new Map<string, Awaited<ReturnType<typeof loadOffers>> extends Map<string, infer V> ? V : never>();
   /** Which ordinary subjects contributed a live offer price or gate to this
    *  order — the subjects a redemption row is written for, so `offer_limits`
    *  works on an ordinary product with no new machinery at all. */
@@ -2691,7 +2703,8 @@ export async function computeCheckout(
         // no figure of the old ladder — its value is the one frozen at the grant, its cost unknown (`unpriced`,
         // no estimate: the product has no V2 result). A V2 product's gift is valued at its V2 regular price.
         const v2Gift = facts.doc.sku_strict === true;
-        const giftUnit = giftUnitValueOf(v2Gift, facts.resolved.regular_iqd, verdict.frozenValueIqd, sel.qty);
+        // Its value is what a customer pays for it today: the sale price under a live offer (row 303).
+        const giftUnit = giftUnitValueOf(v2Gift, giftShelfUnitIqd(facts.resolved, giftOffers.get(offerKey(subjectOf(String(row.id)))) ?? null, facts.doc), verdict.frozenValueIqd, sel.qty);
         const giftResolved = v2Gift ? facts.zeroed : unpricedGiftResolved(facts.zeroed, giftUnit);
         const block = giftPricingBlock(verdict, giftUnit, sel.qty);
         // The cost leaves the customer's snapshot and lands on the row (0095):
@@ -6384,6 +6397,14 @@ orderRoutes.post('/:id/cancel', async (c) => {
     stock_returned: stock.kind,
     stock_rows: stock.plan?.applied ?? 0,
   });
+  // Row 303 R1 (policy 8.16): a pending order may be one the team walked back from delivered; cancelled,
+  // it takes its printers' review codes and the waiting gifts they opened with it, as the team's doors do;
+  // and a gift ordered here whose code died with its printer goes too, instead of coming back (L1).
+  try {
+    await voidReviewGiftsOfOrder(c.env, { orderId: id, actorId: user.id, ref: `order_cancelled:${id}` }, now);
+  } catch (e) {
+    console.error('review gifts not cancelled with order', id, e instanceof Error ? e.message : String(e));
+  }
   const after = (await loadOrder(c.env.DB, id))!;
   const snaps = await getOrderPointsSnapshots(c.env, [id]);
   return c.json({

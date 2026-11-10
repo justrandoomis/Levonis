@@ -59,7 +59,7 @@ import Countdown from '../ui/Countdown';
 import { CouponsSkeleton, ForwardChevron, ICON_DISC, INLINE_LINK, SetupState } from './AreaChrome';
 import type { CopyKey } from './copy';
 import { useCouponAction, useShipDetail } from './couponUse';
-import { SEP, couponDestination, nearDate, revokeKey, toDeviceTarget, underADay, usable, wholeDaysLeft } from './model';
+import { SEP, couponDestination, nearDate, pickName, revokeKey, toDeviceTarget, underADay, usable, wholeDaysLeft } from './model';
 import { PrintersBlock } from './PrintersBlock';
 import type { RewardCoupon, RewardPrintersData, RewardsHubData } from './types';
 import type { Read } from './useRewardsData';
@@ -179,11 +179,11 @@ function useCouponTitle() {
 }
 
 function CouponCard({ c, focal, serverTime, skewMs, reloadSoon, onUse }: CouponCardProps) {
-  const { t, count, tri, lang } = useRewardsT();
+  const { t, count, lang } = useRewardsT();
   const title = useCouponTitle();
   const ship = c.kind === 'free_shipping';
   const canUse = couponDestination(c).kind !== 'none';
-  const printerName = c.printer ? tri(c.printer.name) : '';
+  const printerName = c.printer ? pickName(c.printer.name) : '';
   const left = wholeDaysLeft(c.expires_at, serverTime);
   const days = Number.isFinite(left) ? Math.max(0, left) : 0;
   const surface = focal ? 'lv-surface-raised' : 'lv-surface';
@@ -289,10 +289,10 @@ function CouponScope({ c, onMore }: { c: RewardCoupon; onMore: () => void }) {
             {i > 0 && SEP[lang]}
             {p.slug ? (
               <Link to={`/product/${encodeURIComponent(p.slug)}`} dir="auto" className={INLINE_LINK}>
-                {tri(p.name)}
+                {pickName(p.name)}
               </Link>
             ) : (
-              <span dir="auto">{tri(p.name)}</span>
+              <span dir="auto">{pickName(p.name)}</span>
             )}
           </React.Fragment>
         ))}
@@ -362,7 +362,7 @@ export function CodeCopy({ code }: { code: string }) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+    <div className="relative flex flex-wrap items-center gap-x-2 gap-y-1">
       <code dir="ltr" className="lv-well min-w-0 flex-1 basis-36 truncate select-all rounded-md px-3 py-2 text-[14px] font-bold tabular-nums text-text-primary">
         {code}
       </code>

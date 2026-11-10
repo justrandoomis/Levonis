@@ -221,6 +221,8 @@ export interface CodeRow {
   levels: number[];
   code: string | null;
   code_redeemed_at: string | null;
+  /** The reviewed printer went back, or its order was cancelled: the code opens nothing (row 303 R1). Absent from an older server. */
+  code_void?: 'returned' | 'cancelled' | null;
 }
 
 export function CodePanel({ lang, row, onChanged }: { lang: Lang; row: CodeRow; onChanged: () => void }) {
@@ -282,11 +284,18 @@ export function CodePanel({ lang, row, onChanged }: { lang: Lang; row: CodeRow; 
           </code>
           <CopyButton lang={lang} text={formatGiftCode(row.code)} label={t('copyCode')} testId="code" />
         </div>
-        <p className="text-[12px] font-medium text-text-secondary" data-review-code-state={row.code_redeemed_at ? 'redeemed' : 'waiting'}>
-          {row.code_redeemed_at ? t('stateRedeemed', { date: formatDate(row.code_redeemed_at, lang) }) : t('stateWaiting')}
-        </p>
+        {row.code_void ? (
+          // The printer is no longer the customer's: no sentence to send, no new code to make.
+          <p className="lv-alert lv-alert-warning text-[12px] font-medium text-text-primary" data-review-code-state="void" data-review-code-void={row.code_void}>
+            {t(row.code_void === 'cancelled' ? 'stateVoidCancelled' : 'stateVoidReturned')}
+          </p>
+        ) : (
+          <p className="text-[12px] font-medium text-text-secondary" data-review-code-state={row.code_redeemed_at ? 'redeemed' : 'waiting'}>
+            {row.code_redeemed_at ? t('stateRedeemed', { date: formatDate(row.code_redeemed_at, lang) }) : t('stateWaiting')}
+          </p>
+        )}
       </div>
-      {!row.code_redeemed_at && (
+      {!row.code_redeemed_at && !row.code_void && (
         <>
           <div className="space-y-1.5">
             <p className="text-[11px] font-bold text-text-muted">{t('sentenceTitle')}</p>

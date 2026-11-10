@@ -69,7 +69,18 @@ export default function BrowseMissionTimer() {
     };
   }, [isAuthenticated]);
 
-  if (!isAuthenticated || !state.visible) return null;
+  // The clock owns its corner: a toast rises above it. The mission's own «started» toast stayed 7 s over the clock it had just started.
+  const shown = isAuthenticated && state.visible;
+  useEffect(() => {
+    if (!shown) return;
+    const root = document.documentElement;
+    root.style.setProperty('--toast-lift', '3.25rem');
+    return () => {
+      root.style.removeProperty('--toast-lift');
+    };
+  }, [shown]);
+
+  if (!shown) return null;
 
   return (
     <div

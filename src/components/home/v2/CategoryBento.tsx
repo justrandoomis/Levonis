@@ -55,13 +55,12 @@ type Copy = { title: string; caption?: string };
 function useTileCopy(): Record<BentoTileId, Copy> {
   const { loc, t } = useLanguage();
   return {
-    // OWNER: Sorani to be written by hand (every loc() below without a third argument).
     printers: { title: loc('الطابعات ثلاثية الأبعاد', '3D printers', t('printers')) },
-    filament: { title: 'Filament', caption: loc('خامات الطباعة', 'Printing filament') },
-    resin: { title: 'Resin', caption: loc('راتنج الطباعة', 'Printing resin') },
-    parts: { title: loc('قطع الغيار والمستلزمات', 'Spare parts & supplies') },
-    accessories: { title: loc('الإكسسوارات والأدوات', 'Accessories & tools') },
-    used: { title: loc('المنتجات المستعملة', 'Pre-owned') },
+    filament: { title: 'Filament', caption: loc('خامات الطباعة', 'Printing filament', 'فیلامێنتی چاپ') },
+    resin: { title: 'Resin', caption: loc('راتنج الطباعة', 'Printing resin', 'ڕەزینی چاپ') },
+    parts: { title: loc('قطع الغيار والمستلزمات', 'Spare parts & supplies', 'پارچەی یەدەگ و پێداویستییەکان') },
+    accessories: { title: loc('الإكسسوارات والأدوات', 'Accessories & tools', 'ئێکسسوار و ئامرازەکان') },
+    used: { title: loc('المنتجات المستعملة', 'Pre-owned', 'بەرهەمی بەکارهاتوو') },
   };
 }
 
@@ -107,7 +106,7 @@ function LargeTile({ tile, copy, sizes, eager }: TileProps) {
         </h3>
         <span className="inline-flex h-8 w-fit items-center gap-1.5 whitespace-nowrap rounded-full bg-snow px-3 text-[12px] font-bold text-onyx shadow-1 lg:h-10 lg:px-4 lg:text-[14px]">
           {/* OWNER: Sorani to be written by hand. */}
-          {tile.id === 'printers' ? loc('تسوق الطابعات', 'Shop printers') : loc('تسوق الآن', 'Shop now')}
+          {tile.id === 'printers' ? loc('تسوق الطابعات', 'Shop printers', 'چاپکەرەکان بکڕە') : loc('تسوق الآن', 'Shop now', 'ئێستا بکڕە')}
           <ArrowGlyph className="h-3 w-3 lg:h-3.5 lg:w-3.5" />
         </span>
       </div>
@@ -196,9 +195,9 @@ export default function CategoryBento({ tiles }: { tiles: BentoTile[] }) {
       {/* OWNER: Sorani to be written by hand. */}
       <SectionHead
         id="home-bento-title"
-        title={loc('تسوق حسب الفئة', 'Shop by category')}
+        title={loc('تسوق حسب الفئة', 'Shop by category', 'بەپێی پۆل بکڕە')}
         to="/categories"
-        linkLabel={loc('عرض جميع الفئات', 'All categories')}
+        linkLabel={loc('عرض جميع الفئات', 'All categories', 'هەموو پۆلەکان')}
       />
       <div
         className={`grid gap-2 lg:gap-3 ${

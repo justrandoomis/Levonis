@@ -41,7 +41,7 @@ import SafeImage from '../ui/SafeImage';
 import { GiftItemSummary, groupByLevel, type GiftView } from '../reviews/gifts/GiftCard';
 import { giftLang, giftText, type GiftStringKey } from '../reviews/gifts/giftStrings';
 import { SCORE_SCALE } from './copy';
-import { SEP } from './model';
+import { SEP, pickName } from './model';
 import {
   MOTION,
   PART_FILL,
@@ -340,7 +340,7 @@ function LevelTrack({ data, lit, settled }: { data: RevealData; lit: number; set
 // ------------------------------------------------------------ the analysis
 
 function Analysis({ data, script, onDone, onSkip }: { data: RevealData; script: readonly RevealStep[]; onDone: () => void; onSkip: () => void }) {
-  const { t, tri, dir, lang } = useRewardsT();
+  const { t, dir, lang } = useRewardsT();
   const parts = usePartLines(data);
   const [step, setStep] = useState(0);
   const scroller = useRef<HTMLDivElement | null>(null);
@@ -371,7 +371,7 @@ function Analysis({ data, script, onDone, onSkip }: { data: RevealData; script: 
   const dot = useMove<HTMLSpanElement>(reading, MOTION.breathe);
   const total = useMove<HTMLDivElement>(atTotal, MOTION.rise);
 
-  const name = tri(data.review.name);
+  const name = pickName(data.review.name);
   const status = t(step === 0 ? 'reveal.download' : atTotal ? 'reveal.total' : 'reveal.analysing');
   const current = script[step]?.key;
   return (
@@ -602,7 +602,7 @@ function Result({
     }
   };
 
-  const pickedName = pickedItem ? [pickedItem.name.en || pickedItem.name.ar || pickedItem.name.ckb, tri(pickedItem.color)].filter(Boolean).join(' · ') : '';
+  const pickedName = pickedItem ? [pickName(pickedItem.name), pickName(pickedItem.color)].filter(Boolean).join(' · ') : '';
   const conflictKeys: [GiftStringKey, GiftStringKey] = conflict === 'seller' ? ['sellerConflictTitle', 'sellerConflictBody'] : ['shippingConflictTitle', 'shippingConflictBody'];
 
   return (
@@ -626,8 +626,8 @@ function Result({
               </div>
               <div className="min-w-0 flex-1 space-y-1">
                 <p className="text-[13px] font-bold leading-5 text-text-primary">{opened}</p>
-                <p dir="auto" className="line-clamp-1 text-[12px] leading-5 text-text-secondary">
-                  {tri(data.review.name)}
+                <p className="text-[12px] leading-5 text-text-secondary">
+                  <bdi>{pickName(data.review.name)}</bdi>
                 </p>
                 <Stars value={data.review.stars} />
               </div>

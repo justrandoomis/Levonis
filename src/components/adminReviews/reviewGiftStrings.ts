@@ -36,6 +36,8 @@ const ar = {
   copySentence: 'نسخ الرسالة',
   stateWaiting: 'بانتظار أن يكتبه الزبون',
   stateRedeemed: 'استخدمه الزبون في {date}',
+  stateVoidReturned: 'بطل الكود: أُعيدت الطابعة التي قُيّمت إلى المتجر، فلا يفتح هدية.',
+  stateVoidCancelled: 'بطل الكود: أُلغي طلب الطابعة التي قُيّمت، فلا يفتح هدية.',
   regenerate: 'إصدار كود جديد',
   regenerateTitle: 'إصدار كود جديد؟',
   regenerateBody: 'يتوقف الكود الحالي فورًا، وعليك إعطاء الزبون الكود الجديد.',
@@ -75,6 +77,8 @@ const en: Record<ReviewGiftKey, string> = {
   copySentence: 'Copy the message',
   stateWaiting: 'Waiting for the customer to write it',
   stateRedeemed: 'Used by the customer on {date}',
+  stateVoidReturned: 'Code void: the reviewed printer went back to the shop, so it opens no gift.',
+  stateVoidCancelled: "Code void: the reviewed printer's order was cancelled, so it opens no gift.",
   regenerate: 'Issue a new code',
   regenerateTitle: 'Issue a new code?',
   regenerateBody: 'The current code stops working at once, and you must give the customer the new one.',
@@ -112,6 +116,8 @@ const ckb: Record<ReviewGiftKey, string> = {
   copySentence: 'نامەکە کۆپی بکە',
   stateWaiting: 'چاوەڕێی نووسینی لەلایەن کڕیارەوە',
   stateRedeemed: 'کڕیار لە {date} بەکاری هێنا',
+  stateVoidReturned: 'کۆدەکە بەتاڵ بووەوە: ئەو چاپکەرەی هەڵسەنگێنرا گەڕێنرایەوە بۆ فرۆشگا، بۆیە دیاری ناکاتەوە.',
+  stateVoidCancelled: 'کۆدەکە بەتاڵ بووەوە: داواکاریی ئەو چاپکەرەی هەڵسەنگێنرا هەڵوەشێنرایەوە، بۆیە دیاری ناکاتەوە.',
   regenerate: 'دەرکردنی کۆدێکی نوێ',
   regenerateTitle: 'کۆدێکی نوێ دەربکرێت؟',
   regenerateBody: 'کۆدی ئێستا یەکسەر لە کار دەکەوێت، و دەبێت کۆدە نوێیەکە بدەیت بە کڕیار.',
@@ -129,6 +135,35 @@ export function reviewGiftText(lang: string, key: ReviewGiftKey, vars?: Record<s
   const raw = table[key];
   if (!vars) return raw;
   return raw.replace(/\{(\w+)\}/g, (mark, name: string) => (name in vars ? String(vars[name]) : mark));
+}
+
+type Row3 = readonly [ar: string, en: string, ckb: string];
+
+/** What the system saw in a review (worker/lib/reviewQuality.ts): its keys are for the server, these are for the team. */
+export const REVIEW_FACT_WORDS: Readonly<Record<string, Row3>> = {
+  text_40_chars: ['نص من 40 حرفًا فأكثر', 'Text of 40 letters or more', 'دەقی 40 پیت یان زیاتر'],
+  meaningful_text: ['نص من 100 حرف فأكثر', 'Text of 100 letters or more', 'دەقی 100 پیت یان زیاتر'],
+  detailed_text: ['نص مفصّل من 220 حرفًا فأكثر', 'Detailed text of 220 letters or more', 'دەقی ورد بە 220 پیت یان زیاتر'],
+  varied_language: ['لغة متنوعة', 'Varied wording', 'زمانی هەمەچەشن'],
+  unique_images: ['صور فريدة', 'Unique photos', 'وێنەی ڕەسەن'],
+  three_or_more_images: ['ثلاث صور فأكثر', 'Three photos or more', 'سێ وێنە یان زیاتر'],
+  high_quality_images: ['صور عالية الجودة', 'High-quality photos', 'وێنەی کوالیتی بەرز'],
+  video_present: ['فيها فيديو', 'Has a video', 'ڤیدیۆی تێدایە'],
+  useful_video: ['فيديو مفيد', 'A useful video', 'ڤیدیۆیەکی بەسوود'],
+  supporting_evidence: ['دليل ستوري إنستغرام', 'Instagram story evidence', 'بەڵگەی ستۆری ئینستاگرام'],
+  repetitive_text: ['نص مكرر', 'Repetitive text', 'دەقی دووبارەکراوە'],
+  padded_text: ['نص محشو بالتكرار', 'Text padded with repeats', 'دەقی پڕکراو بە دووبارەکردنەوە'],
+  duplicate_text: ['النص نفسه في مراجعة سابقة', 'The same text as an earlier review', 'هەمان دەقی هەڵسەنگاندنێکی پێشوو'],
+  duplicate_media: ['الصورة نفسها أكثر من مرة', 'The same photo more than once', 'هەمان وێنە زیاتر لە جارێک'],
+  reused_media: ['وسائط من مراجعة سابقة', 'Media from an earlier review', 'میدیا لە هەڵسەنگاندنێکی پێشوو'],
+  low_quality_image: ['صورة منخفضة الجودة', 'A low-quality photo', 'وێنەیەکی کوالیتی نزم'],
+  low_quality_video: ['فيديو منخفض الجودة', 'A low-quality video', 'ڤیدیۆیەکی کوالیتی نزم'],
+};
+
+/** A reason or a signal in the reader's language; a key a newer server adds reads as itself. */
+export function reviewFactWord(lang: string, key: string): string {
+  const row = REVIEW_FACT_WORDS[key];
+  return row ? row[lang === 'en' ? 1 : lang === 'ckb' ? 2 : 0] : key;
 }
 
 /** A code, grouped so it can be read aloud: GFT-7KQ-4MZX. The server reads it with or without the dashes. */

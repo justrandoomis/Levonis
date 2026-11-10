@@ -8,13 +8,13 @@
  */
 import { useCallback, useEffect, useId, useState } from 'react';
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
-import { api, failureText } from '../../lib/api';
+import { api, ApiError, failureText } from '../../lib/api';
 import { Sheet } from '../ui/Overlay';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Banner, Field, Grid, TextArea, TextInput, Toggle } from '../adminProducts/form/formUi';
 import * as T from '../adminProducts/theme';
 import ItemFields, { blankItem } from './ItemFields';
-import { ItemRow, triOf } from './ui';
+import { GIFTS_ACCENT, ItemRow, triOf } from './ui';
 import { adminText, type AdminLang, type AdminStringKey } from './strings';
 import type { ItemInput, Level, LevelItem, Tri } from './types';
 
@@ -72,14 +72,15 @@ function ItemSheet({
       onSaved();
       onClose();
     } catch (e) {
-      setError(failureText(e, t('loadFailed')));
+      const code = e instanceof ApiError ? e.code : '';
+      setError(code === 'GIFT_ITEM_DUPLICATE' ? t('itemDuplicate') : code === 'GIFT_ITEM_LEGACY' ? t('itemLegacy') : failureText(e, t('loadFailed')));
       setBusy(false);
     }
   };
 
   return (
     <Sheet open={open} onClose={() => !busy && onClose()} labelledBy={titleId} panelClassName="w-full sm:max-w-lg">
-      <div className={`${T.AP} px-5 pb-5 pt-2 space-y-3`} data-gift-item-sheet>
+      <div className={`${T.AP} px-5 pb-5 pt-2 space-y-3`} style={GIFTS_ACCENT} data-gift-item-sheet>
         <h2 id={titleId} className="text-[15px] font-bold text-[var(--ap-text-1)]">
           {item ? t('editItem') : t('addItem')} · {adminText(lang, 'levelN', { n: level })}
         </h2>
@@ -225,11 +226,11 @@ function LevelCard({ lang, level, onChanged }: { lang: AdminLang; level: Level; 
                 trailing={
                   <div className="flex shrink-0 items-center gap-1">
                     {!item.active && <span className="text-[11.5px] text-[var(--ap-text-3)]">{t('inactive')}</span>}
-                    <button type="button" className={T.btnIcon} aria-label={t('edit')} title={t('edit')} onClick={() => setSheet({ item })}>
+                    <button type="button" className={`${T.btnIcon} relative lv-hit`} aria-label={t('edit')} title={t('edit')} onClick={() => setSheet({ item })}>
                       <Pencil className="w-3.5 h-3.5" aria-hidden />
                     </button>
                     {item.active && (
-                      <button type="button" className={T.btnIconDanger} aria-label={t('remove')} title={t('remove')} onClick={() => setRemoving(item)}>
+                      <button type="button" className={`${T.btnIconDanger} relative lv-hit`} aria-label={t('remove')} title={t('remove')} onClick={() => setRemoving(item)}>
                         <Trash2 className="w-3.5 h-3.5" aria-hidden />
                       </button>
                     )}

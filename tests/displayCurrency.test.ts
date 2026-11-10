@@ -167,7 +167,7 @@ test('the rate source: displayUsdRate, or nothing (dinars) — NEVER the wallet 
   assert.match(ctx, /const \{ displayUsdRate, displayUsdRateAttributed: attributed \} = useWallet\(\);/);
   assert.match(ctx, /const settingsLoaded = displayUsdRate !== undefined;/);
   // …and hands it to the screens, so a «not approved yet» note can wait for the settings (FX-1A review #5).
-  assert.match(ctx, /currencyValue\(currency, setCurrency, rate, settingsLoaded\)/);
+  assert.match(ctx, /currencyValue\(currency, setCurrency, rate, settingsLoaded, lang\)/);
   assert.equal(currencyValue('USD', noop, null, false).settingsLoaded, false);
   assert.equal(currencyValue('USD', noop, null).settingsLoaded, true);
   assert.match(read('src/WalletContext.tsx'), /displayUsdRate: settings \? \(settings\.displayUsdRate \?\? null\) : undefined,/);
@@ -298,7 +298,7 @@ test('an order’s total keeps the dinar too — it is a record of a charge', ()
 
 test('moneyBoth really shows both, and the charge first', () => {
   const src = read('src/CurrencyContext.tsx');
-  assert.match(src, /return usd \? `\$\{formatIqd\(iqd\)\} · \$\{usd\}` : formatIqd\(iqd\);/);
+  assert.match(src, /return usd \? `\$\{dinars\(iqd\)\} · \$\{usd\}` : dinars\(iqd\);/);
   const v = currencyValue('USD', noop, shop('1400'));
   assert.equal(v.moneyBoth(1_750_000), `${formatIqd(1_750_000)} · $1,250.00`);
   assert.equal(currencyValue('IQD', noop, shop('1400')).moneyBoth(1_750_000), formatIqd(1_750_000));
@@ -347,14 +347,15 @@ test('every customer-facing price goes through the hook, not formatIqd', () => {
       const code = read(rel).replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
       const calls = code.match(/\bformatIqd\(/g) ?? [];
       if (rel === RATE_SENTENCE) {
-        // Exactly the six: two constants, three times (Arabic, English and
-        // Sorani — DECISIONS row 183: the Sorani sentence quotes the same rate).
-        assert.equal(calls.length, 6, `${rel}: the rate-sentence allowance is for those two rates only`);
+        // Exactly the four: two constants in Arabic and in Sorani (DECISIONS row 183: the
+        // Sorani sentence quotes the same rate). The English quotes them too, and reads «IQD».
+        assert.equal(calls.length, 4, `${rel}: the rate-sentence allowance is for those two rates only`);
         assert.equal(
           (code.match(/formatIqd\(codTax(PerBlock|Block)Iqd\)/g) ?? []).length,
-          6,
+          4,
           `${rel}: the rate sentence must quote the ADMIN's configured rate, not the packaged constant`
         );
+        assert.equal((code.match(/formatMoney\(codTax(PerBlock|Block)Iqd, 'en'\)/g) ?? []).length, 2, `${rel}: the English sentence quotes the same rate`);
         continue;
       }
       if (calls.length) offenders.push(rel);

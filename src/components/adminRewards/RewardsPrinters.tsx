@@ -239,7 +239,7 @@ function PrinterCard({ p, l, onOpen }: { p: AdminPrinter; l: keyof Tri; onOpen: 
       <p className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border-subtle px-3 py-2 text-[12px] leading-5 text-text-muted">
         <span>
           {loc('الطلب', 'Order', 'داواکاری')}{' '}
-          <a dir="ltr" href={`/admin?tab=orders&order=${encodeURIComponent(p.order_id)}`} className="font-mono text-text-primary underline underline-offset-2">
+          <a dir="ltr" href={`/admin?tab=orders&order=${encodeURIComponent(p.order_id)}`} className="relative lv-hit font-mono text-text-primary underline underline-offset-2">
             {p.order_id}
           </a>
         </span>

@@ -33,7 +33,7 @@ import { toast } from '../../lib/toastStore';
 import { Sheet } from '../ui/Sheet';
 import SafeImage from '../ui/SafeImage';
 import { ForwardChevron } from './AreaChrome';
-import { couponDestination } from './model';
+import { couponDestination, pickName } from './model';
 import type { RewardCoupon } from './types';
 import { useRewardsT } from './useT';
 
@@ -46,8 +46,10 @@ export function useShipDetail(): (c: Pick<RewardCoupon, 'amount_iqd' | 'min_tota
   const { money } = useMoney();
   return (c) => {
     if (!c.amount_iqd) return t('coupon.shipDetail');
-    const amount = t('coupon.shipAmount', { money: money(c.amount_iqd) });
-    return c.min_total_iqd ? `${amount} · ${t('coupon.shipMin', { money: money(c.min_total_iqd) })}` : amount;
+    // A figure and its unit never part at a line end: «100,000 / د.ع» read as two things.
+    const whole = (iqd: number) => money(iqd).replace(/ /g, '\u00A0');
+    const amount = t('coupon.shipAmount', { money: whole(c.amount_iqd) });
+    return c.min_total_iqd ? `${amount} · ${t('coupon.shipMin', { money: whole(c.min_total_iqd) })}` : amount;
   };
 }
 
@@ -103,7 +105,7 @@ export interface CouponTargetsSheetProps {
  * window from `sm`; one height on a phone, dragged by its grabber.
  */
 export function CouponTargetsSheet({ open, coupon, onClose }: CouponTargetsSheetProps) {
-  const { t, count, tri } = useRewardsT();
+  const { t, count } = useRewardsT();
   const targets = coupon.targets ?? null;
   const rows = (targets?.products ?? []).filter((p) => !!p.slug).slice(0, TARGETS_SHOWN_MAX);
   // Counted against the rows shown, so a product with no page still counts as one more.
@@ -130,8 +132,8 @@ export function CouponTargetsSheet({ open, coupon, onClose }: CouponTargetsSheet
             <li key={p.id}>
               <Link to={`/product/${encodeURIComponent(p.slug)}`} onClick={onClose} className="lv-choice flex w-full items-center gap-3 p-3 text-start">
                 <SafeImage src={p.image || null} alt="" aspect="square" sizes="48px" className="size-12 shrink-0 rounded-md" bgClassName="bg-surface" />
-                <span dir="auto" className="min-w-0 flex-1 text-[14px] font-semibold text-text-primary">
-                  {tri(p.name)}
+                <span className="min-w-0 flex-1 text-[14px] font-semibold text-text-primary">
+                  <bdi>{pickName(p.name)}</bdi>
                 </span>
                 <ForwardChevron />
               </Link>

@@ -344,19 +344,24 @@ test('the notices say what the owner set: his pieces, and no minimum when there 
   const kinds = ['free_shipping', 'filament_discount'] as const;
   const terms = { kind: 'weekly_coupons' as const, until: '2026-12-01', percent: 15, amount: 5_000, kinds };
   const usual = rewardText({ ...terms, min: 100_000, pieces: 1 }).body;
-  assert.match(usual.ar, /فوق 100,000 د\.ع/);
+  // The minimum counts: an order of exactly 100,000 qualifies (owner, 2026-11-09, DECISIONS row 303 R3),
+  // so the notice says «من … فأكثر» / «or more», never «فوق» / «over» / «سەرووی».
+  assert.match(usual.ar, /للطلبات من 100,000 د\.ع فأكثر/);
+  assert.doesNotMatch(usual.ar, /فوق/);
   assert.match(usual.ar, /قطعة واحدة/);
-  assert.match(usual.en, /over 100,000 IQD/);
+  assert.match(usual.en, /on orders of 100,000 IQD or more/);
+  assert.doesNotMatch(usual.en, /\bover\b|\babove\b/);
   assert.match(usual.en, /one piece/);
-  assert.match(usual.ckb, /سەرووی 100,000 دینار/);
+  assert.match(usual.ckb, /بۆ داواکارییەکانی 100,000 دینار و زیاتر/);
+  assert.doesNotMatch(usual.ckb, /سەروو/);
   assert.match(usual.ckb, /یەک پارچە/);
 
   const owners = rewardText({ ...terms, min: 0, pieces: 3 }).body;
-  assert.doesNotMatch(owners.ar, /فوق/);
+  assert.doesNotMatch(owners.ar, /فأكثر/);
   assert.match(owners.ar, /3 قطع/);
-  assert.doesNotMatch(owners.en, /over/);
+  assert.doesNotMatch(owners.en, /or more/);
   assert.match(owners.en, /3 pieces/);
-  assert.doesNotMatch(owners.ckb, /سەرووی/);
+  assert.doesNotMatch(owners.ckb, /و زیاتر/);
   assert.match(owners.ckb, /3 پارچە/);
   assert.match(rewardText({ ...terms, min: 0, pieces: 2 }).body.ar, /قطعتين/);
   assert.match(rewardText({ ...terms, min: 0, pieces: 11 }).body.ar, /11 قطعة/);

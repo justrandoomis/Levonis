@@ -46,6 +46,8 @@ const ar = {
   bodyOrdered: 'هديتك في طلب قيد التجهيز. تابعه من صفحة الطلب.',
   bodyFulfilled: 'وصلتك الهدية. نتمنى أن تعجبك!',
   bodyCancelled: 'تواصل مع الدعم إن كان لديك سؤال عنها.',
+  // Row 303 R1 (policy 8.16): the system cancelled it because the reviewed printer left its customer.
+  bodyCancelledPrinter: 'أُعيدت الطابعة التي فتح كود مراجعتها هذه الهدية إلى المتجر، أو أُلغي طلبها.',
   noChoices: 'لا توجد هدايا متاحة في هذا المستوى الآن. سنُعلمك حين تتوفر.',
 
   chooseThis: 'تأكيد الاختيار',
@@ -146,6 +148,7 @@ const en: Record<GiftStringKey, string> = {
   bodyOrdered: 'Your gift is in an order being prepared. Follow it on the order page.',
   bodyFulfilled: 'Your gift has arrived. We hope you enjoy it!',
   bodyCancelled: 'Contact support if you have a question about it.',
+  bodyCancelledPrinter: 'The printer whose review code opened this gift went back to the shop, or its order was cancelled.',
   noChoices: 'No gifts are available in this level right now. We will let you know when there are.',
 
   chooseThis: 'Confirm choice',
@@ -244,6 +247,7 @@ const ckb: Record<GiftStringKey, string> = {
   bodyOrdered: 'دیارییەکەت لە داواکارییەکدایە کە ئامادە دەکرێت. لە پەڕەی داواکارییەکەوە بەدوایدا بچۆ.',
   bodyFulfilled: 'دیارییەکەت گەیشت. هیوادارین بەدڵت بێت!',
   bodyCancelled: 'ئەگەر پرسیارێکت هەیە پەیوەندی بە پشتگیرییەوە بکە.',
+  bodyCancelledPrinter: 'ئەو چاپکەرەی کۆدی هەڵسەنگاندنەکەی ئەم دیارییەی کردەوە گەڕێنرایەوە بۆ فرۆشگا، یان داواکارییەکەی هەڵوەشێنرایەوە.',
   noChoices: 'ئێستا هیچ دیارییەک لەم ئاستەدا بەردەست نییە. کاتێک هەبوو ئاگادارت دەکەینەوە.',
 
   chooseThis: 'پشتڕاستکردنەوەی هەڵبژاردن',

@@ -133,6 +133,21 @@ const AWAITING_CONFIRMATION: Record<Lang, string> = {
   ckb: 'چاوەڕێی پشتڕاستکردنەوە',
 };
 
+/**
+ * THE ORDER PAGE'S PILL. It names the current stage in the server's words when the tracker has
+ * loaded, and the legacy status otherwise. A cancelled order has no current stage: the tracker
+ * stops where the order stood, «تم استلام الطلب» at best, so the pill would say the shop has the
+ * order while the list beside it says «ملغية». The status decides that one, not the path.
+ */
+export function orderPillLabel(
+  lang: string,
+  order: { status: OrderStatus | string; total_iqd?: number; wallet_applied_iqd?: number; due_on_delivery_iqd?: number } | null | undefined,
+  steps: ReadonlyArray<{ current?: boolean; label: string }> | null | undefined
+): string {
+  if (order?.status === 'cancelled') return orderStatusLabel(lang, order);
+  return steps?.find((st) => st.current)?.label ?? (order ? orderStatusLabel(lang, order) : '');
+}
+
 export function orderStatusLabel(
   lang: string,
   order: { status: OrderStatus | string; total_iqd?: number; wallet_applied_iqd?: number; due_on_delivery_iqd?: number }

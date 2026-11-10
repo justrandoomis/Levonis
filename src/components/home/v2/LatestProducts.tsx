@@ -113,22 +113,21 @@ export default function LatestProducts({
 
   const label: Record<LatestChipId, string> = {
     all: loc('الكل', 'All', 'هەموو'),
-    // OWNER: Sorani to be written by hand (printers, accessories chips and the section title).
-    printers: loc('الطابعات', 'Printers'),
+    printers: loc('الطابعات', 'Printers', 'چاپکەرەکان'),
     filament: 'Filament',
     resin: 'Resin',
-    accessories: loc('الإكسسوارات', 'Accessories'),
+    accessories: loc('الإكسسوارات', 'Accessories', 'ئێکسسوارەکان'),
     offers: loc('العروض', 'Deals', 'ئۆفەرەکان'),
   };
 
   return (
     <section data-home-section="latest" aria-labelledby="home-latest-title">
-      <SectionHead id="home-latest-title" title={loc('أحدث المنتجات', 'Latest products')} to={latestSeeAll(chip)} />
+      <SectionHead id="home-latest-title" title={loc('أحدث المنتجات', 'Latest products', 'نوێترین بەرهەمەکان')} to={latestSeeAll(chip)} />
 
       {shownChips.length > 1 && (
         <div
           role="group"
-          aria-label={loc('تصفية المنتجات', 'Filter products')}
+          aria-label={loc('تصفية المنتجات', 'Filter products', 'پاڵاوتنی بەرهەمەکان')}
           className="-mx-4 mb-2 flex gap-1.5 overflow-x-auto overscroll-x-contain px-4 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:mb-4 lg:px-0"
         >
           {shownChips.map((c) => {
@@ -185,7 +184,7 @@ export default function LatestProducts({
         <div className="flex flex-col items-center gap-1 py-5 text-center text-[13px] text-text-secondary">
           {failed[active] ? (
             <>
-              <p>{loc('تعذر تحميل هذا القسم الآن.', 'This section could not be loaded right now.')}</p>
+              <p>{loc('تعذر تحميل هذا القسم الآن.', 'This section could not be loaded right now.', 'ئێستا ئەم بەشە بار نەبوو.')}</p>
               <button
                 type="button"
                 onClick={() => setFailed((prev) => ({ ...prev, [active]: false }))}
@@ -195,7 +194,7 @@ export default function LatestProducts({
               </button>
             </>
           ) : (
-            <p>{loc('لا توجد منتجات في هذا القسم بعد.', 'No products in this section yet.')}</p>
+            <p>{loc('لا توجد منتجات في هذا القسم بعد.', 'No products in this section yet.', 'هێشتا هیچ بەرهەمێک لەم بەشەدا نییە.')}</p>
           )}
         </div>
       ) : null}

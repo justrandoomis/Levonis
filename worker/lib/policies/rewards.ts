@@ -170,6 +170,27 @@ import type { PolicyDocument } from './types';
  *     already running: its ticket may still be claimed that day (rewards.ts `/video`).
  *   * PRODUCTS FOR POINTS — 14.9. «23000 points to redeem filament»: the rule, with
  *     no price; the prices are the owner's settings, announced on the page.
+ *   * THE OWNER'S RULINGS OF 2026-11-09 (DECISIONS row 303), written into this
+ *     version before it was published (live served version 7):
+ *       R1 — 8.16, and 8.5 names it: a review code dies with its printer. Returned
+ *            with a refund, or its order cancelled: the code opens no gift and no
+ *            new one replaces it; an unordered gift it opened is cancelled. The
+ *            printers' own «returned» decides (worker/lib/rewards/earning.ts
+ *            `reviewedPrinterVoidSql`), so a line of two keeps its review while one
+ *            printer of it stays.
+ *       R2 — 14.10: a coupon bought with points and withdrawn by the Store before
+ *            use and before it ends gives the points back, once, with a notice
+ *            (worker/lib/rewards/coupons.ts `couponPointsBackStatements`).
+ *       R3 — 14.4: the minimum counts — «من 100,000 د.ع فأكثر», «100,000 IQD or
+ *            more»: packages/pricing/src/coupons.ts compares with >=.
+ *       R4 — 7.8: a printer review whose gift the Store refuses earns, at the
+ *            refusal, the points any valid review earns, once (worker/routes/reviews.ts).
+ *     And the lead's calls on what the second integration run left open (row 303):
+ *       L1 — 8.16: a gift ordered before its printer went back stays, but its own
+ *            order cancelled before delivery takes it too, by every door
+ *            (worker/lib/gifts/reviewCode.ts `voidReviewGiftsOfOrder`).
+ *       L2 — 7.8: a refused printer review approved later keeps those points and
+ *            gets its code: nothing taken back, nothing paid twice.
  */
 export const rewards: PolicyDocument = {
   key: 'rewards',
@@ -405,7 +426,7 @@ export const rewards: PolicyDocument = {
 إذا لم تكن القيمة الأساسية محددة في إعدادات المتجر فلا تُمنح نقاط مراجعة، ويُعلَن ذلك للزبون في الصفحة بصريح العبارة. ولا يخترع النظام قيمة، ولا ينشأ للزبون حق بأثر رجعي عند تحديدها لاحقاً.
 
 ### 7.8 المراجعة التي تدخل قائمة الهدية
-المراجعة التي تدخل قائمة الهدية لا تُمنح نقاط المراجعة التلقائية، لأنها دخلت مسار الهدية المبيّن في الفصل الثامن.
+المراجعة التي تدخل قائمة الهدية لا تُمنح نقاط المراجعة التلقائية عند إرسالها، لأنها دخلت مسار الهدية المبيّن في الفصل الثامن. فإن رفض المتجر هديتها مُنحت عند الرفض نقاط المراجعة التي تُمنح لأي مراجعة يدوية صحيحة وفق المادة 7.5، مرة واحدة لا تتكرر. وإن وافق المتجر على هديتها بعد رفضها بقيت لها تلك النقاط وأخذت كودها أيضاً، فلا يُسترد منها شيء ولا تُدفع النقاط مرة ثانية.
 
 ### 7.9 تعديل المراجعة
 للزبون تعديل مراجعته ما دامت مكافأتها لم يُبتّ فيها. وإن أظهر التعديل في المراجعة إشارة إساءة مما تذكره المادة 8.3 بقيت المراجعة منشورة، وسُجّل رفض مكافأة الهدية بسبب مكتوب، ومُنحت المراجعة نقاطها التلقائية كأي مراجعة يدوية صحيحة.
@@ -434,7 +455,7 @@ export const rewards: PolicyDocument = {
 لا يصدر قبول ولا رفض ولا طلب تعديل بغير سبب مكتوب يُعرض على صاحب المراجعة.
 
 ### 8.5 القرار لا يُعاد
-المكافأة التي قُبلت لا يُعاد البتّ فيها، ولا تُسحب بقرار لاحق، إلا في حالات إساءة الاستعمال المبيّنة في الفصل الثالث عشر.
+المكافأة التي قُبلت لا يُعاد البتّ فيها، ولا تُسحب بقرار لاحق، إلا في حالات إساءة الاستعمال المبيّنة في الفصل الثالث عشر، وفي الطابعة التي تعود إلى المتجر وفق المادة 8.16.
 
 ### 8.6 استحقاق واحد لكل مراجعة
 تنشئ كتابة الكود استحقاق هدية واحداً لا غير عن المراجعة الواحدة.
@@ -465,6 +486,9 @@ export const rewards: PolicyDocument = {
 
 ### 8.15 ما قُبل قبل هذا الإصدار
 المراجعة التي قُبلت قبل نفاذ هذا الإصدار تبقى على الاستحقاق الذي نشأ لها، بمستواها، بلا كود.
+
+### 8.16 الطابعة التي تعود إلى المتجر
+إذا أُرجعت الطابعة التي قُيّمت واستُرد ثمنها، أو أُلغي طلبها، بطل كود مراجعتها: لا يفتح هدية، ولا يصدر بدله كود جديد، وتقول صفحة «قيّم طابعتك» ذلك لصاحبه مع سببه. والهدية التي فتحها الكود ولم تُطلب بعد تُلغى حين يُبتّ في الإرجاع أو يُلغى الطلب. أما الهدية التي طُلبت أو سُلّمت فتبقى، ويسري عليها الفصل الثالث عشر. فإن أُلغي الطلب الذي طُلبت فيه هذه الهدية قبل تسليمها أُلغيت الهدية معه، ولا يمكن طلبها مرة أخرى. ومن كان في سطر طلبه أكثر من طابعة من الطراز نفسه بقيت مراجعته وكودها ما بقيت لديه واحدة منها.
 
 ## 9. التقييم التلقائي بعد سبعة أيام
 
@@ -617,7 +641,7 @@ export const rewards: PolicyDocument = {
 يصلح كوبون المكافأة سبعة أيام كاملة من لحظة إصداره، ما لم يعلن المتجر مدة أخرى قبل إصداره. وتُعرض نهاية صلاحية كل كوبون معه في صفحة المكافآت، ولا يُقبل بعدها.
 
 ### 14.4 كوبون التوصيل المجاني
-يخصم من أجرة توصيل الطلب قيمته المعلنة معه، ولا يخصم شيئاً من ثمن المنتجات. ويُقبل في طلب بلغ ثمن منتجاته، بعد كل الخصومات وقبل أجرة التوصيل، الحدَّ المعلن معه. والمعلن عند صدور هذه النسخة: 5,000 د.ع للطلبات فوق 100,000 د.ع. ولا تُحسب النقاط خصماً هنا، فهي طريقة دفع. ولا يخصم أكثر مما بقي من الأجرة، ولا يُستهلك في طلب كان توصيله مجانياً أصلاً، ولا في طلب يُستلم من المخزن.
+يخصم من أجرة توصيل الطلب قيمته المعلنة معه، ولا يخصم شيئاً من ثمن المنتجات. ويُقبل في طلب بلغ ثمن منتجاته، بعد كل الخصومات وقبل أجرة التوصيل، الحدَّ المعلن معه. والمعلن عند صدور هذه النسخة: 5,000 د.ع للطلبات من 100,000 د.ع فأكثر. ولا تُحسب النقاط خصماً هنا، فهي طريقة دفع. ولا يخصم أكثر مما بقي من الأجرة، ولا يُستهلك في طلب كان توصيله مجانياً أصلاً، ولا في طلب يُستلم من المخزن.
 
 ### 14.5 كوبون الفلامنت
 يخصم النسبة المعلنة معه من ثمن قطعة واحدة من خيط الطباعة الذي يسمّيه الكوبون، بحد أقصى معلن للكوبون الواحد، ولا يمس سائر المنتجات ولا التوصيل. وإذا اختلفت أثمان القطع في الطلب وقع على أغلاها. ويُطبَّق كذلك على القطعة التي عليها عرض أو خصم آخر، فيخصم من سعرها بعده، ما لم يُعلن معه غير ذلك. وتُثبَّت نسبته وحده الأقصى وعدد قطعه وقائمة الخيط المشمول لحظة إصداره.
@@ -636,8 +660,8 @@ export const rewards: PolicyDocument = {
 
 وله كذلك أن يستبدل نقاطه المستقرة بمنتج يعرضه المتجر في متجر النقاط، بالسعر المعلن بالنقاط في الصفحة نفسها. تُخصم النقاط لحظة الاستبدال، ويصير المنتج هدية في «هداياي» تُطلب عبر السلة بسعر صفر، فلا يدفع الزبون عنها إلا أجرة التوصيل. ولا يحوز في وقت واحد أكثر من هدية واحدة لم تُطلب بعد من المنتج المعروض الواحد. وإذا ألغى المتجر الهدية قبل طلبها عادت النقاط مرة واحدة. وإذا أُلغي الطلب عادت الهدية قابلة للطلب وبقيت النقاط مصروفة.
 
-### 14.10 لا عودة للنقاط المستبدلة
-النقاط التي استُبدلت بكوبون لا تعود إذا انتهت صلاحيته دون استعمال.
+### 14.10 متى تعود النقاط المستبدلة
+النقاط التي استُبدلت بكوبون لا تعود إذا انتهت صلاحيته دون استعمال. وإذا سحب المتجر كوبوناً استُبدل بالنقاط قبل أن يُستعمل وقبل انتهاء صلاحيته عادت نقاطه إلى صاحبه مرة واحدة، ووصله إشعار بذلك.
 
 ### 14.11 الكوبون ليس مالاً
 كوبون المكافأة ليس مالاً ولا رصيداً، ولا يُستبدل بنقد ولا بنقاط، ولا يُعوَّض عنه إذا انتهت صلاحيته.
@@ -918,7 +942,7 @@ The value of review points is twice the base value published in the Store's sett
 If the base value is not set in the Store's settings, no review points are granted, and this is stated to the customer on the page in express terms. The system invents no value, and no retroactive right arises for the customer when a value is later set.
 
 ### 7.8 A review that enters the gift queue
-A review that enters the gift queue is not granted the automatic review points, because it has entered the gift path set out in chapter 8.
+A review that enters the gift queue is not granted the automatic review points when it is sent, because it has entered the gift path set out in chapter 8. If the Store refuses its gift, it is granted, at the refusal, the review points any valid manual review is granted under article 7.5, once only. If the Store approves its gift after refusing it, the review keeps those points and also receives its code: nothing is taken back, and the points are not paid a second time.
 
 ### 7.9 Editing a review
 A customer may edit their review as long as its reward has not been decided. If the edit shows a sign of abuse listed in article 8.3, the review remains published, the refusal of the gift reward is recorded with a written reason, and the review is granted its automatic points like any other valid manual review.
@@ -947,7 +971,7 @@ The gift queue takes every manual review of a printer delivered to the customer,
 No approval, refusal or request for changes is issued without a written reason shown to the author of the review.
 
 ### 8.5 The decision is not reopened
-A reward that has been approved is not re-decided and is not withdrawn by a later decision, save in the cases of abuse set out in chapter 13.
+A reward that has been approved is not re-decided and is not withdrawn by a later decision, save in the cases of abuse set out in chapter 13 and for a printer that goes back to the Store under article 8.16.
 
 ### 8.6 One entitlement per review
 Writing the code creates one gift entitlement only, per review.
@@ -978,6 +1002,9 @@ On approval a personal code is issued for the review, which the Levonis team han
 
 ### 8.15 What was approved before this version
 A review approved before this version took effect keeps the entitlement created for it, at its level, without a code.
+
+### 8.16 A printer that goes back to the Store
+If the reviewed printer is returned and its price refunded, or its order is cancelled, the review's code becomes void: it opens no gift, no new code is issued in its place, and the «Rate your printer» page tells its holder so, with the reason. A gift the code opened that has not been ordered yet is cancelled when the return is decided or the order cancelled. A gift already ordered or delivered stays, and chapter 13 applies to it. If the order holding such a gift is cancelled before the gift is delivered, the gift is cancelled with it and cannot be ordered again. A customer whose order line held more than one printer of the same model keeps the review and its code while one of them stays with them.
 
 ## 9. The automatic rating after seven days
 
@@ -1130,7 +1157,7 @@ No coupons are created by a printer received as a gift, by an order from a store
 A reward coupon is valid for seven full days from the moment it is issued, unless the Store announces another period before it is issued. The end of each coupon's validity is shown with it on the Rewards page, and it is not accepted after that.
 
 ### 14.4 The free-delivery coupon
-It takes the value announced with it off the order's delivery charge and nothing off the price of the products. It is accepted on an order whose products reach the threshold announced with it, after every discount and before the delivery charge. Announced when this version was issued: 5,000 IQD on orders over 100,000 IQD. Points are not counted as a discount here: they are a way of paying. It takes no more than what is left of the charge, and it is not used up on an order whose delivery was free already, nor on an order collected from the warehouse.
+It takes the value announced with it off the order's delivery charge and nothing off the price of the products. It is accepted on an order whose products reach the threshold announced with it, after every discount and before the delivery charge. Announced when this version was issued: 5,000 IQD on orders of 100,000 IQD or more. Points are not counted as a discount here: they are a way of paying. It takes no more than what is left of the charge, and it is not used up on an order whose delivery was free already, nor on an order collected from the warehouse.
 
 ### 14.5 The filament coupon
 It takes the percentage announced with it off the price of one piece of the print filament the coupon names, up to an announced ceiling per coupon; it does not touch other products or delivery. Where the pieces in an order differ in price, it falls on the dearest. It also applies to an item that carries an offer or another discount, off the price after it, unless announced otherwise with it. Its percentage, its ceiling, its number of pieces and the list of filament it covers are fixed when it is issued.
@@ -1149,8 +1176,8 @@ A customer may exchange settled points for a free-delivery coupon or a filament 
 
 A customer may also exchange settled points for a product the Store offers in the points shop, at the price in points announced on the same page. The points are deducted at the moment of the exchange, and the product becomes a gift in «My gifts», ordered through the cart at a price of zero, so that the customer pays only for delivery. A customer holds no more than one gift not yet ordered of the same offered product at any one time. If the Store cancels the gift before it is ordered, the points return once. If the order is cancelled, the gift can be ordered again and the points stay spent.
 
-### 14.10 Exchanged points do not return
-Points exchanged for a coupon do not return if the coupon expires unused.
+### 14.10 When exchanged points return
+Points exchanged for a coupon do not return if the coupon expires unused. If the Store withdraws a coupon exchanged for points before it is used and before it expires, its points return to its holder once, with a notice.
 
 ### 14.11 A coupon is not money
 A reward coupon is not money and not a balance; it cannot be exchanged for cash or for points, and no compensation is given when it expires.
@@ -1431,7 +1458,7 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ئەگەر بەها بنەڕەتییەکە لە ڕێکخستنەکانی فرۆشگادا دیاری نەکرابێت، هیچ خاڵی پێداچوونەوە نابەخشرێت، و ئەمە بە ڕوونی لە پەڕەکەدا بە کڕیار ڕادەگەیەنرێت. سیستەمەکە هیچ بەهایەک داناهێنێت، و هیچ مافێکی دواکەوتوو بۆ کڕیار سەرهەڵنادات کاتێک بەهایەک دواتر دیاری دەکرێت.
 
 ### 7.8 پێداچوونەوەیەک کە دەچێتە ناو ڕیزی دیاری
-پێداچوونەوەیەک کە دەچێتە ناو ڕیزی دیاری، خاڵی خۆکاری پێداچوونەوەی پێ نابەخشرێت، چونکە چووەتە ناو ڕێچکەی دیاری کە لە بەشی هەشتەمدا هاتووە.
+پێداچوونەوەیەک کە دەچێتە ناو ڕیزی دیاری، لە کاتی ناردنیدا خاڵی خۆکاری پێداچوونەوەی پێ نابەخشرێت، چونکە چووەتە ناو ڕێچکەی دیاری کە لە بەشی هەشتەمدا هاتووە. ئەگەر فرۆشگا دیارییەکەی ڕەت بکاتەوە، لە کاتی ڕەتکردنەوەکەدا ئەو خاڵانەی پێداچوونەوەی پێ دەبەخشرێت کە بە هەر پێداچوونەوەیەکی دەستیی دروست دەبەخشرێت بەپێی ماددەی 7.5، تەنها یەک جار. ئەگەر فرۆشگا دوای ڕەتکردنەوەکە دیارییەکەی پەسەند بکات، ئەو خاڵانە بۆ پێداچوونەوەکە دەمێننەوە و کۆدەکەشی وەردەگرێت: هیچیان لێ وەرناگیرێتەوە و دوو جار نادرێن.
 
 ### 7.9 دەستکاریکردنی پێداچوونەوە
 کڕیار دەتوانێت پێداچوونەوەکەی دەستکاری بکات تا ئەو کاتەی بڕیار لەسەر پاداشتەکەی نەدراوە. ئەگەر دەستکارییەکە نیشانەیەکی خراپ بەکارهێنان دەربخات لەوانەی ماددەی 8.3 باسیان دەکات، پێداچوونەوەکە بڵاوکراوە دەمێنێتەوە، ڕەتکردنەوەی پاداشتی دیاری بە هۆکارێکی نووسراو تۆمار دەکرێت، و پێداچوونەوەکە خاڵی خۆکاری خۆی وەردەگرێت وەک هەر پێداچوونەوەیەکی دەستیی دروست.
@@ -1460,7 +1487,7 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 هیچ پەسەندکردن و ڕەتکردنەوە و داواکردنی گۆڕانکارییەک بەبێ هۆکارێکی نووسراو دەرناچێت کە بە خاوەنی پێداچوونەوەکە پیشان دەدرێت.
 
 ### 8.5 بڕیارەکە دووبارە ناکرێتەوە
-ئەو پاداشتەی پەسەند کراوە دووبارە بڕیاری لەسەر نادرێتەوە و بە بڕیارێکی دواتر نافەوتێنرێت، جگە لە دۆخەکانی خراپ بەکارهێنان کە لە بەشی سێزدەیەمدا هاتوون.
+ئەو پاداشتەی پەسەند کراوە دووبارە بڕیاری لەسەر نادرێتەوە و بە بڕیارێکی دواتر نافەوتێنرێت، جگە لە دۆخەکانی خراپ بەکارهێنان کە لە بەشی سێزدەیەمدا هاتوون، و ئەو چاپکەرەی بۆ فرۆشگا دەگەڕێتەوە بەپێی ماددەی 8.16.
 
 ### 8.6 یەک شایستەیی بۆ هەر پێداچوونەوەیەک
 نووسینی کۆدەکە تەنها یەک شایستەیی دیاری دروست دەکات بۆ هەر پێداچوونەوەیەک.
@@ -1491,6 +1518,9 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 
 ### 8.15 ئەوەی پێش ئەم وەشانە پەسەندکراوە
 پێداچوونەوەیەک کە پێش کارپێکردنی ئەم وەشانە پەسەندکراوە، لەسەر ئەو شایستەیییە دەمێنێتەوە کە بۆی دروست بووە، بە ئاستەکەی خۆی، بەبێ کۆد.
+
+### 8.16 ئەو چاپکەرەی بۆ فرۆشگا دەگەڕێتەوە
+ئەگەر ئەو چاپکەرەی پێداچوونەوەی بۆ کراوە بگەڕێنرێتەوە و نرخەکەی بدرێتەوە، یان داواکارییەکەی هەڵبوەشێنرێتەوە، کۆدی پێداچوونەوەکەی بەتاڵ دەبێتەوە: هیچ دیارییەک ناکاتەوە، هیچ کۆدێکی نوێش لە جێگەی دەرناچێت، و پەڕەی «چاپکەرەکەت هەڵبسەنگێنە» ئەوە و هۆکارەکەی بە خاوەنەکەی دەڵێت. ئەو دیارییەی کۆدەکە کردوویەتەوە و هێشتا داوا نەکراوە، لە کاتی بڕیاردان لەسەر گەڕاندنەوەکە یان هەڵوەشاندنەوەی داواکارییەکەدا هەڵدەوەشێنرێتەوە. بەڵام ئەو دیارییەی داوا کراوە یان گەیەنراوە دەمێنێتەوە، و بەشی سێزدەیەمی بەسەردا دەسەپێت. ئەگەر ئەو داواکارییەی ئەم دیارییەی تێدا داوا کراوە پێش گەیاندنی هەڵبوەشێنرێتەوە، دیارییەکەش لەگەڵیدا هەڵدەوەشێنرێتەوە و ناتوانرێت دووبارە داوا بکرێتەوە. ئەو کڕیارەی لە یەک هێڵی داواکارییەکەیدا زیاتر لە چاپکەرێکی هەمان مۆدێلی هەبووە، تا یەکێکیانی لا بمێنێت پێداچوونەوەکەی و کۆدەکەی دەمێننەوە.
 
 ## 9. پلەدانی خۆکار دوای حەوت ڕۆژ
 
@@ -1643,7 +1673,7 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 کۆپۆنی پاداشت حەوت ڕۆژی تەواو لە ساتی دەرچوونییەوە بەکاردێت، مەگەر فرۆشگا پێش دەرکردنی ماوەیەکی تر ڕابگەیەنێت. کۆتایی ماوەی هەر کۆپۆنێک لەگەڵیدا لە پەڕەی پاداشتەکاندا پیشان دەدرێت، و دوای ئەوە وەرناگیرێت.
 
 ### 14.4 کۆپۆنی گەیاندنی بەخۆڕایی
-بەهای ڕاگەیەنراو لەگەڵیدا لە تێچووی گەیاندنی داواکارییەکە کەم دەکاتەوە و هیچ لە نرخی بەرهەمەکان کەم ناکاتەوە. لە داواکارییەکدا وەردەگیرێت کە نرخی بەرهەمەکانی، دوای هەموو داشکاندنەکان و پێش تێچووی گەیاندن، بگاتە ئەو سنوورەی لەگەڵیدا ڕاگەیەنراوە. ئەوەی لە کاتی دەرچوونی ئەم وەشانەدا ڕاگەیەنراوە: 5,000 دینار بۆ داواکارییەکانی سەرووی 100,000 دینار. لێرەدا خاڵەکان وەک داشکاندن ناژمێردرێن، چونکە شێوازێکی پارەدانن. لەوەی لە تێچووەکە ماوە زیاتر کەم ناکاتەوە، و لە داواکارییەکدا کە گەیاندنەکەی پێشتر بەخۆڕایی بووبێت، یان لە داواکارییەکدا کە لە کۆگا وەردەگیرێت، بەکارنابرێت.
+بەهای ڕاگەیەنراو لەگەڵیدا لە تێچووی گەیاندنی داواکارییەکە کەم دەکاتەوە و هیچ لە نرخی بەرهەمەکان کەم ناکاتەوە. لە داواکارییەکدا وەردەگیرێت کە نرخی بەرهەمەکانی، دوای هەموو داشکاندنەکان و پێش تێچووی گەیاندن، بگاتە ئەو سنوورەی لەگەڵیدا ڕاگەیەنراوە. ئەوەی لە کاتی دەرچوونی ئەم وەشانەدا ڕاگەیەنراوە: 5,000 دینار بۆ داواکارییەکانی 100,000 دینار و زیاتر. لێرەدا خاڵەکان وەک داشکاندن ناژمێردرێن، چونکە شێوازێکی پارەدانن. لەوەی لە تێچووەکە ماوە زیاتر کەم ناکاتەوە، و لە داواکارییەکدا کە گەیاندنەکەی پێشتر بەخۆڕایی بووبێت، یان لە داواکارییەکدا کە لە کۆگا وەردەگیرێت، بەکارنابرێت.
 
 ### 14.5 کۆپۆنی دەزووی چاپ
 ئەو ڕێژەیەی لەگەڵیدا ڕاگەیەنراوە لە نرخی یەک پارچە لەو دەزووی چاپەی کە کۆپۆنەکە ناوی دەبات کەم دەکاتەوە، تا سنوورێکی ڕاگەیەنراو بۆ هەر کۆپۆنێک، و دەست لە بەرهەمەکانی تر و گەیاندن نادات. ئەگەر نرخی پارچەکانی داواکارییەکە جیاواز بوون، لەسەر گرانترینیان جێبەجێ دەبێت. لەسەر پارچەیەکیش کە ئۆفەر یان داشکاندنێکی تری لەسەرە جێبەجێ دەبێت و لە نرخەکەی دوای ئەوە کەم دەکاتەوە، مەگەر لەگەڵیدا پێچەوانەکەی ڕابگەیەنرێت. ڕێژە و سنوور و ژمارەی پارچەکان و لیستی ئەو دەزووەی دەیگرێتەوە لە کاتی دەرچووندا جێگیر دەکرێن.
@@ -1662,8 +1692,8 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 
 هەروەها کڕیار دەتوانێت خاڵە جێگیرەکانی بە بەرهەمێک بگۆڕێتەوە کە فرۆشگا لە فرۆشگای خاڵدا دەیخاتە ڕوو، بەو نرخە بە خاڵەی لە هەمان پەڕەدا ڕاگەیەنراوە. خاڵەکان لە ساتی گۆڕینەوەدا کەم دەکرێنەوە، و بەرهەمەکە دەبێتە دیارییەک لە «دیارییەکانم» کە لە ڕێگەی سەبەتەوە بە نرخی سفر داوا دەکرێت، بۆیە کڕیار تەنها کرێی گەیاندن دەدات. لە یەک کاتدا زیاتر لە یەک دیاریی داوانەکراو لە هەمان بەرهەمی خراوەڕوو ناگرێت. ئەگەر فرۆشگا پێش داواکردن دیارییەکە هەڵبوەشێنێتەوە، خاڵەکان یەک جار دەگەڕێنەوە. ئەگەر داواکارییەکە هەڵوەشایەوە، دیارییەکە دووبارە دەکرێت داوا بکرێت و خاڵەکان خەرجکراو دەمێننەوە.
 
-### 14.10 خاڵی گۆڕدراو ناگەڕێتەوە
-ئەو خاڵانەی بە کۆپۆن گۆڕدراون ناگەڕێنەوە ئەگەر ماوەی کۆپۆنەکە بەبێ بەکارهێنان کۆتایی بێت.
+### 14.10 کەی خاڵی گۆڕدراو دەگەڕێتەوە
+ئەو خاڵانەی بە کۆپۆن گۆڕدراون ناگەڕێنەوە ئەگەر ماوەی کۆپۆنەکە بەبێ بەکارهێنان کۆتایی بێت. ئەگەر فرۆشگا کۆپۆنێک کە بە خاڵ گۆڕدراوە پێش بەکارهێنان و پێش کۆتاییهاتنی ماوەکەی بکشێنێتەوە، خاڵەکانی یەک جار بۆ خاوەنەکەی دەگەڕێنەوە، و ئاگادارکردنەوەیەکی پێدەگات.
 
 ### 14.11 کۆپۆن پارە نییە
 کۆپۆنی پاداشت نە پارەیە و نە باڵانس؛ بە پارە یان بە خاڵ ناگۆڕدرێتەوە، و کاتێک ماوەکەی کۆتایی دێت هیچ قەرەبوویەک نادرێت.

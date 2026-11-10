@@ -1024,7 +1024,7 @@ export async function finishCompetition(
       const points = prizes[p.place - 1] ?? 0;
       return {
         userId: owners.get(p.entry_id)!,
-        text: rewardText({ kind: 'competition_won', title: competitionTitle(row), place: p.place, points }),
+        text: rewardText({ kind: 'competition_won', title: competitionTitle(row), place: p.place, points, prize: { ar: row.prize_ar, en: row.prize_en, ckb: row.prize_ckb } }),
         competitionId: id,
         eventKey: `reward:competition:${id}:won`,
         meta: { place: p.place, points },

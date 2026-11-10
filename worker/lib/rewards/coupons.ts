@@ -1030,3 +1030,60 @@ export async function buyShopCoupon(env: Env, userId: string, kind: RewardCoupon
   if (!row) throw new RewardShopError('REWARD_SHOP_HOLDING', 'You already hold this coupon — use it before buying another');
   return grantView(row);
 }
+
+/** The note a returned price of a withdrawn shop coupon carries in the ledger (the page names it, src/components/points/words.ts). */
+export const SHOP_COUPON_BACK_NOTE = 'Points shop refund: coupon withdrawn';
+
+/**
+ * POINTS COME BACK WITH A WITHDRAWN COUPON (owner, 2026-11-09; DECISIONS row 303 R2; rewards policy
+ * 14.10). The team withdrew a live coupon the customer bought with points: the price goes back, in the
+ * withdrawal's own batch and after its fence, with one notice in three languages — what a cancelled
+ * points-shop gift already does (`pointsBackStatements`, worker/lib/rewards/shopItems.ts).
+ *
+ * ONCE. The ledger row is keyed by the grant (`wtx_rwshop_back_<grant>`, the gift's own shape) and
+ * inserted only while no row holds that key, only when this batch is the one that withdrew it
+ * (`revoked_at` is this instant), and only while the coupon is unspent: a second press, a replay or a
+ * concurrent order gets nothing back twice. A coupon that had already expired gives nothing back:
+ * 14.10 keeps an expired coupon's points spent, and withdrawing it changes nothing for the customer.
+ * Nothing at all for a printer's or the team's coupon, which cost no points.
+ */
+export function couponPointsBackStatements(
+  db: D1Database,
+  g: Record<string, unknown>,
+  nowIso: string
+): D1PreparedStatement[] {
+  const points = Math.max(0, Math.trunc(Number(g.points_spent) || 0));
+  if (g.source !== 'points_shop' || g.state !== 'active' || points <= 0) return [];
+  const id = String(g.id);
+  const userId = String(g.user_id);
+  const say = rewardText({ kind: 'shop_coupon_refund', coupon: g.kind === 'filament_discount' ? 'filament_discount' : 'free_shipping', points });
+  const notice = notifyStatement(db, {
+    userId,
+    kind: 'reward',
+    title_ar: say.title.ar,
+    title_en: say.title.en,
+    body_ar: say.body.ar,
+    body_en: say.body.en,
+    link: '/rewards/coupons',
+    entity_type: 'reward_grant',
+    entity_id: id,
+    meta: { title_ckb: say.title.ckb, body_ckb: say.body.ckb, points },
+    eventKey: `reward:shop_coupon_refund:${id}`,
+  });
+  return [
+    db
+      .prepare(
+        `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+         SELECT ?1, ?2, 'deposit', 'POINT', ?3, 'approved', ?4, ?5, 'system', ?6
+          WHERE NOT EXISTS (SELECT 1 FROM wallet_transactions WHERE id = ?1)
+            AND EXISTS (SELECT 1 FROM reward_grants g WHERE g.id = ?7 AND g.source = 'points_shop' AND g.revoked_at = ?6)
+            AND NOT ${SPENT_SQL('?8')}`
+      )
+      .bind(`wtx_rwshop_back_${id}`, userId, points, SHOP_COUPON_BACK_NOTE, `reward_shop_back:${id}`, nowIso, id, String(g.coupon_id ?? '')),
+    notice.stmt,
+    // The notice says the points are back, so it stays only beside the row this batch wrote.
+    db
+      .prepare(`DELETE FROM user_notifications WHERE id = ?1 AND NOT EXISTS (SELECT 1 FROM wallet_transactions WHERE id = ?2 AND decided_at = ?3)`)
+      .bind(notice.id, `wtx_rwshop_back_${id}`, nowIso),
+  ];
+}

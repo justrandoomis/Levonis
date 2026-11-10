@@ -104,7 +104,7 @@ export default function RewardsShopProducts({
           const editing = open === row.id || !row.product_id;
           const bad = badIndex === index;
           return (
-            <li key={row.id} className={`lv-well rounded-lg p-3 space-y-3 ${bad ? 'outline outline-2 outline-danger/60' : ''}`} data-admin-shop-product={row.id}>
+            <li key={row.id} className={`lv-well rounded-lg p-3 space-y-3 ${bad ? 'border border-danger/50' : ''}`} data-admin-shop-product={row.id}>
               {p ? (
                 <div className="flex items-start gap-3">
                   <div className="size-14 shrink-0 overflow-hidden rounded-lg bg-surface-raised">

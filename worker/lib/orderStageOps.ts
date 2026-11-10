@@ -182,6 +182,25 @@ export function newHistoryId(orderId: string, at: string): string {
   return `osh_${orderId.slice(-12)}_${at.replace(/[^0-9]/g, '')}`;
 }
 
+/**
+ * A CANCELLED ORDER'S REVIEW GIFTS (DECISIONS row 303 R1 and the lead's L1; rewards policy 8.16): the gifts
+ * a review code of the order's printers opened that nobody ordered yet, and the order's own gift lines whose
+ * review code died with its printer, are cancelled (worker/lib/gifts/reviewCode.ts `voidReviewGiftsOfOrder`).
+ * Run after a cancellation committed, by the stage machine below and by the two sweeps of an order nobody
+ * confirmed (worker/lib/orderExpirySweep.ts, worker/lib/giniSweep.ts), as the returns desk runs its own hook
+ * after the refund: a failure is logged and never undoes the cancellation. Imported when needed, so every
+ * module that loads the stage machine keeps its load order: the rewards modules sit on an import cycle of
+ * their own (worker/lib/rewards/earning.ts, tests/rewardsEarningLoadOrder.test.ts).
+ */
+export async function voidReviewGiftsOfCancelledOrder(env: Env, orderId: string, actorId: string | null, nowIso: string): Promise<void> {
+  try {
+    const { voidReviewGiftsOfOrder } = await import('./gifts/reviewCode');
+    await voidReviewGiftsOfOrder(env, { orderId, actorId, ref: `order_cancelled:${orderId}` }, nowIso);
+  } catch (e) {
+    console.error('review gifts not cancelled with order', orderId, e instanceof Error ? e.message : String(e));
+  }
+}
+
 // ------------------------------------------- the delivery day, at two moments
 
 /**
@@ -586,6 +605,13 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
       opts.source, nowIso, opts.changedBy ?? '', opts.note ?? ''
     )
     .run();
+
+  // A REVIEW CODE DIES WITH ITS PRINTER (DECISIONS row 303 R1, policy 8.16): this cancellation —
+  // the stage door's, or the courier's — takes with it every gift a review code of this order's
+  // printers opened that nobody ordered yet, and this order's own gift lines whose code died (L1).
+  if (cancellation && legacyFrom !== 'cancelled') {
+    await voidReviewGiftsOfCancelledOrder(env, order.id, opts.changedBy || null, nowIso);
+  }
 
   // The order aggregate's events (03-EVENTS.md §3.12/§3.13) — emitted from the
   // ONE place a stage move happens, after the conditional flip has proved this

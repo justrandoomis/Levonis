@@ -132,7 +132,7 @@ test('the home rail is the way in: an «العروض» chip while the page holds
   assert.equal(latestSeeAll(PRINTERS), '/products?category=cat_printers');
   assert.equal(latestSeeAll(ALL), '/products');
   const src = read('src/components/home/v2/LatestProducts.tsx');
-  assert.match(src, /<SectionHead id="home-latest-title" title=\{loc\('أحدث المنتجات', 'Latest products'\)\} to=\{latestSeeAll\(chip\)\} \/>/);
+  assert.match(src, /<SectionHead id="home-latest-title" title=\{loc\('أحدث المنتجات', 'Latest products', '[^']+'\)\} to=\{latestSeeAll\(chip\)\} \/>/);
   assert.match(src, /\['\/api\/products\?type=offers&limit=20'\]/, 'the chip asks the sales list itself, once');
   assert.match(src, /const onSale = \(p: ApiProduct\) => p\.offer\?\.price_source === 'offer';/, 'the rule of /offers: the card’s own «from» lowered');
 });

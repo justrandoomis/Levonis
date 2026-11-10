@@ -56,7 +56,7 @@ import { formatFigure } from '../../lib/localeNumber';
 import { formatDate } from '../orders/format';
 import { CompetitionsSkeleton, ForwardChevron, GroupHeading, ICON_DISC, SetupState } from './AreaChrome';
 import { pointsForm, type CopyKey } from './copy';
-import { SEP, competitionGroups, myResult, nearDate, resultWhen, toDeviceTarget, underADay, type CompetitionsView, type CurrentPhase } from './model';
+import { SEP, competitionGroups, isolateLatin, myResult, nearDate, resultWhen, toDeviceTarget, underADay, type CompetitionsView, type CurrentPhase } from './model';
 import type { Competition, CompetitionsPage } from './types';
 import type { CompetitionsListRead } from './useRewardsData';
 import { useRewardsT } from './useT';
@@ -463,7 +463,7 @@ function CompetitionRow({ c, serverTime, skewMs, lastOpened, reloadSoon }: RowCl
         </span>
         <span className="min-w-0 flex-1">
           <span id={titleId} dir="auto" className="block text-[14px] font-bold leading-5 line-clamp-2 text-text-primary">
-            {tri(c.title) || t('title.competition')}
+            {isolateLatin(tri(c.title) || t('title.competition'))}
           </span>
           <span id={metaId} className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-5 text-text-muted tabular-nums">
             {chip && (

@@ -61,7 +61,7 @@ import { formatDate, formatDateTime } from '../orders/format';
 import { CompetitionSkeleton, ForwardChevron, SectionHeading } from './AreaChrome';
 import { pointsForm, type CopyKey } from './copy';
 import { EntryConfirm, EntrySheet, entryFee } from './EntrySheet';
-import { myResult, toDeviceTarget, underADay, wholeDaysLeft, type MyResult } from './model';
+import { isolateLatin, myResult, toDeviceTarget, underADay, wholeDaysLeft, type MyResult } from './model';
 import type { Competition, CompetitionDetailResponse, CompetitionEntry, CompetitionGate } from './types';
 import type { CompetitionRead } from './useRewardsData';
 import { useRewardsT } from './useT';
@@ -310,7 +310,7 @@ function StatusCard({ c, clock, cta, onEnter }: { c: Competition; clock: Clock; 
       </div>
       <StatusLine c={c} clock={clock} />
       <h2 id="competition-title" tabIndex={-1} dir="auto" className="text-[20px] font-bold leading-8 text-text-primary focus:outline-none">
-        {tri(c.title) || t('title.competition')}
+        {isolateLatin(tri(c.title) || t('title.competition'))}
       </h2>
       {firstPrize > 0 ? (
         <p className="flex items-center gap-1.5 text-[15px] font-semibold text-text-primary">
@@ -321,7 +321,7 @@ function StatusCard({ c, clock, cta, onEnter }: { c: Competition; clock: Clock; 
         <p className="flex items-center gap-1.5 text-[15px] font-semibold text-text-primary">
           <Trophy className="w-4 h-4 shrink-0" aria-hidden="true" />
           <span dir="auto" className="min-w-0 line-clamp-1">
-            {prizeWords}
+            {isolateLatin(prizeWords)}
           </span>
         </p>
       ) : null}
@@ -521,7 +521,7 @@ function Prizes({ c }: { c: Competition }) {
       )}
       {words && (
         <p dir="auto" className="whitespace-pre-line px-1 text-[13px] leading-6 text-text-secondary">
-          {words}
+          {isolateLatin(words)}
         </p>
       )}
     </section>

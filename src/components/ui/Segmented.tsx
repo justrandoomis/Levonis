@@ -72,11 +72,13 @@ export interface SegmentedProps {
    * The options fill the track, so all three line up.
    */
   size?: 'md' | 'sm';
+  /** Over the equal columns: more options than one row holds on a phone wrap instead of being cut (ADMIN → المكافآت). */
+  style?: React.CSSProperties;
 }
 
 const DEFAULT_ACCENT = { text: 'text-text-primary' };
 
-export function Segmented({ items, value, onChange, label, group, className = '', dataAttr, size = 'md' }: SegmentedProps) {
+export function Segmented({ items, value, onChange, label, group, className = '', dataAttr, size = 'md', style }: SegmentedProps) {
   const m = useMotion();
   const { dir } = useLanguage();
   const refs = useRef<Array<HTMLButtonElement | null>>([]);
@@ -124,7 +126,7 @@ export function Segmented({ items, value, onChange, label, group, className = ''
       data-segmented={group}
       onKeyDown={onKeyDown}
       className={`grid ${size === 'sm' ? 'h-9 box-border gap-0.5 p-0.5' : 'gap-1 p-1'} rounded-full lv-well border border-border-subtle ${className}`}
-      style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))` }}
+      style={{ gridTemplateColumns: `repeat(${Math.max(items.length, 1)}, minmax(0, 1fr))`, ...style }}
     >
       {items.map((it, idx) => {
         const checked = it.id === value;

@@ -66,7 +66,7 @@ test('the shell mounts the Toaster the first time there is a message — on both
   assert.match(app, /<CompareTrayGate \/>\s*\{!shellHasToaster && <ToasterGate aboveNav=\{!navHidden\} \/>\}/, 'the main layout, above the nav while it shows');
   assert.match(
     code('src/components/ui/Toast.tsx'),
-    /insetBlockEnd: aboveNav\s*\? 'calc\(max\(var\(--shell-bottom-inset, 0px\), var\(--nav-stack\)\) \+ 0\.75rem\)'/,
+    /insetBlockEnd: aboveNav\s*\? 'calc\(max\(var\(--shell-bottom-inset, 0px\), var\(--nav-stack\)\) \+ 0\.75rem \+ var\(--toast-lift, 0px\)\)'/,
     'a toast is never drawn over the nav'
   );
   assert.match(

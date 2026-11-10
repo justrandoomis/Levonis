@@ -71,25 +71,22 @@ export default function AdminRewards() {
           )}
         </p>
       </div>
-      {/* All six names show from a 360 px phone: the tabs give up side padding for it. On a narrower one the strip scrolls rather than cutting a name short. */}
-      <div className="overflow-x-auto py-1 [scrollbar-width:none] sm:overflow-visible">
-        <Segmented
-          value={view}
-          onChange={(v) => setView(v as typeof view)}
-          group="admin-rewards"
-          size="sm"
-          className="min-w-[25rem] sm:min-w-0 [&_[role=radio]]:px-0.5"
-          items={[
-            { id: 'overview', label: loc('نظرة عامة', 'Overview', 'پوختە') },
-            { id: 'printers', label: loc('الطابعات', 'Printers', 'چاپکەران') },
-            { id: 'coupons', label: loc('الكوبونات', 'Coupons', 'کۆپۆنەکان') },
-            { id: 'competitions', label: loc('المسابقات', 'Contests', 'پێشبڕکێ') },
-            { id: 'ads', label: loc('الإعلانات', 'Ads', 'ڕیکلامەکان') },
-            { id: 'settings', label: loc('الإعدادات', 'Settings', 'ڕێکخستن') },
-          ]}
-          label={loc('أقسام المكافآت', 'Rewards sections', 'بەشەکانی خەڵات')}
-        />
-      </div>
+      {/* Six names: two rows of three on a phone, one row from about 700 px. Nothing is cut or scrolled away, and every tab is 44 px. Inline: the stylesheet pays nothing. */}
+      <Segmented
+        value={view}
+        onChange={(v) => setView(v as typeof view)}
+        group="admin-rewards"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(6.5rem, 1fr))', borderRadius: '1.5rem' }}
+        items={[
+          { id: 'overview', label: loc('نظرة عامة', 'Overview', 'پوختە') },
+          { id: 'printers', label: loc('الطابعات', 'Printers', 'چاپکەران') },
+          { id: 'coupons', label: loc('الكوبونات', 'Coupons', 'کۆپۆنەکان') },
+          { id: 'competitions', label: loc('المسابقات', 'Contests', 'پێشبڕکێ') },
+          { id: 'ads', label: loc('الإعلانات', 'Ads', 'ڕیکلامەکان') },
+          { id: 'settings', label: loc('الإعدادات', 'Settings', 'ڕێکخستن') },
+        ]}
+        label={loc('أقسام المكافآت', 'Rewards sections', 'بەشەکانی خەڵات')}
+      />
       {view === 'overview' && <RewardsOverview onGo={setView} />}
       {view === 'printers' && (
         <RewardsPrinters
@@ -125,7 +122,7 @@ export function weeklyEarnSummary(
     const min = money(cfg.free_shipping.min_order_iqd);
     parts.push(
       cfg.free_shipping.min_order_iqd > 0
-        ? say(`كوبون توصيل بقيمة ${amount} للطلبات من ${min}`, `a ${amount} delivery coupon on orders from ${min}`, `کۆپۆنێکی گەیاندن بە بەهای ${amount} بۆ داواکارییەکانی ${min} و زیاتر`)
+        ? say(`كوبون توصيل بقيمة ${amount} للطلبات من ${min} فأكثر`, `a ${amount} delivery coupon on orders of ${min} or more`, `کۆپۆنێکی گەیاندن بە بەهای ${amount} بۆ داواکارییەکانی ${min} و زیاتر`)
         : say(`كوبون توصيل بقيمة ${amount}`, `a ${amount} delivery coupon`, `کۆپۆنێکی گەیاندن بە بەهای ${amount}`)
     );
   }
@@ -268,7 +265,7 @@ function SettingsPanel() {
             onChange={(e) => set((c) => ((c.free_shipping.amount_iqd = Math.max(1, Math.trunc(Number(e.target.value) || 1))), c))} />
         </div>
         <div>
-          <label className={label} htmlFor="rw-ship-min">{loc('للطلبات فوق (د.ع، بعد كل الخصومات)', 'On orders over (IQD, after every discount)', 'بۆ داواکارییەکانی سەرووی (د.ع، دوای هەموو داشکاندنەکان)')}</label>
+          <label className={label} htmlFor="rw-ship-min">{loc('للطلبات من هذا المبلغ فأكثر (د.ع، بعد كل الخصومات)', 'On orders of this amount or more (IQD, after every discount)', 'بۆ داواکارییەکانی ئەم بڕە و زیاتر (د.ع، دوای هەموو داشکاندنەکان)')}</label>
           <input id="rw-ship-min" className="lv-input text-sm" dir="ltr" type="number" min={0} value={cfg.free_shipping.min_order_iqd}
             onChange={(e) => set((c) => ((c.free_shipping.min_order_iqd = Math.max(0, Math.trunc(Number(e.target.value) || 0))), c))} />
         </div>

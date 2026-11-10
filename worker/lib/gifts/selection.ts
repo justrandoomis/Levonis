@@ -33,6 +33,9 @@ import { canonicalOptionValueIds, optionValueIdsInRelationOrder } from '../cartS
 import { productImageForSelection } from '../productSelectionImage';
 import { pricingContextFrom, resolveCartLine, type PricingContext } from '../../routes/cart';
 import { saleAvailability, unusableOrderType, type SaleAvailability } from '../../routes/products';
+import { applyOfferToResolved, loadOffers, offerKey, subjectOf, type FixedUsdDoc, type OfferView } from '../offers';
+import { isSchemaMissing } from '../membershipBenefits';
+import type { ResolvedPrice } from '../pricing';
 
 export type GiftSaleType = 'direct_sale' | 'pre_order';
 export type GiftTransport = '' | 'air' | 'sea' | 'land';
@@ -105,7 +108,7 @@ export interface GiftSnapshot {
   sku: string;
   /** The product's REGULAR unit price for this selection when the snapshot was taken — never charged. */
   regular_unit_iqd: number;
-  /** regular_unit_iqd × qty: what the gift is worth, shown beside its 0 IQD line. */
+  /** What the gift is worth, shown beside its 0 IQD line: its price today × qty, the sale price under a live offer (row 303). */
   value_iqd: number;
   /** Swapped for points in the shop: it belongs to no level, whatever the row's `level` column must say. */
   points_shop?: boolean;
@@ -147,6 +150,34 @@ export interface GiftProductContext {
    * granted whatever this says. Absent = not asked (treated as listed by older callers).
    */
   listed?: boolean;
+  /** The product's live offer, for the gift's stated value only (`giftShelfUnitIqd`): it prices nothing. Absent = none. */
+  offer?: OfferView | null;
+}
+
+/**
+ * WHAT A GIFT IS WORTH: THE PRICE A CUSTOMER PAYS FOR IT TODAY (the lead's call on the owner's ruling,
+ * 2026-11-09; DECISIONS row 303). While a live public offer lowers the product, its value is the sale
+ * price (eSUN PLA+: 24,000, not the struck 27,250); otherwise the regular price, as before. Never a
+ * member's price (no tier is asked), never charged: the line stays at 0. The same function the cart,
+ * the checkout and the grant's snapshot read, so a gift is worth one figure on every screen.
+ */
+export function giftShelfUnitIqd(resolved: ResolvedPrice, offer: OfferView | null | undefined, doc: FixedUsdDoc | null | undefined, nowMs = Date.now()): number {
+  const regular = Math.max(0, Math.round(Number(resolved.regular_iqd) || 0));
+  // A members' offer is not the price a customer pays: only a public one (offerEligible gates the rest at the door).
+  if (!offer?.window || (offer.window.required_tiers ?? []).length > 0) return regular;
+  const priced = applyOfferToResolved(resolved, offer, 'free', false, nowMs, doc ?? null);
+  return priced.source === 'offer' ? Math.max(0, Math.round(Number(priced.resolved.regular_iqd) || 0)) : regular;
+}
+
+/** The live offers of these products, for a gift's stated value; none before 0060, so the value is the regular price. */
+async function giftOffers(db: D1Database, ids: readonly string[]): Promise<Map<string, OfferView>> {
+  if (ids.length === 0) return new Map();
+  try {
+    return await loadOffers(db, ids.map((id) => subjectOf(id)));
+  } catch (e) {
+    if (isSchemaMissing(e)) return new Map();
+    throw e;
+  }
 }
 
 export async function loadGiftProduct(env: { DB: D1Database }, productId: string): Promise<GiftProductContext> {
@@ -157,10 +188,10 @@ export async function loadGiftProduct(env: { DB: D1Database }, productId: string
   ]);
   const ctx = pricingContextFrom(settings);
   if (!row) return { productId: id, row: null, view: undefined, ctx };
-  const views = await loadRelationsViews(env.DB, [{ id, inventory_mode: row.inventory_mode }]);
+  const [views, offers] = await Promise.all([loadRelationsViews(env.DB, [{ id, inventory_mode: row.inventory_mode }]), giftOffers(env.DB, [id])]);
   const L = await listing(env.DB);
   const listed = L.isSellableRow(row, await L.unsellableIds([id]));
-  return { productId: id, row, view: views.get(id), ctx, listed };
+  return { productId: id, row, view: views.get(id), ctx, listed, offer: offers.get(offerKey(subjectOf(id))) ?? null };
 }
 
 /** Several products at once, for a list of level items or of gifts. */
@@ -176,15 +207,18 @@ export async function loadGiftProducts(env: { DB: D1Database }, productIds: read
   ]);
   const ctx = pricingContextFrom(settings);
   const byId = new Map((rows.results ?? []).map((r) => [text(r.id), r]));
-  const views = await loadRelationsViews(
-    env.DB,
-    [...byId.values()].map((r) => ({ id: text(r.id), inventory_mode: r.inventory_mode }))
-  );
+  const [views, offers] = await Promise.all([
+    loadRelationsViews(
+      env.DB,
+      [...byId.values()].map((r) => ({ id: text(r.id), inventory_mode: r.inventory_mode }))
+    ),
+    giftOffers(env.DB, [...byId.keys()]),
+  ]);
   const L = await listing(env.DB);
   const unlisted = await L.unsellableIds([...byId.keys()]);
   for (const id of ids) {
     const row = byId.get(id) ?? null;
-    out.set(id, { productId: id, row, view: row ? views.get(id) : undefined, ctx, listed: !!row && L.isSellableRow(row, unlisted) });
+    out.set(id, { productId: id, row, view: row ? views.get(id) : undefined, ctx, listed: !!row && L.isSellableRow(row, unlisted), offer: offers.get(offerKey(subjectOf(id))) ?? null });
   }
   return out;
 }
@@ -352,7 +386,7 @@ export function checkGiftSelection(
   return {
     ok: true,
     selection: sel,
-    snapshot: snapshotFor(p, doc, sel, Number(resolved.regular_iqd) || 0, {
+    snapshot: snapshotFor(p, doc, sel, Number(resolved.regular_iqd) || 0, giftShelfUnitIqd(resolved, p.offer, doc), {
       text: text(resolved.fulfillment?.lead_time_text),
       min: resolved.fulfillment?.lead_time_min_days ?? null,
       max: resolved.fulfillment?.lead_time_max_days ?? null,
@@ -382,6 +416,8 @@ function snapshotFor(
   doc: ProductDoc,
   sel: GiftSelection,
   regularUnitIqd: number,
+  /** What it is worth today (`giftShelfUnitIqd`): the sale price under a live offer, else the regular. */
+  valueUnitIqd: number,
   leadTime: { text: string; min: number | null; max: number | null },
   now?: string
 ): GiftSnapshot {
@@ -422,7 +458,7 @@ function snapshotFor(
     color_hex: color ? text(color.hex) : '',
     sku: [text(row.sku), ...parts].filter(Boolean).join('-'),
     regular_unit_iqd: unit,
-    value_iqd: unit * sel.qty,
+    value_iqd: Math.max(0, Math.round(valueUnitIqd)) * sel.qty,
     lead_time_text: leadTime.text,
     lead_time_min_days: Number.isFinite(Number(leadTime.min)) && leadTime.min !== null ? Number(leadTime.min) : null,
     lead_time_max_days: Number.isFinite(Number(leadTime.max)) && leadTime.max !== null ? Number(leadTime.max) : null,

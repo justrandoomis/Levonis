@@ -2347,6 +2347,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This code has already been used.',
     ckb: 'ئەم کۆدە پێشتر بەکارهاتووە.',
   },
+  // Row 303 R1: the reviewed printer went back, or its order was cancelled.
+  GIFT_CODE_VOID: {
+    ar: 'لم يعد هذا الكود يفتح هدية: الطابعة التي قُيّمت لم تعد لدى صاحبها.',
+    en: 'This code no longer opens a gift: the reviewed printer is no longer with its owner.',
+    ckb: 'ئەم کۆدە چیتر دیاری ناکاتەوە: ئەو چاپکەرەی هەڵسەنگێنرا چیتر لای خاوەنەکەی نییە.',
+  },
   GIFT_CODE_NONE: {
     ar: 'لا كود لهذه المراجعة.',
     en: 'This review holds no code.',

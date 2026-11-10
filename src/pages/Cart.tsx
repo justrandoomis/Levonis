@@ -12,6 +12,7 @@ import type { CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
 import { methodDesc, methodTitle } from '../lib/methodText';
 import { deliveryCharge, type DeliveryPolicy } from '../../packages/shipping/src/storeDelivery';
+import { calculateCodTaxIqd } from '../../packages/shipping/src/codTax';
 import { asLang, monthsLabel } from '../components/orders/format';
 import Note from '../components/ui/Note';
 import { QuantityInput } from '../components/ui/QuantityInput';
@@ -1363,6 +1364,8 @@ export default function Cart() {
   // they have already reduced: the same order as the checkout.
   const pointsDiscount = usePoints ? Math.min(pointBalance, Math.max(0, merchandise - couponGoods)) : 0;
   const total = merchandise - couponGoods + (shipping ?? 0) - couponDelivery - pointsDiscount;
+  /** What cash at the door would add to `total` (the quote of the checkout is the authority); nothing for a member the rule exempts. */
+  const codTaxAhead = activeMembership?.cod_tax_exempt ? 0 : calculateCodTaxIqd(total, { blockIqd: settings?.codTaxBlockIqd, perBlockIqd: settings?.codTaxPerBlockIqd });
   /**
    * THE SAME FIGURES IN THE SHOP'S DOLLARS (DECISIONS row 248): Σ each selected line's dollar price ×
    * quantity, and ONE conversion of everything else the dinar figure holds (lines without a dollar
@@ -1542,7 +1545,7 @@ export default function Cart() {
           // group told a screen-reader customer nothing about which colour they were changing.
           aria-label={item.color_tag ? colourWords.lineSelect(itemName(item), isolate(item.color_tag.name)) : itemName(item)}
           onClick={() => toggleSelect(item.id)}
-          className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
+          className="relative lv-hit shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
         >
           <span
             aria-hidden="true"
@@ -1713,7 +1716,7 @@ export default function Cart() {
           // group told a screen-reader customer nothing about which colour they were changing.
           aria-label={item.color_tag ? colourWords.lineSelect(itemName(item), isolate(item.color_tag.name)) : itemName(item)}
           onClick={() => toggleSelect(item.id)}
-          className="shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
+          className="relative lv-hit shrink-0 w-9 sm:w-11 min-h-[44px] pt-4 sm:pt-6 flex items-start justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
         >
           <span
             aria-hidden="true"
@@ -2233,7 +2236,7 @@ export default function Cart() {
             aria-checked={state}
             aria-label={colourWords.groupSelect(name)}
             onClick={() => toggleGroup(lines.map((l) => l.id), state !== true)}
-            className="shrink-0 w-9 sm:w-11 min-h-[44px] flex items-center justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
+            className="relative lv-hit shrink-0 w-9 sm:w-11 min-h-[44px] flex items-center justify-center -ms-1 sm:-ms-2 [touch-action:manipulation]"
           >
             <span
               aria-hidden="true"
@@ -2275,7 +2278,7 @@ export default function Cart() {
           at the top of the shell, so it paints the workbench light of the shell
           (lv-canvas) and the light runs on through it instead of stopping. */}
       <div className="fixed inset-x-0 top-0 z-40 flex items-center justify-between border-b border-border-subtle lv-canvas px-4 py-3">
-        <button type="button" onClick={() => navigate(-1)} className="flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-white/[0.05] hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+        <button type="button" onClick={() => navigate(-1)} className="relative lv-hit flex h-10 w-10 items-center justify-center rounded-lg text-text-secondary hover:bg-white/[0.05] hover:text-text-primary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
           {dir === 'rtl' ? <ArrowRight className="w-6 h-6" /> : <ArrowLeft className="w-6 h-6" />}
         </button>
         <h1 className="text-text-primary font-bold text-[17px]">
@@ -2284,7 +2287,7 @@ export default function Cart() {
         <button
           type="button"
           onClick={() => navigate('/profile')}
-          className="text-[15px] text-text-secondary hover:text-text-primary font-medium"
+          className="relative lv-hit text-[15px] text-text-secondary hover:text-text-primary font-medium"
         >
           {loc('المفضلة', 'Favorites', 'دڵخوازەکان')}
         </button>
@@ -2827,7 +2830,7 @@ export default function Cart() {
               )}{' '}
               <Link
                 to="/subscription"
-                className="rounded text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                className="relative lv-hit rounded text-gold hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {loc('اشترك الآن', 'Subscribe', 'بەشداربە')}
               </Link>
@@ -2847,6 +2850,17 @@ export default function Cart() {
           {hasEstimates && estimateWords && (
             <p data-cart-estimate-notice className="text-[12px] leading-relaxed text-text-secondary">
               {estimateWords.ESTIMATE_STRINGS.cartNotice[estimateLang]}
+            </p>
+          )}
+          {/* «ضريبة شركة التوصيل» depends on how the customer pays, chosen at the checkout. Above the block the owner sets, cash
+              at the door costs more than this total, and the cart says so at the very rate the checkout charges. */}
+          {codTaxAhead > 0 && (
+            <p data-cart-cod-tax className="text-[12px] leading-relaxed text-text-secondary">
+              {loc(
+                `عند الدفع نقدًا عند الاستلام تُضاف ضريبة شركة التوصيل: ${money(codTaxAhead)}`,
+                `Paying cash on delivery adds the delivery company tax: ${money(codTaxAhead)}`,
+                `ئەگەر لە کاتی گەیاندن بە کاش پارە بدەیت، باجی پارەدان لە کاتی گەیاندن زیاد دەکرێت: ${money(codTaxAhead)}`
+              )}
             </p>
           )}
         </div>

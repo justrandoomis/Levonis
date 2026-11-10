@@ -51,6 +51,14 @@ export interface CustomerFilter {
   label: string;
 }
 
+/**
+ * What withdrawing this coupon gives back: a live coupon the customer bought with points returns them
+ * (row 303 R2; policy 14.10), anything else nothing. The server decides it; the dialog only says it first.
+ */
+export function pointsBackOnWithdraw(g: Pick<AdminGrant, 'source' | 'state' | 'points_spent'>): number {
+  return g.source === 'points_shop' && g.state === 'active' ? Math.max(0, Math.trunc(Number(g.points_spent) || 0)) : 0;
+}
+
 /** Links out of the admin's single page reload it: the order board opens on `order`. */
 const orderHref = (id: string) => `/admin?tab=orders&order=${encodeURIComponent(id)}`;
 
@@ -96,7 +104,7 @@ export function useGrantWords() {
     terms: (g: Pick<AdminGrant, 'kind' | 'amount_iqd' | 'min_total_iqd' | 'max_discount_iqd' | 'max_quantity'>) => {
       if (g.kind === 'free_shipping') {
         const amount = g.amount_iqd ? loc(`${money(g.amount_iqd)} من التوصيل`, `${money(g.amount_iqd)} off the delivery`, `${money(g.amount_iqd)} لە کرێی گەیاندن`) : loc('رسوم التوصيل كاملة', 'The whole delivery fee', 'هەموو کرێی گەیاندن');
-        return g.min_total_iqd > 0 ? `${amount} · ${loc(`للطلبات من ${money(g.min_total_iqd)}`, `On orders from ${money(g.min_total_iqd)}`, `بۆ داواکارییەکانی ${money(g.min_total_iqd)} و زیاتر`)}` : amount;
+        return g.min_total_iqd > 0 ? `${amount} · ${loc(`للطلبات من ${money(g.min_total_iqd)} فأكثر`, `On orders of ${money(g.min_total_iqd)} or more`, `بۆ داواکارییەکانی ${money(g.min_total_iqd)} و زیاتر`)}` : amount;
       }
       const pieces = g.max_quantity ? countText('pieces', g.max_quantity, l) : loc('كل القطع', 'every piece', 'هەموو پارچەکان');
       const on = loc(`على ${pieces}`, `On ${pieces}`, `لەسەر ${pieces}`);
@@ -215,10 +223,10 @@ export function useGrantActions(onDone: () => unknown, onError: (text: string) =
   const refusal = useRewardsRefusal();
   const [busy, setBusy] = useState('');
 
-  const askReason = (title: string, confirmLabel: string, destructive = false) =>
+  const askReason = (title: string, confirmLabel: string, destructive = false, before = '') =>
     prompt({
       title,
-      description: loc('يُحفظ السبب في السجل.', 'The reason is kept in the audit log.', 'هۆکارەکە لە تۆماردا دەمێنێتەوە.'),
+      description: `${before}${loc('يُحفظ السبب في السجل.', 'The reason is kept in the audit log.', 'هۆکارەکە لە تۆماردا دەمێنێتەوە.')}`,
       label: loc('السبب', 'Reason', 'هۆکار'),
       required: true,
       maxLength: 200,
@@ -242,7 +250,20 @@ export function useGrantActions(onDone: () => unknown, onError: (text: string) =
   };
 
   const revoke = async (g: AdminGrant) => {
-    const reason = await askReason(loc(`سحب الكوبون ${g.code}؟`, `Withdraw coupon ${g.code}?`, `کۆپۆنی ${g.code} بکشێتەوە؟`), loc('سحب', 'Withdraw', 'کشاندنەوە'), true);
+    const back = pointsBackOnWithdraw(g);
+    const reason = await askReason(
+      loc(`سحب الكوبون ${g.code}؟`, `Withdraw coupon ${g.code}?`, `کۆپۆنی ${g.code} بکشێتەوە؟`),
+      loc('سحب', 'Withdraw', 'کشاندنەوە'),
+      true,
+      // The customer paid points for it: they go back with it, once (row 303 R2; policy 14.10).
+      back > 0
+        ? `${loc(
+            `تعود إلى الزبون ${formatFigure(back, 'ar')} نقطة دفعها مقابل هذا الكوبون، ويصله إشعار بذلك.`,
+            `The ${formatFigure(back, 'en')} points the customer paid for this coupon go back to them, with a notice.`,
+            `ئەو ${formatFigure(back, 'ckb')} خاڵەی کڕیار بۆ ئەم کۆپۆنە دای بۆی دەگەڕێتەوە، و ئاگادارکردنەوەیەکی پێدەگات.`
+          )} `
+        : ''
+    );
     if (reason !== null) await send(g, 'revoke', { reason });
   };
 

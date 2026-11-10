@@ -4,7 +4,8 @@
  * - `tx(key, { x: <Money … /> })` for a sentence with an element in one of its marks;
  * - `count(key, n)` for a counted sentence, `{n}` filled in every form;
  * - `ord(place)` for «الثاني» / «2nd» / «دووەم»;
- * - `tri(value)` for the owner's three-language text (own language, then English, then Arabic).
+ * - `tri(value)` for the owner's three-language text (own language, then English, then Arabic);
+ *   a product, option or colour is `pickName` (./model) instead: English in every language.
  */
 import React, { useCallback, useMemo } from 'react';
 import { useLanguage } from '../../LanguageContext';

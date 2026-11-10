@@ -13,7 +13,7 @@ import { formatDateTime, statusLabel } from '../orders/format';
 import { formatFigure } from '../../lib/localeNumber';
 import { Banner, Field, Select, TextArea } from '../adminProducts/form/formUi';
 import * as T from '../adminProducts/theme';
-import { GiftStatusChip, ItemRow, triOf } from './ui';
+import { GIFTS_ACCENT, GiftStatusChip, ItemRow, triOf } from './ui';
 import { actionLabel, adminText, reasonKey, type AdminLang, type AdminStringKey } from './strings';
 import { GRANT_REASONS, type AdminGift, type AuditEntry, type GrantReason } from './types';
 
@@ -97,7 +97,7 @@ export default function GrantDetail({
 
   return (
     <Sheet open={!!giftId} onClose={() => !busy && onClose()} labelledBy={titleId} panelClassName="w-full sm:max-w-xl">
-      <div className={`${T.AP} px-5 pb-5 pt-2 space-y-4`} data-gift-detail={giftId ?? ''}>
+      <div className={`${T.AP} px-5 pb-5 pt-2 space-y-4`} style={GIFTS_ACCENT} data-gift-detail={giftId ?? ''}>
         <h2 id={titleId} className="text-[15px] font-bold text-[var(--ap-text-1)]">
           {t('detail')}
         </h2>
@@ -157,7 +157,8 @@ export default function GrantDetail({
               {grant.cancelled_at && (
                 <Fact label={t('cancelledBy')}>
                   {formatDateTime(grant.cancelled_at, lang)}
-                  {grant.cancel_reason ? ` — ${grant.cancel_reason}` : ''}
+                  {/* A system cancel carries a key, worded here (row 303 R1); a person's reason is their own words. */}
+                  {grant.cancel_reason ? ` — ${grant.cancel_reason === 'review_printer_returned' ? t('cancelPrinterReturned') : grant.cancel_reason}` : ''}
                 </Fact>
               )}
             </dl>

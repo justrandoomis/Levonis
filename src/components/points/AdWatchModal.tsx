@@ -25,6 +25,7 @@ import { useLanguage } from '../../LanguageContext';
 import { Overlay } from '../ui/Overlay';
 import Spinner from '../ui/Spinner';
 import { filmAt, filmEnded, parseFilmNote, recallFilm, stageAfterPause, type AdView, type FilmNote, type FilmStage } from './adMission';
+import { secondsLeftText } from './words';
 
 /**
  * The height the frame may take: of what the phone really shows (`dvh`) where the
@@ -259,7 +260,7 @@ export function AdPlayer({
 
         {/* On the film, which is over by now: it moves nothing, and covers no button on any phone. */}
         {note && (
-          <p role="alert" className="absolute inset-x-0 bottom-0 m-2 lv-surface-raised rounded-xl px-3 py-2 text-text-primary text-xs font-medium text-center">
+          <p role="alert" className="absolute start-2 end-2 bottom-2 lv-surface-raised rounded-xl px-3 py-2 text-text-primary text-xs font-medium text-center">
             {note}
           </p>
         )}
@@ -321,7 +322,7 @@ export function AdPlayer({
         aria-label={loc('تقدّم الإعلان', 'Ad progress', 'پێشکەوتنی ڕیکلام')}
         className="h-1.5 rounded-full lv-well overflow-hidden"
       >
-        <div className="h-full rounded-full bg-gold transition-[width] duration-300 ease-linear" style={{ width: `${percent}%` }} />
+        <div className="h-full rounded-full bg-gold transition-[width] duration-300" style={{ width: `${percent}%`, transitionTimingFunction: 'linear' }} />
       </div>
 
       {ready ? (
@@ -340,7 +341,7 @@ export function AdPlayer({
         <div className="w-full flex items-center justify-between gap-3">
           <span className="text-gold font-bold text-sm tabular-nums">
             {secondsLeft > 0
-              ? loc(`متبقٍ ${secondsLeft} ثانية`, `${secondsLeft}s remaining`, `${secondsLeft} چرکە ماوە`)
+              ? loc(secondsLeftText(secondsLeft), `${secondsLeft}s remaining`, `${secondsLeft} چرکە ماوە`)
               : stage === 'playing' && loc('الإعلان قيد التشغيل…', 'Video is playing...', 'ڕیکلامەکە پەخش دەکرێت…')}
           </span>
           <button type="button" className="lv-button lv-button-ghost" onClick={onClose}>

@@ -25,8 +25,12 @@ export const ESUN_ITEMS = [
 export const ESUN_UNIT_IQD = 24_000;
 /** The price the live offer strikes through. */
 export const ESUN_BEFORE_OFFER_IQD = 27_250;
-/** What a gift of it is shown as worth: its regular price, in this fixture's published dollars. A gift looks up no offer (S8). Never charged. */
-export const ESUN_GIFT_VALUE_IQD = 28_000;
+/**
+ * What a gift of it is shown as worth: the price a customer pays for it today, the live offer's (the lead's call on
+ * the owner's ruling, 2026-11-09, DECISIONS row 303 — it was the regular price, 28,000 in this fixture's published
+ * dollars, while the shelf said 24,000). The offer still prices nothing on a gift line (S8): never charged.
+ */
+export const ESUN_GIFT_VALUE_IQD = ESUN_UNIT_IQD;
 
 export function esunWorld(appliedAt = Date.now()): DatabaseSync {
   const raw = rewardsWorld(appliedAt);

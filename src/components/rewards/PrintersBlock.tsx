@@ -15,7 +15,7 @@ import { Button } from '../ui/Button';
 import SafeImage from '../ui/SafeImage';
 import { GROUP_HEADING } from './AreaChrome';
 import type { CopyKey } from './copy';
-import { nearDate } from './model';
+import { nearDate, pickName } from './model';
 import type { PrinterStopped, RewardPrinter, RewardPrintersData } from './types';
 import type { Read } from './useRewardsData';
 import { useRewardsT } from './useT';
@@ -67,14 +67,14 @@ export function PrintersBlock({ read }: { read: Read<RewardPrintersData> }) {
 }
 
 function PrinterRow({ p, serverTime }: { p: RewardPrinter; serverTime: string }) {
-  const { t, tri, lang } = useRewardsT();
+  const { t, lang } = useRewardsT();
   return (
     <li data-rewards-printer={p.earning ? 'earning' : (p.stopped ?? 'stopped')} className="flex items-center gap-3 py-2.5">
       <SafeImage src={p.image || null} alt="" aspect="square" sizes="48px" className="size-12 shrink-0 rounded-md" bgClassName="bg-surface-raised" />
       <div className="min-w-0 flex-1">
-        {/* Two lines, not a cut: the shop's real names are long, and a cut lands mid-word in an RTL line. */}
-        <p className="line-clamp-2 text-[14px] font-semibold leading-5 text-text-primary">
-          <bdi>{tri(p.name)}</bdi>
+        {/* The whole name, never a cut: the shop's real names are long, and two models differ at their end. */}
+        <p className="text-[14px] font-semibold leading-5 text-text-primary">
+          <bdi>{pickName(p.name)}</bdi>
         </p>
         {p.earning ? (
           <>

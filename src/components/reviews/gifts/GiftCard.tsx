@@ -91,6 +91,8 @@ export interface GiftView {
   ordered_at: string | null;
   fulfilled_at: string | null;
   cancelled_at: string | null;
+  /** 'printer_returned': the system cancelled it, the reviewed printer having left (policy 8.16); absent from an older server. */
+  cancel_why?: 'printer_returned' | null;
   /** What the customer swapped for this product in the points shop; 0 on any other gift, absent from an older server. */
   points_spent?: number;
   legacy: unknown;
@@ -147,8 +149,9 @@ export function groupByLevel(choices: readonly GiftItemView[]): Array<{ level: n
 /** A three-language label in the reader's language, falling back to Arabic. */
 export const pick = (lang: GiftLang, t: Tri | null | undefined): string => (t ? (t[lang] || t.ar || t.en || '').trim() : '');
 
-/** The product's own name: the store names products the same way in every language (§3/§12). */
-const productName = (item: GiftItemView): string => (item.name.en || item.name.ar || item.name.ckb || '').trim();
+/** The product's own name: the store names products, options and colours the same way in every language (§3/§7/§12). */
+const productWord = (t: Tri | null | undefined): string => (t?.en || t?.ar || t?.ckb || '').trim();
+const productName = (item: GiftItemView): string => productWord(item.name);
 
 function saleLabel(lang: GiftLang, item: Pick<GiftItemView, 'sale_type' | 'transport_method'>): string {
   if (item.sale_type !== 'pre_order') return giftText(lang, 'saleDirect');
@@ -204,8 +207,8 @@ export function GiftItemSummary({
   trailing?: React.ReactNode;
 }) {
   const name = productName(item);
-  const variant = pick(lang, item.variant);
-  const color = item.color ? pick(lang, item.color) : '';
+  const variant = productWord(item.variant);
+  const color = productWord(item.color);
   return (
     <div className="flex items-start gap-3 min-w-0" data-gift-item={item.item_id ?? item.product_id}>
       <Thumb src={item.image} alt={name} size={size} />
@@ -387,7 +390,9 @@ export default function GiftCard({ lang, gift, money, busy = false, error, notic
   const titleId = useId();
   const [changing, setChanging] = useState(false);
   const status = gift.status === 'LEGACY' ? 'CANCELLED' : gift.status;
-  const [titleKey, bodyKey] = TITLE[status];
+  const [titleKey, ownBody] = TITLE[status];
+  // Row 303 R1: a gift cancelled with its printer says why, here as on «قيّم طابعتك» (policy 8.16).
+  const bodyKey: GiftStringKey = gift.status === 'CANCELLED' && gift.cancel_why === 'printer_returned' ? 'bodyCancelledPrinter' : ownBody;
   const upTo = gift.choice_scope === 'up_to';
   const levelName = gift.level
     ? upTo && gift.chosen_level

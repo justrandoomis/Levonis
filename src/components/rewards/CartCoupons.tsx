@@ -574,7 +574,7 @@ function CouponRow({ row, applied, lineName }: { row: CartCouponRow; applied: bo
           </div>
         )}
         {link && (
-          <Link to={link} className="mt-0.5 inline-block rounded text-[12px] font-semibold leading-5 text-text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+          <Link to={link} className="relative lv-hit mt-0.5 inline-block rounded text-[12px] font-semibold leading-5 text-text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
             {t('seeFilament')}
           </Link>
         )}

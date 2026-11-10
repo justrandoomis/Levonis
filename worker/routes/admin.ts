@@ -47,6 +47,7 @@ import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { sniff } from './uploads';
 import { deductOrderStock, planOrderReturn, stockReturnNote } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
+import { voidReviewGiftsOfOrder } from '../lib/gifts/reviewCode';
 import { cancelStoreOrder, notifyMerchantOfStoreOrder, storeCancelMovesMoney } from '../lib/storeOrderOps';
 import { assertFinancialScope } from '../lib/walletAdjust';
 import { deleteCancelledOrder, OrderDeletionRefusal } from '../lib/orderDeletion';
@@ -3886,6 +3887,16 @@ adminRoutes.patch('/orders/:id', async (c) => {
       await audit(c.env.DB, adminUser.id, 'referral.reward_cancel', id, {
         reason: 'order_cancelled', count: rewards.meta.changes,
       });
+    }
+    // Row 303 R1 (policy 8.16): a printer's order cancelled takes its review code with it, and every gift
+    // such a code opened that nobody ordered yet (worker/lib/gifts/reviewCode.ts). From ANY state: a delivered
+    // order cannot be cancelled until it is walked back to shipped (ORDER_TRANSITIONS above), so a guard on
+    // `from === 'delivered'` never ran. And a gift ordered in this order whose code died with its printer goes
+    // with it instead of coming back to be ordered again (L1). An order with neither reads nothing.
+    try {
+      await voidReviewGiftsOfOrder(c.env, { orderId: id, actorId: adminUser.id, ref: `order_cancelled:${id}` });
+    } catch (e) {
+      console.error('review gifts not cancelled with order', id, e instanceof Error ? e.message : String(e));
     }
   }
   // Keep the tracking stage in step with the legacy status. The old dropdown

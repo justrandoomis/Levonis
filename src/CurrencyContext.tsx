@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useWallet } from './WalletContext';
 import { formatIqd, formatUsdCents } from './lib/api';
+import { useOptionalLanguage } from './LanguageContext';
 import { iqdToUsdCentsExact, readCachedDisplayRate, rememberDisplayRate, usableRate } from './lib/displayRate';
 
 /**
@@ -369,8 +370,11 @@ export function currencyValue(
   currency: DisplayCurrency,
   setCurrency: (next: DisplayCurrency) => void,
   rate: DisplayRate | null,
-  settingsLoaded = true
+  settingsLoaded = true,
+  /** The reader's language: English reads «IQD», Arabic and Sorani «د.ع» (the rule of src/lib/money.ts). */
+  lang = 'ar'
 ): CurrencyContextValue {
+  const dinars = lang === 'en' ? (iqd: number) => `${Math.round(iqd).toLocaleString('en-US')} IQD` : formatIqd;
   // The shop's own dollar price when the figure has one (DECISIONS row 248), else the dinars read at the rate.
   const usdOf = (iqd: number, usdCents?: number | null): string | null => {
     if (!rate) return null;
@@ -379,7 +383,7 @@ export function currencyValue(
     return cents === null ? null : formatUsdCents(cents);
   };
   const converted = currency === 'USD' && rate !== null;
-  const money = (iqd: number, usdCents?: number | null) => (converted ? usdOf(iqd, usdCents) ?? formatIqd(iqd) : formatIqd(iqd));
+  const money = (iqd: number, usdCents?: number | null) => (converted ? usdOf(iqd, usdCents) ?? dinars(iqd) : dinars(iqd));
   return {
     currency,
     setCurrency,
@@ -391,13 +395,13 @@ export function currencyValue(
     // «1,750,000 د.ع · ‎$1,250.00» — the charge first, the dollars after it.
     moneyBoth: (iqd: number, usdCents?: number | null) => {
       const usd = converted ? usdOf(iqd, usdCents) : null;
-      return usd ? `${formatIqd(iqd)} · ${usd}` : formatIqd(iqd);
+      return usd ? `${dinars(iqd)} · ${usd}` : dinars(iqd);
     },
     usdTotal: (totalIqd: number, lines: readonly UsdLine[]) => (converted ? usdTotalCents(totalIqd, lines, rate!.text) : null),
     usdWith: (iqd: number, base: UsdLine | null | undefined) => (converted ? usdWithBaseCents(iqd, base, rate!.text) : null),
     walletMoney: (iqd: number, usdCents?: number | null) =>
-      currency === 'USD' && typeof usdCents === 'number' && Number.isFinite(usdCents) ? formatUsdCents(usdCents) : formatIqd(iqd),
-    walletCharge: (iqd: number) => formatIqd(iqd),
+      currency === 'USD' && typeof usdCents === 'number' && Number.isFinite(usdCents) ? formatUsdCents(usdCents) : dinars(iqd),
+    walletCharge: (iqd: number) => dinars(iqd),
   };
 }
 
@@ -409,6 +413,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   );
   const [cached] = useState<string | null>(() => readCachedDisplayRate());
   const { displayUsdRate, displayUsdRateAttributed: attributed } = useWallet();
+  const lang = useOptionalLanguage();
 
   const setCurrency = useCallback((next: DisplayCurrency) => {
     setCurrencyState(next);
@@ -442,8 +447,8 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
   }, [rate, cached]);
 
   const value = useMemo<CurrencyContextValue>(
-    () => currencyValue(currency, setCurrency, rate, settingsLoaded),
-    [currency, setCurrency, rate, settingsLoaded]
+    () => currencyValue(currency, setCurrency, rate, settingsLoaded, lang),
+    [currency, setCurrency, rate, settingsLoaded, lang]
   );
 
   return <CurrencyContext.Provider value={value}>{children}</CurrencyContext.Provider>;

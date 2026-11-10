@@ -24,7 +24,7 @@ import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthori
 import { audit, auditStatements } from '../lib/audit';
 import { notifyGiftGranted, planGrant } from '../lib/gifts/grant';
 import { changedExactlyOne, isLostRace } from '../lib/gifts/model';
-import { codeTail, levelOffer, newGiftCode, offerIsEmpty, offerWarnings, rewardCodeFacts } from '../lib/gifts/reviewCode';
+import { codeTail, levelOffer, newGiftCode, offerIsEmpty, offerWarnings, reviewPrinterVoid, rewardCodeFacts } from '../lib/gifts/reviewCode';
 import { reachForMany } from '../lib/customerNotify';
 import { clampGiftScore, giftLevelsForScore, maxGiftLevel, scoreForOldLevel } from '../../packages/contracts/src/giftScore';
 import { GIFT_CODE_NOTICE } from '../lib/rewards/strings';
@@ -563,10 +563,10 @@ reviewRoutes.post('/', requireAuth, async (c) => {
       (!facts.gift_line && quality.rewardEligible ? `\nOpens gift levels up to ${maxGiftLevel(quality.score)} — awaiting an admin decision` : '')
   );
 
+  // Never the score: it belongs to the moment the customer writes the team's code (owner, row 301; GiftReveal).
   return c.json({
     success: true,
     published: true,
-    quality,
     review: await loadMyReview(c.env.DB, user.id, reviewId),
   });
 });
@@ -695,7 +695,6 @@ function myReviewView(r: Record<string, unknown>) {
     media: publicMedia(r.media),
     source: r.source ?? 'user',
     system_generated: (r.source ?? 'user') === 'system',
-    quality: safeParse<ReviewQualityResult | null>(r.quality_summary, null),
     status: r.status, // pending | published | rejected
     moderation_note: r.moderation_note ?? '',
     created_at: r.created_at,
@@ -703,8 +702,8 @@ function myReviewView(r: Record<string, unknown>) {
     reward: r.reward_id ? {
       kind: r.kind,
       state: r.reward_state,
+      // The old 1..5 level of a reward approved before row 301; empty since. The system's 1..100 stays out of this answer.
       quality_score: r.reward_quality_score ?? null,
-      quality: safeParse<ReviewQualityResult | null>(r.quality_snapshot, null),
       reason: r.reward_reason ?? '',
       points_awarded: Number(r.points_awarded) || 0,
       // Own evidence back to its owner only — never in public payloads.
@@ -1187,10 +1186,12 @@ reviewRoutes.get('/admin/queue', async (c) => {
 
   // The code of each approved reward, the customers' languages (the ready sentence
   // is written in theirs) and what every level offers today, for the warnings.
-  const [codes, reach, offer] = await Promise.all([
+  // And, for an approved one, whether its printer went back (row 303 R1): its code is then void, and the row says why.
+  const [codes, reach, offer, voids] = await Promise.all([
     rewardCodeFacts(c.env.DB, results.map((r) => String(r.reward_id ?? ''))),
     reachForMany(c.env, results.map((r) => String(r.user_id ?? ''))),
     levelOffer(c.env),
+    reviewPrinterVoid(c.env.DB, results.filter((r) => r.reward_state === 'approved').map((r) => String(r.review_id ?? ''))),
   ]);
 
   // Live printer-catalog membership for the listed products (one query).
@@ -1238,6 +1239,8 @@ reviewRoutes.get('/admin/queue', async (c) => {
       code: code?.code ?? null,
       code_issued_at: code?.code_issued_at ?? null,
       code_redeemed_at: code?.code_redeemed_at ?? null,
+      // 'returned' | 'cancelled' while the reviewed printer is no longer the customer's: the code opens nothing.
+      code_void: code?.code ? voids.get(String(r.review_id ?? '')) ?? null : null,
       reason: r.reason ?? '',
       points_awarded: Number(r.points_awarded) || 0,
       decided_at: r.decided_at ?? null,
@@ -1387,14 +1390,48 @@ reviewRoutes.post('/admin/:id/reward', async (c) => {
   if (action !== 'approve') {
     const reason = str(body.reason, 'reason', { min: 3, max: 1000 });
     const nextState = action === 'reject' ? 'rejected' : 'revision_needed';
-    const res = await c.env.DB.prepare(
-      `UPDATE review_rewards SET state = ?, reason = ?, decided_by = ?, decided_at = ? WHERE id = ? AND state != 'approved'`
-    )
-      .bind(nextState, reason, admin.id, now, row.reward_id)
-      .run();
-    if (res.meta.changes === 0) throw conflict('Reward was already decided');
-    await audit(c.env.DB, admin.id, 'review.reward', id, { action, reason });
-    return c.json({ success: true, review_id: id, reward_state: nextState });
+    /**
+     * A PRINTER REVIEW WHOSE GIFT THE TEAM REFUSES EARNS WHAT ANY REVIEW EARNS (owner, 2026-11-09,
+     * DECISIONS row 303 R4; rewards policy 7.8): the fallback points it took before the review road,
+     * twice the configured base at the reviewer's multiplier, paid at the refusal in the refusal's own
+     * batch, after its fence. The keys are the fallback's own (`review-fallback:<review>`,
+     * `wtx_review_fallback_<review>`), and each insert is guarded by its key, so a review is paid them
+     * once however it is refused: twice, after the old path paid them, or in a lost race. Points not
+     * configured: nothing is invented, and the refusal still stands.
+     */
+    const fallback = action === 'reject' && row.kind === 'printer_gift' ? noLevelReviewPoints(await getReviewPointsValue(c.env.DB)) : null;
+    const award = fallback !== null ? await reviewAward(c.env.DB, String(row.user_id), fallback) : null;
+    const sourceRef = `review-fallback:${id}`;
+    const txId = `wtx_review_fallback_${id}`;
+    try {
+      await c.env.DB.batch([
+        c.env.DB.prepare(
+          `UPDATE review_rewards SET state = ?, reason = ?, decided_by = ?, decided_at = ? WHERE id = ? AND state != 'approved'`
+        ).bind(nextState, reason, admin.id, now, row.reward_id),
+        ...changedExactlyOne(c.env.DB),
+        ...(award
+          ? [
+              c.env.DB.prepare(
+                `INSERT INTO points_awards (source_ref, user_id, points, created_at)
+                 SELECT ?1, ?2, ?3, ?4 WHERE NOT EXISTS (SELECT 1 FROM points_awards WHERE source_ref = ?1)`
+              ).bind(sourceRef, row.user_id, award.points, now),
+              c.env.DB.prepare(
+                `INSERT INTO wallet_transactions (id, user_id, type, currency, amount, status, note, ref, created_by, decided_at)
+                 SELECT ?1, ?2, 'deposit', 'POINT', ?3, 'approved', ?4, ?5, 'system', ?6
+                  WHERE NOT EXISTS (SELECT 1 FROM wallet_transactions WHERE id = ?1)`
+              ).bind(txId, row.user_id, award.points, fallbackNote(award.multiplierX100), sourceRef, now),
+              c.env.DB.prepare('UPDATE reviews SET fallback_points_awarded = ? WHERE id = ? AND COALESCE(fallback_points_awarded, 0) = 0').bind(award.points, id),
+            ]
+          : []),
+      ]);
+    } catch (e) {
+      if (isLostRace(e)) throw conflict('Reward was already decided');
+      throw e;
+    }
+    const paid = award ? await c.env.DB.prepare('SELECT amount FROM wallet_transactions WHERE id = ?').bind(txId).first<{ amount: number }>() : null;
+    const pointsAwarded = paid ? Number(paid.amount) || 0 : 0;
+    await audit(c.env.DB, admin.id, 'review.reward', id, { action, reason, ...(award ? { fallback_points: pointsAwarded } : {}) });
+    return c.json({ success: true, review_id: id, reward_state: nextState, ...(action === 'reject' && row.kind === 'printer_gift' ? { fallback_points_awarded: pointsAwarded } : {}) });
   }
 
   // ---- approve ----
@@ -1562,6 +1599,9 @@ reviewRoutes.post('/admin/:id/code/regenerate', requireMoneyAuthority('review_re
   const current = (await rewardCodeFacts(c.env.DB, [row.reward_id])).get(row.reward_id);
   if (row.state !== 'approved' || !current?.code) throw conflict('This reward holds no code.', 'GIFT_CODE_NONE');
   if (current.code_redeemed_at) throw conflict('This code was already used.', 'GIFT_CODE_USED');
+  // Row 303 R1: a new code for a printer that went back would open nothing either.
+  const gone = (await reviewPrinterVoid(c.env.DB, [id])).get(id);
+  if (gone) throw new HttpError(409, 'This printer is no longer the customer’s, so its review code opens no gift.', 'GIFT_CODE_VOID', { reason: gone });
   const now = new Date().toISOString();
   for (let attempt = 0; attempt < 4; attempt++) {
     const code = newGiftCode();

@@ -41,9 +41,10 @@ type Params =
   | ({ kind: 'weekly_coupons'; until: string } & CouponTerms)
   | ({ kind: 'team_coupon'; until: string } & CouponTerms)
   | { kind: 'coupons_expiring'; count: number; until: string }
-  | { kind: 'competition_won'; title: Trilingual; place: number; points: number }
+  | { kind: 'competition_won'; title: Trilingual; place: number; points: number; prize?: Trilingual }
   | { kind: 'competition_refund'; title: Trilingual; points: number }
-  | { kind: 'shop_gift_refund'; name: Trilingual; points: number };
+  | { kind: 'shop_gift_refund'; name: Trilingual; points: number }
+  | { kind: 'shop_coupon_refund'; coupon: RewardCouponKind; points: number };
 
 const n = (v: number) => Math.max(0, Math.trunc(v)).toLocaleString('en-US');
 const capital = (s: string) => `${s.charAt(0).toUpperCase()}${s.slice(1)}`;
@@ -54,10 +55,11 @@ function couponsPhrase(p: CouponTerms): { what: Trilingual; both: boolean } {
   const both = p.kinds.includes('free_shipping') && p.kinds.includes('filament_discount');
   const shipOnly = !both && p.kinds.includes('free_shipping');
   const hasMin = p.min > 0;
+  // The minimum counts: an order of exactly that much qualifies (owner, 2026-11-09, R3; policy 14.4).
   const ship: Trilingual = {
-    ar: `كوبون توصيل مجاني بقيمة ${n(p.amount)} د.ع${hasMin ? ` للطلبات فوق ${n(p.min)} د.ع` : ''}`,
-    en: `a free-delivery coupon worth ${n(p.amount)} IQD${hasMin ? ` on orders over ${n(p.min)} IQD` : ''}`,
-    ckb: `کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای ${n(p.amount)} دینار${hasMin ? ` بۆ داواکارییەکانی سەرووی ${n(p.min)} دینار` : ''}`,
+    ar: `كوبون توصيل مجاني بقيمة ${n(p.amount)} د.ع${hasMin ? ` للطلبات من ${n(p.min)} د.ع فأكثر` : ''}`,
+    en: `a free-delivery coupon worth ${n(p.amount)} IQD${hasMin ? ` on orders of ${n(p.min)} IQD or more` : ''}`,
+    ckb: `کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای ${n(p.amount)} دینار${hasMin ? ` بۆ داواکارییەکانی ${n(p.min)} دینار و زیاتر` : ''}`,
   };
   const k = Math.max(1, Math.trunc(p.pieces));
   const filament: Trilingual = {
@@ -161,6 +163,8 @@ export function rewardText(p: Params): RewardText {
       };
     case 'competition_won': {
       const pts = p.points > 0;
+      // The prize in the owner's own words, when he wrote it; policy 15.5 is how a prize in kind reaches the winner.
+      const words = (lang: keyof Trilingual) => (p.prize ? pick(p.prize, lang).trim() : '');
       return {
         title: {
           ar: `🏆 فزت في مسابقة «${pick(p.title, 'ar')}»`,
@@ -168,9 +172,9 @@ export function rewardText(p: Params): RewardText {
           ckb: `🏆 لە پێشبڕکێی «${pick(p.title, 'ckb')}» براوە بوویت`,
         },
         body: {
-          ar: `حللت في المركز ${n(p.place)}${pts ? ` وأُضيفت ${n(p.points)} نقطة إلى رصيدك` : ''}. شكرًا لمشاركتك!`,
-          en: `You placed ${n(p.place)}${pts ? `, and ${n(p.points)} points were added to your balance` : ''}. Thank you for taking part!`,
-          ckb: `پلەی ${n(p.place)}ت بەدەستهێنا${pts ? ` و ${n(p.points)} خاڵ خرایە سەر باڵانسەکەت` : ''}. سوپاس بۆ بەشداریکردنت!`,
+          ar: `حللت في المركز ${n(p.place)}${pts ? ` وأُضيفت ${n(p.points)} نقطة إلى رصيدك` : ''}.${words('ar') ? ` جائزة المسابقة: ${words('ar')}. تُسلَّم الجوائز العينية كما يعلن المتجر.` : ''} شكرًا لمشاركتك!`,
+          en: `You placed ${n(p.place)}${pts ? `, and ${n(p.points)} points were added to your balance` : ''}.${words('en') ? ` The prize: ${words('en')}. Prizes in kind are handed over as the shop announces.` : ''} Thank you for taking part!`,
+          ckb: `پلەی ${n(p.place)}ت بەدەستهێنا${pts ? ` و ${n(p.points)} خاڵ خرایە سەر باڵانسەکەت` : ''}.${words('ckb') ? ` خەڵاتی پێشبڕکێکە: ${words('ckb')}. خەڵاتە کاڵاییەکان بەو شێوەیە دەدرێن کە فرۆشگا ڕایدەگەیەنێت.` : ''} سوپاس بۆ بەشداریکردنت!`,
         },
       };
     }
@@ -200,6 +204,22 @@ export function rewardText(p: Params): RewardText {
           ckb: `ئەو ${n(p.points)} خاڵەی بۆ ${pick(p.name, 'ckb')} دابووت گەڕێنرایەوە بۆ باڵانسەکەت.`,
         },
       };
+    case 'shop_coupon_refund': {
+      // The team withdrew a coupon bought with points: they come back (row 303 R2; policy 14.10).
+      const filament = p.coupon === 'filament_discount';
+      return {
+        title: {
+          ar: '↩️ سُحب كوبونك من متجر النقاط',
+          en: '↩️ Your points-shop coupon was withdrawn',
+          ckb: '↩️ کۆپۆنەکەت لە فرۆشگای خاڵ کشێنرایەوە',
+        },
+        body: {
+          ar: `أعدنا إلى رصيدك ${n(p.points)} نقطة دفعتها مقابل ${filament ? 'كوبون الفلامنت' : 'كوبون التوصيل المجاني'}.`,
+          en: `The ${n(p.points)} points you paid for ${filament ? 'the filament coupon' : 'the free-delivery coupon'} are back in your balance.`,
+          ckb: `ئەو ${n(p.points)} خاڵەی بۆ ${filament ? 'کۆپۆنی فیلامێنت' : 'کۆپۆنی گەیاندنی بەخۆڕایی'} دابووت گەڕێنرایەوە بۆ باڵانسەکەت.`,
+        },
+      };
+    }
   }
 }
 

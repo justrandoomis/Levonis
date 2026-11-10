@@ -110,6 +110,7 @@ import { PRICE_PROTECTION_NOTICES, PRICE_PROTECTION_REASON_CODES } from '../../p
 import { estimateServerMessage } from '../../packages/contracts/src/priceEstimates';
 import { notifyCustomer } from '../lib/customerNotify';
 import { revokeRewardsForReturn } from '../lib/rewards/coupons';
+import { voidReviewGiftsOfLine } from '../lib/gifts/reviewCode';
 import type { EmailLang } from '../lib/emailTemplates';
 
 const WINDOW_MS = 7 * 86_400_000;
@@ -1175,6 +1176,13 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         await revokeRewardsForReturn(c.env, { caseId: id, orderItemId: kase.order_item_id, qty: kase.qty });
       } catch (e) {
         console.error('reward coupons not withdrawn for return', id, e instanceof Error ? e.message : String(e));
+      }
+      // Row 303 R1: the gift a review code of this printer opened, still unordered, goes with it
+      // (only once the line holds no printer of the customer's: worker/lib/gifts/reviewCode.ts).
+      try {
+        await voidReviewGiftsOfLine(c.env, { orderItemId: kase.order_item_id, actorId: admin.id, ref: `return:${id}` }, nowIso);
+      } catch (e) {
+        console.error('review gift not cancelled for return', id, e instanceof Error ? e.message : String(e));
       }
     }
   }

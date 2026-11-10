@@ -13,8 +13,9 @@
  *   · EVERY WEEK for the printer's warranty period, 12 months (owner,
  *     2026-11-05; migration 0225; DECISIONS rows 223 #4 and 295): «كل اسبوع»,
  *     «all the warranty period 12month». The extended warranty does not count;
- *   · the delivery coupon is worth 5,000 IQD on an order over 100,000 IQD: «1
- *     free shipping 5000», «للطلبات فوق 100 الف»;
+ *   · the delivery coupon is worth 5,000 IQD on an order of 100,000 IQD or more
+ *     (the minimum counts: owner, 2026-11-09, DECISIONS row 303 R3): «1 free
+ *     shipping 5000», «للطلبات فوق 100 الف»;
  *   · the filament coupon is 15% off ONE PIECE, at most 25,000 IQD, on the
  *     filaments ticked in Admin → Rewards — and, until any is ticked, on every
  *     product in the FDM filament section: «the coupon is for 1 pic». It also works on

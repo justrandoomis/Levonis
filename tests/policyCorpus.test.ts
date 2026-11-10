@@ -1120,13 +1120,15 @@ test('rewards 7.5 names the gift line, and rewards 5.5 keeps a view already runn
   assert.doesNotMatch(articleOf(rewards.body.ar, '5.5'), /أو انتهت فترته لم تُحتسب/);
 });
 
-test('faq 12.11 says which review takes which path, and routes to rewards 7.5, 8.2 and 8.3', () => {
+test('faq 12.11 says which review takes which path, and routes to rewards 7.5, 7.8, 8.2 and 8.3', () => {
   const faq = published('faq');
   const rewards = published('rewards');
+  // 7.8 joined the reference with R4's sentence (the lead's M2, 2026-11-10; DECISIONS row 303):
+  // tests/rewardsPolicyPublished.test.ts holds the sentence itself, as GET /api/policies/faq serves it.
   const REFERENCE: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
-    ar: /المرجع: وثيقة النقاط والمراجعات، المواد 7\.5 و8\.2 و8\.3\.$/m,
-    en: /Reference: the Points and Reviews document, articles 7\.5, 8\.2 and 8\.3\.$/m,
-    ckb: /سەرچاوە: بەڵگەنامەی خاڵ و پێداچوونەوە، ماددەکانی 7\.5 و 8\.2 و 8\.3\.$/m,
+    ar: /المرجع: وثيقة النقاط والمراجعات، المواد 7\.5 و7\.8 و8\.2 و8\.3\.$/m,
+    en: /Reference: the Points and Reviews document, articles 7\.5, 7\.8, 8\.2 and 8\.3\.$/m,
+    ckb: /سەرچاوە: بەڵگەنامەی خاڵ و پێداچوونەوە، ماددەکانی 7\.5 و 7\.8 و 8\.2 و 8\.3\.$/m,
   };
   // What version 7 said: a review enters the decision only at a measured quality score.
   const STALE: Readonly<Record<(typeof POLICY_LANGS)[number], RegExp>> = {
@@ -1144,7 +1146,7 @@ test('faq 12.11 says which review takes which path, and routes to rewards 7.5, 8
     assert.match(entry, REFERENCE[lang], `faq 12.11/${lang}: the reference`);
     assert.doesNotMatch(entry, STALE[lang], `faq 12.11/${lang}: the old gate`);
     assert.match(entry, ANY_SCORE[lang], `faq 12.11/${lang}`);
-    for (const num of ['7.5', '8.2', '8.3']) articleOf(rewards.body[lang], num);
+    for (const num of ['7.5', '7.8', '8.2', '8.3']) articleOf(rewards.body[lang], num);
   }
   // The code's half of it: the smallest sound printer review enters.
   const smallest = evaluateReviewQuality({ stars: 1, body: 'Good', media: [], hasEvidence: false, isPrinter: true });

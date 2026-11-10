@@ -321,16 +321,19 @@ export default function OrderCard({
         )}
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            data-track-order={order.id}
-            aria-expanded={trackingOpen}
-            onClick={onToggleTracking}
-            className={`${ACTION} lv-button-secondary`}
-          >
-            <Truck className="w-4 h-4 shrink-0" aria-hidden />
-            <span className="truncate">{trackingOpen ? s.hideTrack : s.track}</span>
-          </button>
+          {/* Nothing to track on a cancelled order: its path stopped, and the pill above says why. */}
+          {order.status !== 'cancelled' && (
+            <button
+              type="button"
+              data-track-order={order.id}
+              aria-expanded={trackingOpen}
+              onClick={onToggleTracking}
+              className={`${ACTION} lv-button-secondary`}
+            >
+              <Truck className="w-4 h-4 shrink-0" aria-hidden />
+              <span className="truncate">{trackingOpen ? s.hideTrack : s.track}</span>
+            </button>
+          )}
           {/* A LIST OF CARDS HAS NO PRIMARY: each card is a row, so Details
               is raised clay like Track, never a column of competing gold fills
               down the page. Cancel is a quiet ghost in the danger ink — the
@@ -376,7 +379,7 @@ export default function OrderCard({
           )}
         </div>
 
-        {trackingOpen && <OrderTracker orderId={order.id} lang={lang} />}
+        {trackingOpen && order.status !== 'cancelled' && <OrderTracker orderId={order.id} lang={lang} />}
       </div>
     </article>
   );

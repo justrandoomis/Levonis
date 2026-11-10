@@ -26,6 +26,8 @@ import type { ResolvedPrice } from '../pricing';
 import { canonicalOptionValueIds } from '../cartSelectionIdentity';
 import { safeParse } from '../types';
 import { giftSelectionOf, type GiftSelection } from './selection';
+// The gift's stated value, for the routes that read it beside the line (row 303): defined with the grant's snapshot.
+export { giftShelfUnitIqd } from './selection';
 
 export const GIFT_LINE_PREFIX = 'gift:';
 
@@ -267,7 +269,7 @@ export function unpricedGiftResolved(zeroed: ResolvedPrice, frozenUnitIqd: numbe
   };
 }
 
-/** The unit value a gift line shows: the V2 regular price, or — not V2-published — the value frozen at the grant. */
+/** The unit value a gift line shows: the V2 shelf price (`giftShelfUnitIqd`), or — not V2-published — the value frozen at the grant. */
 export function giftUnitValueOf(v2: boolean, regularUnitIqd: number, frozenValueIqd: number | null | undefined, qty: number): number {
   if (v2) return Math.max(0, Math.round(Number(regularUnitIqd) || 0));
   return Math.max(0, Math.round((Number(frozenValueIqd) || 0) / Math.max(1, qty)));

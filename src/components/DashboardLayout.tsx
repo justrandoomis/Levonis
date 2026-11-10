@@ -459,7 +459,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                 onClick={() => setShowNotifications(!showNotifications)}
                 aria-label={t.notifications}
                 aria-expanded={showNotifications}
-                className="hover:text-text-primary transition-colors min-h-11 px-1 flex items-center"
+                className="relative lv-hit hover:text-text-primary transition-colors min-h-11 px-1 flex items-center"
               >
                 <Bell className="w-5 h-5 stroke-[2]" />
               </button>
@@ -477,7 +477,7 @@ export default function DashboardLayout({ title = 'LEVO', sidebarItems, activeTa
                 onClick={() => setShowUserMenu(!showUserMenu)}
                 aria-label={t.myStore}
                 aria-expanded={showUserMenu}
-                className="w-9 h-9 rounded-full bg-surface flex items-center justify-center overflow-hidden shadow-xs border border-border-subtle active:shadow-press transition-colors"
+                className="relative lv-hit w-9 h-9 rounded-full bg-surface flex items-center justify-center shadow-xs border border-border-subtle active:shadow-press transition-colors"
               >
                 <User className="w-5 h-5 text-text-secondary" />
               </button>

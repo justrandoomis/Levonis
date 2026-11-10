@@ -271,7 +271,7 @@ test('the card exists in all three languages, with no Arabic left in the English
   const en = card(r, 'none', 'en');
   assert.match(en, /Your coupons/);
   assert.match(en, /Apply my coupons/);
-  // The money is `useMoney()`, as on every other figure of the cart, and it writes «د.ع» in every language.
+  // The money is `useMoney()`, as on every other figure of the cart; this tree has no language above the currency, so it writes «د.ع».
   assert.doesNotMatch(en.replace(/<[^>]+>/g, '').replace(/د\.ع/g, ''), /[؀-ۿ]/);
   const ckb = card(r, 'none', 'ckb');
   assert.match(ckb, /کۆپۆنەکانت/);
@@ -567,7 +567,8 @@ test('the shop’s real names: no doubled word in any line, and two lines rather
   const printers = src('src/components/adminRewards/RewardsPrinters.tsx');
   assert.doesNotMatch(printers, /كوبونات الطابعة \$\{/, 'nor the row’s label');
   assert.match(printers, /line-clamp-2 text-\[16px\]/, 'the sheet’s title');
-  assert.match(src('src/components/rewards/PrintersBlock.tsx'), /line-clamp-2 text-\[14px\]/);
+  // The customer's own printer row prints the whole name, more than the two lines this asked for: two models differ at their end (integration run).
+  assert.doesNotMatch(src('src/components/rewards/PrintersBlock.tsx'), /line-clamp/);
   for (const key of ['ar', 'en', 'ckb'] as const) {
     assert.doesNotMatch(copyText('coupon.fromPrinterNamed', key, { name: 'N', week: 1 }), /طابعتك|your printer|چاپکەرەکەت/);
   }

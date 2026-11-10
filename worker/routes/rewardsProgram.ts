@@ -64,7 +64,7 @@ import {
   withGates,
 } from '../lib/rewards/competitions';
 import { readPendingPoints } from '../lib/rewards/pending';
-import { giftRevealFor, redeemGiftCode, rewardCodeFacts } from '../lib/gifts/reviewCode';
+import { giftRevealFor, redeemGiftCode, reviewPrinterVoid, rewardCodeFacts } from '../lib/gifts/reviewCode';
 import { GIFT_ROW_SELECT, giftChoiceScope, giftStatusOf, loadCustomerGift } from '../lib/gifts/model';
 import { giftLevelThreshold, maxGiftLevel } from '../../packages/contracts/src/giftScore';
 import { customerPrinters } from '../lib/rewards/printers';
@@ -121,7 +121,12 @@ async function printersToRate(db: D1Database, userId: string) {
          FROM orders o
          JOIN order_items oi ON oi.order_id = o.id
          JOIN products p ON p.id = oi.product_id
-        WHERE o.user_id = ?1 AND o.status = 'delivered'
+        WHERE o.user_id = ?1
+          AND (o.status = 'delivered'
+               -- Row 303 R1: a delivered printer whose order the team then cancelled stays listed while its review
+               -- holds an approved reward, so the page can say why that review's code opens nothing.
+               OR (o.status = 'cancelled' AND EXISTS (SELECT 1 FROM reviews rv JOIN review_rewards rw ON rw.review_id = rv.id
+                                                       WHERE rv.order_item_id = oi.id AND rv.user_id = ?1 AND rw.state = 'approved')))
           AND oi.gift_entitlement_id IS NULL
           AND COALESCE(o.seller_type, 'levonis') <> 'merchant'
           AND EXISTS (SELECT 1 FROM product_catalogs pc JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
@@ -136,15 +141,18 @@ async function printersToRate(db: D1Database, userId: string) {
   if (!lines.length) return [];
   const { results: reviews } = await db
     .prepare(
-      `SELECT r.id, r.product_id, r.stars, r.source, rr.id AS reward_id, rr.state AS reward_state, rr.quality_score AS reward_level
+      `SELECT r.id, r.product_id, r.stars, r.source, r.fallback_points_awarded AS review_points,
+              rr.id AS reward_id, rr.state AS reward_state, rr.quality_score AS reward_level,
+              rr.reason AS reward_reason, rr.decided_by AS reward_decided_by
          FROM reviews r LEFT JOIN review_rewards rr ON rr.review_id = r.id
         WHERE r.user_id = ?1 AND r.product_id IN (SELECT value FROM json_each(?2))`
     )
     .bind(userId, JSON.stringify(lines.map((l) => l.product_id)))
-    .all<{ id: string; product_id: string; stars: number; source: string | null; reward_id: string | null; reward_state: string | null; reward_level: number | null }>();
+    .all<{ id: string; product_id: string; stars: number; source: string | null; review_points: number | null; reward_id: string | null; reward_state: string | null; reward_level: number | null; reward_reason: string | null; reward_decided_by: string | null }>();
   const byProduct = new Map((reviews ?? []).map((r) => [r.product_id, r]));
   const rewardIds = (reviews ?? []).map((r) => r.reward_id ?? '').filter(Boolean);
-  const [codes, gifts] = await Promise.all([rewardCodeFacts(db, rewardIds), rewardGifts(db, userId, rewardIds)]);
+  const approved = (reviews ?? []).filter((r) => r.reward_state === 'approved').map((r) => r.id);
+  const [codes, gifts, voids] = await Promise.all([rewardCodeFacts(db, rewardIds), rewardGifts(db, userId, rewardIds), reviewPrinterVoid(db, approved)]);
   return lines.map((l) => {
     const review = byProduct.get(l.product_id);
     const own = review && (review.source ?? 'user') !== 'system' ? review : null;
@@ -154,6 +162,12 @@ async function printersToRate(db: D1Database, userId: string) {
     const gift = own?.reward_id ? gifts.get(own.reward_id) ?? null : null;
     // The score belongs to the moment the customer writes the code: not a figure before it.
     const opened = code?.code_redeemed_at && code.final_score != null;
+    /**
+     * Row 303 R1: the printer this review is about went back, or its order was cancelled, so its code
+     * opens no gift: nothing to write, and the page says why. A gift already ordered stays what it is.
+     */
+    const ordered = gift?.status === 'ORDERED' || gift?.status === 'FULFILLED';
+    const codeVoid = own && code?.code && !ordered ? voids.get(own.id) ?? null : null;
     return {
       order_id: l.order_id,
       product_id: l.product_id,
@@ -167,23 +181,34 @@ async function printersToRate(db: D1Database, userId: string) {
        * code_ready       approved, and the code the team gives them is unwritten (row 301);
        * reward_approved  a gift waits for the customer: in /gifts, or on this page for a code's;
        * rated            reviewed, and nothing is left to do: outside the gift
-       *                  levels, not approved, or the gift already ordered.
+       *                  levels, not approved, the gift already ordered, or the
+       *                  code void with its printer (`code_void` says why).
        */
       state: !own
         ? 'to_rate'
         : own.reward_state === 'submitted' || own.reward_state === 'revision_needed'
           ? 'reward_pending'
           : own.reward_state === 'approved'
-            ? code?.code && !code.code_redeemed_at
-              ? 'code_ready'
-              : gift?.waiting
-                ? 'reward_approved'
-                : 'rated'
+            ? codeVoid
+              ? 'rated'
+              : code?.code && !code.code_redeemed_at
+                ? 'code_ready'
+                : gift?.waiting
+                  ? 'reward_approved'
+                  : 'rated'
             : 'rated',
+      /** Why this review's code opens no gift: 'returned' or 'cancelled' (row 303 R1); null while it would. */
+      code_void: codeVoid,
       stars: own ? Number(own.stars) || null : null,
       reward_level: own && own.reward_state === 'approved' ? (opened ? maxGiftLevel(code.final_score!) : Number(own.reward_level) || null) : null,
       final_score: opened ? code.final_score : null,
       gift: gift ? { id: gift.id, status: gift.status, scope: gift.scope } : null,
+      // A reward the team refused, or a review it sent back, and why: the reason is written to be shown to the
+      // customer (AdminReviews «يُعرض للعميل»). A system refusal holds an English record for the audit, not a sentence.
+      reward_decision: own?.reward_state === 'rejected' ? ('rejected' as const) : own?.reward_state === 'revision_needed' ? ('revision' as const) : null,
+      reward_reason: own && (own.reward_state === 'rejected' || own.reward_state === 'revision_needed') && own.reward_decided_by !== 'system' ? (own.reward_reason ?? '') : '',
+      // What the review itself earned when its gift was refused (row 303 R4; policy 7.8), or before the review road.
+      review_points: own && own.reward_state === 'rejected' ? Math.max(0, Number(own.review_points) || 0) : 0,
     };
   });
 }

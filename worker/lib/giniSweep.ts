@@ -74,7 +74,7 @@
 import type { Env } from './types';
 import { planOrderReturn } from './orderInventory';
 import { cancelledOrderRefundStatements } from './orderCancelOps';
-import { newHistoryId } from './orderStageOps';
+import { newHistoryId, voidReviewGiftsOfCancelledOrder } from './orderStageOps';
 import { audit } from './audit';
 
 export interface GiniHoldReport {
@@ -164,6 +164,9 @@ export async function sweepGiniHolds(env: Env, nowIso: string, limit = 100): Pro
           hold_until: String(order.gini_hold_until ?? ''),
           released: stock.plan?.applied ?? 0,
         });
+        // A gift ordered here comes back to be ordered again, unless its review code died with its
+        // printer (rewards policy 8.16): then it goes with this order. Logged, never thrown.
+        await voidReviewGiftsOfCancelledOrder(env, id, null, nowIso);
       } else {
         // The flip lost a race — somebody scanned the barcode in the same
         // instant, and the fence rolled everything back with it.

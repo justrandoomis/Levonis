@@ -62,7 +62,7 @@
 import type { Env } from './types';
 import { planOrderReturn } from './orderInventory';
 import { cancelledOrderRefundStatements } from './orderCancelOps';
-import { newHistoryId } from './orderStageOps';
+import { newHistoryId, voidReviewGiftsOfCancelledOrder } from './orderStageOps';
 import { orderExpiryActive, type OrderExpiryConfig } from './orderExpiry';
 import { audit } from './audit';
 import { isPriceHeld } from './priceHold';
@@ -185,6 +185,9 @@ export async function sweepExpiredOrders(
           ttl_minutes: cfg.ttl_minutes,
           released: stock.plan?.applied ?? 0,
         });
+        // A gift ordered here comes back to be ordered again, unless its review code died with its
+        // printer (rewards policy 8.16): then it goes with this order. Logged, never thrown.
+        await voidReviewGiftsOfCancelledOrder(env, id, null, nowIso);
       } else {
         // The flip lost a race — the fence rolled everything back with it.
         out.skipped += 1;

@@ -37,19 +37,19 @@ import { editorialImageSizes } from '../../../lib/homeImageSizes';
 function Banner({ card, columns }: { card: EditorialCard; columns: number }) {
   const { loc } = useLanguage();
 
-  // OWNER: Sorani to be written by hand (both presets' three lines).
+  // The Sorani of both presets' three lines, written on 2026-11-09: the browse mission sent a Sorani customer here, to a page half in Arabic.
   const preset =
     card.preset === 'multicolor'
       ? {
-          title: loc('اطبع بأكثر من لون.', 'Print in more than one colour.'),
-          subtitle: loc('اكتشف إمكانيات الطباعة متعددة الألوان.', 'Discover what multi-colour printing can do.'),
-          cta: loc('اكتشف الآن', 'Explore now'),
+          title: loc('اطبع بأكثر من لون.', 'Print in more than one colour.', 'بە زیاتر لە ڕەنگێک چاپ بکە.'),
+          subtitle: loc('اكتشف إمكانيات الطباعة متعددة الألوان.', 'Discover what multi-colour printing can do.', 'توانای چاپی فرەڕەنگ بدۆزەرەوە.'),
+          cta: loc('اكتشف الآن', 'Explore now', 'ئێستا بیدۆزەرەوە'),
         }
       : card.preset === 'materials'
         ? {
-            title: loc('من أول طبعة إلى مشروع كامل.', 'From the first print to a whole project.'),
-            subtitle: loc('مواد عالية الجودة لكل احتياجاتك.', 'Quality materials for everything you make.'),
-            cta: loc('تسوق مواد الطباعة', 'Shop materials'),
+            title: loc('من أول طبعة إلى مشروع كامل.', 'From the first print to a whole project.', 'لە یەکەم چاپەوە تا پڕۆژەیەکی تەواو.'),
+            subtitle: loc('مواد عالية الجودة لكل احتياجاتك.', 'Quality materials for everything you make.', 'ماددەی کوالیتی بەرز بۆ هەموو پێداویستییەکانت.'),
+            cta: loc('تسوق مواد الطباعة', 'Shop materials', 'ماددەکانی چاپ بکڕە'),
           }
         : { title: '', subtitle: '', cta: '' };
   const title = card.title ?? preset.title;
@@ -123,7 +123,7 @@ export default function EditorialBanners({ cards }: { cards: EditorialCard[] }) 
   return (
     <section
       data-home-section="editorial"
-      aria-label={loc('مختارات تحريرية', 'Featured stories')}
+      aria-label={loc('مختارات تحريرية', 'Featured stories', 'هەڵبژاردەی تایبەت')}
       className={`grid gap-2 sm:gap-2.5 lg:gap-4 ${cards.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}
     >
       {cards.map((c) => (

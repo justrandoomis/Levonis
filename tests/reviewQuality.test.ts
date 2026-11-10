@@ -1,5 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import type { DatabaseSync } from 'node:sqlite';
 import { evaluateReviewQuality, reviewTextCounts, type ReviewQualityMedia } from '../worker/lib/reviewQuality';
 import { LEVEL_COMPOSITION, reviewRoutes } from '../worker/routes/reviews';
 import { GIFT_SCORE_PARTS } from '../packages/contracts/src/giftScore';
@@ -206,6 +207,16 @@ class ReviewBucket {
   }
 }
 
+/**
+ * WHAT THE SERVER RECORDED. The customer's own answers no longer carry it: the system's score belongs to the moment
+ * the team's code is written (owner's brief, DECISIONS row 301; the integration run read it in POST /api/reviews), so
+ * these tests read the columns the queue reads.
+ */
+const storedQuality = (raw: DatabaseSync, reviewId: string) =>
+  JSON.parse((raw.prepare('SELECT quality_summary AS q FROM reviews WHERE id = ?').get(reviewId) as { q: string }).q);
+const queuedQuality = (raw: DatabaseSync, reviewId: string) =>
+  JSON.parse((raw.prepare('SELECT quality_snapshot AS q FROM review_rewards WHERE review_id = ?').get(reviewId) as { q: string }).q);
+
 test('qualified manual review enters reward queue; rejecting reward leaves publication intact', async () => {
   const raw = freshDb();
   seedPurchase(raw);
@@ -237,7 +248,7 @@ test('qualified manual review enters reward queue; rejecting reward leaves publi
   const created = await json(response);
   assert.equal(created.review.status, 'published');
   assert.equal(created.review.reward.state, 'submitted');
-  assert.equal(created.review.reward.quality.tier, 5);
+  assert.equal(queuedQuality(raw, created.review.id).tier, 5);
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM user_notifications WHERE kind='review_reward_pending'"), 1);
 
   const admin = stubApp(asD1(raw), { id: 'boss', role: 'admin', email: 'boss@x.co' }, (a) => {
@@ -327,13 +338,13 @@ test('the same video uploaded again, for another printer, is reused media: it st
   assert.equal((await bucket.head(first.key))?.customMetadata?.sha256, first.sha256);
 
   const a = await json(await post(app, '/api/reviews', { productId: 'p_one', orderId: 'ord_p_one', stars: 4, body: 'A full review of the first printer, its noise and its first layer.', videoKey: first.key }));
-  assert.deepEqual(a.quality.suspiciousSignals, []);
-  assert.equal(a.quality.videoQuality, GIFT_SCORE_PARTS.video);
+  assert.deepEqual(storedQuality(raw, a.review.id).suspiciousSignals, []);
+  assert.equal(storedQuality(raw, a.review.id).videoQuality, GIFT_SCORE_PARTS.video);
   assert.equal(a.review.reward.state, 'submitted');
 
   const b = await json(await post(app, '/api/reviews', { productId: 'p_two', orderId: 'ord_p_two', stars: 4, body: 'Different words about the second one: quiet at night, quick to print.', videoKey: again.key }));
-  assert.ok(b.quality.suspiciousSignals.includes('reused_media'), JSON.stringify(b.quality.suspiciousSignals));
-  assert.equal(b.quality.rewardEligible, false);
+  assert.ok(storedQuality(raw, b.review.id).suspiciousSignals.includes('reused_media'), JSON.stringify(storedQuality(raw, b.review.id).suspiciousSignals));
+  assert.equal(storedQuality(raw, b.review.id).rewardEligible, false);
   assert.equal(b.review.reward, null, 'no reward row: the queue never sees it');
   assert.equal(b.review.status, 'published', 'the review stays public');
   assert.equal(b.review.fallback_points_awarded, 24, 'the configured fallback, as policy 7.5 says');
@@ -341,13 +352,13 @@ test('the same video uploaded again, for another printer, is reused media: it st
 });
 
 test('another video is another video, and editing a review never counts its own video against it', async () => {
-  const { app, upload } = uploadWorld();
+  const { raw, app, upload } = uploadWorld();
   const one = await upload(mp4Bytes(1), 'one.mp4', 'video/mp4');
   const two = await upload(mp4Bytes(2), 'two.mp4', 'video/mp4');
   assert.notEqual(one.sha256, two.sha256);
   const a = await json(await post(app, '/api/reviews', { productId: 'p_one', orderId: 'ord_p_one', stars: 4, body: 'A full review of the first printer, its noise and its first layer.', videoKey: one.key }));
   const b = await json(await post(app, '/api/reviews', { productId: 'p_two', orderId: 'ord_p_two', stars: 4, body: 'Different words about the second one: quiet at night, quick to print.', videoKey: two.key }));
-  assert.deepEqual(b.quality.suspiciousSignals, []);
+  assert.deepEqual(storedQuality(raw, b.review.id).suspiciousSignals, []);
   assert.equal(b.review.reward.state, 'submitted');
   const edited = await app.request(`/api/reviews/${a.review.id}`, {
     method: 'PUT',
@@ -355,19 +366,19 @@ test('another video is another video, and editing a review never counts its own 
     body: JSON.stringify({ stars: 5, body: 'A fuller review of the first printer, its noise, its first layer and its speed.' }),
   });
   assert.equal(edited.status, 200);
-  const after = (await edited.json()) as { review: { reward: { state: string; quality: { suspiciousSignals: string[] } } } };
+  const after = (await edited.json()) as { review: { reward: { state: string } } };
   assert.equal(after.review.reward.state, 'submitted');
-  assert.deepEqual(after.review.reward.quality.suspiciousSignals, []);
+  assert.deepEqual(queuedQuality(raw, a.review.id).suspiciousSignals, []);
 });
 
 test('the same photo uploaded twice into one review counts once, however many keys it has: «distinct images», policy 7.4', async () => {
-  const { app, upload } = uploadWorld();
+  const { raw, app, upload } = uploadWorld();
   const a = await upload(jpegBytes(1), 'a.jpg', 'image/jpeg');
   const copy = await upload(jpegBytes(1), 'a-copy.jpg', 'image/jpeg');
   const other = await upload(jpegBytes(2), 'b.jpg', 'image/jpeg');
   const res = await json(await post(app, '/api/reviews', { productId: 'p_one', orderId: 'ord_p_one', stars: 4, body: 'A full review of the first printer, its noise and its first layer.', photoKeys: [a.key, copy.key, other.key] }));
-  assert.ok(res.quality.suspiciousSignals.includes('duplicate_media'), JSON.stringify(res.quality.suspiciousSignals));
-  assert.equal(res.quality.imageCount, 2);
+  assert.ok(storedQuality(raw, res.review.id).suspiciousSignals.includes('duplicate_media'), JSON.stringify(storedQuality(raw, res.review.id).suspiciousSignals));
+  assert.equal(storedQuality(raw, res.review.id).imageCount, 2);
   assert.equal(res.review.reward.state, 'submitted', 'a copy inside one review is not the severe signal');
 });
 

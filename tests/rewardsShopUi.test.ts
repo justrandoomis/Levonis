@@ -188,10 +188,11 @@ test('the gift card says what was paid, and a cancelled one says it came back', 
 });
 
 test('the points history names the new movements in three languages, before the coupon’s words can claim them', () => {
-  const page = src('src/pages/Rewards.tsx');
+  // The table moved out of the page, so a test reads every language without one (src/components/points/words.ts).
+  const page = src('src/components/points/words.ts');
   const product = page.indexOf('/^Points shop product/');
   const refund = page.indexOf('/^Points shop refund/');
-  const coupon = page.indexOf('/^Points shop/.test');
+  const coupon = page.indexOf('/^Points shop/,');
   assert.ok(product > 0 && refund > 0 && coupon > 0);
   assert.ok(product < coupon && refund < coupon, 'the general rule comes last');
   assert.match(src('worker/lib/rewards/shopItems.ts'), /`Points shop product: /, 'the server writes the note the page reads');

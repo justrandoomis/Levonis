@@ -71,6 +71,13 @@ export const GIFT_STATUSES: readonly GiftStatus[] = [
 export const LEVELS = [1, 2, 3, 4, 5] as const;
 export const levelPoolId = (n: number) => `gift_level_${n}`;
 
+/**
+ * The reason the system writes on a gift a review code opened when the reviewed printer leaves its customer
+ * (worker/lib/gifts/reviewCode.ts `voidReviewGiftsOfLine` / `voidReviewGiftsOfOrder`, DECISIONS row 303 R1).
+ * The system's own word, not the team's free text: the customer's card may say it (`GiftView.cancel_why`).
+ */
+export const PRINTER_RETURNED_CANCEL = 'review_printer_returned';
+
 const text = (v: unknown): string => (typeof v === 'string' ? v : v === null || v === undefined ? '' : String(v));
 const orNull = (v: unknown): string | null => (v === null || v === undefined || v === '' ? null : text(v));
 
@@ -159,6 +166,12 @@ export interface GiftView {
   ordered_at: string | null;
   fulfilled_at: string | null;
   cancelled_at: string | null;
+  /**
+   * Why a cancelled gift was cancelled, when the SYSTEM cancelled it and may say so: 'printer_returned', the
+   * reviewed printer whose code opened it went back or its order was cancelled (policy 8.16). Null on every
+   * other gift, and on a gift the team cancelled, whose reason is internal.
+   */
+  cancel_why: 'printer_returned' | null;
   /** What the customer swapped for this product in the points shop; 0 on every other gift. */
   points_spent: number;
   /** Legacy review boxes only — the old card, read as it always was. */
@@ -427,6 +440,7 @@ export function giftViewFrom(g: Record<string, unknown>, ctx: ViewContext): Gift
     ordered_at: orNull(g.ordered_at),
     fulfilled_at: orNull(g.fulfilled_at),
     cancelled_at: orNull(g.cancelled_at),
+    cancel_why: status === 'CANCELLED' && text(g.cancel_reason) === PRINTER_RETURNED_CANCEL ? 'printer_returned' : null,
     points_spent: Math.max(0, Math.trunc(Number(g.points_spent) || 0)),
     legacy: legacyBlock,
   };

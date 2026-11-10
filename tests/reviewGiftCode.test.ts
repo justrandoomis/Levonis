@@ -144,6 +144,10 @@ async function approved(r: Road, id: string, finalScore?: number): Promise<J> {
 
 const writeCode = (app: Road['buyer'], code: unknown) => post(app, '/api/rewards/program/gift-code', { code });
 
+/** What the server recorded of a review: its own answers to the customer no longer carry the score. */
+const storedQuality = (r: Road, reviewId: string) =>
+  JSON.parse((r.raw.prepare('SELECT quality_summary AS q FROM reviews WHERE id = ?').get(reviewId) as { q: string }).q);
+
 /** The whole hub answer, for what it says beside the printers. */
 const hubOf = async (app: Road['buyer']): Promise<J> => json(await get(app, '/api/rewards/program'));
 
@@ -427,9 +431,10 @@ test('admission: a printer review with almost nothing still enters the queue as 
   assert.equal(small.status, 200, JSON.stringify(smallOut));
   assert.equal(smallOut.review.fallback_points_awarded, 0, 'no fallback: it can still earn a gift');
   assert.equal(smallOut.review.reward.state, 'submitted');
-  assert.equal(smallOut.quality.score, 5);
-  assert.equal(smallOut.quality.tier, null, 'the old gate is still computed, and decides nothing');
-  assert.equal(smallOut.quality.rewardEligible, true);
+  const smallQuality = storedQuality(r, smallOut.review.id);
+  assert.equal(smallQuality.score, 5);
+  assert.equal(smallQuality.tier, null, 'the old gate is still computed, and decides nothing');
+  assert.equal(smallQuality.rewardEligible, true);
   // The admin's default is the system's own score.
   const out = await approved(r, smallOut.review.id);
   assert.equal(out.final_score, 5);
@@ -456,8 +461,8 @@ test('admission: a printer review with almost nothing still enters the queue as 
   const copy = await post(r.buyer, '/api/reviews', { productId: 'p_printer2', orderId: 'ord_b2', stars: 4, body: DETAILED });
   const copyOut = await json(copy);
   assert.equal(copy.status, 200, JSON.stringify(copyOut));
-  assert.ok(copyOut.quality.suspiciousSignals.includes('duplicate_text'));
-  assert.equal(copyOut.quality.rewardEligible, false);
+  assert.ok(storedQuality(r, copyOut.review.id).suspiciousSignals.includes('duplicate_text'));
+  assert.equal(storedQuality(r, copyOut.review.id).rewardEligible, false);
   assert.equal(copyOut.review.reward, null, 'a severe signal never enters the queue');
   assert.equal(copyOut.review.fallback_points_awarded, 24, 'its path is what it was: the fallback points');
 });
@@ -504,9 +509,163 @@ test('a non-printer review keeps its fallback points, and a review proved by a g
   const res = await post(r.buyer, '/api/reviews', { productId: 'p_plain', orderId: 'ord_n', stars: 5, body: DETAILED });
   const out = await json(res);
   assert.equal(res.status, 200, JSON.stringify(out));
-  assert.equal(out.quality.rewardEligible, false);
+  assert.equal(storedQuality(r, out.review.id).rewardEligible, false);
   assert.equal(out.review.reward, null);
   assert.equal(out.review.fallback_points_awarded, 24);
+});
+
+// ------------------------------------------------------------------ what the customer's answers hold
+
+test('no answer to the customer carries the system’s score before the code: the owner’s analysis is the first he sees of it', async () => {
+  const r = road();
+  const res = await post(r.buyer, '/api/reviews', { productId: 'p_printer', orderId: 'ord_b', ...RICH });
+  const created = await json(res);
+  assert.equal(res.status, 200, JSON.stringify(created));
+  const clean = (value: unknown, where: string) => {
+    const text = JSON.stringify(value);
+    assert.doesNotMatch(text, /"quality"|"score"|"textQuality"|"videoQuality"|"tier"/, where);
+  };
+  clean(created, 'POST /api/reviews');
+  const mine = await json(await get(r.buyer, '/api/reviews/mine'));
+  assert.equal(mine.reviews.length, 1);
+  clean(mine, 'GET /api/reviews/mine');
+  clean(await json(await get(r.buyer, '/api/reviews/eligibility/p_printer')), 'GET /api/reviews/eligibility');
+  // The team's own screen still reads all of it, and the system did score it.
+  const queue = await json(await get(r.admin, '/api/reviews/admin/queue?state=submitted'));
+  assert.equal(queue.queue[0].quality.score, storedQuality(r, created.review.id).score);
+  assert.ok(storedQuality(r, created.review.id).score > 5);
+  // And the customer's edit answers the same way.
+  const edit = await r.buyer.request(`/api/reviews/${created.review.id}`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json', 'CF-Connecting-IP': '1.2.3.4' },
+    body: JSON.stringify({ stars: 4, body: DETAILED }),
+  });
+  assert.equal(edit.status, 200);
+  clean(await edit.json(), 'PUT /api/reviews/:id');
+});
+
+test('a reward the team refused, or sent back, says so on «قيّم طابعتك» with its written reason; a system refusal shows no English record', async () => {
+  const r = road();
+  const id = await review(r);
+  const printerOf = async () => (await hubOf(r.buyer)).printers.find((p: J) => p.product_id === 'p_printer');
+  const waiting = await printerOf();
+  assert.equal(waiting.state, 'reward_pending');
+  assert.equal(waiting.reward_decision, null);
+  assert.equal(waiting.reward_reason, '');
+
+  const sentBack = await post(r.admin, `/api/reviews/admin/${id}/reward`, { action: 'request_changes', reason: 'أضف صورة أوضح للطبعة' });
+  assert.equal(sentBack.status, 200, JSON.stringify(await sentBack.clone().json()));
+  const revising = await printerOf();
+  assert.equal(revising.state, 'reward_pending', 'old screens keep their state');
+  assert.equal(revising.reward_decision, 'revision');
+  assert.equal(revising.reward_reason, 'أضف صورة أوضح للطبعة');
+
+  const refused = await post(r.admin, `/api/reviews/admin/${id}/reward`, { action: 'reject', reason: 'الصور ليست لهذه الطابعة' });
+  assert.equal(refused.status, 200, JSON.stringify(await refused.clone().json()));
+  const closed = await printerOf();
+  assert.equal(closed.state, 'rated', 'nothing is left to do: the state stands');
+  assert.equal(closed.reward_decision, 'rejected');
+  assert.equal(closed.reward_reason, 'الصور ليست لهذه الطابعة');
+  assert.equal(closed.final_score, null, 'and no figure');
+
+  r.raw.exec(`UPDATE review_rewards SET decided_by = 'system', reason = 'Review no longer qualifies after edit' WHERE review_id = '${id}'`);
+  const system = await printerOf();
+  assert.equal(system.reward_decision, 'rejected');
+  assert.equal(system.reward_reason, '', 'an audit record is not a sentence');
+});
+
+/**
+ * A REJECTED PRINTER REVIEW EARNS THE NORMAL POINTS (owner, 2026-11-09; DECISIONS row 303 R4; policy 7.8). It
+ * entered the queue instead of taking the fallback points at once; when the team refuses its gift it takes them
+ * then, at the reviewer's multiplier, in the refusal's own batch, once however it is refused.
+ */
+test('a refused printer review earns the points any review earns, once, at the refusal; a request for changes pays nothing', async () => {
+  const r = road();
+  r.raw.exec(`INSERT INTO admin_settings (key,value) VALUES ('reviewPointsConfig','{"enabled":true,"points":12}')`);
+  const id = await review(r);
+  const paid = () => all<{ amount: number; note: string }>(r.raw, "SELECT amount, note FROM wallet_transactions WHERE user_id = 'buyer' AND currency = 'POINT' AND ref = ?", `review-fallback:${id}`);
+  const fallbackOf = () => row<{ n: number }>(r.raw, 'SELECT fallback_points_awarded AS n FROM reviews WHERE id = ?', id)!.n;
+  assert.deepEqual(paid(), [], 'nothing on entering the queue');
+
+  const sentBack = await post(r.admin, `/api/reviews/admin/${id}/reward`, { action: 'request_changes', reason: 'Add a clearer photo of the print.' });
+  assert.equal(sentBack.status, 200);
+  assert.deepEqual(paid(), [], 'a request for changes decides nothing');
+
+  const refused = await post(r.admin, `/api/reviews/admin/${id}/reward`, { action: 'reject', reason: 'The photos are of another printer.' });
+  const out = await json(refused);
+  assert.equal(refused.status, 200, JSON.stringify(out));
+  assert.equal(out.fallback_points_awarded, 24, 'twice the base of 12, as any valid review');
+  assert.deepEqual(paid(), [{ amount: 24, note: 'Valid manual review fallback (2x base)' }]);
+  assert.equal(fallbackOf(), 24);
+  assert.equal(count(r.raw, 'SELECT COUNT(*) AS n FROM points_awards WHERE source_ref = ?', `review-fallback:${id}`), 1);
+  assert.equal((await hubOf(r.buyer)).printers.find((p: J) => p.product_id === 'p_printer').review_points, 24, '«قيّم طابعتك» says what it earned');
+
+  // Refused again (a second admin, an old tab): nothing more.
+  const twice = await json(await post(r.admin, `/api/reviews/admin/${id}/reward`, { action: 'reject', reason: 'Refused again from an old tab.' }));
+  assert.equal(twice.fallback_points_awarded, 24);
+  assert.equal(paid().length, 1, 'once');
+  assert.equal(count(r.raw, 'SELECT COUNT(*) AS n FROM points_awards WHERE source_ref = ?', `review-fallback:${id}`), 1);
+  assert.equal(fallbackOf(), 24);
+});
+
+/**
+ * THE TEAM CORRECTS ITSELF (the lead's L2, 2026-11-09; policy 7.8). A printer review whose gift was refused, and
+ * paid the points of 7.8 at the refusal, is approved later. It keeps those points (about 24 IQD) and gets its code
+ * as any approval does: nothing is taken back, nothing is paid a second time, and no balance goes below zero.
+ */
+test('L2: a refused printer review approved later keeps its points and gets its code: never a second payment, never a negative balance', async () => {
+  const r = road();
+  r.raw.exec(`INSERT INTO admin_settings (key,value) VALUES ('reviewPointsConfig','{"enabled":true,"points":12}')`);
+  await placeGifts(r);
+  const id = await review(r);
+  const rows = () => count(r.raw, "SELECT COUNT(*) AS n FROM wallet_transactions WHERE user_id = 'buyer' AND currency = 'POINT'");
+  const paidFor = (ref: string) => count(r.raw, "SELECT COUNT(*) AS n FROM wallet_transactions WHERE currency = 'POINT' AND ref = ?", ref);
+  const balance = async () => (await hubOf(r.buyer)).point_balance as number;
+  assert.equal(await balance(), 0);
+
+  const refused = await json(await post(r.admin, `/api/reviews/admin/${id}/reward`, { action: 'reject', reason: 'The photos are of another printer.' }));
+  assert.equal(refused.fallback_points_awarded, 24);
+  assert.equal(await balance(), 24);
+  // The customer spends them before the team changes its mind.
+  r.raw
+    .prepare("INSERT INTO wallet_transactions (id,user_id,type,currency,amount,status,note,ref) VALUES ('wtx_spent','buyer','withdrawal','POINT',24,'approved','Points spent at checkout','order:ORD-SPENT')")
+    .run();
+  assert.equal(await balance(), 0);
+
+  // The team approves after all: the code comes, and the points stay where they are.
+  const ok = await approved(r, id, 60);
+  assert.match(String(ok.code), /^GFT[A-HJ-NP-Z2-9]{7}$/);
+  assert.equal(row<{ s: string }>(r.raw, 'SELECT state AS s FROM review_rewards WHERE review_id = ?', id)!.s, 'approved');
+  assert.equal(paidFor(`review-fallback:${id}`), 1, 'the refusal’s points, once');
+  assert.equal(paidFor(`review:${id}`), 0, 'the approval pays no points of its own');
+  assert.equal(rows(), 2, 'nothing taken back, nothing paid again');
+  assert.equal(await balance(), 0, 'never below zero');
+  assert.equal(row<{ n: number }>(r.raw, 'SELECT fallback_points_awarded AS n FROM reviews WHERE id = ?', id)!.n, 24, 'the review keeps what it earned');
+  assert.equal((await printerOf(r.buyer)).state, 'code_ready', '«قيّم طابعتك» offers the code');
+
+  // A refusal after the approval is refused (approved is final), and pays nothing.
+  const late = await post(r.admin, `/api/reviews/admin/${id}/reward`, { action: 'reject', reason: 'Refused again from an old tab.' });
+  assert.equal(late.status, 409);
+  assert.equal(rows(), 2);
+
+  // The code opens its gift; the points still do not move.
+  const opened = await json(await writeCode(r.buyer, ok.code));
+  assert.ok(opened.gift?.id, JSON.stringify(opened));
+  assert.deepEqual(opened.levels, [1, 2, 3, 4], '60 opens four levels');
+  assert.equal(rows(), 2);
+  assert.equal(await balance(), 0);
+  assert.equal(count(r.raw, 'SELECT COUNT(*) AS n FROM points_awards WHERE source_ref = ?', `review-fallback:${id}`), 1);
+});
+
+test('a refused printer review with review points not configured: the refusal stands and nothing is invented', async () => {
+  const r = road();
+  const id = await review(r);
+  const refused = await post(r.admin, `/api/reviews/admin/${id}/reward`, { action: 'reject', reason: 'Not this printer.' });
+  const out = await json(refused);
+  assert.equal(refused.status, 200, JSON.stringify(out));
+  assert.equal(out.fallback_points_awarded, 0);
+  assert.equal(count(r.raw, "SELECT COUNT(*) AS n FROM wallet_transactions WHERE currency = 'POINT' AND ref = ?", `review-fallback:${id}`), 0);
+  assert.equal(row<{ s: string }>(r.raw, 'SELECT state AS s FROM review_rewards WHERE review_id = ?', id)!.s, 'rejected');
 });
 
 // ------------------------------------------------------------------ the refusals

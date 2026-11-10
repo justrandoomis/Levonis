@@ -68,6 +68,7 @@ import SummaryInfo from '../components/ui/SummaryInfo';
  * imports at all, so nothing of the Worker runtime enters the bundle.
  */
 import { COD_TAX_BLOCK_IQD, COD_TAX_PER_BLOCK_IQD } from '../../packages/shipping/src/codTax';
+import { formatMoney } from '../lib/money';
 import { chooseDeliveryMethod } from '../../packages/shipping/src/printerDeliveryPolicy';
 /**
  * THE SIX DIGITS, FROM THE MODULE THAT ALSO REFUSES THEM AT THE DOOR.
@@ -2939,7 +2940,7 @@ export default function Checkout() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-sm font-normal text-text-primary line-clamp-1">{entry.items[0].name}</h4>
+                    <h4 className="text-sm font-normal text-text-primary line-clamp-2">{entry.items[0].name}</h4>
                     <p className="text-[12px] tabular-nums text-text-muted">
                       {groupSummaryText(colourLang(lang), entry.items.map((l) => ({ colourId: l.colourTag?.id ?? '', qty: l.qty })))}
                     </p>
@@ -2983,7 +2984,7 @@ export default function Checkout() {
                     <span className="absolute top-1 end-1 w-5 h-5 bg-white text-black rounded flex items-center justify-center text-[10px] font-medium shadow-md">{line.qty}</span>
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <h4 className="text-sm font-normal text-text-primary line-clamp-1 mb-0.5">{line.name}</h4>
+                    <h4 className="text-sm font-normal text-text-primary line-clamp-2 mb-0.5">{line.name}</h4>
                     {line.colourTag ? (
                       // THE COLOUR, AS A SWATCH AND A NAME, WITH ITS COUNT (§6) — the last screen
                       // where 56 pieces of the wrong colour can still be seen.
@@ -3423,7 +3424,7 @@ export default function Checkout() {
                      charges. Converting a definition would make the explanation
                      depend on a rate the shop can change tomorrow. */
                   `وقدرها ${formatIqd(codTaxPerBlockIqd)} عن كل ${formatIqd(codTaxBlockIqd)} من المبلغ المدفوع عند الاستلام.`,
-                  `It is ${formatIqd(codTaxPerBlockIqd)} for every ${formatIqd(codTaxBlockIqd)} collected at the door.`,
+                  `It is ${formatMoney(codTaxPerBlockIqd, 'en')} for every ${formatMoney(codTaxBlockIqd, 'en')} collected at the door.`,
                   `بۆ هەر ${formatIqd(codTaxBlockIqd)} کە لە کاتی وەرگرتن دەدرێت، ${formatIqd(codTaxPerBlockIqd)} وەردەگیرێت.`
                 )}</p>
                 <p>{loc(
@@ -3653,7 +3654,7 @@ export default function Checkout() {
                   aria-expanded={false}
                   aria-controls="checkout-promo-field"
                   data-checkout-promo-toggle
-                  className="inline-flex items-center gap-2 text-[13px] font-light text-text-muted hover:text-text-secondary transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                  className="relative lv-hit inline-flex items-center gap-2 text-[13px] font-light text-text-muted hover:text-text-secondary transition-colors rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <Tag className="w-3.5 h-3.5" strokeWidth={1.5} aria-hidden="true" />
                   {loc('استخدام كود خاص', 'Use a special code', 'بەکارهێنانی کۆدی تایبەت')}

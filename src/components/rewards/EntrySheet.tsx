@@ -58,6 +58,7 @@ import SafeImage from '../ui/SafeImage';
 import { Sheet } from '../ui/Sheet';
 import Spinner from '../ui/Spinner';
 import { pointsForm, type CopyKey } from './copy';
+import { isolateLatin } from './model';
 import type { Competition, GateBlock } from './types';
 import { useRewardsT } from './useT';
 
@@ -329,7 +330,7 @@ export function EntrySheet({ open, onClose, competition: c, pointBalance, reload
             {t('sheet.title')}
           </h2>
           <p dir="auto" className="truncate px-4 pb-2 text-center text-[13px] text-text-muted">
-            {tri(c.title)}
+            {isolateLatin(tri(c.title))}
           </p>
         </div>
       }
@@ -511,7 +512,7 @@ export function EntryConfirm({ open, onClose, competition: c, reload, onEntered 
   return (
     <ConfirmDialog
       open={open}
-      title={tx('confirm.title', { title: <bdi dir="auto">{tri(c.title)}</bdi> })}
+      title={tx('confirm.title', { title: <bdi>{isolateLatin(tri(c.title))}</bdi> })}
       consequence={fee > 0 ? t('confirm.fee', { points: count(pointsForm('confirm.fee'), fee) }) : t('confirm.free')}
       confirmLabel={fee > 0 ? t('cta.enterFee', { points: count(pointsForm('cta.enterFee'), fee) }) : t('confirm.go')}
       cancelLabel={t('cancel')}

@@ -23,6 +23,17 @@
  * DEPLOY-AHEAD (CLAUDE.md rule 2). Before 0228 no row holds a code: a read that
  * names the new columns treats their absence as no code (`rewardCodeFacts`, the
  * door below), so every code answers GIFT_CODE_INVALID like any other.
+ *
+ * A CODE DIES WITH ITS PRINTER (owner, 2026-11-09; DECISIONS row 303 R1; policy
+ * 8.16). Once the printer the review is about was returned with a refund, or its
+ * order cancelled (`reviewedPrinterVoidSql`, the printers' own «returned»), the
+ * code opens no gift: GIFT_CODE_VOID, to its owner only, with why. The redeeming
+ * UPDATE names the same test, so a return resolving in the same instant wins. A
+ * gift the code already opened and nobody ordered goes when the return resolves
+ * (`voidReviewGiftsOfLine`, beside `revokeRewardsForReturn`), or when the printer's
+ * order is cancelled by any door (`voidReviewGiftsOfOrder`), and «هداياي» says why.
+ * An ordered gift stays, until its own order is cancelled: then it goes too, by the
+ * same doors, instead of coming back to be ordered again (the lead's L1, 2026-11-09).
  */
 import type { Env } from '../types';
 import { safeParse } from '../types';
@@ -31,8 +42,10 @@ import { auditStatements } from '../audit';
 import { isSchemaMissing } from '../membershipBenefits';
 import { GIFT_SCORE_PARTS, clampGiftScore, giftLevelThreshold, giftLevelsForScore, maxGiftLevel } from '../../../packages/contracts/src/giftScore';
 import { evaluateReviewQuality, reviewTextCounts, type ReviewQualityMedia, type ReviewQualityResult } from '../reviewQuality';
+import { reviewLineSql, reviewedPrinterVoidSql, type ReviewPrinterVoid } from '../rewards/earning';
 import { planGrant } from './grant';
 import {
+  PRINTER_RETURNED_CANCEL,
   activeLevelItems,
   changedExactlyOne,
   giftChoiceScope,
@@ -247,6 +260,42 @@ async function answerFor(env: Env, row: Record<string, unknown>, gift: GiftView)
 
 const invalid = () => new HttpError(404, 'This code is not valid.', 'GIFT_CODE_INVALID');
 const used = () => new HttpError(409, 'This code has already been used.', 'GIFT_CODE_USED');
+/** Row 303 R1: the printer the review is about is no longer the customer's. Told to the code's owner only. */
+const voided = (why: ReviewPrinterVoid) =>
+  new HttpError(
+    409,
+    why === 'cancelled'
+      ? "This printer's order was cancelled, so its review code opens no gift."
+      : 'This printer went back to the shop, so its review code opens no gift.',
+    'GIFT_CODE_VOID',
+    { reason: why }
+  );
+
+/**
+ * WHY EACH REVIEW'S PRINTER LEFT ITS CUSTOMER, for the reviews that have one gone: 'returned' or
+ * 'cancelled' (`reviewedPrinterVoidSql`). The code door, the customer's printers and the team's queue
+ * read it here, so the three can never disagree. Its tables are older than any code.
+ */
+export async function reviewPrinterVoid(db: D1Database, reviewIds: readonly string[]): Promise<Map<string, ReviewPrinterVoid>> {
+  const ids = [...new Set(reviewIds.filter(Boolean))];
+  if (ids.length === 0) return new Map();
+  const { results } = await db
+    .prepare(`SELECT r.id, ${reviewedPrinterVoidSql(reviewLineSql('r'))} AS gone FROM reviews r WHERE r.id IN (SELECT value FROM json_each(?1))`)
+    .bind(JSON.stringify(ids))
+    .all<{ id: string; gone: string | null }>();
+  const out = new Map<string, ReviewPrinterVoid>();
+  for (const r of results ?? []) {
+    if (r.gone === 'returned' || r.gone === 'cancelled') out.set(String(r.id), r.gone);
+  }
+  return out;
+}
+
+/**
+ * The redeeming UPDATE's own test that the reviewed printer is still the customer's, over `review_rewards`.
+ * Built when called, never at load: ../rewards/earning.ts reads imports of an import cycle (its own note).
+ */
+const printerStillHereSql = () =>
+  `${reviewedPrinterVoidSql(`(SELECT ${reviewLineSql('rv')} FROM reviews rv WHERE rv.id = review_rewards.review_id)`)} IS NULL`;
 
 /** The states a replay still shows: the gift is on its way. Once delivered or cancelled the code is simply used. */
 const REPLAY_STATES: ReadonlySet<string> = new Set(['granted', 'ready_to_redeem', 'redeemed', 'ordered']);
@@ -280,6 +329,9 @@ export async function redeemGiftCode(env: Env, userId: string, raw: unknown): Pr
       throw e;
     });
   if (!row || text(row.user_id) !== userId || text(row.state) !== 'approved') throw invalid();
+  // The printer went back, or its order was cancelled: the code opens nothing, a replay included.
+  const gone = (await reviewPrinterVoid(env.DB, [text(row.review_id)])).get(text(row.review_id));
+  if (gone) throw voided(gone);
   if (row.code_redeemed_at) return { ...(await replayAnswer(env, userId, row)), replay: true };
 
   const score = clampGiftScore(Number(row.final_score));
@@ -317,7 +369,8 @@ export async function redeemGiftCode(env: Env, userId: string, raw: unknown): Pr
     await env.DB.batch([
       env.DB.prepare(
         `UPDATE review_rewards SET code_redeemed_at = ?
-          WHERE id = ? AND redeem_code = ? AND code_redeemed_at IS NULL AND state = 'approved'`
+          WHERE id = ? AND redeem_code = ? AND code_redeemed_at IS NULL AND state = 'approved'
+            AND ${printerStillHereSql()}`
       ).bind(now, text(row.id), code),
       ...changedExactlyOne(env.DB),
       ...plan.statements,
@@ -329,6 +382,9 @@ export async function redeemGiftCode(env: Env, userId: string, raw: unknown): Pr
     const fresh = await env.DB.prepare(`${REWARD_SELECT} WHERE rr.id = ?`).bind(text(row.id)).first<Record<string, unknown>>();
     // Regenerated in that instant: the code in hand no longer exists.
     if (!fresh || text(fresh.redeem_code) !== code) throw invalid();
+    // The return resolved in that instant: the printer won.
+    const goneNow = (await reviewPrinterVoid(env.DB, [text(fresh.review_id)])).get(text(fresh.review_id));
+    if (goneNow) throw voided(goneNow);
     return { ...(await replayAnswer(env, userId, fresh)), replay: true };
   }
   const gift = await loadCustomerGift(env, userId, plan.id);
@@ -389,4 +445,123 @@ export async function rewardCodeFacts(db: D1Database, rewardIds: readonly string
     if (isSchemaMissing(e)) return new Map();
     throw e;
   }
+}
+
+// -------------------------------------------------------------- the return
+
+/** The reason a gift cancelled with its printer carries; the admin's gift screen and the customer's «هداياي» word it. */
+export { PRINTER_RETURNED_CANCEL };
+
+/**
+ * THE GIFT A CODE OPENED GOES WITH ITS PRINTER (owner, 2026-11-09; DECISIONS row 303 R1; policy 8.16).
+ * Called when a return of `orderItemId` resolves with a refund (worker/routes/returns.ts, beside
+ * `revokeRewardsForReturn`): every gift a review code of that line opened and nobody ordered yet is
+ * cancelled, its cart line with it, one batch per gift with its audit row, while the printers' own test
+ * says the reviewed printer left the customer — a line of two whose other printer stays keeps its gift.
+ * An ordered or delivered gift stays (chapter 13 is the remedy). Idempotent: a cancelled gift is not
+ * read again, and each flip is fenced by the gift's state and version. Before 0228: nothing to do.
+ */
+export function voidReviewGiftsOfLine(
+  env: Env,
+  input: { orderItemId: string; actorId: string | null; ref: string },
+  nowIso = new Date().toISOString()
+): Promise<{ cancelled: string[] }> {
+  return voidReviewGiftsWhere(env, `${reviewLineSql('r')} = ?1`, input.orderItemId, input, nowIso);
+}
+
+/**
+ * THE SAME WHEN AN ORDER IS CANCELLED (policy 8.16: «أو يُلغى الطلب»), from whatever state it left and by
+ * whichever door: the team's status door (worker/routes/admin.ts), the stage door and the courier's sync
+ * (`moveOrderStage`), the customer's own cancel (worker/routes/orders.ts), and the two sweeps of an order
+ * nobody confirmed (worker/lib/orderExpirySweep.ts, worker/lib/giniSweep.ts). A delivered order is walked
+ * back to «shipped» before it can be cancelled (ORDER_TRANSITIONS), so the doors call this for every
+ * cancellation. Two kinds of gift go with the order:
+ *  - the waiting gifts the codes of ITS reviewed printers opened (row 303 R1);
+ *  - ITS OWN GIFT LINES whose review code is void (the lead's L1 on round 2's major, 2026-11-09; 8.16):
+ *    a gift ordered before its printer went back stays (8.16), but when its own order is cancelled the
+ *    gift trigger (0175 `trg_orders_gift_cancelled`) has just put it back to «redeemed», orderable again
+ *    for delivery only. Read here by the order's lines, which keep the gift after the trigger clears the
+ *    gift's link, it is cancelled instead: the same reason, one audit row, fenced, once.
+ * On an order with neither it reads nothing.
+ */
+export function voidReviewGiftsOfOrder(
+  env: Env,
+  input: { orderId: string; actorId: string | null; ref: string },
+  nowIso = new Date().toISOString()
+): Promise<{ cancelled: string[] }> {
+  return voidReviewGiftsWhere(
+    env,
+    `(${reviewLineSql('r')} IN (SELECT ol.id FROM order_items ol WHERE ol.order_id = ?1)
+      OR g.id IN (SELECT gl.gift_entitlement_id FROM order_items gl WHERE gl.order_id = ?1 AND gl.gift_entitlement_id IS NOT NULL))`,
+    input.orderId,
+    input,
+    nowIso
+  );
+}
+
+/** The two above: the waiting gifts the redeemed codes `where` names opened (over `reviews r` and `gift_entitlements g`, `key` as ?1). */
+async function voidReviewGiftsWhere(
+  env: Env,
+  where: string,
+  key: string,
+  input: { actorId: string | null; ref: string },
+  nowIso: string
+): Promise<{ cancelled: string[] }> {
+  const db = env.DB;
+  let rows: Array<Record<string, unknown>>;
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT g.id, g.user_id, g.state, g.version, g.level, g.max_level, g.reward_id, rr.review_id,
+                ${reviewedPrinterVoidSql(reviewLineSql('r'))} AS gone
+           FROM reviews r
+           JOIN review_rewards rr ON rr.review_id = r.id
+           JOIN gift_entitlements g ON g.reward_id = rr.id
+          WHERE ${where}
+            AND rr.code_redeemed_at IS NOT NULL
+            AND COALESCE(g.grant_mode, 'legacy') <> 'legacy'
+            AND g.state IN ('granted', 'ready_to_redeem', 'redeemed')`
+      )
+      .bind(key)
+      .all<Record<string, unknown>>();
+    rows = results ?? [];
+  } catch (e) {
+    if (isSchemaMissing(e)) return { cancelled: [] };
+    throw e;
+  }
+  const cancelled: string[] = [];
+  for (const g of rows) {
+    const why = text(g.gone);
+    if (why !== 'returned' && why !== 'cancelled') continue;
+    const id = text(g.id);
+    const audit = await auditStatements(db, input.actorId, 'gift.cancel', id, {
+      user_id: text(g.user_id),
+      level: g.level ?? g.max_level ?? null,
+      from: text(g.state),
+      reason: PRINTER_RETURNED_CANCEL,
+      printer: why,
+      review_id: text(g.review_id),
+      ref: input.ref,
+    });
+    try {
+      await db.batch([
+        db
+          .prepare(
+            `UPDATE gift_entitlements
+                SET state = 'cancelled', cancelled_at = ?, cancelled_by = ?, cancel_reason = ?, updated_at = ?, version = version + 1
+              WHERE id = ? AND state = ? AND version = ?`
+          )
+          .bind(nowIso, input.actorId ?? 'system', PRINTER_RETURNED_CANCEL, nowIso, id, text(g.state), Number(g.version)),
+        ...changedExactlyOne(db),
+        db.prepare('DELETE FROM cart_items WHERE gift_entitlement_id = ?').bind(id),
+        ...audit.statements,
+      ]);
+      cancelled.push(id);
+    } catch (e) {
+      // The customer ordered it, or it changed, in that instant: what stands now stands.
+      if (isLostRace(e)) continue;
+      throw e;
+    }
+  }
+  return { cancelled };
 }

@@ -211,7 +211,7 @@ export function Toaster({ aboveNav = false }: { aboveNav?: boolean } = {}) {
         style={{
           zIndex: UI_LAYERS.toast,
           insetBlockEnd: aboveNav
-            ? 'calc(max(var(--shell-bottom-inset, 0px), var(--nav-stack)) + 0.75rem)'
+            ? 'calc(max(var(--shell-bottom-inset, 0px), var(--nav-stack)) + 0.75rem + var(--toast-lift, 0px))'
             : 'calc(var(--shell-bottom-inset, 0px) + max(0.75rem, env(safe-area-inset-bottom)))',
         }}
       >

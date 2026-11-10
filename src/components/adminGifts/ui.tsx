@@ -8,6 +8,22 @@ import type { GiftStatus, ItemView, Tri } from './types';
 
 export const triOf = (lang: AdminLang, t: Tri | null | undefined): string => (t ? (t[lang] || t.ar || t.en || '').trim() : '');
 
+/**
+ * «الهدايا» SPEAKS THE SHOP'S CLAY AND BLACK, like المكافآت beside it, not the product form's violet. The `.ap`
+ * scope draws its one accent from these names (adminProducts/theme.css), so re-pointing them on each root of this
+ * section turns its primary button, its switch and its chosen chips together, in both themes: the canvas colour
+ * on the primary fill is what `lv-button-primary` itself prints. Inline: the stylesheet pays nothing.
+ */
+export const GIFTS_ACCENT = {
+  '--color-iris': 'var(--color-primary-fill)',
+  '--color-iris-deep': 'var(--color-primary-fill-hover)',
+  '--color-snow': 'var(--color-canvas)',
+  '--ap-accent-active': 'var(--color-primary-fill-hover)',
+  '--ap-accent-text': 'var(--color-text-primary)',
+  '--ap-accent-soft': 'var(--color-surface-selected)',
+  '--ap-accent-border': 'var(--color-border-subtle)',
+} as React.CSSProperties;
+
 const STATUS_TONE: Record<GiftStatus, Tone> = {
   GRANTED: 'accent',
   READY_TO_REDEEM: 'accent',
@@ -32,8 +48,9 @@ export function saleText(lang: AdminLang, item: Pick<ItemView, 'sale_type' | 'tr
 /** One product a gift grants: picture, name, model · colour, sale type × qty, value, availability. */
 export function ItemRow({ lang, item, trailing }: { lang: AdminLang; item: ItemView; trailing?: React.ReactNode }) {
   const name = (item.name.en || item.name.ar || '').trim();
-  const variant = triOf(lang, item.variant);
-  const color = item.color ? triOf(lang, item.color) : '';
+  // English on every surface, as the name above and the cart line (§3/§7).
+  const variant = (item.variant?.en || item.variant?.ar || '').trim();
+  const color = (item.color?.en || item.color?.ar || '').trim();
   return (
     <div className="flex items-start gap-3 min-w-0">
       <div className="w-12 h-12 shrink-0 overflow-hidden rounded-sm bg-surface-raised">

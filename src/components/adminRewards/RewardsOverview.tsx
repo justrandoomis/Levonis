@@ -180,9 +180,9 @@ export function OverviewScreen({ data, onGo }: { data: OverviewData; onGo: (view
         <p className="mt-1 text-[20px] font-bold tabular-nums text-text-primary">{money(weekly.ceiling_iqd)}</p>
         <p className="mt-1 text-[12px] leading-5 text-text-secondary">
           {loc(
-            `الطابعات (${fig(weekly.printers)}) × ${money(weekly.per_printer_iqd)}: أقصى ما تخصمه كوبونات أسبوع لو صُرفت كلها كاملة، لا ما سيُصرف فعلًا.`,
-            `Printers (${fig(weekly.printers)}) × ${money(weekly.per_printer_iqd)}: the most a week’s coupons could take if every one were spent in full, not what will be spent.`,
-            `چاپکەرەکان (${fig(weekly.printers)}) × ${money(weekly.per_printer_iqd)}: زۆرترین بڕێک کە کۆپۆنەکانی هەفتەیەک کەمی دەکەنەوە ئەگەر هەموویان بە تەواوی خەرج بکرێن، نەک ئەوەی بەڕاستی خەرج دەکرێت.`
+            `الطابعات (${fig(weekly.printers)}) × ${money(weekly.per_printer_iqd)}: سقف الإعدادات (كوبون التوصيل + أعلى خصم مسموح لكوبون الفلامنت)، لا ما سيُصرف فعلًا. خصم الفلامنت الحقيقي نسبة من سعر القطعة، وغالبًا أقل من هذا السقف بكثير.`,
+            `Printers (${fig(weekly.printers)}) × ${money(weekly.per_printer_iqd)}: the ceiling of the settings (the delivery coupon + the largest discount the filament coupon may take), not what will be spent. The real filament discount is a percentage of the piece’s price, usually far below this ceiling.`,
+            `چاپکەرەکان (${fig(weekly.printers)}) × ${money(weekly.per_printer_iqd)}: سنووری ڕێکخستنەکان (کۆپۆنی گەیاندن + زۆرترین داشکاندنی ڕێگەپێدراوی کۆپۆنی فیلامێنت)، نەک ئەوەی بەڕاستی خەرج دەکرێت. داشکاندنی ڕاستەقینەی فیلامێنت ڕێژەیەکە لە نرخی پارچەکە و زۆربەی جار زۆر لەم سنوورە کەمترە.`
           )}
           {weekly.filament_uncapped &&
             ` ${loc('كوبون الفلامنت بلا سقف، فهو خارج هذا الرقم.', 'The filament coupon has no ceiling, so it is left out of this figure.', 'کۆپۆنی فیلامێنت سنووری نییە، بۆیە لەم ژمارەیەدا نییە.')}`}

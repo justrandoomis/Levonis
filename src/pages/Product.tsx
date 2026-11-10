@@ -5972,7 +5972,7 @@ export default function Product() {
       </div>
 
       {/* ------------------------------------------------ phone purchase bar */}
-      <div ref={buyBarRef} data-testid="product-buybar" data-bottom-bar className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised/98 px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-dock">
+      <div ref={buyBarRef} data-testid="product-buybar" data-bottom-bar className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-dock">
         {noPrice ? (
           selectionUnoffered ? (
             /* A combination the product does not sell: nothing here can be bought or

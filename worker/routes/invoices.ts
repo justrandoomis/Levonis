@@ -19,6 +19,7 @@ import {
   emailLang,
   renderInvoiceHtmlDocument,
   renderOrderInvoiceEmail,
+  type InvoiceCancellation,
   type InvoicePaymentStatus,
 } from '../lib/emailTemplates';
 
@@ -45,6 +46,7 @@ interface InvoiceRow {
   issued_at: string;
   superseded_by: string | null;
   owner_user_id: string;
+  order_status: string;
 }
 
 function invoicePublic(row: InvoiceRow, withSnapshot: boolean) {
@@ -66,12 +68,33 @@ function invoicePublic(row: InvoiceRow, withSnapshot: boolean) {
 async function loadAuthorized(c: Context<AppContext>, id: string): Promise<InvoiceRow> {
   const user = c.get('user')!;
   const row = await c.env.DB.prepare(
-    `SELECT i.*, o.user_id AS owner_user_id FROM invoices i JOIN orders o ON o.id = i.order_id WHERE i.id = ?`
+    `SELECT i.*, o.user_id AS owner_user_id, o.status AS order_status FROM invoices i JOIN orders o ON o.id = i.order_id WHERE i.id = ?`
   )
     .bind(id)
     .first<InvoiceRow>();
   if (!row || (row.owner_user_id !== user.id && user.role !== 'admin')) throw notFound('Invoice not found');
   return row;
+}
+
+/**
+ * WHAT A CANCELLED ORDER GAVE BACK, from the ledger's own refund rows (worker/lib/orderCancelOps.ts, one per order
+ * by its deterministic id): the document says what happened, not what should have. A cancel that moved no money has
+ * neither row, and the page still says it was cancelled. A row from before the dinar column reads the invoice's own
+ * wallet figure, which is what that order took.
+ */
+async function cancellationOf(db: D1Database, row: InvoiceRow, snapshot: InvoiceSnapshotV1): Promise<InvoiceCancellation | null> {
+  if (row.order_status !== 'cancelled') return null;
+  const wallet = `wtx_refund_${row.order_id}_usd`;
+  const points = `wtx_refund_${row.order_id}_pts`;
+  const { results } = await db
+    .prepare("SELECT * FROM wallet_transactions WHERE id IN (?, ?) AND status = 'approved'")
+    .bind(wallet, points)
+    .all<{ id: string; amount: number; amount_iqd?: number | null }>();
+  const walletRow = results.find((r) => r.id === wallet);
+  return {
+    refunded_wallet_iqd: walletRow ? Math.max(0, Number(walletRow.amount_iqd) || Number(snapshot.totals.wallet_applied_iqd) || 0) : 0,
+    refunded_points: Math.max(0, Number(results.find((r) => r.id === points)?.amount) || 0),
+  };
 }
 
 invoiceRoutes.get('/mine', async (c) => {
@@ -99,7 +122,7 @@ invoiceRoutes.get('/:id/html', async (c) => {
   const snapshot = safeParse<InvoiceSnapshotV1 | null>(row.snapshot, null);
   if (!snapshot) throw notFound('Invoice snapshot is unreadable');
   const lang = emailLang(c.req.query('lang') || localeToApi(user.locale));
-  const doc = renderInvoiceHtmlDocument(lang, invoiceEmailData(snapshot, row.invoice_no, row.revision, row.issued_at));
+  const doc = renderInvoiceHtmlDocument(lang, invoiceEmailData(snapshot, row.invoice_no, row.revision, row.issued_at), await cancellationOf(c.env.DB, row, snapshot));
   c.header('Cache-Control', 'no-store');
   asDocument(c);
   return c.html(doc);

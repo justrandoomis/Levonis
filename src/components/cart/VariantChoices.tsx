@@ -47,7 +47,7 @@ export default function VariantChoices({ lang, colors, options, pendingColorId, 
                   onClick={() => onColor(active ? '' : c.id)}
                   aria-pressed={active}
                   data-variant-choice="colour"
-                  className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
+                  className="lv-choice lv-hit flex items-center gap-2 px-4 py-2 text-sm"
                 >
                   <span
                     aria-hidden="true"
@@ -77,7 +77,7 @@ export default function VariantChoices({ lang, colors, options, pendingColorId, 
                   onClick={() => onOption(active ? '' : o.id)}
                   aria-pressed={active}
                   data-variant-choice="option"
-                  className="lv-choice flex items-center gap-2 px-4 py-2 text-sm"
+                  className="lv-choice lv-hit flex items-center gap-2 px-4 py-2 text-sm"
                 >
                   <span>
                     <bdi data-variant-choice-name>{oName}</bdi>

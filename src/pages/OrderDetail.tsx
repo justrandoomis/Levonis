@@ -29,7 +29,7 @@ import StoreReceipt from '../components/orders/StoreReceipt';
 import PriceApprovalCard from '../components/orders/PriceApprovalCard';
 import ChunkBoundary from '../components/ChunkBoundary';
 import { apiRefusal } from '../lib/refusalStrings';
-import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, orderStatusLabel, statusStyle } from '../components/orders/format';
+import { asLang, countItems, formatDate, itemCountLabel, monthsLabel, orderPillLabel, statusStyle } from '../components/orders/format';
 import { pairedUsd, useMoney } from '../CurrencyContext';
 import type { Claim } from '../components/warranty/types';
 import VariantImg from '../components/ui/VariantImg';
@@ -468,7 +468,7 @@ export default function OrderDetail() {
 
   // The pill names the CURRENT stage in the server's words when the tracker
   // loaded; the six-value legacy label is the fallback, never a guess.
-  const pillLabel = tracking?.steps.find((st) => st.current)?.label ?? (order ? orderStatusLabel(lang, order) : '');
+  const pillLabel = orderPillLabel(lang, order, tracking?.steps);
   const notFound = orderError !== null && classifyError(orderError) === 'not-found';
   // The total in dollars (DECISIONS row 248): Σ the lines' frozen dollar prices, plus one conversion of the
   // rest at today's display rate (delivery, fees, points, lines sold before the dollar was frozen).
@@ -672,7 +672,14 @@ export default function OrderDetail() {
             <TabPanels value={tab} order={TABS}>
               {tab === 'tracking' && (
                 <div className="flex flex-col gap-3">
-                  <OrderTracker orderId={order.id} lang={lang} tracking={tracking} showTrackingNo={false} />
+                  {/* A cancelled order goes nowhere: it says so, instead of a path stopped at its first step. */}
+                  {order.status === 'cancelled' ? (
+                    <p data-order-cancelled className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary">
+                      {s.cancelledNotice}
+                    </p>
+                  ) : (
+                    <OrderTracker orderId={order.id} lang={lang} tracking={tracking} showTrackingNo={false} />
+                  )}
                   {/*
                     THE DAY SITS IN THE TRACKING TAB, directly under the
                     tracker. This is the tab the customer already opened to ask

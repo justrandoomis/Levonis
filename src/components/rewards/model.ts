@@ -136,7 +136,29 @@ const TRI_ORDER: Readonly<Record<Language, ReadonlyArray<keyof Tri>>> = {
   ckb: ['ckb', 'en', 'ar'],
 };
 
-/** The owner's three-language text (a title, a product name) in the reader's language, or the nearest one written. */
+/**
+ * A PRODUCT'S NAME, OR ITS OPTION'S OR ITS COLOUR'S: English on every screen, in every language
+ * (product-form mandate §3 and §7; src/pages/Product.tsx `pickName`). The product page, the cart and
+ * the checkout print it that way, so the rewards screens do too: one product, one name, from the
+ * points shop to the invoice. `pickTri` is for what the owner writes in three languages.
+ */
+export function pickName(value: Partial<Tri> | null | undefined): string {
+  return (value?.en || value?.ar || value?.ckb || '').trim();
+}
+
+const LATIN_RUN = /[A-Za-z0-9](?:[A-Za-z0-9 .,:/_+-]*[A-Za-z0-9+])?/g;
+
+/**
+ * THE OWNER'S WORDS IN AN ARABIC LINE KEEP THEIR ORDER. Every Latin or number run becomes its own left-to-right
+ * isolate, so a title ending in «eSUN PLA+» keeps its plus (it was drawn «+eSUN PLA») and «1 كغم» its figure beside its
+ * unit. Latin text is left alone. The rule of src/lib/bidi.ts `ltrRuns`, as a string: it takes any element and costs
+ * no import of that module, which rides with the product page (tests/motionLazy.test.ts counts what a new importer splits).
+ */
+export function isolateLatin(text: string): string {
+  return /[\u0600-\u06FF]/.test(text) ? text.replace(LATIN_RUN, (run) => `\u2066${run}\u2069`) : text;
+}
+
+/** The owner's three-language text (a title, a description) in the reader's language, or the nearest one written. */
 export function pickTri(value: Partial<Tri> | null | undefined, lang: Language): string {
   if (!value) return '';
   for (const k of TRI_ORDER[lang] ?? TRI_ORDER.ar) {
@@ -273,6 +295,8 @@ export type DoorText =
         | 'door.rate.code'
         | 'door.rate.pending'
         | 'door.rate.done'
+        | 'door.rate.void.returned'
+        | 'door.rate.void.cancelled'
         | 'door.rate.how'
         | 'door.shop.checkout';
     }
@@ -352,6 +376,9 @@ function rateDoor(hub: RewardsHubData): Door {
   if (toRate > 0) return door([{ count: 'printersToRate', n: toRate }]);
   if (printers.some((p) => p.state === 'reward_approved')) return door([{ key: 'door.rate.gift' }]);
   if (printers.some((p) => p.state === 'reward_pending')) return door([{ key: 'door.rate.pending' }]);
+  // Row 303 R1: nothing else is waiting, and a code died with its printer: the door says why, not «all done».
+  const voided = printers.find((p) => p.code_void);
+  if (voided) return door([{ key: voided.code_void === 'cancelled' ? 'door.rate.void.cancelled' : 'door.rate.void.returned' }]);
   if (printers.length > 0) return door([{ key: 'door.rate.done' }]);
   return door([{ key: 'door.rate.how' }]);
 }

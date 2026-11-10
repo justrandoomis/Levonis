@@ -336,7 +336,7 @@ export default function RewardsArea() {
       <AreaHeader title={t(TITLE[section])} onBack={goBack} wide={section === 'competition'} titleRef={titleRef}>
         {onList && !guest && <CompetitionTabs view={view} counts={list.counts} onChange={setView} />}
       </AreaHeader>
-      <div key={screenKey} ref={scroller} onScroll={saveOffset} data-rewards-scroll className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+      <div key={screenKey} ref={scroller} onScroll={saveOffset} data-rewards-scroll className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain">
         <div
           className={`mx-auto w-full max-w-2xl ${section === 'competition' ? 'lg:max-w-4xl' : ''} px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] space-y-4`}
         >

@@ -166,6 +166,7 @@ import { productImageForSelection } from '../lib/productSelectionImage';
 import {
   giftEntitlementIdOf,
   giftLineDiscriminator,
+  giftShelfUnitIqd,
   giftUnitValueOf,
   giftVerdictRefusal,
   GIFT_LINE_COLUMNS,
@@ -1020,6 +1021,12 @@ async function loadCart(c: Context<AppContext>) {
       ),
     new Map<string, OfferView>()
   );
+  // A gift line's offer prices nothing: it only says what the gift is worth today, the sale price under a
+  // live offer (row 303, `giftShelfUnitIqd`). One read, only when the cart holds a gift.
+  const giftRows = results.filter((r) => !!giftEntitlementIdOf(r));
+  const giftOffers = giftRows.length
+    ? await degradeIfSchemaMissing('special offers (migration 0060)', () => loadOffers(c.env.DB, giftRows.map((r) => subjectOf(String(r.id)))), new Map<string, OfferView>())
+    : new Map<string, OfferView>();
   const nowMs = Date.now();
   // A bundle's printers are its COMPONENTS' — the parent row is never in a
   // printer catalog itself — so the home-delivery note fires for a printer
@@ -1115,6 +1122,7 @@ async function loadCart(c: Context<AppContext>) {
         view: views.get(String(row.id)),
         isPrinter: printerIds.has(String(row.id ?? '')),
         coarseStock: poolMemberIds.has(String(row.id ?? '')),
+        offer: giftOffers.get(offerKey(subjectOf(String(row.id)))) ?? null,
       });
       if (row.status === 'active') constrainDelivery(gift.doc);
       items.push({ ...gift.item, ...singlePart(gift.doc) });
@@ -2365,7 +2373,7 @@ function giftLineRefusalFor(
 function giftCartItem(
   row: Record<string, unknown>,
   verdict: GiftLineVerdict | undefined,
-  input: { ctx: PricingContext; view?: ProductRelationsView; isPrinter: boolean; coarseStock: boolean }
+  input: { ctx: PricingContext; view?: ProductRelationsView; isPrinter: boolean; coarseStock: boolean; offer?: OfferView | null }
 ) {
   const sel: GiftSelection =
     verdict?.selection ??
@@ -2417,7 +2425,8 @@ function giftCartItem(
       gift: {
         id: giftEntitlementIdOf(row),
         level: verdict?.fromPointsShop ? 0 : (verdict?.level ?? 0),
-        value_iqd: giftUnitValueOf(doc.sku_strict === true, facts.resolved.regular_iqd, verdict?.frozenValueIqd, sel.qty) * sel.qty,
+        // What it is worth today: the sale price under a live offer (row 303), never charged.
+        value_iqd: giftUnitValueOf(doc.sku_strict === true, giftShelfUnitIqd(facts.resolved, input.offer, doc), verdict?.frozenValueIqd, sel.qty) * sel.qty,
       },
       stock: input.coarseStock ? null : row.stock,
       low_stock_threshold: input.coarseStock ? null : ((row.low_stock_threshold as number | null) ?? null),

@@ -150,7 +150,8 @@ test('the frame keeps its own scroll memory and focus, one keyed scroller, and t
   assert.match(page, /const RESTORE_WINDOW_MS = 2_000;/);
   assert.match(
     page,
-    /<div key=\{screenKey\} ref=\{scroller\} onScroll=\{saveOffset\} data-rewards-scroll className="flex-1 min-h-0 overflow-y-auto overscroll-contain">/
+    // «relative»: an absolutely placed span inside a screen (every sr-only status) hung off the document past the scroller, and the coupons page slid (integration run).
+    /<div key=\{screenKey\} ref=\{scroller\} onScroll=\{saveOffset\} data-rewards-scroll className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain">/
   );
   assert.match(page, /saveFrame\.current = requestAnimationFrame\(/, 'the offset write is rAF-throttled');
   assert.match(page, /navigationType === 'POP' \? \{ key: location\.key, at: Date\.now\(\), done: false \} : null/);

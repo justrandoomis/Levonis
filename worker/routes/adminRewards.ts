@@ -37,7 +37,8 @@ import {
   saveRewardConfigStatement,
   validateRewardConfig,
 } from '../lib/rewards/config';
-import { DAY_MS, GRANT_SELECT, grantSelect, grantView, mintStatements, rewardCouponCode, termsFor } from '../lib/rewards/coupons';
+import { DAY_MS, GRANT_SELECT, couponPointsBackStatements, grantSelect, grantView, mintStatements, rewardCouponCode, termsFor } from '../lib/rewards/coupons';
+import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 import { SPENT_AMOUNT_SQL, SPENT_SQL } from '../lib/rewards/pool';
 import { adminPrintersPage, type AdminPrinterState } from '../lib/rewards/printers';
 import { emptyOverview, LIVE_OFFER_SQL, rewardsOverview } from '../lib/rewards/overview';
@@ -319,12 +320,25 @@ adminRewardsRoutes.post('/grants/:id/revoke', async (c) => {
   if (!g) throw notFound('Reward coupon not found');
   if (g.state === 'used') throw conflict('This coupon was already spent on an order; it stays with that order', 'REWARD_COUPON_USED');
   if (g.state === 'revoked') return c.json({ success: true, already: true });
-  const res = await c.env.DB.batch([
-    c.env.DB.prepare("UPDATE reward_grants SET revoked_at = ?1, revoke_reason = 'admin' WHERE id = ?2 AND revoked_at IS NULL").bind(nowIso, id),
-    c.env.DB.prepare('UPDATE coupons SET active = 0 WHERE reward_grant_id = ?1').bind(id),
-  ]);
-  await audit(c.env.DB, admin.id, 'rewards.revoke', id, { reason, changed: res[0]?.meta.changes ?? 0 });
-  return c.json({ success: true });
+  // A live coupon bought with points gives them back in this batch, once (row 303 R2; policy 14.10). The
+  // fence after the flip makes a concurrent or replayed withdrawal write nothing, so nothing comes back twice.
+  const pointsBack = couponPointsBackStatements(c.env.DB, g, nowIso);
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare("UPDATE reward_grants SET revoked_at = ?1, revoke_reason = 'admin' WHERE id = ?2 AND revoked_at IS NULL").bind(nowIso, id),
+      ...changedExactlyOne(c.env.DB),
+      c.env.DB.prepare('UPDATE coupons SET active = 0 WHERE reward_grant_id = ?1').bind(id),
+      ...pointsBack,
+    ]);
+  } catch (e) {
+    if (isLostRace(e)) return c.json({ success: true, already: true });
+    throw e;
+  }
+  const returned = pointsBack.length
+    ? Number((await c.env.DB.prepare('SELECT amount FROM wallet_transactions WHERE id = ? AND decided_at = ?').bind(`wtx_rwshop_back_${id}`, nowIso).first<{ amount: number }>())?.amount) || 0
+    : 0;
+  await audit(c.env.DB, admin.id, 'rewards.revoke', id, { reason, changed: 1, ...(returned > 0 ? { points_returned: returned } : {}) });
+  return c.json({ success: true, points_returned: returned });
 });
 
 /** Gives an unused coupon more days — a customer whose week ran out through the shop's delay. */

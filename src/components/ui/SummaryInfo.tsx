@@ -76,7 +76,7 @@ export default function SummaryInfo({
             // A 24px target inside a 13px row. The height comes back out as
             // negative margin so asking the question never makes the row
             // taller than the rows around it.
-            className={`-my-1 ms-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+            className={`relative lv-hit -my-1 ms-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full align-middle transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
               open ? 'text-gold' : 'text-text-muted hover:text-text-primary'
             }`}
           >

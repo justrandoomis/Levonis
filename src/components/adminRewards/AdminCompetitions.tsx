@@ -11,6 +11,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Plus, Loader2, Trophy, Users } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
+import { countText } from '../rewards/copy';
+import { isolateLatin } from '../rewards/model';
+import { usePrompt } from '../ui/PromptDialog';
 import SafeImage from '../ui/SafeImage';
 
 type Tri = { ar: string; en: string; ckb: string };
@@ -46,6 +49,14 @@ interface Entry {
 }
 
 const label = 'block text-text-secondary text-[11px] font-bold mb-1.5';
+
+/** A window's day as the shop counts days, whichever time zone the admin's device is in: 2026-12-12, not the UTC day before it. */
+export function baghdadDay(iso: string): string {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return '';
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Baghdad', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+}
+
 const toLocal = (iso: string) => {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
@@ -74,6 +85,7 @@ type Form = ReturnType<typeof BLANK>;
 export default function AdminCompetitions() {
   const { loc, lang } = useLanguage();
   const l = (lang === 'en' || lang === 'ckb' ? lang : 'ar') as keyof Tri;
+  const [prompt, promptDialog] = usePrompt();
   const [rows, setRows] = useState<AdminCompetition[] | null>(null);
   const [form, setForm] = useState<Form | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
@@ -150,8 +162,17 @@ export default function AdminCompetitions() {
   const act = async (c: AdminCompetition, what: 'publish' | 'cancel') => {
     let payload: Record<string, unknown> = {};
     if (what === 'cancel') {
-      const reason = window.prompt(loc('سبب الإلغاء (تُعاد كل نقاط الاشتراك):', 'Why cancel? (every entry fee is returned)', 'هۆکاری هەڵوەشاندنەوە؟ (هەموو خاڵی بەشداریکردن دەگەڕێنرێتەوە)'))?.trim();
-      if (!reason) return;
+      const reason = await prompt({
+        title: loc('إلغاء المسابقة', 'Cancel competition', 'هەڵوەشاندنەوەی پێشبڕکێ'),
+        description: loc('تُعاد كل نقاط الاشتراك إلى أصحابها.', 'Every entry fee goes back to its owner.', 'هەموو خاڵی بەشداریکردن بۆ خاوەنەکەی دەگەڕێتەوە.'),
+        label: loc('سبب الإلغاء', 'Why cancel?', 'هۆکاری هەڵوەشاندنەوە'),
+        required: true,
+        multiline: true,
+        destructive: true,
+        confirmLabel: loc('إلغاء المسابقة', 'Cancel competition', 'هەڵوەشاندنەوەی پێشبڕکێ'),
+        cancelLabel: loc('رجوع', 'Back', 'گەڕانەوە'),
+      });
+      if (reason === null) return;
       payload = { reason };
     }
     setBusy(c.id);
@@ -277,12 +298,15 @@ export default function AdminCompetitions() {
             <li key={c.id} className="lv-surface p-4">
               <div className="flex items-start justify-between gap-3 flex-wrap">
                 <div>
-                  <p className="text-text-primary font-bold flex items-center gap-2"><Trophy className="w-4 h-4 text-gold" aria-hidden />{c.title[l] || c.title.ar}</p>
-                  <p className="text-text-secondary text-[12px] mt-1" dir="ltr">{c.starts_at.slice(0, 10)} → {c.ends_at.slice(0, 10)}</p>
+                  <p className="text-text-primary font-bold flex items-center gap-2">
+                    <Trophy className="w-4 h-4 text-gold" aria-hidden />
+                    <span dir="auto">{isolateLatin(c.title[l] || c.title.ar)}</span>
+                  </p>
+                  <p className="text-text-secondary text-[12px] mt-1" dir="ltr" data-competition-window>{baghdadDay(c.starts_at)} → {baghdadDay(c.ends_at)}</p>
                   <p className="text-text-secondary text-[12px] flex items-center gap-1.5 mt-1">
                     <Users className="w-3.5 h-3.5" aria-hidden />
-                    {loc(`${c.entries_count} مشارك`, `${c.entries_count} entries`, `${c.entries_count} بەشداربوو`)}
-                    {c.points_collected > 0 ? ` · ${loc(`${c.points_collected} نقطة اشتراك`, `${c.points_collected} entry points`, `${c.points_collected} خاڵی بەشداریکردن`)}` : ''}
+                    {countText('entrants', c.entries_count, l, String(c.entries_count))}
+                    {c.points_collected > 0 ? ` · ${loc(`نقاط الاشتراك: ${c.points_collected}`, `Entry points: ${c.points_collected}`, `خاڵی بەشداریکردن: ${c.points_collected}`)}` : ''}
                   </p>
                   {c.publish_problem && <p className="text-warning text-[11px] mt-1">{problemText(c.publish_problem)}</p>}
                 </div>
@@ -309,12 +333,23 @@ export default function AdminCompetitions() {
           ))}
         </ul>
       )}
+      {promptDialog}
     </div>
   );
 }
 
+/** An entry's state in the reader's words: the server's are for the server. */
+export function entryStateWords(state: string, loc: (ar: string, en: string, ckb: string) => string): string {
+  if (state === 'entered') return loc('مشارك', 'Entered', 'بەشداربوو');
+  if (state === 'winner') return loc('فائز', 'Winner', 'براوە');
+  if (state === 'refunded') return loc('أُعيدت نقاطه', 'Points returned', 'خاڵەکانی گەڕێنرانەوە');
+  if (state === 'disqualified') return loc('لم تُقبل', 'Not accepted', 'پەسەند نەکرا');
+  return state;
+}
+
 function Judging({ c, onDone, onError }: { c: AdminCompetition; onDone: () => Promise<void>; onError: (e: unknown) => void }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
+  const [prompt, promptDialog] = usePrompt();
   const [entries, setEntries] = useState<Entry[] | null>(null);
   const [places, setPlaces] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -333,8 +368,17 @@ function Judging({ c, onDone, onError }: { c: AdminCompetition; onDone: () => Pr
   }, [load]);
 
   const disqualify = async (e: Entry) => {
-    const note = window.prompt(loc('لماذا لا تُقبل هذه المشاركة؟', 'Why is this entry not accepted?', 'بۆچی ئەم بەشدارییە پەسەند ناکرێت؟'))?.trim();
-    if (!note) return;
+    const note = await prompt({
+      title: loc('رفض المشاركة', 'Refuse this entry', 'ڕەتکردنەوەی ئەم بەشدارییە'),
+      description: e.entry_points > 0 ? loc('تُعاد إلى صاحبها نقاط اشتراكه.', 'Its entry points go back to its owner.', 'خاڵی بەشداریکردنەکەی بۆ خاوەنەکەی دەگەڕێتەوە.') : undefined,
+      label: loc('لماذا لا تُقبل هذه المشاركة؟', 'Why is this entry not accepted?', 'بۆچی ئەم بەشدارییە پەسەند ناکرێت؟'),
+      required: true,
+      multiline: true,
+      destructive: true,
+      confirmLabel: loc('رفض', 'Refuse', 'ڕەتکردنەوە'),
+      cancelLabel: loc('رجوع', 'Back', 'گەڕانەوە'),
+    });
+    if (note === null) return;
     try {
       await api.post(`/api/admin/rewards/competitions/${encodeURIComponent(c.id)}/entries/${encodeURIComponent(e.id)}/disqualify`, { note });
       await load();
@@ -368,7 +412,10 @@ function Judging({ c, onDone, onError }: { c: AdminCompetition; onDone: () => Pr
           <div className="min-w-0 flex-1 text-[13px]">
             <p className="text-text-primary font-bold">{e.user_name || e.username}</p>
             {e.answer && <p className="text-text-secondary whitespace-pre-line">{e.answer}</p>}
-            <p className="text-text-muted text-[11px]">{e.state}{e.entry_points ? ` · ${e.entry_points}` : ''}</p>
+            <p className="text-text-muted text-[11px]" data-entry-state={e.state}>
+              {entryStateWords(e.state, loc)}
+              {e.entry_points ? ` · ${countText('points', e.entry_points, lang === 'en' || lang === 'ckb' ? lang : 'ar', String(e.entry_points))}` : ''}
+            </p>
           </div>
           {e.state === 'entered' && (
             <div className="flex flex-col gap-1 items-end">
@@ -393,6 +440,7 @@ function Judging({ c, onDone, onError }: { c: AdminCompetition; onDone: () => Pr
           </button>
         </div>
       )}
+      {promptDialog}
     </div>
   );
 }

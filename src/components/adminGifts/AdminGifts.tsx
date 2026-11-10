@@ -22,6 +22,7 @@ import GrantsPanel from './GrantsPanel';
 import GrantSheet from './GrantSheet';
 import GrantDetail from './GrantDetail';
 import { adminLang, adminText, type AdminStringKey } from './strings';
+import { GIFTS_ACCENT } from './ui';
 import type { Level } from './types';
 
 export type AdminGiftsView = 'levels' | 'grants';
@@ -54,7 +55,7 @@ export default function AdminGifts({ initialView = 'levels' }: { initialView?: A
   }, [granting, loadLevels]);
 
   return (
-    <div className={`${T.AP} space-y-4`} dir={dir} data-panel="gifts">
+    <div className={`${T.AP} space-y-4`} style={GIFTS_ACCENT} dir={dir} data-panel="gifts">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-[20px] font-bold leading-tight text-[var(--ap-text-1)]">

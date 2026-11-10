@@ -55,6 +55,7 @@ import type { Language } from '../../translations';
 import { formatDate } from '../orders/format';
 import { RateSkeleton, SectionHeading, SetupState } from './AreaChrome';
 import { SCORE_SCALE, pointsForm, type CopyKey } from './copy';
+import { pickName } from './model';
 import type { GiftReveal as RevealData, PrinterToRate, RewardsHubData } from './types';
 import type { Read } from './useRewardsData';
 import { useRewardsT } from './useT';
@@ -137,17 +138,19 @@ function printerChip(p: PrinterToRate, t: T, lang: Language): { tone: Tone; text
     case 'to_rate':
       return { tone: 'neutral', text: t('rate.toRate') };
     case 'reward_pending':
-      return { tone: 'warning', text: t('rate.pending') };
+      return { tone: 'warning', text: t(p.reward_decision === 'revision' ? 'rate.revision' : 'rate.pending') };
     case 'code_ready':
       return { tone: 'success', text: t('rate.codeReady') };
     case 'reward_approved': {
       const level = positive(p.reward_level);
       if (p.gift?.status === 'ADDED_TO_ORDER') return { tone: 'success', text: t('rate.inCart') };
       if (level === null) return { tone: 'success', text: t('now.gift') };
-      return { tone: 'success', text: t(p.gift?.scope === 'up_to' ? 'rate.upTo' : 'rate.approved', { level: formatFigure(level, lang) }) };
+      return { tone: 'success', text: t(p.gift?.scope === 'up_to' && level > 1 ? 'rate.upTo' : 'rate.approved', { level: formatFigure(level, lang) }) };
     }
     case 'rated': {
       if (p.gift?.status === 'ORDERED' || p.gift?.status === 'FULFILLED') return { tone: 'neutral', text: t('rate.giftOrdered') };
+      if (p.code_void) return { tone: 'warning', text: t('rate.codeVoid') };
+      if (p.reward_decision === 'rejected') return { tone: 'warning', text: t('rate.rewardRejected') };
       const stars = positive(p.stars);
       return stars !== null ? { tone: 'neutral', text: t('rate.rated', { stars: formatFigure(stars, lang) }) } : null;
     }
@@ -267,7 +270,7 @@ function RateReady({ data, reload }: { data: RewardsHubData; reload: () => Promi
       {!codeOnFocal && <QuietCodeRow open={codeAwaited} onWritten={onWritten} />}
       {openError && (
         <p role="alert" className="px-1 text-[12.5px] leading-5 text-danger">
-          <Link to="/gifts" className="underline underline-offset-2">
+          <Link to="/gifts" className="relative lv-hit underline underline-offset-2">
             {t('rate.openFailed')}
           </Link>
         </p>
@@ -324,7 +327,18 @@ function GiftCodeForm({ primary, onWritten, autoFocus }: { primary: boolean; onW
     } catch (err) {
       const status = err instanceof ApiError ? err.status : 0;
       const refusal = err instanceof ApiError ? err.code : undefined;
-      setError(status === 429 ? t('tooMany') : refusal === 'GIFT_CODE_INVALID' ? t('code.err.invalid') : refusal === 'GIFT_CODE_USED' ? t('code.err.used') : t('code.err.generic'));
+      const voidWhy = err instanceof ApiError && err.details?.reason === 'cancelled' ? 'code.err.void.cancelled' : 'code.err.void.returned';
+      setError(
+        status === 429
+          ? t('tooMany')
+          : refusal === 'GIFT_CODE_INVALID'
+            ? t('code.err.invalid')
+            : refusal === 'GIFT_CODE_USED'
+              ? t('code.err.used')
+              : refusal === 'GIFT_CODE_VOID'
+                ? t(voidWhy)
+                : t('code.err.generic')
+      );
     } finally {
       setBusy(false);
     }
@@ -411,7 +425,7 @@ function FocalPrinter({
   onOpen: (giftId: string, play: boolean) => void;
   opening: string | null;
 }) {
-  const { t, tri, lang } = useRewardsT();
+  const { t, lang } = useRewardsT();
   const approved = p.state === 'reward_approved';
   const awaiting = p.state === 'code_ready';
   const upTo = approved && p.gift?.scope === 'up_to' ? p.gift : null;
@@ -437,9 +451,10 @@ function FocalPrinter({
       <div className="flex items-start gap-3">
         <SafeImage src={p.image || null} alt="" aspect="square" sizes="64px" className="size-16 shrink-0 rounded-lg" bgClassName="bg-surface" />
         <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5">
-            <h2 id="rate-next-title" dir="auto" className="min-w-0 flex-1 basis-32 text-[15px] font-bold leading-6 text-text-primary line-clamp-2">
-              {tri(p.name)}
+          {/* The whole name, and the chip on its own line in every state: beside it the name had 135 px and lost its end. */}
+          <div className="flex flex-col items-start gap-1.5">
+            <h2 id="rate-next-title" className="max-w-full text-[15px] font-bold leading-6 text-text-primary">
+              <bdi>{pickName(p.name)}</bdi>
             </h2>
             {chip && <StatusChip tone={chip.tone}>{chip.text}</StatusChip>}
           </div>
@@ -476,11 +491,12 @@ function FocalPrinter({
  * One of «طابعاتك»: flat, its state in a chip, and a secondary link when a
  * step is left (the review to write, the gift under «هداياي»). The link is
  * described by the printer's name, so «اكتب مراجعتك» says which printer.
- * Narrower than the name, chip and link together, the link drops under the
- * chip rather than squeezing the name.
+ * On a phone the link drops under the chip rather than squeezing the name, which
+ * is never cut. A reward the team refused, or sent back, says so here with the
+ * team's own written reason (a system refusal has none to show).
  */
 function PrinterRow({ printer: p, onOpen, opening }: { printer: PrinterToRate; onOpen: (giftId: string, play: boolean) => void; opening: string | null }) {
-  const { t, tri, lang } = useRewardsT();
+  const { t, count, lang } = useRewardsT();
   const nameId = useId();
   const chip = printerChip(p, t, lang);
   const upTo = p.state === 'reward_approved' && p.gift?.scope === 'up_to' && p.gift.status !== 'ADDED_TO_ORDER' ? p.gift : null;
@@ -488,6 +504,8 @@ function PrinterRow({ printer: p, onOpen, opening }: { printer: PrinterToRate; o
   const action =
     p.state === 'to_rate' && p.slug
       ? { to: reviewPath(p.slug), label: t('rate.write') }
+      : p.reward_decision === 'revision' && p.slug
+        ? { to: reviewPath(p.slug), label: t('rate.revision.edit') }
       : p.state === 'reward_approved' && !upTo
         ? p.gift?.status === 'ADDED_TO_ORDER'
           ? { to: '/cart', label: t('reveal.checkout') }
@@ -495,17 +513,32 @@ function PrinterRow({ printer: p, onOpen, opening }: { printer: PrinterToRate; o
         : taken
           ? { to: '/gifts', label: t('rate.gifts') }
           : null;
-  const note = p.state === 'reward_pending' ? t('rate.pendingNote') : p.state === 'code_ready' ? t('rate.codeReady.note') : p.state === 'to_rate' && !p.slug ? t('rate.noPage') : '';
+  // Row 303 R1: the printer went back, or its order was cancelled; the code it held opens nothing, and the row says why.
+  const voided = p.code_void && !taken ? t(p.code_void === 'cancelled' ? 'rate.codeVoid.cancelled' : 'rate.codeVoid.returned') : '';
+  // Row 303 R4: a refused gift still pays the review its points, and the row says how many.
+  const earned = p.reward_decision === 'rejected' && (p.review_points ?? 0) > 0 ? t('rate.rejectedPoints', { points: count(pointsForm('rate.rejectedPoints'), p.review_points ?? 0) }) : '';
+  const decided = p.reward_decision ? [p.reward_reason ? t('rate.reason', { reason: p.reward_reason }) : '', earned].filter(Boolean).join(' ') : null;
+  const note = voided
+    ? voided
+    : decided !== null
+      ? decided
+      : p.state === 'reward_pending'
+        ? t('rate.pendingNote')
+        : p.state === 'code_ready'
+          ? t('rate.codeReady.note')
+          : p.state === 'to_rate' && !p.slug
+            ? t('rate.noPage')
+            : '';
   return (
     <li className="lv-surface p-3 flex items-center gap-3">
       <SafeImage src={p.image || null} alt="" aspect="square" sizes="48px" className="size-12 shrink-0 rounded-md" bgClassName="bg-surface" />
       <div className="min-w-0 flex-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <div className="min-w-0 flex-1 basis-32 flex flex-col items-start gap-1.5">
-          <p id={nameId} dir="auto" className="max-w-full text-[14px] font-bold leading-5 text-text-primary line-clamp-2">
-            {tri(p.name)}
+        <div className="min-w-0 flex-1 basis-48 flex flex-col items-start gap-1.5">
+          <p id={nameId} className="max-w-full text-[14px] font-bold leading-5 text-text-primary">
+            <bdi>{pickName(p.name)}</bdi>
           </p>
           {chip && <StatusChip tone={chip.tone}>{chip.text}</StatusChip>}
-          {note && <p className="text-[12px] leading-5 text-text-muted">{note}</p>}
+          {note && <p className="max-w-full break-words text-[12px] leading-5 text-text-muted" dir="auto" data-rate-note>{note}</p>}
         </div>
         {action && (
           <Link to={action.to} aria-describedby={nameId} className="lv-button lv-button-secondary lv-button-sm shrink-0">

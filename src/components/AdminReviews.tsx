@@ -13,8 +13,10 @@ import {
 import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
 import VariantImg from './ui/VariantImg';
+import { usePrompt } from './ui/PromptDialog';
+import { formatDate } from './orders/format';
 import { CodePanel, ScoreField, canApproveScore, draftScore, initialDraft, type LevelOffer } from './adminReviews/ReviewGiftDecision';
-import { reviewGiftText } from './adminReviews/reviewGiftStrings';
+import { reviewGiftText, reviewFactWord } from './adminReviews/reviewGiftStrings';
 
 /**
  * Admin: review/reward queue with eligibility facts and evidence viewing and
@@ -61,6 +63,7 @@ const STRINGS = {
     approvePoints: (n: number) => `اعتماد ومنح ${n.toLocaleString()} نقطة`,
     pointsUnconfigured: 'قيمة نقاط المراجعة غير مُعدّة (reviewPointsConfig) — لا يمكن اعتماد مكافأة نقاط حتى إعدادها. لا أرقام مُختلقة.',
     rejectReward: 'رفض المكافأة',
+    rejectRewardPoints: 'يُعرض السبب للزبون. ومراجعة الطابعة تأخذ عند الرفض نقاط المراجعة المعتادة، مرة واحدة (المادة 7.8).',
     decided: 'القرار',
     stars: 'النجوم',
     working: 'جارٍ التنفيذ...',
@@ -129,6 +132,7 @@ const STRINGS = {
     approvePoints: (n: number) => `Approve & award ${n.toLocaleString()} points`,
     pointsUnconfigured: 'Review-points value is NOT configured (reviewPointsConfig) — points rewards cannot be approved until it is set. No invented numbers.',
     rejectReward: 'Reject reward',
+    rejectRewardPoints: 'The customer sees the reason. A printer review then earns the usual review points, once (article 7.8).',
     decided: 'Decision',
     stars: 'Stars',
     working: 'Working...',
@@ -195,6 +199,7 @@ const STRINGS = {
     approvePoints: (n: number) => `پەسەندکردن و بەخشینی ${n.toLocaleString()} خاڵ`,
     pointsUnconfigured: 'بەهای خاڵی پێداچوونەوە ڕێکنەخراوە (reviewPointsConfig) — ناتوانرێت خەڵاتی خاڵ پەسەند بکرێت هەتا ڕێکدەخرێت.',
     rejectReward: 'ڕەتکردنەوەی خەڵات',
+    rejectRewardPoints: 'کڕیار هۆکارەکە دەبینێت. پێداچوونەوەی چاپکەر لە کاتی ڕەتکردنەوەدا خاڵی ئاسایی پێداچوونەوە وەردەگرێت، یەک جار (ماددەی 7.8).',
     decided: 'بڕیار',
     stars: 'ئەستێرەکان',
     working: 'جێبەجێ دەکرێت...',
@@ -262,6 +267,8 @@ interface QueueRow {
   code: string | null;
   code_issued_at: string | null;
   code_redeemed_at: string | null;
+  /** Row 303 R1: the reviewed printer went back, or its order was cancelled; absent from an older server. */
+  code_void?: 'returned' | 'cancelled' | null;
   reason: string;
   points_awarded: number;
   entitlement_id: string | null;
@@ -285,6 +292,7 @@ interface QueueRow {
 export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'levels' | 'grants') => void } = {}) {
   const { lang, dir, loc } = useLanguage();
   const S = STRINGS[lang] ?? STRINGS.ar;
+  const [prompt, promptDialog] = usePrompt();
 
   // ---------------- queue state
   const [stateFilter, setStateFilter] = useState<'submitted' | 'revision_needed' | 'approved' | 'rejected' | 'all'>('submitted');
@@ -325,10 +333,10 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
   const moderate = async (row: QueueRow, action: 'approve' | 'reject' | 'request_changes') => {
     let reason = '';
     if (action !== 'approve') {
-      const input = window.prompt(S.reasonPrompt);
+      const verb = action === 'reject' ? S.unpublishReject : S.requestChanges;
+      const input = await prompt({ title: verb, label: S.reasonPrompt, required: true, multiline: true, destructive: action === 'reject', confirmLabel: verb, cancelLabel: S.cancel });
       if (input === null) return;
-      reason = input.trim();
-      if (!reason) return;
+      reason = input;
     }
     setBusyId(row.review_id);
     setRowError(null);
@@ -345,10 +353,12 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
   const decideReward = async (row: QueueRow, action: 'approve' | 'reject' | 'request_changes') => {
     let reason = rubricDraft[row.review_id]?.trim() ?? '';
     if (action !== 'approve') {
-      const input = window.prompt(S.reasonPrompt, reason);
+      const verb = action === 'reject' ? S.rejectReward : S.requestChanges;
+      // Row 303 R4: refusing a printer review's gift pays the review its usual points; the dialog says so before the press.
+      const description = action === 'reject' && row.kind === 'printer_gift' ? S.rejectRewardPoints : undefined;
+      const input = await prompt({ title: verb, description, label: S.reasonPrompt, initialValue: reason, required: true, multiline: true, destructive: action === 'reject', confirmLabel: verb, cancelLabel: S.cancel });
       if (input === null) return;
-      reason = input.trim();
-      if (!reason) return;
+      reason = input;
     }
     const payload: Record<string, unknown> = { action, reason };
     if (action === 'approve' && row.kind === 'printer_gift') {
@@ -390,8 +400,8 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
     </span>
   );
 
-  const productName = (p: { name: string | null; name_ar: string | null }) =>
-    loc(p.name_ar || p.name || '—', p.name || p.name_ar || '—');
+  // The product's own name, English on every surface (§3/§7), and so on Sorani too, where this fell back to the Arabic.
+  const productName = (p: { name: string | null; name_ar: string | null }) => p.name || p.name_ar || '—';
 
   return (
     <div dir={dir} className="space-y-6 text-text-primary">
@@ -425,14 +435,15 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
       {(
         <div className="space-y-4">
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="flex lv-well border border-border-subtle p-1 rounded-xl overflow-x-auto">
+            {/* The house filter (adminFinance/PeriodControl): `lv-choice` options, 44 px each, the chosen one pressed and announced. */}
+            <div role="group" aria-label={S.tabs.queue} className="flex flex-wrap items-center gap-1.5">
               {(['submitted', 'revision_needed', 'approved', 'rejected', 'all'] as const).map((f) => (
                 <button
                   key={f}
+                  type="button"
+                  aria-pressed={stateFilter === f}
                   onClick={() => setStateFilter(f)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
-                    stateFilter === f ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'
-                  }`}
+                  className="lv-choice press-scale min-h-[44px] px-3 text-[12px] leading-[1.5] font-bold whitespace-nowrap"
                 >
                   {S.states[f]}
                 </button>
@@ -473,9 +484,11 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                 >
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="min-w-0">
-                      <div className="text-sm font-bold truncate">{productName(row.product)}</div>
+                      {/* Its own direction, so a long English name in an Arabic or Sorani row is cut at its end, not its start; aligned with the row. */}
+                      <div dir="auto" className={`text-sm font-bold truncate ${dir === 'rtl' ? 'text-right' : 'text-left'}`}>{productName(row.product)}</div>
+                      {/* Each part isolated: a written month after the Latin email and order id kept its day across the line. */}
                       <div className="text-[11px] text-text-muted truncate">
-                        {row.customer.email} · {row.order_id ?? '—'} · {new Date(row.created_at).toLocaleDateString()}
+                        <bdi>{row.customer.email}</bdi> · <bdi>{row.order_id ?? '—'}</bdi> · <bdi>{formatDate(row.created_at, lang)}</bdi>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -537,11 +550,11 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
                           <span>{loc('جودة الفيديو', 'Video quality', 'کوالیتی ڤیدیۆ')}: {row.quality.videoQuality}/18</span>
                         </div>
                         {row.quality.reasons.length > 0 && (
-                          <p className="mt-1 break-words">{loc('الأسباب', 'Reasons', 'هۆکارەکان')}: {row.quality.reasons.join(' · ')}</p>
+                          <p className="mt-1 break-words" data-review-reasons>{loc('الأسباب', 'Reasons', 'هۆکارەکان')}: {row.quality.reasons.map((r) => reviewFactWord(lang, r)).join(' · ')}</p>
                         )}
                         {row.quality.suspiciousSignals.length > 0 && (
                           <p className="mt-1 text-warning break-words">
-                            {loc('إشارات تحتاج فحصًا', 'Signals to inspect', 'نیشانە پێویستە بپشکنرێت')}: {row.quality.suspiciousSignals.join(' · ')}
+                            {loc('إشارات تحتاج فحصًا', 'Signals to inspect', 'نیشانە پێویستە بپشکنرێت')}: {row.quality.suspiciousSignals.map((r) => reviewFactWord(lang, r)).join(' · ')}
                           </p>
                         )}
                       </div>
@@ -709,7 +722,7 @@ export default function AdminReviews({ onOpenGifts }: { onOpenGifts?: (view: 'le
           })}
         </div>
       )}
-
+      {promptDialog}
     </div>
   );
 }

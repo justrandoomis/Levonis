@@ -50,7 +50,7 @@ interface Props {
   keepOpen?: boolean;
 }
 
-const label = (p: PickerProduct, ar: boolean) => (ar ? p.name_ar || p.name_en : p.name_en || p.name_ar) || p.id;
+const label = (p: PickerProduct) => p.name_en || p.name_ar || p.id;
 
 export default function ProductPicker({
   value,
@@ -161,7 +161,7 @@ export default function ProductPicker({
           aria-label={ariaLabel ?? loc('اختر منتجًا', 'Choose a product', 'بەرهەمێک هەڵبژێرە')}
         >
           <span className="truncate" dir="ltr">
-            {chosen ? label(chosen, lang !== 'en') : value || placeholder || loc('اختر منتجًا', 'Choose a product', 'بەرهەمێک هەڵبژێرە')}
+            {chosen ? label(chosen) : value || placeholder || loc('اختر منتجًا', 'Choose a product', 'بەرهەمێک هەڵبژێرە')}
           </span>
           <Search className="w-4 h-4 shrink-0 text-[var(--ap-text-3)]" aria-hidden />
         </button>
@@ -208,7 +208,7 @@ export default function ProductPicker({
                   className="w-full text-start px-2 py-1.5 rounded-md hover:bg-[var(--ap-surface-2)] flex items-center justify-between gap-2"
                 >
                   <span className="min-w-0 truncate text-[13px] text-[var(--ap-text-1)]" dir="ltr">
-                    {label(p, lang !== 'en')}
+                    {label(p)}
                     {p.sku ? <span className="text-[var(--ap-text-3)]"> · {p.sku}</span> : null}
                   </span>
                   <span

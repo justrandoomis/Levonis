@@ -12,7 +12,7 @@ import { Sheet } from '../ui/Overlay';
 import { Banner, Field, Select, TextArea } from '../adminProducts/form/formUi';
 import * as T from '../adminProducts/theme';
 import ItemFields, { blankItem } from './ItemFields';
-import { ItemRow, triOf } from './ui';
+import { GIFTS_ACCENT, ItemRow, triOf } from './ui';
 import { adminText, reasonKey, type AdminLang, type AdminStringKey } from './strings';
 import { GRANT_REASONS, type AdminGift, type GrantReason, type ItemInput, type Level, type UserHit } from './types';
 
@@ -127,6 +127,7 @@ export default function GrantSheet({
     <Sheet open={open} onClose={() => !busy && onClose()} labelledBy={titleId} panelClassName="w-full sm:max-w-xl" dirty={!!user && !busy}>
       <form
         className={`${T.AP} px-5 pb-5 pt-2 space-y-4`}
+        style={GIFTS_ACCENT}
         data-gift-grant-sheet
         onSubmit={(e) => {
           e.preventDefault();

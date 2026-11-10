@@ -24,6 +24,7 @@ import { ConfirmDialog } from '../ui/ConfirmDialog';
 import SafeImage from '../ui/SafeImage';
 import { ForwardChevron, INLINE_LINK, SECTION_HEADING } from './AreaChrome';
 import { pointsForm, type CopyKey } from './copy';
+import { pickName } from './model';
 import type { ShopProductItem } from './types';
 import { useRewardsT } from './useT';
 
@@ -62,7 +63,7 @@ export interface ShopProductsProps {
 }
 
 export function ShopProducts({ items, reload, onSwapped }: ShopProductsProps) {
-  const { t, count, tri, lang } = useRewardsT();
+  const { t, count, lang } = useRewardsT();
   const gl = giftLang(lang);
   // The item is kept after closing, so the dialog's words stay in place while it slides away.
   const [asking, setAsking] = useState<{ item: ShopProductItem; open: boolean } | null>(null);
@@ -96,7 +97,7 @@ export function ShopProducts({ items, reload, onSwapped }: ShopProductsProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done?.giftId]);
 
-  const nameOf = (item: ShopProductItem) => tri(item.product.name);
+  const nameOf = (item: ShopProductItem) => pickName(item.product.name);
   const cancel = () => setAsking((s) => (s ? { ...s, open: false } : s));
 
   const settle = async (giftId: string | undefined, name: string) => {
@@ -184,8 +185,8 @@ export function ShopProducts({ items, reload, onSwapped }: ShopProductsProps) {
           const short = !held && !off && !item.affordable;
           const reasonId = `shop-product-${item.id}-why`;
           const name = nameOf(item);
-          const color = item.product.color ? tri(item.product.color) : '';
-          const option = item.product.option ? tri(item.product.option) : '';
+          const color = pickName(item.product.color);
+          const option = pickName(item.product.option);
           const qty = item.product.qty ?? 1;
           return (
             <li key={item.id} className="lv-surface p-4 space-y-3" data-testid="shop-product" data-shop-product={item.id}>

@@ -137,3 +137,41 @@ export const slotStoppedSql = (b: Pick<EarningBinds, 'now' | 'months'>) => `CASE
 
 /** A slot's warranty end, from the device in the customer's hands. */
 export const slotWarrantyEndSql = () => `COALESCE(${chainEnd('warranty_end_at')}, d.warranty_end_at)`;
+
+/**
+ * THE PRINTERS' OWN «returned», FOR ONE SLOT `d` (with `oi`): a refund took the slot, or the device at
+ * the end of its chain went back. `slotStoppedSql` says 'returned' exactly when this holds and the slot
+ * was neither traded in nor in the shop (tests/rewardsReviewVoid.test.ts holds the two to each other).
+ * Never NULL: every part is a boolean test.
+ */
+export const slotReturnedSql = () =>
+  `((${slotNotRefundedSql()}) IS NOT TRUE OR ((${slotOpenSql()}) IS NOT TRUE AND ${chainEnd('warranty_closed_reason')} IS 'returned'))`;
+
+/** Why the printer a review is about left the customer: its order was cancelled, or it went back. */
+export type ReviewPrinterVoid = 'cancelled' | 'returned';
+
+/**
+ * A REVIEW CODE DIES WITH ITS PRINTER (owner, 2026-11-09; DECISIONS row 303 R1; rewards policy 8.16).
+ * One scalar expression over the reviewed line `line` (an order_items id): 'cancelled' when its order
+ * was cancelled, 'returned' when refunds took every printer of the line or no printer of it is still in
+ * the customer's hands by the printers' own test (`slotReturnedSql`), else NULL. A line of two keeps its
+ * review while one printer of it stays: which of them was reviewed cannot be told apart. A line with no
+ * unit rows is judged by its refunds alone, so a missing row never voids a code. The expression names
+ * its own aliases (o, oi, d, u, rc, low, r1…, lr1…): `line` must name none of them.
+ */
+export const reviewedPrinterVoidSql = (line: string) => `(SELECT CASE
+           WHEN o.status = 'cancelled' THEN 'cancelled'
+           WHEN COALESCE((SELECT SUM(rc.qty) FROM return_cases rc
+                           WHERE rc.order_item_id = oi.id AND rc.state = 'resolved' AND rc.resolution = 'refund'), 0) >= oi.qty THEN 'returned'
+           WHEN EXISTS (SELECT 1 FROM order_item_units u WHERE u.order_item_id = oi.id AND u.replacement_of_unit_id IS NULL)
+                AND NOT EXISTS (SELECT 1 FROM order_item_units d
+                                  ${chainJoins()}
+                                 WHERE d.order_item_id = oi.id AND d.replacement_of_unit_id IS NULL AND NOT ${slotReturnedSql()})
+             THEN 'returned'
+           ELSE NULL END
+          FROM order_items oi JOIN orders o ON o.id = oi.order_id
+         WHERE oi.id = ${line})`;
+
+/** The line a review proves its purchase by: its own column, else the order's line of that product. Over a `reviews` alias. */
+export const reviewLineSql = (review: string) =>
+  `COALESCE(${review}.order_item_id, (SELECT x.id FROM order_items x WHERE x.order_id = ${review}.order_id AND x.product_id = ${review}.product_id LIMIT 1))`;

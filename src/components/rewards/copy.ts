@@ -170,6 +170,8 @@ export const COPY = {
   'door.rate.gift': ['هديتك بانتظارك في «هداياي»', 'Your gift is waiting in «My gifts»', 'دیارییەکەت لە «دیارییەکانم» چاوەڕێتە'],
   'door.rate.pending': ['مراجعتك بانتظار قرار الهدية', 'Your review awaits the gift decision', 'هەڵسەنگاندنەکەت چاوەڕێی بڕیاری دیارییە'],
   'door.rate.done': ['قيّمت كل طابعاتك', "You've reviewed all your printers", 'هەموو چاپکەرەکانت هەڵسەنگاندووە'],
+  'door.rate.void.returned': ['أُعيدت طابعتك، فلا يفتح كود مراجعتها هدية', 'Your printer went back, so its review code opens no gift', 'چاپکەرەکەت گەڕێنرایەوە، بۆیە کۆدی هەڵسەنگاندنەکەی دیاری ناکاتەوە'],
+  'door.rate.void.cancelled': ['أُلغي طلب طابعتك، فلا يفتح كود مراجعتها هدية', "Your printer's order was cancelled, so its review code opens no gift", 'داواکاریی چاپکەرەکەت هەڵوەشێنرایەوە، بۆیە کۆدی هەڵسەنگاندنەکەی دیاری ناکاتەوە'],
   'door.rate.code': [
     'اعتُمدت مراجعتك — أدخل كود هديتك',
     'Your review was approved — enter your gift code',
@@ -190,7 +192,9 @@ export const COPY = {
   'coupon.filament': ['خصم {percent} على الفلامنت', '{percent} off filament', '{percent} داشکاندن لەسەر فیلامێنت'],
   'coupon.shipDetail': ['رسوم التوصيل كاملة لطلب واحد', 'The full delivery fee on one order', 'هەموو کرێی گەیاندن بۆ یەک داواکاری'],
   'coupon.shipAmount': ['خصم {money} من رسوم التوصيل', '{money} off the delivery fee', '{money} لە کرێی گەیاندن کەم دەکاتەوە'],
-  'coupon.shipMin': ['للطلبات فوق {money}', 'On orders over {money}', 'بۆ داواکارییەکانی سەرووی {money}'],
+  // The minimum counts: an order of exactly that much qualifies (owner, 2026-11-09, row 303 R3; policy 14.4).
+  // The amount and «فأكثر» part at no line end: «فأكثر» alone on a line read as a word of its own.
+  'coupon.shipMin': ['للطلبات من {money}\u00A0فأكثر', 'On orders of {money}\u00A0or\u00A0more', 'بۆ داواکارییەکانی {money}\u00A0و\u00A0زیاتر'],
   'coupon.pieces': ['يشمل {pieces}', 'Covers {pieces}', '{pieces} دەگرێتەوە'],
   'coupon.capOn': ['حتى {money} على:', 'Up to {money} on:', 'تا {money} لەسەر:'],
   'coupon.on': ['على:', 'On:', 'لەسەر:'],
@@ -248,9 +252,9 @@ export const COPY = {
     'هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت هەموو هەفتەیەک {what}ت پێدەدات بۆ ماوەی {months} لە گەرەنتییەکەی، و هەر کۆپۆنێک {days} لە کاتی دەرچوونییەوە بەکاردێت.',
   ],
   'coupons.what.bothTerms': [
-    'كوبون توصيل مجاني بقيمة {amount} للطلبات فوق {min}، وكوبون خصم {percent} على {pieces} من الفلامنت المختار',
-    'a free-delivery coupon worth {amount} on orders over {min}, and a {percent} coupon on {pieces} of selected filament',
-    'کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای {amount} بۆ داواکارییەکانی سەرووی {min}، و کۆپۆنێکی {percent} داشکاندن لەسەر {pieces} لە فیلامێنتی هەڵبژێردراو',
+    'كوبون توصيل مجاني بقيمة {amount} للطلبات من {min} فأكثر، وكوبون خصم {percent} على {pieces} من الفلامنت المختار',
+    'a free-delivery coupon worth {amount} on orders of {min} or more, and a {percent} coupon on {pieces} of selected filament',
+    'کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای {amount} بۆ داواکارییەکانی {min} و زیاتر، و کۆپۆنێکی {percent} داشکاندن لەسەر {pieces} لە فیلامێنتی هەڵبژێردراو',
   ],
   'coupons.what.bothAmount': [
     'كوبون توصيل مجاني بقيمة {amount}، وكوبون خصم {percent} على {pieces} من الفلامنت المختار',
@@ -258,9 +262,9 @@ export const COPY = {
     'کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای {amount}، و کۆپۆنێکی {percent} داشکاندن لەسەر {pieces} لە فیلامێنتی هەڵبژێردراو',
   ],
   'coupons.what.shipTerms': [
-    'كوبون توصيل مجاني بقيمة {amount} للطلبات فوق {min}',
-    'a free-delivery coupon worth {amount} on orders over {min}',
-    'کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای {amount} بۆ داواکارییەکانی سەرووی {min}',
+    'كوبون توصيل مجاني بقيمة {amount} للطلبات من {min} فأكثر',
+    'a free-delivery coupon worth {amount} on orders of {min} or more',
+    'کۆپۆنێکی گەیاندنی بەخۆڕایی بە بەهای {amount} بۆ داواکارییەکانی {min} و زیاتر',
   ],
   'coupons.what.shipAmount': [
     'كوبون توصيل مجاني بقيمة {amount}',
@@ -727,6 +731,17 @@ export const COPY = {
     'ئەم کۆدە پێشتر بەکارهاتووە. دۆخی دیارییەکەت لە «دیارییەکانم» دەبینیت.',
   ],
   'code.err.generic': ['تعذّر التحقق من الكود. أعد المحاولة.', "The code couldn't be checked. Try again.", 'کۆدەکە نەپشکنرا. دووبارە هەوڵ بدەرەوە.'],
+  // Row 303 R1: the printer the review is about went back, or its order was cancelled (GIFT_CODE_VOID).
+  'code.err.void.returned': [
+    'لم يعد هذا الكود يفتح هدية: أُعيدت الطابعة التي قيّمتها إلى المتجر.',
+    'This code no longer opens a gift: the printer you reviewed went back to the shop.',
+    'ئەم کۆدە چیتر دیاری ناکاتەوە: ئەو چاپکەرەی هەڵتسەنگاند گەڕێنرایەوە بۆ فرۆشگا.',
+  ],
+  'code.err.void.cancelled': [
+    'لم يعد هذا الكود يفتح هدية: أُلغي طلب الطابعة التي قيّمتها.',
+    "This code no longer opens a gift: the order of the printer you reviewed was cancelled.",
+    'ئەم کۆدە چیتر دیاری ناکاتەوە: داواکاریی ئەو چاپکەرەی هەڵتسەنگاند هەڵوەشێنرایەوە.',
+  ],
   'rate.codeReady': ['اعتُمدت — أدخل الكود', 'Approved — enter your code', 'پەسەندکرا — کۆدەکە بنووسە'],
   'rate.codeReady.note': [
     'اعتُمدت مراجعتك. سيصلك كود هديتك من فريق Levonis، أدخله هنا.',
@@ -737,6 +752,24 @@ export const COPY = {
   'rate.score': ['درجتك {score} من {max}', 'You scored {score} of {max}', '{score} لە {max} نمرەت هێنا'],
   'rate.inCart': ['هديتك في سلتك', 'Your gift is in your cart', 'دیارییەکەت لە سەبەتەکەتدایە'],
   'rate.giftOrdered': ['طلبت هديتك', 'You ordered your gift', 'دیارییەکەت داوا کرد'],
+  'rate.rewardRejected': ['لم تُعتمد الهدية', 'Gift not approved', 'دیارییەکە پەسەند نەکرا'],
+  // Row 303 R4: a refused gift still pays the review its points (policy 7.8).
+  'rate.rejectedPoints': ['أُضيفت {points} إلى رصيدك عن مراجعتك.', '{points} were added to your balance for your review.', '{points} خرایە سەر باڵانسەکەت بۆ هەڵسەنگاندنەکەت.'],
+  // Row 303 R1: a printer that went back takes its review code with it (policy 8.16).
+  'rate.codeVoid': ['بطل الكود', 'Code void', 'کۆدەکە بەتاڵ بووەوە'],
+  'rate.codeVoid.returned': [
+    'أُعيدت هذه الطابعة إلى المتجر، فلم يعد كود مراجعتها يفتح هدية.',
+    'This printer went back to the shop, so its review code no longer opens a gift.',
+    'ئەم چاپکەرە گەڕێنرایەوە بۆ فرۆشگا، بۆیە کۆدی هەڵسەنگاندنەکەی چیتر دیاری ناکاتەوە.',
+  ],
+  'rate.codeVoid.cancelled': [
+    'أُلغي طلب هذه الطابعة، فلم يعد كود مراجعتها يفتح هدية.',
+    "This printer's order was cancelled, so its review code no longer opens a gift.",
+    'داواکاریی ئەم چاپکەرە هەڵوەشێنرایەوە، بۆیە کۆدی هەڵسەنگاندنەکەی چیتر دیاری ناکاتەوە.',
+  ],
+  'rate.revision': ['طلب الفريق تعديلًا', 'The team asked for a change', 'تیمەکە داوای دەستکاریکردنی کرد'],
+  'rate.revision.edit': ['عدّل مراجعتك', 'Edit your review', 'هەڵسەنگاندنەکەت دەستکاری بکە'],
+  'rate.reason': ['السبب: {reason}', 'Reason: {reason}', 'هۆکار: {reason}'],
   'rate.watch': ['شاهد التحليل', 'Watch the analysis', 'شیکردنەوەکە ببینە'],
   'rate.openFailed': ['تعذّر فتح هديتك. تجدها في «هداياي».', "Your gift couldn't be opened. It is in «My gifts».", 'دیارییەکەت نەکرایەوە. لە «دیارییەکانم»دایە.'],
   'now.giftCode': ['كود هديتك', 'Your gift code', 'کۆدی دیارییەکەت'],
@@ -750,6 +783,11 @@ export const COPY = {
     'فتحت مراجعتك المستويات حتى {level}. اختر هدية واحدة منها.',
     'Your review opened the levels up to {level}. Choose one gift from them.',
     'هەڵسەنگاندنەکەت ئاستەکانی تا {level} کردەوە. یەک دیاری لێیان هەڵبژێرە.',
+  ],
+  'now.giftUpTo.one': [
+    'فتحت مراجعتك المستوى الأول. اختر هدية واحدة منه.',
+    'Your review opened level 1. Choose one gift from it.',
+    'هەڵسەنگاندنەکەت ئاستی یەکەمی کردەوە. یەک دیاری لێی هەڵبژێرە.',
   ],
   'reveal.title': ['تحليل مراجعتك', 'Your review analysis', 'شیکردنەوەی هەڵسەنگاندنەکەت'],
   'reveal.skip': ['تخطَّ', 'Skip', 'تێپەڕێنە'],

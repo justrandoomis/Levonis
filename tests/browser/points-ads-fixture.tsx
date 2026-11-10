@@ -55,7 +55,7 @@ function Shell() {
   }
   if (view === 'clock' || view === 'cart') {
     return (
-      <div className="lv-canvas h-screen overflow-hidden flex flex-col text-text-primary">
+      <div className="lv-canvas overflow-hidden flex flex-col text-text-primary" style={{ height: '100vh' }}>
         <div className="flex-1 overflow-y-auto">{view === 'cart' ? <Cart /> : <ShopPage />}</div>
         <ToasterGate aboveNav />
         <BottomNav />

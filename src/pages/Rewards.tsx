@@ -15,6 +15,7 @@ import Spinner from '../components/ui/Spinner';
 import { toast } from '../lib/toastStore';
 import { clockText } from '../lib/browseMissionClock';
 import { adCard, adCardLine, adClaimFailure, adNewDayText, missionsAllDone, type AdView } from '../components/points/adMission';
+import { historyDate, ledgerLabel, secondsText, streakText } from '../components/points/words';
 import AdWatchModal from '../components/points/AdWatchModal';
 
 /**
@@ -378,25 +379,6 @@ function PointsPage() {
   };
 
   /**
-   * A LEDGER MOVEMENT IN THE READER'S LANGUAGE. Its note is the server's
-   * English record (worker/lib/pointsOps.ts, worker/routes/reviews.ts,
-   * worker/lib/rewards/*); the movements a customer meets most are named here,
-   * and anything else keeps the record as written.
-   */
-  const ledgerLabel = (note: string): string => {
-    if (/^Purchase points/.test(note)) return loc('نقاط الشراء', 'Purchase points', 'خاڵی کڕین');
-    if (/^Points reversal/.test(note)) return loc('نقاط طلب أُلغي أو أُرجع', 'Points of a cancelled or returned order', 'خاڵی داواکارییەکی هەڵوەشاوە یان گەڕێنراوە');
-    if (/^Valid manual review/.test(note)) return loc('نقاط مراجعة', 'Review points', 'خاڵی هەڵسەنگاندن');
-    if (/^Points shop product/.test(note)) return loc('منتج من متجر النقاط', 'A product from the points shop', 'بەرهەمێک لە فرۆشگای خاڵ');
-    if (/^Points shop refund/.test(note)) return loc('نقاط منتج أُلغي من متجر النقاط', 'Points of a cancelled points-shop product', 'خاڵی بەرهەمێکی هەڵوەشاوەی فرۆشگای خاڵ');
-    if (/^Points shop/.test(note)) return loc('كوبون من متجر النقاط', 'A coupon from the points shop', 'کۆپۆنێک لە فرۆشگای خاڵ');
-    if (/^Competition prize/.test(note)) return loc('جائزة مسابقة', 'Competition prize', 'خەڵاتی پێشبڕکێ');
-    if (/^Competition entry not accepted|^Competition cancelled/.test(note)) return loc('استرداد اشتراك مسابقة', 'Competition entry refunded', 'گەڕاندنەوەی بەشداریکردنی پێشبڕکێ');
-    if (/^Competition entry/.test(note)) return loc('الاشتراك في مسابقة', 'Competition entry', 'بەشداریکردن لە پێشبڕکێ');
-    return note;
-  };
-
-  /**
    * «X points on the way» (policy arts. 3.7 and 12.6): pending purchase points,
    * not spendable yet. The noun agrees with its count («نقطة واحدة»,
    * «نقطتان», «3 نقاط», «11 نقطة»; '1 point'), and one point has no «first».
@@ -418,29 +400,17 @@ function PointsPage() {
   };
 
   /**
-   * When a history line happened. A dated mission shows its Baghdad day, which
-   * is the period it was earned for; everything else shows the instant the
-   * server recorded. `day` is never rendered on its own, because for the
-   * one-time push mission it is the word 'once'.
+   * Says plainly that a task is counted in the customer's own browser, so the store cannot
+   * verify it (policy 5.8), instead of implying it can. The words are the owner's of
+   * 2026-11-10 (DECISIONS row 303); they replaced «غير مُتحقَّق منه» / 'Not verifiable'.
    */
-  const historyWhen = (h: HistoryRow): string => {
-    const dated = /^\d{4}-\d{2}-\d{2}$/.test(h.day);
-    if (dated) return h.day;
-    if (!h.awarded_at) return '';
-    const d = new Date(h.awarded_at);
-    return Number.isNaN(d.getTime())
-      ? ''
-      : d.toLocaleDateString(lang === 'en' ? 'en-GB' : lang === 'ckb' ? ['ckb-IQ', 'ar-IQ'] : 'ar-IQ', { year: 'numeric', month: 'short', day: 'numeric' });
-  };
-
-  /** Says plainly that the store cannot verify a task, instead of implying it can. */
   const UnverifiedTag = ({ proof }: { proof: string }) => (
     <span
       title={proof}
       className="lv-chip [--chip:var(--color-warning)] inline-flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5"
     >
       <ShieldAlert aria-hidden="true" className="w-3 h-3" />
-      {loc('غير مُتحقَّق منه', 'Not verifiable', 'پشتڕاست نەکراوەتەوە')}
+      {loc('يعتمد على متصفحك', 'Relies on your browser', 'پشت بە وێبگەڕەکەت دەبەستێت')}
     </span>
   );
 
@@ -460,7 +430,8 @@ function PointsPage() {
       ></div>
 
       {/* Header */}
-      <div className="flex items-center px-4 py-4 sticky top-0 z-10 relative">
+      {/* It stays, with the mascot that lives on it, and the page scrolls under it: the mascot never sits over a mission. */}
+      <div className="flex shrink-0 items-center px-4 py-2 sticky top-0 z-20 bg-canvas border-b border-border-subtle">
         {/* A ghost back arrow: no resting or pressed fill (the clay ratchet
             counts filled hand-drawn buttons), and no shared IconButton import,
             which would add to the storefront bundle. The arrow is ink — gold is
@@ -608,11 +579,7 @@ function PointsPage() {
               <div className="lv-surface-raised p-4">
                 <div>
                   <h2 className="text-[16px] font-bold mb-1">
-                    {loc(
-                      `سجّلت دخولك ${data?.streak ?? 0} ${(data?.streak ?? 0) === 1 ? 'يومًا' : 'أيام'} متتالية`,
-                      `You've checked in for ${data?.streak ?? 0} day${(data?.streak ?? 0) === 1 ? '' : 's'}`,
-                      `${data?.streak ?? 0} ڕۆژی یەک لە دوای یەک ئامادە بوویت`
-                    )}
+                    {streakText(data?.streak ?? 0, lang)}
                   </h2>
                   <p className="text-[11px] text-text-secondary mb-4">
                     {loc(
@@ -807,7 +774,7 @@ function PointsPage() {
                             ? adCardLine(videoCard, loc, (iso) => formatDayMonth(iso, lang))
                             : missions.video.available
                               ? loc(
-                                  `${missions.video.required_seconds} ثانية على الأقل — يحسبها الخادم`,
+                                  `${secondsText(missions.video.required_seconds, 'ar')} على الأقل — يحسبها الخادم`,
                                   `${missions.video.required_seconds}s minimum, timed by the server`,
                                   `لانیکەم ${missions.video.required_seconds} چرکە — ڕاژەکار دەیژمێرێت`
                                 )
@@ -909,7 +876,7 @@ function PointsPage() {
                       <div>
                         <h4 className="text-text-primary font-bold text-[14px]">
                           {/* A ledger movement has no mission; it carries its own wording. */}
-                          {missionLabel[h.mission] ?? (h.note ? ledgerLabel(h.note) : h.mission)}
+                          {missionLabel[h.mission] ?? (h.note ? ledgerLabel(h.note, lang) : h.mission)}
                           {h.streak_day ? ` · ${loc(`يوم ${h.streak_day}`, `day ${h.streak_day}`, `ڕۆژی ${h.streak_day}`)}` : ''}
                         </h4>
                         <span className="text-text-secondary font-medium text-[12px]">
@@ -918,7 +885,7 @@ function PointsPage() {
                               it is the literal string 'once', which is not a date
                               anyone can read. The server already sends the real
                               instant; a mission keeps its Baghdad day beside it. */}
-                          {historyWhen(h)}
+                          {historyDate(h, lang)}
                           {h.multiplier_x100 > 100 && h.base_points !== null
                             ? ` · ${h.base_points} × ${(h.multiplier_x100 / 100).toString()} ${h.tier_at_award.toUpperCase()}`
                             : ''}
@@ -926,7 +893,7 @@ function PointsPage() {
                       </div>
                     </div>
                     <div className={`font-bold text-[16px] shrink-0 tabular-nums ${spend ? 'text-text-primary' : 'text-gold'}`}>
-                      {spend ? '−' : '+'}{h.points} {loc('نقطة', 'pts', 'خاڵ')}
+                      {spend ? '−' : '+'}{formatFigure(h.points, lang)} {loc('نقطة', 'pts', 'خاڵ')}
                     </div>
                   </div>
                   );

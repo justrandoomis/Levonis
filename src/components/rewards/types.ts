@@ -119,6 +119,14 @@ export interface PrinterToRate {
   final_score?: number | null;
   /** The gift this printer's review became; absent from an older server. */
   gift?: PrinterGift | null;
+  /** The team refused the reward, or sent the review back; absent from an older server. */
+  reward_decision?: 'rejected' | 'revision' | null;
+  /** The team's written reason for that decision, in its own words; empty for a system refusal. */
+  reward_reason?: string;
+  /** Row 303 R1: the printer went back, or its order was cancelled, so the review's code opens no gift. Absent from an older server. */
+  code_void?: 'returned' | 'cancelled' | null;
+  /** Row 303 R4: what the review itself earned when the team refused its gift; 0 otherwise. Absent from an older server. */
+  review_points?: number;
 }
 
 /**
