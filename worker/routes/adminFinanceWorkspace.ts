@@ -58,26 +58,32 @@ function sumRows(rows:Row[]):Row {
  * the sale-time estimate, if any, is only a hint — the owner confirms a price.
  * `cost_qty` is what a line's goods cost covers: the pieces the customer kept
  * (a return put back in stock is not a cost of this sale). `stock_qty` counts
- * pieces that came from a stock batch: such a line is priced in its order.
+ * pieces that came from a stock batch, and `preorder` marks a pre-order line
+ * whose batch is not linked yet: both are priced in their order (a linked batch
+ * brings the actual cost), never from the list.
  */
-type MissingCostLine={order_id:string;version:number;delivered_at:string|null;customer_name:string|null;line_id:string;product_id:string|null;name:string;option:string|null;color:string|null;qty:number;restocked_qty:number;cost_qty:number;stock_qty:number;confidence:string;estimate_unit_iqd:number|null;cogs_iqd:number|null};
+type MissingCostLine={order_id:string;version:number;delivered_at:string|null;customer_name:string|null;line_id:string;product_id:string|null;name:string;option:string|null;color:string|null;qty:number;restocked_qty:number;cost_qty:number;stock_qty:number;preorder:boolean;confidence:string;estimate_unit_iqd:number|null;cogs_iqd:number|null};
 const keptQty=(l:ProfitLine)=>Math.max(0,n(l.qty)-n(l.restocked_qty));
+const isPreorder=(order:Row)=>s(order.shipping_type).startsWith('preorder_');
 function missingCostLines(bases:OrderProfitBase[]):MissingCostLine[]{
   return bases.flatMap((b)=>b.lines.filter((l)=>!isConfirmedOrderCost(l.cost_confidence)).map((l)=>({order_id:b.order_id,version:b.version,delivered_at:b.order.delivered_at==null?null:s(b.order.delivered_at),customer_name:b.order.customer_name==null?null:s(b.order.customer_name),
     line_id:l.id,product_id:l.product_id??null,name:s(l.name_snapshot),option:l.option_snapshot==null?null:s(l.option_snapshot),color:l.color_snapshot==null?null:s(l.color_snapshot),qty:n(l.qty),restocked_qty:n(l.restocked_qty),cost_qty:keptQty(l),
-    stock_qty:(l.allocations??[]).reduce((v,a)=>v+n(a.qty),0),confidence:s(l.cost_confidence),
+    stock_qty:(l.allocations??[]).reduce((v,a)=>v+n(a.qty),0),preorder:isPreorder(b.order),confidence:s(l.cost_confidence),
     estimate_unit_iqd:typeof l.estimated_cost_iqd==='number'?l.estimated_cost_iqd:null,cogs_iqd:l.cogs_iqd==null?null:n(l.cogs_iqd)})));
 }
 /**
- * The orders whose every amount is known, and their share of the period's sold
- * units — the basis the summary spreads promotion by (`allocation_basis`). General
- * expenses and an unallocated promotion belong to the whole period, so the complete
- * orders carry only that share of them, never all of it.
+ * The orders whose every amount is known, and their share of the period's revenue.
+ * General expenses and an unallocated promotion belong to the whole period, so the
+ * complete orders carry only that share of them, never all of it. By revenue, not
+ * by sold units: many cheap pieces (magnets) must not shift the overhead onto the
+ * few dear ones and make a period that is a loss look like a profit (review 2026-11-11).
  */
 function completeOrders(bases:OrderProfitBase[]){
   const complete=bases.filter((b)=>b.totals.owner_net_iqd!=null&&b.totals.profit_basis_iqd!=null);
-  const units=(rows:OrderProfitBase[])=>rows.reduce((v,b)=>v+n(b.totals.units),0),all=units(bases);
-  return {complete,share:all>0?units(complete)/all:bases.length?complete.length/bases.length:0};
+  const revenue=(rows:OrderProfitBase[])=>rows.reduce((v,b)=>v+Math.max(0,n(b.totals.retained_revenue_iqd)+n(b.totals.shipping_income_iqd)+n(b.totals.cod_tax_iqd)),0);
+  const units=(rows:OrderProfitBase[])=>rows.reduce((v,b)=>v+n(b.totals.units),0);
+  const allRevenue=revenue(bases),allUnits=units(bases);
+  return {complete,share:allRevenue>0?revenue(complete)/allRevenue:allUnits>0?units(complete)/allUnits:bases.length?complete.length/bases.length:0};
 }
 /** The period's figures over the orders whose every amount is known (none: null), and what the rest lack. */
 function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean){
@@ -436,7 +442,8 @@ adminFinanceWorkspaceRoutes.post('/orders/:id/adjustments',async(c)=>{
  * the order sheet, as the line's cost itself (planProfitAdjustment), never as a
  * change to its sale-time estimate.
  * Refused: a line with pieces from a stock batch (their batch cost is known; it is set
- * in the order itself) and a line whose pieces changed since the list was read.
+ * in the order itself), a pre-order line (its batch, once linked, brings the actual
+ * cost) and a line whose pieces changed since the list was read.
  * Left as it is: a line priced meanwhile (a batch linked, a cost set in its order).
  * The order's version is read here, so two products of one order can be priced from
  * the same list one after the other. Its own rate bucket (`limitInstead` above).
@@ -451,6 +458,8 @@ adminFinanceWorkspaceRoutes.post('/missing-costs/lines',async(c)=>{
     const line=current.lines.find((l)=>l.id===lineId);if(!line)throw notFound('Order line not found');
     if(isConfirmedOrderCost(line.cost_confidence))return 'skip';
     if((line.allocations??[]).length>0)throw conflict('بعض قطع هذا البند من دفعة مخزون؛ ثبّت تكلفته من الطلب نفسه','MISSING_COST_HAS_STOCK');
+    // A pre-order's batch brings its actual cost («اربط بالدفعة الواصلة»); a typed price would stay over it.
+    if(isPreorder(current.order))throw conflict('هذا البند من طلب مسبق؛ اربط دفعته الواصلة من الطلب نفسه لتُحسب تكلفته الفعلية','MISSING_COST_PREORDER');
     if(keptQty(line)!==costQty)throw conflict('تغيّرت قطع هذا البند منذ فُتحت القائمة؛ حدّثها وراجعها','MISSING_COST_LINE_CHANGED');
   }});
   const reconciliationPending=result.skipped?false:await reconcileWorkspace(db,id,actor.id,baghdadDay());

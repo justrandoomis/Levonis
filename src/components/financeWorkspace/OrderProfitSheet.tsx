@@ -22,7 +22,8 @@ export type OrderFocus = 'collection' | 'cost';
 
 /**
  * `onChanged`: the order may have changed (a save, or the background refresh found
- * news) — refresh the period. `onSaved`: the owner saved something here.
+ * news) — refresh the period. `onSaved`: the owner saved something here (a
+ * correction, or a collection or staff task recorded in the panel inside).
  * `focusLine`: with focus 'cost', the line to land on.
  */
 export default function OrderProfitSheet({ orderId, onClose, onChanged, onSaved, focus, focusLine }: {
@@ -266,7 +267,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, onSaved,
           <Button onClick={() => setAdvanced('payroll')}>{loc('إسناد مهمة للموظف', 'Assign staff task')}</Button></div>
         {advanced && <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}><FinanceOperationsPanel key={advanced}
           {...monthRange(financeDay(data.order.delivered_at || data.order.created_at).slice(0, 7))}
-          initialTab={advanced} initialOrderId={orderId} onChanged={() => { setRevision((v) => v + 1); onChanged(); }} /></Suspense>}
+          initialTab={advanced} initialOrderId={orderId} onChanged={() => { setRevision((v) => v + 1); onChanged(); onSaved?.(); }} /></Suspense>}
       </details>
       <details className="fw-advanced"><summary><Clock3 size={15} />{loc('سجل التعديلات', 'Change history')}{data.history?.length ? ` · ${data.history.length}` : ''}</summary>
         <div className="fw-history">{data.history?.length ? data.history.map((entry, i) => <div className="fw-history-row" key={entry.id || `${entry.version}:${i}`}>

@@ -112,7 +112,7 @@ export interface DisplayUsdOrders { available: boolean; today_rate?: string | nu
 /** `display_usd` of `GET /orders/:id?display=USD`. */
 export interface DisplayUsdOrder { available: boolean; today_rate?: string | null; usd_basis?: 'at_time' | 'today'; fx_rate_snapshot?: string; cents?: UsdCents; lines?: Record<string, UsdCents>; batch_cost_lines?: number }
 
-/** The period over the orders whose every amount is known (owner 2026-11-10), with their share of the period's general expenses by sold units. */
+/** The period over the orders whose every amount is known (owner 2026-11-10), with their share of the period's general expenses by revenue. */
 export type FinanceKnown = { orders_count: number; incomplete_orders: number; revenue_iqd: number | null; cost_iqd: number | null; owner_net_iqd: number | null; overhead_share_iqd?: number };
 /** What keeps the period from being complete: lines without a confirmed purchase price. */
 export type FinanceMissingCosts = { lines: number; orders: number; unknown_lines: number; estimated_lines: number; unknown_products: { product_id: string | null; name: string; qty: number; lines: number }[] };

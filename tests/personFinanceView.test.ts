@@ -125,6 +125,8 @@ test('held investment money says why in plain words, and the owner can release e
   assert.match(sheet, /focus === 'collection' \? 'collections' : null/);
   assert.match(sheet, /beginEdit\('cogs_iqd'/);
   assert.match(sheet, /data\.lines\.find\(\(l\) => l\.id === focusLine\)/);
+  // Cash or a staff task recorded in the panel inside the sheet counts as a save too: «سجّل استلام النقد» releases the held sale on close.
+  assert.match(sheet, /initialOrderId=\{orderId\} onChanged=\{\(\) => \{ setRevision\(\(v\) => v \+ 1\); onChanged\(\); onSaved\?\.\(\); \}\}/);
   assert.match(sheet, /onChanged\(\); onSaved\?\.\(\);/);
   const panel = codeOf('src/components/adminOperations/FinanceOperationsPanel.tsx');
   const prefill = panel.slice(panel.indexOf('const prefilled = useRef(false);'), panel.indexOf('const touch = () =>'));
@@ -142,13 +144,13 @@ test('held investment money says why in plain words, and the owner can release e
 
 test('the missing-costs sheet groups by product and size, no-price groups first, and writes only after the owner confirms (owner 2026-11-10)', async () => {
   const { groupMissing } = await import('../src/components/financeWorkspace/MissingCostsSheet');
-  const line = (order: string, product: string, option: string | null, qty: number, cogs: number | null, estimate: number | null, extra: { restocked_qty?: number; cost_qty?: number; stock_qty?: number } = {}) => ({ order_id: order, version: 1, delivered_at: '2026-11-05T10:00:00Z', customer_name: null, line_id: `${order}:${product}:${option}`, product_id: product, name: product, option, color: null, qty, confidence: cogs == null ? 'unknown' : 'estimated', estimate_unit_iqd: estimate, cogs_iqd: cogs, ...extra });
+  const line = (order: string, product: string, option: string | null, qty: number, cogs: number | null, estimate: number | null, extra: { restocked_qty?: number; cost_qty?: number; stock_qty?: number; preorder?: boolean } = {}) => ({ order_id: order, version: 1, delivered_at: '2026-11-05T10:00:00Z', customer_name: null, line_id: `${order}:${product}:${option}`, product_id: product, name: product, option, color: null, qty, confidence: cogs == null ? 'unknown' : 'estimated', estimate_unit_iqd: estimate, cogs_iqd: cogs, ...extra });
   const groups = groupMissing([line('a', 'esun', 'BLACK', 1, 15271, 15271), line('b', 'esun', 'BLACK', 2, 30542, 15271), line('a', 'magnet', 'D8', 30, null, null), line('c', 'magnet', 'D6', 30, null, null)]);
   assert.deepEqual(groups.map((g) => [g.name, g.variant, g.qty, g.orders]), [['magnet', 'D8', 30, 1], ['magnet', 'D6', 30, 1], ['esun', 'BLACK', 3, 2]]);
   assert.deepEqual(groups[2].estimates, [15271]);
-  // Pieces put back in stock are not sold; a line with stock-batch pieces is priced in its order, not here (review 2026-11-11).
-  const [returned] = groupMissing([line('r', 'magnet', 'D8', 3, null, null, { restocked_qty: 1, cost_qty: 2 }), line('s', 'magnet', 'D8', 4, null, null, { cost_qty: 4, stock_qty: 2 })]);
-  assert.deepEqual([returned.qty, returned.returned, returned.ready.map((l) => l.order_id), returned.stock.map((l) => l.order_id)], [6, 1, ['r'], ['s']]);
+  // Pieces put back in stock are not sold; a line with stock-batch pieces, or of a pre-order, is priced in its order, not here (review 2026-11-11).
+  const [returned] = groupMissing([line('r', 'magnet', 'D8', 3, null, null, { restocked_qty: 1, cost_qty: 2 }), line('s', 'magnet', 'D8', 4, null, null, { cost_qty: 4, stock_qty: 2 }), line('p', 'magnet', 'D8', 1, null, null, { cost_qty: 1, preorder: true })]);
+  assert.deepEqual([returned.qty, returned.returned, returned.ready.map((l) => l.order_id), returned.stock.map((l) => l.order_id), returned.preorder.map((l) => l.order_id)], [7, 1, ['r'], ['s'], ['p']]);
   const sheet = codeOf('src/components/financeWorkspace/MissingCostsSheet.tsx');
   // The only write is the server's per-line pricing, behind the confirm step; the server multiplies by the kept pieces.
   assert.match(sheet, /api\.post<[^>]*>\(`\$\{WORKSPACE_API\}\/missing-costs\/lines`/);

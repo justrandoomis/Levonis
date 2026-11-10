@@ -189,7 +189,7 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
   const cost = data.chart_data?.cost_iqd ?? (costFromKnown ? known!.cost_iqd : null);
   // In dollars, the complete orders' figures come from the server's cents too (none: a dash, never dinars among dollars).
   const uk = u ? u.known ?? null : undefined;
-  const knownNote = known ? `${loc('من الطلبات المكتملة فقط', 'From complete orders only')} (${known.orders_count}/${t.orders_count ?? data.orders.length})${(known.overhead_share_iqd ?? 0) > 0 ? loc('، مع حصتها من المصاريف العامة حسب القطع المباعة', ', with their share of general expenses by units sold') : ''}` : '';
+  const knownNote = known ? `${loc('من الطلبات المكتملة فقط', 'From complete orders only')} (${known.orders_count}/${t.orders_count ?? data.orders.length})${(known.overhead_share_iqd ?? 0) > 0 ? loc('، مع حصتها من المصاريف العامة بنسبة إيرادها', ', with their share of general expenses by revenue') : ''}` : '';
   const metrics = [
     { label: loc('صافي حصتك', 'Your net share'), value: net, cents: ut ? netFromKnown ? uk?.owner_net_cents ?? null : (t.owner_period_net_iqd !== undefined ? ut.owner_period_net_cents : ut.owner_net_cents) ?? null : undefined, note: `${loc('هامش حصتك', 'Your share margin')} ${margin}${netFromKnown ? ` · ${knownNote}` : ''}`, primary: true },
     { label: loc('الإيراد', 'Revenue'), value: revenue, cents: u?.chart ? u.chart.revenue_cents : undefined, note: loc('بعد المرتجعات، مع إيراد التوصيل والدفع', 'After refunds, including delivery and payment income') },

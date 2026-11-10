@@ -273,7 +273,7 @@ function missingSetup(){
     s.raw.prepare("INSERT INTO return_cases(id,order_id,order_item_id,user_id,qty,reason,state,resolution,decided_at) VALUES (?,?,?,'buyer',?,'defective','resolved','refund',?)").run(caseId,order,item,qty,new Date().toISOString());
     await recordReturnFinancials(s.env,{caseId,orderId:order,itemId:item,refundIqd:500*qty,qty,restocked:true,actor:'admin',day:baghdadDay()});
   };
-  type MissingLine={line_id:string;qty:number;restocked_qty:number;cost_qty:number;stock_qty:number;confidence:string;cogs_iqd:number|null;estimate_unit_iqd:number|null};
+  type MissingLine={line_id:string;qty:number;restocked_qty:number;cost_qty:number;stock_qty:number;preorder:boolean;confidence:string;cogs_iqd:number|null;estimate_unit_iqd:number|null};
   const list=async()=>(await json(await get(s.app,`/f/missing-costs?${period()}`))) as {lines:MissingLine[];stocked:string[]};
   const line=async(id:string)=>(await list()).lines.find((l)=>l.line_id===id)!;
   const price=(order:string,lineId:string,unit:number,costQty:number)=>post(s.app,'/f/missing-costs/lines',{operation_id:`missingcost:${lineId}:${unit}:${costQty}`,order_id:order,line_id:lineId,unit_iqd:unit,cost_qty:costQty});
@@ -340,6 +340,16 @@ test('two products of one order priced one after the other from the same list: n
   assert.equal(count(raw,"SELECT COUNT(*) n FROM finance_order_adjustments WHERE order_id='two'"),2,'written once each');
 });
 
+test('a pre-order line is not priced from the list: the batch linked in its order brings the actual cost (review 2026-11-11)',async()=>{
+  const {raw,db,sell,line,price}=missingSetup();
+  await sell('po',[{id:'po:line',product:'esun',qty:1,unit:20000,estimate:15271}]);
+  raw.exec("UPDATE orders SET shipping_type='preorder_air' WHERE id='po'");
+  const l=await line('po:line');assert.equal(l.preorder,true);
+  const refused=await price('po','po:line',14000,1);
+  assert.equal(refused.status,409);assert.equal((await json(refused)).code,'MISSING_COST_PREORDER');
+  assert.deepEqual([(await getOrderProfitBase(db,'po')).lines[0].cost_confidence,count(raw,"SELECT COUNT(*) n FROM finance_order_adjustments WHERE order_id='po'")],['estimated',0]);
+});
+
 test('a line priced in its order meanwhile is left as it is by the list (review 2026-11-11)',async()=>{
   const {db,app,sell,line,price}=missingSetup();
   await sell('done',[{id:'done:line',product:'magnet',qty:4,unit:500}]);
@@ -350,15 +360,19 @@ test('a line priced in its order meanwhile is left as it is by the list (review 
   assert.equal((await getOrderProfitBase(db,'done')).lines[0].cogs_iqd,1000);
 });
 
-test('the complete orders carry only their share of the period\'s general expenses, by sold units; with no complete order there is nothing to show (review 2026-11-11)',async()=>{
+test('the complete orders carry only their revenue\'s share of the period\'s general expenses — never all of it, and not a units share that many cheap pieces would shrink; with no complete order there is nothing to show (review 2026-11-11)',async()=>{
   const {raw,app,sell}=missingSetup();
-  await sell('miss',[{id:'miss:a',product:'magnet',qty:2,unit:2000}]);
-  // setup()'s own order: 2 units with a FIFO cost. The period: 4 units, 2 of them complete.
+  // 60 cheap magnets without a price beside setup()'s 2 printers with a FIFO cost: by units the printers would carry 2/62 of the rent.
+  await sell('miss',[{id:'miss:a',product:'magnet',qty:60,unit:500}]);
   raw.prepare(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent1','rent',30000,?,'Rent','admin')`).run(baghdadDay());
-  const summary=await json(await get(app,`/f/summary?${period()}`)),order=summary.orders.find((o:{id:string})=>o.id==='order');
+  const summary=await json(await get(app,`/f/summary?${period()}`));
+  type Row={id:string;owner_net_iqd:number;retained_revenue_iqd:number;shipping_income_iqd:number;cod_tax_iqd:number};
+  const of=(id:string)=>summary.orders.find((o:Row)=>o.id===id) as Row,revenue=(o:Row)=>o.retained_revenue_iqd+o.shipping_income_iqd+o.cod_tax_iqd;
+  const share=Math.round(30000*revenue(of('order'))/(revenue(of('order'))+revenue(of('miss'))));
   assert.equal(summary.known.orders_count,1);assert.equal(summary.known.incomplete_orders,1);
-  assert.equal(summary.known.overhead_share_iqd,15000,'half the units, half the rent');
-  assert.equal(summary.known.owner_net_iqd,order.owner_net_iqd-15000,'not the whole 30,000 against one order');
+  assert.equal(summary.known.overhead_share_iqd,share);
+  assert.ok(share>Math.round(30000*2/62)*10,`the printers' revenue share (${share}), far above a units share`);
+  assert.equal(summary.known.owner_net_iqd,of('order').owner_net_iqd-share,'not the whole 30,000 against one order');
   raw.exec("UPDATE order_item_inventory_allocations SET cogs_iqd=NULL,unit_cost_iqd=NULL WHERE order_id='order'");
   const none=await json(await get(app,`/f/summary?${period()}`));
   assert.equal(none.known,null,'no complete order: the tiles keep their dash, never a zero');

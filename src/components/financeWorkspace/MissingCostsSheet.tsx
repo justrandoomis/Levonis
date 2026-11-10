@@ -18,12 +18,14 @@ import { financeDay, WORKSPACE_API } from './types';
  */
 type Line = { order_id: string; version: number; delivered_at: string | null; customer_name: string | null; line_id: string; product_id: string | null; name: string; option: string | null; color: string | null; qty: number;
   /** Absent from a server that predates them. */
-  restocked_qty?: number; cost_qty?: number; stock_qty?: number;
+  restocked_qty?: number; cost_qty?: number; stock_qty?: number; preorder?: boolean;
   confidence: string; estimate_unit_iqd: number | null; cogs_iqd: number | null };
 type Answer = { lines: Line[]; stocked: string[]; truncated: boolean };
-type Group = { key: string; product_id: string | null; name: string; variant: string; lines: Line[]; ready: Line[]; stock: Line[]; qty: number; returned: number; orders: number; estimates: number[] };
+/** `ready`: priced from here. `stock` (pieces from a stock batch) and `preorder` (a batch to link): priced in their order. */
+type Group = { key: string; product_id: string | null; name: string; variant: string; lines: Line[]; ready: Line[]; stock: Line[]; preorder: Line[]; qty: number; returned: number; orders: number; estimates: number[] };
 type OpenOrder = (id: string, focus?: 'cost', lineId?: string) => void;
-type Applied = { pending: string[] };
+/** After one group: the orders still waiting, and those of the group that are now complete. */
+type Applied = { pending: string[]; cleared: string[] };
 
 const INVENTORY_PURCHASES = '/admin?tab=inventory&itab=procurement';
 /** The pieces a line's goods cost covers: the ones the customer kept. */
@@ -36,8 +38,8 @@ export function groupMissing(lines: Line[]): Group[] {
   for (const l of lines) {
     const variant = [l.option, l.color].filter(Boolean).join(' · ');
     const key = `${l.product_id ?? l.name}|${variant}`;
-    const g = groups.get(key) ?? { key, product_id: l.product_id, name: l.name, variant, lines: [], ready: [], stock: [], qty: 0, returned: 0, orders: 0, estimates: [] };
-    g.lines.push(l); (l.stock_qty ? g.stock : g.ready).push(l);
+    const g = groups.get(key) ?? { key, product_id: l.product_id, name: l.name, variant, lines: [], ready: [], stock: [], preorder: [], qty: 0, returned: 0, orders: 0, estimates: [] };
+    g.lines.push(l); (l.stock_qty ? g.stock : l.preorder ? g.preorder : g.ready).push(l);
     g.qty += costQty(l); g.returned += l.restocked_qty ?? 0;
     if (l.estimate_unit_iqd != null && !g.estimates.includes(l.estimate_unit_iqd)) g.estimates.push(l.estimate_unit_iqd);
     groups.set(key, g);
@@ -65,13 +67,15 @@ export default function MissingCostsSheet({ from, to, onClose, onChanged, openOr
   }, [from, to, revision]);
   const groups = useMemo(() => groupMissing(data?.lines ?? []), [data]);
   const finished = useCallback((applied: Applied) => {
-    setRunning(null); setStale(true); setPending(applied.pending);
+    // Orders still waiting from earlier groups stay named until a later group completes them.
+    setRunning(null); setStale(true);
+    setPending((before) => [...new Set([...before.filter((id) => !applied.cleared.includes(id)), ...applied.pending])]);
     setRevision((v) => v + 1); onChanged();
   }, [onChanged]);
   return <Sheet title={loc('التكاليف الناقصة', 'Missing costs', 'تێچووە کەمەکان')} subtitle={loc('كل بند مُسلَّم لم تُثبَّت تكلفة بضاعته في هذه الفترة', 'Every delivered line in this period without a confirmed goods cost', 'هەموو بڕگەیەکی گەیەندراو لەم ماوەیەدا کە تێچووی کاڵاکەی جێگیر نەکراوە')} onClose={onClose}>
     {error && <div className="fw-error" role="alert">{error}<Button variant="ghost" onClick={() => setRevision((v) => v + 1)}>{loc('تحديث', 'Refresh', 'نوێکردنەوە')}</Button></div>}
     {!data && !error && <Loading text={loc('تحميل البنود الناقصة…', 'Loading missing lines…', 'بارکردنی بڕگە کەمەکان…')} />}
-    {pending.length > 0 && <p className="fw-note" role="status">{loc('حُفظ السعر. لم يكتمل حساب هذه الطلبات بعد — في بعضها منتج آخر ما زالت تكلفته ناقصة:', 'Price saved. These orders are not complete yet — some still have another product without a confirmed cost:', 'نرخەکە پاشەکەوت کرا. حیسابی ئەم داواکاریانە هێشتا تەواو نەبووە — لە هەندێکیاندا بەرهەمێکی تر هێشتا تێچووەکەی کەمە:')}{' '}
+    {pending.length > 0 && <p className="fw-note" role="status">{loc('حُفظ السعر، لكن حساب هذه الطلبات لم يكتمل بعد؛ افتح كل طلب لترى ما ينتظره (منتج آخر بلا تكلفة مثبتة، أو تسوية لم تكتمل):', 'Price saved, but these orders are not complete yet; open each to see what it is waiting for (another product without a confirmed cost, or a settlement not finished):', 'نرخەکە پاشەکەوت کرا، بەڵام حیسابی ئەم داواکاریانە هێشتا تەواو نەبووە؛ هەر داواکارییەک بکەرەوە بۆ ئەوەی ببینیت چاوەڕێی چییە (بەرهەمێکی تر بێ تێچووی جێگیر، یان ڕێکخستنێکی تەواونەبوو):')}{' '}
       {pending.map((id, i) => <span key={id}>{i > 0 && ' · '}<button type="button" className="fw-link" dir="ltr" onClick={() => openOrder(id, 'cost')}>{id}</button></span>)}</p>}
     {data && !groups.length && <p className="fw-success" role="status"><Check size={16} />{loc('كل تكاليف البضاعة في هذه الفترة مثبتة.', 'Every goods cost in this period is confirmed.', 'هەموو تێچووی کاڵاکانی ئەم ماوەیە جێگیرکراون.')}</p>}
     {data && groups.length > 0 && <p className="fw-note">{loc('اكتب سعر شراء القطعة الواحدة مرة واحدة لكل منتج؛ بعد تأكيدك يُثبَّت على بنوده هنا لكل قطعة احتفظ بها الزبون (المُرجَع إلى المخزون لا يُحسب) ويُعاد حساب كل طلب: الربح وحصة المستثمر والأجور. التقدير المعروض تلميح فقط، والسعر المثبت يبقى حتى تغيّره من الطلب.', 'Type the purchase price of one piece once per product; after you confirm, it is set on its lines here for every piece the customer kept (a return put back in stock does not count) and every order is recalculated: profit, investor share, wages. The estimate shown is only a hint; the confirmed price stays until you change it in the order.', 'نرخی کڕینی یەک پارچە یەک جار بۆ هەر بەرهەمێک بنووسە؛ دوای پشتڕاستکردنەوەت لەسەر بڕگەکانی لێرە بۆ هەر پارچەیەک کە کڕیار هێشتوویەتەوە جێگیر دەکرێت (ئەوەی گەڕێندراوەتەوە کۆگا حیساب ناکرێت) و هەموو داواکارییەک دووبارە حیساب دەکرێتەوە: قازانج، بەشی وەبەرهێنەر، کرێ. خەمڵاندنەکە تەنها ئاماژەیە، و نرخی جێگیرکراو دەمێنێتەوە تا لە داواکارییەکەدا دەیگۆڕیت.')}</p>}
@@ -103,25 +107,28 @@ function MissingGroup({ g, stockNote, locked, onStart, onDone, openOrder }: { g:
     const code = e instanceof ApiError ? e.code : undefined;
     if (code === 'MISSING_COST_LINE_CHANGED') return loc('تغيّرت قطع أحد البنود منذ فُتحت القائمة (مرتجع جديد مثلًا). حُدِّثت القائمة: راجعها ثم أكّد من جديد.', 'A line\'s pieces changed since the list was opened (a new return, say). The list has been refreshed: review it and confirm again.', 'پارچەکانی بڕگەیەک گۆڕان لەو کاتەوەی لیستەکە کرایەوە (بۆ نموونە گەڕاندنەوەیەکی نوێ). لیستەکە نوێ کرایەوە: پێداچوونەوەی بۆ بکە و دووبارە پشتڕاستی بکەرەوە.');
     if (code === 'MISSING_COST_HAS_STOCK') return loc('في أحد البنود قطع من دفعة مخزون؛ ثبّت تكلفته من الطلب نفسه.', 'One line has pieces from a stock batch; set its cost in the order itself.', 'بڕگەیەک پارچەی لە بارێکی کۆگا تێدایە؛ تێچووەکەی لە خودی داواکارییەکەدا جێگیر بکە.');
+    if (code === 'MISSING_COST_PREORDER') return loc('أحد البنود من طلب مسبق؛ اربط دفعته الواصلة من الطلب نفسه لتُحسب تكلفته الفعلية.', 'One line is from a pre-order; link its arrived batch in the order itself to get its actual cost.', 'بڕگەیەک لە داواکارییەکی پێشوەختەیە؛ بارە گەیشتووەکەی لە خودی داواکارییەکەدا ببەستەرەوە بۆ ئەوەی تێچووی ڕاستەقینەی حیساب بکرێت.');
     if (code === 'RATE_LIMITED') return loc('طلبات كثيرة خلال ساعة؛ أكمل لاحقًا — ما حُفظ يبقى محفوظًا.', 'Too many requests this hour; finish later — what was saved stays saved.', 'داواکاری زۆر لەم کاتژمێرەدا؛ دواتر تەواوی بکە — ئەوەی پاشەکەوت کراوە دەمێنێتەوە.');
     return e instanceof Error ? e.message : String(e);
   };
   const apply = async () => {
     setBusy(true); setError(''); setDone(0); onStart();
-    const pending = new Set<string>();
+    // An order is named as waiting if any of its lines answered so; it is complete only if none did.
+    const pending = new Set<string>(), answered = new Set<string>();
     try {
       // One line per request: the server prices the pieces the customer kept and reads
       // each order's version itself, so lines of one order follow each other safely.
       for (const l of g.ready) {
-        const result = await api.post<{ reconciliation_pending?: boolean }>(`${WORKSPACE_API}/missing-costs/lines`, {
+        const result = await api.post<{ reconciliation_pending?: boolean; skipped?: boolean }>(`${WORKSPACE_API}/missing-costs/lines`, {
           operation_id: `missingcost:${l.line_id}:${unit}:${costQty(l)}`, order_id: l.order_id, line_id: l.line_id, unit_iqd: unit, cost_qty: costQty(l),
         });
+        if (!result.skipped) answered.add(l.order_id);
         if (result.reconciliation_pending) pending.add(l.order_id);
         setDone((v) => v + 1);
       }
       setConfirming(false);
     } catch (e) { setError(refusal(e)); }
-    finally { setBusy(false); onDone({ pending: [...pending] }); }
+    finally { setBusy(false); onDone({ pending: [...pending], cleared: [...answered].filter((id) => !pending.has(id)) }); }
   };
   const count = (label: string, n: number) => <>{label}: {n}</>;
   return <section className="fw-missing-group">
@@ -135,6 +142,7 @@ function MissingGroup({ g, stockNote, locked, onStart, onDone, openOrder }: { g:
     {stockNote && <p className="fw-note"><PackagePlus size={14} aria-hidden="true" /> {loc('لا توجد دفعة مخزون مسعّرة لهذا المنتج، فلا تُحسب تكلفة مبيعاته القادمة أيضًا. سجّل شراءه في المخزون.', 'This product has no priced stock batch, so its next sales cannot cost themselves either. Record its purchase in Inventory.', 'ئەم بەرهەمە هیچ بارێکی کۆگای نرخدار نییە، بۆیە تێچووی فرۆشتنەکانی داهاتووشی حیساب ناکرێت. کڕینەکەی لە کۆگا تۆمار بکە.')}{' '}
       <a className="fw-link" href={INVENTORY_PURCHASES}>{loc('سجّل الشراء في المخزون', 'Record the purchase in Inventory', 'کڕینەکە لە کۆگا تۆمار بکە')}</a></p>}
     {g.stock.length > 0 && <p className="fw-note">{loc('بنود فيها قطع من دفعة مخزون تُثبَّت من طلبها، لأن تكلفة تلك القطع معروفة', 'Lines with pieces from a stock batch are set in their order, because those pieces\' cost is known', 'ئەو بڕگانەی پارچەیان لە بارێکی کۆگا تێدایە لە داواکارییەکەیانەوە جێگیر دەکرێن، چونکە تێچووی ئەو پارچانە زانراوە')}: {g.stock.length}</p>}
+    {g.preorder.length > 0 && <p className="fw-note">{loc('بنود من طلبات مسبقة: اربط دفعتها الواصلة من الطلب، فتأتي تكلفتها الفعلية', 'Pre-order lines: link their arrived batch in the order, which brings their actual cost', 'بڕگەی داواکاریی پێشوەختە: بارە گەیشتووەکەیان لە داواکارییەکەدا ببەستەرەوە، تێچووی ڕاستەقینەیان دێنێت')}: {g.preorder.length}</p>}
     {g.ready.length > 0 && <div className="fw-missing-price">
       <label className="fw-field"><span>{loc('سعر شراء القطعة الواحدة (د.ع)', 'Purchase price of one piece (IQD)', 'نرخی کڕینی یەک پارچە (د.ع)')}</span>
         <input className="fw-input" type="number" inputMode="numeric" min="0" step="1" value={price} disabled={busy || locked} placeholder={g.estimates[0] != null ? String(g.estimates[0]) : ''}
@@ -151,7 +159,7 @@ function MissingGroup({ g, stockNote, locked, onStart, onDone, openOrder }: { g:
     <details className="fw-advanced"><summary>{loc('البنود', 'Lines', 'بڕگەکان')} ({g.lines.length})</summary>
       {g.lines.map((l) => <div className="fw-row" key={l.line_id}>
         <button type="button" className="fw-link" dir="ltr" onClick={() => openOrder(l.order_id, 'cost', l.line_id)}>{l.order_id}</button>
-        <span className="fw-muted">{l.delivered_at ? financeDay(l.delivered_at) : ''} · {count(loc('القطع', 'Pieces', 'پارچەکان'), costQty(l))}{l.restocked_qty ? <> ({count(loc('أُرجع', 'returned', 'گەڕێندرایەوە'), l.restocked_qty)})</> : null}{l.customer_name ? <> · {isolate(l.customer_name)}</> : null}{l.stock_qty ? <> · {loc('من دفعة مخزون: ثبّته من الطلب', 'From a stock batch: set it in the order', 'لە بارێکی کۆگاوە: لە داواکارییەکەدا جێگیری بکە')}</> : null}</span>
+        <span className="fw-muted">{l.delivered_at ? financeDay(l.delivered_at) : ''} · {count(loc('القطع', 'Pieces', 'پارچەکان'), costQty(l))}{l.restocked_qty ? <> ({count(loc('أُرجع', 'returned', 'گەڕێندرایەوە'), l.restocked_qty)})</> : null}{l.customer_name ? <> · {isolate(l.customer_name)}</> : null}{l.stock_qty ? <> · {loc('من دفعة مخزون: ثبّته من الطلب', 'From a stock batch: set it in the order', 'لە بارێکی کۆگاوە: لە داواکارییەکەدا جێگیری بکە')}</> : l.preorder ? <> · {loc('طلب مسبق: اربط دفعته من الطلب', 'Pre-order: link its batch in the order', 'پێشوەختە: بارەکەی لە داواکارییەکەدا ببەستەرەوە')}</> : null}</span>
         <span>{l.cogs_iqd == null ? loc('بلا سعر', 'No price', 'بێ نرخ') : <Money value={l.cogs_iqd} />}</span>
       </div>)}
       <p className="fw-muted">{lang === 'en' ? 'Open an order to set a different cost for that line only.' : lang === 'ckb' ? 'داواکارییەک بکەرەوە بۆ دانانی تێچوویەکی جیاواز تەنها بۆ ئەو بڕگەیە.' : 'افتح الطلب لتضع تكلفة مختلفة لذلك البند وحده.'}</p>
