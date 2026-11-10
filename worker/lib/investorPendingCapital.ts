@@ -15,7 +15,8 @@ export async function planPendingInvestorCapital(db:D1Database,orderId:string,al
   for(const a of allocations) {
     const old=await db.prepare('SELECT * FROM investor_allocation_results WHERE allocation_id=? AND contract_id=?')
       .bind(a.allocation_id,a.contract_id).first<{profit_iqd:number;capital_iqd:number;loss_iqd:number;version:number;snapshot:string}>();
-    const previous=old?JSON.parse(old.snapshot):{};
+    // A re-delivery projects the sale again: a taken-back zero's flag (DECISIONS row 308) does not carry over.
+    const {lost_delivery:_takenBack,...previous}=old?JSON.parse(old.snapshot):{};
     if(old&&old.capital_iqd===a.capital_iqd&&previous.qty===a.qty)continue;
     const proof=JSON.parse(a.snapshot),version=(old?.version??0)+1;
     const snapshot=JSON.stringify({...previous,qty:a.qty,principal_iqd:a.capital_iqd,source_fingerprint:proof.source_fingerprint,

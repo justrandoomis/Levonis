@@ -42,6 +42,13 @@ export async function reconcileFinanceOrder(db:D1Database,orderId:string,opts:{a
       return {complete:false,staff_complete:true,pending:true};
     }
     await db.prepare('DELETE FROM finance_posting_errors WHERE event_key IN (?,?)').bind(`investor:${orderId}`,`investor-pending:${orderId}`).run();
+    // An order that lost its delivery (DECISIONS rows 307-308) has no delivery
+    // posting or sale cost left to wait for: its wages and investor shares are
+    // settled above. Left behind, those markers would hold its employees' rows
+    // and a loss-sharing agreement's whole capital for ever. A re-delivery
+    // records them again if they still hold.
+    if(basis.order.status!=='delivered'&&basis.order.delivered_at)
+      await db.prepare('DELETE FROM finance_posting_errors WHERE event_key IN (?,?)').bind(`delivered:${orderId}`,`cogs:${orderId}`).run();
     return workspacePending?{complete:false,staff_complete:true,pending:true}:{complete:true,staff_complete:true,pending:false};
   }catch(e){
     await recordFinancialFailure(db,orderId,'investor',e);

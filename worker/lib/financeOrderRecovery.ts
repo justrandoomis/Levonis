@@ -62,7 +62,9 @@ const deliveredCandidateSql = (settled: boolean) => `o.seller_type='levonis' AND
 // waits, unselected, until that withdrawal is paid or released — instead of
 // being picked every minute for a wage that cannot move.
 // It is also a candidate while the investor projections its delivery wrote are
-// not yet the settled zero that takes the sale back (DECISIONS row 308).
+// not yet the settled zero that takes the sale back (DECISIONS row 308), and
+// while it still carries a delivery, cost or reconciliation marker: a done
+// reconciliation clears them, a failed one keeps it a durable retry.
 const lostDeliverySql = (settled: boolean) => `o.seller_type='levonis' AND o.status<>'delivered' AND o.delivered_at IS NOT NULL AND ((
   EXISTS(SELECT 1 FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id
     WHERE c.order_id=o.id AND c.state<>'reversed' AND NOT ${settledCostSql('c.id', settled)}
@@ -73,7 +75,9 @@ const lostDeliverySql = (settled: boolean) => `o.seller_type='levonis' AND o.sta
   AND NOT EXISTS(SELECT 1 FROM finance_order_costs hc JOIN finance_withdrawal_allocations wa ON wa.source_kind='staff' AND wa.source_id=hc.id
     JOIN finance_withdrawals w ON w.id=wa.withdrawal_id
     WHERE hc.order_id=o.id AND w.state IN ('requested','approved','part_paid') AND wa.amount_iqd>wa.paid_iqd AND NOT ${settledCostSql('hc.id', settled)}))
-  OR ${investorLostDeliveryPendingSql('o.id')})`;
+  OR ${investorLostDeliveryPendingSql('o.id')}
+  OR EXISTS(SELECT 1 FROM finance_posting_errors le WHERE le.order_id=o.id AND le.event_key IN (
+    'delivered:'||o.id,'cogs:'||o.id,'investor:'||o.id,'investor-pending:'||o.id,'workspace-reconciliation:'||o.id,'automatic-finance:'||o.id)))`;
 const candidateSql = (settled: boolean) => `((${deliveredCandidateSql(settled)}) OR (${lostDeliverySql(settled)}))`;
 
 function checkpoint(value: string): Checkpoint {

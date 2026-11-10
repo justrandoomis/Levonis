@@ -202,15 +202,23 @@ test('overlapping drains have one lease winner and expired owners cannot release
   assert.equal(row(x.raw, 'SELECT value FROM admin_settings WHERE key=?', CHECKPOINT)?.value, replacement);
 });
 
-test('recovery is inert before the wage schema exists and never selects non-delivered orders', async () => {
+test('recovery is inert before the wage schema exists and never selects an order that was never delivered', async () => {
   const old = dbThrough('0166');
   const report = await drainOrderFinanceRecovery({ DB: asD1(old) } as Env);
   assert.equal(report.schema_ready, false);
   assert.equal(count(old, 'SELECT COUNT(*) n FROM admin_settings WHERE key=?', CHECKPOINT), 0);
   const x = await setup(); x.order('shipped', 'snapshot', 'shipped');
+  x.raw.exec("UPDATE orders SET delivered_at=NULL WHERE id='shipped'");
   await recordFinancialFailure(x.db, 'shipped', 'delivered', new Error('An old marker is not delivery evidence'));
   assert.equal((await drainOrderFinanceRecovery(x.env)).scanned, 0);
   assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM accounting_entries'), 0);
+  // Delivered once and walked back (DECISIONS rows 307-308): its stale delivery
+  // marker is cleared, and with nothing to settle no money moves.
+  x.order('walked-back', 'snapshot', 'shipped');
+  await recordFinancialFailure(x.db, 'walked-back', 'delivered', new Error('A delivery posting that no longer applies'));
+  assert.deepEqual([(await drainOrderFinanceRecovery(x.env)).completed, count(x.raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE order_id='walked-back'")], [1, 0]);
+  assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM accounting_entries'), 0);
+  assert.equal((await drainOrderFinanceRecovery(x.env)).scanned, 0);
 });
 
 test('a closed current posting period blocks all recovery writes until that period is reopened', async () => {

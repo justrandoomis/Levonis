@@ -49,10 +49,16 @@ const legacyFingerprintSql = `json_array(
  (SELECT json_group_array(json_array(e.return_case_id,e.allocation_id,e.qty,r.state)) FROM stock_return_lot_evidence e JOIN return_cases r ON r.id=e.return_case_id WHERE r.order_id=?1))`;
 const fingerprintSql = participantNetFingerprintSql(legacyFingerprintSql,'?1');
 async function fingerprint(db: D1Database, orderId: string) { return (await db.prepare(`SELECT ${fingerprintSql} AS value`).bind(orderId).first<{ value: string }>())!.value; }
+/** A sale taken back after losing its delivery (DECISIONS row 308): its zero is
+ * settled for as long as the order stays undelivered, whatever else changes. */
+const takenBackSql = (resultAlias: string, orderSql: string) => `(json_extract(${resultAlias}.snapshot,'$.lost_delivery') IS 1 AND ${resultAlias}.pending=0
+  AND ${resultAlias}.profit_iqd=0 AND ${resultAlias}.capital_iqd=0 AND ${resultAlias}.loss_iqd=0 AND ${resultAlias}.eligible=0
+  AND (SELECT tb.status FROM orders tb WHERE tb.id=${orderSql})<>'delivered')`;
 /** Trusted SQL expressions only. Used inside payout's own transaction fence. */
 export function investorProjectionStaleSql(contractExpr='e.contract_id'){
   return `EXISTS(SELECT 1 FROM investor_allocation_results ip JOIN order_item_inventory_allocations ia ON ia.id=ip.allocation_id
-    WHERE ip.contract_id=${contractExpr} AND (ip.pending=1 OR json_extract(ip.snapshot,'$.source_fingerprint') IS NOT (${fingerprintSql.replace(/\?1/g,'ia.order_id')})))`;
+    WHERE ip.contract_id=${contractExpr} AND NOT ${takenBackSql('ip', 'ia.order_id')}
+      AND (ip.pending=1 OR json_extract(ip.snapshot,'$.source_fingerprint') IS NOT (${fingerprintSql.replace(/\?1/g,'ia.order_id')})))`;
 }
 /** Order-scoped recovery must not replay other orders sharing a contract. */
 export function investorOrderProjectionStaleSql(orderExpr:string){
@@ -227,8 +233,10 @@ export function investorWholeHoldSql(kindSql = 'e.kind', contractSql = 'e.contra
  * capital (the unit is back in stock, or still on the undelivered order) and no
  * loss share, through the same correction events and journals as any other
  * correction. A payout already made stays paid: the investor's next profit
- * covers it. A re-delivery projects the sale again. The snapshot keeps the
- * order's current fingerprint, so the zero is a settled answer, not a stale one.
+ * covers it. A re-delivery projects the sale again. The zero depends on nothing
+ * but the lost delivery, so its snapshot carries no source fingerprint: it stays
+ * settled (never stale) while the order stays undelivered, and a recheck writes
+ * nothing. The batch is still fenced on the order's fingerprint.
  */
 async function lostDeliverySplit(db: D1Database, orderId: string) {
   const rows = (await db.prepare(`SELECT r.allocation_id,r.contract_id,r.snapshot,a.lot_id FROM investor_allocation_results r
@@ -241,7 +249,7 @@ async function lostDeliverySplit(db: D1Database, orderId: string) {
   return { pending: false, capital_allocations: [] as VerifiedCapitalAllocation[], source_fingerprint: sourceFingerprint, allocations: rows.map((r) => {
     const old = JSON.parse(r.snapshot) as Record<string, unknown>;
     return { allocation_id: r.allocation_id, contract_id: r.contract_id, lot_id: r.lot_id, profit_iqd: 0, capital_iqd: 0, raw_loss_iqd: 0, loss_iqd: 0, eligible: false,
-      snapshot: JSON.stringify({ version, profit_basis: old.profit_basis ?? null, source_fingerprint: sourceFingerprint, contract_version: old.contract_version ?? null,
+      snapshot: JSON.stringify({ version, profit_basis: old.profit_basis ?? null, contract_version: old.contract_version ?? null,
         qty: 0, principal_iqd: 0, revenue: 0, cost: 0, expenses: 0, profit: 0, collected: false, delivered: false, lost_delivery: true }) };
   }) };
 }
@@ -249,8 +257,7 @@ async function lostDeliverySplit(db: D1Database, orderId: string) {
  * are not yet the settled zero (the recovery scan's candidate). */
 export function investorLostDeliveryPendingSql(orderExpr: string) {
   return `EXISTS(SELECT 1 FROM investor_allocation_results lr JOIN order_item_inventory_allocations la ON la.id=lr.allocation_id
-    WHERE la.order_id=${orderExpr} AND (lr.profit_iqd<>0 OR lr.capital_iqd<>0 OR lr.loss_iqd<>0 OR lr.eligible<>0 OR lr.pending<>0
-      OR json_extract(lr.snapshot,'$.source_fingerprint') IS NOT (${fingerprintSql.replace(/\?1/g, 'la.order_id')})))`;
+    WHERE la.order_id=${orderExpr} AND NOT ${takenBackSql('lr', 'la.order_id')})`;
 }
 
 /** Delivery/refund/correction/collection hook. Source events and journal commit together. */

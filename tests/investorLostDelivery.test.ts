@@ -22,7 +22,10 @@ import { all, asD1, count, freshDb, json, post, row, stubApp } from './fixtures/
 import { adminInvestmentFinanceRoutes } from '../worker/routes/adminInvestmentFinance';
 import { drainOrderFinanceRecovery } from '../worker/lib/financeOrderRecovery';
 import { investorOrderSplit, syncInvestorOrder } from '../worker/lib/investorFinance';
-import { participantOverview } from '../worker/lib/financeParticipants';
+import { participantOverview, participantSources } from '../worker/lib/financeParticipants';
+import { continueStaffReconciliation } from '../worker/lib/financeStaffAccrual';
+import { runOrderFinancialEffects } from '../worker/lib/orderFinance';
+import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOperations';
 import { personFinance } from '../worker/lib/personFinance';
 import { runOrderDeliveredEffects } from '../worker/lib/orderDeliveredEffects';
 import { baghdadDay, journalPlan } from '../worker/lib/operations';
@@ -191,4 +194,107 @@ test('a cancelled order the investor never had a projection for is not a candida
     VALUES ('ORD-NEVER-PROJECTED','buyer','cancelled','{}','standard','{}','cash',500,1500,500,500,0,'2026-10-16T10:00:00.000Z','2026-10-16T10:00:00.000Z')`).run();
   assert.equal((await drainOrderFinanceRecovery(s.env)).scanned, 0);
   assert.equal(count(s.raw, 'SELECT COUNT(*) n FROM investor_finance_events WHERE order_id=?', 'ORD-NEVER-PROJECTED'), 0);
+});
+
+test('review: a stale delivery or cost marker on the cancelled sale no longer holds a loss-sharing agreement whole', async () => {
+  const s = setup();
+  const c = await s.contract(10000);
+  await s.sale('ORD-K1'); await s.sale('ORD-K2');
+  assert.equal((await drainOrderFinanceRecovery(s.env)).failed, 0);
+  const capital = async () => (await participantSources(s.db, 'investor')).filter((x) => x.id === `invcapital:${c}`).map((x) => [x.amount_iqd, x.eligible, x.available_iqd]);
+  assert.deepEqual(await capital(), [[200, true, 200]]);
+  // ORD-K1's delivery left markers behind (a delivery posting to retry, a cost to fix), then it was cancelled.
+  s.raw.exec(`INSERT INTO finance_posting_errors(event_key,order_id,message,last_attempt_at) VALUES
+    ('delivered:ORD-K1','ORD-K1','posting pending','2026-10-16T10:00:00.000Z'),('cogs:ORD-K1','ORD-K1','cost incomplete','2026-10-16T10:00:00.000Z')`);
+  s.cancel('ORD-K1');
+  assert.equal((await drainOrderFinanceRecovery(s.env)).completed, 1);
+  assert.equal(count(s.raw, "SELECT COUNT(*) n FROM finance_posting_errors WHERE order_id='ORD-K1'"), 0);
+  // ORD-K2's 100 is the investor's at once; ORD-K1's 100 is in stock again.
+  assert.deepEqual(await capital(), [[100, true, 100]]);
+  assert.equal((await drainOrderFinanceRecovery(s.env)).scanned, 0);
+});
+
+test('review: the settled zero stays settled when its delivery month changes', async () => {
+  const s = setup();
+  const c = await s.contract(10000);
+  await s.sale('ORD-M'); await s.sale('ORD-M2');
+  assert.equal((await drainOrderFinanceRecovery(s.env)).failed, 0);
+  s.cancel('ORD-M');
+  assert.equal((await drainOrderFinanceRecovery(s.env)).completed, 1);
+  const version = () => row<{ version: number }>(s.raw, "SELECT version FROM investor_allocation_results WHERE allocation_id='ORD-M-a'")!.version;
+  const before = version();
+  // A general expense in October changes every October sale's fingerprint, the cancelled one's too.
+  s.raw.exec(`INSERT INTO expense_categories(id,slug,name_ar) VALUES ('rent','lost-rent','إيجار');
+    INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,note) VALUES ('rent-oct','rent',10,'2026-10-20','Rent','');`);
+  const report = await drainOrderFinanceRecovery(s.env);
+  assert.equal(report.failed, 0, JSON.stringify(report));
+  assert.equal(version(), before, 'the scan does not rewrite the zero');
+  await syncInvestorOrder(s.db, 'ORD-M');
+  assert.equal(version(), before, 'a recheck writes nothing');
+  assert.equal(count(s.raw, "SELECT COUNT(*) n FROM investor_finance_events WHERE order_id='ORD-M'"), 4);
+  // The taken-back sale is not what holds the loss-sharing capital: once ORD-M2 is current again, it is free.
+  for (let i = 0; i < 3 && (await drainOrderFinanceRecovery(s.env)).scanned; i++);
+  const source = (await participantSources(s.db, 'investor')).find((x) => x.id === `invcapital:${c}`)!;
+  assert.deepEqual([source.amount_iqd, source.eligible], [100, true]);
+});
+
+test('review: re-delivered while its profit waits for a cost, the sale is a sale again (the taken-back flag does not carry over)', async () => {
+  const s = setup();
+  const c = await s.contract();
+  await s.sale('ORD-WAIT');
+  s.cancel('ORD-WAIT');
+  assert.equal((await drainOrderFinanceRecovery(s.env)).completed, 1);
+  // Delivered again with a spool whose cost is not recorded: the investor's profit waits, the capital is proven.
+  s.raw.exec(`INSERT INTO products(id,name,slug,price_iqd,stock,inventory_mode) VALUES ('spool','Spool','lost-inv-spool',50,0,'BASE');
+    INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_basis) VALUES ('ORD-WAIT-spool','ORD-WAIT','spool','Spool',1,50,50,'unrecorded');
+    DELETE FROM order_item_inventory_allocations WHERE id='ORD-WAIT-release';
+    UPDATE inventory_lots SET qty_remaining=qty_remaining-1 WHERE id='lot-a';
+    UPDATE orders SET status='delivered' WHERE id='ORD-WAIT';`);
+  await runOrderDeliveredEffects(s.env, 'ORD-WAIT');
+  const result = row<{ pending: number; capital_iqd: number; snapshot: string }>(s.raw, "SELECT pending,capital_iqd,snapshot FROM investor_allocation_results WHERE allocation_id='ORD-WAIT-a'")!;
+  assert.deepEqual([result.pending, result.capital_iqd, JSON.parse(result.snapshot).lost_delivery ?? null], [1, 100, null]);
+  const a = (await personFinance(s.db, 'investor', { owner: true })).investor!.agreements.find((x) => x.id === c)!;
+  assert.deepEqual([a.profit.sales, a.profit.sales_unknown, a.units.sold], [1, 1, 1]);
+});
+
+test('review: the recovery limit bounds two cancelled five-line orders with wages and five funded agreements each', async (context) => {
+  const raw = freshDb();
+  raw.exec(`INSERT INTO users(id,email,name,role,admin_scope) VALUES ('admin','boss@x.co','Owner','admin','full'),('investor','investor@x.co','Investor','admin','assistant'),('buyer','buyer@x.co','Buyer','customer',NULL);
+    UPDATE finance_staff SET start_work_date='2026-09-01' WHERE id IN ('staff_hussein','staff_sajjad');
+    INSERT INTO inventory_suppliers(id,name) VALUES ('supplier','Supplier');`);
+  for (let k = 0; k < 5; k++) raw.exec(`INSERT INTO products(id,name,name_ar,slug,sku,price_iqd,product_cost_iqd,stock,inventory_mode) VALUES ('part${k}','Part${k}','قطعة','budget-part-${k}','BP${k}',50000,20000,4,'BASE');
+    INSERT INTO incoming_inventory(id,product_id,scope,scope_id,qty_ordered,qty_received,purchase_unit_iqd,shipping_total_iqd,internal_delivery_total_iqd,supplier_id,status,created_by) VALUES ('inc${k}','part${k}','base','',4,4,20000,0,0,'supplier','received','admin');
+    INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,total_cost_iqd,cost_basis,received_at,incoming_id,supplier_id) VALUES ('lot${k}','part${k}','base','',4,4,20000,80000,'received','2026-01-01','inc${k}','supplier');`);
+  const db = asD1(raw), env = { DB: db } as Env;
+  const boss = stubApp(db, ADMIN, (a) => { a.route('/operations', adminFinanceOperationsRoutes); a.route('/i', adminInvestmentFinanceRoutes); });
+  for (const [staff_id, amount] of [['staff_hussein', 2500], ['staff_sajjad', 7500]] as const) {
+    const rule = await post(boss, '/operations/rules', { staff_id, milestone: 'delivered', basis: 'unit', amount });
+    assert.equal(rule.status, 200, JSON.stringify(await json(rule.clone())));
+    for (let i = 0; i < 10; i++) if ((await continueStaffReconciliation(env, staff_id))?.state === 'complete') break;
+  }
+  for (let k = 0; k < 5; k++) {
+    const body = { operation_id: `budget-${k}-${crypto.randomUUID()}`, incoming_id: `inc${k}`, user_id: 'investor', name: `تمويل ${k}`, principal_iqd: 80000, capital_share_bps: 10000, profit_share_bps: 3500, loss_share_bps: k % 2 ? 10000 : 0 };
+    assert.equal((await post(boss, '/i/contracts', body)).status, 200);
+    assert.equal((await post(boss, `/i/contracts/${body.operation_id}/funding`, { operation_id: crypto.randomUUID(), amount_iqd: 80000, payment_day: baghdadDay(), reference: 'cash' })).status, 200);
+  }
+  for (const id of ['ORD-B1', 'ORD-B2', 'ORD-B3']) {
+    raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,created_at,delivered_at)
+      VALUES (?,'buyer','delivered','{}','standard','{}','cash',250000,1500,250000,250000,0,'2026-10-01T10:00:00.000Z','2026-10-16T10:00:00.000Z')`).run(id);
+    for (let k = 0; k < 5; k++) {
+      raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES (?,?,?,'قطعة',1,50000,50000,20000,'snapshot')`).run(`${id}-i${k}`, id, `part${k}`);
+      raw.prepare(`INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,scope_id,qty,unit_cost_iqd,cogs_iqd,idempotency_key) VALUES (?,?,?,?,'base','',1,20000,20000,?)`).run(`${id}-a${k}`, id, `${id}-i${k}`, `lot${k}`, `alloc:${id}:${k}`);
+    }
+    raw.prepare("INSERT INTO finance_collections(id,order_id,payer,amount_iqd,collection_day,actor_id,created_at) VALUES (?,?,'customer',250000,'2026-10-16','admin','2026-10-16T10:00:00.000Z')").run(`${id}-cash`, id);
+    await runOrderFinancialEffects(env, id, 'delivered');
+  }
+  for (let i = 0; i < 4; i++) await drainOrderFinanceRecovery(env, { maxOrders: 2 });
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM investor_allocation_results WHERE profit_iqd>0'), 15);
+  for (const id of ['ORD-B1', 'ORD-B2', 'ORD-B3']) raw.prepare("UPDATE orders SET status='cancelled' WHERE id=?").run(id);
+  let prepared = 0;
+  const measured = { prepare(sql: string) { prepared++; return db.prepare(sql); }, batch(statements: D1PreparedStatement[]) { return db.batch(statements); } } as D1Database;
+  const report = await drainOrderFinanceRecovery({ DB: measured } as Env, { maxOrders: 999 });
+  assert.deepEqual([report.scanned, report.completed], [2, 2], JSON.stringify(report));
+  context.diagnostic(`two cancelled five-line orders, two employees, five funded agreements each: ${prepared} prepared statements`);
+  assert.ok(prepared < 700, `Unexpected D1 query growth: ${prepared}`);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM investor_allocation_results WHERE json_extract(snapshot,'$.lost_delivery') IS 1"), 10);
 });
