@@ -191,11 +191,15 @@ import type { PolicyDocument } from './types';
  *            (worker/lib/gifts/reviewCode.ts `voidReviewGiftsOfOrder`).
  *       L2 — 7.8: a refused printer review approved later keeps those points and
  *            gets its code: nothing taken back, nothing paid twice.
+ *   * EFFECTIVE ON THE DAY IT WENT LIVE (2026-11-10; DECISIONS row 303). Version 8 was first written on
+ *     2026-11-06 and carried that date while live kept serving version 7. The archive row written at the
+ *     first request makes published_at and effective_at permanent (migration 0070), so the date is the day
+ *     this version was actually published with the rewards build, never the day it was drafted.
  */
 export const rewards: PolicyDocument = {
   key: 'rewards',
   version: 8,
-  effective_at: '2026-11-06',
+  effective_at: '2026-11-10',
   title: {
     ar: 'سياسة النقاط والمراجعات والهدايا والإحالات',
     en: 'Points, Reviews, Gifts and Referrals Policy',

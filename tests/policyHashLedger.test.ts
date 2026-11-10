@@ -203,7 +203,7 @@ test('the review road moved rewards to 8 and faq to 8 on one date; rewards 7 and
   for (const [key, version] of [['rewards', 8], ['faq', 8]] as const) {
     const doc = POLICY_DOCUMENTS.find((d) => d.key === key)!;
     assert.equal(doc.version, version, key);
-    assert.equal(doc.effective_at, '2026-11-06', `${key}: the day the review road was published`);
+    assert.equal(doc.effective_at, '2026-11-10', `${key}: the day version 8 went live with the rewards build (row 303), not the day it was drafted`);
     for (const lang of POLICY_LANGS) {
       assert.ok(`${key}@${version}:${lang}` in LEDGER, `${key}@${version}:${lang}`);
       assert.ok(`${key}@${version - 1}:${lang}` in LEDGER, `${key}@${version - 1}:${lang} left the ledger`);

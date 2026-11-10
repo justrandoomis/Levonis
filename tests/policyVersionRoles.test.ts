@@ -67,7 +67,8 @@ const CURRENT = { ...MOVED, purchase: 7, price_protection: 6, faq: 8 } as const;
 /** The documents that have moved since decision 7, and the day each did. */
 const META_PIXEL_EFFECTIVE = '2026-10-31';
 const ESTIMATE_EFFECTIVE = '2026-10-31';
-const REVIEW_ROAD_EFFECTIVE = '2026-11-06';
+/** faq 8 (the review road, row 301) went live with the rewards build on 2026-11-10 (row 303), not on the 2026-11-06 it was drafted. */
+const REVIEW_ROAD_EFFECTIVE = '2026-11-10';
 const EFFECTIVE_SINCE: Readonly<Record<string, string>> = { faq: REVIEW_ROAD_EFFECTIVE, purchase: ESTIMATE_EFFECTIVE, price_protection: ESTIMATE_EFFECTIVE };
 /** The consent documents as decision 7 left them — what a customer had accepted before the Meta Pixel. */
 const CONSENT_AT_DECISION_7 = { terms: 4, privacy: 3, quick_buy: 1 } as const;

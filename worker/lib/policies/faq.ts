@@ -98,11 +98,15 @@ import type { PolicyDocument } from './types';
  *     One sentence says so after the approval, and the reference routes to 7.8
  *     too. tests/rewardsPolicyPublished.test.ts reads it off GET
  *     /api/policies/faq in all three languages.
+ *   * EFFECTIVE ON THE DAY IT WENT LIVE (2026-11-10; DECISIONS row 303). Version 8 was first written on
+ *     2026-11-06 and carried that date while live kept serving version 7. The archive row written at the
+ *     first request makes published_at and effective_at permanent (migration 0070), so the date is the day
+ *     this version was actually published with the rewards build, never the day it was drafted.
  */
 export const faq: PolicyDocument = {
   key: 'faq',
   version: 8,
-  effective_at: '2026-11-06',
+  effective_at: '2026-11-10',
   title: {
     ar: 'الأسئلة الشائعة',
     en: 'Frequently Asked Questions',
