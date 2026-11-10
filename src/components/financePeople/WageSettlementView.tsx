@@ -18,7 +18,9 @@ const shares = (bps: number[]) => bps.map((b) => percentText(b)).join(' / ');
 
 export function SettlementPreviewView({ preview, s, lang }: { preview: SettlementPreview; s: PersonFinanceStrings; lang: Language }) {
   const t = s.settle, arrow = lang === 'en' ? '→' : '←';
-  const owner = new Map(preview.investors.flatMap((v) => v.order_ids.map((id) => [id, v] as const)));
+  // Every investor whose goods an order sold, with the share of the agreement those goods came from.
+  const owners = new Map<string, Array<{ user_id: string; name: string; share_bps: number }>>();
+  for (const v of preview.investors) for (const o of v.orders) owners.set(o.order_id, [...(owners.get(o.order_id) ?? []), { user_id: v.user_id, name: v.name, share_bps: o.share_bps }]);
   return <div className="fp-stack" data-settlement-preview>
     <div className="fp-review-heading"><CalendarCheck size={20} aria-hidden="true" /><div><strong>{t.ordersThrough} {dayText(lastSettledDay(preview.through_day), lang)}</strong>
       <p className="fp-muted">{t.rowsLine(preview.rows, preview.adjusted, preview.reversed)}</p></div></div>
@@ -32,13 +34,13 @@ export function SettlementPreviewView({ preview, s, lang }: { preview: Settlemen
     <p className="fp-note">{t.paidStays}</p>
     {preview.investors.length > 0 && <div className="fp-warning-box" data-settlement-investors><strong>{t.investorTitle}</strong><p>{t.investorWhy}</p>
       <div className="fp-rows">{preview.investors.map((v) => <div className="fp-row" key={v.user_id}><div className="min-w-0"><strong><bdi>{v.name}</bdi></strong>
-        <p className="fp-row-meta">{t.investorShare} {shares(v.share_bps)} · {t.investorOrders(v.order_ids.length)} · {t.investorWages} <Amount value={v.wage_change_iqd} lang={lang} signed /></p>
+        <p className="fp-row-meta">{t.investorShare} {shares(v.share_bps)} · {t.investorOrders(v.orders.length)} · {t.investorWages} <Amount value={v.wage_change_iqd} lang={lang} signed /></p>
         {v.profit_change_iqd !== 0 && <p className="fp-row-meta">{v.profit_change_iqd > 0 ? t.investorUp : t.investorDown} <Amount value={Math.abs(v.profit_change_iqd)} lang={lang} className={tone(v.profit_change_iqd)} /> {t.investorLess}</p>}
       </div></div>)}</div></div>}
     {preview.order_changes.length === 0 ? <p className="fp-muted">{t.noOrders}</p>
       : <details className="fp-detail" open={preview.order_changes.length <= 6 || undefined}><summary>{t.ordersTitle(preview.order_changes.length)}</summary>
-        <div className="fp-rows">{preview.order_changes.map((o) => { const v = owner.get(o.order_id); return <div className="fp-row" key={o.order_id}>
-          <div className="min-w-0"><bdi dir="ltr">{o.order_id}</bdi>{v && <p className="fp-row-meta"><span className="fp-status fp-status-approved"><bdi>{v.name}</bdi> · {shares(v.share_bps)}</span></p>}</div>
+        <div className="fp-rows">{preview.order_changes.map((o) => { const sold = owners.get(o.order_id) ?? []; return <div className="fp-row" key={o.order_id}>
+          <div className="min-w-0"><bdi dir="ltr">{o.order_id}</bdi>{sold.length > 0 && <p className="fp-row-meta fp-chips">{sold.map((v) => <span className="fp-status fp-status-approved" key={v.user_id}><bdi>{v.name}</bdi> · {percentText(v.share_bps)}</span>)}</p>}</div>
           <div className="text-end"><Amount value={o.before_iqd} lang={lang} /> {arrow} <Amount value={o.after_iqd} lang={lang} className={tone(o.after_iqd - o.before_iqd)} /></div>
         </div>; })}</div></details>}
     <p className="fp-muted">{t.final}</p>

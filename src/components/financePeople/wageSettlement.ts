@@ -17,7 +17,7 @@ import type { SettleRefusalKey } from '../../lib/personFinanceStrings';
 const settlePath = (staffId: string) => `/api/admin/finance-people/staff/${encodeURIComponent(staffId)}/settle`;
 
 export interface SettlementInput { through_day: string; owed_iqd: number; reason: string }
-export interface SettlementInvestor { user_id: string; name: string; share_bps: number[]; order_ids: string[]; wage_change_iqd: number; profit_change_iqd: number }
+export interface SettlementInvestor { user_id: string; name: string; share_bps: number[]; orders: Array<{ order_id: string; share_bps: number }>; wage_change_iqd: number; profit_change_iqd: number }
 export interface SettlementPreview {
   staff_id: string; through_day: string; owed_iqd: number;
   earned_before_iqd: number; paid_before_iqd: number; owed_before_iqd: number;

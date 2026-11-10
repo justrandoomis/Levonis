@@ -17,12 +17,13 @@
  *   - the books move by one entry: the agreed amount minus what was unpaid.
  * Settlements are immutable, one per day boundary, each after the last.
  */
-import { badRequest, conflict, notFound } from './http';
+import { badRequest, conflict, HttpError, notFound } from './http';
 import { auditStatements } from './audit';
 import { newId } from './crypto';
 import { allocateExact, baghdadDay, fence, journalPlan, periodOpen } from './operations';
 import { readStaff } from './financeEmployment';
 import { staffAdvanceSql } from './financeParticipants';
+import { remainingAllocationQtySql } from './inventoryAllocationQuantity';
 import { settledCostSql, settledThroughSql, settlementInstalled } from './staffSettledSql';
 
 const effectiveSql = 'c.amount_iqd+COALESCE((SELECT SUM(ca.delta_iqd) FROM finance_cost_adjustments ca WHERE ca.cost_id=c.id),0)';
@@ -123,18 +124,31 @@ function orderChanges(rows: PeriodRow[], lines: SettlementLine[]) {
   return [...byOrder].map(([order_id, v]) => ({ order_id, ...v }));
 }
 
-export async function settleStaffWages(db: D1Database, input: { staffId: string; throughDay: string; owedIqd: number; reason?: string; actor: string; expectedOwedBefore?: number; operationId?: string }) {
+type SettleInput = { staffId: string; throughDay: string; owedIqd: number; reason?: string; actor: string; expectedOwedBefore?: number; operationId?: string };
+
+export async function settleStaffWages(db: D1Database, input: SettleInput) {
   const staff = await readStaff(db, input.staffId);
   if (!staff) throw notFound('الموظف غير موجود');
   // A retried request (a timeout after the write) answers with the settlement it already made.
   const id = input.operationId ? `wagesettle_${input.operationId}` : newId('wagesettle');
-  if (input.operationId && await settlementInstalled(db)) {
+  const landed = async () => {
+    if (!input.operationId || !await settlementInstalled(db)) return null;
     const prior = await db.prepare('SELECT * FROM finance_staff_settlements WHERE id=?').bind(id).first<{ staff_id: string; through_day: string; owed_iqd: number }>();
-    if (prior) {
-      if (prior.staff_id !== staff.id || prior.through_day !== input.throughDay || prior.owed_iqd !== input.owedIqd) throw conflict('رقم العملية مستخدم لتسوية أخرى', 'SETTLE_OPERATION_REUSED');
-      return { already: true, settlement: prior };
-    }
+    if (!prior) return null;
+    if (prior.staff_id !== staff.id || prior.through_day !== input.throughDay || prior.owed_iqd !== input.owedIqd) throw conflict('رقم العملية مستخدم لتسوية أخرى', 'SETTLE_OPERATION_REUSED');
+    return { already: true, settlement: prior };
+  };
+  const prior = await landed();
+  if (prior) return prior;
+  try { return await writeSettlement(db, staff, id, input); } catch (error) {
+    // A retry sent while its first request was still being written finds the period settled
+    // (or its wages moved) by that very request: answer with it, not with a refusal.
+    if (error instanceof HttpError && (error.code === 'SETTLE_ALREADY_SETTLED' || error.code === 'SETTLE_CHANGED')) { const done = await landed(); if (done) return done; }
+    throw error;
   }
+}
+
+async function writeSettlement(db: D1Database, staff: NonNullable<Awaited<ReturnType<typeof readStaff>>>, id: string, input: SettleInput) {
   // The plan refuses wages being redone (SETTLE_RECALCULATING), as the preview does.
   const plan = await planStaffSettlement(db, staff.id, input.throughDay, input.owedIqd);
   if (input.expectedOwedBefore !== undefined && input.expectedOwedBefore !== plan.owed_before_iqd) throw conflict('تغيرت الأجور منذ المعاينة؛ حدّث ثم أعد المحاولة', 'SETTLE_CHANGED');
@@ -184,32 +198,36 @@ export interface SettlementInvestor {
   user_id: string; name: string;
   /** The profit shares of the investor's agreements whose goods these orders sold. */
   share_bps: number[];
-  order_ids: string[];
+  /** Each order, with the share of the agreement its goods came from (the highest, if two). */
+  orders: Array<{ order_id: string; share_bps: number }>;
   /** The wage change on those orders (after − before; negative: a cut). */
   wage_change_iqd: number;
-  /** The investor's share of the opposite move in those orders' profit, at their agreed
-   * share: the most it can be (less when an order also sold goods that are not theirs). */
+  /** An estimate, not a promise: the opposite move in those orders' profit at the investor's
+   * agreed share. Less when an order also sold goods that are not theirs, or sold below cost;
+   * nothing while an order's profit waits for a cost. The screen says «about … or less». */
   profit_change_iqd: number;
 }
 
 /** Owner, preview only: the investors whose goods were sold on the orders whose wage moves.
  * A wage cut raises the order's profit by the same amount, and an investor takes their agreed
- * share of the profit on their own goods (worker/lib/investorFinance.ts). Read-only. */
+ * share of the profit on their own goods (worker/lib/investorFinance.ts). Only what that
+ * attribution counts: delivered orders (one cancelled after delivery pays no investor profit)
+ * and goods still sold (not released back to stock). Read-only. */
 export async function settlementInvestors(db: D1Database, changes: SettlementPlan['order_changes']): Promise<SettlementInvestor[]> {
   if (!changes.length || !await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='investment_contracts'").first()) return [];
   const rows = (await db.prepare(`SELECT a.order_id,c.user_id,COALESCE(NULLIF(u.name,''),u.email) AS name,MAX(c.profit_share_bps) AS share_bps
-    FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id
+    FROM order_item_inventory_allocations a JOIN orders o ON o.id=a.order_id AND o.status='delivered' JOIN inventory_lots l ON l.id=a.lot_id
     JOIN investment_contracts c ON c.incoming_id=l.incoming_id AND c.state='active' JOIN users u ON u.id=c.user_id
-    WHERE a.order_id IN (SELECT value FROM json_each(?)) AND a.released_at IS NULL
+    WHERE a.order_id IN (SELECT value FROM json_each(?)) AND a.released_at IS NULL AND ${remainingAllocationQtySql('a')}>0
     GROUP BY a.order_id,c.user_id ORDER BY name,c.user_id,a.order_id`).bind(JSON.stringify(changes.map((o) => o.order_id)))
     .all<{ order_id: string; user_id: string; name: string; share_bps: number }>()).results ?? [];
   const byOrder = new Map(changes.map((o) => [o.order_id, o.after_iqd - o.before_iqd] as const));
   const out = new Map<string, SettlementInvestor>();
   for (const r of rows) {
     const delta = byOrder.get(r.order_id) ?? 0;
-    const v = out.get(r.user_id) ?? { user_id: r.user_id, name: r.name, share_bps: [], order_ids: [], wage_change_iqd: 0, profit_change_iqd: 0 };
+    const v = out.get(r.user_id) ?? { user_id: r.user_id, name: r.name, share_bps: [], orders: [], wage_change_iqd: 0, profit_change_iqd: 0 };
     if (!v.share_bps.includes(r.share_bps)) v.share_bps = [...v.share_bps, r.share_bps].sort((a, b) => a - b);
-    v.order_ids.push(r.order_id); v.wage_change_iqd += delta;
+    v.orders.push({ order_id: r.order_id, share_bps: r.share_bps }); v.wage_change_iqd += delta;
     v.profit_change_iqd += Math.trunc(-delta * r.share_bps / 10000);
     out.set(r.user_id, v);
   }

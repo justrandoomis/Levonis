@@ -18,7 +18,7 @@ import { personFinanceStrings } from '../../lib/personFinanceStrings';
 
 type Named = { id: string; name?: string; name_ar?: string; name_en?: string; parent_id?: string | null };
 type Scope = { catalog_ids: string[]; product_ids: string[]; excluded_product_ids: string[] };
-type Staff = { id: string; name: string; role: string; active: number; user_id: string | null; employment_version: number; inactive_periods_json?: string; cutoff_earnings?: { orders: number; first_day: string } | null; start_work_date?: string | null; archived_at?: string | null; period?: {earned_iqd:number;paid_iqd:number;adjustments_iqd:number;pending_costs:number}; account_name?: string; account_email?: string; balance?: StaffBalance };
+type Staff = { id: string; name: string; role: string; active: number; user_id: string | null; employment_version: number; inactive_periods_json?: string; cutoff_earnings?: { orders: number; first_day: string } | null; start_work_date?: string | null; archived_at?: string | null; period?: {earned_iqd:number;paid_iqd:number;adjustments_iqd:number;pending_costs:number}; account_name?: string; account_email?: string; balance?: StaffBalance; settlement?: { through_day: string; owed_iqd: number; settlement_day: string } | null };
 type Rule = { id: string; version: number; name: string; staff_id: string | null; amount: number; basis: string; milestone: string; requires_assignment: number; active: number; scope?: Scope; target_type?: string; target_id?: string; cap_iqd?: number | null; group_key?: string; category_id?: string; center_id?: string | null; priority?: number; effective_from?: string; effective_to?: string | null; employment_effective_default?: number };
 type StaffWrite = { staff?: Staff; reconciliation?: Reconciliation | null };
 type Config = { can_manage_staff?: boolean; staff: Staff[]; catalogs: Named[]; rules: Rule[]; scope_products: Named[]; reconciliations?: Reconciliation[] };
@@ -63,7 +63,8 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
   const refresh = async () => { await Promise.all([remote.load(), people.load()]); if (mounted.current) onChanged?.(); };
   const config = remote.data;
   const canManage = config?.can_manage_staff === true;
-  const lastSettlement = (staffId: string) => personOf(staffId)?.work?.roles.find((r) => r.staff_id === staffId)?.settlement ?? null;
+  // The staff list carries every employee's latest settlement (an unlinked removed one too); the people picture is the fallback.
+  const lastSettlement = (staffId: string) => config?.staff.find((p) => p.id === staffId)?.settlement ?? personOf(staffId)?.work?.roles.find((r) => r.staff_id === staffId)?.settlement ?? null;
   const settleButton = (person: Staff) => canManage && <Button size="sm" icon={<Handshake size={14} />} disabled={op.busy} onClick={() => { op.clear(); setSettling(person); }}>{s.settle.action}</Button>;
   useFreshOnReturn(async () => { await remote.load(); if (mounted.current) onChanged?.(); }, {
     pollWhileVisibleMs: 30_000, minIntervalMs: 30_000,
@@ -150,7 +151,7 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder }: P
     </Surface>
     {personEditor && <StaffEditor person={personEditor.person} onClose={() => setPersonEditor(null)} onSaved={saved} />}
     {history && <StaffHistorySheet staff={history} onClose={() => setHistory(null)} />}
-    {settling && <WageSettlementDialog staff={settling} last={lastSettlement(settling.id)} onClose={() => setSettling(null)} onDone={(done) => { const name = `⁨${settling.name}⁩`; setSettling(null); void op.run(refresh, () => s.settle.done(name, dayText(lastSettledDay(done.through_day), lang), moneyText(done.owed_iqd, lang))); }} />}
+    {settling && <WageSettlementDialog staff={settling} last={lastSettlement(settling.id)} onClose={() => setSettling(null)} onStale={() => void refresh()} onDone={(done) => { const name = `\u2068${settling.name}\u2069`; setSettling(null); void op.run(refresh, () => s.settle.done(name, dayText(lastSettledDay(done.through_day), lang), moneyText(done.owed_iqd, lang))); }} />}
     {sheet && <PersonSheet person={people.data?.people.find((p) => p.user_id === sheet.user_id) ?? sheet} onClose={() => setSheet(null)} openOrder={openOrder ? (id) => { setSheet(null); openOrder(id); } : undefined} />}
     {editor && config && (editor.rule ? <WageChangeDialog rule={editor.rule} staff={editor.staff} catalogs={config.catalogs} products={config.scope_products} onClose={() => setEditor(null)} onSaved={(result) => saved(result, loc('تم تسجيل تغيير الأجر والتسوية.', 'Pay change and adjustment recorded.'))} /> : <RuleBuilder config={config} initial={editor} onClose={() => setEditor(null)} onSaved={(result) => saved(result, loc('تم حفظ الأجر.', 'Pay saved.'))} />)}
     <Dialog open={!!removing} onClose={() => setRemoving(null)} title={loc('حذف الموظف', 'Delete employee')} busy={op.busy}>

@@ -21,12 +21,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { asD1, count, ctx, freshDb, json, post, row, send, stubApp, type App } from './fixtures/app';
+import { asD1, count, ctx, freshDb, get, json, post, row, send, stubApp, type App } from './fixtures/app';
 import { codeOf } from './fixtures/source';
 import { adminFinancePeopleRoutes } from '../worker/routes/adminFinancePeople';
 import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOperations';
 import { financeEarningsRoutes } from '../worker/routes/financeEarnings';
 import { planOrderFinanceSnapshot } from '../worker/lib/orderFinance';
+import { baghdadDay } from '../worker/lib/operations';
+import { settleStaffWages } from '../worker/lib/staffSettlement';
 import { ApiError } from '../src/lib/api';
 import { PERSON_FINANCE_STRINGS } from '../src/lib/personFinanceStrings';
 import { applySettlement, baghdadToday, previewSettlement, settlementDays, settlementProblem, settlementRefusal, type SettlementPreview } from '../src/components/financePeople/wageSettlement';
@@ -82,7 +84,7 @@ function setup() {
     }
     return assert.fail('the wages were not calculated');
   }
-  return { raw, db, boss, self: app('employee'), employee };
+  return { raw, db, boss, self: app('employee'), employee, order };
 }
 
 /** The dialog's requests reach the owner's routes; every body it sends is kept. */
@@ -113,7 +115,7 @@ test('preview: earned / paid / owed before → agreed, the change, each order, a
   assert.deepEqual(preview.order_changes, [
     { order_id: 'o21', before_iqd: 2500, after_iqd: 1000 }, { order_id: 'o22', before_iqd: 2500, after_iqd: 1000 }, { order_id: 'inv23', before_iqd: 2500, after_iqd: 1000 }]);
   // inv23 sold the investor's printer: its wage falls 1,500, so its profit rises 1,500, and the investor takes 45% of it.
-  assert.deepEqual(preview.investors, [{ user_id: 'inv', name: 'Sajjad Amer', share_bps: [4500], order_ids: ['inv23'], wage_change_iqd: -1500, profit_change_iqd: 675 }]);
+  assert.deepEqual(preview.investors, [{ user_id: 'inv', name: 'Sajjad Amer', share_bps: [4500], orders: [{ order_id: 'inv23', share_bps: 4500 }], wage_change_iqd: -1500, profit_change_iqd: 675 }]);
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_staff_settlements'), 0);
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_cost_adjustments'), 0);
 
@@ -131,6 +133,51 @@ test('preview: earned / paid / owed before → agreed, the change, each order, a
   // A raise lowers the investor's share, and is said so.
   const raise: SettlementPreview = { ...preview, owed_iqd: 9000, change_iqd: 1500, investors: [{ ...preview.investors[0], wage_change_iqd: 500, profit_change_iqd: -225 }] };
   assert.ok(text(renderToStaticMarkup(createElement(SettlementPreviewView, { preview: raise, s: PERSON_FINANCE_STRINGS.en, lang: 'en' }))).includes(`${PERSON_FINANCE_STRINGS.en.settle.investorDown} 225 IQD`));
+  // An order that sold two investors' goods names both, each with its own agreement's share.
+  const two: SettlementPreview = { ...preview, investors: [...preview.investors, { user_id: 'other', name: 'Other Investor', share_bps: [3000], orders: [{ order_id: 'inv23', share_bps: 3000 }], wage_change_iqd: -1500, profit_change_iqd: 450 }] };
+  const both = text(renderToStaticMarkup(createElement(SettlementPreviewView, { preview: two, s: PERSON_FINANCE_STRINGS.en, lang: 'en' })));
+  for (const chip of ['Sajjad Amer · 45%', 'Other Investor · 30%']) assert.ok(both.includes(chip), `«${chip}» missing: ${both}`);
+});
+
+test('the investors named are the ones whose profit the cut reaches: delivered orders and goods still sold only', async () => {
+  const { raw, boss, employee, order } = setup();
+  // Two more orders from the investor's lot: one cancelled after delivery, one whose printer came back to stock.
+  await order('invC24', '2026-09-24T10:00:00.000Z', true);
+  await order('invR25', '2026-09-25T10:00:00.000Z', true);
+  const id = await employee();
+  raw.exec("UPDATE orders SET status='cancelled' WHERE id='invC24'");
+  raw.exec(`INSERT INTO order_item_inventory_allocations(id,order_id,order_item_id,lot_id,scope,qty,unit_cost_iqd,cogs_iqd,idempotency_key,released_at)
+    VALUES ('release:invR25','invR25','line:invR25','lot:investor','base',1,20000,20000,'released:invR25','2026-09-26T10:00:00.000Z')`);
+  const preview = await asOwner(boss, () => previewSettlement(id, { ...AGREED, owed_iqd: 5000 }));
+  // Both stay in the settlement (they were delivered before the day) …
+  assert.deepEqual(preview.order_changes.map((o) => o.order_id).sort(), ['inv23', 'invC24', 'invR25', 'o21', 'o22']);
+  // … but neither pays the investor a profit, so only inv23 counts for them.
+  assert.deepEqual(preview.investors.map((v) => ({ orders: v.orders.map((o) => o.order_id), wages: v.wage_change_iqd })), [{ orders: ['inv23'], wages: preview.order_changes.find((o) => o.order_id === 'inv23')!.after_iqd - 2500 }]);
+});
+
+test('a retry sent while its first request was still being written answers with that settlement, not «already settled»', async () => {
+  const { raw, db, employee } = setup();
+  const id = await employee();
+  const input = { staffId: id, throughDay: '2026-10-01', owedIqd: 3000, reason: 'x', actor: 'boss', expectedOwedBefore: 7500, operationId: 'settle-cross-0001' };
+  const first = await settleStaffWages(db, input);
+  assert.equal('already' in first, false);
+  // The retry looked for its settlement a moment before the first one landed …
+  let hidden = false;
+  const racing = new Proxy(db, {
+    get(target, key) {
+      if (key === 'prepare') return (sql: string) => (!hidden && sql.startsWith('SELECT * FROM finance_staff_settlements WHERE id=?') ? (hidden = true, { bind: () => ({ first: async () => null }) }) : target.prepare(sql));
+      const value = Reflect.get(target, key);
+      return typeof value === 'function' ? value.bind(target) : value;
+    },
+  });
+  // … then found the period settled by that very request: it answers with it.
+  const again = await settleStaffWages(racing, input);
+  assert.equal(hidden, true);
+  assert.equal('already' in again && again.already, true);
+  assert.equal(again.settlement.through_day, '2026-10-01');
+  assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_staff_settlements'), 1);
+  // Another request that finds the period settled is still refused.
+  await assert.rejects(settleStaffWages(db, { ...input, operationId: 'settle-cross-0002' }), (e: unknown) => (e as { code?: string }).code === 'SETTLE_ALREADY_SETTLED');
 });
 
 test('apply: the preview\'s owed-before and one operation id are sent; a retried apply returns the same settlement; the period is then settled', async () => {
@@ -150,6 +197,9 @@ test('apply: the preview\'s owed-before and one operation id are sent; a retried
     // The same day again is a period already settled.
     assert.equal(await refusalOf(previewSettlement(id, AGREED)), 'settled');
   });
+  // The staff list carries it (the dialog's lower bound, for an employee with no linked account too).
+  const listed = (await json(await get(boss, `${PEOPLE}/staff`))).staff.find((s: { id: string }) => s.id === id);
+  assert.deepEqual(listed.settlement, { through_day: '2026-10-01', owed_iqd: 3000, settlement_day: baghdadDay() });
 });
 
 test('each refusal comes back by code and is said in ar, en and ckb: an open withdrawal, a recalculation still running, a period already settled, wages changed since the preview', async () => {
@@ -235,6 +285,9 @@ test('the day: today in Baghdad at most, after the last settlement; settled thro
   assert.equal(settlementProblem({ ...ok, through_day: '2026-11-10' }, days), 'settled');
   for (const owed of [null, -1, 1.5]) assert.equal(settlementProblem({ ...ok, owed_iqd: owed }, days), 'amount');
   assert.equal(settlementProblem({ ...ok, reason: ' a  ' }, days), 'reason');
+  // The counts read right in English, one or many.
+  assert.equal(PERSON_FINANCE_STRINGS.en.settle.rowsLine(1, 1, 1), '1 wage in the period · 1 changes · 1 waiting for an order cost is cancelled');
+  assert.equal(PERSON_FINANCE_STRINGS.en.settle.rowsLine(10, 7, 0), '10 wages in the period · 7 change');
 });
 
 test('the Staff tab offers «تسوية الأجور» to the owner only, on live and removed employees, and previews before it applies', () => {
@@ -242,13 +295,23 @@ test('the Staff tab offers «تسوية الأجور» to the owner only, on liv
   assert.match(panel, /const settleButton = \(person: Staff\) => canManage && <Button /);
   assert.equal(panel.match(/settleButton\(person\)/g)?.length, 2, 'live and removed employees');
   assert.match(panel, /\{canManage && <div className="fp-row-actions">\{settleButton\(person\)\}<\/div>\}/);
-  assert.match(panel, /<WageSettlementDialog staff=\{settling\} last=\{lastSettlement\(settling\.id\)\}/);
+  assert.match(panel, /<WageSettlementDialog staff=\{settling\} last=\{lastSettlement\(settling\.id\)\} onClose=\{\(\) => setSettling\(null\)\} onStale=\{\(\) => void refresh\(\)\}/);
   assert.match(panel, /void op\.run\(refresh, \(\) => s\.settle\.done\(/);
+  // The last settlement comes from the staff list first (every employee), the people picture second.
+  assert.match(panel, /const lastSettlement = \(staffId: string\) => config\?\.staff\.find\(\(p\) => p\.id === staffId\)\?\.settlement \?\? personOf\(staffId\)/);
+  // No raw bidi control characters in the source (the name's isolates are escapes).
+  assert.doesNotMatch(panel, /[\u2066-\u2069\u202a-\u202e]/);
+  assert.match(panel, /`\\u2068\$\{settling\.name\}\\u2069`/);
   const dialog = codeOf('src/components/financePeople/WageSettlementDialog.tsx');
   assert.match(dialog, /previewSettlement\(staff\.id, \{ through_day: day, owed_iqd: owed, reason \}\);\s*operation\.current = crypto\.randomUUID\(\);/);
   assert.match(dialog, /applySettlement\(staff\.id, preview, reason, operation\.current\)/);
   // Apply exists only beside a preview, and not while a refusal stands.
   assert.match(dialog, /\{preview \? <Button variant="primary" loading=\{op\.busy\} disabled=\{!!refusal\} onClick=\{apply\}>/);
+  // Old figures are reloaded: on «already settled» or «changed», and on closing after an apply that got no answer.
+  assert.match(dialog, /if \(kind === 'settled' \|\| kind === 'changed'\) onStale\(\);/);
+  assert.match(dialog, /const close = \(\) => \{ if \(tried\.current\) onStale\(\); onClose\(\); \};/);
+  assert.match(dialog, /setRefusal\(null\); tried\.current = true;/);
+  assert.match(dialog, /<Dialog open title=\{t\.title\} onClose=\{close\}/);
   // Every word on the dialog comes from personFinanceStrings (checked key for key in tests/personFinanceView.test.ts).
   for (const file of ['WageSettlementDialog.tsx', 'WageSettlementView.tsx', 'wageSettlement.ts']) assert.doesNotMatch(codeOf(`src/components/financePeople/${file}`), /\bloc\(/, file);
   // The client's path is the people routes' own (shared.tsx pulls a stylesheet, so it is written out).

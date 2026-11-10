@@ -17,7 +17,7 @@ import { personFinanceStrings, type SettleRefusalKey } from '../../lib/personFin
 import { applySettlement, baghdadToday, dayText, lastSettledDay, previewSettlement, settlementDays, settlementProblem, settlementRefusal, type LastSettlement, type SettlementDone, type SettlementPreview } from './wageSettlement';
 import { SettlementPreviewView, SettlementRefusalBox } from './WageSettlementView';
 
-export default function WageSettlementDialog({ staff, last, onClose, onDone }: { staff: { id: string; name: string }; last: LastSettlement | null; onClose: () => void; onDone: (done: SettlementDone) => void }) {
+export default function WageSettlementDialog({ staff, last, onClose, onStale, onDone }: { staff: { id: string; name: string }; last: LastSettlement | null; onClose: () => void; onStale: () => void; onDone: (done: SettlementDone) => void }) {
   const { lang } = useLanguage(), s = personFinanceStrings(lang), t = s.settle, op = useMutation();
   const [today] = useState(baghdadToday);
   const days = settlementDays(today, last);
@@ -29,9 +29,13 @@ export default function WageSettlementDialog({ staff, last, onClose, onDone }: {
   // One id per preview: a retried apply of THIS preview (a timeout after the write) returns the settlement it made.
   const operation = useRef('');
   const problem = days.open ? settlementProblem({ through_day: day, owed_iqd: owed, reason }, days) : 'settled';
+  // An apply that got no answer (a timeout) may still have landed: the panel reloads when the dialog closes.
+  const tried = useRef(false);
   const edited = () => { setRefusal(null); op.clear(); };
-  /** A coded refusal is said in the reader's language; anything else keeps the server's words (op.error). */
-  const refused = (error: unknown) => { const kind = settlementRefusal(error); if (!kind) throw error; setRefusal(kind); };
+  /** A coded refusal is said in the reader's language; anything else keeps the server's words (op.error).
+   * «Already settled» or «changed» means the panel's figures are old: reload them (and `last` with them). */
+  const refused = (error: unknown) => { const kind = settlementRefusal(error); if (!kind) throw error; setRefusal(kind); if (kind === 'settled' || kind === 'changed') onStale(); };
+  const close = () => { if (tried.current) onStale(); onClose(); };
   const inspect = () => op.run(async () => {
     if (problem || owed === null) return;
     setRefusal(null);
@@ -43,14 +47,14 @@ export default function WageSettlementDialog({ staff, last, onClose, onDone }: {
   });
   const apply = () => op.run(async () => {
     if (!preview) return;
-    setRefusal(null);
+    setRefusal(null); tried.current = true;
     try { onDone(await applySettlement(staff.id, preview, reason, operation.current)); } catch (error) { refused(error); }
   });
   const back = () => { setPreview(null); edited(); };
   const dayError = problem === 'future' ? t.refusalAction.future : problem === 'settled' && days.open ? t.refusalAction.settled : undefined;
   // The day the new period starts is exclusive: name the last day it settles, so it is not read one day off.
   const dayOk = !problem || problem === 'amount' || problem === 'reason';
-  return <Dialog open title={t.title} onClose={onClose} dirty={owed !== null || !!reason.trim()} busy={op.busy}>
+  return <Dialog open title={t.title} onClose={close} dirty={owed !== null || !!reason.trim()} busy={op.busy}>
     <p className="fp-muted">{staff.name}</p>
     <ol className="fp-steps">{[t.stepAgree, t.stepReview].map((label, i) => <li key={label} aria-current={(preview ? 1 : 0) === i ? 'step' : undefined} data-done={!!preview && i === 0}>{i + 1}. {label}</li>)}</ol>
     {preview ? <SettlementPreviewView preview={preview} s={s} lang={lang} /> : <div className="fp-stack">
@@ -70,7 +74,7 @@ export default function WageSettlementDialog({ staff, last, onClose, onDone }: {
       {preview && <div className="fp-row-actions"><Button size="sm" loading={op.busy} onClick={inspect}>{t.again}</Button></div>}</div>}
     <Feedback error={op.error} />
     <footer className="fp-footer">
-      <Button variant="ghost" disabled={op.busy} onClick={preview ? back : onClose}>{preview ? t.back : t.cancel}</Button>
+      <Button variant="ghost" disabled={op.busy} onClick={preview ? back : close}>{preview ? t.back : t.cancel}</Button>
       {preview ? <Button variant="primary" loading={op.busy} disabled={!!refusal} onClick={apply}>{t.apply}</Button>
         : days.open && <Button variant="primary" loading={op.busy} disabled={!!problem} onClick={inspect}>{t.preview}</Button>}
     </footer>
