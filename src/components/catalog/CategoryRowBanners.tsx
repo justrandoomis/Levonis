@@ -108,11 +108,16 @@ export function CategoryRowBanner({
         aria-hidden="true"
         className="absolute inset-0 bg-gradient-to-l from-transparent from-30% via-[rgb(11_12_15/0.55)] via-62% to-[rgb(11_12_15/0.9)] rtl:bg-gradient-to-r sm:from-42% sm:via-70%"
       />
+      {/* THE WORDS NEVER SHRINK (owner's FDM page, 2026-11-11; DECISIONS row 309). The strip is 88–96 px on a phone and
+          its column needs about 100 at py-3/gap-1, so flex shrank the clamped title and line below their own line
+          height and cut what hangs under the baseline: «منتجات» read «منتحات», «بطلب مسبق» lost its dots. Tighter on a
+          phone (py-2, gap-0.5: 88 px, the strip's minimum), and the two lines keep their height (shrink-0): anything
+          left over spills into the column's padding, inside the strip, instead of clipping the letters. */}
       <div
-        className={`relative flex min-w-0 max-w-[64%] flex-col items-start justify-center gap-1 px-3.5 py-3 sm:max-w-[52%] sm:gap-1.5 sm:px-5 lg:max-w-[44%] lg:px-8 ${ON_PHOTO_INK}`}
+        className={`relative flex min-w-0 max-w-[64%] flex-col items-start justify-center gap-0.5 px-3.5 py-2 sm:max-w-[52%] sm:gap-1.5 sm:px-5 lg:max-w-[44%] lg:px-8 ${ON_PHOTO_INK}`}
       >
-        <h3 className="line-clamp-1 text-[16px] font-bold leading-[22px] text-ivory [text-shadow:0_1px_2px_rgb(0_0_0/0.35)] sm:text-[19px] sm:leading-7 lg:text-[23px] lg:leading-8">{title}</h3>
-        <p className="line-clamp-1 text-[11.5px] font-semibold leading-4 tabular-nums text-ivory/[0.78] sm:text-[13px] sm:leading-5 lg:text-[14px]">{line}</p>
+        <h3 className="line-clamp-1 shrink-0 text-[16px] font-bold leading-[22px] text-ivory [text-shadow:0_1px_2px_rgb(0_0_0/0.35)] sm:text-[19px] sm:leading-7 lg:text-[23px] lg:leading-8">{title}</h3>
+        <p className="line-clamp-1 shrink-0 text-[11.5px] font-semibold leading-4 tabular-nums text-ivory/[0.78] sm:text-[13px] sm:leading-5 lg:text-[14px]">{line}</p>
         <span className="mt-0.5 inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-full border border-white/25 bg-onyx/55 px-3 text-[12px] font-bold text-ivory transition-colors group-hover:border-white/50 motion-reduce:transition-none sm:h-8 sm:px-3.5 sm:text-[13px] lg:h-9 lg:px-4 lg:text-[14px]">
           {cta}
           <ArrowGlyph className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5 motion-reduce:transition-none" />

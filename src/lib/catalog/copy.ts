@@ -133,16 +133,20 @@ export function resultCountLabel(shown: number, of: number | null, kind: NounKin
  * The «متوفرة الآن» pill: «● 4 متوفرة الآن», «● متوفر الآن» for a single
  * product that is available, «● كلها متوفرة» when every one is. `null`
  * when none is available (the pill is not drawn) or the count is unknown.
+ * One of them agrees with the noun (row 309): a product «متوفر», a printer
+ * «متوفرة» — «17 منتجًا · 1 متوفر الآن», «طابعة واحدة · متوفرة الآن».
  */
-export function availableLabel(available: number | null, total: number, lang: CatalogLang): string | null {
+export function availableLabel(available: number | null, total: number, lang: CatalogLang, kind: NounKind = 'product'): string | null {
   if (available === null || available <= 0) return null;
   if (lang === 'en') {
     if (total === 1) return 'Available now';
     if (available === total) return 'All available';
     return `${available} available now`;
   }
-  if (total === 1) return 'متوفر الآن';
+  const one = kind === 'printer' ? 'متوفرة الآن' : 'متوفر الآن';
+  if (total === 1) return one;
   if (available === total) return 'كلها متوفرة';
+  if (available === 1) return `1 ${one}`;
   return `${available} متوفرة الآن`;
 }
 
@@ -152,6 +156,8 @@ export interface SectionStock {
   available_count: number | null;
   preorder_count?: number | null;
   unavailable_count?: number | null;
+  /** Direct-sale products whose shelf count the server withheld: they may be in stock. */
+  withheld_count?: number | null;
 }
 
 /**
@@ -163,17 +169,19 @@ export interface SectionStock {
  * The counts are the card rule's own states (packages/catalog/src/availability.ts), rolled up per section by
  * the server, so a section never says what its cards contradict. A pre-order filament is not «غير متوفرة»:
  * the shelf count alone called most Bambu filaments that, and they can be ordered. Anything unknown says
- * nothing: a null count (the map past its stock cap), an older answer without the states, or a section
- * whose remaining products are catalog-only or have a withheld count. Arabic agrees with the noun: one
+ * nothing: a null count (the map past its stock cap), an older answer without the states, a section
+ * holding a product whose shelf count the server withheld (it may be in stock: never «بطلب مسبق» over
+ * it), or a section whose remaining products are catalog-only. Arabic agrees with the noun: one
  * product «غير متوفر», one printer «غير متوفرة», two «غير متوفرين» / «غير متوفرتين», more «غير متوفرة».
  */
 export function sectionStockLabel(s: SectionStock, kind: NounKind, lang: CatalogLang): string | null {
   const total = s.product_count;
   if (!(total > 0) || typeof s.available_count !== 'number') return null;
-  if (s.available_count > 0) return availableLabel(s.available_count, total, lang);
+  if (s.available_count > 0) return availableLabel(s.available_count, total, lang, kind);
   const preorder = s.preorder_count;
   const unavailable = s.unavailable_count;
-  if (typeof preorder !== 'number' || typeof unavailable !== 'number') return null;
+  const withheld = s.withheld_count;
+  if (typeof preorder !== 'number' || typeof unavailable !== 'number' || typeof withheld !== 'number' || withheld > 0) return null;
   if (preorder > 0) return lang === 'en' ? 'Pre-order' : lang === 'ckb' ? 'بە پێش-داواکاری' : 'بطلب مسبق';
   if (unavailable !== total) return null;
   if (lang === 'en') return 'Unavailable now';

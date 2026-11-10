@@ -76,6 +76,12 @@ export interface CatalogTreeNode {
    */
   preorder_count?: number | null;
   unavailable_count?: number | null;
+  /**
+   * Of the unknown, how many sell direct but had their shelf count WITHHELD by the server (an active
+   * mystery-pool member): they may be in stock, so a section holding one never claims «بطلب مسبق».
+   * Catalog-only products are unknown too but not withheld. `null` exactly when `available_count` is.
+   */
+  withheld_count?: number | null;
   is_printer_catalog: boolean;
   /** The product type this branch resolves to (`printer`, `filament`, …), or null. */
   product_type: string | null;

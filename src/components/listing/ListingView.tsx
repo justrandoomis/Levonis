@@ -237,7 +237,12 @@ export default function ListingView({
         <PageTopBar
           title={scope.title}
           subtitle={
-            [countText || (scope.total !== null ? countNoun(scope.total, scope.kind, lang) : ''), narrowed ? null : scope.stock]
+            // The section's word only beside the section's own count: not under a filter, and not while the
+            // list answers a different total than the section's (two caches a minute apart; row 309).
+            [
+              countText || (scope.total !== null ? countNoun(scope.total, scope.kind, lang) : ''),
+              narrowed || (total !== null && total !== scope.total) ? null : scope.stock,
+            ]
               .filter(Boolean)
               .join(' · ') || undefined
           }

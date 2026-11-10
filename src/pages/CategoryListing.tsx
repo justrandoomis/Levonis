@@ -15,7 +15,7 @@ import { listingCategory, listsBySlug, primeGet } from '../lib/bootFetch';
 import { nodeDescription, nodeName } from '../lib/catalog/categoryPageModel';
 import { nounKindFor, sectionStockLabel, type SectionStock } from '../lib/catalog/copy';
 import { bannerRows } from '../lib/catalog/explorerModel';
-import { CATEGORY_PAGE_CAP, withStock } from '../lib/catalog/sectionStock';
+import { CATEGORY_PAGE_CAP, rememberSectionStock, rememberedSectionStock, withStock } from '../lib/catalog/sectionStock';
 import { sectionTypeOf } from '../lib/catalog/listingModel';
 import type { CatalogTreeNode, CatalogTreeResponse } from '../lib/catalog/types';
 
@@ -89,20 +89,29 @@ export default function CategoryListing() {
       : null;
   const [stock, setStock] = useState<{ slug: string; counts: Map<string, SectionStock> } | null>(null);
   useEffect(() => {
-    if (!stockSlug) return;
+    if (!stockSlug || !shown) return;
+    const ids = [shown.id, ...(shown.children ?? []).map((c) => c.id)];
+    const known = rememberedSectionStock(ids);
+    if (known) {
+      setStock({ slug: stockSlug, counts: known });
+      return;
+    }
     let alive = true;
-    loadCategory(stockSlug)
+    // Silent, by id when the slug is too long to ask by: the page is already drawn, this only adds a word.
+    loadCategory(listingCategory(shown), { mascot: 'silent' })
       .then((p) => {
+        const nodes = [p.node, ...(p.children ?? [])];
+        rememberSectionStock(nodes);
         if (!alive) return;
         const counts = new Map<string, SectionStock>();
-        for (const n of [p.node, ...(p.children ?? [])]) counts.set(n.id, n);
+        for (const n of nodes) counts.set(n.id, n);
         setStock({ slug: stockSlug, counts });
       })
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [stockSlug]);
+  }, [stockSlug, shown]);
   const rows = useBannerPhotos(
     useMemo(() => {
       const counts = stock && stock.slug === shown?.slug ? stock.counts : null;

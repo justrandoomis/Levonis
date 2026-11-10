@@ -325,7 +325,7 @@ export function treeNode(
   counts: Map<string, StockCounts>,
   availableKnown: boolean
 ): CatalogTreeNode {
-  const c = counts.get(r.id) ?? { products: 0, available: 0, preorder: 0, unavailable: 0 };
+  const c = counts.get(r.id) ?? { products: 0, available: 0, preorder: 0, unavailable: 0, withheld: 0 };
   return {
     id: r.id,
     slug: r.slug,
@@ -348,6 +348,7 @@ export function treeNode(
     available_count: availableKnown ? c.available : null,
     preorder_count: availableKnown ? c.preorder : null,
     unavailable_count: availableKnown ? c.unavailable : null,
+    withheld_count: availableKnown ? c.withheld : null,
     is_printer_catalog: r.is_printer_catalog,
     product_type: idx.productType(r.id),
     sort: r.sort,
@@ -365,7 +366,12 @@ export interface StockCounts {
   available: number;
   preorder: number;
   unavailable: number;
+  /** Unknown because the server withheld a direct-sale shelf count (it may be in stock). */
+  withheld: number;
 }
+
+/** The card rule's state, with its `unknown` split: a direct-sale card whose count was withheld may be in stock. */
+export type SectionState = AvailabilityState | 'withheld';
 
 /**
  * Roll-up counts per catalog. `states` is each READ product's card state (`cardAvailability`); a product
@@ -374,27 +380,41 @@ export interface StockCounts {
  */
 export function rollUpCounts(
   byProduct: Map<string, Set<string>>,
-  states: ReadonlyMap<string, AvailabilityState> | null
+  states: ReadonlyMap<string, SectionState> | null
 ): Map<string, StockCounts> {
   const out = new Map<string, StockCounts>();
   for (const [pid, catalogs] of byProduct) {
     const state = states?.get(pid);
     for (const cid of catalogs) {
-      const c = out.get(cid) ?? { products: 0, available: 0, preorder: 0, unavailable: 0 };
+      const c = out.get(cid) ?? { products: 0, available: 0, preorder: 0, unavailable: 0, withheld: 0 };
       c.products += 1;
       if (state === 'available') c.available += 1;
       else if (state === 'preorder') c.preorder += 1;
       else if (state === 'unavailable') c.unavailable += 1;
+      else if (state === 'withheld') c.withheld += 1;
       out.set(cid, c);
     }
   }
   return out;
 }
 
-/** Each read card's state, by product id: the card rule, the one every card and grid draws. */
-export function cardStates(cards: Iterable<[string, Record<string, unknown>]>): Map<string, AvailabilityState> {
-  const out = new Map<string, AvailabilityState>();
-  for (const [id, card] of cards) out.set(id, cardAvailability(card).state);
+/**
+ * Each read card's state, by product id: the card rule, the one every card and grid draws — with its
+ * `unknown` split. A priced card that sells direct (or as a bundle) and carries no shelf count had the count
+ * WITHHELD (packages/catalog/src/availability.ts: «A HIDDEN COUNT IS NOT A ZERO»): it may be in stock.
+ */
+export function cardStates(cards: Iterable<[string, Record<string, unknown>]>): Map<string, SectionState> {
+  const out = new Map<string, SectionState>();
+  for (const [id, card] of cards) {
+    const state = cardAvailability(card).state;
+    const sale = Array.isArray(card.sale_types) ? (card.sale_types as unknown[]) : [];
+    const withheld =
+      state === 'unknown' &&
+      card.price_status !== 'unpriced' &&
+      (card.direct_stock_available === undefined || card.direct_stock_available === null) &&
+      (sale.includes('direct_sale') || sale.includes('bundle'));
+    out.set(id, withheld ? 'withheld' : state);
+  }
   return out;
 }
 

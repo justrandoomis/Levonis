@@ -40,12 +40,12 @@ import {
   treeNode,
   visibleChildren,
   type CatalogIndex,
+  type SectionState,
   type ShelfCandidate,
 } from '../lib/catalogPresentation';
 import { pricingCtx, pricingCtxForUser, resolveProductCards, type PricingCtx } from './products';
 import { safeParse } from '../lib/types';
 import { cardLeadPhoto } from '../lib/cardPhoto';
-import type { AvailabilityState } from '../../packages/catalog/src/availability';
 import type { CatalogTreeNode, CategoryPayload } from '@levonis/catalog/discoveryTypes';
 
 export const catalogRoutes = new Hono<AppContext>();
@@ -146,7 +146,7 @@ async function availableProductIds(
   idx: CatalogIndex
 ): Promise<{
   available: Set<string> | null;
-  states: Map<string, AvailabilityState> | null;
+  states: Map<string, SectionState> | null;
   ordered: Array<{ id: string; card: Record<string, unknown> }> | null;
 }> {
   if (ids.length === 0) return { available: new Set(), states: new Map(), ordered: [] };

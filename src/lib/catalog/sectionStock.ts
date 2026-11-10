@@ -24,5 +24,41 @@ export function withStock(node: CatalogTreeNode, counts: ReadonlyMap<string, Sec
     available_count: s.available_count,
     preorder_count: s.preorder_count ?? null,
     unavailable_count: s.unavailable_count ?? null,
+    withheld_count: s.withheld_count ?? null,
   };
+}
+
+/**
+ * EVERY SECTION ANSWER, REMEMBERED A MINUTE. A parent's answer already carries its children's exact counts, so
+ * opening PLA from «مواد FDM» (or coming Back) asks nothing again; the signed-in owner's answer is not cached
+ * by the browser (private, no-store), and this keeps the listing from rebuilding it on every hop.
+ */
+const REMEMBER_MS = 60_000;
+const remembered = new Map<string, { at: number; stock: SectionStock }>();
+
+export function rememberSectionStock(nodes: Iterable<{ id: string } & SectionStock>, now = Date.now()): void {
+  for (const n of nodes) {
+    if (typeof n.available_count !== 'number') continue;
+    remembered.set(n.id, {
+      at: now,
+      stock: {
+        product_count: n.product_count,
+        available_count: n.available_count,
+        preorder_count: n.preorder_count ?? null,
+        unavailable_count: n.unavailable_count ?? null,
+        withheld_count: n.withheld_count ?? null,
+      },
+    });
+  }
+}
+
+/** The remembered counts of every id, or null when any is missing or older than a minute. */
+export function rememberedSectionStock(ids: readonly string[], now = Date.now()): Map<string, SectionStock> | null {
+  const out = new Map<string, SectionStock>();
+  for (const id of ids) {
+    const hit = remembered.get(id);
+    if (!hit || now - hit.at > REMEMBER_MS) return null;
+    out.set(id, hit.stock);
+  }
+  return out;
 }

@@ -34,7 +34,8 @@ import {
   authoredSrc,
 } from '../src/lib/catalog/explorerModel';
 import { availableLabel, categoriesCount, countNoun, countWord, explorerSubline, resultCountLabel, sectionStockLabel, showCountLabel } from '../src/lib/catalog/copy';
-import { CATEGORY_PAGE_CAP, withStock } from '../src/lib/catalog/sectionStock';
+import { CATEGORY_PAGE_CAP, rememberSectionStock, rememberedSectionStock, withStock } from '../src/lib/catalog/sectionStock';
+import { cardStates, rollUpCounts } from '../worker/lib/catalogPresentation';
 import { CATEGORY_PAGE_CAP as SERVER_CATEGORY_PAGE_CAP } from '../worker/routes/catalog';
 import { LanguageProvider } from '../src/LanguageContext';
 import CategoryRowBanners from '../src/components/catalog/CategoryRowBanners';
@@ -157,10 +158,14 @@ test('counted words: dual, plural, and the 11–99 singular', () => {
  * when every product is unavailable; anything unknown says nothing.
  */
 test('sectionStockLabel: in stock, pre-order, unavailable, and silence when unknown — in three languages', () => {
-  const s = (available: number | null, preorder?: number | null, unavailable?: number | null, total = 5) => ({
-    product_count: total, available_count: available, preorder_count: preorder, unavailable_count: unavailable,
+  const s = (available: number | null, preorder?: number | null, unavailable?: number | null, total = 5, withheld: number | null | undefined = 0) => ({
+    product_count: total, available_count: available, preorder_count: preorder, unavailable_count: unavailable, withheld_count: withheld,
   });
-  assert.equal(sectionStockLabel(s(1, 4, 0), 'product', 'ar'), '1 متوفرة الآن', 'in stock wins');
+  assert.equal(sectionStockLabel(s(1, 4, 0), 'product', 'ar'), '1 متوفر الآن', 'in stock wins; one product agrees, «متوفر»');
+  assert.equal(sectionStockLabel(s(1, 4, 0), 'printer', 'ar'), '1 متوفرة الآن', 'one printer, «متوفرة»');
+  assert.equal(sectionStockLabel(s(1, 0, 0, 1), 'printer', 'ar'), 'متوفرة الآن');
+  assert.equal(sectionStockLabel(s(1, 0, 0, 1), 'product', 'ar'), 'متوفر الآن');
+  assert.equal(sectionStockLabel(s(4, 1, 0, 17), 'product', 'ar'), '4 متوفرة الآن');
   assert.equal(sectionStockLabel(s(0, 4, 1), 'product', 'ar'), 'بطلب مسبق', 'pre-order, even beside an unavailable one');
   assert.equal(sectionStockLabel(s(0, 4, 1), 'product', 'en'), 'Pre-order');
   assert.equal(sectionStockLabel(s(0, 4, 1), 'product', 'ckb'), 'بە پێش-داواکاری');
@@ -177,6 +182,13 @@ test('sectionStockLabel: in stock, pre-order, unavailable, and silence when unkn
   // Silence: unknown counts, an older answer, catalog-only products, an empty section.
   assert.equal(sectionStockLabel(s(null, 0, 5), 'product', 'ar'), null, 'the map past its cap');
   assert.equal(sectionStockLabel(s(0), 'product', 'ar'), null, 'an answer without the states');
+  // A product whose shelf count the server withheld may be in stock: never «بطلب مسبق» over it.
+  assert.equal(sectionStockLabel(s(0, 9, 0, 10, 1), 'printer', 'ar'), null, 'a withheld count silences the pre-order claim');
+  assert.equal(
+    sectionStockLabel({ product_count: 10, available_count: 0, preorder_count: 9, unavailable_count: 0 }, 'printer', 'ar'),
+    null,
+    'and so does an answer without the withheld count'
+  );
   assert.equal(sectionStockLabel(s(0, null, null), 'product', 'ar'), null);
   assert.equal(sectionStockLabel(s(0, 0, 3), 'product', 'ar'), null, 'two of five are catalog-only or withheld: nothing is claimed');
   assert.equal(sectionStockLabel(s(0, 0, 0, 0), 'product', 'ar'), null);
@@ -185,10 +197,10 @@ test('sectionStockLabel: in stock, pre-order, unavailable, and silence when unkn
 test('withStock lays the section answer’s counts over a map node, only when both counted the same products', () => {
   assert.equal(CATEGORY_PAGE_CAP, SERVER_CATEGORY_PAGE_CAP, 'the client mirrors the server’s cap');
   const node = { id: 'c', product_count: 5, available_count: null } as never;
-  const counts = new Map([['c', { product_count: 5, available_count: 0, preorder_count: 5, unavailable_count: 0 }]]);
+  const counts = new Map([['c', { product_count: 5, available_count: 0, preorder_count: 5, unavailable_count: 0, withheld_count: 0 }]]);
   assert.deepEqual(
-    (({ available_count, preorder_count, unavailable_count }) => ({ available_count, preorder_count, unavailable_count }))(withStock(node, counts) as never),
-    { available_count: 0, preorder_count: 5, unavailable_count: 0 }
+    (({ available_count, preorder_count, unavailable_count, withheld_count }) => ({ available_count, preorder_count, unavailable_count, withheld_count }))(withStock(node, counts) as never),
+    { available_count: 0, preorder_count: 5, unavailable_count: 0, withheld_count: 0 }
   );
   assert.equal(withStock(node, new Map([['c', { product_count: 6, available_count: 0, preorder_count: 6, unavailable_count: 0 }]])), node, 'a different count is not laid over');
   assert.equal(withStock(node, null), node);
@@ -299,4 +311,34 @@ test('the banner picture for a theme: this theme’s → the other theme’s →
   assert.deepEqual(authoredPhoto(n('', '/l', '')), { src: '/l', productPhoto: false, productId: null });
   assert.deepEqual(authoredPhoto(n('', '', '/c')), { src: '/c', productPhoto: false, productId: null });
   assert.equal(authoredPhoto(n('', '', '')), null);
+});
+
+test('a section answer is remembered a minute, for every node it counted, and only when it counted stock', () => {
+  const t0 = 1_000_000;
+  rememberSectionStock(
+    [
+      { id: 'fdm', product_count: 47, available_count: 1, preorder_count: 44, unavailable_count: 0, withheld_count: 0 },
+      { id: 'pla', product_count: 17, available_count: 1, preorder_count: 16, unavailable_count: 0, withheld_count: 0 },
+      { id: 'big', product_count: 589, available_count: null },
+    ],
+    t0
+  );
+  assert.equal(rememberedSectionStock(['fdm', 'pla'], t0 + 30_000)?.get('pla')?.preorder_count, 16, 'PLA from the parent’s answer');
+  assert.equal(rememberedSectionStock(['fdm', 'pla'], t0 + 61_000), null, 'older than a minute: ask again');
+  assert.equal(rememberedSectionStock(['fdm', 'big'], t0 + 1_000), null, 'an uncounted node is never remembered');
+  assert.equal(rememberedSectionStock(['nowhere'], t0), null);
+});
+
+test('the server splits a withheld shelf count from a catalog-only card, and rolls the states up per section', () => {
+  const states = cardStates([
+    ['on', { sale_types: ['direct_sale'], direct_stock_available: 3 }],
+    ['pre', { sale_types: ['direct_sale', 'pre_order'], direct_stock_available: 0 }],
+    ['out', { sale_types: ['direct_sale'], direct_stock_available: 0 }],
+    ['pool', { sale_types: ['direct_sale'] }],
+    ['catalog', { sale_types: ['direct_sale'], price_status: 'unpriced' }],
+  ]);
+  assert.deepEqual(Object.fromEntries(states), { on: 'available', pre: 'preorder', out: 'unavailable', pool: 'withheld', catalog: 'unknown' });
+  const byProduct = new Map([...states.keys()].map((id) => [id, new Set(['sec'])]));
+  byProduct.set('unread', new Set(['sec']));
+  assert.deepEqual(rollUpCounts(byProduct, states).get('sec'), { products: 6, available: 1, preorder: 1, unavailable: 1, withheld: 1 });
 });
