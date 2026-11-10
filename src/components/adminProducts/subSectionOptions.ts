@@ -12,8 +12,10 @@
  * So the list is every ACTIVE section under the main one, depth first, each level in the admin's own
  * order (`sort`, then the English and Arabic names, as GET /api/admin/taxonomy/catalogs reads them). A
  * deeper section is named with its path, «مواد FDM ← PLA», so two sections with the same name under
- * different parents stay apart. The section a product ALREADY carries stays in the list even when it is
- * inactive or outside this tree, so opening and saving that product never files it nowhere.
+ * different parents stay apart. A switched-off section is not offered, but the active sections inside it
+ * are (the storefront still shows them), named through it. The section a product ALREADY carries stays in
+ * the list even when it is inactive or outside this tree, so opening and saving that product never files
+ * it nowhere. The membership rule dialog lists its sections the same way (adminBenefits/RuleDialog.tsx).
  */
 
 export interface SectionLike {
@@ -51,7 +53,7 @@ export function subSectionOptions(
   if (categoryId) {
     const kids = new Map<string, SectionLike[]>();
     for (const c of catalogs) {
-      if (!c.parent_id || !c.active) continue;
+      if (!c.parent_id) continue;
       const list = kids.get(c.parent_id) ?? [];
       list.push(c);
       kids.set(c.parent_id, list);
@@ -63,13 +65,13 @@ export function subSectionOptions(
         seen.add(c.id);
         const ar = [...pathAr, c.name_ar];
         const en = [...pathEn, c.name_en];
-        out.push({ id: c.id, depth, label_ar: ar.join(' ← '), label_en: en.join(' › '), kept: false });
+        if (c.active) out.push({ id: c.id, depth, label_ar: ar.join(' ← '), label_en: en.join(' › '), kept: false });
         walk(c.id, depth + 1, ar, en);
       }
     };
     walk(categoryId, 1, [], []);
   }
-  if (currentSubId && !seen.has(currentSubId)) {
+  if (currentSubId && !out.some((o) => o.id === currentSubId)) {
     const own = catalogs.find((c) => c.id === currentSubId);
     if (own) out.push({ id: own.id, depth: 1, label_ar: own.name_ar, label_en: own.name_en, kept: true });
   }

@@ -772,12 +772,18 @@ adminImportRoutes.get('/export', async (c) => {
 
   let productIds = idsParam;
   if (productIds.length === 0) {
+    // The section and every section inside it: a filament filed on «PLA» is exported with «مواد FDM», as a
+    // product filed on «مواد FDM» always was with «مواد الطباعة» (owner, 2026-11-10; DECISIONS row 309).
     const { results } = await c.env.DB
       .prepare(
-        `SELECT id FROM products WHERE category_id = ? OR sub_category_id = ?
+        `WITH RECURSIVE subtree(id) AS (
+           SELECT ? UNION SELECT c.id FROM catalogs c JOIN subtree s ON c.parent_id = s.id
+         )
+         SELECT id FROM products
+          WHERE category_id IN (SELECT id FROM subtree) OR sub_category_id IN (SELECT id FROM subtree)
           ORDER BY display_order, created_at DESC LIMIT ?`
       )
-      .bind(categoryId, categoryId, MAX_PRODUCTS)
+      .bind(categoryId, MAX_PRODUCTS)
       .all<{ id: string }>();
     productIds = results.map((r) => r.id);
   }

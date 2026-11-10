@@ -902,6 +902,35 @@ test('a sub-section that is not a child of the main section is refused', () => {
   assert.ok(r.issues.some((i) => i.message.includes('ليس قسمًا فرعيًا')));
 });
 
+/**
+ * ANY DEPTH UNDER THE MAIN SECTION (owner, 2026-11-10; DECISIONS row 309). «PLA» sits inside «مواد FDM» inside
+ * «مواد الطباعة»; the product form files there, and a sheet exported from PLA states «PLA» as its sub-section.
+ * Refusing it failed every row of an untouched export. A section outside the main one is still refused.
+ */
+test('a sub-section anywhere under the main section is accepted; one in another tree is refused', () => {
+  const deep: ImportMaps = {
+    ...maps,
+    catalogs: new Map([
+      ...maps.catalogs,
+      [normKey('FDM Pro'), { id: 'cat_printers_fdm_pro', parent_id: 'cat_printers_fdm', slug: 'fdm-pro', name_en: 'FDM Pro', name_ar: 'FDM برو', template_family: null }],
+      [normKey('Lasers'), { id: 'cat_lasers', parent_id: null, slug: 'lasers', name_en: 'Lasers', name_ar: 'الليزر', template_family: 'devices' }],
+      [normKey('Laser Kits'), { id: 'cat_laser_kits', parent_id: 'cat_lasers', slug: 'laser-kits', name_en: 'Laser Kits', name_ar: 'عدد الليزر', template_family: null }],
+    ]),
+  };
+  const p = parsedSample();
+  p.category = 'Printers';
+  p.sub_category = 'FDM Pro';
+  const ok = resolveProduct(p, null, deep, { newId: idFactory(), money: true });
+  assert.deepEqual(ok.issues.filter((i) => i.severity === 'error' && i.message.startsWith('sub_category')), []);
+  assert.equal(ok.doc.sub_category_id, 'cat_printers_fdm_pro');
+
+  const q = parsedSample();
+  q.category = 'Printers';
+  q.sub_category = 'Laser Kits';
+  const refused = resolveProduct(q, null, deep, { newId: idFactory(), money: true });
+  assert.ok(refused.issues.some((i) => i.message.includes('ليس قسمًا فرعيًا')), 'a section of another tree is still refused');
+});
+
 test('an assistant admin cannot write cost through an import either', () => {
   const r = resolveProduct(parsedSample(), null, maps, { newId: idFactory(), money: false });
   assert.equal(r.doc.product_cost_iqd, null);

@@ -23,6 +23,7 @@
 import { useMemo, useState } from 'react';
 import * as T from '../adminProducts/theme';
 import ProductPicker from '../adminProducts/form/ProductPicker';
+import { subSectionOptions } from '../adminProducts/subSectionOptions';
 import { api } from '../../lib/api';
 import { Check, Dialog, FieldRow, useLoc, type CatalogNode } from '../adminTaxonomy/shared';
 import {
@@ -174,8 +175,10 @@ export default function RuleDialog({ rule, schema, catalogs, notes, notesKnown, 
     () => catalogs.filter((c) => !c.parent_id && (c.active || c.id === form.category_id)),
     [catalogs, form.category_id]
   );
+  // Every active section under the main one, a deeper one with its path, as the product form lists them:
+  // a rule can name «PLA» inside «مواد FDM», and it covers that section's whole branch (DECISIONS row 309).
   const children = useMemo(
-    () => catalogs.filter((c) => c.parent_id === form.category_id && (c.active || c.id === form.sub_category_id)),
+    () => subSectionOptions(catalogs, form.category_id || null, form.sub_category_id || null),
     [catalogs, form.category_id, form.sub_category_id]
   );
 
@@ -359,7 +362,7 @@ export default function RuleDialog({ rule, schema, catalogs, notes, notesKnown, 
               <option value="">{loc('— اختر —', '— choose —')}</option>
               {children.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {name(c)}
+                  {(lang === 'en' ? c.label_en || c.label_ar : c.label_ar || c.label_en) || c.id}
                 </option>
               ))}
             </select>

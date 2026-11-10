@@ -19,8 +19,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { ROOT } from './fixtures/d1';
-import { all, asD1, freshDb, get, json, stubApp } from './fixtures/app';
+import { all, asD1, freshDb, get, json, OWNER, stubApp } from './fixtures/app';
 import { catalogRoutes } from '../worker/routes/catalog';
+import { adminImportRoutes } from '../worker/routes/adminImport';
+import { parseCsv } from '../worker/lib/importCsv';
 import { subSectionOptions } from '../src/components/adminProducts/subSectionOptions';
 
 const MIGRATION = readFileSync(join(ROOT, 'migrations', '0231_fdm_material_sections.sql'), 'utf8');
@@ -98,6 +100,10 @@ test('0231 moves the sixteen PLA filaments and PETG Basic off «مواد FDM», 
   assert.equal(before.pla, 1, 'the bug: PLA lists PLA Metal alone');
   assert.equal(before.petg ?? 0, 0);
 
+  raw.exec("UPDATE products SET updated_at = '2026-11-01T00:00:00.000Z'");
+  // What every form save leaves: the section pair as placements (withClassificationPlacements).
+  raw.exec(`INSERT INTO product_catalogs (product_id, catalog_id, position)
+    SELECT id, 'cat_materials_fdm', 100 + ROW_NUMBER() OVER (ORDER BY slug) FROM products WHERE slug = 'esun-pla-plus'`);
   raw.exec(MIGRATION);
   const after = subOf(raw);
   for (const slug of PLA) {
@@ -107,11 +113,21 @@ test('0231 moves the sixteen PLA filaments and PETG Basic off «مواد FDM», 
   assert.equal(after[PETG], 'cat_bi_petg');
   assert.equal(after['pla-metal'], 'cat_bi_pla');
   assert.equal(after['some-other-filament'], 'cat_materials_fdm', 'a product 0231 does not name stays where it is');
-  assert.deepEqual(
-    all(raw, "SELECT product_id, catalog_id FROM product_catalogs WHERE product_id = 'p_bambu_lab_pla_cf'"),
-    [{ product_id: 'p_bambu_lab_pla_cf', catalog_id: 'cat_bi_fiber' }],
-    'PLA-CF keeps its fibre placement'
-  );
+  const placedIn = (slug: string) =>
+    all<{ catalog_id: string }>(raw, 'SELECT pc.catalog_id FROM product_catalogs pc JOIN products p ON p.id = pc.product_id WHERE p.slug = ? ORDER BY pc.catalog_id', slug).map((r) => r.catalog_id);
+  assert.deepEqual(placedIn('bambu-lab-pla-cf'), ['cat_bi_fiber', 'cat_bi_pla'], 'PLA-CF keeps its fibre placement and gains PLA');
+  assert.deepEqual(placedIn('esun-pla-plus'), ['cat_bi_pla', 'cat_materials_fdm'], 'the old «مواد FDM» placement stays, PLA is added');
+  assert.deepEqual(placedIn(PETG), ['cat_bi_petg']);
+  assert.deepEqual(placedIn('bambu-lab-pla-wood'), [], 'a product 0231 did not move gains nothing');
+  assert.deepEqual(placedIn('some-other-filament'), []);
+  const positions = all<{ position: number }>(raw, "SELECT position FROM product_catalogs WHERE catalog_id = 'cat_bi_pla'").map((r) => r.position);
+  assert.equal(new Set(positions).size, positions.length, 'every PLA position is its own');
+  // A form opened before 0231 cannot save the old section back: the moved products' updated_at moved.
+  const stamp = (slug: string) => all<{ updated_at: string }>(raw, 'SELECT updated_at FROM products WHERE slug = ?', slug)[0].updated_at;
+  assert.notEqual(stamp('esun-pla-plus'), '2026-11-01T00:00:00.000Z');
+  assert.notEqual(stamp(PETG), '2026-11-01T00:00:00.000Z');
+  assert.equal(stamp('bambu-lab-pla-wood'), '2026-11-01T00:00:00.000Z', 'an unmoved product keeps its stamp');
+  assert.equal(stamp('some-other-filament'), '2026-11-01T00:00:00.000Z');
 
   const now = await counts(raw);
   assert.equal(now.pla, 16, 'PLA Metal and the fifteen moved (Wood went to fibre)');
@@ -120,10 +136,14 @@ test('0231 moves the sixteen PLA filaments and PETG Basic off «مواد FDM», 
   assert.equal(now['fdm-materials'], before['fdm-materials'], '«مواد FDM» still counts every one of them');
   assert.equal(now['printing-materials'], before['printing-materials'], '«مواد الطباعة» too');
 
-  // Re-runnable: a second run changes nothing.
-  const once = subOf(raw);
+  // Re-runnable: a second run changes nothing — sections, stamps or placements.
+  const snapshot = () => ({
+    products: all(raw, 'SELECT slug, sub_category_id, updated_at FROM products ORDER BY slug'),
+    placements: all(raw, 'SELECT product_id, catalog_id, position FROM product_catalogs ORDER BY product_id, catalog_id'),
+  });
+  const once = snapshot();
   raw.exec(MIGRATION);
-  assert.deepEqual(subOf(raw), once);
+  assert.deepEqual(snapshot(), once);
 });
 
 test('0231 moves nothing when its section is missing or switched off', () => {
@@ -146,6 +166,7 @@ test('the product form offers every section under the main one, a deeper one wit
     { id: 'cat_bi_petg', parent_id: 'cat_materials_fdm', active: true, sort: 2, name_ar: 'PETG', name_en: 'PETG' },
     { id: 'cat_bi_pla', parent_id: 'cat_materials_fdm', active: true, sort: 1, name_ar: 'PLA', name_en: 'PLA' },
     { id: 'cat_off', parent_id: 'cat_materials_fdm', active: false, sort: 0, name_ar: 'قديم', name_en: 'Old' },
+    { id: 'cat_off_kid', parent_id: 'cat_off', active: true, sort: 0, name_ar: 'باقي', name_en: 'Kept' },
     { id: 'cat_printers', parent_id: null, active: true, sort: 0, name_ar: 'الطابعات', name_en: 'Printers' },
     { id: 'cat_printers_fdm', parent_id: 'cat_printers', active: true, sort: 0, name_ar: 'طابعات FDM', name_en: 'FDM Printers' },
   ];
@@ -154,11 +175,12 @@ test('the product form offers every section under the main one, a deeper one wit
     opts.map((o) => [o.id, o.depth, o.label_ar]),
     [
       ['cat_materials_fdm', 1, 'مواد FDM'],
+      ['cat_off_kid', 3, 'مواد FDM ← قديم ← باقي'],
       ['cat_bi_pla', 2, 'مواد FDM ← PLA'],
       ['cat_bi_petg', 2, 'مواد FDM ← PETG'],
       ['cat_materials_resin', 1, 'مواد Resin'],
     ],
-    'depth first, in each level’s own order; an inactive section is not offered; another tree is not offered'
+    'depth first, in each level’s own order; a switched-off section is not offered but an active one inside it is; another tree is not'
   );
   assert.equal(opts.find((o) => o.id === 'cat_bi_pla')?.label_en, 'FDM Materials › PLA');
 
@@ -168,4 +190,44 @@ test('the product form offers every section under the main one, a deeper one wit
   assert.equal(subSectionOptions(catalogs, 'cat_materials', 'cat_bi_pla').filter((o) => o.id === 'cat_bi_pla').length, 1);
   // No main section: nothing to offer but what the product carries.
   assert.deepEqual(subSectionOptions(catalogs, null, null), []);
+});
+
+/**
+ * THE CSV DOOR AFTER 0231 (review of row 309). Exporting «مواد FDM» matched only products filed exactly there,
+ * so after the move it exported nothing; and the import refused «PLA» as a sub-section of «مواد الطباعة», so an
+ * untouched export of PLA failed every row. Now the export takes the section's whole tree, and the sheet it
+ * gives imports back under the section itself or its main section with no failed row.
+ */
+test('after 0231 the CSV export of «مواد FDM» carries the moved filaments, and a PLA sheet imports back', async () => {
+  const raw = liveShaped();
+  raw.exec("INSERT OR IGNORE INTO users (id, name, email, password_hash, role) VALUES ('usr_owner', 'O', 'boss@x.co', 'h', 'admin')");
+  // Simple stock, as most live filaments are: the sheet carries no variant rows, and that is not what is tested here.
+  raw.exec("UPDATE products SET sku = 'SKU-' || slug, inventory_mode = 'BASE'");
+  raw.exec(MIGRATION);
+  const app = () => stubApp(asD1(raw) as never, OWNER, (a) => a.route('/api/admin/import', adminImportRoutes));
+  const keys = (csv: string) => {
+    const rows = parseCsv(csv.replace(/^\uFEFF/, ''));
+    const head = rows[0] ?? [];
+    return rows
+      .slice(1)
+      .filter((r) => r[head.indexOf('row_type')] === 'product')
+      .map((r) => r[head.indexOf('key')])
+      .sort();
+  };
+  const fdm = await (await app().request('/api/admin/import/export?category=cat_materials_fdm&format=csv')).text();
+  for (const slug of [...PLA, PETG, 'pla-metal', 'some-other-filament']) assert.ok(keys(fdm).includes(`SKU-${slug}`), `«مواد FDM» exports ${slug}`);
+
+  const pla = await (await app().request('/api/admin/import/export?category=cat_bi_pla&format=csv')).text();
+  assert.ok(keys(pla).includes('SKU-esun-pla-plus'));
+  assert.ok(!keys(pla).includes(`SKU-${PETG}`), 'PLA exports PLA only');
+  for (const section of ['cat_bi_pla', 'cat_materials']) {
+    const form = new FormData();
+    form.set('file', new File([pla], 'pla.csv', { type: 'text/csv' }));
+    form.set('category', section);
+    const res = await app().request('/api/admin/import/preview', { method: 'POST', body: form });
+    const body = (await res.json()) as { success: boolean; summary: { failed: number; total: number }; rows: Array<{ key: string; errors: unknown[] }> };
+    assert.equal(res.status, 200, JSON.stringify(body).slice(0, 400));
+    assert.equal(body.summary.failed, 0, `${section}: ${JSON.stringify(body.rows.filter((r) => r.errors.length)).slice(0, 600)}`);
+    assert.equal(body.summary.total, keys(pla).length);
+  }
 });

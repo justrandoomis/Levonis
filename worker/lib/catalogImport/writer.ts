@@ -849,7 +849,8 @@ interface Mapped {
   externalIds: ImportPayload['external_ids'];
   relations: ImportPayload['relations'];
   sourceRefs: Array<{ kind: string; source_id: string; levonis_id: string; source_label: string; binding_rule: string; via_variant_id: string }>;
-  conflicts: Array<{ kind: string; field: string }>;
+  /** `detail`: what the row records beside the kind (a refined section names the one it left). */
+  conflicts: Array<{ kind: string; field: string; detail?: string }>;
   boxItems: number;
 }
 
@@ -1225,8 +1226,9 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     // An EMPTY classification is filled from the map (§E.2), logged; a non-empty one is never moved
     // elsewhere. It is only REFINED: a product the owner filed on a section that CONTAINS the map's leaf
     // (an «مواد FDM» filament whose leaf is «PLA», a section created later inside «مواد FDM») moves down
-    // into that leaf, logged as category_filled. It stays inside the section the owner chose; keeping it
-    // on the parent left it in no section at all (owner, 2026-11-10; DECISIONS row 309).
+    // into that leaf when the leaf is active, logged as category_filled with the section it left in the
+    // row's detail. It stays inside the section the owner chose; keeping it on the parent left it in no
+    // section at all (owner, 2026-11-10; DECISIONS row 309).
     if (!doc.category_id) {
       doc.category_id = tax.category_id;
       conflicts.push({ kind: 'category_filled', field: 'category_id' });
@@ -1235,9 +1237,14 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
       doc.sub_category_id = tax.sub_category_id;
       conflicts.push({ kind: 'category_filled', field: 'sub_category_id' });
     } else if (tax.sub_category_id && doc.sub_category_id !== tax.sub_category_id) {
-      if (doc.category_id === tax.category_id && isStrictAncestor(tax.catalogs, doc.sub_category_id, tax.sub_category_id)) {
+      const refine =
+        doc.category_id === tax.category_id &&
+        Number(tax.catalogs.get(tax.sub_category_id)?.active ?? 0) === 1 &&
+        isStrictAncestor(tax.catalogs, doc.sub_category_id, tax.sub_category_id);
+      if (refine) {
+        const left = doc.sub_category_id;
         doc.sub_category_id = tax.sub_category_id;
-        conflicts.push({ kind: 'category_filled', field: 'sub_category_id' });
+        conflicts.push({ kind: 'category_filled', field: 'sub_category_id', detail: `refined from ${left}` });
       } else conflicts.push({ kind: 'field_kept_existing', field: 'sub_category_id' });
     }
     if (!doc.name_en.trim()) {
@@ -1512,7 +1519,7 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     const k = `${c.kind}:${c.field}`;
     const n = (seenConflicts.get(k) ?? 0) + 1;
     seenConflicts.set(k, n);
-    return [`cic_${H(`${input.itemId}:${k}:${n}`)}`, runId, input.itemId, productId, c.kind, c.field, ''];
+    return [`cic_${H(`${input.itemId}:${k}:${n}`)}`, runId, input.itemId, productId, c.kind, c.field, c.detail ?? ''];
   });
   side.push({
     table: 'catalog_import_conflicts',

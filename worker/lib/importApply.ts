@@ -360,6 +360,23 @@ const err = (line: number, message: string): RowIssue => ({ line, severity: 'err
 const warn = (line: number, message: string): RowIssue => ({ line, severity: 'warning', message });
 
 /**
+ * Whether `sub` sits anywhere under the main section `categoryId` (never the main section itself). The
+ * sheet's lookup map is keyed by name, so the parents are found by id among its values; at most 12 steps,
+ * so a cycle in bad data cannot loop.
+ */
+export function isUnderSection(catalogs: ReadonlyMap<string, CatalogRef>, sub: CatalogRef, categoryId: string): boolean {
+  if (sub.id === categoryId) return false;
+  const byId = new Map<string, CatalogRef>();
+  for (const c of catalogs.values()) byId.set(c.id, c);
+  let at: string | null = sub.parent_id;
+  for (let steps = 0; at && steps < 12; steps++) {
+    if (at === categoryId) return true;
+    at = byId.get(at)?.parent_id ?? null;
+  }
+  return false;
+}
+
+/**
  * One parsed product -> the doc and relations payloads, with every name
  * resolved to an id. Pure: it reads the maps it is handed and writes nothing.
  */
@@ -454,8 +471,10 @@ export function resolveProduct(
       issues.push(err(p.line, `sub_category: لا يوجد قسم فرعي باسم "${p.sub_category}"`));
     } else if (maps.ambiguous?.catalogs.has(normKey(p.sub_category))) {
       issues.push(err(p.line, ambiguousMessage('sub_category', p.sub_category)));
-    } else if (categoryId && sub.parent_id !== categoryId) {
-      // §4: the sub-section is limited to the children of the main section.
+    } else if (categoryId && !isUnderSection(maps.catalogs, sub, categoryId)) {
+      // §4: the sub-section is limited to the main section's tree. Any depth: «PLA» sits inside «مواد FDM»
+      // inside «مواد الطباعة», the product form files there, and a sheet exported from PLA must import back
+      // (owner, 2026-11-10; DECISIONS row 309).
       issues.push(err(p.line, `sub_category: "${p.sub_category}" ليس قسمًا فرعيًا من "${p.category}"`));
     } else {
       subCategoryId = sub.id;

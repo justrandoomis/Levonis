@@ -405,9 +405,11 @@ test('a merge into a V2-published product: protected fingerprints equal, V2 resu
  * and the PLA section listed one product. Here «FDM Printers» is moved under a middle section the A1 is filed on.
  */
 test('a merge refines a filing on a section above the map’s leaf into the leaf, and keeps a filing elsewhere', async () => {
-  for (const [filedOn, want, kind] of [
-    ['cat_printers_mid', 'cat_printers_fdm', 'category_filled'],
-    ['cat_printers_other', 'cat_printers_other', 'field_kept_existing'],
+  for (const [filedOn, leafActive, want, kind, detail] of [
+    ['cat_printers_mid', 1, 'cat_printers_fdm', 'category_filled', 'refined from cat_printers_mid'],
+    ['cat_printers_other', 1, 'cat_printers_other', 'field_kept_existing', ''],
+    // A switched-off leaf is never a destination: the filing stays where the owner put it.
+    ['cat_printers_mid', 0, 'cat_printers_mid', 'field_kept_existing', ''],
   ] as const) {
     const w = newWorld();
     w.raw.exec(`INSERT INTO catalogs (id, parent_id, slug, name_ar, name_en, name_ckb, sort, is_printer_catalog, active, template_family) VALUES
@@ -415,12 +417,19 @@ test('a merge refines a filing on a section above the map’s leaf into the leaf
       ('cat_printers_other', 'cat_printers', 'printers-other', 'أخرى', 'Other', 'هی تر', 51, 1, 1, NULL)`);
     w.raw.exec("UPDATE catalogs SET parent_id = 'cat_printers_mid' WHERE id = 'cat_printers_fdm'");
     await existingA1(w, filedOn);
+    // After the product is filed (the form refuses an inactive section), so only the import's choice sees it.
+    w.raw.prepare("UPDATE catalogs SET active = ? WHERE id = 'cat_printers_fdm'").run(leafActive);
     w.matches.push(a1Match());
     const s = stage(w, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1old' });
     const { result } = await write(w, s);
-    assert.equal(result.merged, true, filedOn);
-    assert.deepEqual(one(w, 'SELECT category_id, sub_category_id FROM products WHERE id = ?', 'p_a1old'), { category_id: 'cat_printers', sub_category_id: want }, filedOn);
-    assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM catalog_import_conflicts WHERE kind = '${kind}' AND field = 'sub_category_id'`), 1, filedOn);
+    const label = `${filedOn} (leaf ${leafActive ? 'on' : 'off'})`;
+    assert.equal(result.merged, true, label);
+    assert.deepEqual(one(w, 'SELECT category_id, sub_category_id FROM products WHERE id = ?', 'p_a1old'), { category_id: 'cat_printers', sub_category_id: want }, label);
+    assert.deepEqual(
+      rows(w, "SELECT kind, detail FROM catalog_import_conflicts WHERE field = 'sub_category_id'"),
+      [{ kind, detail }],
+      `${label}: one row, and a refined section names the one it left`
+    );
   }
 });
 
