@@ -303,7 +303,7 @@ export async function runOrderFinancialEffects(
     const employee=staff?staffById.get(staff):undefined;
     if(employee&&!staffCanAccrue(employee,goods.order))continue;
     // A settled period is closed (DECISIONS row 306): no new wage for an order delivered inside it.
-    const settledDay=employee?.settled_through,deliveredDay=goods.order.status==='delivered'&&goods.order.delivered_at?baghdadDay(new Date(String(goods.order.delivered_at).includes('T')?String(goods.order.delivered_at):`${String(goods.order.delivered_at).replace(' ','T')}Z`)):null;
+    const settledDay=employee?.settled_through,deliveredDay=goods.order.delivered_at?baghdadDay(new Date(String(goods.order.delivered_at).includes('T')?String(goods.order.delivered_at):`${String(goods.order.delivered_at).replace(' ','T')}Z`)):null;
     if(settledDay&&deliveredDay&&deliveredDay<settledDay)continue;
     const relevant = goods.lines.filter((l) => lineIds.includes(l.id));
     const percentageLines=['profit_percent','revenue_percent'].includes(rule.basis)?percentageBase!.lines.filter(l=>lineIds.includes(l.id)):null;

@@ -150,9 +150,6 @@ export async function settleStaffWages(db: D1Database, input: { staffId: string;
   ];
   for (const line of plan.lines) {
     statements.push(db.prepare('INSERT INTO finance_staff_settled_costs(cost_id,settlement_id,before_iqd,paid_iqd,after_iqd) VALUES (?,?,?,?,?)').bind(line.id, id, line.before_iqd, line.paid_iqd, line.after_iqd));
-    // A target still waiting for an amount would keep the order's profit «pending» for ever
-    // (orderProfit, the recovery scan): the agreed amount is that amount now.
-    statements.push(db.prepare('UPDATE finance_wage_targets SET amount_iqd=?,updated_at=? WHERE cost_id=? AND amount_iqd IS NULL').bind(line.reverse ? 0 : line.after_iqd ?? 0, now, line.id));
     if (line.reverse) {
       statements.push(db.prepare("UPDATE finance_order_costs SET state='reversed' WHERE id=? AND state='pending_cost'").bind(line.id));
       if ((line.before_iqd ?? 0) > 0) statements.push(db.prepare('INSERT INTO finance_cost_reversals(id,cost_id,amount_iqd,reversal_day,reason,actor_id) VALUES (?,?,?,?,?,?)').bind(newId('rev'), line.id, line.before_iqd, day, reason, input.actor));
@@ -161,6 +158,11 @@ export async function settleStaffWages(db: D1Database, input: { staffId: string;
         .bind(newId('wagesettle'), line.id, line.after_iqd - line.before_iqd, line.before_iqd, line.after_iqd, input.actor, day, now, staff.employment_version, reason));
     }
   }
+  // A target still waiting for an amount would keep its order's profit «pending» for ever
+  // (orderProfit, the recovery scan): the agreed amount is that amount now — one statement
+  // for every settled row (a reversed row's after_iqd is NULL: 0).
+  statements.push(db.prepare(`UPDATE finance_wage_targets SET amount_iqd=COALESCE((SELECT s.after_iqd FROM finance_staff_settled_costs s WHERE s.cost_id=finance_wage_targets.cost_id),0),updated_at=?
+    WHERE amount_iqd IS NULL AND cost_id IN (SELECT cost_id FROM finance_staff_settled_costs WHERE settlement_id=?)`).bind(now, id));
   if (plan.change_iqd) statements.push(...journalPlan(db, { key: `staff-settlement:${id}`, day, title: reason, source: 'finance_staff_settlement', sourceId: id, actor: input.actor },
     plan.change_iqd < 0 ? [{ account: '2100', debit: -plan.change_iqd }, { account: '5100', credit: -plan.change_iqd }] : [{ account: '5100', debit: plan.change_iqd }, { account: '2100', credit: plan.change_iqd }]).statements);
   statements.push(...(await auditStatements(db, input.actor, 'finance.staff_settled', staff.id, {

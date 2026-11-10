@@ -58,7 +58,7 @@ const staffReconciliationBlockedCoreSql=(orderSql='c.order_id',costSql='c.id',in
   AND NOT EXISTS(SELECT 1 FROM finance_cost_adjustments ca WHERE ca.cost_id=sc.id AND ca.kind='manual')
   AND (${unknownWageRefundSql(orderSql,'sc.order_item_id')} OR NOT EXISTS(SELECT 1 FROM finance_staff_basis sb WHERE sb.order_id=${orderSql} AND sb.basis_fingerprint=(${staffBasisFingerprintSql(orderSql,includeLate)})))))`;
 /** A settled wage (DECISIONS row 306) is agreed, not calculated: nothing holds it again. */
-export const staffReconciliationBlockedSql=(orderSql='c.order_id',costSql='c.id',includeLate=true,settled=false)=>settled?`(NOT ${settledCostSql(costSql,true)} AND ${staffReconciliationBlockedCoreSql(orderSql,costSql,includeLate)})`:staffReconciliationBlockedCoreSql(orderSql,costSql,includeLate);
+export const staffReconciliationBlockedSql=(orderSql:string,costSql:string,includeLate:boolean,settled:boolean)=>settled?`(NOT ${settledCostSql(costSql,true)} AND ${staffReconciliationBlockedCoreSql(orderSql,costSql,includeLate)})`:staffReconciliationBlockedCoreSql(orderSql,costSql,includeLate);
 
 const pendingPaymentCoverSql=(cost='c.id')=>`COALESCE((SELECT MIN(${staffPaidSql(cost)},COALESCE(t.amount_iqd,0)) FROM finance_wage_pending_targets t JOIN finance_wage_changes wc ON wc.id=t.change_id JOIN finance_order_costs ec ON ec.id=t.cost_id JOIN finance_staff_reconciliations j ON j.staff_id=ec.staff_id AND j.operation_id=t.change_id WHERE t.cost_id=${cost} AND j.state<>'complete' AND ec.order_id>j.cursor ORDER BY wc.created_at DESC LIMIT 1),0)`;
 
