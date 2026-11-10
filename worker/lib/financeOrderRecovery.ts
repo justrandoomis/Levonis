@@ -3,7 +3,7 @@ import { baghdadDay, periodOpen } from './operations';
 import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
 import { staffBasisFingerprintSql } from './financeParticipants';
 import { reconcileFinanceOrder } from './financeReconcile';
-import { investorOrderProjectionStaleSql } from './investorFinance';
+import { investorLostDeliveryPendingSql, investorOrderProjectionStaleSql } from './investorFinance';
 import { membershipDiscountAtLineSql } from './orderMembership';
 import { settledCostSql, settledThroughSql, settlementInstalled } from './staffSettledSql';
 
@@ -61,8 +61,10 @@ const deliveredCandidateSql = (settled: boolean) => `o.seller_type='levonis' AND
 // outright), so while any of the order's unsettled wages is held the order
 // waits, unselected, until that withdrawal is paid or released — instead of
 // being picked every minute for a wage that cannot move.
-const lostDeliverySql = (settled: boolean) => `o.seller_type='levonis' AND o.status<>'delivered' AND o.delivered_at IS NOT NULL
-  AND EXISTS(SELECT 1 FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id
+// It is also a candidate while the investor projections its delivery wrote are
+// not yet the settled zero that takes the sale back (DECISIONS row 308).
+const lostDeliverySql = (settled: boolean) => `o.seller_type='levonis' AND o.status<>'delivered' AND o.delivered_at IS NOT NULL AND ((
+  EXISTS(SELECT 1 FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id
     WHERE c.order_id=o.id AND c.state<>'reversed' AND NOT ${settledCostSql('c.id', settled)}
       AND (c.amount_iqd IS NULL OR c.amount_iqd+COALESCE((SELECT SUM(a.delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0)<>0)
       AND EXISTS(SELECT 1 FROM finance_wage_versions v WHERE v.rule_id=c.rule_id AND v.staff_id=c.staff_id AND (s.start_work_date IS NOT NULL
@@ -70,7 +72,8 @@ const lostDeliverySql = (settled: boolean) => `o.seller_type='levonis' AND o.sta
       AND COALESCE(date(o.delivered_at,'+3 hours')>=${settledThroughSql('s.id', settled)},1))
   AND NOT EXISTS(SELECT 1 FROM finance_order_costs hc JOIN finance_withdrawal_allocations wa ON wa.source_kind='staff' AND wa.source_id=hc.id
     JOIN finance_withdrawals w ON w.id=wa.withdrawal_id
-    WHERE hc.order_id=o.id AND w.state IN ('requested','approved','part_paid') AND wa.amount_iqd>wa.paid_iqd AND NOT ${settledCostSql('hc.id', settled)})`;
+    WHERE hc.order_id=o.id AND w.state IN ('requested','approved','part_paid') AND wa.amount_iqd>wa.paid_iqd AND NOT ${settledCostSql('hc.id', settled)}))
+  OR ${investorLostDeliveryPendingSql('o.id')})`;
 const candidateSql = (settled: boolean) => `((${deliveredCandidateSql(settled)}) OR (${lostDeliverySql(settled)}))`;
 
 function checkpoint(value: string): Checkpoint {

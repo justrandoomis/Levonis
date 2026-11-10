@@ -165,7 +165,9 @@ async function investorPart(db: D1Database, userId: string, sources: Participant
 
   // Three grouped reads for every agreement at once, never one per sale.
   const [totals, saleRows, inOrders] = contracts.length ? await Promise.all([
-    db.prepare(`SELECT r.contract_id,COUNT(DISTINCT a.order_id) AS sales,COUNT(DISTINCT CASE WHEN r.pending=1 THEN a.order_id END) AS sales_unknown,
+    // A sale taken back after losing its delivery (DECISIONS row 308) is not a
+    // sale: its zero snapshot adds nothing below, and it is not counted.
+    db.prepare(`SELECT r.contract_id,COUNT(DISTINCT CASE WHEN json_extract(r.snapshot,'$.lost_delivery') IS NOT 1 THEN a.order_id END) AS sales,COUNT(DISTINCT CASE WHEN r.pending=1 THEN a.order_id END) AS sales_unknown,
         COALESCE(SUM(MAX(0,COALESCE(json_extract(r.snapshot,'$.qty'),0))),0) AS sold,
         COALESCE(SUM(CASE WHEN r.pending=1 THEN 0 ELSE MAX(0,COALESCE(json_extract(r.snapshot,'$.profit'),0)) END),0) AS basis,
         COALESCE(SUM(CASE WHEN r.pending=1 THEN 0 ELSE r.profit_iqd END),0) AS earned_known,
@@ -178,6 +180,7 @@ async function investorPart(db: D1Database, userId: string, sources: Participant
       LEFT JOIN purchase_investor_lot_capital lc ON lc.lot_id=a.lot_id AND lc.contract_id=r.contract_id
       WHERE c.user_id=? AND c.state='active' GROUP BY r.contract_id`).bind(userId).all<Totals>().then((r) => r.results ?? []),
     // Only sales with a reason of their own: pending, not collected, not delivered, or a posting error.
+    // A sale already taken back after losing its delivery holds nothing (DECISIONS row 308).
     db.prepare(`SELECT r.contract_id,a.order_id,o.status,date(o.delivered_at,'+3 hours') AS day,
         SUM(CASE WHEN r.pending=1 THEN 0 ELSE r.profit_iqd END) AS profit,SUM(r.capital_iqd) AS capital,MAX(r.pending) AS pending,MIN(r.eligible) AS eligible,
         (SELECT COALESCE(SUM(fc.amount_iqd),0) FROM finance_collections fc WHERE fc.order_id=a.order_id)>=MAX(0,COALESCE(o.due_on_delivery_iqd,0)+COALESCE(o.gini_paid_iqd,0)
@@ -187,14 +190,16 @@ async function investorPart(db: D1Database, userId: string, sources: Participant
       FROM investor_allocation_results r JOIN investment_contracts c ON c.id=r.contract_id
       JOIN order_item_inventory_allocations a ON a.id=r.allocation_id JOIN orders o ON o.id=a.order_id
       WHERE c.user_id=? AND c.state='active' AND (r.pending=1 OR r.eligible=0 OR o.status<>'delivered' OR EXISTS(SELECT 1 FROM finance_posting_errors pe WHERE pe.order_id=a.order_id))
+        AND NOT (o.status<>'delivered' AND json_extract(r.snapshot,'$.lost_delivery') IS 1)
       GROUP BY r.contract_id,a.order_id ORDER BY o.delivered_at,a.order_id LIMIT 2000`).bind(userId).all<SaleRow>().then((r) => r.results ?? []),
     // Units on confirmed orders not delivered yet: off the shelf, not yet a sale.
     // A cancellation restocks through a separate release row, so count what is
-    // still on the order, never the original allocation.
+    // still on the order, never the original allocation. A delivery walked back
+    // and taken back (DECISIONS row 308) is on its order again, not sold.
     db.prepare(`SELECT c.id AS contract_id,COALESCE(SUM(${remainingAllocationQtySql('a')}),0) AS qty FROM investment_contracts c JOIN inventory_lots l ON l.incoming_id=c.incoming_id
       JOIN order_item_inventory_allocations a ON a.lot_id=l.id JOIN orders o ON o.id=a.order_id
       WHERE c.user_id=? AND c.state='active' AND a.released_at IS NULL AND o.status NOT IN ('delivered','cancelled')
-        AND NOT EXISTS(SELECT 1 FROM investor_allocation_results r WHERE r.allocation_id=a.id AND r.contract_id=c.id) GROUP BY c.id`).bind(userId).all<{ contract_id: string; qty: number }>().then((r) => r.results ?? []),
+        AND NOT EXISTS(SELECT 1 FROM investor_allocation_results r WHERE r.allocation_id=a.id AND r.contract_id=c.id AND json_extract(r.snapshot,'$.lost_delivery') IS NOT 1) GROUP BY c.id`).bind(userId).all<{ contract_id: string; qty: number }>().then((r) => r.results ?? []),
   ]) : [[], [], []] as [Totals[], SaleRow[], { contract_id: string; qty: number }[]];
   // The person's real held totals come from the ledgers, which net one
   // agreement's overpayment against another's money; each agreement's row

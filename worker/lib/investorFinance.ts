@@ -220,15 +220,49 @@ export function investorWholeHoldSql(kindSql = 'e.kind', contractSql = 'e.contra
       OR EXISTS(SELECT 1 FROM finance_posting_errors wpe JOIN order_item_inventory_allocations wa ON wa.order_id=wpe.order_id JOIN inventory_lots wl ON wl.id=wa.lot_id JOIN investment_contracts wk ON wk.incoming_id=wl.incoming_id WHERE wk.id=${contractSql})))`;
 }
 
+/**
+ * A SALE THAT LOST ITS DELIVERY IS TAKEN BACK LIKE A RETURN (owner 2026-11-10;
+ * DECISIONS row 308). Cancelled or moved back after delivery, the order keeps
+ * the projections its delivery wrote; each goes to no profit, no recovered
+ * capital (the unit is back in stock, or still on the undelivered order) and no
+ * loss share, through the same correction events and journals as any other
+ * correction. A payout already made stays paid: the investor's next profit
+ * covers it. A re-delivery projects the sale again. The snapshot keeps the
+ * order's current fingerprint, so the zero is a settled answer, not a stale one.
+ */
+async function lostDeliverySplit(db: D1Database, orderId: string) {
+  const rows = (await db.prepare(`SELECT r.allocation_id,r.contract_id,r.snapshot,a.lot_id FROM investor_allocation_results r
+    JOIN order_item_inventory_allocations a ON a.id=r.allocation_id WHERE a.order_id=? ORDER BY r.allocation_id,r.contract_id`).bind(orderId)
+    .all<{ allocation_id: string; contract_id: string; snapshot: string; lot_id: string }>()).results ?? [];
+  if (!rows.length) return null;
+  const sourceFingerprint = await fingerprint(db, orderId);
+  // The order's correction version, as getOrderProfitBase reports it: the owner's order view compares it.
+  const version = (await db.prepare('SELECT COALESCE(MAX(version),0) AS v FROM finance_order_adjustments WHERE order_id=?').bind(orderId).first<{ v: number }>())?.v ?? 0;
+  return { pending: false, capital_allocations: [] as VerifiedCapitalAllocation[], source_fingerprint: sourceFingerprint, allocations: rows.map((r) => {
+    const old = JSON.parse(r.snapshot) as Record<string, unknown>;
+    return { allocation_id: r.allocation_id, contract_id: r.contract_id, lot_id: r.lot_id, profit_iqd: 0, capital_iqd: 0, raw_loss_iqd: 0, loss_iqd: 0, eligible: false,
+      snapshot: JSON.stringify({ version, profit_basis: old.profit_basis ?? null, source_fingerprint: sourceFingerprint, contract_version: old.contract_version ?? null,
+        qty: 0, principal_iqd: 0, revenue: 0, cost: 0, expenses: 0, profit: 0, collected: false, delivered: false, lost_delivery: true }) };
+  }) };
+}
+/** Trusted SQL expression: an order whose lost delivery's investor projections
+ * are not yet the settled zero (the recovery scan's candidate). */
+export function investorLostDeliveryPendingSql(orderExpr: string) {
+  return `EXISTS(SELECT 1 FROM investor_allocation_results lr JOIN order_item_inventory_allocations la ON la.id=lr.allocation_id
+    WHERE la.order_id=${orderExpr} AND (lr.profit_iqd<>0 OR lr.capital_iqd<>0 OR lr.loss_iqd<>0 OR lr.eligible<>0 OR lr.pending<>0
+      OR json_extract(lr.snapshot,'$.source_fingerprint') IS NOT (${fingerprintSql.replace(/\?1/g, 'la.order_id')})))`;
+}
+
 /** Delivery/refund/correction/collection hook. Source events and journal commit together. */
 export async function syncInvestorOrder(db: D1Database, orderId: string, opts: { actor?: string; day?: string } = {}) {
   if (!await investorFinanceInstalled(db)) return;
-  const order = await db.prepare('SELECT status FROM orders WHERE id=?').bind(orderId).first<{ status: string }>();
+  const order = await db.prepare('SELECT status,delivered_at FROM orders WHERE id=?').bind(orderId).first<{ status: string; delivered_at: string | null }>();
   if (!order) return;
   const day = opts.day ?? baghdadDay();
   await recognizeLateCosts(db, orderId, day, opts.actor);
-  if (order.status !== 'delivered') return;
-  const split = await investorOrderSplit(db, orderId);
+  if (order.status !== 'delivered' && !order.delivered_at) return;
+  const split = order.status === 'delivered' ? await investorOrderSplit(db, orderId) : await lostDeliverySplit(db, orderId);
+  if (!split) return;
   if (split.pending) {
     const capital = split.capital_allocations ?? [];
     const contracts = (await db.prepare(`SELECT c.* FROM investment_contracts c WHERE c.id IN

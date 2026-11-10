@@ -309,7 +309,7 @@ test('only what the planner will cut is a candidate: never-delivered orders and 
   assert.equal(count(x.raw, 'SELECT COUNT(*) n FROM finance_cost_adjustments'), 0);
 });
 
-test('investor profit follows the wage: held while the sale is cancelled, re-synced with the wage on re-delivery', async () => {
+test('investor profit follows the wage: taken back while the sale is cancelled, re-synced with the wage on re-delivery', async () => {
   const x = await setup();
   const app = stubApp(x.db, { id: 'boss', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, (a) => a.route('/i', adminInvestmentFinanceRoutes));
   x.raw.exec(`INSERT INTO users(id,email,name,role,admin_scope) VALUES ('investor','investor@x.co','Investor','admin','assistant');
@@ -338,8 +338,9 @@ test('investor profit follows the wage: held while the sale is cancelled, re-syn
   x.cancel('ORD-FUNDED');
   assert.equal((await drainOrderFinanceRecovery(x.env)).completed, 1);
   assert.deepEqual(x.wages('ORD-FUNDED').map((w) => w.effective), [0]);
-  // A cancelled sale pays its investor nothing while it stays cancelled.
-  assert.equal((await investor()).investor_profit_available_iqd, 0);
+  // A cancelled sale is taken back from its investor like a return (DECISIONS
+  // row 308, tests/investorLostDelivery.test.ts): nothing earned, nothing held.
+  assert.deepEqual([(await investor()).investor_profit_iqd, (await investor()).investor_profit_available_iqd], [0, 0]);
 
   await x.redeliver('ORD-FUNDED');
   assert.deepEqual(x.wages('ORD-FUNDED').map((w) => w.effective), [2500]);
