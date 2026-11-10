@@ -4,6 +4,7 @@ import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance
 import { staffBasisFingerprintSql } from './financeParticipants';
 import { investorOrderProjectionStaleSql } from './investorFinance';
 import { membershipDiscountAtLineSql } from './orderMembership';
+import { settledCostSql, settlementInstalled } from './staffSettledSql';
 
 // An internal checkpoint, deliberately absent from SETTING_KEYS and
 // PUBLIC_SETTING_KEYS. No customer or admin setting API exposes this value.
@@ -34,11 +35,11 @@ export interface OrderFinanceRecoveryReport {
 // Genuine unknown costs remain candidates, but the rotating cursor prevents
 // them from starving later orders. Refund posting has its own writer and is
 // intentionally not claimed by this delivery-only repair.
-const candidate = `o.seller_type='levonis' AND o.status='delivered' AND o.delivered_at IS NOT NULL AND (
+const candidateSql = (settled: boolean) => `o.seller_type='levonis' AND o.status='delivered' AND o.delivered_at IS NOT NULL AND (
   (EXISTS(SELECT 1 FROM order_items oi WHERE oi.order_id=o.id)
     AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id))
   OR
-  EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.order_id=o.id AND c.staff_id IS NOT NULL AND c.state<>'reversed' AND (
+  EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.order_id=o.id AND c.staff_id IS NOT NULL AND c.state<>'reversed' AND NOT ${settledCostSql('c.id', settled)} AND (
     c.state='pending_cost' OR EXISTS(SELECT 1 FROM finance_wage_targets t WHERE t.cost_id=c.id AND t.amount_iqd IS NULL)
     OR (COALESCE((SELECT basis FROM finance_wage_targets t WHERE t.cost_id=c.id),CASE WHEN json_valid(c.snapshot) THEN json_extract(c.snapshot,'$.rule.basis') END) IN ('profit_percent','revenue_percent')
       AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id AND b.basis_fingerprint=(${staffBasisFingerprintSql('o.id')}))
@@ -94,6 +95,8 @@ export async function drainOrderFinanceRecovery(env: Env, opts: { maxOrders?: nu
   };
   const requested = opts.maxOrders ?? MAX_ORDERS;
   const limit = Number.isFinite(requested) ? Math.max(1, Math.min(MAX_ORDERS, Math.floor(requested))) : MAX_ORDERS;
+  // A settled wage row is final (DECISIONS row 306): it is never a reason to replay its order.
+  const candidate = candidateSql(await settlementInstalled(db));
   const select = () => db.prepare(`SELECT o.id FROM orders o WHERE o.id>? AND ${candidate} ORDER BY o.id LIMIT ?`).bind(state.cursor, limit).all<{ id: string }>();
   try {
     let orders = (await select()).results ?? [];

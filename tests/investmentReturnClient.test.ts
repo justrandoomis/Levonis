@@ -89,5 +89,8 @@ test('the screens use the words: the footer row, the saved block, the confirm gu
   assert.match(earnings, /ir\.batchesPending/);
   const profiles = codeOf('src/components/financePeople/InvestorProfiles.tsx');
   assert.doesNotMatch(profiles, /نقد غير مخصص/);
-  assert.match(profiles, /profilesReturned/);
+  // Rebuilt 2026-11-09 (DECISIONS row 304): the unused remainder is one part of
+  // «رجع إليه» on the person card, worded once for the owner and the investor.
+  assert.match(profiles, /<PersonCard /);
+  assert.match(codeOf('src/components/financePeople/PersonFinanceView.tsx'), /s\.unusedReturned/);
 });

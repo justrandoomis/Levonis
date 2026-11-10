@@ -176,18 +176,48 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
 export function planInvestorSources(db: D1Database, contract: InvestmentContract, day: string) {
   // All aggregates are evaluated inside the same D1 batch as each projection.
   // Two orders cannot publish a source calculated from an earlier read.
+  //
+  // ONE UNRESOLVED SALE HOLDS ONLY ITSELF (owner 2026-11-09; DECISIONS row
+  // 305). A pending sale is never eligible, so its own profit and principal
+  // already stay out of `available` and `capital`; it no longer zeroes the
+  // settled sales of the same agreement. Profit is per sale under every
+  // contract. Only a loss-sharing contract still holds all its capital while
+  // anything is pending: the unresolved sale may end as a loss that the
+  // capital account absorbs.
   return ['investor_profit','investor_capital'].map(kind => db.prepare(`
     WITH totals AS (SELECT COALESCE(SUM(profit_iqd),0) AS accrued,COALESCE(SUM(CASE WHEN eligible=1 THEN profit_iqd ELSE 0 END),0) AS available,
       COALESCE(SUM(capital_iqd),0) AS accrued_capital,COALESCE(SUM(CASE WHEN eligible=1 THEN capital_iqd ELSE 0 END),0) AS capital,COALESCE(SUM(loss_iqd),0) AS loss,COALESCE(MAX(pending),0) AS pending FROM investor_allocation_results WHERE contract_id=?1),
     funds AS (SELECT COALESCE(SUM(CASE WHEN kind='funding' THEN amount_iqd ELSE 0 END),0) AS funded,
       COALESCE(SUM(CASE WHEN allocation_id IS NULL AND kind IN ('loss','loss_correction') THEN amount_iqd ELSE 0 END),0) AS physical_loss FROM investor_finance_events WHERE contract_id=?1),
     value AS (SELECT CASE WHEN ?2='investor_profit' THEN accrued ELSE MAX(0,MIN(accrued_capital,funded-loss-physical_loss)) END AS accrued,
-      CASE WHEN pending=1 THEN 0 WHEN ?2='investor_profit' THEN CASE WHEN funded>=?3 THEN MAX(0,available) ELSE 0 END ELSE MAX(0,MIN(capital,funded-loss-physical_loss)) END AS amount FROM totals,funds)
+      CASE WHEN ?2='investor_profit' THEN CASE WHEN funded>=?3 THEN MAX(0,available) ELSE 0 END WHEN pending=1 AND ?9>0 THEN 0 ELSE MAX(0,MIN(capital,funded-loss-physical_loss)) END AS amount FROM totals,funds)
     INSERT INTO finance_investor_earnings(id,user_id,contract_id,kind,title,amount_iqd,accrued_iqd,state,day,updated_at)
     SELECT ?4,?5,?1,?2,?6,amount,accrued,CASE WHEN amount>0 THEN 'available' ELSE 'pending' END,?7,?8 FROM value WHERE 1
     ON CONFLICT(id) DO UPDATE SET amount_iqd=excluded.amount_iqd,accrued_iqd=excluded.accrued_iqd,state=excluded.state,
     version=finance_investor_earnings.version+1,updated_at=excluded.updated_at WHERE amount_iqd<>excluded.amount_iqd OR accrued_iqd<>excluded.accrued_iqd OR state<>excluded.state`)
-    .bind(contract.id,kind,contract.principal_iqd,`${kind === 'investor_profit' ? 'invprofit' : 'invcapital'}:${contract.id}`,contract.user_id,contract.name,day,new Date().toISOString()));
+    .bind(contract.id,kind,contract.principal_iqd,`${kind === 'investor_profit' ? 'invprofit' : 'invcapital'}:${contract.id}`,contract.user_id,contract.name,day,new Date().toISOString(),contract.loss_share_bps));
+}
+
+/**
+ * What a source still holds at read time, per sale (DECISIONS row 305): the
+ * eligible amount of each settled allocation whose order is being redone — a
+ * stale projection, a posting error, or a wage job that may still change it.
+ * Read and payout fences use these same two expressions, so a withdrawal is
+ * checked against exactly what the page showed.
+ */
+export function investorHeldPartSql(kindSql = 'e.kind', contractSql = 'e.contract_id') {
+  return `COALESCE((SELECT SUM(CASE WHEN ${kindSql}='investor_profit' THEN hr.profit_iqd ELSE hr.capital_iqd END)
+    FROM investor_allocation_results hr JOIN order_item_inventory_allocations ha ON ha.id=hr.allocation_id
+    WHERE hr.contract_id=${contractSql} AND hr.eligible=1 AND hr.pending=0 AND (
+      json_extract(hr.snapshot,'$.source_fingerprint') IS NOT (${fingerprintSql.replace(/\?1/g, 'ha.order_id')})
+      OR EXISTS(SELECT 1 FROM finance_posting_errors hpe WHERE hpe.order_id=ha.order_id)
+      OR ${investorEmploymentPendingSql(contractSql, kindSql, 'ha.order_id')})),0)`;
+}
+/** A loss-sharing contract's capital waits as a whole while anything in it is unresolved. */
+export function investorWholeHoldSql(kindSql = 'e.kind', contractSql = 'e.contract_id') {
+  return `(${kindSql}='investor_capital' AND EXISTS(SELECT 1 FROM investment_contracts wc WHERE wc.id=${contractSql} AND wc.loss_share_bps>0)
+    AND (${investorEmploymentPendingSql(contractSql, kindSql)} OR ${investorProjectionStaleSql(contractSql)}
+      OR EXISTS(SELECT 1 FROM finance_posting_errors wpe JOIN order_item_inventory_allocations wa ON wa.order_id=wpe.order_id JOIN inventory_lots wl ON wl.id=wa.lot_id JOIN investment_contracts wk ON wk.incoming_id=wl.incoming_id WHERE wk.id=${contractSql})))`;
 }
 
 /** Delivery/refund/correction/collection hook. Source events and journal commit together. */

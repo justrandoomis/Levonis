@@ -9,6 +9,7 @@ import { reconcileStaffOrderCosts } from './financeParticipants';
 import { recordFinancialFailure } from './financePostingErrors';
 import { wageVersions } from './financeWageTimeline';
 import { employmentInstalled, nextEmploymentDay, staffCanAccrue, type EmploymentStaff } from './financeEmployment';
+import { settledThroughSql, settlementInstalled } from './staffSettledSql';
 import { advanceCollectionsSql } from './membershipSaleCorrection';
 import { readDeletedProductFinanceScopes } from './financeDeletedProductScope';
 import { participantNetProfit } from './participantProfit';
@@ -227,7 +228,7 @@ export async function runOrderFinancialEffects(
   if (!snapshot) return;
   let frozen = JSON.parse(snapshot.rules_json) as RuleSnapshot;
   const hasEmployment=await employmentInstalled(db);
-  const staffRows=hasEmployment?(await db.prepare('SELECT * FROM finance_staff').all<EmploymentStaff>()).results??[]:[];
+  const staffRows=hasEmployment?(await db.prepare(`SELECT s.*,${settledThroughSql('s.id',await settlementInstalled(db))} AS settled_through FROM finance_staff s`).all<EmploymentStaff&{settled_through:string|null}>()).results??[]:[];
   const temporalVersions=await wageVersions(db);
   const temporalRules=new Set(temporalVersions.filter(v=>staffRows.find(s=>s.id===v.staff_id)?.start_work_date||(v.revision>1&&!v.id.startsWith('wage:baseline:'))).map(v=>v.rule_id));
   const temporalStaff=new Set(temporalVersions.filter(v=>temporalRules.has(v.rule_id)).map(v=>v.staff_id));
@@ -301,6 +302,9 @@ export async function runOrderFinancialEffects(
     if(staffOnly&&staff!==staffOnly.staffId)continue;
     const employee=staff?staffById.get(staff):undefined;
     if(employee&&!staffCanAccrue(employee,goods.order))continue;
+    // A settled period is closed (DECISIONS row 306): no new wage for an order delivered inside it.
+    const settledDay=employee?.settled_through,deliveredDay=goods.order.delivered_at?baghdadDay(new Date(String(goods.order.delivered_at).includes('T')?String(goods.order.delivered_at):`${String(goods.order.delivered_at).replace(' ','T')}Z`)):null;
+    if(settledDay&&deliveredDay&&deliveredDay<settledDay)continue;
     const relevant = goods.lines.filter((l) => lineIds.includes(l.id));
     const percentageLines=['profit_percent','revenue_percent'].includes(rule.basis)?percentageBase!.lines.filter(l=>lineIds.includes(l.id)):null;
     const qty = relevant.reduce((s, l) => s + l.qty, 0),

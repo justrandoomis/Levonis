@@ -3,6 +3,7 @@ import { baghdadDay, dateValue, fence, journalPlan, periodOpen } from './operati
 import { auditStatements } from './audit';
 import { newId } from './crypto';
 import { employmentIntervals, inactiveAt, inactiveAtSql, staffActiveAt, type EmploymentInterval } from './financeEmploymentIntervals';
+import { settledCostSql, settlementInstalled } from './staffSettledSql';
 
 export interface EmploymentStaff {
   id:string; name:string; role:string; user_id:string|null; active:number;
@@ -17,12 +18,15 @@ export const publicReconciliation=(job:StaffReconciliation|null)=>job?{staff_id:
 export const employmentInstalled=(db:D1Database)=>db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_staff_reconciliations'").first();
 /** A queued retrospective wage can alter both investor profit and, for
  * loss-sharing contracts, recovered principal. Read and payout fences share
- * this predicate so a job created after the balance read also invalidates it. */
-export const investorEmploymentPendingSql=(contractSql='e.contract_id',kindSql='e.kind')=>`EXISTS(
+ * this predicate so a job created after the balance read also invalidates it.
+ * With `orderSql`, only that order of the contract is asked about: a job holds
+ * the money of the sales it may still change, not the whole agreement
+ * (DECISIONS row 305). */
+export const investorEmploymentPendingSql=(contractSql='e.contract_id',kindSql='e.kind',orderSql?:string)=>`EXISTS(
   SELECT 1 FROM investment_contracts ec JOIN inventory_lots el ON el.incoming_id=ec.incoming_id
   JOIN order_item_inventory_allocations ea ON ea.lot_id=el.id JOIN orders eo ON eo.id=ea.order_id
   JOIN finance_staff_reconciliations ej JOIN finance_staff es ON es.id=ej.staff_id
-  WHERE ec.id=${contractSql} AND ej.state<>'complete' AND eo.id>ej.cursor AND (ej.affected_from IS NULL OR date(eo.delivered_at,'+3 hours')>=ej.affected_from) AND (ej.affected_until IS NULL OR date(eo.delivered_at,'+3 hours')<ej.affected_until)
+  WHERE ec.id=${contractSql}${orderSql?` AND eo.id=${orderSql}`:''} AND ej.state<>'complete' AND eo.id>ej.cursor AND (ej.affected_from IS NULL OR date(eo.delivered_at,'+3 hours')>=ej.affected_from) AND (ej.affected_until IS NULL OR date(eo.delivered_at,'+3 hours')<ej.affected_until)
   AND (${kindSql}='investor_profit' OR ec.loss_share_bps>0 OR EXISTS(SELECT 1 FROM finance_withdrawal_allocations pa WHERE pa.source_id='invprofit:'||ec.id AND pa.source_kind='investor_profit' AND pa.paid_iqd>0))
   AND (EXISTS(SELECT 1 FROM finance_order_costs cost WHERE cost.order_id=eo.id AND cost.staff_id=es.id AND cost.state<>'reversed')
     OR (es.start_work_date IS NOT NULL AND eo.status='delivered' AND date(eo.delivered_at,'+3 hours')>es.start_work_date
@@ -129,11 +133,13 @@ async function updateWithLegacyRules(db:D1Database,id:string,actor:string,statem
  * cash settlements and manual corrections remain immutable. */
 export async function reconcileEmploymentCutoff(db:D1Database,orderId:string,actor?:string,day=baghdadDay()) {
   if(!await employmentInstalled(db))return 0;
+  // A settled row is final (DECISIONS row 306): no cutoff moves its agreed amount.
+  const settled=await settlementInstalled(db);
   const rows=(await db.prepare(`SELECT c.id,c.rule_id,c.staff_id,c.amount_iqd,c.state,s.start_work_date,s.employment_version,s.active,s.archived_at,s.inactive_periods_json,o.status AS order_status,o.delivered_at,
     COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0) AS effective,
     COALESCE(c.amount_iqd,0)+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id AND a.employment_version IS NULL),0) AS intended,
     (SELECT COALESCE(SUM(a.amount_iqd-a.paid_iqd),0) FROM finance_withdrawal_allocations a JOIN finance_withdrawals w ON w.id=a.withdrawal_id WHERE a.source_kind='staff' AND a.source_id=c.id AND w.state IN ('requested','approved','part_paid')) AS held
-    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id WHERE c.order_id=? AND c.state IN ('due','approved')`).bind(orderId).all<EmploymentStaff&{id:string;rule_id:string;staff_id:string;amount_iqd:number;state:string;order_status:string;delivered_at:string|null;effective:number;intended:number;held:number}>()).results??[];
+    FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id JOIN orders o ON o.id=c.order_id WHERE c.order_id=? AND c.state IN ('due','approved') AND NOT ${settledCostSql('c.id',settled)}`).bind(orderId).all<EmploymentStaff&{id:string;rule_id:string;staff_id:string;amount_iqd:number;state:string;order_status:string;delivered_at:string|null;effective:number;intended:number;held:number}>()).results??[];
   const timeline=await db.prepare("SELECT 1 FROM sqlite_master WHERE name='finance_wage_versions'").first();
   const managed=timeline?new Set(((await db.prepare("SELECT DISTINCT v.rule_id FROM finance_wage_versions v JOIN finance_staff s ON s.id=v.staff_id WHERE s.start_work_date IS NOT NULL OR EXISTS(SELECT 1 FROM finance_wage_versions revised WHERE revised.rule_id=v.rule_id AND revised.revision>1 AND revised.id NOT LIKE 'wage:baseline:%')").all<{rule_id:string}>()).results??[]).map(r=>r.rule_id)):new Set<string>();
   const statements:D1PreparedStatement[]=[];let changed=0;

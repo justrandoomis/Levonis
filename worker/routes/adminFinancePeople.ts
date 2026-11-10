@@ -17,6 +17,9 @@ import { employmentDate, publicReconciliation, queueStaffReconciliation, readSta
 import { effectiveWageRules, wageVersions } from '../lib/financeWageTimeline';
 import { applyWageChange, previewWageChangePage, type WageChangeInput } from '../lib/financeWageChanges';
 import { continueStaffReconciliation } from '../lib/financeStaffAccrual';
+import { peopleFinance } from '../lib/personFinance';
+import { latestSettlements, planStaffSettlement, settleStaffWages, settlementInvestors } from '../lib/staffSettlement';
+import { settledCostSql, settlementInstalled } from '../lib/staffSettledSql';
 
 export const adminFinancePeopleRoutes = new Hono<AppContext>();
 adminFinancePeopleRoutes.use('*',requireAdmin);
@@ -86,7 +89,9 @@ adminFinancePeopleRoutes.get('/staff',async(c)=>{
   const rr=(rules.results??[]).map(r=>{const current=currentRules.get(String(r.id));return current?{...r,...current,version:r.version}:r;}).map((r)=>({...r,scope:readRuleScope(r)??{catalog_ids:r.target_type==='catalog'?[r.target_id]:[],product_ids:r.target_type==='product'?[r.target_id]:[],excluded_product_ids:[]}}));
   const ids=[...new Set(rr.flatMap((r)=>[...r.scope.product_ids,...r.scope.excluded_product_ids]))];
   const products=ids.length?await db.prepare('SELECT id,name,name_ar,name_en,sku FROM products WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(ids)).all():{results:[]};
-  return c.json({success:true,can_manage_staff:isOwner(c.env,c.get('user')!),staff:(staff.results??[]).map(s=>({...s,active:Number(staffActiveAt(s as unknown as import('../lib/financeEmployment').EmploymentStaff)),cutoff_earnings:cutoffByStaff.get(String(s.id))??null,balance:balances.get(String(s.id))??null,period:periods.get(String(s.id))??{earned_iqd:0,paid_iqd:0,adjustments_iqd:0,pending_costs:0}})),catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[],reconciliations:(jobs.results??[]).map(publicReconciliation)});
+  // The latest wage settlement of every employee, linked or not, live or removed (the «تسوية الأجور» dialog's lower bound).
+  const settled=await latestSettlements(db,(staff.results??[]).map(s=>String(s.id)));
+  return c.json({success:true,can_manage_staff:isOwner(c.env,c.get('user')!),staff:(staff.results??[]).map(s=>({...s,active:Number(staffActiveAt(s as unknown as import('../lib/financeEmployment').EmploymentStaff)),cutoff_earnings:cutoffByStaff.get(String(s.id))??null,balance:balances.get(String(s.id))??null,period:periods.get(String(s.id))??{earned_iqd:0,paid_iqd:0,adjustments_iqd:0,pending_costs:0},settlement:settled.get(String(s.id))??null})),catalogs:catalogs.results??[],rules:rr,scope_products:products.results??[],reconciliations:(jobs.results??[]).map(publicReconciliation)});
 });
 adminFinancePeopleRoutes.post('/staff',async(c)=>{
   const actor=c.get('user')!;await requireCapability(c.env,actor,'rules');if(!isOwner(c.env,actor))throw forbidden('تعديل الموظفين وتواريخهم للأدمن الرئيسي فقط');
@@ -142,6 +147,29 @@ adminFinancePeopleRoutes.post('/staff/:id/recheck',async(c)=>{
     return c.json({success:true,already:false,reconciliation});
   }catch(e){if(/CHECK constraint|UNIQUE constraint/.test(String(e)))throw conflict('تغير حساب الموظف أثناء بدء الفحص؛ حدّث البيانات');throw e;}
 });
+/** WAGE SETTLEMENT (owner 2026-11-10; DECISIONS row 306): one agreed amount still
+ * owed for every order an employee earned on before `through_day`
+ * (worker/lib/staffSettlement.ts). `preview: true` answers what would change
+ * and writes nothing; it also names the investors whose goods those orders sold
+ * (a wage cut raises their profit). The owner's screen: WageSettlementDialog.tsx. */
+adminFinancePeopleRoutes.post('/staff/:id/settle',async(c)=>{
+  const actor=c.get('user')!;await requireCapability(c.env,actor,'pay');if(!isOwner(c.env,actor))throw forbidden('تسوية الأجور للأدمن الرئيسي فقط');
+  const b=await c.req.json<Record<string,unknown>>(),id=c.req.param('id'),db=c.env.DB;
+  const through=dateValue(b.through_day),owed=whole(b.owed_iqd,'المبلغ المتفق عليه',0);
+  if(b.preview===true){const {lines:_lines,fingerprint:_fingerprint,...preview}=await planStaffSettlement(db,id,through,owed);return c.json({success:true,preview:{...preview,investors:await settlementInvestors(db,preview.order_changes)}});}
+  const expected=b.expected_owed_before_iqd===undefined?undefined:Number(b.expected_owed_before_iqd);
+  if(expected!==undefined&&!Number.isSafeInteger(expected))throw badRequest('الرصيد المتوقع غير صحيح');
+  const operation=b.operation_id===undefined?undefined:str(b.operation_id,'operation_id',{min:8,max:80});
+  return c.json({success:true,...await settleStaffWages(db,{staffId:id,throughDay:through,owedIqd:owed,reason:typeof b.reason==='string'?b.reason:'',actor:actor.id,expectedOwedBefore:expected,operationId:operation})});
+});
+/** «الأشخاص» — every person the owner pays, one picture each: capital, share,
+ * profit and why any of it is held, return, wages, and the combined total
+ * (worker/lib/personFinance.ts). The period adds what was earned in it. */
+adminFinancePeopleRoutes.get('/people',async(c)=>{
+  await requireCapability(c.env,c.get('user')!,'accounting');
+  const range=financeRange(c.req.query());
+  return c.json({success:true,range,people:await peopleFinance(c.env.DB,range.from||range.to?range:undefined)});
+});
 adminFinancePeopleRoutes.get('/accounts/:id/earnings',async(c)=>{
   await requireCapability(c.env,c.get('user')!,'pay');
   return c.json({success:true,...await participantOverview(c.env.DB,c.req.param('id'),{foldProfitShare:false})});
@@ -173,6 +201,7 @@ adminFinancePeopleRoutes.patch('/costs/:id',async(c)=>{
   const b=await c.req.json<Record<string,unknown>>(),amount=whole(b.amount_iqd,'المبلغ'),db=c.env.DB,id=c.req.param('id');
   const old=await db.prepare(`SELECT c.*,${effectiveStaffCostSql()} AS effective_iqd,${staffPaidSql()} AS paid_iqd,${heldSourceSql("'staff'",'c.id')} AS held_iqd FROM finance_order_costs c WHERE c.id=?`).bind(id).first<{state:string;effective_iqd:number|null;paid_iqd:number;held_iqd:number;staff_id:string|null;order_id:string}>();
   if(!old)throw notFound('الاستحقاق غير موجود');
+  if(await settlementInstalled(db)&&await db.prepare(`SELECT ${settledCostSql('?',true)} AS settled`).bind(id).first<{settled:number}>().then(r=>!!r?.settled))throw conflict('هذا الأجر ضمن تسوية نهائية متفق عليها؛ لا يُعدّل');
   if(!['due','approved'].includes(old.state)||old.effective_iqd===null)throw conflict('الاستحقاق ينتظر تثبيت التكلفة أو تم عكسه');
   const employee=old.staff_id?await readStaff(db,old.staff_id):null;
   const delivery=await db.prepare('SELECT status,delivered_at FROM orders WHERE id=?').bind(old.order_id).first<{status:string;delivered_at:string|null}>();
