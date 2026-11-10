@@ -577,6 +577,20 @@ interface ResolvedTaxonomy {
   catalogs: Map<string, CatalogRow>;
 }
 
+/**
+ * Whether `ancestorId` is a section ABOVE `leafId` in the stored tree (never the same section). Walks the
+ * leaf's parents, at most 12 steps as `resolveCatalogs` does, so bad data with a cycle cannot loop.
+ */
+export function isStrictAncestor(catalogs: ReadonlyMap<string, { parent_id: string | null }>, ancestorId: string | null, leafId: string): boolean {
+  if (!ancestorId || ancestorId === leafId) return false;
+  let at = catalogs.get(leafId)?.parent_id ?? null;
+  for (let steps = 0; at && steps < 12; steps++) {
+    if (at === ancestorId) return true;
+    at = catalogs.get(at)?.parent_id ?? null;
+  }
+  return false;
+}
+
 async function resolveCatalogs(db: D1Database, tax: TaxonomyResolution): Promise<ResolvedTaxonomy> {
   const { results } = await db
     .prepare('SELECT id, parent_id, slug, template_family, is_printer_catalog, active FROM catalogs')
@@ -1208,7 +1222,11 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     prev = parseProductRow(prevRow!);
     doc = parseProductRow(prevRow!);
     if (match!.decision === 'merge_publish') doc.status = 'active';
-    // An EMPTY classification is filled from the map (§E.2), logged; a non-empty one is never touched.
+    // An EMPTY classification is filled from the map (§E.2), logged; a non-empty one is never moved
+    // elsewhere. It is only REFINED: a product the owner filed on a section that CONTAINS the map's leaf
+    // (an «مواد FDM» filament whose leaf is «PLA», a section created later inside «مواد FDM») moves down
+    // into that leaf, logged as category_filled. It stays inside the section the owner chose; keeping it
+    // on the parent left it in no section at all (owner, 2026-11-10; DECISIONS row 309).
     if (!doc.category_id) {
       doc.category_id = tax.category_id;
       conflicts.push({ kind: 'category_filled', field: 'category_id' });
@@ -1216,7 +1234,12 @@ export async function planImportWrite(ctx: ImportWriteContext, input: ImportWrit
     if (!doc.sub_category_id && tax.sub_category_id) {
       doc.sub_category_id = tax.sub_category_id;
       conflicts.push({ kind: 'category_filled', field: 'sub_category_id' });
-    } else if (tax.sub_category_id && doc.sub_category_id !== tax.sub_category_id) conflicts.push({ kind: 'field_kept_existing', field: 'sub_category_id' });
+    } else if (tax.sub_category_id && doc.sub_category_id !== tax.sub_category_id) {
+      if (doc.category_id === tax.category_id && isStrictAncestor(tax.catalogs, doc.sub_category_id, tax.sub_category_id)) {
+        doc.sub_category_id = tax.sub_category_id;
+        conflicts.push({ kind: 'category_filled', field: 'sub_category_id' });
+      } else conflicts.push({ kind: 'field_kept_existing', field: 'sub_category_id' });
+    }
     if (!doc.name_en.trim()) {
       doc.name_en = payload.product.title_en;
       filled.push('name');

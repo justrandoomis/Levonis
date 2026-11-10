@@ -74,6 +74,7 @@ import {
   importWriteContext,
   ImportWriteRefused,
   IMPORT_ACTOR,
+  isStrictAncestor,
   MONEY_PROBE_SQL,
   moneyProbeAtDefault,
   planImportWrite,
@@ -306,10 +307,10 @@ test('content: a section heading opens its section once, not every text piece of
 
 // ---------------------------------------------------------------- merges (§E.2–§E.4)
 
-async function existingA1(w: World): Promise<void> {
+async function existingA1(w: World, subCategoryId: string | null = null): Promise<void> {
   w.raw.exec("INSERT OR IGNORE INTO users (id, name, email, password_hash, role) VALUES ('usr_owner', 'O', 'o@x.co', 'h', 'admin')");
   const db = asD1(w.raw);
-  const doc = validateProductDoc({ id: 'p_a1old', slug: 'bambu-lab-a1', name_en: 'Bambu Lab A1', name_ar: 'بامبو A1', name_ckb: 'بامبو A1 (کوردی)', price_iqd: 0, status: 'active', category_id: 'cat_printers', brand_id: 'brd_bambu', description_en: 'Our own description.' });
+  const doc = validateProductDoc({ id: 'p_a1old', slug: 'bambu-lab-a1', name_en: 'Bambu Lab A1', name_ar: 'بامبو A1', name_ckb: 'بامبو A1 (کوردی)', price_iqd: 0, status: 'active', category_id: 'cat_printers', sub_category_id: subCategoryId, brand_id: 'brd_bambu', description_en: 'Our own description.' });
   const plan0 = await planProductSave(db, {
     mode: 'create',
     doc,
@@ -395,6 +396,50 @@ test('a merge into a V2-published product: protected fingerprints equal, V2 resu
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM catalog_import_protected WHERE phase = 'write' AND subject = 'p_a1old'"), 1, 'the write digest, stored');
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM product_option_source_refs WHERE product_id = 'p_a1old' AND kind = 'value' AND levonis_id IN ('v_std','v_combo')"), 2);
   assert.deepEqual(violations, []);
+});
+
+/**
+ * THE LIVE CASE OF 2026-11-10 (DECISIONS row 309), on the A1 the fixtures already merge: a product the owner
+ * filed on a section that CONTAINS the map's leaf moves down into the leaf. On live, fifteen Bambu PLA filaments
+ * filed on «مواد FDM» kept that filing when the map placed them in «PLA», a section created inside «مواد FDM»,
+ * and the PLA section listed one product. Here «FDM Printers» is moved under a middle section the A1 is filed on.
+ */
+test('a merge refines a filing on a section above the map’s leaf into the leaf, and keeps a filing elsewhere', async () => {
+  for (const [filedOn, want, kind] of [
+    ['cat_printers_mid', 'cat_printers_fdm', 'category_filled'],
+    ['cat_printers_other', 'cat_printers_other', 'field_kept_existing'],
+  ] as const) {
+    const w = newWorld();
+    w.raw.exec(`INSERT INTO catalogs (id, parent_id, slug, name_ar, name_en, name_ckb, sort, is_printer_catalog, active, template_family) VALUES
+      ('cat_printers_mid', 'cat_printers', 'printers-mid', 'وسط', 'Middle', 'ناوەڕاست', 50, 1, 1, NULL),
+      ('cat_printers_other', 'cat_printers', 'printers-other', 'أخرى', 'Other', 'هی تر', 51, 1, 1, NULL)`);
+    w.raw.exec("UPDATE catalogs SET parent_id = 'cat_printers_mid' WHERE id = 'cat_printers_fdm'");
+    await existingA1(w, filedOn);
+    w.matches.push(a1Match());
+    const s = stage(w, 'a1', { writeMode: 'merge', mergeProductId: 'p_a1old' });
+    const { result } = await write(w, s);
+    assert.equal(result.merged, true, filedOn);
+    assert.deepEqual(one(w, 'SELECT category_id, sub_category_id FROM products WHERE id = ?', 'p_a1old'), { category_id: 'cat_printers', sub_category_id: want }, filedOn);
+    assert.equal(count(w.raw, `SELECT COUNT(*) AS n FROM catalog_import_conflicts WHERE kind = '${kind}' AND field = 'sub_category_id'`), 1, filedOn);
+  }
+});
+
+test('isStrictAncestor: a section above the leaf, never the leaf itself, a sibling or a cycle', () => {
+  const tree = new Map<string, { parent_id: string | null }>([
+    ['root', { parent_id: null }],
+    ['fdm', { parent_id: 'root' }],
+    ['pla', { parent_id: 'fdm' }],
+    ['petg', { parent_id: 'fdm' }],
+    ['loop_a', { parent_id: 'loop_b' }],
+    ['loop_b', { parent_id: 'loop_a' }],
+  ]);
+  assert.equal(isStrictAncestor(tree, 'fdm', 'pla'), true);
+  assert.equal(isStrictAncestor(tree, 'root', 'pla'), true);
+  assert.equal(isStrictAncestor(tree, 'pla', 'pla'), false);
+  assert.equal(isStrictAncestor(tree, 'petg', 'pla'), false);
+  assert.equal(isStrictAncestor(tree, 'pla', 'fdm'), false);
+  assert.equal(isStrictAncestor(tree, null, 'pla'), false);
+  assert.equal(isStrictAncestor(tree, 'nowhere', 'loop_a'), false);
 });
 
 test('a merge into a printer with a legacy warranty plan and a pre-order route without `active`: fingerprinted by the fee tuples, equal', async () => {

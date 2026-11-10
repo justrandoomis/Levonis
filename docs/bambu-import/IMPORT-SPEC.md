@@ -1406,7 +1406,7 @@ Taxonomy verification is part of §I.1 (the category and subcategory listing, th
 
 **Never changed:**
 
-- `name`, `name_ar`, `name_ku` (unless empty), `slug`, `status` (except under `merge_publish`), and a non-empty `category_id` / `sub_category_id`;
+- `name`, `name_ar`, `name_ku` (unless empty), `slug`, `status` (except under `merge_publish`), and a non-empty `category_id` / `sub_category_id` (one exception, refining, below);
 - existing memberships, which are only added to;
 - option groups, values and variants: no add, remove or rename;
 - every money, stock and package column; `sale_types`, `inventory_mode`, `sku`;
@@ -1419,6 +1419,7 @@ Taxonomy verification is part of §I.1 (the category and subcategory listing, th
 - images appended after the existing ones, bound only through `value_map`: to existing option values or variants, or **by `color_id` to existing `product_colors`** (a hex is never written); unmapped images stay product-level;
 - secondary category memberships;
 - an **empty** `category_id` or `sub_category_id` filled from the map (an additive change, logged as `category_filled` and in the merge report);
+- a `sub_category_id` that is a section **above** the map's leaf, under the same `category_id`, **refined** to the leaf (logged as `category_filled`): the product stays inside the section the owner chose, one level more specific. Fifteen Bambu PLA filaments filed on «مواد FDM» before the import created «PLA» inside it kept that filing, and the PLA section listed one product (2026-11-10, docs/DECISIONS.md row 309; `isStrictAncestor`, worker/lib/catalogImport/writer.ts). A filing on any other section is still kept, as `field_kept_existing`;
 - `product_spec_values`, `product_documents`, `product_external_ids`, `product_relations`, `product_source_refs` (`match_kind 'merged'`, `stock_decision 'not_required'`), `product_option_source_refs` (mapped values);
 - swatches for mapped colour **option values** (not for `product_colors`, which carry their own swatch);
 - `spec_fields` keys that are empty today;

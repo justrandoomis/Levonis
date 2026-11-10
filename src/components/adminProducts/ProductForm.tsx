@@ -126,6 +126,7 @@ import { ImagesSection } from './form/ImagesSection';
 import { MainImagesPair } from './form/MainImagesPair';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
 import { setLeaveGuard } from '../../lib/leaveGuard';
+import { subSectionOptions } from './subSectionOptions';
 
 interface TemplateField {
   id: string;
@@ -520,8 +521,10 @@ export default function ProductForm({
     () => catalogs.filter((c) => !c.parent_id && (c.active || c.id === doc.category_id)),
     [catalogs, doc.category_id]
   );
+  // Every active section UNDER the main one, not only its direct children: «PLA» sits inside «مواد FDM»,
+  // and a list one level deep could never file a filament there (DECISIONS row 309; subSectionOptions.ts).
   const children = useMemo(
-    () => catalogs.filter((c) => (c.parent_id === doc.category_id && c.active) || (!!doc.sub_category_id && c.id === doc.sub_category_id)),
+    () => subSectionOptions(catalogs, doc.category_id, doc.sub_category_id),
     [catalogs, doc.category_id, doc.sub_category_id]
   );
   const filteredBrands = useMemo(() => {
@@ -1325,8 +1328,8 @@ export default function ProductForm({
                 >
                   <option value="">— بدون —</option>
                   {children.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name_ar} · {c.name_en}
+                    <option key={c.id} value={c.id} data-depth={c.depth}>
+                      {c.label_ar} · {c.label_en}
                     </option>
                   ))}
                 </Select>
