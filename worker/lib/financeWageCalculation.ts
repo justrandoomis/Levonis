@@ -38,13 +38,19 @@ export function deliveryDay(order:Record<string,unknown>):string|null {
   const value=String(order.delivered_at),at=new Date(value.includes('T')?value:`${value.replace(' ','T')}Z`);
   return Number.isNaN(at.getTime())?null:baghdadDay(at);
 }
+/** The delivery an order no longer has (DECISIONS row 307): it is not delivered
+ * now, but it was — a platform order keeps its first `delivered_at` when it is
+ * later cancelled or moved back. Its wages are planned on that day, at 0. */
+export function lostDeliveryDay(order:Record<string,unknown>):string|null {
+  return order.status==='delivered'?null:deliveryDay({...order,status:'delivered'});
+}
 /** This plan is shared by the read-only preview and the posting job. Original
  * order snapshots are evidence, never the authority for a later wage change. */
 export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:OrderProfitBase,versions:WageVersion[]):Promise<WageTarget[]> {
   const installed=await settlementInstalled(db);
   const old=(await db.prepare(wageCostQuery(installed)).bind(base.order_id,staff.id).all<WageCost>()).results??[];
   const managed=new Set(versions.map(v=>v.rule_id));
-  const day=deliveryDay(base.order);
+  const delivered=deliveryDay(base.order),day=delivered??lostDeliveryDay(base.order);
   if(!day)return [];
   // A settled period is closed (DECISIONS row 306): its agreed rows stay as they
   // are and no new row is created for an order delivered inside it.
@@ -52,7 +58,10 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
   const carried=(staff as EmploymentStaff&{settled_through?:string|null}).settled_through;
   const through=carried!==undefined?carried:installed?(await db.prepare(`SELECT ${settledThroughSql('?',true)} AS through_day`).bind(staff.id).first<{through_day:string|null}>())?.through_day??null:null;
   if(through&&day<through)return [];
-  const eligible=staffCanAccrue(staff,base.order);
+  // An order that stopped being delivered earns nothing: as with an employment
+  // cutoff, every managed row comes to 0 below (a paid part stays as debt, an
+  // open withdrawal blocks it), and a re-delivery plans the wage again.
+  const eligible=!!delivered&&staffCanAccrue(staff,base.order);
   const rules=eligible?effectiveWageRules(versions,staff,day):[];
   // Pre-timeline revisions do not prove when an old value was agreed to start.
   // Keep their already-earned rule as evidence until an explicit new boundary
@@ -149,7 +158,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
   const revisedRules=new Set(allVersions.filter(v=>v.revision>1&&!v.id.startsWith('wage:baseline:')).map(v=>v.rule_id));
   const versions=allVersions.filter(v=>datedStaff.has(v.staff_id)||revisedRules.has(v.rule_id));
   if(!versions.length)return {adjusted:0,managed:new Set<string>(),netCostsChanged:false};
-  const base=await getOrderProfitBase(db,orderId),earningDay=deliveryDay(base.order);
+  const base=await getOrderProfitBase(db,orderId),delivered=deliveryDay(base.order),earningDay=delivered??lostDeliveryDay(base.order);
   const managed=new Set(versions.map(v=>v.rule_id));if(!earningDay)return {adjusted:0,managed:new Set<string>(),netCostsChanged:false};
   const source=await profitSourceFingerprint(db,orderId);
   const scopeInstalled=(await db.prepare('PRAGMA table_info(finance_wage_targets)').all<{name:string}>()).results.some(c=>c.name==='line_ids_json');
@@ -188,7 +197,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
       }else if(cost&&amount!==null&&amount!==cost.effective_iqd){
         const delta=amount-(cost.effective_iqd??0),adjustment=newId('wagefix');
         const revision=(await db.prepare('SELECT COUNT(*) AS n FROM finance_cost_adjustments WHERE cost_id=?').bind(id).first<{n:number}>())!.n;
-        const reason=!staffDateEligible(staff,base.order)?'خارج تاريخ بدء استحقاق الموظف':!staffCanAccrue(staff,base.order)?'تسوية فترة توقف الموظف':rule.change_reason==='إنشاء قاعدة الأجر'||!rule.change_reason?'إعادة احتساب الأجر بحسب يوم التسليم وفترات العمل':rule.change_reason;
+        const reason=!delivered?'الطلب لم يعد مُسلَّمًا؛ يعود أجره إلى صفر حتى يُسلَّم من جديد':!staffDateEligible(staff,base.order)?'خارج تاريخ بدء استحقاق الموظف':!staffCanAccrue(staff,base.order)?'تسوية فترة توقف الموظف':rule.change_reason==='إنشاء قاعدة الأجر'||!rule.change_reason?'إعادة احتساب الأجر بحسب يوم التسليم وفترات العمل':rule.change_reason;
         statements.push(db.prepare("INSERT INTO finance_cost_adjustments(id,cost_id,kind,delta_iqd,before_iqd,after_iqd,actor_id,adjustment_day,created_at,employment_version,reason,wage_version_id,earning_day,recalculation_key) VALUES (?,?,'recalculation',?,?,?,?,?,?,?,?,?,?,?)")
           .bind(adjustment,id,delta,cost.effective_iqd??0,amount,opts.actor??null,day,now,staff.employment_version,reason,rule.wage_version_id??null,earningDay,`wage:${id}:${staff.employment_version}:${revision}:${amount}`),
           ...journalPlan(db,{key:`wage-adjustment:${adjustment}`,day,title:reason,source:'finance_cost_adjustment',sourceId:adjustment,actor:opts.actor},delta>0?[{account:'5100',debit:delta},{account:liability,credit:delta}]:[{account:liability,debit:-delta},{account:'5100',credit:-delta}]).statements,

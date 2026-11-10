@@ -1,10 +1,11 @@
 import type { Env } from './types';
 import { baghdadDay, periodOpen } from './operations';
 import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
-import { staffBasisFingerprintSql } from './financeParticipants';
+import { reconcileStaffOrderCosts, staffBasisFingerprintSql } from './financeParticipants';
+import { reconcileEmploymentCutoff } from './financeEmployment';
 import { investorOrderProjectionStaleSql } from './investorFinance';
 import { membershipDiscountAtLineSql } from './orderMembership';
-import { settledCostSql, settlementInstalled } from './staffSettledSql';
+import { settledCostSql, settledThroughSql, settlementInstalled } from './staffSettledSql';
 
 // An internal checkpoint, deliberately absent from SETTING_KEYS and
 // PUBLIC_SETTING_KEYS. No customer or admin setting API exposes this value.
@@ -34,8 +35,8 @@ export interface OrderFinanceRecoveryReport {
 // no investor. Replaying it also records a checkpoint when no wage applies.
 // Genuine unknown costs remain candidates, but the rotating cursor prevents
 // them from starving later orders. Refund posting has its own writer and is
-// intentionally not claimed by this delivery-only repair.
-const candidateSql = (settled: boolean) => `o.seller_type='levonis' AND o.status='delivered' AND o.delivered_at IS NOT NULL AND (
+// intentionally not claimed by this delivery repair.
+const deliveredCandidateSql = (settled: boolean) => `o.seller_type='levonis' AND o.status='delivered' AND o.delivered_at IS NOT NULL AND (
   (EXISTS(SELECT 1 FROM order_items oi WHERE oi.order_id=o.id)
     AND NOT EXISTS(SELECT 1 FROM finance_staff_basis b WHERE b.order_id=o.id))
   OR
@@ -50,6 +51,26 @@ const candidateSql = (settled: boolean) => `o.seller_type='levonis' AND o.status
   OR ${investorOrderProjectionStaleSql('o.id')}
   OR EXISTS(SELECT 1 FROM finance_posting_errors e WHERE e.order_id=o.id AND e.event_key IN (
     'delivered:'||o.id,'cogs:'||o.id,'investor:'||o.id,'investor-pending:'||o.id,'workspace-reconciliation:'||o.id,'automatic-finance:'||o.id)))`;
+// AN ORDER THAT LOST ITS DELIVERY (DECISIONS row 307). Cancelled or moved back
+// after delivery, it keeps `delivered_at`, and its timeline-managed wages used
+// to keep counting, held for ever. It is a candidate while such a live,
+// unsettled wage is not 0 — exactly the rows reconcileEffectiveWages brings to
+// 0: a rule with a wage version of this employee who is dated or whose rule was
+// revised, on an order delivered on or after the employee's settled day. An
+// open withdrawal on any of the order's unsettled wages makes the writers refuse
+// the cut, so the order waits, unselected, until that withdrawal is paid or
+// released, instead of failing every minute.
+const lostDeliverySql = (settled: boolean) => `o.seller_type='levonis' AND o.status<>'delivered' AND o.delivered_at IS NOT NULL
+  AND EXISTS(SELECT 1 FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id
+    WHERE c.order_id=o.id AND c.state<>'reversed' AND NOT ${settledCostSql('c.id', settled)}
+      AND (c.amount_iqd IS NULL OR c.amount_iqd+COALESCE((SELECT SUM(a.delta_iqd) FROM finance_cost_adjustments a WHERE a.cost_id=c.id),0)<>0)
+      AND EXISTS(SELECT 1 FROM finance_wage_versions v WHERE v.rule_id=c.rule_id AND v.staff_id=c.staff_id AND (s.start_work_date IS NOT NULL
+        OR EXISTS(SELECT 1 FROM finance_wage_versions r WHERE r.rule_id=v.rule_id AND r.revision>1 AND r.id NOT LIKE 'wage:baseline:%')))
+      AND COALESCE(date(o.delivered_at,'+3 hours')>=${settledThroughSql('s.id', settled)},1))
+  AND NOT EXISTS(SELECT 1 FROM finance_order_costs hc JOIN finance_withdrawal_allocations wa ON wa.source_kind='staff' AND wa.source_id=hc.id
+    JOIN finance_withdrawals w ON w.id=wa.withdrawal_id
+    WHERE hc.order_id=o.id AND w.state IN ('requested','approved','part_paid') AND wa.amount_iqd>wa.paid_iqd AND NOT ${settledCostSql('hc.id', settled)})`;
+const candidateSql = (settled: boolean) => `((${deliveredCandidateSql(settled)}) OR (${lostDeliverySql(settled)}))`;
 
 function checkpoint(value: string): Checkpoint {
   try {
@@ -97,7 +118,7 @@ export async function drainOrderFinanceRecovery(env: Env, opts: { maxOrders?: nu
   const limit = Number.isFinite(requested) ? Math.max(1, Math.min(MAX_ORDERS, Math.floor(requested))) : MAX_ORDERS;
   // A settled wage row is final (DECISIONS row 306): it is never a reason to replay its order.
   const candidate = candidateSql(await settlementInstalled(db));
-  const select = () => db.prepare(`SELECT o.id FROM orders o WHERE o.id>? AND ${candidate} ORDER BY o.id LIMIT ?`).bind(state.cursor, limit).all<{ id: string }>();
+  const select = () => db.prepare(`SELECT o.id,o.status FROM orders o WHERE o.id>? AND ${candidate} ORDER BY o.id LIMIT ?`).bind(state.cursor, limit).all<{ id: string; status: string }>();
   try {
     let orders = (await select()).results ?? [];
     if (!orders.length && state.cursor) {
@@ -114,7 +135,14 @@ export async function drainOrderFinanceRecovery(env: Env, opts: { maxOrders?: nu
         const day = baghdadDay();
         await periodOpen(db, day);
         writerStarted = true;
-        await runOrderFinancialEffects(env, order.id, 'delivered', day);
+        // An order that lost its delivery has no sale to post: only its wages
+        // move, to 0 (DECISIONS row 307), through the same two wage writers
+        // reconcileFinanceOrder runs, in the same order.
+        if (order.status === 'delivered') await runOrderFinancialEffects(env, order.id, 'delivered', day);
+        else {
+          await reconcileEmploymentCutoff(db, order.id, undefined, day);
+          await reconcileStaffOrderCosts(db, order.id, { day });
+        }
         // These markers describe the same full reconciliation just completed.
         // COGS/unknown/refund failures are owned by their original writers.
         await db.prepare('DELETE FROM finance_posting_errors WHERE order_id=? AND event_key IN (?,?)')

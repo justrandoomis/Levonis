@@ -94,10 +94,14 @@ test('Hussein: the agreed 75,000-style amount is all payable at once — a cance
   for (let d = 21; d <= 26; d++) await order(`o${d}`, `2026-09-${d}T10:00:00.000Z`);
   await order('cancelled', '2026-09-27T10:00:00.000Z');
   const id = await staff(); await rule(id); await drain(id);
+  assert.equal((await send(boss, 'DELETE', `/people/staff/${id}`)).status, 200); await drain(id);
+  // Cancelled after the last recalculation, before anything reconciled it: its
+  // wage still counts, held. (A recalculation or the recovery scan brings it to
+  // 0 — DECISIONS row 307, tests/wageLostDelivery.test.ts — and the settlement
+  // then finds nothing to cut there.)
   raw.prepare("UPDATE orders SET status='cancelled' WHERE id='cancelled'").run();
   let b = await balance();
   assert.equal(b.staff_iqd, 17500); assert.equal(b.staff_available_iqd, 15000); assert.equal(b.reconciliation_pending, true);
-  assert.equal((await send(boss, 'DELETE', `/people/staff/${id}`)).status, 200); await drain(id);
   const entriesBefore = count(raw, 'SELECT COUNT(*) n FROM accounting_entries');
 
   // The preview writes nothing and says what will happen.
