@@ -13,8 +13,9 @@ import { resolveListingRoute } from '../lib/catalog/listingModel';
 import { listingFirstPagePath, parseListing } from '../lib/catalog/listingQuery';
 import { listingCategory, listsBySlug, primeGet } from '../lib/bootFetch';
 import { nodeDescription, nodeName } from '../lib/catalog/categoryPageModel';
-import { nounKindFor } from '../lib/catalog/copy';
+import { nounKindFor, sectionStockLabel, type SectionStock } from '../lib/catalog/copy';
 import { bannerRows } from '../lib/catalog/explorerModel';
+import { CATEGORY_PAGE_CAP, withStock } from '../lib/catalog/sectionStock';
 import { sectionTypeOf } from '../lib/catalog/listingModel';
 import type { CatalogTreeNode, CatalogTreeResponse } from '../lib/catalog/types';
 
@@ -76,7 +77,38 @@ export default function CategoryListing() {
 
   const route = tree ? resolveListingRoute(tree.roots, categorySlug, subCategorySlug) : null;
   const shown = route ? (route.all ? null : route.node) : fallback && fallback !== 'missing' && !fallback.root ? fallback.node : null;
-  const rows = useBannerPhotos(useMemo(() => bannerRows(shown?.children ?? [], []), [shown]));
+
+  // THE SECTION'S STOCK, EXACT (owner, 2026-11-11; DECISIONS row 309). The map stops counting stock past
+  // its cap (worker/routes/catalog.ts TREE_AVAILABILITY_CAP; the live shop is past it), so its rows would
+  // say nothing; the section's own answer counts every product of its subtree from the cards it reads,
+  // up to CATEGORY_PAGE_CAP. Asked only when the map did not count and the section is small enough to be
+  // exact; a decoration, so a failure simply leaves the line without it.
+  const stockSlug =
+    shown && (typeof shown.available_count !== 'number' || shown.preorder_count === undefined) && shown.product_count <= CATEGORY_PAGE_CAP
+      ? shown.slug
+      : null;
+  const [stock, setStock] = useState<{ slug: string; counts: Map<string, SectionStock> } | null>(null);
+  useEffect(() => {
+    if (!stockSlug) return;
+    let alive = true;
+    loadCategory(stockSlug)
+      .then((p) => {
+        if (!alive) return;
+        const counts = new Map<string, SectionStock>();
+        for (const n of [p.node, ...(p.children ?? [])]) counts.set(n.id, n);
+        setStock({ slug: stockSlug, counts });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [stockSlug]);
+  const rows = useBannerPhotos(
+    useMemo(() => {
+      const counts = stock && stock.slug === shown?.slug ? stock.counts : null;
+      return bannerRows((shown?.children ?? []).map((c) => withStock(c, counts)), []);
+    }, [shown, stock])
+  );
 
   // Not in the tree: an inactive section that still has products, or an old slug.
   const lookup = subCategorySlug === 'all' ? categorySlug : subCategorySlug;
@@ -143,15 +175,18 @@ export default function CategoryListing() {
     return <Navigate replace to={`${canonical}${location.search}`} />;
   }
 
+  const kind = nounKindFor(node.product_type, node.is_printer_catalog);
   const scope: ListingScope = {
     // By slug: the request that left beside the map is this one (by id when
     // the slug is too long to ask by, and nothing left early).
     category: listingCategory(node),
     title: nodeName(node, lang),
     description: nodeDescription(node, lang),
-    kind: nounKindFor(node.product_type, node.is_printer_catalog),
+    kind,
     type: sectionTypeOf(node.product_type, node.is_printer_catalog),
     total: node.product_count,
+    // «17 منتجًا · 1 متوفرة الآن», «5 منتجات · بطلب مسبق» (row 309): only for a section, never a root's «all».
+    stock: route?.all ? null : sectionStockLabel(withStock(node, stock && stock.slug === node.slug ? stock.counts : null), kind, lang),
   };
   // Keyed by section: another section is another list, not a refinement of this one.
   return (

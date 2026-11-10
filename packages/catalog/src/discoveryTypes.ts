@@ -68,6 +68,14 @@ export interface CatalogTreeNode {
   /** Of those, how many sell direct with units available now. `null` when the
    *  catalogue was too large to resolve inside one request (never a guess). */
   available_count: number | null;
+  /**
+   * Of those, how many the card rule (packages/catalog/src/availability.ts `cardAvailability`) calls
+   * PRE-ORDER — nothing on the shelf, but they can be ordered — and how many UNAVAILABLE — neither. The
+   * rest are unknown (catalog-only, or a count the server withheld). `null` exactly when
+   * `available_count` is; absent from an answer cached before them (owner, 2026-11-11; DECISIONS row 309).
+   */
+  preorder_count?: number | null;
+  unavailable_count?: number | null;
   is_printer_catalog: boolean;
   /** The product type this branch resolves to (`printer`, `filament`, …), or null. */
   product_type: string | null;

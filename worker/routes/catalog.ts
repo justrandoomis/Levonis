@@ -29,6 +29,7 @@ import type { AppContext } from '../lib/types';
 import { HttpError, str } from '../lib/http';
 import {
   buildTree,
+  cardStates,
   catalogIdForRetiredSlug,
   indexCatalogs,
   loadCatalogRecords,
@@ -44,6 +45,7 @@ import {
 import { pricingCtx, pricingCtxForUser, resolveProductCards, type PricingCtx } from './products';
 import { safeParse } from '../lib/types';
 import { cardLeadPhoto } from '../lib/cardPhoto';
+import type { AvailabilityState } from '../../packages/catalog/src/availability';
 import type { CatalogTreeNode, CategoryPayload } from '@levonis/catalog/discoveryTypes';
 
 export const catalogRoutes = new Hono<AppContext>();
@@ -142,9 +144,13 @@ async function availableProductIds(
   ctxPromise: Promise<PricingCtx>,
   ids: string[],
   idx: CatalogIndex
-): Promise<{ available: Set<string> | null; ordered: Array<{ id: string; card: Record<string, unknown> }> | null }> {
-  if (ids.length === 0) return { available: new Set(), ordered: [] };
-  if (ids.length > TREE_AVAILABILITY_CAP) return { available: null, ordered: null };
+): Promise<{
+  available: Set<string> | null;
+  states: Map<string, AvailabilityState> | null;
+  ordered: Array<{ id: string; card: Record<string, unknown> }> | null;
+}> {
+  if (ids.length === 0) return { available: new Set(), states: new Map(), ordered: [] };
+  if (ids.length > TREE_AVAILABILITY_CAP) return { available: null, states: null, ordered: null };
   // VISIBLE with each row's SELLABLE flag (DECISIONS row 240): a catalog-only card claims no stock.
   const L = await listing(db);
   const { results } = await db.prepare(
@@ -159,7 +165,7 @@ async function availableProductIds(
   // A stable partition: available now first, each group in the SQL order.
   const ordered = [...cards].map(([id, card]) => ({ id, card }));
   ordered.sort((a, b) => Number(out.has(b.id)) - Number(out.has(a.id)));
-  return { available: out, ordered };
+  return { available: out, states: cardStates(cards), ordered };
 }
 
 // ----------------------------------------------------------- one photograph per section
@@ -297,8 +303,8 @@ export async function buildCatalogTree(
   ]);
   const idx = indexCatalogs(records);
   const byProduct = membershipByProduct(memberships, idx);
-  const { available, ordered } = await availableProductIds(db, ctxPromise, [...byProduct.keys()], idx);
-  const counts = rollUpCounts(byProduct, available);
+  const { available, states, ordered } = await availableProductIds(db, ctxPromise, [...byProduct.keys()], idx);
+  const counts = rollUpCounts(byProduct, states);
   const roots = buildTree(idx, counts, available !== null);
   if (opts.photos) {
     if (ordered) {
@@ -377,9 +383,8 @@ catalogRoutes.get('/:slug', async (c) => {
     const cards = await resolveProductCards(c.env.DB, rows, ctx, idx, 'flag');
     const truncated = memberIds.length > rows.length;
 
-    const availableIds = new Set([...cards].filter(([, card]) => Number(card.direct_stock_available ?? 0) > 0).map(([id]) => id));
     // Availability is exact only when every product of the subtree was read.
-    const counts = rollUpCounts(byProduct, availableIds);
+    const counts = rollUpCounts(byProduct, cardStates(cards));
     const node = treeNode(record, idx, counts, !truncated);
     const children: CatalogTreeNode[] = visibleChildren(record, idx, counts, !truncated);
     node.children = children;
@@ -417,7 +422,8 @@ catalogRoutes.get('/:slug', async (c) => {
 
     const branch = idx.branch(record.id).slice().reverse();
     const ownRoot = branch[0]?.id;
-    const related = buildTree(idx, counts, !truncated)
+    // This page read none of another root's products, so their stock is unknown here, never a 0.
+    const related = buildTree(idx, counts, false)
       .filter((r) => r.id !== ownRoot)
       .map((r) => ({ ...r, children: [] }));
 

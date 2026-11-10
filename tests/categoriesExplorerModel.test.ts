@@ -33,7 +33,9 @@ import {
   authoredPhoto,
   authoredSrc,
 } from '../src/lib/catalog/explorerModel';
-import { availableLabel, categoriesCount, countNoun, countWord, explorerSubline, resultCountLabel, showCountLabel } from '../src/lib/catalog/copy';
+import { availableLabel, categoriesCount, countNoun, countWord, explorerSubline, resultCountLabel, sectionStockLabel, showCountLabel } from '../src/lib/catalog/copy';
+import { CATEGORY_PAGE_CAP, withStock } from '../src/lib/catalog/sectionStock';
+import { CATEGORY_PAGE_CAP as SERVER_CATEGORY_PAGE_CAP } from '../worker/routes/catalog';
 import { LanguageProvider } from '../src/LanguageContext';
 import CategoryRowBanners from '../src/components/catalog/CategoryRowBanners';
 import type { CatalogTreeNode, CatalogTreeResponse } from '../src/lib/catalog/types';
@@ -147,6 +149,49 @@ test('counted words: dual, plural, and the 11–99 singular', () => {
   assert.equal(availableLabel(2, 2, 'ar'), 'كلها متوفرة');
   assert.equal(availableLabel(0, 3, 'ar'), null, 'the pill is omitted at zero');
   assert.equal(availableLabel(null, 3, 'ar'), null, 'an unknown count is never guessed');
+});
+
+/**
+ * WHAT A SECTION CAN DO NOW, BESIDE ITS COUNT (owner, 2026-11-11; DECISIONS row 309): something on the shelf says
+ * so; nothing on the shelf but something to pre-order is «بطلب مسبق», never «غير متوفرة»; «غير متوفرة حالياً» only
+ * when every product is unavailable; anything unknown says nothing.
+ */
+test('sectionStockLabel: in stock, pre-order, unavailable, and silence when unknown — in three languages', () => {
+  const s = (available: number | null, preorder?: number | null, unavailable?: number | null, total = 5) => ({
+    product_count: total, available_count: available, preorder_count: preorder, unavailable_count: unavailable,
+  });
+  assert.equal(sectionStockLabel(s(1, 4, 0), 'product', 'ar'), '1 متوفرة الآن', 'in stock wins');
+  assert.equal(sectionStockLabel(s(0, 4, 1), 'product', 'ar'), 'بطلب مسبق', 'pre-order, even beside an unavailable one');
+  assert.equal(sectionStockLabel(s(0, 4, 1), 'product', 'en'), 'Pre-order');
+  assert.equal(sectionStockLabel(s(0, 4, 1), 'product', 'ckb'), 'بە پێش-داواکاری');
+  assert.equal(sectionStockLabel(s(0, 0, 5), 'product', 'ar'), 'غير متوفرة حالياً');
+  assert.equal(sectionStockLabel(s(0, 0, 5), 'product', 'en'), 'Unavailable now');
+  assert.equal(sectionStockLabel(s(0, 0, 5), 'product', 'ckb'), 'ئێستا بەردەست نییە');
+  for (const t of ['بە پێش-داواکاری', 'ئێستا بەردەست نییە']) assert.doesNotMatch(t, /[ةىيك]/, 'no Arabic-only letter in the Sorani');
+  // Agreement: one product, one printer, the dual, more.
+  assert.equal(sectionStockLabel(s(0, 0, 1, 1), 'product', 'ar'), 'غير متوفر حالياً');
+  assert.equal(sectionStockLabel(s(0, 0, 1, 1), 'printer', 'ar'), 'غير متوفرة حالياً');
+  assert.equal(sectionStockLabel(s(0, 0, 2, 2), 'product', 'ar'), 'غير متوفرين حالياً');
+  assert.equal(sectionStockLabel(s(0, 0, 2, 2), 'printer', 'ar'), 'غير متوفرتين حالياً');
+  assert.equal(sectionStockLabel(s(0, 0, 11, 11), 'product', 'ar'), 'غير متوفرة حالياً');
+  // Silence: unknown counts, an older answer, catalog-only products, an empty section.
+  assert.equal(sectionStockLabel(s(null, 0, 5), 'product', 'ar'), null, 'the map past its cap');
+  assert.equal(sectionStockLabel(s(0), 'product', 'ar'), null, 'an answer without the states');
+  assert.equal(sectionStockLabel(s(0, null, null), 'product', 'ar'), null);
+  assert.equal(sectionStockLabel(s(0, 0, 3), 'product', 'ar'), null, 'two of five are catalog-only or withheld: nothing is claimed');
+  assert.equal(sectionStockLabel(s(0, 0, 0, 0), 'product', 'ar'), null);
+});
+
+test('withStock lays the section answer’s counts over a map node, only when both counted the same products', () => {
+  assert.equal(CATEGORY_PAGE_CAP, SERVER_CATEGORY_PAGE_CAP, 'the client mirrors the server’s cap');
+  const node = { id: 'c', product_count: 5, available_count: null } as never;
+  const counts = new Map([['c', { product_count: 5, available_count: 0, preorder_count: 5, unavailable_count: 0 }]]);
+  assert.deepEqual(
+    (({ available_count, preorder_count, unavailable_count }) => ({ available_count, preorder_count, unavailable_count }))(withStock(node, counts) as never),
+    { available_count: 0, preorder_count: 5, unavailable_count: 0 }
+  );
+  assert.equal(withStock(node, new Map([['c', { product_count: 6, available_count: 0, preorder_count: 6, unavailable_count: 0 }]])), node, 'a different count is not laid over');
+  assert.equal(withStock(node, null), node);
 });
 
 test('the explorer’s sub-line carries live counts up to ten categories, then only the instruction', () => {

@@ -47,6 +47,11 @@ export interface ListingScope {
   type: SectionType;
   /** The section's unfiltered product count, for «4 من 10»; null when unknown. */
   total: number | null;
+  /**
+   * What the whole section can do now — «1 متوفرة الآن», «بطلب مسبق», «غير متوفرة حالياً» (`sectionStockLabel`,
+   * DECISIONS row 309) — drawn beside its count while no filter narrows the list. Absent: nothing is said.
+   */
+  stock?: string | null;
 }
 
 const VIEW_KEY = 'levonis.listing.view.v1';
@@ -231,7 +236,11 @@ export default function ListingView({
       {ownTopBar ? (
         <PageTopBar
           title={scope.title}
-          subtitle={countText || (scope.total !== null ? countNoun(scope.total, scope.kind, lang) : undefined)}
+          subtitle={
+            [countText || (scope.total !== null ? countNoun(scope.total, scope.kind, lang) : ''), narrowed ? null : scope.stock]
+              .filter(Boolean)
+              .join(' · ') || undefined
+          }
           actions={
             <>
               <CompareBadge className="border border-border-subtle bg-surface text-text-primary" />

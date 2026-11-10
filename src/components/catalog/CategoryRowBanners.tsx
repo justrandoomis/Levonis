@@ -6,7 +6,7 @@ import { IMAGE_SIZES } from '../../../packages/contracts/src/imageSizes';
 import { ArrowGlyph } from '../home/v2/SectionHead';
 import { prefetchProps } from '../../lib/catalog/prefetch';
 import { nodeDescription, nodeName } from '../../lib/catalog/categoryPageModel';
-import { availableLabel, countNoun, nounKindFor } from '../../lib/catalog/copy';
+import { countNoun, nounKindFor, sectionStockLabel } from '../../lib/catalog/copy';
 import { bannerCta, type BannerPhoto, type BannerRow } from '../../lib/catalog/explorerModel';
 
 /**
@@ -127,8 +127,9 @@ export function CategoryNodeBanner({ row, eager = false }: { row: BannerRow; eag
   const { lang, loc } = useLanguage();
   const { node } = row;
   const kind = nounKindFor(node.product_type, node.is_printer_catalog);
-  const avail = availableLabel(node.available_count, node.product_count, lang);
-  const line = [countNoun(node.product_count, kind, lang), avail].filter(Boolean).join(' · ');
+  // «4 متوفرة الآن», «بطلب مسبق» or «غير متوفرة حالياً», from the cards' own states; nothing when unknown (row 309).
+  const stock = sectionStockLabel(node, kind, lang);
+  const line = [countNoun(node.product_count, kind, lang), stock].filter(Boolean).join(' · ');
   // OWNER: Sorani to be written by hand (both calls to action).
   const cta = bannerCta(node) === 'explore' ? loc('استكشف', 'Explore') : loc('تسوق الآن', 'Shop now');
   const description = nodeDescription(node, lang).split('\n')[0];

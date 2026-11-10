@@ -6,7 +6,7 @@ import CropPhoto from './CropPhoto';
 import { IMAGE_SIZES, cropHeroCompactSizes } from '../../../packages/contracts/src/imageSizes';
 import { compareHref, compareTray } from '../../lib/compareTray';
 import { isPrinterNode, nodeDescription, nodeName } from '../../lib/catalog/categoryPageModel';
-import { countWord, nounKindFor } from '../../lib/catalog/copy';
+import { countWord, nounKindFor, sectionStockLabel } from '../../lib/catalog/copy';
 import type { BannerPhoto } from '../../lib/catalog/explorerModel';
 import type { CategoryPayload } from '../../lib/catalog/types';
 
@@ -50,6 +50,8 @@ const CategoryHero = forwardRef<HTMLElement, {
   const compareTo = tray.type === 'printer' && tray.items.length ? compareHref(tray) : '/compare';
   const Sep = dir === 'rtl' ? ChevronLeft : ChevronRight;
   const avail = node.available_count;
+  // Nothing on the shelf: «بطلب مسبق» or «غير متوفرة حالياً» when the cards say so, else nothing (row 309).
+  const stockWord = avail === 0 ? sectionStockLabel(node, kind, lang) : null;
   const band = !!photo && !photo.productPhoto;
 
   // OWNER: Sorani to be written by hand (every loc() in this file without a third argument).
@@ -131,6 +133,13 @@ const CategoryHero = forwardRef<HTMLElement, {
               <dt className="sr-only">{loc('متوفرة الآن', 'Available now')}</dt>
               <dd className="font-bold tabular-nums text-text-primary">{avail}</dd>
               <dd aria-hidden="true">{loc('متوفرة الآن', 'available now')}</dd>
+            </div>
+          ) : null}
+          {stockWord ? (
+            <div data-hero-stock="" className="flex items-center gap-1.5">
+              <span aria-hidden="true" className="text-text-muted">·</span>
+              <dt className="sr-only">{loc('التوفر', 'Availability', 'بەردەستبوون')}</dt>
+              <dd>{stockWord}</dd>
             </div>
           ) : null}
         </dl>

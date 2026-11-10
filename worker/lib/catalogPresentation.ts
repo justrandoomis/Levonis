@@ -19,6 +19,7 @@
  * something a child shelf does not already say.
  */
 import { membershipCte } from './catalogMembership';
+import { cardAvailability, type AvailabilityState } from '../../packages/catalog/src/availability';
 import { completenessAbsentLately, runListed } from './listing';
 import { catalogImageUrl } from './siteMedia';
 import { isSchemaMissing } from './membershipBenefits';
@@ -321,10 +322,10 @@ export function membershipByProduct(
 export function treeNode(
   r: CatalogRecord,
   idx: CatalogIndex,
-  counts: Map<string, { products: number; available: number }>,
+  counts: Map<string, StockCounts>,
   availableKnown: boolean
 ): CatalogTreeNode {
-  const c = counts.get(r.id) ?? { products: 0, available: 0 };
+  const c = counts.get(r.id) ?? { products: 0, available: 0, preorder: 0, unavailable: 0 };
   return {
     id: r.id,
     slug: r.slug,
@@ -345,6 +346,8 @@ export function treeNode(
     hero_light_mobile_image_url: catalogImageUrl(r.hero_light_mobile_image_key),
     product_count: c.products,
     available_count: availableKnown ? c.available : null,
+    preorder_count: availableKnown ? c.preorder : null,
+    unavailable_count: availableKnown ? c.unavailable : null,
     is_printer_catalog: r.is_printer_catalog,
     product_type: idx.productType(r.id),
     sort: r.sort,
@@ -353,21 +356,45 @@ export function treeNode(
   };
 }
 
-/** Roll-up counts per catalog: distinct products, and those available now. */
+/**
+ * Per catalog: distinct products, and of those how many the card rule calls available now, pre-order or
+ * unavailable. The rest are unknown: catalog-only, a withheld count, or a product this request did not read.
+ */
+export interface StockCounts {
+  products: number;
+  available: number;
+  preorder: number;
+  unavailable: number;
+}
+
+/**
+ * Roll-up counts per catalog. `states` is each READ product's card state (`cardAvailability`); a product
+ * absent from it still counts as a product, in no state. `null`: nothing was read (the counts are only the
+ * products, and the caller reports availability as unknown).
+ */
 export function rollUpCounts(
   byProduct: Map<string, Set<string>>,
-  availableIds: Set<string> | null
-): Map<string, { products: number; available: number }> {
-  const out = new Map<string, { products: number; available: number }>();
+  states: ReadonlyMap<string, AvailabilityState> | null
+): Map<string, StockCounts> {
+  const out = new Map<string, StockCounts>();
   for (const [pid, catalogs] of byProduct) {
-    const avail = availableIds?.has(pid) ?? false;
+    const state = states?.get(pid);
     for (const cid of catalogs) {
-      const c = out.get(cid) ?? { products: 0, available: 0 };
+      const c = out.get(cid) ?? { products: 0, available: 0, preorder: 0, unavailable: 0 };
       c.products += 1;
-      if (avail) c.available += 1;
+      if (state === 'available') c.available += 1;
+      else if (state === 'preorder') c.preorder += 1;
+      else if (state === 'unavailable') c.unavailable += 1;
       out.set(cid, c);
     }
   }
+  return out;
+}
+
+/** Each read card's state, by product id: the card rule, the one every card and grid draws. */
+export function cardStates(cards: Iterable<[string, Record<string, unknown>]>): Map<string, AvailabilityState> {
+  const out = new Map<string, AvailabilityState>();
+  for (const [id, card] of cards) out.set(id, cardAvailability(card).state);
   return out;
 }
 
@@ -376,7 +403,7 @@ export function rollUpCounts(
  * non-empty descendants nested under the nearest ACTIVE ancestor (an inactive
  * middle branch lifts its children up rather than hiding them).
  */
-type Counts = Map<string, { products: number; available: number }>;
+type Counts = Map<string, StockCounts>;
 
 const visibleIn = (counts: Counts) => (r: CatalogRecord) => r.active && (counts.get(r.id)?.products ?? 0) > 0;
 

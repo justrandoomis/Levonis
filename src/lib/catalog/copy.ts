@@ -146,6 +146,43 @@ export function availableLabel(available: number | null, total: number, lang: Ca
   return `${available} متوفرة الآن`;
 }
 
+/** A section's counts by the card rule's states (worker/lib/catalogPresentation.ts `rollUpCounts`). */
+export interface SectionStock {
+  product_count: number;
+  available_count: number | null;
+  preorder_count?: number | null;
+  unavailable_count?: number | null;
+}
+
+/**
+ * WHAT A SECTION CAN DO FOR A CUSTOMER NOW, BESIDE ITS COUNT (owner, 2026-11-11: «Show it, marked», then
+ * «بطلب مسبق» or «غير متوفرة حالياً», whichever fits; docs/DECISIONS.md row 309):
+ *   something on the shelf                      «4 متوفرة الآن» — `availableLabel`, as before;
+ *   nothing on the shelf, something to pre-order «بطلب مسبق» / "Pre-order" / «بە پێش-داواکاری»;
+ *   nothing in it can be ordered at all          «غير متوفرة حالياً» / "Unavailable now" / «ئێستا بەردەست نییە».
+ * The counts are the card rule's own states (packages/catalog/src/availability.ts), rolled up per section by
+ * the server, so a section never says what its cards contradict. A pre-order filament is not «غير متوفرة»:
+ * the shelf count alone called most Bambu filaments that, and they can be ordered. Anything unknown says
+ * nothing: a null count (the map past its stock cap), an older answer without the states, or a section
+ * whose remaining products are catalog-only or have a withheld count. Arabic agrees with the noun: one
+ * product «غير متوفر», one printer «غير متوفرة», two «غير متوفرين» / «غير متوفرتين», more «غير متوفرة».
+ */
+export function sectionStockLabel(s: SectionStock, kind: NounKind, lang: CatalogLang): string | null {
+  const total = s.product_count;
+  if (!(total > 0) || typeof s.available_count !== 'number') return null;
+  if (s.available_count > 0) return availableLabel(s.available_count, total, lang);
+  const preorder = s.preorder_count;
+  const unavailable = s.unavailable_count;
+  if (typeof preorder !== 'number' || typeof unavailable !== 'number') return null;
+  if (preorder > 0) return lang === 'en' ? 'Pre-order' : lang === 'ckb' ? 'بە پێش-داواکاری' : 'بطلب مسبق';
+  if (unavailable !== total) return null;
+  if (lang === 'en') return 'Unavailable now';
+  if (lang === 'ckb') return 'ئێستا بەردەست نییە';
+  if (total === 1) return kind === 'printer' ? 'غير متوفرة حالياً' : 'غير متوفر حالياً';
+  if (total === 2) return kind === 'printer' ? 'غير متوفرتين حالياً' : 'غير متوفرين حالياً';
+  return 'غير متوفرة حالياً';
+}
+
 const FEMININE_WORDS = ['', 'واحدة', 'فئتان', 'ثلاث', 'أربع', 'خمس', 'ست', 'سبع', 'ثماني', 'تسع', 'عشر'];
 
 /**

@@ -230,3 +230,49 @@ test('the hero shows the admin’s banner for the theme on screen as a band that
   const light = await page('printers', `UPDATE catalogs SET hero_light_image_key = 'UiUx/MainPage/PrintersLight.webp' WHERE id = 'cat_printers'`);
   assert.equal(heroPhoto(light.body)!.src, '/files/UiUx/MainPage/PrintersLight.webp');
 });
+
+/**
+ * WHAT A SECTION CAN DO NOW, THROUGH THE REAL ROUTE (owner, 2026-11-11: «بطلب مسبق» or «غير متوفرة حالياً»,
+ * whichever fits; DECISIONS row 309). The route counts its children by the cards' own states. With the shelf
+ * emptied, printers that offer pre-order read «بطلب مسبق» in their row and hero — never «غير متوفرة», which the
+ * shelf count alone would have said of most Bambu filaments; with pre-order taken away too, «غير متوفرة حالياً».
+ * A root this page read nothing of carries null counts, never a false 0.
+ */
+test('a section with nothing on the shelf reads «بطلب مسبق» when it can be pre-ordered, «غير متوفرة حالياً» when nothing can be ordered', async () => {
+  const emptyShelf = 'UPDATE products SET stock = 0, stock_reserved = 0; UPDATE product_variants SET stock = 0';
+  const rowLine = (body: CategoryPayload) => {
+    const html = renderToStaticMarkup(
+      createElement(LanguageProvider, { children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows: bannerRows(body.children, []), label: 'x' })) })
+    );
+    return [...html.matchAll(/<p class="line-clamp-1[^"]*">([^<]*)<\/p>/g)].map((m) => m[1]);
+  };
+
+  const pre = (await page('printers', emptyShelf)).body;
+  const fdm = pre.children.find((c) => c.slug === 'fdm-printers')!;
+  assert.equal(fdm.available_count, 0);
+  assert.ok((fdm.preorder_count ?? 0) > 0, 'the seed’s printers offer pre-order');
+  assert.ok(rowLine(pre).some((l) => l.endsWith(' · بطلب مسبق')), rowLine(pre).join(' | '));
+  assert.ok(!rowLine(pre).some((l) => l.includes('غير متوفر')), 'a pre-order section is never «غير متوفرة»');
+  const hero = renderHero(pre);
+  assert.match(hero, /data-hero-stock=""/);
+  assert.match(hero, /بطلب مسبق/);
+
+  const none = (await page('printers', `${emptyShelf}; UPDATE products SET sale_types = '["direct_sale"]', selling_type = 'direct_sale'`)).body;
+  const fdmNone = none.children.find((c) => c.slug === 'fdm-printers')!;
+  assert.equal(fdmNone.preorder_count, 0);
+  assert.equal(fdmNone.unavailable_count, fdmNone.product_count, 'every printer is unavailable');
+  assert.ok(rowLine(none).some((l) => l.endsWith(' · غير متوفرة حالياً')), rowLine(none).join(' | '));
+  assert.match(renderHero(none), /غير متوفرة حالياً/);
+
+  // In stock: the usual words, and no state word beside them.
+  const stocked = (await page('printers')).body;
+  assert.ok(rowLine(stocked).every((l) => !/بطلب مسبق|غير متوفر/.test(l)), rowLine(stocked).join(' | '));
+  assert.doesNotMatch(renderHero(stocked), /data-hero-stock/);
+
+  // Another root, read nothing of here: unknown, never a 0 a row could word as «غير متوفرة».
+  const materials = (await page('printing-materials')).body;
+  for (const r of materials.related) {
+    assert.equal(r.available_count, null, r.slug);
+    assert.equal(r.preorder_count ?? null, null, r.slug);
+  }
+});
