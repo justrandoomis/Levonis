@@ -298,27 +298,36 @@ async function main() {
   /**
    * THE THREE FACTS THE BOARD IS ABOUT, written onto the fixture directly.
    *
-   * `delivery_due_day` is taken from the SERVER's own `today` — never from
+   * `delivery_due_day` is taken from the SERVER's own `tomorrow` — never from
    * this process's clock, which is the same mistake the screen is forbidden to
-   * make. `delivery_day_changed_at` is what makes the row say «مؤجل»: an order
+   * make. Tomorrow, because the board files an order on the day it is packed
+   * and handed to the courier, a day before the customer's day (DECISIONS row
+   * 322): the fixture goes by courier (the first method, `standard`) and is
+   * mid-preparation, so tomorrow's delivery is TODAY's work.
+   * `delivery_day_changed_at` is what makes the row say «مؤجل»: an order
    * that silently sinks down the list looks, to the admin who read it this
    * morning, like an order that vanished. `priority` is the owner's pin
    * («طلباتهم مثبتة في الأعلى دائما»), and its badge is the only visible
    * evidence that the pin is working at all.
    */
-  const today = String((await admin.get('/api/admin/orders?limit=1')).data?.today ?? '');
+  const anchors = (await admin.get('/api/admin/orders?limit=1')).data ?? {};
+  const today = String(anchors.today ?? '');
+  const tomorrow = String(anchors.tomorrow ?? '');
   check('the server names its own Baghdad day', /^\d{4}-\d{2}-\d{2}$/.test(today), today);
+  check('and the day after it', /^\d{4}-\d{2}-\d{2}$/.test(tomorrow) && tomorrow > today, tomorrow);
   sql(
-    `UPDATE orders SET delivery_due_day='${today}', delivery_day_changed_at='${today}T09:00:00.000Z', ` +
+    `UPDATE orders SET delivery_due_day='${tomorrow}', delivery_day_changed_at='${today}T09:00:00.000Z', ` +
       `delivery_day_schedulable=1, priority=1 WHERE id='${orderId}'`
   );
   await settle();
   const pinned = await admin.get('/api/admin/orders?limit=50');
   const pinnedRow = (pinned.data?.orders ?? []).find((o) => o.id === orderId);
-  check('the fixture now sits in today\'s bucket', pinnedRow?.due_bucket === 'today', JSON.stringify(pinnedRow?.due_bucket));
+  check('the courier fixture spends a day on the road', pinnedRow?.lead_days === 1, JSON.stringify(pinnedRow?.lead_days));
+  check('so, due tomorrow, it sits in today\'s bucket — packed today', pinnedRow?.due_bucket === 'today', JSON.stringify(pinnedRow?.due_bucket));
+  check('and its day to prepare is the server\'s today', pinnedRow?.board_day === today, JSON.stringify(pinnedRow?.board_day));
   check(
-    'and its day arrives already written as «اليوم» — the SPA never formats one',
-    pinnedRow?.due_label === 'اليوم',
+    'and the customer\'s day arrives already written as «غدًا» — the SPA never formats one',
+    pinnedRow?.due_label === 'غدًا',
     JSON.stringify(pinnedRow?.due_label)
   );
   check('the moved day is reported', !!pinnedRow?.delivery_day_changed_at, JSON.stringify(pinnedRow?.delivery_day_changed_at));
@@ -508,6 +517,12 @@ async function main() {
       // the only visible evidence that the pin they asked for is working.
       check(`${width}px — the PRO badge survives the compact row`, row.pro === 1, JSON.stringify(row));
       check(`${width}px — the day chip reads "today" from the server's bucket`, row.day === 'today', String(row.day));
+      // Filed under today, it still names the CUSTOMER'S day, and says whose (row 322).
+      check(
+        `${width}px — and names the delivery day: «التوصيل: غدًا»`,
+        /(التوصيل|Delivery|گەیاندن): (غدًا|Tomorrow|بەیانی)/.test(row.dayText),
+        JSON.stringify(row.dayText)
+      );
       check(`${width}px — a day that MOVED is marked «مؤجل»`, row.postponed === 1, JSON.stringify(row));
       // One primary action per row. The delete verb only exists on a cancelled
       // order, and this fixture is not one.

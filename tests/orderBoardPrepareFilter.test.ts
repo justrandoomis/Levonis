@@ -15,7 +15,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, get, json, send, pending } from './fixtures/app';
-import { adminRoutes, needsPreparation, PREPARE_WHERE_SQL } from '../worker/routes/admin';
+import { adminRoutes, BOARD_ORDER_SQL, needsPreparation, PREPARE_WHERE_SQL } from '../worker/routes/admin';
 import { DIRECT_STAGES, PREORDER_STAGES, STAGE_LEGACY_STATUS, type OrderStage } from '../worker/lib/orderStages';
 
 interface Seed { id: string; type: string; stage: string; status: string }
@@ -112,8 +112,7 @@ test('the prepare scope still reads through the board’s partial index', () => 
         `EXPLAIN QUERY PLAN SELECT o.* FROM orders o LEFT JOIN users u ON u.id = o.user_id
           WHERE (o.status NOT IN ('delivered','cancelled'))
             AND (${PREPARE_WHERE_SQL})
-          ORDER BY o.delivery_due_day IS NULL, o.delivery_due_day ASC, o.priority DESC,
-                   (o.priority_due_at IS NULL), o.priority_due_at ASC, o.created_at ASC, o.id ASC LIMIT 30`
+          ${BOARD_ORDER_SQL} LIMIT 30`
       )
       .all() as { detail: string }[]
   )

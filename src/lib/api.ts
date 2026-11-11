@@ -1533,7 +1533,12 @@ export interface OrderTrackingPublic {
  * which is the one time of day this screen is load-bearing.
  */
 
-/** Which day-group header a row belongs under. Computed SERVER-side. */
+/**
+ * Which day-group header a row belongs under. Computed SERVER-side, from the
+ * BOARD DAY — the day the order needs us: packed and handed to the courier at
+ * 7 pm, a day before the customer's own day (DECISIONS row 322). `overdue` is
+ * a board day before today.
+ */
 export type OrderDueBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later' | 'unscheduled';
 
 /**
@@ -1580,9 +1585,19 @@ export interface AdminOrderRow extends ApiOrder {
    *  vanished — so the row says «مؤجل» rather than just re-sorting. */
   delivery_day_changed_at?: string | null;
   due_bucket?: OrderDueBucket;
-  /** «اليوم» / «غدًا» / «الأربعاء ٢٣ أيلول», localised BY THE SERVER. The
-   *  screen renders this string and never formats a day itself. */
+  /** «اليوم» / «غدًا» / «الأربعاء ٢٣ أيلول», localised BY THE SERVER — the
+   *  CUSTOMER'S delivery day. The screen renders this string and never
+   *  formats a day itself. */
   due_label?: string;
+  /** The day to prepare, `'YYYY-MM-DD'` (row 322): the delivery day less
+   *  `lead_days`. The bucket is filed by it. Null with no day. */
+  board_day?: string | null;
+  /** 1 for the courier; 0 for the store's same-day methods and for an order
+   *  already with the courier or finished. Null with no day. */
+  lead_days?: number | null;
+  /** The board day, labelled by the server like `due_label` — sent only when
+   *  it is a different day from the delivery day, '' otherwise. */
+  prepare_label?: string;
   /**
    * THE ONE-TAP MOVE, decided by the server — the next stage on THIS order's
    * own path, already labelled in the caller's language. `null` at the end of
@@ -1631,7 +1646,8 @@ export interface AdminOrdersResponse {
     date?: OrderSearchDateEcho;
   } | null;
   /**
-   * The group headers, over the whole filtered board rather than this page.
+   * The group headers, over the whole filtered board rather than this page,
+   * counted by the BOARD day (row 322) — the same day each row's bucket reads.
    * `today` and `overdue` are disjoint here; the LIST merges them, because a
    * box that should have gone out on Tuesday is not a separate kind of work on
    * Wednesday — it is today's work, and the most urgent of it.
@@ -1681,6 +1697,12 @@ export interface AdminOrdersResponse {
 /** Everything the fulfilment screen needs for ONE order. */
 export interface AdminOrderDetail extends ApiOrder {
   admin_note: string;
+  /** The customer's delivery day, labelled by the server in `?lang=`; '' with no day (row 322). */
+  delivery_day_label?: string;
+  /** The day to prepare it, `'YYYY-MM-DD'`, or null with no day. */
+  board_day?: string | null;
+  /** The day to prepare, labelled — only when it differs from the delivery day, '' otherwise. */
+  prepare_label?: string;
   /** «بانتظار تأكيد السعر النهائي» (migration 0218): an estimated line still waits; absent on an older server. */
   price_estimate_open?: boolean;
   membership_tier_snapshot?: string;

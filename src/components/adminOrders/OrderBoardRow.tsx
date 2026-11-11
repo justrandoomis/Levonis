@@ -130,6 +130,8 @@ export default function OrderBoardRow({
             label={order.due_label}
             bucket={order.due_bucket}
             postponed={!!order.delivery_day_changed_at}
+            prepareLabel={order.prepare_label}
+            handedOver={order.stage === 'out_for_delivery'}
             loc={loc}
           />
           <ProBadge order={order} />

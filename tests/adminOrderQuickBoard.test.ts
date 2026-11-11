@@ -47,7 +47,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
 import { freshDb, asD1, stubApp, get, post, patch, json, pending } from './fixtures/app';
-import { adminRoutes } from '../worker/routes/admin';
+import { adminRoutes, BOARD_ORDER_SQL } from '../worker/routes/admin';
 import { chatRoutes } from '../worker/routes/chats';
 import { moveOrderStage } from '../worker/lib/orderStageOps';
 
@@ -176,8 +176,7 @@ test('(أ) `scope=all` carries NO shipping_type clause — the partial index\'s 
         `EXPLAIN QUERY PLAN
          SELECT o.* FROM orders o LEFT JOIN users u ON u.id = o.user_id
           WHERE (o.status NOT IN ('delivered','cancelled'))
-          ORDER BY o.delivery_due_day IS NULL, o.delivery_due_day ASC, o.priority DESC,
-                   (o.priority_due_at IS NULL), o.priority_due_at ASC, o.created_at ASC, o.id ASC`
+          ${BOARD_ORDER_SQL}`
       )
       .all() as Array<{ detail: string }>
   )

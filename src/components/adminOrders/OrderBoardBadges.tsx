@@ -7,6 +7,7 @@
  * as the day chips under them, and a PRO badge drawn two ways is two badges.
  */
 import type { AdminOrderRow, OrderDueBucket, OrderShippingType } from '../../lib/api';
+import { PREPARE_DAY_STRINGS, dayLine } from './prepareDayStrings';
 
 /** The context's own `loc`, passed down rather than re-derived per badge. */
 type Loc = (ar: string, en: string, ckb?: string) => string;
@@ -87,42 +88,64 @@ export function ProBadge({ order }: { order: AdminOrderRow }) {
 }
 
 /**
- * The day the box goes out, as the server wrote it, plus the two facts a
- * label alone cannot carry.
+ * The customer's day, as the server wrote it, plus the facts a label alone
+ * cannot carry.
  *
  * `label` is `due_label` — «اليوم», «غدًا» or «الأربعاء ٢٣ أيلول», already in
- * the reader's language. The screen never re-formats it and never derives the
- * bucket from it: `due_bucket` is computed on the server against the Baghdad
- * day, and a browser that recomputed it would file today's work as overdue for
- * the first three hours of every Iraqi day.
+ * the reader's language — and it is the CUSTOMER'S day, so the chip says so:
+ * «التوصيل: غدًا». The row is FILED by another day (DECISIONS row 322): the
+ * day to pack it and hand it to the courier, which `due_bucket` was computed
+ * from on the server against the Baghdad day. The screen never re-formats a
+ * label and never derives a bucket — a browser that did would file today's
+ * work as overdue for the first three hours of every Iraqi day.
+ *
+ * `prepareLabel` is that day, labelled by the server, sent only when it differs
+ * from the delivery day; it is shown away from «اليوم», whose header already
+ * says when to pack it. `handedOver` (the parcel is with the courier) picks
+ * which lateness «متأخر» means.
  */
 export function DayChip({
   label,
   bucket,
   postponed,
+  prepareLabel,
+  handedOver = false,
   loc,
 }: {
   label?: string;
   bucket?: OrderDueBucket;
   postponed: boolean;
+  prepareLabel?: string;
+  handedOver?: boolean;
   loc: Loc;
 }) {
   const none = !label;
+  const showPrepare = !!prepareLabel && (bucket === 'tomorrow' || bucket === 'week' || bucket === 'later');
   return (
-    <span className="inline-flex items-center gap-1.5">
+    <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
       <span
         data-order-day={bucket ?? 'unscheduled'}
         className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[12px] leading-[1.4] font-bold ${
           none ? 'text-text-muted' : 'bg-surface-selected text-text-primary'
         }`}
       >
-        {none ? loc('بلا موعد', 'No day', 'بێ ڕۆژ') : label}
+        {none ? loc('بلا موعد', 'No day', 'بێ ڕۆژ') : dayLine(loc, PREPARE_DAY_STRINGS.delivery, label)}
       </span>
+      {showPrepare && (
+        <span data-order-prepare-day className="text-[11px] leading-[1.4] font-bold text-text-muted">
+          {dayLine(loc, PREPARE_DAY_STRINGS.prepare, prepareLabel)}
+        </span>
+      )}
       {/* The one red thing on the row, for the same reason it is the one red
           thing in the header: a box that should have gone out on Tuesday is
-          today's work, and the most urgent of it. */}
+          today's work, and the most urgent of it. Two lates share the word,
+          so its title says which: still on our shelf, or with the courier. */}
       {bucket === 'overdue' && (
-        <span data-order-overdue className="text-[11px] leading-[1.4] font-bold text-danger">
+        <span
+          data-order-overdue={handedOver ? 'courier' : 'prepare'}
+          className="text-[11px] leading-[1.4] font-bold text-danger"
+          title={dayLine(loc, handedOver ? PREPARE_DAY_STRINGS.overdueCourier : PREPARE_DAY_STRINGS.overduePrepare)}
+        >
           {loc('متأخر', 'Overdue', 'دواکەوتوو')}
         </span>
       )}

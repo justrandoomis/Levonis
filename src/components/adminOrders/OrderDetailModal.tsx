@@ -13,6 +13,7 @@ import CopyField from './CopyField';
 import { localIraqiPhone } from './localPhone';
 import { collectOnDeliveryIqd } from './collectAmount';
 import { DeliveryMethodBadge } from './deliveryMethod';
+import { PREPARE_DAY_STRINGS, dayLine } from './prepareDayStrings';
 import MysteryReveal from '../offers/MysteryReveal';
 import OrderChatPanel from './OrderChatPanel';
 import OrderStagePanel from './OrderStagePanel';
@@ -107,7 +108,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
     setLoading(true);
     setError(null);
     try {
-      const data = await api.get<{ order: EstimateOrderDetail }>(`/api/admin/orders/${orderId}`);
+      // `lang`: the two day labels (row 322) are written by the server, in the reader's language.
+      const data = await api.get<{ order: EstimateOrderDetail }>(`/api/admin/orders/${orderId}?lang=${lang}`);
       setDetail(data.order);
       setSerials(data.order.serials && data.order.serials.installed ? data.order.serials : null);
     } catch (e) {
@@ -115,7 +117,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, lang]);
 
   useEffect(() => {
     load();
@@ -358,6 +360,20 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
+            {/* THE TWO DAYS (row 322): the customer's, and — when it is another
+                day — the one to pack it and hand it to the courier, which is
+                the day the board files it under. Both labels are the server's. */}
+            {detail.delivery_day_label ? (
+              <p data-order-days className="text-[13px] font-bold text-text-secondary">
+                {dayLine(loc, PREPARE_DAY_STRINGS.delivery, detail.delivery_day_label)}
+                {detail.prepare_label ? (
+                  <>
+                    <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
+                    {dayLine(loc, PREPARE_DAY_STRINGS.prepare, detail.prepare_label)}
+                  </>
+                ) : null}
+              </p>
+            ) : null}
             {detail.priority === 1 && (
               <section data-pro-priority className="lv-alert lv-alert-danger p-3.5">
                 <div className="flex items-start gap-2.5">

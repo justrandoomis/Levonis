@@ -30,6 +30,12 @@
  *  (د) THE DAY BOUNDARY. Between 00:00 and 03:00 Baghdad, a UTC-derived
  *      "today" is yesterday — and that is the shift when the day's runs are
  *      planned. The clock is pinned inside that window on purpose.
+ *
+ * THE DAY IS THE DAY TO PREPARE (DECISIONS row 322). Every dated order seeded
+ * here goes by courier — a day on the road — so its bucket, its count and its
+ * `due` are those of the day BEFORE its delivery day. The same-day methods,
+ * the courier's own day and the index plans of the rule are in
+ * tests/adminOrderPrepareDay.test.ts.
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,7 +44,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { freshDb, asD1, stubApp, get, json, row } from './fixtures/app';
 import { ROOT } from './fixtures/d1';
-import { adminRoutes } from '../worker/routes/admin';
+import { adminRoutes, BOARD_ORDER_SQL } from '../worker/routes/admin';
 
 // 13:00 in Baghdad on the nineteenth — a plain, unambiguous afternoon.
 const NOON = '2026-09-19T10:00:00.000Z';
@@ -274,7 +280,8 @@ test('pre-orders are their own SCOPE, not a bucket in among today\'s work', asyn
 
 test('a merchant order is BADGED, and cannot inflate a due count — it has no day to be due on', async () => {
   const { app } = seed([
-    { id: 'ORD-L000000001', day: TODAY },
+    // Due TOMORROW, so it is packed and handed to the courier TODAY (row 322).
+    { id: 'ORD-L000000001', day: TOMORROW },
     { id: 'ORD-R000000002', seller_type: 'merchant', day: null },
   ]);
   const body = await at(NOON, () => board(app));
@@ -317,9 +324,11 @@ test('a bad parameter is a 400 with a message, not a silently empty board', asyn
 // =========================================================================
 
 test('(د) «today» is the BAGHDAD day, asserted at 22:00 UTC', async () => {
+  // Courier orders, a day on the road: each is filed on the day BEFORE its
+  // delivery day — the day it is packed and handed over (row 322).
   const { app } = seed([
-    { id: 'ORD-N000000001', day: '2026-09-19' },
-    { id: 'ORD-N000000002', day: '2026-09-20' },
+    { id: 'ORD-N000000001', day: '2026-09-20' },
+    { id: 'ORD-N000000002', day: '2026-09-21' },
   ]);
   const body = await at(AFTER_MIDNIGHT, () => board(app));
   assert.equal(body.today, '2026-09-19', '01:00 Baghdad on the nineteenth is 22:00 UTC on the eighteenth');
@@ -327,10 +336,11 @@ test('(د) «today» is the BAGHDAD day, asserted at 22:00 UTC', async () => {
   assert.equal(body.tomorrow, '2026-09-20');
   assert.equal(body.week_end, '2026-09-26');
 
-  const rows = body.orders as { id: string; due_bucket: string; due_label: string }[];
-  const nineteenth = rows.find((r) => r.id === 'ORD-N000000001')!;
-  assert.equal(nineteenth.due_bucket, 'today', 'a UTC-derived bucket would read `tomorrow` here');
-  assert.equal(nineteenth.due_label, 'اليوم');
+  const rows = body.orders as { id: string; due_bucket: string; due_label: string; board_day: string }[];
+  const twentieth = rows.find((r) => r.id === 'ORD-N000000001')!;
+  assert.equal(twentieth.board_day, '2026-09-19', 'packed on the nineteenth, the BAGHDAD today');
+  assert.equal(twentieth.due_bucket, 'today', 'a UTC-derived bucket would read `tomorrow` here');
+  assert.equal(twentieth.due_label, 'غدًا', 'and the row still names the customer\'s day');
   assert.equal(rows.find((r) => r.id === 'ORD-N000000002')!.due_bucket, 'tomorrow');
 
   // And the filter agrees with the bucket, because both came from one clock.
@@ -338,12 +348,13 @@ test('(د) «today» is the BAGHDAD day, asserted at 22:00 UTC', async () => {
 });
 
 test('the counts ride inside the COUNT that already runs, and cover every bucket', async () => {
+  // Each delivery day one after the board day it is counted under (row 322).
   const { app } = seed([
-    { id: 'ORD-C000000001', day: '2026-09-17' }, // overdue
-    { id: 'ORD-C000000002', day: TODAY },
-    { id: 'ORD-C000000003', day: TOMORROW },
-    { id: 'ORD-C000000004', day: '2026-09-24' }, // this week
-    { id: 'ORD-C000000005', day: '2026-11-01' }, // later
+    { id: 'ORD-C000000001', day: '2026-09-18' }, // overdue: should have gone on the 17th
+    { id: 'ORD-C000000002', day: TOMORROW }, // today
+    { id: 'ORD-C000000003', day: '2026-09-21' }, // tomorrow
+    { id: 'ORD-C000000004', day: '2026-09-25' }, // this week
+    { id: 'ORD-C000000005', day: '2026-11-02' }, // later
     { id: 'ORD-C000000006', day: null },
     { id: 'ORD-C000000007', status: 'delivered', day: TODAY },
   ]);
@@ -373,8 +384,12 @@ test('the projection carries the day, when it moved, and what packing a box need
   const rowOut = (await at(NOON, () => board(app))).orders[0] as Record<string, unknown>;
   assert.equal(rowOut.delivery_due_day, TOMORROW);
   assert.equal(rowOut.delivery_day_changed_at, '2026-09-18T11:00:00.000Z');
-  assert.equal(rowOut.due_bucket, 'tomorrow');
+  // Due tomorrow by courier: today's packing (row 322), labelled with both days.
+  assert.equal(rowOut.due_bucket, 'today');
   assert.equal(rowOut.due_label, 'غدًا');
+  assert.equal(rowOut.board_day, TODAY);
+  assert.equal(rowOut.lead_days, 1);
+  assert.equal(rowOut.prepare_label, 'اليوم');
   assert.equal(rowOut.customer_name, 'أحمد الخفاجي');
   // The parcel goes to the name and the governorate on the ADDRESS, which may
   // be a different person from the account holder — a gift, or an office.
@@ -540,9 +555,9 @@ test('the open scope actually READS THROUGH the partial index, both branches', (
   // The claim migration 0094 makes is not about the SQL text, it is about the
   // plan — and the failure mode it names is that the plan still says "USING
   // INDEX" while using the WRONG one. So this asserts the index BY NAME.
+  // The route's own ORDER BY, by the day to prepare (row 322) — never a copy.
   const raw: DatabaseSync = freshDb();
-  const ORDER = `ORDER BY o.delivery_due_day IS NULL, o.delivery_due_day ASC, o.priority DESC,
-    (o.priority_due_at IS NULL), o.priority_due_at ASC, o.created_at ASC, o.id ASC LIMIT 30 OFFSET 0`;
+  const ORDER = `${BOARD_ORDER_SQL} LIMIT 30 OFFSET 0`;
   const plan = (where: string) =>
     (
       raw

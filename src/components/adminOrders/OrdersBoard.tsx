@@ -101,6 +101,7 @@ import OrderDetailModal from './OrderDetailModal';
 import OrderBoardRow from './OrderBoardRow';
 import OrderSearchField from './OrderSearchField';
 import { countText } from './OrderBoardBadges';
+import { PREPARE_DAY_STRINGS, dayLine } from './prepareDayStrings';
 import { apiRefusal, refusalText } from '../../lib/refusalStrings';
 import { estimateRefusalText } from '../../../packages/contracts/src/priceEstimates';
 import { gateRefusalOf } from './serials/SerialGateRefusal';
@@ -148,6 +149,12 @@ const ARCHIVE_SCOPES: Array<{ id: ArchiveScope; ar: string; en: string; ckb: str
 /**
  * The day headers, in the order the server already returns rows in (day
  * ascending, NULLs last), so grouping never reorders anything.
+ *
+ * THE DAY IS THE DAY TO PREPARE (DECISIONS row 322). «اليوم» is what needs us
+ * today: packed and handed to the courier at 7 pm, a day before the customer's
+ * day — or arriving today, for our own same-day delivery and for a parcel
+ * already with the courier. The words did not change; the row says whose day
+ * it names («التوصيل: غدًا»), and the note under the header says the rule.
  *
  * OVERDUE IS NOT A GROUP OF ITS OWN. The server takes the same view for its
  * `due=today` filter: «a box that should have gone out on Tuesday is not a
@@ -252,9 +259,10 @@ export default function OrdersBoard() {
     setLoading(true);
     setError(null);
     /**
-     * `lang` IS SENT, AND IT IS NOT DECORATION. Two strings on this payload are
-     * rendered by the SERVER — `due_label` («اليوم» / «الأربعاء ٢٣ أيلول») and
-     * `quick_next.label` (the stage the button moves to) — and `langOf` reads
+     * `lang` IS SENT, AND IT IS NOT DECORATION. Three strings on this payload
+     * are rendered by the SERVER — `due_label` («اليوم» / «الأربعاء ٢٣ أيلول»),
+     * `prepare_label` (the day to pack it, row 322) and `quick_next.label`
+     * (the stage the button moves to) — and `langOf` reads
      * exactly this parameter, defaulting to Arabic. Without it an English or
      * Sorani admin gets an otherwise-translated board with two Arabic strings
      * in the middle of it, one of them on a button that changes an order.
@@ -471,6 +479,14 @@ export default function OrdersBoard() {
               </>
             )}
           </p>
+          {/* WHY AN ORDER FOR TOMORROW IS UNDER «اليوم» (row 322), once, in
+              muted words — the live board only: the archive is filed by the
+              day each order reached the customer. */}
+          {!archive && (
+            <p data-order-board-note className="mt-0.5 text-[12px] leading-[1.5] text-text-muted">
+              {dayLine(loc, PREPARE_DAY_STRINGS.boardNote)}
+            </p>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-2">

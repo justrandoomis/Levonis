@@ -71,8 +71,9 @@ import { productDocumentPublic } from './products';
 import { parseProductRow } from '../lib/productModel';
 import { applyRelations, loadRelationsViews, type ProductRelationsView } from '../lib/productOverlay';
 import { langOf, mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
-import { baghdadDay, isDay } from '../lib/baghdadTime';
+import { addDays, baghdadDay, isDay } from '../lib/baghdadTime';
 import { dayLabel } from '../lib/deliveryDay';
+import { boardDayOf, boardDaySql, leadBounds, leadDaysFor, leadDaysSql } from '../lib/deliveryLead';
 import { classifyOrderSearch } from '../lib/orderSearch';
 import { arabicFoldSql, phoneDigitsSql } from '../lib/sqlFold';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
@@ -1626,6 +1627,11 @@ adminRoutes.post('/wallet/credit', async (c) => {
  * put them on separate rows of controls and never have to explain which
  * combinations exist.
  *
+ * THE DAY IS THE DAY TO PREPARE (DECISIONS row 322). `due`, the counts, the
+ * group buckets and the order all read the BOARD DAY — the day the box must be
+ * packed and handed to the courier, a day before the customer's own day — not
+ * the delivery day itself. See `BOARD_DAY_SQL` below.
+ *
  *   scope=open       the work: everything not delivered and not cancelled,
  *                    DIRECT orders only — pre-orders are their own scope.
  *   scope=preorder   «فصلها في الطلبات المسبقة» — owner decision (أ) point 2. A
@@ -1693,6 +1699,113 @@ const BOARD_DUE = ['today', 'tomorrow', 'week', 'later', 'unscheduled'] as const
 const BOARD_TYPES = ['direct', 'preorder_air', 'preorder_sea', 'preorder_land'] as const;
 
 /**
+ * ===========================================================================
+ *  THE DAY TO PREPARE — «يظهر للمسؤول لتجهيزه قبل يوم التوصيل بيوم»
+ * ===========================================================================
+ * Owner, 2026-11-11: «when the customer needs the order delivered on e.g.
+ * 13-11, it should appear to the admin to prepare on 12-11 because delivery
+ * takes 24hr». Every parcel is packed and handed to the courier at 7 pm, so an
+ * order for the 13th is the 12th's work; filed under its own day it reached
+ * «اليوم» on the 13th, left at 7 pm and arrived on the 14th.
+ *
+ * THE BOARD DAY = THE DELIVERY DAY − THE ORDER'S LEAD (worker/lib/deliveryLead.ts):
+ *   1 day   everything the courier carries, every governorate alike (the
+ *           owner: «1 day everywhere», DECISIONS row 322);
+ *   0 days  the store's own same-day methods (`personal`, `pickup`), and an
+ *           order already with the courier (`out_for_delivery`), delivered or
+ *           cancelled — those are filed by the customer's day, so last night's
+ *           hand-over is not red this morning, a courier who is late still is,
+ *           and the archive reads exactly as it did.
+ * Groups, counts, `?due=`, the order and «متأخر» all go by it: OVERDUE IS A
+ * BOARD DAY BEFORE TODAY — a box not handed over on its day, or a parcel not
+ * delivered on its day. The row still says the customer's day (`due_label`).
+ *
+ * ONE STORED DAY, READ TWO WAYS (0094: one day column, not two). Nothing is
+ * written, so there is no migration and no index change, and a customer who
+ * moves the day — or a stage that moves — files the order again on the next
+ * read. An order with no day («في أقرب وقت») has nothing to subtract and stays
+ * «بلا موعد».
+ *
+ * EXPORTED so the EXPLAIN tests read the route's own text, as with
+ * PREPARE_WHERE_SQL (tests/adminOrderPrepareDay.test.ts).
+ */
+export const BOARD_LEAD_SQL = leadDaysSql();
+export const BOARD_DAY_SQL = boardDaySql();
+
+/**
+ * THE LIVE BOARD'S ORDER. The board day (no day last), then PRO FIRST INSIDE A
+ * DAY — decision (أ): a PRO order is pinned within its day, never above the
+ * calendar, and a PRO order still spends its day on the road, so its board day
+ * is the same as anyone's — then the earlier delivery day (a same-day personal
+ * delivery before tomorrow's courier parcel, both packed today), then the
+ * 12-hour deadline, the oldest order, and the id as the unique final key (ج).
+ *
+ * It was never index order — the board has sorted in a temp B-tree since
+ * `delivery_due_day IS NULL` led it — so an expression key costs no plan.
+ */
+export const BOARD_ORDER_SQL =
+  `ORDER BY ${BOARD_DAY_SQL} IS NULL, ${BOARD_DAY_SQL} ASC, o.priority DESC, o.delivery_due_day ASC,` +
+  ' (o.priority_due_at IS NULL), o.priority_due_at ASC, o.created_at ASC, o.id ASC';
+
+/**
+ * THE ARCHIVE'S ORDER (scope=delivered|cancelled), word for word the order the
+ * whole board used before row 322. A finished order has no day left to
+ * prepare, and how the completed orders sort is a decision of its own — it
+ * changes here, never by reusing the live board's order.
+ */
+const ARCHIVE_ORDER_SQL =
+  'ORDER BY o.delivery_due_day IS NULL, o.delivery_due_day ASC, o.priority DESC,' +
+  ' (o.priority_due_at IS NULL), o.priority_due_at ASC, o.created_at ASC, o.id ASC';
+
+const LEAD_BOUNDS = leadBounds();
+
+/**
+ * `?due=` BY THE BOARD DAY — behind a range on the STORED day.
+ *
+ * ##########################################################################
+ * #  THE STORED-DAY RANGE IS LOAD-BEARING. IT CHANGES NO ROW.               #
+ * ##########################################################################
+ * The board day is an expression, and no index holds it. Compared on its own
+ * (`date(…) <= ?`), the rows become a SCAN of the partial index and — the
+ * silent one — the FACET statement leaves it for `SCAN o USING INDEX
+ * idx_orders_shipping_type`: every order ever placed, with EXPLAIN still
+ * reading "USING INDEX", the regression migration 0094 warns about. The lead
+ * lies between LEAD_BOUNDS.min and .max days, so the stored day lies between
+ * board day + min and board day + max: implied by the board-day comparison,
+ * and what the planner SEARCHes idx_orders_board_open by. Dropping it changes
+ * no result and costs the index; tests/adminOrderPrepareDay.test.ts EXPLAINs
+ * the route's own statements for every live scope and every `due`.
+ *
+ * `today` INCLUDES OVERDUE, as it always has.
+ */
+export function boardDueClause(
+  due: (typeof BOARD_DUE)[number],
+  at: { today: string; tomorrow: string; weekEnd: string }
+): { sql: string; binds: string[] } {
+  const B = BOARD_DAY_SQL;
+  const lo = (d: string) => addDays(d, LEAD_BOUNDS.min);
+  const hi = (d: string) => addDays(d, LEAD_BOUNDS.max);
+  switch (due) {
+    case 'today':
+      return { sql: `o.delivery_due_day IS NOT NULL AND o.delivery_due_day <= ? AND ${B} <= ?`, binds: [hi(at.today), at.today] };
+    case 'tomorrow':
+      return {
+        sql: `o.delivery_due_day >= ? AND o.delivery_due_day <= ? AND ${B} = ?`,
+        binds: [lo(at.tomorrow), hi(at.tomorrow), at.tomorrow],
+      };
+    case 'week':
+      return {
+        sql: `o.delivery_due_day > ? AND o.delivery_due_day <= ? AND ${B} > ? AND ${B} <= ?`,
+        binds: [lo(at.tomorrow), hi(at.weekEnd), at.tomorrow, at.weekEnd],
+      };
+    case 'later':
+      return { sql: `o.delivery_due_day > ? AND ${B} > ?`, binds: [lo(at.weekEnd), at.weekEnd] };
+    case 'unscheduled':
+      return { sql: 'o.delivery_due_day IS NULL', binds: [] };
+  }
+}
+
+/**
  * THE CUSTOMER'S NAME AND DELIVERY PHONE ARE NOT COLUMNS. They live at `$.name`
  * and `$.phone` inside `orders.address_snapshot`, a frozen JSON copy of the
  * whole `addresses` row.
@@ -1715,7 +1828,9 @@ const SNAPSHOT_PHONE_SQL = `CASE WHEN json_valid(o.address_snapshot) THEN json_e
 export type OrderDueBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later' | 'unscheduled';
 
 /**
- * A row's bucket, from its day and the server's three Baghdad anchors.
+ * A row's bucket, from its BOARD day (the SQL's own `board_day`, so a bucket
+ * and the COUNT beside it cannot disagree) and the server's three Baghdad
+ * anchors.
  *
  * ############################################################################
  * #  WHY THIS IS NOT COMPUTED IN THE BROWSER                                 #
@@ -1955,17 +2070,12 @@ adminRoutes.get('/orders', async (c) => {
       // THE DAY IS NOT A FACET DIMENSION, so it goes into both WHEREs: an
       // admin looking at today's work wants «مباشر ٦» to mean six boxes going
       // out today, not six boxes in existence.
-      if (due === 'today') {
-        bothWheres('o.delivery_due_day IS NOT NULL AND o.delivery_due_day <= ?', today);
-      } else if (due === 'tomorrow') {
-        bothWheres('o.delivery_due_day = ?', tomorrow);
-      } else if (due === 'week') {
-        bothWheres('o.delivery_due_day > ? AND o.delivery_due_day <= ?', tomorrow, weekEnd);
-      } else if (due === 'later') {
-        bothWheres('o.delivery_due_day > ?', weekEnd);
-      } else {
-        bothWheres('o.delivery_due_day IS NULL');
-      }
+      //
+      // AND IT IS THE BOARD DAY (row 322): `due=today` is the boxes to pack and
+      // hand over today, whatever day they reach the customer. See
+      // `boardDueClause` for the stored-day range that keeps the index.
+      const { sql: dueSql, binds: dueBinds } = boardDueClause(due, { today, tomorrow, weekEnd });
+      bothWheres(dueSql, ...dueBinds);
     }
   }
 
@@ -2067,16 +2177,18 @@ adminRoutes.get('/orders', async (c) => {
    */
   const FROM = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id';
 
+  // The live board sorts by the day to prepare; the archive keeps its own order.
+  const orderBy = scope === 'delivered' || scope === 'cancelled' ? ARCHIVE_ORDER_SQL : BOARD_ORDER_SQL;
+
   const [{ results }, countRow, facetRows, heldRow, estimateRow] = await Promise.all([
+    // `board_day` and `board_lead_days` ride on the row so its bucket is the
+    // SQL's own board day — the one the COUNT and `due` used — never a second
+    // computation that could drift from it.
     c.env.DB.prepare(
-      `SELECT o.*, u.email, u.username, u.name AS user_name, u.phone_e164 AS user_phone
+      `SELECT o.*, u.email, u.username, u.name AS user_name, u.phone_e164 AS user_phone,
+              ${BOARD_DAY_SQL} AS board_day, ${BOARD_LEAD_SQL} AS board_lead_days
          ${FROM}${where}
-        ORDER BY o.delivery_due_day IS NULL,
-                 o.delivery_due_day ASC,
-                 o.priority DESC,
-                 (o.priority_due_at IS NULL), o.priority_due_at ASC,
-                 o.created_at ASC,
-                 o.id ASC
+        ${orderBy}
         LIMIT ? OFFSET ?`
     )
       .bind(...params, limit, offset)
@@ -2084,14 +2196,15 @@ adminRoutes.get('/orders', async (c) => {
     // THE GROUP HEADERS RIDE IN THE COUNT THAT ALREADY RUNS. Six SUM(CASE)
     // columns over the same WHERE cost one scan the board was paying for
     // anyway; six separate COUNT queries would be six more round trips to D1
-    // for numbers nobody can act on individually.
+    // for numbers nobody can act on individually. The five dated ones count
+    // the BOARD day (row 322); `unscheduled` is the order with no day at all.
     c.env.DB.prepare(
       `SELECT COUNT(*) AS n,
-              SUM(CASE WHEN o.delivery_due_day IS NOT NULL AND o.delivery_due_day < ? THEN 1 ELSE 0 END) AS overdue,
-              SUM(CASE WHEN o.delivery_due_day = ? THEN 1 ELSE 0 END) AS due_today,
-              SUM(CASE WHEN o.delivery_due_day = ? THEN 1 ELSE 0 END) AS due_tomorrow,
-              SUM(CASE WHEN o.delivery_due_day > ? AND o.delivery_due_day <= ? THEN 1 ELSE 0 END) AS due_week,
-              SUM(CASE WHEN o.delivery_due_day > ? THEN 1 ELSE 0 END) AS due_later,
+              SUM(CASE WHEN ${BOARD_DAY_SQL} IS NOT NULL AND ${BOARD_DAY_SQL} < ? THEN 1 ELSE 0 END) AS overdue,
+              SUM(CASE WHEN ${BOARD_DAY_SQL} = ? THEN 1 ELSE 0 END) AS due_today,
+              SUM(CASE WHEN ${BOARD_DAY_SQL} = ? THEN 1 ELSE 0 END) AS due_tomorrow,
+              SUM(CASE WHEN ${BOARD_DAY_SQL} > ? AND ${BOARD_DAY_SQL} <= ? THEN 1 ELSE 0 END) AS due_week,
+              SUM(CASE WHEN ${BOARD_DAY_SQL} > ? THEN 1 ELSE 0 END) AS due_later,
               SUM(CASE WHEN o.delivery_due_day IS NULL THEN 1 ELSE 0 END) AS unscheduled
          ${FROM}${where}`
     )
@@ -2223,6 +2336,8 @@ adminRoutes.get('/orders', async (c) => {
   const lang = langOf(c);
   const out = results.map((o) => {
     const day = typeof o.delivery_due_day === 'string' ? o.delivery_due_day : '';
+    // The SQL's own board day (row 322) — the one `due` and the COUNT used.
+    const boardDay = isDay(o.board_day) ? o.board_day : '';
     // An order held by unsettled estimated lines (0218) offers no one-tap move:
     // the gate would refuse it — the row shows the badge instead of a button.
     const estimateHeld = itemsHoldOrder(byOrder.get(String(o.id)) ?? []);
@@ -2271,8 +2386,18 @@ adminRoutes.get('/orders', async (c) => {
       /** «يستطيع اختيار وتغيير يوم التوصيل» — the day itself, and when it moved. */
       delivery_due_day: day || null,
       delivery_day_changed_at: o.delivery_day_changed_at ?? null,
-      due_bucket: dueBucketOf(day, today, tomorrow, weekEnd),
+      /**
+       * THE DAY TO PREPARE (row 322): the delivery day less `lead_days` — 1 for
+       * the courier, 0 for the store's same-day methods and for an order
+       * already with the courier or finished. The bucket is filed by it; the
+       * label still names the CUSTOMER'S day, and `prepare_label` names this
+       * one only when the two differ.
+       */
+      board_day: boardDay || null,
+      lead_days: day ? Number(o.board_lead_days) || 0 : null,
+      due_bucket: dueBucketOf(boardDay, today, tomorrow, weekEnd),
       due_label: day ? dayLabel(day, today, lang).label : '',
+      prepare_label: boardDay && boardDay !== day ? dayLabel(boardDay, today, lang).label : '',
     };
   });
 
@@ -2359,6 +2484,25 @@ adminRoutes.delete('/orders/:id', async (c) => {
     throw error;
   }
 });
+
+/**
+ * The order window's two days (DECISIONS row 322): the customer's delivery day
+ * and, when it is a different day, the day to prepare it — labelled here, in
+ * the reader's language, by the board's own rule (`leadDaysFor` is
+ * `BOARD_LEAD_SQL` read in TypeScript; tests/deliveryLead.test.ts holds the two
+ * together). No day («في أقرب وقت») is no line.
+ */
+function orderDayLabels(o: Record<string, unknown>, nowMs: number, lang: string) {
+  const day = isDay(o.delivery_due_day) ? o.delivery_due_day : '';
+  if (!day) return { delivery_day_label: '', board_day: null, prepare_label: '' };
+  const today = baghdadDay(nowMs);
+  const boardDay = boardDayOf(day, leadDaysFor(o));
+  return {
+    delivery_day_label: dayLabel(day, today, lang).label,
+    board_day: boardDay || null,
+    prepare_label: boardDay && boardDay !== day ? dayLabel(boardDay, today, lang).label : '',
+  };
+}
 
 /**
  * Everything needed to PREPARE one order, in a single call.
@@ -2478,6 +2622,8 @@ adminRoutes.get('/orders/:id', async (c) => {
         member_since: o.user_since ?? null,
       },
       address,
+      /** «التوصيل: … · التجهيز: …» — the two days, written by the server (row 322). */
+      ...orderDayLabels(o, Date.now(), langOf(c)),
       units: units.map((u) => ({
         id: u.id,
         order_item_id: u.order_item_id,
