@@ -299,6 +299,14 @@ interface ProductPreview extends Pick<SocialPreview, 'title' | 'description' | '
   lead?: OpeningLead | null;
 }
 
+/**
+ * The shape of the card a product document keeps in its colo (worker/index.ts
+ * `catalogueCard`, S1): part of the copy's key, so a copy an older build kept is
+ * never read by a newer one. Bump it with any change to `ProductPreview` or to
+ * what `resolveProductPreview` puts in it.
+ */
+export const PRODUCT_CARD_REVISION = 'card-2026-11-11';
+
 /** Arabic first — the store's own default language — then English, then any. */
 function pickText(...candidates: unknown[]): string {
   for (const candidate of candidates) {

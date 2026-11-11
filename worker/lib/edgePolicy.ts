@@ -387,6 +387,17 @@ async function purgedAt(key: Request): Promise<number | null> {
   return Number.isFinite(at) && at > 0 ? at : null;
 }
 
+/**
+ * The same, for a reader that must not trust what it cannot check (`edgeMemo`):
+ * a marker that cannot be read is an error, never «not purged».
+ */
+async function markedAt(markers: Cache, key: Request): Promise<number | null> {
+  const url = new URL(key.url);
+  const hit = await markers.match(purgeMarkerKey(url.host, url.pathname));
+  const at = Number(hit?.headers.get(PURGED_AT_HEADER));
+  return Number.isFinite(at) && at > 0 ? at : null;
+}
+
 export interface EdgeServeOptions {
   /** The canonical key (`canonicalKey`). */
   key: Request;
@@ -489,6 +500,142 @@ export async function peekAnonymousCopy(c: Context<AppContext>, path: string, li
       return null;
     }
     return await hit.json();
+  } catch {
+    return null;
+  }
+}
+
+// ---------------------------------------------- a value the Worker needs itself
+//
+// A VALUE IS KEPT LIKE A GUEST'S ANSWER (S1, 2026-11-11, DECISIONS row 314; owner:
+// «I need it to become very very fast»). Some reads are not an answer any route
+// sends but a value the Worker needs to build one: the share card a product
+// document is rewritten with (worker/index.ts `assetWithPreview`, `catalogueCard`)
+// was read from D1 on EVERY view — two dependent round trips (the row, then its
+// pictures) from the colo (Sofia, for Iraq) to the primary in western North
+// America, 330–530 ms of Worker time on each product page while the page's own
+// answer was already a colo hit. `edgeMemo` keeps such a value under a canonical
+// key with `edgeServe`'s ladder — fresh; refreshed in the background past half
+// its `s-maxage`; served stale within the declared window while it is rebuilt;
+// retired by its path's purge marker — with two differences: the value is JSON,
+// and a refresh calls `build` again (in `waitUntil`) rather than replaying a URL
+// through the Worker, because no route answers the key.
+//
+// WHAT IS NEVER KEPT. A build that finds nothing (null), or a value `keep`
+// refuses (the card: one whose picture read failed), is returned as it is and
+// never stored; a refresh that builds either drops the copy, so the next read
+// builds again. The CALLER decides that the value is the same for every viewer.
+//
+// A FAILING CACHE IS TODAY'S BEHAVIOUR. No `caches`; no purge markers, or a
+// marker that cannot be read (a copy is kept only where its purge can retire
+// it, and served only when its marker says it may be); a match or a put that
+// throws or rejects; an unreadable copy: each is a build, as if nothing had ever
+// been kept. What stays best effort is what every guest answer's purge already
+// is: a marker the purge failed to WRITE is logged, and the copies it would have
+// retired age out within their window. And nothing here waits on a body it does
+// not read: an expired copy is released, never awaited (releasing a cloned body
+// can wait for ever on its other branch — Node's tee does — and an answer must not).
+const memoRefreshing = new Map<string, Promise<void>>();
+
+export async function edgeMemo<T>(
+  c: Context<AppContext>,
+  key: Request,
+  lifetime: EdgeLifetime,
+  build: () => Promise<T | null>,
+  keep: (value: T) => boolean = () => true
+): Promise<T | null> {
+  let cache: Cache | null;
+  try {
+    cache = edgeCache();
+  } catch {
+    cache = null;
+  }
+  // Kept only where its purge can retire it: without the purge markers, nothing is.
+  let markers: Cache | null = null;
+  try {
+    if (cache) markers = await purgeMarkers();
+  } catch {
+    markers = null;
+  }
+  if (!cache || !markers) return build();
+  const colo = cache;
+  const marks = markers;
+  const store = async (value: T, startedAt: number): Promise<void> => {
+    await colo.put(
+      key,
+      new Response(JSON.stringify(value), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': storedCacheControl(lifetime),
+          [PROJECTION_HEADER]: PUBLIC_PROJECTION_REVISION,
+          [STORED_AT_HEADER]: String(startedAt),
+        },
+      })
+    );
+  };
+  const refresh = () => {
+    if (memoRefreshing.has(key.url)) return;
+    const work = (async () => {
+      // After the answer has gone: the rebuild shares this isolate's one thread.
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+      const startedAt = Date.now();
+      const value = await build();
+      if (value === null || !keep(value)) await colo.delete(key).catch(() => false);
+      else await store(value, startedAt);
+    })()
+      .catch((e) => {
+        console.error('edge memo refresh failed (the copy ages out within its window):', new URL(key.url).pathname, e instanceof Error ? e.message : e);
+      })
+      .finally(() => {
+        memoRefreshing.delete(key.url);
+      });
+    memoRefreshing.set(key.url, work);
+    void schedule(c, work);
+  };
+  try {
+    const [hit, purged] = await Promise.all([colo.match(key).catch(() => undefined), markedAt(marks, key)]);
+    if (hit) {
+      const storedAt = Number(hit.headers.get(STORED_AT_HEADER));
+      const usable =
+        hit.headers.get(PROJECTION_HEADER) === PUBLIC_PROJECTION_REVISION &&
+        Number.isFinite(storedAt) &&
+        storedAt > 0 &&
+        !(purged !== null && storedAt <= purged);
+      const state = usable ? freshnessOf(Date.now() - storedAt, lifetime) : 'expired';
+      if (state !== 'expired') {
+        const value = (await hit.json()) as T | null;
+        if (value !== null && keep(value)) {
+          if (state !== 'fresh') refresh();
+          return value;
+        }
+      } else {
+        void hit.body?.cancel().catch(() => undefined);
+      }
+    }
+  } catch {
+    // An unreadable copy is a miss.
+  }
+  // The value is as old as the moment it was READ (a purge during the build retires it).
+  const startedAt = Date.now();
+  const value = await build();
+  if (value !== null && keep(value)) void schedule(c, store(value, startedAt));
+  return value;
+}
+
+/**
+ * The path a product's purge marks — `cataloguePaths` names `/api/products/<slug>`
+ * and `purgeAnonymousCache` marks the URL parser's spelling of it — when that is
+ * also the slug's one unambiguous spelling as a path segment (`encodeURIComponent`).
+ * Null for a slug the two would spell differently (`?`, `#`, `/`, `%`, `@`, `+`…):
+ * a value kept under such a slug could miss its purge, and a raw `?` would make
+ * its key another path's. A slug the admin writes (lower-case letters, digits and
+ * hyphens; Arabic letters too) has the one spelling.
+ */
+export function productPurgePath(slug: string): string | null {
+  try {
+    const marked = new URL(`https://x/api/products/${slug}`).pathname;
+    return slug && marked === `/api/products/${encodeURIComponent(slug)}` ? marked : null;
   } catch {
     return null;
   }
@@ -628,7 +775,8 @@ export function storefrontDocumentPaths(slug: string, id?: string): string[] {
  * list and its pages named and the sitemap, so every price-state flip (a V2 write, FX-5, a completeness flip in
  * either direction) drops their copies too. Each product named also drops its knowledge answer (the Bambu
  * import spec §G.1: `/api/products/<slug>/knowledge`, five minutes at the edge), so a product write — its
- * specifications, its documents, its visibility — is never answered from an older copy in this colo.
+ * specifications, its documents, its visibility — is never answered from an older copy in this colo. The
+ * product path's marker also retires the share card its document keeps (worker/index.ts `catalogueCard`, S1).
  */
 export function cataloguePaths(slugs: readonly string[] = []): string[] {
   const named = slugs.filter(Boolean);

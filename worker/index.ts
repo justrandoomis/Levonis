@@ -2,7 +2,7 @@ import { searchTrendingRoutes } from './routes/searchTrending';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
-import { noStoreUnlessSet, peekAnonymousCopy, purgeCatalogueFromJob, setEdgeRefreshDispatcher } from './lib/edgePolicy';
+import { ANONYMOUS_LIFETIME, canonicalKey, edgeMemo, noStoreUnlessSet, peekAnonymousCopy, productPurgePath, purgeCatalogueFromJob, setEdgeRefreshDispatcher } from './lib/edgePolicy';
 import { openingLeadFromDetail } from './lib/productOpeningLead';
 import { securityEventsDoor } from './lib/securityEvents';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
@@ -24,6 +24,7 @@ import {
   MANIFEST_PATH,
   preloadImagePath,
   previewStoreRef,
+  PRODUCT_CARD_REVISION,
   productSlugFromPath,
   resolveProductPreview,
   resolveStorePreview,
@@ -949,6 +950,46 @@ function logDocumentRegion(c: Context<AppContext>, path: string, docMs: number):
   }
 }
 
+// A CATALOGUE PRODUCT'S CARD WITHOUT A D1 READ ON EVERY VIEW (S1, 2026-11-11;
+// DECISIONS row 314). `resolveProductPreview` is two dependent D1 reads, the
+// row and then its pictures (two probes more on a cold isolate). From Sofia,
+// where visitors from Iraq are served, to the primary in western North America
+// that was 330-530 ms of every product document (server-timing `cfWorker`; the
+// home document takes 5 ms), on the page the shop's adverts land on. The card
+// is the same for every visitor: no price, no stock, nothing of a session, and
+// neither language nor theme (Arabic first, each theme's lead picture). So the
+// colo keeps it like a guest's answer (`edgeMemo`, worker/lib/edgePolicy.ts):
+//
+//   - keyed on everything the card is built from but the rows: the origin it
+//     names (`trustedOrigin`, the apex on the live site, whatever host the
+//     document was asked on) and the slug;
+//   - under the product answer's own path, `/api/products/<slug>`, with a
+//     `__card` parameter no route declares, so no request can read or fill it,
+//     and every purge of that answer on the apex (the catalogue seam on an
+//     admin product write, a visibility flip, the FX and repricing jobs:
+//     `cataloguePaths`) retires the card in that colo at once;
+//   - for that answer's own lifetime (`ANONYMOUS_LIFETIME`), so another colo
+//     never shows a card older than the page's own answer it serves;
+//   - only a card that names its picture (a failed picture read is served once,
+//     never kept), and only for a slug its purge spells the same way
+//     (`productPurgePath`): any other is read on every view, as before;
+//   - never a store-scoped card (a merchant host, a store's page of a product
+//     on the main site): that one is read as before.
+//
+// A cache that fails is a build, exactly as before; the revision in the key
+// (`PRODUCT_CARD_REVISION`) keeps a copy of an older shape from being read.
+function catalogueCard(c: Context<AppContext>, slug: string, origin: string) {
+  const build = () => resolveProductPreview(c.env.DB, slug, origin);
+  const path = productPurgePath(slug);
+  let key: Request | null = null;
+  try {
+    if (path) key = canonicalKey(new URL(`${path}?__card=${PRODUCT_CARD_REVISION}`, origin).toString(), ['__card']);
+  } catch {
+    key = null;
+  }
+  return key ? edgeMemo(c, key, ANONYMOUS_LIFETIME, build, (card) => !!card.image) : build();
+}
+
 async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
   const asset = await c.env.ASSETS.fetch(c.req.raw);
   const slug = productSlugFromPath(c.req.path);
@@ -1011,7 +1052,7 @@ async function assetWithPreview(c: Context<AppContext>): Promise<Response> {
     // itself will read, when this colo holds one (no build, no D1): what the
     // page opens on is read from it (worker/lib/productOpeningLead.ts).
     const [product, storeOnHost, manifest, resolve, detail] = await Promise.all([
-      slug ? resolveProductPreview(c.env.DB, slug, origin, scope) : null,
+      slug ? (scope.storeSlug || scope.storeRef ? resolveProductPreview(c.env.DB, slug, origin, scope) : catalogueCard(c, slug, origin)) : null,
       onStore ? resolveStorePreview(c.env.DB, origin, scope) : null,
       viteManifest(c),
       anonymousResolve(c),
