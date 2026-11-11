@@ -9,7 +9,12 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { Loader2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api, ApiError, failureText } from '../../lib/api';
-import { Sheet } from '../ui/Overlay';
+// The v2 sheet (`dragHandle`): its body scrolls under a finger. An item's
+// fields grow with its product (sale type, route, one row per option group,
+// colour, quantity) past an iPhone's screen, and the whole-panel sheet
+// cannot scroll — its drag takes every vertical swipe — so Save could end
+// up below the bottom edge. tests/overlayViewportFit.test.ts.
+import { Sheet } from '../ui/Sheet';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Banner, Field, Grid, TextArea, TextInput, Toggle } from '../adminProducts/form/formUi';
 import * as T from '../adminProducts/theme';
@@ -79,7 +84,7 @@ function ItemSheet({
   };
 
   return (
-    <Sheet open={open} onClose={() => !busy && onClose()} labelledBy={titleId} panelClassName="w-full sm:max-w-lg">
+    <Sheet open={open} onClose={() => !busy && onClose()} labelledBy={titleId} dragHandle panelClassName="w-full sm:max-w-lg max-h-[92dvh]">
       <div className={`${T.AP} px-5 pb-5 pt-2 space-y-3`} style={GIFTS_ACCENT} data-gift-item-sheet>
         <h2 id={titleId} className="text-[15px] font-bold text-[var(--ap-text-1)]">
           {item ? t('editItem') : t('addItem')} · {adminText(lang, 'levelN', { n: level })}

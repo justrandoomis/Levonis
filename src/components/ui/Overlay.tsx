@@ -217,14 +217,20 @@ function DiscardGuard({
   onDiscard: () => void;
 }) {
   const id = useId();
+  const rootRef = useRef<HTMLDivElement | null>(null);
   const keepRef = useRef<HTMLButtonElement | null>(null);
   // Scrolled to, not just focused: in a window whose whole panel scrolls, the
-  // question is at the foot of the content and must be seen to be answered.
+  // question is at the foot of the content and must be seen to be answered —
+  // ALL of it. Focusing «keep editing» alone brought only that button in; where
+  // the two buttons wrap (Sorani on a narrow phone) «discard» stayed under the
+  // bottom edge. tests/overlayViewportFit.test.ts.
   useEffect(() => {
-    keepRef.current?.focus();
+    keepRef.current?.focus({ preventScroll: true });
+    rootRef.current?.scrollIntoView({ block: 'nearest' });
   }, []);
   return (
     <div
+      ref={rootRef}
       role="alertdialog"
       aria-modal="false"
       aria-labelledby={`${id}-t`}
@@ -294,7 +300,13 @@ export interface OverlayProps {
    * Safari, between the status bar and the toolbar) and `vh` the screen
    * without its toolbar, which pushed a bottom window's header off the top.
    * The panel is capped at its layer (`[data-overlay-panel]` in
-   * src/index.css); a `max-h-*` here replaces that cap, so it says dvh too
+   * src/index.css); a `max-h-*` here replaces that cap, so it says dvh too.
+   * The cap does NOT scroll: a window that can be taller than the screen
+   * scrolls itself — a dvh `max-h-*` with `overflow-y-auto` here, or a flex
+   * column whose body scrolls — or what does not fit is cut off at the
+   * bottom edge.
+   * The whole-panel `Sheet` below cannot scroll under a finger (its drag takes
+   * the vertical swipe); a tall sheet is the v2 one, `dragHandle`
    * (tests/overlayViewportFit.test.ts).
    */
   panelClassName?: string;

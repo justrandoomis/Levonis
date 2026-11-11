@@ -402,7 +402,21 @@ html {
      panel keeps its top edge, and so its header, on the screen whatever unit
      sized it. A caller's own `max-h-*` is a utility, a later layer, and still
      wins: size windows in dvh. A dvh value a browser cannot read is dropped,
-     and this cap is what it falls back to. tests/overlayViewportFit.test.ts. */
+     and this cap is what it falls back to.
+     IT DOES NOT SCROLL. What does not fit is cut off at the BOTTOM edge, so a
+     window that can be taller than the screen scrolls itself (a dvh `max-h-*`
+     and `overflow-y-auto` on its panel, or a v2 Sheet's body). An overflow here
+     would clip whatever hangs outside a panel: the shop's search window is
+     just its field, and the results drop down outside it.
+     THE STATUS BAR. env(safe-area-inset-top) is 0 today: index.html's
+     apple-mobile-web-app-status-bar-style is `default`/`black`, opaque, so an
+     installed app's web view starts below the status bar, and in a Safari tab
+     the browser's own bar covers it. Made `black-translucent`, the page is
+     drawn under the status bar, the cap leaves that band clear, and the
+     full-screen windows (ImageViewer, GiftReveal, the address editor) stop
+     short of the top — and the image viewer, whose header already pads for
+     the inset, gets the gap twice. Give those three `max-h-none` then.
+     tests/overlayViewportFit.test.ts. */
   [data-overlay-panel] {
     max-height: calc(100% - env(safe-area-inset-top));
   }

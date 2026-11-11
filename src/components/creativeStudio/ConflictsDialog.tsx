@@ -31,7 +31,9 @@ export default function ConflictsDialog({ pending, message, onOption, onKeep, on
 }) {
   const { w } = useText();
   return (
-    <Overlay open={!!pending} onClose={onRevert} label={w(S.conflictsDialogTitle)} placement="center" testId="conflicts-dialog">
+    // Scrolls when two or three conflicts with their options outgrow a phone's
+    // screen: the window is capped at the screen, and the choice is at the foot.
+    <Overlay open={!!pending} onClose={onRevert} label={w(S.conflictsDialogTitle)} placement="center" testId="conflicts-dialog" panelClassName="max-h-[90dvh] overflow-y-auto">
       {() => (
         <div className="flex max-w-lg flex-col gap-3 p-5">
           <h2 className="text-base font-bold text-text-primary">{w(S.conflictsDialogTitle)}</h2>

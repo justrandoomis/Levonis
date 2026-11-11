@@ -153,7 +153,11 @@ export function PromptDialog({
       placement="bottom"
       initialFocus={fieldRef}
       testId={testId ?? 'prompt-dialog'}
-      panelClassName="w-full sm:max-w-md"
+      // It scrolls when it must: a description, a three-line answer and the
+      // unsaved-changes question under them fill an iPhone SE's screen, and the
+      // primitive caps the window at the screen without scrolling it
+      // (tests/overlayViewportFit.test.ts).
+      panelClassName="w-full sm:max-w-md max-h-[92dvh] overflow-y-auto"
       dirty={value.trim() !== initialValue.trim()}
     >
       <form

@@ -8,7 +8,11 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { api, failureText } from '../../lib/api';
-import { Sheet } from '../ui/Overlay';
+// The v2 sheet (`dragHandle`): its body scrolls under a finger. A grant's
+// facts, note and actions are taller than an iPhone's screen, and the
+// whole-panel sheet cannot scroll — its drag takes every vertical swipe.
+// tests/overlayViewportFit.test.ts.
+import { Sheet } from '../ui/Sheet';
 import { formatDateTime, statusLabel } from '../orders/format';
 import { formatFigure } from '../../lib/localeNumber';
 import { Banner, Field, Select, TextArea } from '../adminProducts/form/formUi';
@@ -96,7 +100,7 @@ export default function GrantDetail({
   const dirty = !!grant && (note !== grant.note || (grant.reason !== 'legacy' && reason !== grant.reason));
 
   return (
-    <Sheet open={!!giftId} onClose={() => !busy && onClose()} labelledBy={titleId} panelClassName="w-full sm:max-w-xl">
+    <Sheet open={!!giftId} onClose={() => !busy && onClose()} labelledBy={titleId} dragHandle panelClassName="w-full sm:max-w-xl max-h-[92dvh]">
       <div className={`${T.AP} px-5 pb-5 pt-2 space-y-4`} style={GIFTS_ACCENT} data-gift-detail={giftId ?? ''}>
         <h2 id={titleId} className="text-[15px] font-bold text-[var(--ap-text-1)]">
           {t('detail')}

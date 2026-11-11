@@ -1438,7 +1438,10 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
         dismissOnEscape={!pendingBusy}
         z={60}
         testId="admin-unit-action"
-        panelClassName="w-full max-w-md"
+        // Scrolls on a phone: the warranty correction (two durations, the
+        // shorter-warranty warning, the reason) is taller than an iPhone's
+        // screen, and the window is capped at the screen without scrolling.
+        panelClassName="w-full max-w-md max-h-[90dvh] overflow-y-auto"
       >
         <div className="p-6 space-y-4">
           <button
@@ -1648,7 +1651,9 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
         dismissOnEscape={!moveBusy}
         z={60}
         testId="admin-claim-move"
-        panelClassName="w-full max-w-md"
+        // Scrolls on a phone: the money warning, the decisions and the reason
+        // outgrow an iPhone SE's screen, and the window is capped there.
+        panelClassName="w-full max-w-md max-h-[90dvh] overflow-y-auto"
       >
         <div className="p-6 space-y-4">
           <button

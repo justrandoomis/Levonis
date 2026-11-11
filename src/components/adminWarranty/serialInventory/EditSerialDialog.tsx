@@ -67,9 +67,15 @@ export default function EditSerialDialog({
     }
   };
 
+  // THE WINDOW SCROLLS, NOT THE FORM. The unsaved-changes question (`dirty`)
+  // is added by the primitive AFTER this form, inside the panel. On a phone
+  // the form is taller than the screen, so while the form scrolled on its own
+  // the question landed below the bottom edge, Keep and Discard with it. Now
+  // it is the last thing in the window's one scroll, and «متابعة التحرير»
+  // taking focus brings it into view. tests/overlayViewportFit.test.ts.
   return (
-    <Overlay open onClose={onClose} labelledBy={titleId} placement="bottom" panelClassName="w-full sm:max-w-2xl" dirty={dirty} testId="serial-edit">
-      <form onSubmit={save} className={`${T.AP} p-4 sm:p-5 space-y-4 max-h-[85dvh] overflow-y-auto`}>
+    <Overlay open onClose={onClose} labelledBy={titleId} placement="bottom" panelClassName="w-full sm:max-w-2xl max-h-[85dvh] overflow-y-auto" dirty={dirty} testId="serial-edit">
+      <form onSubmit={save} className={`${T.AP} p-4 sm:p-5 space-y-4`}>
         <div>
           <h2 id={titleId} className="text-[16px] font-bold text-[var(--ap-text-1)]">
             {t.editTitle}

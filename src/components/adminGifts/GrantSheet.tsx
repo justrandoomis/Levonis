@@ -8,7 +8,12 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Loader2, Search, X } from 'lucide-react';
 import { api, failureText, newIdempotencyKey } from '../../lib/api';
-import { Sheet } from '../ui/Overlay';
+// The v2 sheet (`dragHandle`): its body scrolls under a finger. This form is
+// taller than an iPhone's screen, and the whole-panel sheet in Overlay.tsx
+// cannot scroll — its drag takes every vertical swipe — so «منح الهدية» and the
+// unsaved-changes question were below the bottom edge with no way down.
+// tests/overlayViewportFit.test.ts.
+import { Sheet } from '../ui/Sheet';
 import { Banner, Field, Select, TextArea } from '../adminProducts/form/formUi';
 import * as T from '../adminProducts/theme';
 import ItemFields, { blankItem } from './ItemFields';
@@ -124,7 +129,7 @@ export default function GrantSheet({
   ];
 
   return (
-    <Sheet open={open} onClose={() => !busy && onClose()} labelledBy={titleId} panelClassName="w-full sm:max-w-xl" dirty={!!user && !busy}>
+    <Sheet open={open} onClose={() => !busy && onClose()} labelledBy={titleId} dragHandle panelClassName="w-full sm:max-w-xl max-h-[92dvh]" dirty={!!user && !busy}>
       <form
         className={`${T.AP} px-5 pb-5 pt-2 space-y-4`}
         style={GIFTS_ACCENT}

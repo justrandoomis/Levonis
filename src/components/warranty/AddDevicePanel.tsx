@@ -363,7 +363,10 @@ export function AddDevicePanel({
         solid
         z={60}
         testId="warranty-scanner"
-        panelClassName="w-full max-w-md bg-surface-raised border border-border-subtle overflow-hidden"
+        // Scrolls, not hidden: on an iPhone SE the camera picture, the title
+        // and the typed-serial row are taller than the screen, and the window
+        // is capped there (tests/overlayViewportFit.test.ts).
+        panelClassName="w-full max-w-md bg-surface-raised border border-border-subtle overflow-y-auto"
       >
         <Suspense
           fallback={

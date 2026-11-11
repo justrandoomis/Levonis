@@ -91,7 +91,8 @@ export default function PurchaseUnitSerial({ value = '', mode, disabled = false,
     {error && !open && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{error}</p>}
     {notice && <p role="status" className={`mt-2 text-xs ${T.text2}`}>{notice}</p>}
     {notes.map((note) => <p key={note} className="mt-2 text-xs text-[var(--ap-warning)]">{note}</p>)}
-    <Overlay open={open} onClose={() => setOpen(false)} labelledBy={titleId} anchor={cameraButton} solid z={80} testId="purchase-unit-serial-scanner" panelClassName="w-full max-w-md overflow-hidden border border-border-subtle bg-surface-raised">
+    {/* Scrolls, not hidden: on an iPhone SE the camera picture, the title and the typed-serial row are taller than the screen, and the window is capped there (tests/overlayViewportFit.test.ts). */}
+    <Overlay open={open} onClose={() => setOpen(false)} labelledBy={titleId} anchor={cameraButton} solid z={80} testId="purchase-unit-serial-scanner" panelClassName="w-full max-w-md overflow-y-auto border border-border-subtle bg-surface-raised">
       <Suspense fallback={<p role="status" className="p-6">{loc('جارٍ فتح الكاميرا…', 'Opening camera…', 'کردنەوەی کامێرا…')}</p>}>
         <BarcodeScanner key={attempt} mode="single" frame="label" deferFeedback waitForCompanions titleId={titleId} title={loc('امسح الرقم التسلسلي لهذه القطعة', 'Scan this unit’s serial number', 'ژمارەی زنجیرەیی ئەم پارچەیە سکان بکە')} onRead={readCamera} onManual={(code) => { void accept({ code, source: 'manual' }); }} onClose={() => setOpen(false)} verdict={<>
           {busy && <p role="status" className="p-3 text-sm">{loc('جارٍ حفظ الرقم لهذه القطعة…', 'Saving serial for this unit…', 'پاشەکەوتکردنی ژمارە بۆ ئەم پارچەیە…')}</p>}

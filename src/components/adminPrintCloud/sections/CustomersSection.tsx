@@ -391,7 +391,10 @@ function AdjustSheet({ kind, userId, refs, onClose, onDone }: { kind: 'credits' 
 
   const titleId = `pc-adjust-${kind}`;
   return (
-    <Sheet open onClose={onClose} labelledBy={titleId} panelClassName="ap w-full sm:max-w-lg">
+    // `dragHandle`: the body scrolls under a finger. Two notes, two choices,
+    // the amount and the reason are taller than an iPhone's screen, and a
+    // whole-panel sheet cannot scroll (tests/overlayViewportFit.test.ts).
+    <Sheet open onClose={onClose} labelledBy={titleId} dragHandle panelClassName="ap w-full sm:max-w-lg max-h-[92dvh]">
       <div className="space-y-3 px-5 pb-5 pt-2">
         <h2 id={titleId} className={`text-[16px] font-bold ${T.text1}`}>
           {t(credits ? S.adjustHours : S.adjustMaterials)}
