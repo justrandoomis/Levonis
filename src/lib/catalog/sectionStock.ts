@@ -9,8 +9,11 @@
 import type { CatalogTreeNode } from './types';
 import type { SectionStock } from './copy';
 
-/** The products one category answer reads (worker/routes/catalog.ts CATEGORY_PAGE_CAP); past it its counts are null. */
-export const CATEGORY_PAGE_CAP = 200;
+/**
+ * The products one category answer reads (worker/routes/catalog.ts CATEGORY_PAGE_CAP: every product of the
+ * section up to a thousand, DECISIONS row 311); past it its counts are null, so a bigger section is not asked.
+ */
+export const CATEGORY_PAGE_CAP = 1000;
 
 /**
  * The node with the section answer's state counts — only when that answer counted the same products as the

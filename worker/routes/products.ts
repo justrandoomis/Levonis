@@ -4138,7 +4138,8 @@ async function listedCards(
  * out of D1 (tests/listingPaging.test.ts: the cards are identical either way).
  * The rule tests/cardProjection.test.ts pins still holds — the resolver sees
  * every column that can move a price, the option ladder included; only text no
- * resolver reads is left out, and only here.
+ * resolver reads is left out, and only in the long card reads (`cardRowColumns`:
+ * this listing and a category page).
  */
 const LISTING_UNREAD_COLUMNS: ReadonlySet<string> = new Set([
   'description', 'description_ar', 'description_ku',
@@ -4156,10 +4157,26 @@ const SAFE_COLUMN = /^[A-Za-z_][A-Za-z0-9_]*$/;
  * fresh isolates.
  */
 const LEARNED_PRODUCT_COLUMNS = new WeakMap<object, string[]>();
-function learnProductColumns(db: D1Database, row: Record<string, unknown> | undefined): void {
+export function learnProductColumns(db: D1Database, row: Record<string, unknown> | undefined): void {
   if (!row || LEARNED_PRODUCT_COLUMNS.has(db as object)) return;
   const cols = Object.keys(row).filter((c) => c !== 'sellable_now');
   if (cols.includes('id') && cols.every((c) => SAFE_COLUMN.test(c))) LEARNED_PRODUCT_COLUMNS.set(db as object, cols);
+}
+
+/**
+ * The select list of a long card read — every learned `products` column but the long text no card carries
+ * (`LISTING_UNREAD_COLUMNS`), as `products."<column>"` — or null until this binding has read one whole row
+ * (`learnProductColumns`), when the caller reads `*` and learns from it. The paged listing's row read, and a
+ * category page's (worker/routes/catalog.ts, up to a thousand rows of one section).
+ */
+export function cardRowColumns(db: D1Database): string | null {
+  const learned = LEARNED_PRODUCT_COLUMNS.get(db as object);
+  return learned
+    ? learned
+        .filter((c) => !LISTING_UNREAD_COLUMNS.has(c))
+        .map((c) => `products."${c}"`)
+        .join(', ')
+    : null;
 }
 
 /**
@@ -4373,13 +4390,8 @@ async function pagedListing(
   const byId = new Map(all.map((c) => [c.id, c] as const));
   type Resolved = Map<string, { row: Record<string, unknown>; card: Record<string, unknown> }>;
   // The row read: every column but the long text no card carries, once the columns are known.
-  const learned = LEARNED_PRODUCT_COLUMNS.get(db as object);
-  const rowSelect = learned
-    ? `SELECT ${learned
-        .filter((c) => !LISTING_UNREAD_COLUMNS.has(c))
-        .map((c) => `products."${c}"`)
-        .join(', ')}, ${optimisticSellableFlag(db)} AS sellable_now FROM products`
-    : o.selectList;
+  const learned = cardRowColumns(db);
+  const rowSelect = learned ? `SELECT ${learned}, ${optimisticSellableFlag(db)} AS sellable_now FROM products` : o.selectList;
   const resolveIds = (ids: string[]): Promise<Resolved> =>
     ids.length === 0
       ? Promise.resolve(new Map())

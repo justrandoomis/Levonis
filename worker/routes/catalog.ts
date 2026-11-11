@@ -43,7 +43,7 @@ import {
   type SectionState,
   type ShelfCandidate,
 } from '../lib/catalogPresentation';
-import { pricingCtx, pricingCtxForUser, resolveProductCards, type PricingCtx } from './products';
+import { cardRowColumns, learnProductColumns, pricingCtx, pricingCtxForUser, resolveProductCards, type PricingCtx } from './products';
 import { safeParse } from '../lib/types';
 import { cardLeadPhoto } from '../lib/cardPhoto';
 import type { CatalogTreeNode, CategoryPayload } from '@levonis/catalog/discoveryTypes';
@@ -72,8 +72,19 @@ export function listingCategoryKey(node: { id: string; slug: string }): string {
  * unknown — rather than estimated. The shop has 14.
  */
 export const TREE_AVAILABILITY_CAP = 1000;
-/** The products one category page reads (§11: "cap 200"). Counts stay exact. */
-export const CATEGORY_PAGE_CAP = 200;
+/**
+ * The products one category page reads: EVERY product of its section up to this many, so each child's
+ * shelf, every count (the rows' «متوفر الآن» / «بطلب مسبق», DECISIONS row 309), the brands and the smart
+ * shelves are exact. It was 200 (§11), and a section past it — the Bambu import's maintenance parts (589),
+ * spare parts (568) and makers' supply (358) on 2026-11-11 — built its shelves from its first 200 alone:
+ * a child whose products came later had no shelf, every count read null, and «Bambu Lab» counted 200 of
+ * 571 (DECISIONS row 311). A thousand is the bound the listing already resolves on the same page for its
+ * own counts (worker/routes/products.ts `LISTING_CANDIDATE_CAP`) and the map counts to
+ * (`TREE_AVAILABILITY_CAP`), read in the same ONE statement and ONE resolve wave, with the long text no
+ * card carries left out (`cardRowColumns`). Past it the page reads the first this-many and says
+ * `truncated`, and its counts are unknown (null), never estimated. src/lib/catalog/sectionStock.ts mirrors it.
+ */
+export const CATEGORY_PAGE_CAP = 1000;
 
 const TREE_CACHE = 'public, max-age=60, s-maxage=300';
 const PAGE_CACHE_SIGNED_OUT = 'public, max-age=60';
@@ -368,10 +379,13 @@ catalogRoutes.get('/:slug', async (c) => {
     // not check `active` either, and a dead link over a full shelf is worse.
     if (memberIds.length === 0) throw notFoundCategory();
 
-    // VISIBLE, priced first so the page cap keeps priced items (DECISIONS row 240, rule R1).
+    // VISIBLE, priced first so the page cap keeps priced items (DECISIONS row 240, rule R1). Every column but
+    // the long text no card carries once this binding knows them (the listing's rule): a section of a thousand
+    // products must not haul a thousand descriptions out of D1 for cards that never show one.
     const L = await listing(c.env.DB);
+    const columns = cardRowColumns(c.env.DB);
     const { results } = await c.env.DB.prepare(
-      `SELECT *, ${L.sellableFlag('products')} AS sellable_now FROM products
+      `SELECT ${columns ?? '*'}, ${L.sellableFlag('products')} AS sellable_now FROM products
         WHERE ${L.visible('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))
         ORDER BY sellable_now DESC, display_order ASC, created_at DESC
         LIMIT ?`
@@ -379,6 +393,7 @@ catalogRoutes.get('/:slug', async (c) => {
       .bind(JSON.stringify(memberIds), CATEGORY_PAGE_CAP)
       .all<Record<string, unknown>>();
     const rows = results ?? [];
+    if (!columns) learnProductColumns(c.env.DB, rows[0]);
     const ctx = await pricingCtx(c);
     const cards = await resolveProductCards(c.env.DB, rows, ctx, idx, 'flag');
     const truncated = memberIds.length > rows.length;
