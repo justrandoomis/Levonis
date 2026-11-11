@@ -678,7 +678,10 @@ test('«كود خصم» says where the box is instead of quoting the rewards pre
 test('the chat promises the weekly coupons only while the owner runs them', async () => {
   const raw = seed();
   const db = asD1(raw);
-  assert.match((await ask(db, { text: 'كود خصم' })).text, /كل أسبوع/);
+  const on = (await ask(db, { text: 'كود خصم' })).text;
+  assert.match(on, /كل أسبوع/);
+  // Rewards policy 14.1-14.2: only while the printer's base warranty runs (owner, 2026-11-11).
+  assert.ok(on.includes('ما دام ضمانها الأساسي شغال'), 'the weekly coupons are promised only under the base warranty');
   raw.prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES (?, ?)').run(REWARD_CONFIG_KEY, JSON.stringify({ weekly: { enabled: false, months: 12 } }));
   const off = await ask(db, { text: 'كود خصم' });
   assert.doesNotMatch(off.text, /كل أسبوع/);

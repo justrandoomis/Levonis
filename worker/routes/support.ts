@@ -860,7 +860,7 @@ const T: Record<Locale, Record<string, string>> = {
       'طرق التوصيل المعروضة عند الدفع وأجورها:\n{lines}\n\nهذي الأجرة الأساسية لكل طريقة؛ المبلغ النهائي يتحسب بشاشة الدفع حسب القطع والكمية وعنوانك.',
     payment_methods_reply: 'طرق الدفع المعروضة عند الدفع:\n{lines}\n\nالمعروض يختلف حسب سلتك وحسابك، وشاشة الدفع هي المرجع.',
     offers_reply:
-      'إذا عندك كود خصم، اكتبه بخانة كود الخصم بصفحة السلة أو عند الدفع، والسيرفر يتأكد منه قبل ما تدفع. وإذا شاري طابعة من عدنا، تنزلك كل أسبوع كوبونات بصفحة «كوبوناتي»، وتكدر تستخدمها كلها بنفس الطلب. نقاطك تنخصم من المبلغ عند الدفع، وأي تخفيض على منتج يظهر على بطاقة المنتج نفسها.',
+      'إذا عندك كود خصم، اكتبه بخانة كود الخصم بصفحة السلة أو عند الدفع، والسيرفر يتأكد منه قبل ما تدفع. وإذا شاري طابعة من عدنا، تنزلك كل أسبوع كوبونات بصفحة «كوبوناتي» ما دام ضمانها الأساسي شغال، وتكدر تستخدمها كلها بنفس الطلب. نقاطك تنخصم من المبلغ عند الدفع، وأي تخفيض على منتج يظهر على بطاقة المنتج نفسها.',
     offers_reply_once:
       'إذا عندك كود خصم، اكتبه بخانة كود الخصم بصفحة السلة أو عند الدفع، والسيرفر يتأكد منه قبل ما تدفع. نقاطك تنخصم من المبلغ عند الدفع، وأي تخفيض على منتج يظهر على بطاقة المنتج نفسها.',
     contact_reply:
@@ -1030,7 +1030,7 @@ const T: Record<Locale, Record<string, string>> = {
       'The delivery methods offered at checkout and their fees:\n{lines}\n\nThat is the base fee for each method; the final amount is worked out on the checkout screen from the items, the quantity and your address.',
     payment_methods_reply: 'The payment methods offered at checkout:\n{lines}\n\nWhat is offered depends on your cart and your account, and the checkout screen is the authority.',
     offers_reply:
-      'If you have a discount code, type it into the promo-code box in the cart or at checkout; the server validates it before you pay. If you bought a printer from us, new coupons arrive in «My coupons» every week, and you can use them all on one order. Your points come off the amount at checkout, and any discount on a product is shown on the product card itself.',
+      'If you have a discount code, type it into the promo-code box in the cart or at checkout; the server validates it before you pay. If you bought a printer from us, new coupons arrive in «My coupons» every week while its base warranty runs, and you can use them all on one order. Your points come off the amount at checkout, and any discount on a product is shown on the product card itself.',
     offers_reply_once:
       'If you have a discount code, type it into the promo-code box in the cart or at checkout; the server validates it before you pay. Your points come off the amount at checkout, and any discount on a product is shown on the product card itself.',
     contact_reply:
@@ -1199,7 +1199,7 @@ const T: Record<Locale, Record<string, string>> = {
     payment_methods_reply:
       'شێوازەکانی پارەدان کە لە کاتی پارەدان پێشکەش دەکرێن:\n{lines}\n\nئەوەی پێشکەش دەکرێت بەپێی سەبەتە و هەژمارەکەت دەگۆڕێت، و پەڕەی پارەدان سەرچاوەی کۆتاییە.',
     offers_reply:
-      'ئەگەر کۆدی داشکاندنت هەیە، لە خانەی کۆدی داشکاندن لە سەبەتە یان لە کاتی پارەدان بینووسە، و سێرڤەر پێش پارەدان پشتڕاستی دەکاتەوە. ئەگەر چاپکەرێکت لێمان کڕیوە، هەموو هەفتەیەک کۆپۆنی نوێ لە «کۆپۆنەکانم» دەگات، و دەتوانیت هەموویان لە یەک داواکاریدا بەکاربهێنیت. خاڵەکانت لە کاتی پارەدان لە بڕەکە کەم دەکرێنەوە، و هەر داشکاندنێکی بەرهەم لەسەر کارتی بەرهەمەکەدا دەردەکەوێت.',
+      'ئەگەر کۆدی داشکاندنت هەیە، لە خانەی کۆدی داشکاندن لە سەبەتە یان لە کاتی پارەدان بینووسە، و سێرڤەر پێش پارەدان پشتڕاستی دەکاتەوە. ئەگەر چاپکەرێکت لێمان کڕیوە، تا گەرەنتی بنەڕەتی چاپکەرەکە کارا بێت هەموو هەفتەیەک کۆپۆنی نوێ لە «کۆپۆنەکانم» دەگات، و دەتوانیت هەموویان لە یەک داواکاریدا بەکاربهێنیت. خاڵەکانت لە کاتی پارەدان لە بڕەکە کەم دەکرێنەوە، و هەر داشکاندنێکی بەرهەم لەسەر کارتی بەرهەمەکەدا دەردەکەوێت.',
     offers_reply_once:
       'ئەگەر کۆدی داشکاندنت هەیە، لە خانەی کۆدی داشکاندن لە سەبەتە یان لە کاتی پارەدان بینووسە، و سێرڤەر پێش پارەدان پشتڕاستی دەکاتەوە. خاڵەکانت لە کاتی پارەدان لە بڕەکە کەم دەکرێنەوە، و هەر داشکاندنێکی بەرهەم لەسەر کارتی بەرهەمەکەدا دەردەکەوێت.',
     contact_reply:
