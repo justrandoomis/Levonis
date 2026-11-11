@@ -318,7 +318,18 @@ export async function profitSourceFingerprint(db:D1Database,orderId:string) {
   const value=(await db.prepare(`SELECT ${sql} value`).bind(orderId).first<{value:string}>())!.value;
   return {sql,value};
 }
-const postingStateSql="COALESCE((SELECT json_group_array(json_array(field,total)) FROM (SELECT field,SUM(delta_iqd) total FROM finance_workspace_postings WHERE order_id=? GROUP BY field ORDER BY field)),'[]')";
+export const postingStateSql="COALESCE((SELECT json_group_array(json_array(field,total)) FROM (SELECT field,SUM(delta_iqd) total FROM finance_workspace_postings WHERE order_id=? GROUP BY field ORDER BY field)),'[]')";
+/** The account each overlay field posts to, against the order settlement account 2990. */
+export const workspaceAccounts:Record<ProfitField,string>={net_goods_iqd:'4000',cogs_iqd:'5000',shipping_iqd:'4100',cod_tax_iqd:'4100',courier_fee_iqd:'5200',payment_fee_iqd:'5400',manual_direct_iqd:'5100'};
+/** One overlay posting of `delta` on `field`: its `order-workspace:` journal and its finance_workspace_postings row.
+ * Also how a sale cancelled after delivery zeroes its overlays (reverseCancelledSale, DECISIONS row 318). */
+export function planWorkspacePosting(db:D1Database,orderId:string,field:ProfitField,delta:number,day:string,actor?:string){
+  const income=['net_goods_iqd','shipping_iqd','cod_tax_iqd'].includes(field),amount=Math.abs(delta),increase=delta>0;
+  const debitAccount=income===increase?'2990':workspaceAccounts[field],creditAccount=income===increase?workspaceAccounts[field]:'2990';
+  const id=newId('profitpost');
+  const journal=journalPlan(db,{key:`order-workspace:${id}`,day,title:'تصحيح مالي خاص بالطلب',source:'order_workspace',sourceId:orderId,actor},[{account:debitAccount,debit:amount},{account:creditAccount,credit:amount}]);
+  return {journalId:journal.id,statements:[...journal.statements,db.prepare('INSERT INTO finance_workspace_postings(id,order_id,field,delta_iqd,journal_id,actor_id,created_at) VALUES (?,?,?,?,?,?,?)').bind(id,orderId,field,delta,journal.id,actor??null,new Date().toISOString())]};
+}
 /** Accounting overlays do not alter the invoice, customer debt, bank cash or
  * physical FIFO. Their counterpart is the explicit order settlement account. */
 export async function planWorkspaceAccounting(db:D1Database,plain:OrderProfitBase,corrected:OrderProfitBase,opts:{actor?:string;day?:string}={}) {
@@ -333,7 +344,6 @@ export async function planWorkspaceAccounting(db:D1Database,plain:OrderProfitBas
   const lateInstalled=!!await db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='lot_cost_adjustment_shares'").first();
   const recognizedLate=lateInstalled?n((await db.prepare('SELECT COALESCE(SUM(s.recognized_iqd),0) amount FROM lot_cost_adjustment_shares s JOIN order_item_inventory_allocations a ON a.id=s.allocation_id WHERE a.order_id=?').bind(plain.order_id).first<{amount:number}>())?.amount):0;
   let pending=false;
-  const accounts:Record<ProfitField,string>={net_goods_iqd:'4000',cogs_iqd:'5000',shipping_iqd:'4100',cod_tax_iqd:'4100',courier_fee_iqd:'5200',payment_fee_iqd:'5400',manual_direct_iqd:'5100'};
   for(const field of profitFields){
     const key=fieldKey(field),before=plain.lines.reduce((sum,l)=>sum+n(l[key]),0),after=corrected.lines.reduce((sum,l)=>sum+n(l[key]),0);
     if(corrected.lines.some((l)=>l[key]===null)){if(field==='cogs_iqd'&&corrected.lines.some((l)=>l.cost_confidence==='manual_verified'))pending=true;continue;}
@@ -341,12 +351,9 @@ export async function planWorkspaceAccounting(db:D1Database,plain:OrderProfitBas
     if(field==='cogs_iqd'&&manualCost&&corrected.lines.some((l)=>!isConfirmedOrderCost(l.cost_confidence))){pending=true;continue;}
     const desired=field==='cogs_iqd'?(manualCost?after-nativeCogs-recognizedLate:0):after-before,delta=desired-(rows.find((r)=>r.field===field)?.total??0);
     if(!delta)continue;
-    const income=['net_goods_iqd','shipping_iqd','cod_tax_iqd'].includes(field),amount=Math.abs(delta),increase=delta>0;
-    const debitAccount=income===increase?'2990':accounts[field],creditAccount=income===increase?accounts[field]:'2990';
-    const id=newId('profitpost');
-    const journal=journalPlan(db,{key:`order-workspace:${id}`,day,title:'تصحيح مالي خاص بالطلب',source:'order_workspace',sourceId:plain.order_id,actor:opts.actor},[{account:debitAccount,debit:amount},{account:creditAccount,credit:amount}]);
-    statements.push(...journal.statements,db.prepare('INSERT INTO finance_workspace_postings(id,order_id,field,delta_iqd,journal_id,actor_id,created_at) VALUES (?,?,?,?,?,?,?)').bind(id,plain.order_id,field,delta,journal.id,opts.actor??null,new Date().toISOString()));
-    journalIds.push(journal.id);
+    const posting=planWorkspacePosting(db,plain.order_id,field,delta,day,opts.actor);
+    statements.push(...posting.statements);
+    journalIds.push(posting.journalId);
   }
   return {statements,journalIds,pending};
 }

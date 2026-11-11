@@ -225,11 +225,13 @@ test('an open withdrawal holds only its own wage: the scan waits, a recalculatio
   // Not paid either: the order is not delivered, so the held row is not payable.
   const held = (await participantSources(x.db, 'hussein')).find((s) => s.order_id === 'ORD-HELD')!;
   assert.deepEqual([held.held_iqd, held.eligible], [2500, false]);
-  // The scan leaves the order with the held wage alone, rather than failing on it every minute.
+  // The scan leaves the order with the held wage alone, rather than failing on it every minute
+  // (it visits it once, for its sale: reversed like a return, DECISIONS row 318).
   const report = await drainOrderFinanceRecovery(x.env);
-  assert.deepEqual([report.scanned, report.completed], [1, 1], JSON.stringify(report));
+  assert.deepEqual([report.scanned, report.completed], [2, 2], JSON.stringify(report));
   assert.deepEqual(x.wages('ORD-UNHELD').map((w) => w.effective), [0]);
   assert.deepEqual(x.wages('ORD-HELD').map((w) => w.effective), [2500]);
+  assert.equal((await drainOrderFinanceRecovery(x.env)).scanned, 0);
   // An employee's recalculation walks past it: it finishes, nothing is marked
   // failed, and the employee's other wages are not held behind it.
   await queueStaffReconciliation(x.db, 'staff_hussein', 'boss');
@@ -280,8 +282,9 @@ test('a settled row keeps its agreed amount; an order delivered after the settle
   assert.deepEqual(x.wages('ORD-A-SETTLED').map((w) => w.effective), [1000]);
   const before = all(x.raw, "SELECT a.* FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id WHERE c.order_id='ORD-A-SETTLED' ORDER BY a.id");
   x.cancel('ORD-A-SETTLED'); x.cancel('ORD-B-LATER');
+  // Both: the settled order's sale is reversed like a return (DECISIONS row 318), its wage is not cut.
   const report = await drainOrderFinanceRecovery(x.env);
-  assert.deepEqual([report.scanned, report.completed], [1, 1], JSON.stringify(report));
+  assert.deepEqual([report.scanned, report.completed], [2, 2], JSON.stringify(report));
   assert.deepEqual(x.wages('ORD-B-LATER').map((w) => w.effective), [0]);
   assert.deepEqual(x.wages('ORD-A-SETTLED').map((w) => w.effective), [1000]);
   // A recalculation of the settled order, cancelled or delivered again, leaves it alone.

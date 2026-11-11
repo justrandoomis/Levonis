@@ -1,8 +1,8 @@
 import type { Env } from './types';
 import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
-import { baghdadDay, fence, journalPlan, operationsInstalled } from './operations';
+import { baghdadDay, fence, isFenceMiss, journalPlan, operationsInstalled } from './operations';
 import { newId } from './crypto';
-import { getOrderGoods, getOrderProfitBase, workspaceInstalled } from './orderProfit';
+import { getOrderGoods, getOrderProfitBase, planWorkspacePosting, postingStateSql, workspaceInstalled, type ProfitField } from './orderProfit';
 import { ruleScopeRank } from './financeRuleScopes';
 import { reconcileFinanceOrder } from './financeReconcile';
 import { reconcileStaffOrderCosts } from './financeParticipants';
@@ -432,10 +432,9 @@ export async function runOrderFinancialEffects(
         ).statements,
       );
   }
-  if (
-    !staffOnly && milestone === 'delivered' &&
-    !(await db.prepare('SELECT id FROM accounting_entries WHERE event_key=?').bind(`sale:${orderId}`).first())
-  ) {
+  // A sale cancelled after delivery was reversed (reverseCancelledSale); delivered again, its reversal is reversed today (DECISIONS row 318).
+  const saleChain = !staffOnly && milestone === 'delivered' ? await chainTails(db, "'sale:'||?1,'membership-sale:'||?1", orderId) : null;
+  if (saleChain && !saleChain.length) {
     const revenue = goods.lines.reduce((s, l) => s + l.net_goods_iqd, 0),
       shipping = Number(goods.order.shipping_iqd ?? 0) + Number(goods.order.cod_tax_iqd ?? 0),
       total = revenue + shipping;
@@ -476,10 +475,9 @@ export async function runOrderFinancialEffects(
         ).statements,
       );
   }
-  if (
-    !staffOnly && milestone === 'delivered' &&
-    !(await db.prepare('SELECT id FROM accounting_entries WHERE event_key=?').bind(`cogs:${orderId}`).first())
-  ) {
+  if (saleChain) statements.push(...redeliveryPlan(db, saleChain, orderId, postingDay ?? baghdadDay()));
+  const cogsChain = !staffOnly && milestone === 'delivered' ? await chainTails(db, "'cogs:'||?1", orderId) : null;
+  if (cogsChain && !cogsChain.length) {
     const cogs = goods.lines.every((l) => l.cogs_iqd !== null && isConfirmedOrderCost(l.cost_confidence))
       ? goods.lines.reduce((s, l) => s + (l.cogs_iqd ?? 0), 0)
       : null;
@@ -495,6 +493,7 @@ export async function runOrderFinancialEffects(
         ).statements,
       );
   }
+  if (cogsChain) statements.push(...redeliveryPlan(db, cogsChain, orderId, postingDay ?? baghdadDay()));
   if (statements.length) await db.batch(statements);
   await db
     .prepare('DELETE FROM finance_posting_errors WHERE event_key=?')
@@ -631,4 +630,63 @@ export async function postStoredRefund(env: Env, caseId: string, actor: string, 
     .bind(`refund:${fact.order_id}`)
     .run();
   await reconcileFinanceOrder(db, fact.order_id, { actor, day });
+}
+
+/**
+ * A SALE CANCELLED AFTER ITS DELIVERY IS REVERSED LIKE A RETURN (owner 2026-11-11, ruling 6.7.2; DECISIONS row 318).
+ *
+ * Every journal chain of an order starts at a native entry (`sale:`, `membership-sale:`, `cogs:`) and runs through the
+ * UNIQUE `reversal_of`: an `order-cancel:` reversal, then an `order-redeliver:` re-posting when the order is delivered
+ * again (a cash order of untracked products can be re-opened, row 310), then the next cancel's reversal. An even depth is
+ * in the books, an odd one is reversed. Both use the source 'order_cancel': the profit fingerprint and the workspace's
+ * native goods cost read only 'order' and 'return' (orderProfit.ts), so no fence churns and a cost is never counted twice.
+ */
+type ChainTail = { id: string; depth: number; lines: string | null };
+const mirrored = (lines: string) =>
+  (JSON.parse(lines) as Array<[string, number, number]>).map(([account, debit, credit]) => ({ account, debit: credit, credit: debit }));
+/** The last entry of each chain these native keys start, with the lines of a reversal. One statement, as the event_key lookup it replaced. */
+async function chainTails(db: D1Database, keys: string, orderId: string) {
+  return (await db.prepare(`WITH RECURSIVE chain(id,depth) AS (SELECT id,0 FROM accounting_entries WHERE event_key IN (${keys})
+      UNION ALL SELECT r.id,c.depth+1 FROM chain c JOIN accounting_entries r ON r.reversal_of=c.id WHERE c.depth<50)
+    SELECT c.id,c.depth,CASE WHEN c.depth%2=1 THEN (SELECT json_group_array(json_array(l.account_code,l.debit_iqd,l.credit_iqd)) FROM accounting_lines l WHERE l.entry_id=c.id) END lines
+    FROM chain c WHERE NOT EXISTS(SELECT 1 FROM accounting_entries x WHERE x.reversal_of=c.id)`).bind(orderId).all<ChainTail>()).results ?? [];
+}
+/** Delivered again: each reversed chain is re-posted on `day` (the re-delivery's), reversing its reversal. */
+function redeliveryPlan(db: D1Database, tails: ChainTail[], orderId: string, day: string) {
+  return tails.filter((t) => t.depth % 2 === 1 && t.lines).flatMap((t) => journalPlan(db, { key: `order-redeliver:${t.id}`, day,
+    title: 'إعادة بيع/تكلفة بضاعة طلب سُلِّم من جديد بعد إلغائه', source: 'order_cancel', sourceId: orderId, reversalOf: t.id }, mirrored(t.lines!)).statements);
+}
+const cancelledAfterDelivery = "o.status='cancelled' AND o.delivered_at<>'' AND o.seller_type='levonis'";
+/** The overlays a cancel takes back with the sale; the courier, payment and other costs stay on the order (Q6 b). */
+const reversedOverlays: ProfitField[] = ['net_goods_iqd', 'cogs_iqd', 'shipping_iqd', 'cod_tax_iqd'];
+/**
+ * Reconciliation of an order cancelled after its delivery (financeReconcile.ts) posts, on `day`, a mirrored
+ * `order-cancel:` reversal of each chain still in the books and zeroes its overlays of net goods, goods cost, delivery
+ * and the cash-on-delivery fee, as planWorkspaceAccounting posts them, behind its posting-state fence. One read, one
+ * batch. A UNIQUE clash (event_key, reversal_of) or a fence miss is a reversal already done: 0. No periodOpen: the
+ * recovery scan checked the day, and the accounting_post trigger refuses a closed month.
+ */
+export async function reverseCancelledSale(db: D1Database, orderId: string, day: string, actor?: string) {
+  const live = `EXISTS(SELECT 1 FROM orders o WHERE o.id=?1 AND ${cancelledAfterDelivery})`;
+  const rows = (await db.prepare(`WITH RECURSIVE chain(id,depth) AS (
+      SELECT id,0 FROM accounting_entries WHERE event_key IN ('sale:'||?1,'membership-sale:'||?1,'cogs:'||?1) AND state='posted'
+      UNION ALL SELECT r.id,c.depth+1 FROM chain c JOIN accounting_entries r ON r.reversal_of=c.id WHERE c.depth<50)
+    SELECT c.id,(SELECT json_group_array(json_array(l.account_code,l.debit_iqd,l.credit_iqd)) FROM accounting_lines l WHERE l.entry_id=c.id) lines,NULL field,NULL total
+      FROM chain c WHERE c.depth%2=0 AND NOT EXISTS(SELECT 1 FROM accounting_entries x WHERE x.reversal_of=c.id) AND ${live}
+    UNION ALL SELECT NULL,NULL,field,SUM(delta_iqd) FROM finance_workspace_postings WHERE order_id=?1 AND ${live} GROUP BY field`).bind(orderId)
+    .all<{ id: string | null; lines: string | null; field: ProfitField | null; total: number | null }>()).results ?? [];
+  const entries = rows.filter((r) => r.id !== null && r.lines !== null);
+  const overlays = rows.filter((r) => r.field !== null).sort((a, b) => (a.field! < b.field! ? -1 : a.field! > b.field! ? 1 : 0));
+  const zeroed = overlays.filter((r) => reversedOverlays.includes(r.field!) && Number(r.total) !== 0);
+  if (!entries.length && !zeroed.length) return 0;
+  const statements = [...fence(db, `EXISTS(SELECT 1 FROM orders o WHERE o.id=? AND ${cancelledAfterDelivery})`, [orderId])];
+  for (const e of entries) statements.push(...journalPlan(db, { key: `order-cancel:${e.id}`, day, title: 'عكس بيع/تكلفة بضاعة طلب أُلغي بعد التسليم',
+    source: 'order_cancel', sourceId: orderId, actor, reversalOf: e.id }, mirrored(e.lines!)).statements);
+  if (zeroed.length) {
+    statements.push(...fence(db, `${postingStateSql}=?`, [orderId, JSON.stringify(overlays.map((r) => [r.field, r.total]))]));
+    for (const r of zeroed) statements.push(...planWorkspacePosting(db, orderId, r.field!, -Number(r.total), day, actor).statements);
+  }
+  try { await db.batch(statements); }
+  catch (e) { if (/UNIQUE constraint/.test(String(e)) || isFenceMiss(e)) return 0; throw e; }
+  return entries.length + zeroed.length;
 }

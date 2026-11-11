@@ -65,6 +65,11 @@ const deliveredCandidateSql = (settled: boolean) => `o.seller_type='levonis' AND
 // not yet the settled zero that takes the sale back (DECISIONS row 308), and
 // while it still carries a delivery, cost or reconciliation marker: a done
 // reconciliation clears them, a failed one keeps it a durable retry.
+// CANCELLED, while its sale or goods cost is still in the journal: a native
+// entry not reversed, or re-posted by a re-delivery and not reversed again — the
+// reversal like a return (DECISIONS row 318), with no wage and no investor too.
+// A top-level arm: this statement sits at SQLite 3.54.1's nesting limit, so it
+// is never wrapped (checked on workerd 1.20261109.1).
 const lostDeliverySql = (settled: boolean) => `o.seller_type='levonis' AND o.status<>'delivered' AND o.delivered_at IS NOT NULL AND ((
   EXISTS(SELECT 1 FROM finance_order_costs c JOIN finance_staff s ON s.id=c.staff_id
     WHERE c.order_id=o.id AND c.state<>'reversed' AND NOT ${settledCostSql('c.id', settled)}
@@ -76,6 +81,11 @@ const lostDeliverySql = (settled: boolean) => `o.seller_type='levonis' AND o.sta
     JOIN finance_withdrawals w ON w.id=wa.withdrawal_id
     WHERE hc.order_id=o.id AND w.state IN ('requested','approved','part_paid') AND wa.amount_iqd>wa.paid_iqd AND NOT ${settledCostSql('hc.id', settled)}))
   OR ${investorLostDeliveryPendingSql('o.id')}
+  OR (o.status='cancelled' AND o.delivered_at<>'' AND EXISTS(SELECT 1 FROM accounting_entries se
+    WHERE se.event_key IN ('sale:'||o.id,'membership-sale:'||o.id,'cogs:'||o.id) AND se.state='posted'
+      AND (NOT EXISTS(SELECT 1 FROM accounting_entries re WHERE re.reversal_of=se.id)
+        OR EXISTS(SELECT 1 FROM accounting_entries c1 JOIN accounting_entries r1 ON r1.reversal_of=c1.id
+          WHERE c1.reversal_of=se.id AND NOT EXISTS(SELECT 1 FROM accounting_entries c2 WHERE c2.reversal_of=r1.id)))))
   OR EXISTS(SELECT 1 FROM finance_posting_errors le WHERE le.order_id=o.id AND le.event_key IN (
     'delivered:'||o.id,'cogs:'||o.id,'investor:'||o.id,'investor-pending:'||o.id,'workspace-reconciliation:'||o.id,'automatic-finance:'||o.id)))`;
 const candidateSql = (settled: boolean) => `((${deliveredCandidateSql(settled)}) OR (${lostDeliverySql(settled)}))`;

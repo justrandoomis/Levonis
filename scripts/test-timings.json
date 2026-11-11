@@ -125,6 +125,7 @@
     "tests/bundlesMysteryIntegration.test.ts": 10.2,
     "tests/bundlesPublicRoutes.test.ts": 110.4,
     "tests/busyOverlay.test.ts": 0.5,
+    "tests/cancelledAfterDeliveryLedger.test.ts": 39.1,
     "tests/canonicalHost.test.ts": 14.6,
     "tests/capacityPriceSafety.test.ts": 16.8,
     "tests/cardPriceCompact.test.ts": 0.5,

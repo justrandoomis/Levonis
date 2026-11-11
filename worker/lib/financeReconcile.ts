@@ -4,6 +4,8 @@ import { recognizeLateCosts, syncInvestorOrder } from './investorFinance';
 import { recordFinancialFailure } from './financePostingErrors';
 import { getOrderProfitBase, syncOrderWorkspaceAccounting } from './orderProfit';
 import { reconcileEmploymentCutoff } from './financeEmployment';
+import { baghdadDay } from './operations';
+import { reverseCancelledSale } from './orderFinance';
 
 /** A source mutation has already committed. Keep its financial projections
  * current, or retain a durable, operator-visible retry instead of losing it. */
@@ -48,9 +50,12 @@ export async function reconcileFinanceOrder(db:D1Database,orderId:string,opts:{a
     // and a loss-sharing agreement's whole capital for ever. A re-delivery
     // records them again if they still hold; the status is asked again at the
     // delete, so one landing meanwhile keeps the markers it wrote.
-    if(basis.order.status!=='delivered'&&basis.order.delivered_at)
+    // Cancelled, the sale and its goods cost are reversed like a return (DECISIONS row 318), with the cuts above.
+    if(basis.order.status!=='delivered'&&basis.order.delivered_at){
       await db.prepare(`DELETE FROM finance_posting_errors WHERE event_key IN (?1,?2)
         AND EXISTS(SELECT 1 FROM orders WHERE id=?3 AND status<>'delivered' AND delivered_at IS NOT NULL)`).bind(`delivered:${orderId}`,`cogs:${orderId}`,orderId).run();
+      if(basis.order.status==='cancelled')await reverseCancelledSale(db,orderId,opts.day??baghdadDay(),opts.actor);
+    }
     return workspacePending?{complete:false,staff_complete:true,pending:true}:{complete:true,staff_complete:true,pending:false};
   }catch(e){
     await recordFinancialFailure(db,orderId,'investor',e);
