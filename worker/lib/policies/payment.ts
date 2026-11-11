@@ -38,11 +38,44 @@ import type { PolicyDocument } from './types';
  *     so the clauses that carried them are published instead of withheld.
  *   * NO POINTER TO NOTHING. ./render.ts now also withholds a line that cites,
  *     by number, an article of this document that is itself withheld.
+ *
+ * VERSION 5 — CASH AT WAREHOUSE PICKUP (the owner, 2026-11-11; DECISIONS row
+ * 312). The archive keeps version 4 byte for byte.
+ *   * WHAT VERSION 4 GOT WRONG. Its 3.1 said cash on delivery "is not available
+ *     on warehouse pickup", while the checkout offers it there:
+ *     `allowedPaymentMethods` (packages/pricing/src/paymentPolicy.ts) offers
+ *     the wallet and cash for every cart without reading the delivery method,
+ *     worker/routes/orders.ts accepts `cash` with `pickup`, and
+ *     src/pages/Checkout.tsx draws exactly the server's list. The owner chose
+ *     the checkout: «Allow cash at pickup: keep the checkout as it is; publish
+ *     a new version of the payment policy that lets pickup customers pay cash
+ *     when they collect.»
+ *   * 1.2 AND 3.1. Cash on delivery covers an official-store order delivered
+ *     to an address and one collected from the warehouse, where it is paid in
+ *     cash on collection. A community-store order is still prepaid (chapter 9).
+ *   * 3.2, 3.4, 3.5 AND 11.8 now speak of the warehouse as well as the door.
+ *     What the code does for a pickup is what it does at the door: the amount
+ *     due is the order's `due_on_delivery_iqd`, on the order and on the
+ *     invoice; handing the order over is not payment, the collection recorded
+ *     through POST /api/orders/:id/settlement is. A customer without the money
+ *     at the warehouse is not handed the order until they pay it in full;
+ *     there is no door and no courier, so it is not a refusal at the door.
+ *   * 3.3 DID NOT MOVE. No cash-on-delivery tax on pickup: `codDeliveryTaxIqd`
+ *     (packages/shipping/src/codTax.ts) charges only standard and personal
+ *     delivery. 3.6 did not move either: it restricts an account for repeated
+ *     refusal or failed delivery and adds nothing for a pickup.
+ *   * EFFECTIVE ON THE DAY IT GOES LIVE. The first request on the new Worker
+ *     writes payment@5 into the archive with published_at = effective_at, and
+ *     migration 0070 makes both permanent. 14.1 says an amendment has no
+ *     retroactive effect, so the date is the day this version is published,
+ *     and it moves with the deploy if the deploy slips (DECISIONS row 303).
+ *   * tests/paymentCashAtPickup.test.ts proves the checkout facts and the
+ *     wording together; tests/policyHashLedger.test.ts pins version 5.
  */
 export const payment: PolicyDocument = {
   key: 'payment',
-  version: 4,
-  effective_at: '2026-09-23',
+  version: 5,
+  effective_at: '2026-11-11',
   title: {
     ar: 'سياسة الدفع والمحفظة',
     en: 'Payment and Wallet Policy',
@@ -60,7 +93,7 @@ export const payment: PolicyDocument = {
 - المحجوز: المبالغ المحجوزة لطلب قائم أو لطلب سحب مفتوح، وهي مقيدة في الرصيد المسوّى ولا تُنفق.
 - الرصيد المتاح: الرصيد المسوّى ناقصاً المحجوز، وهو وحده القابل للإنفاق.
 - الإيداع قيد المراجعة: طلب إيداع لم تُعتمد مراجعته بعد، وهو ليس رصيداً.
-- الدفع عند الاستلام: تحصيل قيمة الطلب نقداً عند تسليمه إلى عنوان.
+- الدفع عند الاستلام: تحصيل قيمة الطلب نقداً عند تسليمه إلى عنوان، أو عند استلامه من المخزن.
 - الدفع المسبق: تسديد قيمة الطلب كاملة من المحفظة عند إنشائه.
 - الدفع المؤجل: تمويل قيمة الطلب على حساب العضوية لسداده في موعد محدد.
 
@@ -96,19 +129,19 @@ export const payment: PolicyDocument = {
 ## 3. الدفع عند الاستلام
 
 ### 3.1 نطاقه
-الدفع عند الاستلام متاح في طلبات متجر Levonis الرسمي المسلَّمة إلى عنوان. وهو غير متاح في طلبات متاجر مجتمع ليفو، وغير متاح على الاستلام من المخزن.
+الدفع عند الاستلام متاح في طلبات متجر Levonis الرسمي، سواء سُلِّمت إلى عنوان أو استلمها الزبون من المخزن. وفي الاستلام من المخزن يُدفع المبلغ نقداً عند استلام الطلب. وهو غير متاح في طلبات متاجر مجتمع ليفو.
 
-### 3.2 المبلغ المستحق عند الباب
-المبلغ المستحق عند الباب هو المعروض على الطلب وعلى الفاتورة، بعد خصم ما دُفع مقدماً من المحفظة أو بالنقاط. ولا يُطلب من الزبون مبلغ يخالف الفاتورة.
+### 3.2 المبلغ المستحق عند الباب أو في المخزن
+المبلغ المستحق عند الباب، أو عند الاستلام من المخزن، هو المعروض على الطلب وعلى الفاتورة، بعد خصم ما دُفع مقدماً من المحفظة أو بالنقاط. ولا يُطلب من الزبون مبلغ يخالف الفاتورة.
 
 ### 3.3 ضريبة الدفع عند الاستلام
 تُضاف ضريبة بمقدار مقرر عن كل شريحة كاملة من المبلغ المستحق عند الباب، ومقدار الضريبة ومقدار الشريحة كلاهما معروضان في شاشة الدفع لذلك الطلب وقابلان للتعديل من إدارة المتجر. ولا تُفرض على الطلب المدفوع مسبقاً ولا على الاستلام من المخزن، وقد تُعفى منها بعض مستويات العضوية، ويُعرض مقدارها ومقدار الإعفاء رقمين منفصلين.
 
 ### 3.4 التحصيل هو ما يُثبت الدفع
-لا يُعدّ الطلب مدفوعاً بمجرد تسليمه، بل بتسجيل التحصيل في النظام. وما يترتب على الدفع من آثار — ومنها تحرير النقاط المكتسبة — يبدأ من تاريخ تسجيل التحصيل.
+لا يُعدّ الطلب مدفوعاً بمجرد تسليمه، سواء سُلِّم إلى عنوان أو في المخزن، بل بتسجيل التحصيل في النظام. وما يترتب على الدفع من آثار — ومنها تحرير النقاط المكتسبة — يبدأ من تاريخ تسجيل التحصيل.
 
-### 3.5 تعذر الدفع عند الباب
-إذا لم يوفّر الزبون المبلغ عند التسليم عُدّ ذلك رفضاً عند الباب، وطُبِّقت عليه أحكام الفصل التاسع من سياسة الشراء.
+### 3.5 تعذر الدفع عند الباب أو في المخزن
+إذا لم يوفّر الزبون المبلغ عند التسليم إلى عنوان عُدّ ذلك رفضاً عند الباب، وطُبِّقت عليه أحكام الفصل التاسع من سياسة الشراء. وإذا لم يوفّره عند الاستلام من المخزن لم يُسلَّم إليه الطلب حتى يؤدي المبلغ المستحق كاملاً.
 
 ### 3.6 تقييد الوسيلة
 للمتجر حصر شراء حساب معيّن بالدفع المسبق عند تكرار رفض الاستلام أو تعذر التسليم، وفق سياسة البيع.
@@ -291,8 +324,8 @@ export const payment: PolicyDocument = {
 ### 11.7 الاسترداد لا يُجمع
 لا يُجمع بين استرداد مالي وتعويض آخر عن الواقعة نفسها، ولا يُعوَّض مرتين عن المبلغ نفسه.
 
-### 11.8 الطلب المدفوع نقداً عند الباب
-الطلب الذي دُفع نقداً عند الباب تُعاد قيمته إلى المحفظة عند استحقاق الإعادة، ما لم يُتفق مع الدعم على وجهة أخرى.
+### 11.8 الطلب المدفوع نقداً عند الباب أو في المخزن
+الطلب الذي دُفع نقداً عند الباب، أو عند استلامه من المخزن، تُعاد قيمته إلى المحفظة عند استحقاق الإعادة، ما لم يُتفق مع الدعم على وجهة أخرى.
 
 ## 12. السجلات والمراجعة والنزاع
 
@@ -347,7 +380,7 @@ This document sets out the payment methods the Store accepts, the terms of the L
 - Held: amounts reserved for a standing order or an open withdrawal request; they remain inside the settled balance and are not spent.
 - Available Balance: the settled balance less what is held; it alone is spendable.
 - Deposit under review: a deposit request not yet approved; it is not a balance.
-- Cash on Delivery: collection of the order's value in cash on delivery to an address.
+- Cash on Delivery: collection of the order's value in cash on its delivery to an address, or on its collection from the warehouse.
 - Prepayment: settlement of the order's full value from the wallet when it is created.
 - Deferred payment: financing of the order's value against the membership, to be settled by a stated date.
 
@@ -383,19 +416,19 @@ No fee not displayed at checkout is added to the order. Any later increase is go
 ## 3. Cash on Delivery
 
 ### 3.1 Its scope
-Cash on delivery is available on orders from the official LEVONIS store delivered to an address. It is not available on orders from Levo community stores, and it is not available on warehouse pickup.
+Cash on delivery is available on orders from the official LEVONIS store, whether they are delivered to an address or collected by the customer from the warehouse. On warehouse pickup the amount is paid in cash when the order is collected. It is not available on orders from Levo community stores.
 
-### 3.2 The amount due at the door
-The amount due at the door is the amount stated on the order and on the invoice, after deduction of whatever was paid in advance from the wallet or in points. The customer is not asked for an amount that differs from the invoice.
+### 3.2 The amount due at the door or at the warehouse
+The amount due at the door, or on collection from the warehouse, is the amount stated on the order and on the invoice, after deduction of whatever was paid in advance from the wallet or in points. The customer is not asked for an amount that differs from the invoice.
 
 ### 3.3 The cash-on-delivery tax
 A tax is added at a stated amount for every complete block of the amount payable at the door; the tax and the size of the block are both displayed at checkout for that order and may be amended by the Store's administration. It is not charged on a prepaid order or on warehouse pickup; certain membership levels may be exempt from it, and the tax and the exemption are displayed as two separate figures.
 
 ### 3.4 Collection is what proves payment
-An order is not treated as paid merely because it was delivered, but by the recording of the collection in the system. The consequences of payment — including the release of earned points — run from the date the collection is recorded.
+An order is not treated as paid merely because it was handed over, whether at an address or at the warehouse, but by the recording of the collection in the system. The consequences of payment — including the release of earned points — run from the date the collection is recorded.
 
-### 3.5 Inability to pay at the door
-Where the customer does not have the amount available at delivery, that is treated as a refusal at the door and chapter 9 of the Purchase Policy applies to it.
+### 3.5 Inability to pay at the door or at the warehouse
+Where the customer does not have the amount available on delivery to an address, that is treated as a refusal at the door and chapter 9 of the Purchase Policy applies to it. Where they do not have it on collection from the warehouse, the order is not handed over to them until the amount due is paid in full.
 
 ### 3.6 Restricting the method
 The Store may restrict a given account's purchasing to prepayment where refusal of delivery or failed delivery is repeated, under the Selling Policy.
@@ -578,8 +611,8 @@ The delivery fee actually paid on an order that was delivered is not returned, n
 ### 11.7 No accumulation of remedies
 A refund is not combined with another compensation for the same event, and the same amount is not compensated twice.
 
-### 11.8 An order paid in cash at the door
-An order paid in cash at the door has its value returned to the wallet where a return falls due, unless another destination is agreed with support.
+### 11.8 An order paid in cash at the door or at the warehouse
+An order paid in cash at the door, or on collection from the warehouse, has its value returned to the wallet where a return falls due, unless another destination is agreed with support.
 
 ## 12. Records, Review and Disputes
 
@@ -634,7 +667,7 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 - گیراو: ئەو بڕانەی بۆ داواکارییەکی هەبوو یان بۆ داواکارییەکی دەرهێنانی کراوە گیراون، لە ناو باڵانسی جێگیرکراودا دەمێننەوە و خەرج ناکرێن.
 - باڵانسی بەردەست: باڵانسی جێگیرکراو کەم کراوە لە گیراو، و تەنها ئەوە خەرجکراوە.
 - داخڵکردنی لەژێر پێداچوونەوە: داواکارییەکی داخڵکردن کە هێشتا پەسەند نەکراوە، و باڵانس نییە.
-- پارەدان لە کاتی وەرگرتن: کۆکردنەوەی بەهای داواکارییەکە بە نەقد لە کاتی گەیاندنی بۆ ناونیشانێک.
+- پارەدان لە کاتی وەرگرتن: کۆکردنەوەی بەهای داواکارییەکە بە نەقد لە کاتی گەیاندنی بۆ ناونیشانێک، یان لە کاتی وەرگرتنی لە کۆگا.
 - پارەدانی پێشەکی: دانی تەواوی بەهای داواکارییەکە لە جزدانەوە لە کاتی دروستبوونیدا.
 - پارەدانی دواخراو: دابینکردنی بەهای داواکارییەکە لەسەر ئەندامێتی بۆ دانەوەی لە بەروارێکی دیاریکراودا.
 
@@ -670,19 +703,19 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 ## 3. پارەدان لە کاتی وەرگرتن
 
 ### 3.1 بواری
-پارەدان لە کاتی وەرگرتن لە داواکارییەکانی فرۆشگا فەرمییەکەی Levonisدا بەردەستە کە بۆ ناونیشانێک دەگەیەنرێن. لە داواکارییەکانی فرۆشگاکانی کۆمەڵگای لیڤۆدا بەردەست نییە، و لەسەر وەرگرتن لە کۆگاش بەردەست نییە.
+پارەدان لە کاتی وەرگرتن لە داواکارییەکانی فرۆشگا فەرمییەکەی Levonisدا بەردەستە، چ بۆ ناونیشانێک بگەیەنرێن چ کڕیار لە کۆگا وەریان بگرێت. لە وەرگرتن لە کۆگادا بڕەکە لە کاتی وەرگرتنی داواکارییەکەدا بە نەقد دەدرێت. لە داواکارییەکانی فرۆشگاکانی کۆمەڵگای لیڤۆدا بەردەست نییە.
 
-### 3.2 ئەو بڕەی لە بەردەرگا دەدرێت
-ئەو بڕەی لە بەردەرگا دەدرێت ئەوەیە لەسەر داواکارییەکە و لەسەر پسووڵەکەدا پیشان دراوە، دوای بڕینی ئەوەی پێشەکی لە جزدان یان بە خاڵ دراوە. لە کڕیار بڕێک داوا ناکرێت کە جیاواز بێت لە پسووڵەکە.
+### 3.2 ئەو بڕەی لە بەردەرگا یان لە کۆگا دەدرێت
+ئەو بڕەی لە بەردەرگا، یان لە کاتی وەرگرتن لە کۆگا، دەدرێت ئەوەیە لەسەر داواکارییەکە و لەسەر پسووڵەکەدا پیشان دراوە، دوای بڕینی ئەوەی پێشەکی لە جزدان یان بە خاڵ دراوە. لە کڕیار بڕێک داوا ناکرێت کە جیاواز بێت لە پسووڵەکە.
 
 ### 3.3 باجی پارەدان لە کاتی وەرگرتن
 باجێک بە بڕێکی دیاریکراو زیاد دەکرێت بۆ هەر بڕێکی تەواو لەو بڕەی لە بەردەرگا دەدرێت، و هەردوو بڕەکە لە شاشەی پارەدانی ئەو داواکارییەدا پیشان دەدرێن و دەکرێت لەلایەن بەڕێوەبەرایەتیی فرۆشگاوە بگۆڕدرێن. لەسەر داواکاری پێشەکی دراو و لەسەر وەرگرتن لە کۆگا زیاد ناکرێت، و لەوانەیە هەندێک ئاستی ئەندامێتی لێی ببەخشرێن، و بڕی باج و بڕی بەخشین وەک دوو ژمارەی جیاواز پیشان دەدرێن.
 
 ### 3.4 کۆکردنەوە ئەوەیە پارەدان دەسەلمێنێت
-داواکارییەک تەنها بەوەی گەیەنراوە بە دراو دانانرێت، بەڵکو بە تۆمارکردنی کۆکردنەوەکە لە سیستەمدا. ئەو کاریگەرییانەی لە پارەدانەوە دێن — لەوانەش ئازادکردنی خاڵە بەدەستهێنراوەکان — لە بەرواری تۆمارکردنی کۆکردنەوەکەوە دەست پێدەکەن.
+داواکارییەک تەنها بەوەی ڕادەست کراوە، چ لە ناونیشانێک چ لە کۆگا، بە دراو دانانرێت، بەڵکو بە تۆمارکردنی کۆکردنەوەکە لە سیستەمدا. ئەو کاریگەرییانەی لە پارەدانەوە دێن — لەوانەش ئازادکردنی خاڵە بەدەستهێنراوەکان — لە بەرواری تۆمارکردنی کۆکردنەوەکەوە دەست پێدەکەن.
 
-### 3.5 نەتوانینی پارەدان لە بەردەرگا
-ئەگەر کڕیار بڕەکەی لە کاتی گەیاندندا ئامادە نەکرد، وەک ڕەتکردنەوە لە بەردەرگا دادەنرێت و بەشی نۆیەمی سیاسەتی کڕین لەسەری جێبەجێ دەبێت.
+### 3.5 نەتوانینی پارەدان لە بەردەرگا یان لە کۆگا
+ئەگەر کڕیار بڕەکەی لە کاتی گەیاندن بۆ ناونیشانێکدا ئامادە نەکرد، وەک ڕەتکردنەوە لە بەردەرگا دادەنرێت و بەشی نۆیەمی سیاسەتی کڕین لەسەری جێبەجێ دەبێت. ئەگەر لە کاتی وەرگرتن لە کۆگادا ئامادەی نەکرد، تا تەواوی بڕەکە نەدات داواکارییەکەی ڕادەست ناکرێت.
 
 ### 3.6 سنووردارکردنی شێوازەکە
 فرۆشگا دەتوانێت کڕینی هەژمارێکی دیاریکراو بە پارەدانی پێشەکی سنووردار بکات لە کاتی دووبارەبوونەوەی ڕەتکردنەوەی وەرگرتن یان شکستی گەیاندن، بەپێی سیاسەتی فرۆشتن.
@@ -865,8 +898,8 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the working hours
 ### 11.7 قەرەبووەکان کۆ ناکرێنەوە
 گەڕاندنەوەی دارایی لەگەڵ قەرەبووێکی دیکە لەسەر هەمان ڕووداو کۆ ناکرێتەوە، و هەمان بڕ دووجار قەرەبوو ناکرێتەوە.
 
-### 11.8 داواکاری بە نەقد لە بەردەرگا دراو
-ئەو داواکارییەی بە نەقد لە بەردەرگا دراوە، لە کاتی شایستەبوونی گەڕاندنەوەدا بەهاکەی بۆ جزدان دەگەڕێتەوە، مەگەر لەگەڵ پشتیوانیدا ئاراستەیەکی دیکە ڕێککەوتی لەسەر بکرێت.
+### 11.8 داواکاری بە نەقد لە بەردەرگا یان لە کۆگا دراو
+ئەو داواکارییەی بە نەقد لە بەردەرگا، یان لە کاتی وەرگرتنی لە کۆگا، دراوە، لە کاتی شایستەبوونی گەڕاندنەوەدا بەهاکەی بۆ جزدان دەگەڕێتەوە، مەگەر لەگەڵ پشتیوانیدا ئاراستەیەکی دیکە ڕێککەوتی لەسەر بکرێت.
 
 ## 12. تۆمارەکان، پێداچوونەوە و ناکۆکی
 

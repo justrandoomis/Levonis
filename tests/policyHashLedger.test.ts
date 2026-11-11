@@ -25,8 +25,10 @@
  *     row 196) followed with the pricing engine's writer, privacy 4 and
  *     faq 6 (owner, 2026-10-31) with the Meta Pixel on the main site, and
  *     purchase 7, price_protection 6 and faq 7 (owner, 2026-10-31; DECISIONS
- *     row 280) with ordering at an estimated price, and rewards 8 and faq 8
- *     (owner, 2026-11-05; DECISIONS row 301) with the review road.
+ *     row 280) with ordering at an estimated price, rewards 8 and faq 8
+ *     (owner, 2026-11-05; DECISIONS row 301) with the review road, and
+ *     payment 5 (owner, 2026-11-11; DECISIONS row 312) with cash at
+ *     warehouse pickup.
  *
  * Adding a version: bump it in its module, run this file, and copy the
  * `key@version:lang → hash` lines the failure prints into the fixture.
@@ -209,6 +211,28 @@ test('the review road moved rewards to 8 and faq to 8 on one date; rewards 7 and
       assert.ok(`${key}@${version - 1}:${lang}` in LEDGER, `${key}@${version - 1}:${lang} left the ledger`);
       assert.notEqual(LEDGER[`${key}@${version}:${lang}`], LEDGER[`${key}@${version - 1}:${lang}`], `${key}/${lang}: the new version is the old text`);
     }
+  }
+  for (const [key, version] of [['terms', 4], ['privacy', 4], ['quick_buy', 1]] as const) {
+    assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, `${key} moved: every consent would be asked again`);
+  }
+});
+
+/**
+ * CASH AT WAREHOUSE PICKUP MOVED payment TO 5 (owner, 2026-11-11; DECISIONS row
+ * 312). Version 4's 3.1 refused cash on pickup while the checkout offered it;
+ * the owner kept the checkout and published the rule instead. payment is not a
+ * consent document, so nobody is asked to accept again, and version 4 stays in
+ * the ledger as the archive holds it. Its date is the day it goes live: the
+ * archive row written at the first request fixes it for good (row 303).
+ */
+test('cash at pickup moved payment to 5 on the day it goes live; payment 4 stays in the ledger and no consent document moved', () => {
+  const doc = POLICY_DOCUMENTS.find((d) => d.key === 'payment')!;
+  assert.equal(doc.version, 5);
+  assert.equal(doc.effective_at, '2026-11-11', 'payment: the day version 5 goes live (row 312), not the day it was drafted');
+  for (const lang of POLICY_LANGS) {
+    assert.ok(`payment@5:${lang}` in LEDGER, `payment@5:${lang}`);
+    assert.ok(`payment@4:${lang}` in LEDGER, `payment@4:${lang} left the ledger`);
+    assert.notEqual(LEDGER[`payment@5:${lang}`], LEDGER[`payment@4:${lang}`], `payment/${lang}: the new version is the old text`);
   }
   for (const [key, version] of [['terms', 4], ['privacy', 4], ['quick_buy', 1]] as const) {
     assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, `${key} moved: every consent would be asked again`);
