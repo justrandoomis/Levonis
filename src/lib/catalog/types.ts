@@ -8,6 +8,7 @@
  *
  *   GET /api/catalog/tree            → CatalogTreeResponse
  *   GET /api/catalog/:slug           → CategoryPayload            (404 CATALOG_NOT_FOUND)
+ *   GET /api/catalog/:slug/counts    → SectionCountsPayload       (the same for every viewer)
  *   GET /api/products?…&facets=1     → ProductsListResponse (+ ListingMeta fields)
  *   GET /api/printer-finder?…        → FinderResponse
  *   GET /api/printer-finder/meta     → FinderMeta
@@ -38,6 +39,8 @@ export type {
   FinderReason,
   FinderRelaxation,
   ListingMeta,
+  SectionCounts,
+  SectionCountsPayload,
   ShelfChip,
   ShelfKind,
   Trilingual,

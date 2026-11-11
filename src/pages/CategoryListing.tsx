@@ -8,7 +8,7 @@ import ListingView, { type ListingScope } from '../components/listing/ListingVie
 import PageTopBar from '../components/catalog/PageTopBar';
 import CategoryRowBanners from '../components/catalog/CategoryRowBanners';
 import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
-import { cachedTree, loadCategory, loadTree } from '../lib/catalog/data';
+import { cachedTree, loadCategory, loadSectionCounts, loadTree } from '../lib/catalog/data';
 import { resolveListingRoute } from '../lib/catalog/listingModel';
 import { listingFirstPagePath, parseListing } from '../lib/catalog/listingQuery';
 import { listingCategory, listsBySlug, primeGet } from '../lib/bootFetch';
@@ -78,11 +78,12 @@ export default function CategoryListing() {
   const route = tree ? resolveListingRoute(tree.roots, categorySlug, subCategorySlug) : null;
   const shown = route ? (route.all ? null : route.node) : fallback && fallback !== 'missing' && !fallback.root ? fallback.node : null;
 
-  // THE SECTION'S STOCK, EXACT (owner, 2026-11-11; DECISIONS row 309). The map stops counting stock past
-  // its cap (worker/routes/catalog.ts TREE_AVAILABILITY_CAP; the live shop is past it), so its rows would
-  // say nothing; the section's own answer counts every product of its subtree from the cards it reads,
-  // up to CATEGORY_PAGE_CAP. Asked only when the map did not count and the section is small enough to be
-  // exact; a decoration, so a failure simply leaves the line without it.
+  // THE SECTION'S STOCK, EXACT (owner, 2026-11-11; DECISIONS rows 309 and 311). The map stops counting stock
+  // past its cap (worker/routes/catalog.ts TREE_AVAILABILITY_CAP; the live shop is past it), so its rows would
+  // say nothing; the section's counts (`/api/catalog/:slug/counts`) count every product of its subtree from
+  // the cards' own states, up to CATEGORY_PAGE_CAP — one small answer, the same for every viewer and cached
+  // for all, not a build of the whole page. Asked only when the map did not count and the section is small
+  // enough to be exact; a decoration, so a failure simply leaves the line without it.
   const stockSlug =
     shown && (typeof shown.available_count !== 'number' || shown.preorder_count === undefined) && shown.product_count <= CATEGORY_PAGE_CAP
       ? shown.slug
@@ -98,13 +99,13 @@ export default function CategoryListing() {
     }
     let alive = true;
     // Silent, by id when the slug is too long to ask by: the page is already drawn, this only adds a word.
-    loadCategory(listingCategory(shown), { mascot: 'silent' })
+    // Every visible descendant comes with it, so opening a child from here asks nothing again for a minute.
+    loadSectionCounts(listingCategory(shown))
       .then((p) => {
-        const nodes = [p.node, ...(p.children ?? [])];
-        rememberSectionStock(nodes);
+        rememberSectionStock(p.counts);
         if (!alive) return;
         const counts = new Map<string, SectionStock>();
-        for (const n of nodes) counts.set(n.id, n);
+        for (const n of p.counts) counts.set(n.id, n);
         setStock({ slug: stockSlug, counts });
       })
       .catch(() => {});

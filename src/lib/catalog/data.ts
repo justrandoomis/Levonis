@@ -26,7 +26,7 @@
 import { api, type ApiProduct, type RequestOptions } from '../api';
 import { CATALOG_TREE_PATH, takePrimedJson } from '../bootFetch';
 import { readPageCache, writePageCache } from '../pageCache';
-import type { CatalogTreeResponse, CategoryPayload } from './types';
+import type { CatalogTreeResponse, CategoryPayload, SectionCountsPayload } from './types';
 
 const opening = new Map<string, Promise<unknown>>();
 
@@ -67,6 +67,15 @@ export async function loadCategory(slug: string, opts?: RequestOptions): Promise
   const data = await openingGet<CategoryPayload>(`/api/catalog/${encodeURIComponent(slug)}`, opts);
   writePageCache(categoryKey(slug), data);
   return data;
+}
+
+/**
+ * A section's state counts and its visible descendants' (`GET /api/catalog/:slug/counts`, DECISIONS row 311):
+ * a few hundred bytes, the same for every viewer and cached for all — never a per-viewer build of the whole
+ * section. Silent: it adds a word to a page that is already drawn, so the character does not act it out.
+ */
+export function loadSectionCounts(slug: string): Promise<SectionCountsPayload> {
+  return api.get<SectionCountsPayload>(`/api/catalog/${encodeURIComponent(slug)}/counts`, { mascot: 'silent' });
 }
 
 export function cachedPhotoPool(): ApiProduct[] | null {

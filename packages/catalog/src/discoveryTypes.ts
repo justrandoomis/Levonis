@@ -152,8 +152,39 @@ export interface CategoryPayload<Card = unknown> {
   brands: BrandCount[];
   /** Other roots that hold products, for «يكمّل طابعتك». */
   related: CatalogTreeNode[];
-  /** True when the subtree held more than the page reads (200); counts stay exact. */
+  /**
+   * True when the subtree holds more visible products than the page reads (worker/routes/catalog.ts
+   * `CATEGORY_PAGE_CAP`, mirrored by src/lib/catalog/sectionStock.ts). `product_count` and a child shelf's
+   * `count` stay exact; the node's and its children's available / pre-order / unavailable / withheld counts are
+   * then null, and which child shelves appear, the smart shelves and the brand counts describe only the
+   * products read.
+   */
   truncated: boolean;
+}
+
+/** One section's state counts, as `GET /api/catalog/:slug/counts` lists them (null: not counted). */
+export interface SectionCounts {
+  id: string;
+  product_count: number;
+  available_count: number | null;
+  preorder_count: number | null;
+  unavailable_count: number | null;
+  withheld_count: number | null;
+}
+
+/**
+ * `GET /api/catalog/:slug/counts` (DECISIONS row 311): the section's and each of its visible descendants'
+ * state counts, the section first — the same for every viewer (built at the guest's prices), so a listing page
+ * gets its rows' words without a per-viewer build of the whole section.
+ */
+export interface SectionCountsPayload {
+  success: true;
+  /** The section's id (its slug may have been renamed: `moved`). */
+  id: string;
+  moved: boolean;
+  /** As on the page: past CATEGORY_PAGE_CAP every count is null. */
+  truncated: boolean;
+  counts: SectionCounts[];
 }
 
 // -------------------------------------------------------------- listing facets

@@ -46,7 +46,7 @@ import {
 import { cardRowColumns, learnProductColumns, pricingCtx, pricingCtxForUser, resolveProductCards, type PricingCtx } from './products';
 import { safeParse } from '../lib/types';
 import { cardLeadPhoto } from '../lib/cardPhoto';
-import type { CatalogTreeNode, CategoryPayload } from '@levonis/catalog/discoveryTypes';
+import type { CatalogTreeNode, CategoryPayload, SectionCounts, SectionCountsPayload } from '@levonis/catalog/discoveryTypes';
 
 export const catalogRoutes = new Hono<AppContext>();
 
@@ -82,12 +82,16 @@ export const TREE_AVAILABILITY_CAP = 1000;
  * own counts (worker/routes/products.ts `LISTING_CANDIDATE_CAP`) and the map counts to
  * (`TREE_AVAILABILITY_CAP`), read in the same ONE statement and ONE resolve wave, with the long text no
  * card carries left out (`cardRowColumns`). Past it the page reads the first this-many and says
- * `truncated`, and its counts are unknown (null), never estimated. src/lib/catalog/sectionStock.ts mirrors it.
+ * `truncated`: its stock counts and its children's are unknown (null), never estimated, while its shelves,
+ * brands and their counts describe only the products read (no live section is near it; the largest,
+ * maintenance parts, holds 589). src/lib/catalog/sectionStock.ts mirrors it.
  */
 export const CATEGORY_PAGE_CAP = 1000;
 
 const TREE_CACHE = 'public, max-age=60, s-maxage=300';
 const PAGE_CACHE_SIGNED_OUT = 'public, max-age=60';
+/** A section's counts (`/:slug/counts`): no price in them, so one copy for every viewer, no `Vary`. */
+const COUNTS_CACHE = 'public, max-age=60';
 /**
  * THEIR FRESHNESS, EXACTLY AS THE HEADERS ABOVE SAY IT (worker/lib/edgePolicy.ts
  * «STALE WHILE REVALIDATE, AS DECLARED»). Neither declares a stale window: the
@@ -354,52 +358,120 @@ catalogRoutes.get('/tree', (c) =>
 const notFoundCategory = () =>
   new HttpError(404, 'هذه الفئة غير موجودة. / This category does not exist.', 'CATALOG_NOT_FOUND');
 
-catalogRoutes.get('/:slug', async (c) => {
-  const slug = str(c.req.param('slug'), 'slug', { max: 80 });
-  const user = c.get('user');
-  const build = async (): Promise<Response> => {
-    const [records, memberships] = await Promise.all([loadCatalogRecords(c.env.DB), loadMemberships(c.env.DB)]);
-    const idx = indexCatalogs(records);
-    // SLUG FIRST (the URL's own word), then the id (an old `?category=<id>`
-    // link), then a slug the admin renamed away from — which is answered with
-    // `moved: true` so the page can `replace` to the canonical path.
-    let record = idx.bySlug.get(slug) ?? idx.byId.get(slug) ?? null;
-    let moved = false;
-    if (!record) {
-      const retired = await catalogIdForRetiredSlug(c.env.DB, slug);
-      record = retired ? idx.byId.get(retired) ?? null : null;
-      moved = record !== null;
-    }
-    if (!record) throw notFoundCategory();
+/**
+ * ONE SECTION, READ — what the page (`/:slug`, at the viewer's prices) and its counts (`/:slug/counts`, at
+ * the guest's) both stand on: the section (by slug, id or a slug the admin renamed away from), the membership
+ * map, and EVERY visible product of its subtree up to CATEGORY_PAGE_CAP, with their cards and the counts
+ * rolled up from the cards' own states. The pricing inputs are asked for at once, beside the catalogs and the
+ * memberships, not after the row read (a member's tier is a read of its own).
+ */
+async function readSection(db: D1Database, slug: string, ctxFor: () => Promise<PricingCtx>) {
+  const ctxPromise = ctxFor();
+  // A section that is not there never awaits it: its failure must not surface as an unhandled rejection.
+  ctxPromise.catch(() => {});
+  // THE COLUMNS, KNOWN BEFORE THE ROW READ. Until a binding has read one whole row it cannot leave the long
+  // text out, and the first build of an isolate would read every row of the section whole — up to a thousand
+  // descriptions (review of row 311: 7 MB instead of 3 for the 589 maintenance parts). One row, read in the
+  // wave that runs anyway, teaches it.
+  const [records, memberships, firstRow] = await Promise.all([
+    loadCatalogRecords(db),
+    loadMemberships(db),
+    cardRowColumns(db)
+      ? Promise.resolve(null)
+      : db
+          .prepare('SELECT * FROM products LIMIT 1')
+          .all<Record<string, unknown>>()
+          .then((r) => r.results?.[0] ?? null),
+  ]);
+  if (firstRow) learnProductColumns(db, firstRow);
+  const idx = indexCatalogs(records);
+  // SLUG FIRST (the URL's own word), then the id (an old `?category=<id>`
+  // link), then a slug the admin renamed away from — which is answered with
+  // `moved: true` so the page can `replace` to the canonical path.
+  let record = idx.bySlug.get(slug) ?? idx.byId.get(slug) ?? null;
+  let moved = false;
+  if (!record) {
+    const retired = await catalogIdForRetiredSlug(db, slug);
+    record = retired ? idx.byId.get(retired) ?? null : null;
+    moved = record !== null;
+  }
+  if (!record) throw notFoundCategory();
+  const section = record;
 
-    const byProduct = membershipByProduct(memberships, idx);
-    const memberIds = [...byProduct].filter(([, cats]) => cats.has(record!.id)).map(([pid]) => pid);
-    // A section with nothing in it is not a page (§1 principle 4). An INACTIVE
-    // section that still holds products renders — `catalogSubtreeFilter` does
-    // not check `active` either, and a dead link over a full shelf is worse.
-    if (memberIds.length === 0) throw notFoundCategory();
+  const byProduct = membershipByProduct(memberships, idx);
+  const memberIds = [...byProduct].filter(([, cats]) => cats.has(section.id)).map(([pid]) => pid);
+  // A section with nothing in it is not a page (§1 principle 4). An INACTIVE
+  // section that still holds products renders — `catalogSubtreeFilter` does
+  // not check `active` either, and a dead link over a full shelf is worse.
+  if (memberIds.length === 0) throw notFoundCategory();
 
-    // VISIBLE, priced first so the page cap keeps priced items (DECISIONS row 240, rule R1). Every column but
-    // the long text no card carries once this binding knows them (the listing's rule): a section of a thousand
-    // products must not haul a thousand descriptions out of D1 for cards that never show one.
-    const L = await listing(c.env.DB);
-    const columns = cardRowColumns(c.env.DB);
-    const { results } = await c.env.DB.prepare(
+  // VISIBLE, priced first so the page cap keeps priced items (DECISIONS row 240, rule R1). Every column but
+  // the long text no card carries (the listing's rule): a section of a thousand products must not haul a
+  // thousand descriptions out of D1 for cards that never show one.
+  const L = await listing(db);
+  const columns = cardRowColumns(db);
+  const { results } = await db
+    .prepare(
       `SELECT ${columns ?? '*'}, ${L.sellableFlag('products')} AS sellable_now FROM products
         WHERE ${L.visible('products')} AND composition = '' AND id IN (SELECT value FROM json_each(?))
         ORDER BY sellable_now DESC, display_order ASC, created_at DESC
         LIMIT ?`
     )
-      .bind(JSON.stringify(memberIds), CATEGORY_PAGE_CAP)
-      .all<Record<string, unknown>>();
-    const rows = results ?? [];
-    if (!columns) learnProductColumns(c.env.DB, rows[0]);
-    const ctx = await pricingCtx(c);
-    const cards = await resolveProductCards(c.env.DB, rows, ctx, idx, 'flag');
-    const truncated = memberIds.length > rows.length;
+    .bind(JSON.stringify(memberIds), CATEGORY_PAGE_CAP)
+    .all<Record<string, unknown>>();
+  const rows = results ?? [];
+  if (!columns) learnProductColumns(db, rows[0]);
+  const cards = await resolveProductCards(db, rows, await ctxPromise, idx, 'flag');
+  // Availability is exact only when every product of the subtree was read.
+  const truncated = memberIds.length > rows.length;
+  const counts = rollUpCounts(byProduct, cardStates(cards));
+  return { idx, record: section, moved, byProduct, rows, cards, truncated, counts };
+}
 
-    // Availability is exact only when every product of the subtree was read.
-    const counts = rollUpCounts(byProduct, cardStates(cards));
+/** One section's (or descendant's) state counts, as `GET /api/catalog/:slug/counts` lists them. */
+function countsOf(n: CatalogTreeNode): SectionCounts {
+  return {
+    id: n.id,
+    product_count: n.product_count,
+    available_count: n.available_count,
+    preorder_count: n.preorder_count ?? null,
+    unavailable_count: n.unavailable_count ?? null,
+    withheld_count: n.withheld_count ?? null,
+  };
+}
+
+/**
+ * A SECTION'S COUNTS, THE SAME FOR EVERY VIEWER (DECISIONS row 311). A listing page lays its section's state
+ * counts over the map's rows when the map stopped counting (past TREE_AVAILABILITY_CAP; the live shop is past
+ * it). It asked the whole page for them: for a signed-in viewer a fresh tier-priced build of every product of
+ * the section — its shelves, its cards, ~90 KB for the 568 spare parts — on every visit, beside the listing the
+ * viewer was waiting for, to read eight numbers. The counts read the cards' stock and sale types, never a
+ * price, so they are built at the GUEST's prices, as the map is, and cached for everyone: the section and each
+ * of its visible descendants, exact up to CATEGORY_PAGE_CAP and null past it. No shelf, no brand, no card.
+ */
+catalogRoutes.get('/:slug/counts', (c) => {
+  const slug = str(c.req.param('slug'), 'slug', { max: 80 });
+  const u = new URL(c.req.url);
+  return cached(c, new Request(withCacheEpoch(`${u.origin}${u.pathname}`), { method: 'GET' }), COUNTS_CACHE, PAGE_LIFETIME, async () => {
+    const s = await readSection(c.env.DB, slug, () => pricingCtxForUser(c.env.DB, null));
+    const node = treeNode(s.record, s.idx, s.counts, !s.truncated);
+    node.children = visibleChildren(s.record, s.idx, s.counts, !s.truncated);
+    const counts: SectionCounts[] = [];
+    const walk = (n: CatalogTreeNode) => {
+      counts.push(countsOf(n));
+      for (const k of n.children ?? []) walk(k);
+    };
+    walk(node);
+    const payload: SectionCountsPayload = { success: true, id: s.record.id, moved: s.moved, truncated: s.truncated, counts };
+    return c.json(payload);
+  });
+});
+
+catalogRoutes.get('/:slug', async (c) => {
+  const slug = str(c.req.param('slug'), 'slug', { max: 80 });
+  const user = c.get('user');
+  const build = async (): Promise<Response> => {
+    const { idx, record, moved, byProduct, rows, cards, truncated, counts } = await readSection(c.env.DB, slug, () => pricingCtx(c));
     const node = treeNode(record, idx, counts, !truncated);
     const children: CatalogTreeNode[] = visibleChildren(record, idx, counts, !truncated);
     node.children = children;
