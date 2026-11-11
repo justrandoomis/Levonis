@@ -101,7 +101,11 @@
 // switched on; the bump retires the v3 caches so nothing is served from a
 // store that was filled under the old rules. tests/serviceWorker.test.ts pins
 // the version to the precached icon bytes — move both together.
-const VERSION = 'v4';
+// v5 (2026-11-11, owner: «the image size is large so it make the browser
+// heavy»): the seven icons were recompressed with the SAME pixels (opaque RGB,
+// adaptive PNG filters, scripts/build-pwa-icons.mjs). This precache is what a
+// first visit downloads in the background: 390 KB of icons before, 251 KB now.
+const VERSION = 'v5';
 
 const DOCUMENT_CACHE = 'levonis-document-' + VERSION;
 const ASSET_CACHE = 'levonis-assets-' + VERSION;

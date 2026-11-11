@@ -677,8 +677,10 @@ test('sw.js is a classic script: no module syntax, no bare specifier, no require
  */
 // v4: P1a moved /fonts/* to the cache-first branch and switched navigation
 // preload on; the icon bytes did not change (same digest below).
-const PRECACHE_VERSION = 'v4';
-const PRECACHE_DIGEST = '72327c6aa8a7cca2cb60cf44be50b798c17af48c1a7619982ac52a8cafb96335';
+// v5: the seven icons recompressed, pixel for pixel the same (opaque RGB with
+// adaptive filters): 390 KB → 251 KB, which every first visit precaches.
+const PRECACHE_VERSION = 'v5';
+const PRECACHE_DIGEST = '444fbf379fe51b8cfebe8e37e289b0e5f3bb7fc912257e3d7c4339712b8d71f4';
 
 test('the precached icon bytes and the worker version move together', () => {
   const sw = loadWorker();

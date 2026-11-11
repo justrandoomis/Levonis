@@ -141,17 +141,21 @@ function readSiteLogo() {
  * accidental: a future logo on a white card would otherwise be trimmed to
  * nothing, or not at all, depending on a pixel nobody looked at.
  */
-async function tile(src, size, fraction) {
+async function tile(src, size, fraction, { rgba = false } = {}) {
   const inner = Math.round(size * fraction);
   const mark = await sharp(src)
     .trim({ threshold: 10 })
     .resize(inner, inner, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer();
-  return sharp({ create: { width: size, height: size, channels: 4, background: BLACK } })
-    .composite([{ input: mark, gravity: 'centre' }])
-    .png({ compressionLevel: 9 })
-    .toBuffer();
+  // OPAQUE RGB WITH ADAPTIVE FILTERING (2026-11-11): the tile is painted on
+  // black, so an alpha channel carried nothing but bytes, and per-row PNG
+  // filters suit a mark on a flat ground. Same pixels, about a third smaller —
+  // icon-192, which Chrome fetches on every first visit, went 39 365 → 25 581 B.
+  // The favicon.ico keeps RGBA (`rgba`): its directory says 32 bits per pixel,
+  // the form Windows' own icon reader expects of a PNG entry.
+  const flat = sharp({ create: { width: size, height: size, channels: 4, background: BLACK } }).composite([{ input: mark, gravity: 'centre' }]);
+  return (rgba ? flat : flat.removeAlpha()).png({ compressionLevel: 9, adaptiveFiltering: true }).toBuffer();
 }
 
 /**
@@ -228,6 +232,6 @@ for (const name of readdirSync(OUT)) {
   }
 }
 
-const favicon = ico(await Promise.all(ICO_SIZES.map(async (size) => ({ size, png: await tile(src, size, 0.92) }))));
+const favicon = ico(await Promise.all(ICO_SIZES.map(async (size) => ({ size, png: await tile(src, size, 0.92, { rgba: true }) }))));
 writeFileSync(FAVICON_ICO, favicon);
 console.log(`build-pwa-icons: ${FAVICON_ICO} (${ICO_SIZES.join('/')}, ${favicon.length} B)`);
