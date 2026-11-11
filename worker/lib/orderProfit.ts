@@ -372,10 +372,16 @@ export async function syncOrderWorkspaceAccounting(db:D1Database,orderId:string,
  * never a line of their own; a month whose lines are all free (gifts) shares it equally.
  * The month total stays exact (`spread`). The owner's report only: staff and investor
  * shares never include promotion (FINANCE-DECISIONS, owner 2026-10-23).
+ *
+ * Redesign step 5 (DECISIONS row 317) also returns WHO CARRIES IT, read off the same line shares and changing no rule:
+ * `products` — each product of the month with its pieces, its net sales and its share, largest first, adding up to the
+ * total exactly (a drawn spool, which has no product of its own, is filed under the offer it came from, as the reports
+ * file it) — and the month's net sales and line count.
  */
+export interface PromotionProductShare { product_id: string | null; name: string; qty: number; sales_iqd: number; promotion_iqd: number }
 export async function monthlyPromotionShares(db: D1Database, month: string) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw badRequest('الشهر غير صحيح');
-  if (!await workspaceInstalled(db)) return { total_iqd: 0, shares: new Map<string, number>(), unallocated_iqd: 0, promotions: [] as Row[] };
+  if (!await workspaceInstalled(db)) return { total_iqd: 0, shares: new Map<string, number>(), unallocated_iqd: 0, promotions: [] as Row[], products: [] as PromotionProductShare[], sales_iqd: 0, lines_count: 0 };
   const delivered = `o.status='delivered' AND o.seller_type='levonis' AND substr(date(o.delivered_at,'+3 hours'),1,7)=?`;
   const [promotions, orders, items] = await Promise.all([
     db.prepare('SELECT *,CASE WHEN currency=\'IQD\' THEN amount_minor ELSE amount_minor/100.0 END amount FROM finance_monthly_promotions WHERE month=? ORDER BY id').bind(month).all<Row>(),
@@ -385,12 +391,24 @@ export async function monthlyPromotionShares(db: D1Database, month: string) {
   const total = (promotions.results ?? []).filter((p) => n(p.enabled) === 1).reduce((sum, p) => sum + n(p.amount_iqd), 0);
   const byOrder = new Map<string, GoodsLine[]>();
   for (const item of items.results ?? []) { const rows = byOrder.get(s(item.order_id)) ?? []; rows.push(item); byOrder.set(s(item.order_id), rows); }
-  const sold = (orders.results ?? []).flatMap((order) => calculateGoods(order, byOrder.get(s(order.id)) ?? [], []).lines.map((l) => ({ id: s(l.id), value: Math.max(0, n(l.net_goods_iqd)) })))
+  const sold = (orders.results ?? []).flatMap((order) => calculateGoods(order, byOrder.get(s(order.id)) ?? [], []).lines.map((l) => ({ id: s(l.id), value: Math.max(0, n(l.net_goods_iqd)), line: l })))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   if (sold.length > 10000 || (items.results ?? []).length > 20000) throw badRequest('عدد بنود الشهر تجاوز حد التوزيع؛ لا يمكن توزيع جزئي للترويج');
   const values = spread(total, sold.map((l) => l.value));
+  // Who carries it: the same shares, by product. A line with no product of its own under a bundle (a drawn spool) is filed
+  // under its parent's product and name; the parent itself is never a line (calculateGoods), so nothing counts twice.
+  const byId = new Map((items.results ?? []).map((item) => [s(item.id), item]));
+  const products = new Map<string, PromotionProductShare>();
+  sold.forEach(({ value, line }, i) => {
+    const parent = !line.product_id && line.bundle_parent_item_id ? byId.get(s(line.bundle_parent_item_id)) : undefined;
+    const productId = line.product_id || parent?.product_id || null, name = s(parent?.product_id ? parent.name_snapshot : line.name_snapshot);
+    const key = productId ?? `name:${name}`, p = products.get(key) ?? { product_id: productId, name, qty: 0, sales_iqd: 0, promotion_iqd: 0 };
+    p.qty += n(line.qty); p.sales_iqd += value; p.promotion_iqd += values[i] ?? 0; products.set(key, p);
+  });
   return { total_iqd: total, shares: new Map(sold.map((l, i) => [l.id, values[i] ?? 0])),
-    unallocated_iqd: sold.length ? 0 : total, promotions: promotions.results ?? [] };
+    unallocated_iqd: sold.length ? 0 : total, promotions: promotions.results ?? [],
+    products: [...products.values()].sort((a, b) => b.promotion_iqd - a.promotion_iqd || b.sales_iqd - a.sales_iqd || a.name.localeCompare(b.name)),
+    sales_iqd: sold.reduce((v, l) => v + l.value, 0), lines_count: sold.length };
 }
 export async function addOwnerPromotions(db: D1Database, bases: OrderProfitBase[]) {
   const months = new Map<string, Awaited<ReturnType<typeof monthlyPromotionShares>>>();

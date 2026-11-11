@@ -5,9 +5,10 @@ import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
 import { FreshOnReturnHold, useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { useLanguage } from '../../LanguageContext';
 import { Button, Loading, Row, Sheet, Surface } from './ui';
-import { currentMonth, financePreset, financeRangeFromSearch, validFinanceRange, WORKSPACE_API, type FinanceSection, type FinanceSummary } from './types';
+import { financePreset, financeRangeFromSearch, validFinanceRange, WORKSPACE_API, type FinanceRange, type FinanceSection, type FinanceSummary } from './types';
 import OrderProfitSheet, { type OrderFocus } from './OrderProfitSheet';
-import MonthlyCosts from './MonthlyCosts';
+import PromotionPage from './PromotionPage';
+import GeneralExpenses from './GeneralExpenses';
 import './finance-workspace.css';
 import { CurrencyToggle, DisplayCurrencyContext, type DisplayCurrency } from './displayCurrency';
 import Overview from './Overview';
@@ -18,9 +19,6 @@ import type { ScopeRef } from './reportTable';
 import { compareRange, defaultCompare, type CompareMode } from './compare';
 import { comparisonFor, keepKey, keptPages, missingBadge, navigate, NO_SUMMARY, NOTHING_KEPT, pageMount, summaryKey, summaryReducer, summaryShown, type ComparisonRead, type Kept } from './frameState';
 import { fw, rangeText, type FwKey } from './overviewStrings';
-import ExpenseLedger from '../adminFinance/ExpenseLedger';
-import { financeStrings } from '../adminFinance/strings';
-import { isLatin } from '../adminFinance/format';
 
 const PeoplePanel = lazy(() => import('../financePeople/PeoplePanel'));
 const InvestorPanel = lazy(() => import('../financePeople/InvestorPanel'));
@@ -84,12 +82,16 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   const { loc, dir, lang } = useLanguage();
   const L = lang as 'ar' | 'en' | 'ckb';
   const [section, setSectionState] = useState<FinanceSection>(initialSection);
-  const [month, setMonth] = useState(() => {
+  // «التكاليف ← ترويج الشهر» shows one month: the period's (its last), unless the owner picked another on that page — a pick
+  // the address keeps (`financeMonth`) until the period changes, when the month follows the period again (redesign step 5).
+  const [monthPick, setMonthPick] = useState<string | null>(() => {
     const value = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('financeMonth') ?? '';
-    return /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : currentMonth();
+    return /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : null;
   });
   const [initialPeriod] = useState(() => financeRangeFromSearch(typeof window === 'undefined' ? '' : window.location.search));
-  const [range, setRange] = useState(initialPeriod.range);
+  const [range, setRangeState] = useState(initialPeriod.range);
+  const setRange = (next: FinanceRange) => { setRangeState(next); setMonthPick(null); };
+  const month = monthPick ?? range.to.slice(0, 7);
   const [draft, setDraft] = useState(initialPeriod.range);
   const [rangeError, setRangeError] = useState(initialPeriod.invalid);
   // The select names the range it shows: a preset when the dates are one, else «فترة مخصصة».
@@ -146,9 +148,9 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   useEffect(() => {
     const url = new URL(window.location.href);
     url.searchParams.set('finance', section); url.searchParams.set('from', range.from); url.searchParams.set('to', range.to);
-    url.searchParams.set('financeMonth', month);
+    if (monthPick) url.searchParams.set('financeMonth', monthPick); else url.searchParams.delete('financeMonth');
     window.history.replaceState(window.history.state, '', url);
-  }, [section, range.from, range.to, month]);
+  }, [section, range.from, range.to, monthPick]);
   // One read of the period serves every section: switching pages never reloads it, and a new
   // period or currency keeps the old figures on screen (dimmed) until its own arrive — or its read fails.
   useEffect(() => {
@@ -256,10 +258,9 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
       {page('sections', () => figures((d) => <GroupsReport data={d} level={level} onLevel={setLevel} onOpenOrders={openOrders} onMissing={() => setSection('missing')} />))}
       {page('days', () => figures((d) => <DaysReport data={d} onOpenOrders={openOrders} />))}
       {page('missing', () => <Suspense fallback={loading}><MissingCostsSheet inline reload={peopleRevision} from={range.from} to={range.to} onClose={() => setSection('overview')} onChanged={refresh} openOrder={(id, step, line) => openOrderAt(id, step, line)} /></Suspense>)}
-      {page('monthly', () => <><label className="fw-chip" style={{ justifySelf: 'start' }}><CalendarDays size={16} aria-hidden />
-        <input type="month" className="fw-input" value={month} aria-label={loc('شهر التكاليف والمستحقات', 'Costs and earnings month', 'مانگی تێچوو و شایستەکان')} onChange={(e) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) setMonth(e.target.value); }} /></label>
-        <MonthlyCosts key={month} month={month} onChanged={refresh} /></>)}
-      {page('expenses', () => <Surface title={fw(loc, 'expenses')}><ExpenseLedger from={range.from} to={range.to} s={financeStrings(loc)} latin={isLatin(lang)} dir={dir === 'rtl' ? 'rtl' : 'ltr'} onChanged={refresh} /></Surface>)}
+      {/* Redesign step 5 (DECISIONS row 317): the month's promotion, its month following the period; the general expenses of the period. */}
+      {page('monthly', () => <PromotionPage month={month} onMonth={setMonthPick} from={range.from} to={range.to} revision={revision} onChanged={refresh} />)}
+      {page('expenses', () => <GeneralExpenses from={range.from} to={range.to} revision={revision} onChanged={refresh} openOrder={(id) => openOrderAt(id)} onNavigate={setSection} />)}
       {page('staff', () => <Suspense fallback={loading}><PeoplePanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} /></Suspense>)}
       {page('investors', () => <Suspense fallback={loading}><InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} />
         <PeriodCharts from={range.from} to={range.to} revision={revision} /></Suspense>)}

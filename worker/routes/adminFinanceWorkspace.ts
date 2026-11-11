@@ -20,6 +20,7 @@ import { reportAdjustments, type ReportAdjustments } from '../lib/financeReportO
 import { loadUsdRateSteps, usdRateAt, type UsdRateSteps } from '../lib/fx/historyRate';
 import { ADDITIVE_IQD_FIELDS, baghdadDayStart, batchCogsCents, centsOf, chartCents, expenseCompositionCents, iqdToCents, instantOf, rederive, sumCents, type Cents } from '../lib/financeUsdDisplay';
 import { loadLotUsdRates } from '../lib/batchSnapshot';
+import { EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
 
 type Row=Record<string,unknown>;
 const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
@@ -540,20 +541,16 @@ async function periodFigures(db:D1Database,r:{from:string;to:string}){
   // delivered (it waits for it, and is counted on its delivery). Once the order ended
   // without a delivery — cancelled, returned, refunded — it is a cost of the shop like
   // rent, on its own day; before 2026-11-11 it vanished from every figure (DECISIONS row 313).
-  const [expenses,failures,promotions,waiting,postingErrors]=await Promise.all([
-    db.prepare(`SELECT e.expense_day,COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ?
-      AND NOT EXISTS(SELECT 1 FROM finance_expense_links l JOIN orders lo ON lo.id=l.order_id WHERE l.expense_id=e.id AND lo.status NOT IN ('cancelled','returned','refunded'))
-      AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id)
-      AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)
-      AND NOT EXISTS(SELECT 1 FROM finance_monthly_promotions p WHERE p.expense_id=e.id) GROUP BY e.expense_day`).bind(r.from,r.to).all<Row>(),
+  // Since redesign step 5 (DECISIONS row 317) where each expense counts is one fragment (financeExpenseKinds.ts) that
+  // GET /expenses reads too: the general expenses by day and the costs still waiting for their orders come from it.
+  const [spent,failures,promotions,postingErrors]=await Promise.all([
+    periodExpenses(db,r),
     db.prepare('SELECT event_key id,order_id,message,last_attempt_at FROM finance_posting_errors WHERE order_id IN (SELECT value FROM json_each(?)) ORDER BY last_attempt_at DESC LIMIT 100').bind(JSON.stringify(bases.map((b)=>b.order_id))).all<Row>(),
     db.prepare("SELECT *,CASE WHEN currency='IQD' THEN amount_minor ELSE amount_minor/100.0 END amount FROM finance_monthly_promotions WHERE month BETWEEN ? AND ? ORDER BY month,id").bind(r.from.slice(0,7),r.to.slice(0,7)).all<Row>(),
-    // Costs entered in the period for orders still on their way: not in this period's net, and named so they are not lost.
-    db.prepare(`SELECT COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e JOIN finance_expense_links l ON l.expense_id=e.id JOIN orders lo ON lo.id=l.order_id
-      WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ? AND lo.status NOT IN ('delivered','cancelled','returned','refunded')`).bind(r.from,r.to).first<Row>(),
     postingErrorOrders(db,bases)]);
-  const expenseDays=expenses.results??[],totals=sumRows(bases.map((b)=>b.totals));totals.orders_count=bases.length;totals.general_expenses_iqd=expenseDays.reduce((v,e)=>v+n(e.total),0);
-  totals.general_waiting_iqd=n(waiting?.total);
+  const expenseDays:Row[]=spent.days,totals=sumRows(bases.map((b)=>b.totals));totals.orders_count=bases.length;totals.general_expenses_iqd=spent.general_iqd;
+  // Costs entered in the period for orders still on their way: not in this period's net, and named so they are not lost.
+  totals.general_waiting_iqd=spent.waiting_iqd;
   let unallocated=0;const unallocatedDays=new Map<string,number>();
   for(const month of new Set((promotions.results??[]).map((p)=>s(p.month))))if(`${month}-01`>=r.from&&`${month}-01`<=r.to){const amount=(await monthlyPromotionShares(db,month)).unallocated_iqd;unallocated+=amount;unallocatedDays.set(`${month}-01`,amount);}
   totals.unallocated_promotion_iqd=unallocated;
@@ -699,15 +696,57 @@ adminFinanceWorkspaceRoutes.post('/missing-costs/lines',async(c)=>{
   const reconciliationPending=result.skipped?false:await reconcileWorkspace(db,id,actor.id,baghdadDay());
   return c.json({success:true,already:result.already,skipped:result.skipped,reconciliation_pending:reconciliationPending,accounting_pending:result.accounting_pending});
 });
+/**
+ * «التكاليف ← ترويج الشهر» (redesign step 5, DECISIONS row 317) reads, beside the month's promotion and its rate suggestion:
+ * WHO CARRIES IT — the month's products, each with its pieces, its net sales and its share of the promotion, from the very
+ * line shares every order carries (monthlyPromotionShares: the rule does not change; a bundle's parent is never a line of its
+ * own, a drawn spool is filed under its offer), so the rows add up to `total_iqd` exactly — with the month's sales and line
+ * count; and THE HISTORY of its edits (finance_promotion_history, migration 0163), newest first, each with who made it and the
+ * amount before and after. `month` must be a month (400 otherwise).
+ */
+type PromotionState={currency:string;amount:number;exchange_rate:number;amount_iqd:number;enabled:boolean};
+function promotionState(json:string):PromotionState|null{
+  let v:Row;try{v=JSON.parse(json) as Row;}catch{return null;}
+  if(!v||typeof v!=='object'||v.amount_minor===undefined)return null;
+  return {currency:s(v.currency),amount:n(v.amount_minor)/(v.currency==='IQD'?1:100),exchange_rate:n(v.exchange_rate),amount_iqd:n(v.amount_iqd),enabled:n(v.enabled)===1||v.enabled===true};
+}
 adminFinanceWorkspaceRoutes.get('/promotions',async(c)=>{
-  const month=text(c.req.query('month'),7)||baghdadDay().slice(0,7),allocation=await monthlyPromotionShares(c.env.DB,month);
+  const month=text(c.req.query('month'),7)||baghdadDay().slice(0,7);
+  if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw badRequest('الشهر غير صحيح / Invalid month','PROMOTION_MONTH_INVALID');
+  const allocation=await monthlyPromotionShares(c.env.DB,month);
   // P-A F3: a SUGGESTION for the rate field — the shop's USD/IQD in force on the
   // month's first day (worker/lib/fx/historyRate), never the wallet's. The page
   // shows it and fills the field only when the owner taps it; the server never
   // books a promotion at it unless that rate is sent as the rate actually paid.
   const start=baghdadDayStart(`${month}-01`),steps=start===null?null:await usdSteps(c.env.DB,[start]),hit=usdRateAt(steps,start);
   const rate_suggestion=hit?{rate:hit.rate,date:`${month}-01`,usd_basis:hit.basis}:null;
-  return c.json({success:true,month,promotions:allocation.promotions,total_iqd:allocation.total_iqd,unallocated_iqd:allocation.unallocated_iqd,allocation_basis:'sales_value',rate_suggestion});
+  const edits=(await c.env.DB.prepare(PROMOTION_HISTORY_SQL).bind(month,month).all<Row>()).results??[];
+  const history=edits.map((h)=>({id:s(h.id),promotion_id:s(h.promotion_id),version:n(h.version),at:s(h.created_at),actor_id:s(h.actor_id),actor_name:h.actor_name==null?null:s(h.actor_name),
+    before:promotionState(s(h.before_json)),after:promotionState(s(h.after_json))}));
+  return c.json({success:true,month,promotions:allocation.promotions,total_iqd:allocation.total_iqd,unallocated_iqd:allocation.unallocated_iqd,allocation_basis:'sales_value',rate_suggestion,
+    products:allocation.products,sales_iqd:allocation.sales_iqd,lines_count:allocation.lines_count,history});
+});
+/**
+ * «التكاليف ← المصاريف العامة» (redesign step 5, DECISIONS row 317): the period's expense entries, each with where it counts
+ * (financeExpenseKinds.ts: general, the month's promotion, an order's wage or material, a courier's fee, linked to a delivered
+ * order, to one on its way, or to one that ended without a delivery), its category in three languages, its cost-centre tag
+ * and the order or the promotion's month it counts with; and the period's sums from the same statement /summary reads —
+ * `general_iqd` is the statement's «المصاريف العامة», `waiting_iqd` its «تنتظر تسليم طلباتها», `by_category` the general
+ * entries by category (they add up to `general_iqd`), `by_kind` every entry, so the page can say why the ledger's total of
+ * every entry is not the general figure. Voided rows only with `include_voided=1`, flagged, and never in a sum. The period is
+ * at most a year (400), as /summary's; the door is the owner's (cost read), as for every route here.
+ */
+const EXPENSE_ROW_LIMIT=500;
+adminFinanceWorkspaceRoutes.get('/expenses',async(c)=>{
+  const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to')),voided=['1','true'].includes(c.req.query('include_voided')??'')?1:0;
+  const [totals,rows]=await Promise.all([periodExpenses(db,r),db.prepare(EXPENSE_ROWS_SQL).bind(r.from,r.to,voided,EXPENSE_ROW_LIMIT+1).all<Row>()]);
+  const list=(rows.results??[]).slice(0,EXPENSE_ROW_LIMIT).map((e)=>({id:s(e.id),expense_day:s(e.expense_day),amount_iqd:n(e.amount_iqd),title:s(e.title),note:s(e.note),series_id:e.series_id==null?null:s(e.series_id),
+    category_id:s(e.category_id),category:{name_ar:s(e.category_name_ar),name_en:s(e.category_name_en),name_ckb:s(e.category_name_ckb)},
+    kind:s(e.expense_kind),counts_as_general:isGeneralKind(s(e.expense_kind)),order_id:e.order_id==null?null:s(e.order_id),order_status:e.order_status==null?null:s(e.order_status),
+    promotion_month:e.promotion_month==null?null:s(e.promotion_month),center_id:e.center_id==null?null:s(e.center_id),center_name:e.center_name==null?null:s(e.center_name),
+    voided:e.voided_at!=null,void_reason:s(e.void_reason)}));
+  const {general_iqd,waiting_iqd,all_iqd,entries,by_kind,by_category}=totals;
+  return c.json({success:true,range:r,rows:list,truncated:(rows.results??[]).length>EXPENSE_ROW_LIMIT,totals:{general_iqd,waiting_iqd,all_iqd,entries,by_kind,by_category}});
 });
 async function promotionValues(db:D1Database,b:Row,old?:Row){
   const month=b.month===undefined?s(old?.month):text(b.month,7);if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw badRequest('الشهر غير صحيح');
@@ -809,7 +848,7 @@ const ORDER_LEVEL_NAMES=['خصومات على مستوى الطلب','Order-leve
  * too, as Reports → Orders names it), 0 when it is confirmed, empty beside an unknown one — so the column adds up to the goods-cost
  * total's «تقديري n», which the orders' `finance_state` alone cannot give.
  */
-const EXPORT_VIEWS=['lines','orders','products','sections','days'] as const;
+const EXPORT_VIEWS=['lines','orders','products','sections','days','expenses'] as const;
 const csvFile=(rows:Row[],fields:readonly string[],name:string)=>new Response('\uFEFF'+[fields.map(csvCell).join(','),...rows.map((row)=>fields.map((f)=>csvCell(row[f])).join(','))].join('\r\n'),
   {headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${name}"`}});
 const MONEY_COLUMNS=['retained_revenue_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd'] as const;
@@ -834,7 +873,7 @@ const UNCLASSIFIED={main:['غير مصنف','Unclassified','پۆلێننەکرا
  * groupDays). A value it does not know, or one the view does not read, is a 400, as an unknown view is.
  */
 const WAIT_REASONS=['no_price','return_cost','wage_waits_cost','investor_waits','refund_unknown','other'] as const;
-const EXPORT_READS:Record<string,readonly string[]>={lines:[],orders:['part','q','state','kind','scope','cash'],products:['q'],sections:['q'],days:['by']};
+const EXPORT_READS:Record<string,readonly string[]>={lines:[],orders:['part','q','state','kind','scope','cash'],products:['q'],sections:['q'],days:['by'],expenses:[]};
 type ExportFilter={part:string;q:string;state:string;kind:string;scope:string;cash:string;by:string};
 function exportFilter(get:(key:string)=>string|undefined,view:string):ExportFilter{
   const f:ExportFilter={part:get('part')||'',q:(get('q')||'').trim().slice(0,100),state:get('state')||'',kind:get('kind')||'',scope:(get('scope')||'').slice(0,300),cash:get('cash')||'',by:get('by')||''};
@@ -872,13 +911,26 @@ adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   if(!(EXPORT_VIEWS as readonly string[]).includes(view))throw badRequest('عرض التصدير غير معروف / Unknown export view','EXPORT_VIEW_INVALID');
   if(!['main','sub'].includes(level))throw badRequest('مستوى الأقسام غير معروف / Unknown section level','EXPORT_LEVEL_INVALID');
   const filter=exportFilter((key)=>c.req.query(key),view);
-  if(view!=='lines')return exportView(c.env.DB,range(c.req.query('from'),c.req.query('to')),view as Exclude<(typeof EXPORT_VIEWS)[number],'lines'>,level as 'main'|'sub',filter);
+  if(view==='expenses')return exportExpenses(c.env.DB,range(c.req.query('from'),c.req.query('to')));
+  if(view!=='lines')return exportView(c.env.DB,range(c.req.query('from'),c.req.query('to')),view as Exclude<(typeof EXPORT_VIEWS)[number],'lines'|'expenses'>,level as 'main'|'sub',filter);
   const r=range(c.req.query('from'),c.req.query('to')),{bases,truncated}=await selectOrders(c.env.DB,r,{summary:true});if(truncated)throw badRequest('اختر فترة أضيق لتصدير جميع البنود');
   const fields=['order_id','id','product_id','name_snapshot','sku_snapshot','qty','returned_qty','main_name','sub_name','net_goods_iqd','refund_iqd','cogs_iqd','cost_confidence','gross_profit_iqd','wages_iqd','materials_iqd','manual_direct_iqd','shipping_income_iqd','cod_tax_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd','investor_iqd','owner_net_iqd','pending_costs','coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd','row_kind'];
   const rows=[fields.map(csvCell).join(','),...bases.flatMap((b)=>{const rest=orderLevelDeductions(b);
     return [...b.lines.map((l):Row=>({...l,row_kind:'line'})),...(rest?[rest]:[])].map((l)=>fields.map((f)=>csvCell(f==='order_id'?b.order_id:l[f])).join(','));})];
   return new Response('\uFEFF'+rows.join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="finance-lines-${r.from}-${r.to}.csv"`}});
 });
+/**
+ * `view=expenses` (redesign step 5, DECISIONS row 317): Costs → General expenses as a file — every live entry of the period with
+ * where it counts (`kind`), `counts_as_general` 1 for the entries the statement's «المصاريف العامة» sums (so a spreadsheet's sum of
+ * those rows is that line), its category in three languages, its cost-centre tag and the order or the promotion's month it counts
+ * with. From the same statement as the page (financeExpenseKinds.ts); a period of more than 20,000 entries is refused, never cut.
+ */
+const EXPENSE_COLUMNS=['expense_day','kind','counts_as_general','category_name_ar','category_name_en','category_name_ckb','title','amount_iqd','center_name','order_id','promotion_month','expense_id'] as const;
+async function exportExpenses(db:D1Database,r:{from:string;to:string}){
+  const rows=(await db.prepare(EXPENSE_ROWS_SQL).bind(r.from,r.to,0,20001).all<Row>()).results??[];
+  if(rows.length>20000)throw badRequest('اختر فترة أضيق لتصدير جميع المصاريف');
+  return csvFile(rows.map((e)=>({...e,kind:s(e.expense_kind),counts_as_general:isGeneralKind(s(e.expense_kind))?1:0,amount_iqd:n(e.amount_iqd),expense_id:s(e.id)})),EXPENSE_COLUMNS,`finance-expenses-${r.from}-${r.to}.csv`);
+}
 async function exportView(db:D1Database,r:{from:string;to:string},view:'orders'|'products'|'sections'|'days',level:'main'|'sub',f:ExportFilter){
   const {answer,bases,truncated}=await periodFigures(db,r);if(truncated)throw badRequest('اختر فترة أضيق لتصدير جميع البنود');
   const filtered=!!(f.q||f.state||f.kind||f.scope||f.cash);

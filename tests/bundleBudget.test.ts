@@ -103,7 +103,10 @@ const CSS_BUDGET = 60 * KB;
  * review (the finance sheet 4,730 B: no column hidden at any width, the cards
  * without their overlay), and 9,165 B after its third (the finance sheet
  * 4,779 B: a partial comparison's reason shown on the keyboard's focus and
- * never copied with a figure); steps 5 and 6 write theirs here.
+ * never copied with a figure); steps 5 and 6 write theirs here. Step 5 (the costs
+ * section; DECISIONS row 317) measured 9,032 B over the three sheets (the
+ * finance sheet 4,646 B: the missing-cost cards and the costs pages' fields
+ * added, the old promotion page's `.fw-promo-*` pruned); step 6 writes its own.
  * Still owner-only and lazy, never on a storefront (the test below).
  */
 const OPERATIONS_CSS_BUDGET = 10.5 * KB;

@@ -171,7 +171,8 @@ test('F3 client: the rate field is in view for a foreign currency, required unle
   const { readFileSync } = await import('node:fs');
   const { join } = await import('node:path');
   const { ROOT } = await import('./fixtures/d1');
-  const src = readFileSync(join(ROOT, 'src/components/financeWorkspace/MonthlyCosts.tsx'), 'utf8');
+  // Redesign step 5 (DECISIONS row 317): «ترويج الشهر» is PromotionPage.tsx, in place of MonthlyCosts.tsx; the F3 rules are unchanged.
+  const src = readFileSync(join(ROOT, 'src/components/financeWorkspace/PromotionPage.tsx'), 'utf8');
   assert.match(src, /\{foreign && rateField\}/);
   assert.match(src, /\(foreign && !keepsRate && exchange\.trim\(\) === ''\)/);
   assert.doesNotMatch(src, /سعر صرف المتجر|store exchange rate/, 'the old «blank = the store rate» hint is gone');

@@ -116,12 +116,15 @@ test('order-wide reduction never creates negative costs on a zero-cost line',asy
   const b=await getOrderProfitBase(db,'order'),extra={...b.lines[0],id:'extra',manual_direct_iqd:0};b.lines[0].manual_direct_iqd=100;b.lines.push(extra);
   const p=planProfitAdjustment(b,null,'manual_direct_iqd',0);assert.deepEqual(p.allocations.map((a)=>a.delta_iqd),[-100,0]);
 });
-test('100 USD monthly promotion uses every sold unit, preserves the invoice basis and excludes duplicate overhead',async()=>{
+// Reworded in redesign step 5 (DECISIONS row 317): since DECISIONS row 313 the month's promotion is shared over every line sold
+// in the month BY SALES VALUE, not per sold unit; the test always held the month's total and the invoice basis, which stand.
+test('100 USD monthly promotion is shared over every line sold in the month by sales value, preserves the invoice basis and excludes duplicate overhead',async()=>{
   const {raw,db,add,app}=setup();add('other',1);
   const operation=crypto.randomUUID(),created=await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD',exchange_rate:1400,operation_id:operation});assert.equal(created.status,200,JSON.stringify(await json(created)));
   assert.equal((await post(app,'/f/promotions',{month:month(),amount:100,currency:'USD',exchange_rate:1400,operation_id:operation})).status,200);
   assert.equal(count(raw,'SELECT COUNT(*) n FROM finance_monthly_promotions'),1);assert.equal(balance(raw,'1000'),-140000);
   const all=await monthlyPromotionShares(db,month());assert.equal(all.total_iqd,140000);assert.equal([...all.shares.values()].reduce((a,b)=>a+b,0),140000);
+  assert.equal(all.products.reduce((a,p)=>a+p.promotion_iqd,0),140000,'by product too (step 5): the same shares, grouped');
   const filtered=await json(await get(app,`/f/orders?${period()}&q=order`));assert.equal(filtered.orders.length,1);assert.equal(filtered.orders[0].promotion_iqd,all.shares.get('order:item'));
   const profit=await json(await get(app,'/f/orders/order'));assert.equal(profit.totals.profit_basis_iqd,35000);assert.equal(profit.totals.owner_net_iqd,35000-n(all.shares.get('order:item')));
   const summary=await json(await get(app,`/f/summary?${period()}`));assert.equal(summary.totals.promotion_iqd,140000);assert.equal(summary.totals.general_expenses_iqd,0);

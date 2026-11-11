@@ -99,6 +99,8 @@ export default {
         'POST /promotions': 'cost_write',
         'PATCH /promotions/:id': 'cost_write',
         'DELETE /promotions/:id': 'cost_write',
+        // Costs → General expenses (redesign step 5, DECISIONS row 317): every entry of the period with where it counts.
+        'GET /expenses': 'cost_read',
         'GET /export.csv': 'cost_read',
       },
     },

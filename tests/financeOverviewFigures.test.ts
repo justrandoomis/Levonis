@@ -41,6 +41,7 @@ import ReportDeductions from '../src/components/financeWorkspace/ReportDeduction
 import { DisplayCurrencyContext } from '../src/components/financeWorkspace/displayCurrency';
 import { LanguageProvider } from '../src/LanguageContext';
 import { FW } from '../src/components/financeWorkspace/overviewStrings';
+import { CS } from '../src/components/financeWorkspace/costsStrings';
 import { codeOf } from './fixtures/source';
 import { ROOT } from './fixtures/d1';
 
@@ -167,18 +168,20 @@ test('the note under «صافي حصتك» names the complete orders in Arabic, 
   }
 });
 
-test('«تكاليف الشهر» explains the promotion by sales value wherever it explains it — no sentence still says pieces (owner 2026-11-11)', () => {
+test('«ترويج الشهر» explains the promotion by sales value wherever it explains it — no sentence still says pieces (owner 2026-11-11)', () => {
   const ARABIC_ONLY = /[ةىيك]/, SORANI_ONLY = /[ڕڵێۆەڤگچپژ]/;
-  const monthly = codeOf('src/components/financeWorkspace/MonthlyCosts.tsx');
-  assert.doesNotMatch(monthly, /قطع المنتجات المباعة|عند بيع القطع|حسب عدد القطع|sold units|units sell/);
-  const escape = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  for (const ar of ['مبلغ واحد للشهر كله. يتوزع على مبيعات الشهر حسب قيمتها ويُخصم من حصة المالك.', 'حسب قيمة المبيعات', 'يظهر الآن ضمن تكاليف المالك، ويتوزع على مبيعات الشهر عند تسليمها.']) {
-    const words = new RegExp(`loc\\('${escape(ar)}', '([^']+)', '([^']+)'\\)`).exec(monthly);
-    assert.ok(words, `«${ar}» is said, with its English and its Sorani`);
-    assert.match(words[1], /sales/i, words[1]);
-    assert.match(words[2], SORANI_ONLY, words[2]);
-    assert.doesNotMatch(words[2], ARABIC_ONLY, words[2]);
+  // Since redesign step 5 (DECISIONS row 317) the page is PromotionPage.tsx (in place of MonthlyCosts.tsx) and its words are in
+  // costsStrings.ts: the rule, the shares adding up to the month and the month with no sales say sales value, in three languages.
+  const page = codeOf('src/components/financeWorkspace/PromotionPage.tsx');
+  assert.doesNotMatch(page, /قطع المنتجات المباعة|عند بيع القطع|حسب عدد القطع|sold units|units sell/);
+  for (const key of ['promoRule', 'promoRuleNote', 'promoWaitingNote'] as const) assert.match(page, new RegExp(`cs\\(loc, '${key}'`), `${key} is said on the page`);
+  for (const [key, [ar, en, ckb]] of [['promoRule', CS.promoRule], ['promoRuleNote', CS.promoRuleNote], ['promoWaitingNote', CS.promoWaitingNote]] as const) {
+    assert.match(ar, /مبيعات/, `${key}: «${ar}»`);
+    assert.match(en, /sales/i, `${key}: ${en}`);
+    assert.match(ckb, SORANI_ONLY, ckb);
+    assert.doesNotMatch(ckb, ARABIC_ONLY, ckb);
   }
+  assert.match(CS.promoRule[0], /حسب قيمة المبيعات/);
 });
 
 test('what the note names as taken off is what came off the figure shown: the complete orders\' own deductions on the known path, nothing without a figure (review R2)', () => {

@@ -10,6 +10,7 @@ import { Amount, estimatedCell, estimatedTotal, FIRST, standingText, stepOf, Usd
 import { exportQuery, orderId } from './reportTable';
 import { financeDay, WORKSPACE_API, type FinanceSection, type FinanceSummary } from './types';
 import type { OrderFocus } from './OrderProfitSheet';
+import { DrawerGeneralEntries } from './GeneralExpenses';
 
 /**
  * «فتح رقم» — THE FIGURE DRAWER (redesign step 4, owner 2026-11-11; DECISIONS row 316).
@@ -98,6 +99,8 @@ export function FigureBody({ data, figure, from, to, onClose, openOrder, onNavig
           <span className="fw-rows-b"><Amount v={r.value} usd={u} /></span></div></li>)}
         <li className="fw-rows-total" data-finance-drill-total><span>{rs(loc, 'total')}</span><span><b><Amount v={d.total} usd={u} missing={unknown} /></b>{d.total != null && estimatedTotal(loc, d.estimated)}</span></li>
       </ul> : figure !== 'general' && <p className="fw-note" role="status">{rs(loc, part === 2 ? 'noneInPeriod' : 'noOrdersHere')}</p>}
+      {/* Redesign step 5 (DECISIONS row 317): the general line lists the period's entries, its total the period's figure. */}
+      {figure === 'general' && <DrawerGeneralEntries from={range.from} to={range.to} />}
       {figure === 'promotion' && <Button variant="secondary" onClick={() => { onClose(); onNavigate('monthly'); }}>{rs(loc, 'openPromotion')}</Button>}
       {figure === 'general' && <Button variant="secondary" onClick={() => { onClose(); onNavigate('expenses'); }}>{rs(loc, 'openExpenses')}</Button>}
     </div>;

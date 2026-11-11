@@ -191,6 +191,10 @@ export function dayText(lang: 'ar' | 'en' | 'ckb', day: string): string {
   const m = (MONTHS[lang] ?? MONTHS.ar)[Number(day.slice(5, 7)) - 1], d = Number(day.slice(8, 10));
   return lang === 'en' ? `${m} ${d}` : `${d} ${m}`;
 }
+/** A month with its year, «تشرين الثاني 2026», "Nov 2026", «تشرینی دووەم 2026» (redesign step 5: the promotion's month); Latin digits. */
+export function monthText(lang: 'ar' | 'en' | 'ckb', month: string): string {
+  return `${(MONTHS[lang] ?? MONTHS.ar)[Number(month.slice(5, 7)) - 1]} ${month.slice(0, 4)}`;
+}
 /**
  * A day in a table of the period `range`: without its year (dayText) — with it when the period spans two calendar years,
  * so a year-long range never shows two rows both «11 تشرين الثاني» (the independent review of step 4).

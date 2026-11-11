@@ -66,6 +66,7 @@ export default function ExpenseLedger({
   latin,
   dir,
   onChanged,
+  formOnly = false,
 }: {
   from: string;
   to: string;
@@ -74,6 +75,11 @@ export default function ExpenseLedger({
   dir: 'rtl' | 'ltr';
   /** The report reads these rows; a write here must move its net profit. */
   onChanged: () => void;
+  /**
+   * Only the entry form and the categories (redesign step 5, DECISIONS row 317): «التكاليف ← المصاريف العامة» lists the
+   * period's entries itself, each with where it counts, and adds a new one here. The old report keeps the whole ledger.
+   */
+  formOnly?: boolean;
 }) {
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [rows, setRows] = useState<ExpenseEntry[]>([]);
@@ -110,14 +116,14 @@ export default function ExpenseLedger({
     setError(null);
     Promise.all([
       fetchExpenseCategories({ signal: ac.signal }),
-      fetchExpenses({ from, to, include_voided: includeVoided, limit: 500 }, { signal: ac.signal }),
+      formOnly ? Promise.resolve(null) : fetchExpenses({ from, to, include_voided: includeVoided, limit: 500 }, { signal: ac.signal }),
     ])
       .then(([cats, page]) => {
         setCategories(cats.categories ?? []);
-        setRows(page.expenses ?? []);
-        setTotalIqd(page.total_iqd ?? 0);
-        setCount(page.count ?? (page.expenses ?? []).length);
-        setTruncated(!!page.truncated);
+        setRows(page?.expenses ?? []);
+        setTotalIqd(page?.total_iqd ?? 0);
+        setCount(page?.count ?? (page?.expenses ?? []).length);
+        setTruncated(!!page?.truncated);
         // The first active category is preselected so the commonest entry is
         // two fields, not three. An empty selection is still a refusal the
         // form explains rather than a silent default to whatever sorts first.
@@ -133,7 +139,7 @@ export default function ExpenseLedger({
         if (!ac.signal.aborted) setLoading(false);
       });
     return () => ac.abort();
-  }, [from, to, includeVoided, reloadKey, s.loadFailed]);
+  }, [from, to, includeVoided, reloadKey, s.loadFailed, formOnly]);
 
   const problem: ExpenseProblem = expenseProblem(draft, today);
   const problemText = (p: ExpenseProblem): string => {
@@ -268,10 +274,10 @@ export default function ExpenseLedger({
   return (
     <section data-finance-ledger dir={dir} className="min-w-0 space-y-4">
       {/* ---------------------------------------------------- 1. WHAT THIS IS */}
-      <header className="lv-surface p-3 sm:p-4">
+      {!formOnly && <header className="lv-surface p-3 sm:p-4">
         <h3 className="text-[15px] leading-[1.4] font-black text-text-primary">{s.ledgerTitle}</h3>
         <p className="mt-1 max-w-[70ch] text-[12px] leading-[1.8] text-text-muted">{s.ledgerIntro}</p>
-      </header>
+      </header>}
 
       {/* ------------------------------------------------- 2. THE ENTRY FORM */}
       <form
@@ -424,7 +430,7 @@ export default function ExpenseLedger({
       </div>
 
       {/* ----------------------------------------------------- 4. THE LEDGER */}
-      <div className="lv-surface p-3 sm:p-4">
+      {!formOnly && <div className="lv-surface p-3 sm:p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h4 className="text-[13px] leading-[1.5] font-black text-text-primary">
             {s.periodTotal}:{' '}
@@ -522,7 +528,7 @@ export default function ExpenseLedger({
         )}
 
         <p className="mt-3 max-w-[70ch] text-[11px] leading-[1.7] text-text-muted">{s.voidMeans}</p>
-      </div>
+      </div>}
     </section>
   );
 }
