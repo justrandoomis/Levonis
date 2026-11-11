@@ -19,7 +19,11 @@
  *   - `/api/products/<slug>/knowledge` for each slug, named here explicitly;
  *   - the catalogue tree (`purgeCatalogTreeCache`);
  *   - `/api/catalog/<section>` for each section the products sit in, and each
- *     ancestor of it (a middle section lists the product too);
+ *     ancestor of it (a middle section lists the product too), and beside it
+ *     `/api/catalog/<section>/counts` — the counts a listing page lays over its
+ *     rows (DECISIONS row 311), named as the storefront asks for them: by slug,
+ *     or by id for a slug too long to ask by (`listingCategoryKey`). Both are
+ *     `sectionCachePath`, the very path the routes key their copy under;
  *   - the public v1 keys of `/products/<slug>` and `/sections/<section>` (the
  *     same sections, ancestors included), built
  *     by `publicV1PurgeKeys` exactly as `serve` stores them.
@@ -34,7 +38,7 @@ import { edgeCache } from '../publicApi/cache';
 import { rootDomainFrom } from '../hosts';
 import { completenessInstalled } from '../listing';
 import { recomputeMany } from '../productCompleteness';
-import { purgeCatalogTreeCache } from '../../routes/catalog';
+import { listingCategoryKey, purgeCatalogTreeCache, sectionCachePath } from '../../routes/catalog';
 import { publicV1PurgeKeys } from '../../routes/publicApi';
 
 /** At most this many related products are recomputed and purged in one call (the invocation budget). */
@@ -83,20 +87,26 @@ export async function purgePlan(db: D1Database, productIds: readonly string[]): 
          SELECT id, 0 FROM seed
          UNION SELECT c.parent_id, up.depth + 1 FROM catalogs c JOIN up ON c.id = up.id WHERE c.parent_id IS NOT NULL AND up.depth < 12
        )
-       SELECT DISTINCT c.slug AS slug FROM up JOIN catalogs c ON c.id = up.id`
+       SELECT DISTINCT c.id AS id, c.slug AS slug FROM up JOIN catalogs c ON c.id = up.id`
     )
     .bind(ids)
-    .all<{ slug: string }>();
+    .all<{ id: string; slug: string }>();
   const slugs = [...new Set((products ?? []).map((p) => String(p.slug ?? '')).filter(Boolean))];
   const sections = [
     ...new Set(
       [...(products ?? []).flatMap((p) => [p.root, p.leaf]), ...(members ?? []).map((m) => m.slug)].map((s) => String(s ?? '')).filter(Boolean)
     ),
   ];
+  // Each section's page by its slug, as the storefront asks for it; its counts by its slug and, for a slug too
+  // long to ask by, by its id — the listing page asks them by `listingCategory`, which `listingCategoryKey` mirrors.
+  const countsAskedAs = (members ?? []).map((m) => listingCategoryKey({ id: String(m.id ?? ''), slug: String(m.slug ?? '') })).filter(Boolean);
   const paths = [
     ...cataloguePaths(slugs),
     ...slugs.map((s) => `/api/products/${s}/knowledge`),
-    ...sections.map((s) => `/api/catalog/${s}`),
+    ...new Set([
+      ...sections.flatMap((s) => [sectionCachePath(s, 'page'), sectionCachePath(s, 'counts')]),
+      ...countsAskedAs.map((k) => sectionCachePath(k, 'counts')),
+    ]),
   ];
   return { productIds: [...new Set(productIds)], slugs, sections, paths };
 }

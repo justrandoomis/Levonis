@@ -357,7 +357,7 @@ test('readback: a swatch of another product\'s value is a mismatch; an R2 that d
   assert.equal(foreign.ok, false);
 });
 
-test('purge: every ancestor section of a three-level placement is purged too (its page lists the product)', async () => {
+test('purge: every ancestor section of a three-level placement is purged too (its page lists the product, its counts count it)', async () => {
   const w = newWorld();
   const s = stage(w, 'refurbished-bambu-lab-h2d-3d-printer');
   await write(w, s);
@@ -373,6 +373,8 @@ test('purge: every ancestor section of a three-level placement is purged too (it
   for (const slug of chain) {
     assert.ok(plan.sections.includes(slug), `${slug} is purged`);
     assert.ok(plan.paths.includes(`/api/catalog/${slug}`));
+    // The counts a listing page asks (DECISIONS row 311): the import changes them as it changes the page.
+    assert.ok(plan.paths.includes(`/api/catalog/${slug}/counts`), `${slug}/counts is purged`);
   }
 });
 

@@ -10,6 +10,10 @@
  * first build of an isolate on. A listing page gets its rows' counts from `/:slug/counts`: the same numbers,
  * the same for every viewer and cached for all, never a per-viewer build of the whole section.
  *
+ * The second review's fixes: the one-row read that teaches the columns is never fatal (whole rows instead);
+ * the page and its counts are kept once per section, whatever spelling of its slug was asked; and the import's
+ * purge drops the counts with the page.
+ *
  * Run: node --import tsx --test tests/bigCategoryPage.test.ts
  */
 import { test } from 'node:test';
@@ -18,9 +22,12 @@ import type { DatabaseSync } from 'node:sqlite';
 import { asD1, freshDb, json, stubApp, type Mount } from './fixtures/app';
 import { wavesD1 } from './fixtures/wavesD1';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
-import { CATEGORY_PAGE_CAP, catalogRoutes } from '../worker/routes/catalog';
+import { CATEGORY_PAGE_CAP, LISTING_SLUG_MAX, catalogRoutes, sectionCachePath } from '../worker/routes/catalog';
 import { cardRowColumns, pricingCtxForUser, resolveProductCards } from '../worker/routes/products';
 import { listing } from '../worker/lib/listing';
+import { purgeImported, purgePlan } from '../worker/lib/catalogImport/purge';
+import { PURGE_MARKER_CACHE } from '../worker/lib/edgePolicy';
+import { withCacheEpoch } from '../worker/lib/publicApi/cache';
 import { nounKindFor, sectionStockLabel } from '../src/lib/catalog/copy';
 import type { CategoryPayload, SectionCountsPayload } from '../src/lib/catalog/types';
 
@@ -214,4 +221,201 @@ test('past CATEGORY_PAGE_CAP the page reads the first this-many and says so: its
   const c = (await json(await app.request('/api/catalog/makers-supply/counts'))) as SectionCountsPayload;
   assert.equal(c.truncated, true);
   for (const n of c.counts) assert.deepEqual(counts(n).slice(1), [null, null, null, null], n.id);
+});
+
+// ------------------------------------------------------------- the second review
+
+/** The one-row column read on `db` fails: its promise rejects (as a D1 error does), or `prepare` itself throws. */
+function failFirstRow(db: D1Database, how: 'reject' | 'throw'): void {
+  const prepare = db.prepare.bind(db);
+  (db as { prepare: (sql: string) => ReturnType<typeof prepare> }).prepare = (sql: string) => {
+    if (sql.trim() !== 'SELECT * FROM products LIMIT 1') return prepare(sql);
+    if (how === 'throw') throw new Error('D1_ERROR: simulated failure to prepare');
+    const fail = () => Promise.reject(new Error('D1_ERROR: simulated read failure'));
+    return { bind: () => ({ all: fail, first: fail, run: fail, raw: fail }), all: fail, first: fail, run: fail, raw: fail } as unknown as ReturnType<typeof prepare>;
+  };
+}
+
+test('the one-row read that teaches the columns is never fatal: without it the page and its counts read whole rows and answer the same', async () => {
+  const unhandled: unknown[] = [];
+  const note = (e: unknown) => unhandled.push(e);
+  process.on('unhandledRejection', note);
+  try {
+    for (const how of ['reject', 'throw'] as const) {
+      for (const path of ['/api/catalog/makers-supply', '/api/catalog/makers-supply/counts']) {
+        const { db, app } = world(30);
+        failFirstRow(db, how);
+        const seen = spy(db);
+        const first = await app.request(path);
+        assert.equal(first.status, 200, `${how} ${path}: ${await first.clone().text()}`);
+        const body = await json(first);
+        assert.deepEqual(counts(path.endsWith('/counts') ? body.counts[0] : body.node), [32, 2, 30, 0, 0], `${how} ${path}`);
+        if (!path.endsWith('/counts')) {
+          assert.deepEqual(
+            (body as CategoryPayload).shelves.filter((s) => s.kind === 'child').map((s) => [s.id, s.count]),
+            [['child:cat_makers_new', 1], ['child:cat_makers_kits', 30], ['child:cat_makers_tools', 1]],
+            `${how}: every child's shelf`
+          );
+        }
+        assert.match(seen.find(isRowRead) ?? '', /^\s*SELECT \*, /, `${how} ${path}: the columns unknown, the rows are read whole (as before row 311)`);
+        assert.ok(cardRowColumns(db), `${how} ${path}: and those rows taught the binding its columns`);
+        seen.length = 0;
+        const second = await app.request(path);
+        assert.equal(seen.filter((s) => s.trim() === 'SELECT * FROM products LIMIT 1').length, 0, `${how} ${path}: not asked again`);
+        assert.doesNotMatch(seen.find(isRowRead) ?? 'SELECT *', /SELECT \*/, `${how} ${path}: the next build leaves the long text out`);
+        assert.deepEqual(await json(second), body, `${how} ${path}: the same answer either way`);
+      }
+    }
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(unhandled, [], 'no rejection left unobserved');
+  } finally {
+    process.off('unhandledRejection', note);
+  }
+});
+
+/** A stand-in for one of the colo's caches (tests/edgeStaleWhileRevalidate.test.ts has one that also expires). */
+function memoryCache() {
+  const store = new Map<string, Response>();
+  return {
+    store,
+    async match(req: Request) {
+      return store.get(req.url)?.clone();
+    },
+    async put(req: Request, res: Response) {
+      store.set(req.url, new Response(await res.arrayBuffer(), res));
+    },
+    async delete(req: Request) {
+      return store.delete(req.url);
+    },
+  };
+}
+
+/** `caches.default` (the answers) and the purge markers' own cache, for the length of `run`. */
+async function withCaches(run: (answers: ReturnType<typeof memoryCache>) => Promise<void>): Promise<void> {
+  const scope = globalThis as { caches?: unknown };
+  const answers = memoryCache();
+  const markers = memoryCache();
+  scope.caches = {
+    default: answers,
+    async open(name: string) {
+      assert.equal(name, PURGE_MARKER_CACHE);
+      return markers;
+    },
+  };
+  try {
+    await run(answers);
+  } finally {
+    delete scope.caches;
+  }
+}
+
+const ORIGIN = 'https://levonis-iq.com';
+/** «makers-supply»'s two in-stock products (tests/fixtures/liveCatalog.ts): the Levo switch and key ring. */
+const LEVO = ['prd_0ce55586ba5e4751bc84', 'prd_94dedaeb082243efb43a'];
+const sellOutLevo = (raw: DatabaseSync) =>
+  raw.exec(
+    `UPDATE products SET stock = 0, stock_reserved = 0 WHERE id IN ('${LEVO.join("','")}');
+     UPDATE product_variants SET stock = 0 WHERE product_id IN ('${LEVO.join("','")}')`
+  );
+/** What the import's `/publish-finish` does after writing those two: the plan, then the purge on this origin. */
+async function importPurge(db: D1Database) {
+  const plan = await purgePlan(db, LEVO);
+  await purgeImported({ STORE_ROOT_DOMAIN: 'levonis-iq.com' }, `${ORIGIN}/api/admin/catalog-import/publish-finish`, plan);
+  // A copy read in the purge's own millisecond counts as read before it: step past it.
+  await new Promise((r) => setTimeout(r, 5));
+  return plan;
+}
+const availableIn = async (res: Response) => {
+  const b = await json(res);
+  return (b.node ?? b.counts[0]).available_count as number | null;
+};
+
+test('one copy per section, whatever spelling of its slug was asked — and the import’s purge drops the page and its counts', async () => {
+  await withCaches(async (answers) => {
+    const raw = seed(3);
+    const db = asD1(raw);
+    const app = stubApp(db, null, mount);
+    const ask = (p: string) => app.request(`${ORIGIN}${p}`);
+    const spellings = {
+      counts: ['/api/catalog/makers-supply/counts', '/api/catalog/%20makers-supply%20/counts', '/api/catalog/makers%2Dsupply/counts'],
+      page: ['/api/catalog/makers-supply', '/api/catalog/%20makers-supply', '/api/catalog/makers%2Dsupply'],
+    };
+    for (const [first, ...others] of [spellings.counts, spellings.page]) {
+      const built = await ask(first);
+      assert.equal(built.status, 200, first);
+      assert.equal(built.headers.get('age'), null, `${first}: built`);
+      assert.equal(await availableIn(built), 2, first);
+      for (const p of others) {
+        const hit = await ask(p);
+        assert.equal(hit.status, 200, p);
+        assert.notEqual(hit.headers.get('age'), null, `${p}: served from the one copy`);
+      }
+    }
+    assert.deepEqual(
+      [...answers.store.keys()].sort(),
+      [withCacheEpoch(`${ORIGIN}/api/catalog/makers-supply`), withCacheEpoch(`${ORIGIN}/api/catalog/makers-supply/counts`)].sort(),
+      'one copy per answer, not one per spelling'
+    );
+
+    sellOutLevo(raw);
+    assert.equal(await availableIn(await ask(spellings.counts[2])), 2, 'until the purge, the copy answers');
+    const plan = await importPurge(db);
+    for (const s of ['makers-supply', 'new-products', 'maker-tools']) {
+      assert.ok(plan.paths.includes(`/api/catalog/${s}`), s);
+      assert.ok(plan.paths.includes(`/api/catalog/${s}/counts`), `${s}: its counts beside its page`);
+    }
+    for (const p of [spellings.counts[1], spellings.page[2], spellings.counts[0], spellings.page[0]]) {
+      const after = await ask(p);
+      assert.equal(await availableIn(after), 0, `${p}: the import's stock`);
+    }
+    assert.equal(answers.store.size, 2, 'and still one copy each');
+  });
+});
+
+test('a section whose slug is too long to ask by: its counts are kept under its id, as the listing asks them, and the purge names that spelling', async () => {
+  await withCaches(async (answers) => {
+    const raw = seed(3);
+    const long = `makers-supply-${'a'.repeat(LISTING_SLUG_MAX)}`;
+    raw.exec(`UPDATE catalogs SET slug = '${long}' WHERE id = 'cat_makers'`);
+    const db = asD1(raw);
+    const app = stubApp(db, null, mount);
+    // src/lib/bootFetch.ts `listingCategory`: past LISTING_SLUG_MAX the storefront asks by id.
+    const path = '/api/catalog/cat_makers/counts';
+    const built = await app.request(`${ORIGIN}${path}`);
+    assert.equal(await availableIn(built), 2);
+    assert.ok(answers.store.has(withCacheEpoch(`${ORIGIN}${path}`)));
+
+    sellOutLevo(raw);
+    const plan = await importPurge(db);
+    assert.ok(plan.paths.includes(path), 'the spelling the storefront asks by');
+    assert.ok(plan.paths.includes(sectionCachePath(long, 'counts')) && plan.paths.includes(sectionCachePath(long, 'page')));
+    assert.ok(!plan.sections.includes('cat_makers'), 'an id is not a section slug (the public v1 keys stay by slug)');
+    const after = await app.request(`${ORIGIN}${path}`);
+    assert.equal(after.headers.get('age'), null, 'rebuilt');
+    assert.equal(await availableIn(after), 0);
+  });
+});
+
+test('a slug no section can be asked by is refused before the cache: the map’s own path, «.», «..» and nothing', async () => {
+  await withCaches(async (answers) => {
+    const guest = world(0).app;
+    assert.equal((await guest.request(`${ORIGIN}/api/catalog/tree`)).status, 200);
+    assert.equal(answers.store.size, 1, 'the map, kept');
+    const member = world(0, { member: true }).app;
+    for (const p of ['/api/catalog/%20tree', '/api/catalog/tree%20', '/api/catalog/%20.', '/api/catalog/%20..', '/api/catalog/%20', '/api/catalog/%20./counts', '/api/catalog/%20../counts', '/api/catalog/%20/counts']) {
+      for (const app of [guest, member]) {
+        const res = await app.request(`${ORIGIN}${p}`);
+        assert.equal(res.status, 404, `${p}: ${(await res.clone().text()).slice(0, 120)}`);
+        assert.equal((await json(res)).code, 'CATALOG_NOT_FOUND', p);
+      }
+    }
+    assert.equal(answers.store.size, 1, 'nothing kept for them, and the map never served as a section');
+
+    // A section slugged «tree» still has its counts at a path of its own (`/api/catalog/tree/counts`).
+    const raw = seed(0);
+    raw.exec(`UPDATE catalogs SET slug = 'tree' WHERE id = 'cat_makers_new'`);
+    const own = await stubApp(asD1(raw), null, mount).request(`${ORIGIN}/api/catalog/tree/counts`);
+    assert.equal(own.status, 200);
+    assert.equal(((await json(own)) as SectionCountsPayload).id, 'cat_makers_new');
+  });
 });

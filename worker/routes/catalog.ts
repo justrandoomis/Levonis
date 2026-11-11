@@ -10,6 +10,9 @@
  *                             product read, its brands and the sibling roots.
  *                             Cards are tier-priced, so only a signed-out
  *                             response is cached.
+ *   GET /api/catalog/:slug/counts
+ *                             the section's and its descendants' stock-state
+ *                             counts, no card: cached for everyone (row 311).
  *
  * ONE MEMBERSHIP RELATION, NO SECOND DEFINITION. Which products a section holds
  * comes from worker/lib/catalogMembership.ts (classification + placements, with
@@ -21,7 +24,7 @@
  * `json_each(?)` parameter; the membership CTE is three terms.
  */
 import { edgeCache, withCacheEpoch } from '../lib/publicApi/cache';
-import { edgeServe, purgeAnonymousCache, type EdgeLifetime } from '../lib/edgePolicy';
+import { canonicalKey, edgeServe, purgeAnonymousCache, type EdgeLifetime } from '../lib/edgePolicy';
 import { completenessAbsentLately, listing, optimisticSellableFlag, runListed } from '../lib/listing';
 import { membershipCte } from '../lib/catalogMembership';
 import { Hono, type Context } from 'hono';
@@ -359,6 +362,53 @@ const notFoundCategory = () =>
   new HttpError(404, 'هذه الفئة غير موجودة. / This category does not exist.', 'CATALOG_NOT_FOUND');
 
 /**
+ * WHERE A SECTION'S ANSWERS ARE KEPT (review of DECISIONS row 311). Both routes read their slug decoded and
+ * trimmed, so `/api/catalog/pla`, `/api/catalog/%20pla` and `/api/catalog/p%6Ca` give one answer; keyed by the
+ * raw path they were three copies, anyone could mint more, and a purge, which names one spelling, dropped one
+ * of them. The key is now the slug as the route reads it, written back the one way the storefront asks for it
+ * (`encodeURIComponent`, src/lib/catalog/data.ts). The import's purge (worker/lib/catalogImport/purge.ts)
+ * names this same path, so the two cannot drift, and it is a URL that gives the same answer, which is what the
+ * edge's background refresh replays.
+ */
+export function sectionCachePath(slug: string, part: 'page' | 'counts'): string {
+  const path = `/api/catalog/${encodeURIComponent(slug)}`;
+  return part === 'counts' ? `${path}/counts` : path;
+}
+
+/**
+ * The `:slug` of a section route, read as both routes always read it (decoded, trimmed) — and refused, for
+ * every viewer, when no section can be asked by it because its path would not be the section's own: nothing
+ * (spaces only), «.» and «..» (a URL resolves those away; padded with spaces they still reach the route) and,
+ * for the page, «tree» (`/api/catalog/tree` is the map: the page would read the map's cached answer and
+ * could write over it). Of these only «tree» can be an admin's slug (letters, digits and hyphens), and such a
+ * section's page was never reachable by it: the map answers that URL. Its id still asks for it.
+ */
+function sectionSlug(c: Context<AppContext>, part: 'page' | 'counts'): string {
+  const slug = str(c.req.param('slug'), 'slug', { max: 80 });
+  if (slug === '' || slug === '.' || slug === '..' || (part === 'page' && slug === 'tree')) throw notFoundCategory();
+  return slug;
+}
+
+/** The colo cache key of a section's page or counts: `sectionCachePath` on this host, exactly as a purge names it. */
+function sectionCacheKey(c: Context<AppContext>, slug: string, part: 'page' | 'counts'): Request {
+  return canonicalKey(new URL(sectionCachePath(slug, part), c.req.url).toString(), [], c.req.header('Host'));
+}
+
+/**
+ * One whole `products` row, to learn the columns from (`learnProductColumns`), or null. NEVER FATAL (review of
+ * row 311): it runs in every first build of an isolate, beside the reads the page needs, only to spare the row
+ * read the long text. When it fails, the page reads its rows whole and learns from them, as before row 311.
+ */
+async function firstProductRow(db: D1Database): Promise<Record<string, unknown> | null> {
+  try {
+    const { results } = await db.prepare('SELECT * FROM products LIMIT 1').all<Record<string, unknown>>();
+    return results?.[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * ONE SECTION, READ — what the page (`/:slug`, at the viewer's prices) and its counts (`/:slug/counts`, at
  * the guest's) both stand on: the section (by slug, id or a slug the admin renamed away from), the membership
  * map, and EVERY visible product of its subtree up to CATEGORY_PAGE_CAP, with their cards and the counts
@@ -372,16 +422,11 @@ async function readSection(db: D1Database, slug: string, ctxFor: () => Promise<P
   // THE COLUMNS, KNOWN BEFORE THE ROW READ. Until a binding has read one whole row it cannot leave the long
   // text out, and the first build of an isolate would read every row of the section whole — up to a thousand
   // descriptions (review of row 311: 7 MB instead of 3 for the 589 maintenance parts). One row, read in the
-  // wave that runs anyway, teaches it.
+  // wave that runs anyway, teaches it — and when that read fails, the row read below is `*` and teaches it.
   const [records, memberships, firstRow] = await Promise.all([
     loadCatalogRecords(db),
     loadMemberships(db),
-    cardRowColumns(db)
-      ? Promise.resolve(null)
-      : db
-          .prepare('SELECT * FROM products LIMIT 1')
-          .all<Record<string, unknown>>()
-          .then((r) => r.results?.[0] ?? null),
+    cardRowColumns(db) ? Promise.resolve(null) : firstProductRow(db),
   ]);
   if (firstRow) learnProductColumns(db, firstRow);
   const idx = indexCatalogs(records);
@@ -448,11 +493,11 @@ function countsOf(n: CatalogTreeNode): SectionCounts {
  * viewer was waiting for, to read eight numbers. The counts read the cards' stock and sale types, never a
  * price, so they are built at the GUEST's prices, as the map is, and cached for everyone: the section and each
  * of its visible descendants, exact up to CATEGORY_PAGE_CAP and null past it. No shelf, no brand, no card.
+ * One copy per section (`sectionCachePath`), which the import's purge drops with the page.
  */
 catalogRoutes.get('/:slug/counts', (c) => {
-  const slug = str(c.req.param('slug'), 'slug', { max: 80 });
-  const u = new URL(c.req.url);
-  return cached(c, new Request(withCacheEpoch(`${u.origin}${u.pathname}`), { method: 'GET' }), COUNTS_CACHE, PAGE_LIFETIME, async () => {
+  const slug = sectionSlug(c, 'counts');
+  return cached(c, sectionCacheKey(c, slug, 'counts'), COUNTS_CACHE, PAGE_LIFETIME, async () => {
     const s = await readSection(c.env.DB, slug, () => pricingCtxForUser(c.env.DB, null));
     const node = treeNode(s.record, s.idx, s.counts, !s.truncated);
     node.children = visibleChildren(s.record, s.idx, s.counts, !s.truncated);
@@ -468,7 +513,7 @@ catalogRoutes.get('/:slug/counts', (c) => {
 });
 
 catalogRoutes.get('/:slug', async (c) => {
-  const slug = str(c.req.param('slug'), 'slug', { max: 80 });
+  const slug = sectionSlug(c, 'page');
   const user = c.get('user');
   const build = async (): Promise<Response> => {
     const { idx, record, moved, byProduct, rows, cards, truncated, counts } = await readSection(c.env.DB, slug, () => pricingCtx(c));
@@ -545,10 +590,10 @@ catalogRoutes.get('/:slug', async (c) => {
     res.headers.set('Cache-Control', 'private, no-store');
     return res;
   }
-  // The key is the PATH alone: a query string changes nothing here, so letting
-  // it into the key would only let anyone mint unbounded cache entries.
-  const u = new URL(c.req.url);
+  // The key is the SECTION alone (`sectionCachePath`): a query string or another
+  // spelling of the slug changes nothing here, so letting either into the key would
+  // only let anyone mint unbounded cache entries that a purge does not reach.
   // Tier-priced: a guest's copy says `Vary: Cookie`, so a browser cannot keep
   // showing it to the same person once they sign in (the listing's rule, P2 review).
-  return cached(c, new Request(withCacheEpoch(`${u.origin}${u.pathname}`), { method: 'GET' }), PAGE_CACHE_SIGNED_OUT, PAGE_LIFETIME, build, true);
+  return cached(c, sectionCacheKey(c, slug, 'page'), PAGE_CACHE_SIGNED_OUT, PAGE_LIFETIME, build, true);
 });
