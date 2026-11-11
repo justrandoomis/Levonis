@@ -14,22 +14,29 @@
  * the page and its counts are kept once per section, whatever spelling of its slug was asked; and the import's
  * purge drops the counts with the page.
  *
+ * The third review's coverage: the counts reach every visible descendant at any depth and nothing hidden, held
+ * or inactive; a member's tier read rides in the first wave and the counts read none; a failed read keeps
+ * nothing; an Arabic slug keeps one copy and is purged; and the page and its counts answer on a database the
+ * deploy runs ahead of.
+ *
  * Run: node --import tsx --test tests/bigCategoryPage.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { asD1, freshDb, json, stubApp, type Mount } from './fixtures/app';
+import { asD1, dbThrough, freshDb, hasColumn, json, stubApp, type Mount } from './fixtures/app';
 import { wavesD1 } from './fixtures/wavesD1';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
+import { DEEP, seedDeepSections } from './fixtures/deepSections';
 import { CATEGORY_PAGE_CAP, LISTING_SLUG_MAX, catalogRoutes, sectionCachePath } from '../worker/routes/catalog';
 import { cardRowColumns, pricingCtxForUser, resolveProductCards } from '../worker/routes/products';
+import { slugify } from '../worker/routes/adminTaxonomy';
 import { listing } from '../worker/lib/listing';
 import { purgeImported, purgePlan } from '../worker/lib/catalogImport/purge';
 import { PURGE_MARKER_CACHE } from '../worker/lib/edgePolicy';
 import { withCacheEpoch } from '../worker/lib/publicApi/cache';
 import { nounKindFor, sectionStockLabel } from '../src/lib/catalog/copy';
-import type { CategoryPayload, SectionCountsPayload } from '../src/lib/catalog/types';
+import type { CatalogTreeNode, CategoryPayload, SectionCountsPayload } from '../src/lib/catalog/types';
 
 const BAMBU = 'brd_1c0917856cc94e2bbd31';
 const mount: Mount = (a) => a.route('/api/catalog', catalogRoutes);
@@ -38,10 +45,9 @@ const MEMBER = { id: 'u1', role: 'customer' as const, email: 'u@x.co' };
 /**
  * «makers-supply» with `kits` priced model kits that sell direct and on pre-order, none in stock, AHEAD of its
  * two in-stock Levo products in the shop's order — so past 200 kits the old page never read the Levo products
- * of «new-products» and «maker-tools».
+ * of «new-products» and «maker-tools». On `raw`, an older database (`dbThrough`), when one is given.
  */
-function seed(kits: number): DatabaseSync {
-  const raw = freshDb();
+function seed(kits: number, raw: DatabaseSync = freshDb()): DatabaseSync {
   seedLiveCatalog(raw);
   raw.exec(`UPDATE products SET display_order = 5000 WHERE category_id = 'cat_makers'`);
   raw.exec(`INSERT INTO users (id,name,email,password_hash,role) VALUES ('${MEMBER.id}','U','${MEMBER.email}','h','customer')`);
@@ -184,6 +190,40 @@ test('the counts: the section and every visible descendant, the page’s own num
   assert.equal((await json(missing)).code, 'CATALOG_NOT_FOUND');
 });
 
+/**
+ * AT ANY DEPTH (the third review). A listing page remembers every node of its section's counts, and opening a
+ * section from there asks nothing again only if its own rows came with them — so the counts walk the whole
+ * subtree the page draws, not its first level (tests/categoryListingStock.test.ts proves the page's side).
+ */
+test('the counts reach every visible descendant at any depth — a grandchild, a leaf lifted from under an inactive section — and nothing hidden, held or inactive', async () => {
+  const raw = freshDb();
+  seedLiveCatalog(raw);
+  seedDeepSections(raw);
+  const app = stubApp(asD1(raw), null, mount);
+  const c = (await json(await app.request('/api/catalog/makers-supply/counts'))) as SectionCountsPayload;
+  const p = (await json(await app.request('/api/catalog/makers-supply'))) as CategoryPayload;
+  const flat = (n: CatalogTreeNode): CatalogTreeNode[] => [n, ...n.children.flatMap(flat)];
+  const nodes = flat(p.node);
+  assert.deepEqual(
+    c.counts.map((x) => x.id),
+    nodes.map((n) => n.id),
+    'every node of the page, at every depth, in its order'
+  );
+  assert.deepEqual(nodes.map((n) => n.id), ['cat_makers', 'cat_makers_new', 'cat_makers_tools', DEEP.hand, DEEP.saws, DEEP.leaf]);
+  for (const n of nodes) assert.deepEqual(counts(c.counts.find((x) => x.id === n.id)!), counts(n), n.slug);
+  assert.ok(!c.counts.some((x) => x.id === DEEP.mid), 'an inactive section is never a node: its leaf is lifted');
+  const by = new Map(c.counts.map((x) => [x.id, x]));
+  assert.deepEqual(counts(by.get(DEEP.saws)!), [1, 1, 0, 0, 0], 'the draft, the hidden and the held product are not counted');
+  assert.deepEqual(counts(by.get(DEEP.leaf)!), [1, 0, 1, 0, 0], 'under the inactive section: one pre-order');
+  assert.deepEqual(counts(by.get('cat_makers')!), [4, 3, 1, 0, 0]);
+  // A descendant's own counts are these very numbers: what a listing page remembers for it is what it would ask.
+  const tools = (await json(await app.request('/api/catalog/maker-tools/counts'))) as SectionCountsPayload;
+  assert.deepEqual(
+    tools.counts,
+    c.counts.filter((x) => ['cat_makers_tools', DEEP.hand, DEEP.saws].includes(x.id))
+  );
+});
+
 test('the page and its counts send the same statements at 32 products and at 602, in a bounded number of waves', async () => {
   const measure = async (kits: number, path: string) => {
     const { waves, db } = wavesD1(seed(kits), 0);
@@ -203,6 +243,31 @@ test('the page and its counts send the same statements at 32 products and at 602
     assert.equal(big.executions, small.executions, `${path}: ${small.executions} statements at 32 products, ${big.executions} at 602\n${big.sqls.join('\n')}`);
     assert.ok(big.waves <= ceiling, `${path}: ${big.waves} waves > ${ceiling}\n${big.sqls.join('\n')}`);
   }
+});
+
+/**
+ * A MEMBER'S PAGE WAITS FOR NO TIER (the third review). The shared pricing inputs are kept in memory, so only a
+ * signed-in viewer's own tier read — never memoised — shows where the pricing inputs are asked for: beside the
+ * catalogs, in the first wave, not after the row read. The counts are built at the guest's prices: no tier.
+ */
+test('a member’s page asks its tier in the first wave — no wave more than a guest’s — and a member’s counts read no tier at all', async () => {
+  const measure = async (member: boolean, path: string) => {
+    const { waves, db } = wavesD1(seed(30), 0);
+    const app = stubApp(db, member ? MEMBER : null, mount, { publishV2: false });
+    assert.equal((await app.request(path)).status, 200, path); // warm: the columns known, the shared inputs in memory
+    waves.reset();
+    assert.equal((await app.request(path)).status, 200, path);
+    return { ...waves.counts };
+  };
+  const tierReads = (sqls: string[]) => sqls.filter((s) => s.includes('FROM memberships WHERE user_id')).length;
+  const guest = await measure(false, '/api/catalog/makers-supply');
+  const member = await measure(true, '/api/catalog/makers-supply');
+  assert.equal(tierReads(guest.sqls), 0);
+  assert.equal(tierReads(member.sqls), 1, 'the member’s tier is read');
+  assert.equal(member.waves, guest.waves, `a member: ${member.waves} waves, a guest: ${guest.waves}\n${member.sqls.join('\n')}`);
+  const memberCounts = await measure(true, '/api/catalog/makers-supply/counts');
+  assert.equal(tierReads(memberCounts.sqls), 0, 'the counts never read the viewer’s tier');
+  assert.deepEqual(memberCounts.sqls, (await measure(false, '/api/catalog/makers-supply/counts')).sqls, 'the very statements a guest’s counts send');
 });
 
 test('past CATEGORY_PAGE_CAP the page reads the first this-many and says so: its stock counts are unknown, never estimated', async () => {
@@ -418,4 +483,136 @@ test('a slug no section can be asked by is refused before the cache: the map’s
     assert.equal(own.status, 200);
     assert.equal(((await json(own)) as SectionCountsPayload).id, 'cat_makers_new');
   });
+});
+
+// -------------------------------------------------------------- the third review
+
+/** Every statement on `db` that `match` names fails — its promise rejects, as a D1 error does — until `heal()`. */
+function failWhere(db: D1Database, match: (sql: string) => boolean): () => void {
+  let broken = true;
+  const prepare = db.prepare.bind(db);
+  (db as { prepare: (sql: string) => ReturnType<typeof prepare> }).prepare = (sql: string) => {
+    if (!broken || !match(sql)) return prepare(sql);
+    const fail = () => Promise.reject(new Error('D1_ERROR: simulated read failure'));
+    return { bind: () => ({ all: fail, first: fail, run: fail, raw: fail }), all: fail, first: fail, run: fail, raw: fail } as unknown as ReturnType<typeof prepare>;
+  };
+  return () => {
+    broken = false;
+  };
+}
+
+test('a failed read keeps nothing: the counts and the page answer 500, no copy is stored, no rejection is left unobserved, and the next ask builds them whole', async () => {
+  const unhandled: unknown[] = [];
+  const note = (e: unknown) => unhandled.push(e);
+  process.on('unhandledRejection', note);
+  try {
+    await withCaches(async (answers) => {
+      const reads: Array<[string, (sql: string) => boolean]> = [
+        ['the sections', (s) => s.trim() === 'SELECT * FROM catalogs'],
+        ['the memberships', (s) => s.includes('membership(product_id, catalog_id) AS')],
+        ['the rows', isRowRead],
+      ];
+      for (const [what, match] of reads) {
+        for (const path of ['/api/catalog/makers-supply/counts', '/api/catalog/makers-supply']) {
+          answers.store.clear();
+          const db = asD1(seed(3));
+          const heal = failWhere(db, match);
+          const app = stubApp(db, null, mount);
+          const failed = await app.request(`${ORIGIN}${path}`);
+          assert.equal(failed.status, 500, `${what}, ${path}`);
+          assert.equal(answers.store.size, 0, `${what}, ${path}: nothing kept`);
+          heal();
+          const next = await app.request(`${ORIGIN}${path}`);
+          assert.equal(next.status, 200, `${what}, ${path}: the next ask builds it`);
+          assert.equal(next.headers.get('age'), null, `${what}, ${path}: built, not a kept failure`);
+          assert.equal(await availableIn(next), 2);
+          assert.equal(answers.store.size, 1, `${what}, ${path}: and keeps it`);
+        }
+      }
+      // A member's tier read fails: their page, which prices with it, is a 500; a section that is not there is
+      // still a 404 (it never waits for the tier); the counts never read it.
+      const db = asD1(seed(3));
+      failWhere(db, (s) => s.replace(/\s+/g, ' ').includes('FROM memberships WHERE user_id'));
+      const member = stubApp(db, MEMBER, mount);
+      assert.equal((await member.request(`${ORIGIN}/api/catalog/makers-supply`)).status, 500);
+      assert.equal((await member.request(`${ORIGIN}/api/catalog/no-such-section`)).status, 404);
+      assert.equal((await member.request(`${ORIGIN}/api/catalog/makers-supply/counts`)).status, 200);
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.deepEqual(unhandled, [], 'no rejection left unobserved');
+  } finally {
+    process.off('unhandledRejection', note);
+  }
+});
+
+test('an Arabic slug: one copy of its page and of its counts however its letters were escaped, and the import’s purge reaches both', async () => {
+  await withCaches(async (answers) => {
+    const raw = seed(3);
+    const arabic = slugify('مستلزمات الصناع', 'x');
+    assert.equal(arabic, 'مستلزمات-الصناع');
+    raw.exec(`UPDATE catalogs SET slug = '${arabic}' WHERE id = 'cat_makers'`);
+    const db = asD1(raw);
+    const app = stubApp(db, null, mount);
+    const ask = (p: string) => app.request(`${ORIGIN}${p}`);
+    // As the storefront asks (src/lib/catalog/data.ts: upper-case escapes), in lower case, and padded.
+    const asked = encodeURIComponent(arabic);
+    const spellings = {
+      counts: [`/api/catalog/${asked}/counts`, `/api/catalog/${asked.toLowerCase()}/counts`, `/api/catalog/%20${asked}/counts`],
+      page: [`/api/catalog/${asked}`, `/api/catalog/${asked.toLowerCase()}`, `/api/catalog/${asked}%20`],
+    };
+    for (const [first, ...others] of [spellings.counts, spellings.page]) {
+      const built = await ask(first);
+      assert.equal(built.status, 200, first);
+      assert.equal(built.headers.get('age'), null, `${first}: built`);
+      assert.equal(await availableIn(built), 2, first);
+      for (const p of others) {
+        const hit = await ask(p);
+        assert.equal(hit.status, 200, p);
+        assert.notEqual(hit.headers.get('age'), null, `${p}: served from the one copy`);
+      }
+    }
+    assert.deepEqual(
+      [...answers.store.keys()].sort(),
+      [withCacheEpoch(`${ORIGIN}/api/catalog/${asked}`), withCacheEpoch(`${ORIGIN}/api/catalog/${asked}/counts`)].sort(),
+      'one copy per answer, under the spelling the storefront asks'
+    );
+
+    sellOutLevo(raw);
+    const plan = await importPurge(db);
+    assert.ok(plan.sections.includes(arabic));
+    assert.ok(plan.paths.includes(`/api/catalog/${asked}`) && plan.paths.includes(`/api/catalog/${asked}/counts`), plan.paths.join('\n'));
+    for (const p of [spellings.counts[1], spellings.page[2], spellings.counts[0], spellings.page[0]]) {
+      assert.equal(await availableIn(await ask(p)), 0, `${p}: the import's stock`);
+    }
+    assert.equal(answers.store.size, 2, 'and still one copy each');
+  });
+});
+
+/**
+ * THE DEPLOY RUNS AHEAD (CLAUDE.md, «a migration and the code that needs it»): the columns the narrowed row read
+ * names are LEARNED from the binding's own table, so a database without the newest `products` column
+ * (0218's `price_estimate`), without V2 pricing (0189: nothing sellable, fail closed) or without the picture
+ * sets and the catalogue hold (0149, 0184) still answers — the same numbers on the page and in its counts.
+ */
+test('on a database the deploy runs ahead of, the page and its counts answer: the narrowed read names only the columns there are', async () => {
+  for (const through of ['0217', '0188', '0148']) {
+    const raw = seed(30, dbThrough(through));
+    assert.equal(hasColumn(raw, 'products', 'price_estimate'), false, `${through}: really behind`);
+    const db = asD1(raw);
+    const seen = spy(db);
+    const app = stubApp(db, null, mount);
+    const firstPage = await app.request('/api/catalog/makers-supply');
+    assert.equal(firstPage.status, 200, `${through}: ${await firstPage.clone().text()}`);
+    const p = (await json(firstPage)) as CategoryPayload;
+    const c = (await json(await app.request('/api/catalog/makers-supply/counts'))) as SectionCountsPayload;
+    assert.equal(c.success, true, through);
+    const by = new Map(c.counts.map((x) => [x.id, x]));
+    for (const n of [p.node, ...p.children]) assert.deepEqual(counts(by.get(n.id)!), counts(n), `${through}: ${n.slug}`);
+    seen.length = 0;
+    const again = await app.request('/api/catalog/makers-supply');
+    const narrowed = seen.find(isRowRead) ?? '';
+    assert.doesNotMatch(narrowed, /SELECT \*/, `${through}: the columns were learned`);
+    assert.ok(!narrowed.includes('price_estimate'), `${through}: never a column the table lacks`);
+    assert.deepEqual(await json(again), p, `${through}: the same answer from the narrowed read`);
+  }
 });

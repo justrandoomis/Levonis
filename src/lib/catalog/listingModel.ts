@@ -647,6 +647,14 @@ export function listingTarget(
 }
 
 /**
+ * The one section a listing page draws its sub-section rows and asks its counts for: the target's node — or
+ * nothing on a root's «all», the whole department, whether the map named the root or the category route did.
+ */
+export function listingSection(target: ListingTarget | null): CatalogTreeNode | null {
+  return target && !target.wholeRoot ? target.node : null;
+}
+
+/**
  * An old `/products?category=<id or slug>` link → the canonical category URL,
  * keeping every other query parameter. Null when the server resolved no
  * catalog (a legacy free-text token keeps listing as it always did).

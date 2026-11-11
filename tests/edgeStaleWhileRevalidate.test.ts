@@ -16,6 +16,8 @@
  *   - past `s-maxage + stale-while-revalidate` it is a miss, built inline;
  *   - a route that declares no stale window (the catalogue tree) is never
  *     served past its s-maxage;
+ *   - a section's page and counts refresh under their one key: the replay asks
+ *     the section's own path, whatever spelling of its slug was read;
  *   - a purge retires the parameterised copies of a path in its colo (a listing
  *     that before lived on 120 s even where the admin wrote);
  *   - a refresh answered 404 drops the copy; refreshes are one per key;
@@ -265,6 +267,37 @@ test('a route that declares no stale window — the catalogue tree, a category p
     advance(61);
     const again = await get(w.guest, '/api/catalog/printers');
     assert.equal(again.headers.get('Age'), null, 'a category page past 60 s is a build, as before');
+  });
+});
+
+/**
+ * ONE KEY PER SECTION, REPLAYED AS SUCH (DECISIONS row 311; the third review). A section's page and counts are
+ * kept under the slug as the route reads it (worker/routes/catalog.ts `sectionCachePath`), so a read through
+ * any spelling refreshes that one copy, and the replay asks the section's own path — a URL that gives the same
+ * answer — never the spelling the visitor happened to type.
+ */
+test('a section’s page and counts refresh under their one key: the replay asks the section’s own path, whatever spelling was read', async () => {
+  await withCaches(async ({ answers }) => {
+    const w = world();
+    for (const [first, other, own] of [
+      ['/api/catalog/%20makers-supply/counts', '/api/catalog/makers%2Dsupply/counts', '/api/catalog/makers-supply/counts'],
+      ['/api/catalog/makers-supply%20', '/api/catalog/%20makers%2Dsupply', '/api/catalog/makers-supply'],
+    ]) {
+      w.refreshes.length = 0;
+      const built = await get(w.guest, first);
+      assert.equal(built.status, 200, `${first}: ${await built.clone().text()}`);
+      assert.equal(built.headers.get('Age'), null, `${first}: built`);
+      await settle();
+      advance(31);
+      const late = await get(w.guest, other);
+      assert.equal(late.headers.get('Age'), '31', `${other}: the one copy, past half its life`);
+      await settle();
+      assert.deepEqual(w.refreshes, [own], 'refreshed behind the answer, by the section’s own path');
+      const fresh = await get(w.guest, first);
+      assert.equal(fresh.headers.get('Age'), '0', `${first}: the refreshed copy, under the same key`);
+    }
+    const kept = [...answers.store.keys()].filter((k) => k.includes('/api/catalog/')).map((k) => new URL(k).pathname).sort();
+    assert.deepEqual(kept, ['/api/catalog/makers-supply', '/api/catalog/makers-supply/counts'], 'one copy each, never one per spelling');
   });
 });
 

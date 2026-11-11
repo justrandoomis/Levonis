@@ -8,14 +8,14 @@ import ListingView, { type ListingScope } from '../components/listing/ListingVie
 import PageTopBar from '../components/catalog/PageTopBar';
 import CategoryRowBanners from '../components/catalog/CategoryRowBanners';
 import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
-import { cachedTree, loadCategory, loadSectionCounts, loadTree } from '../lib/catalog/data';
-import { listingTarget, resolveListingRoute } from '../lib/catalog/listingModel';
+import { cachedTree, loadCategory, loadTree } from '../lib/catalog/data';
+import { listingSection, listingTarget, resolveListingRoute } from '../lib/catalog/listingModel';
 import { listingFirstPagePath, parseListing } from '../lib/catalog/listingQuery';
 import { listingCategory, listsBySlug, primeGet } from '../lib/bootFetch';
 import { nodeDescription, nodeName } from '../lib/catalog/categoryPageModel';
 import { nounKindFor, type SectionStock } from '../lib/catalog/copy';
 import { bannerRows } from '../lib/catalog/explorerModel';
-import { CATEGORY_PAGE_CAP, listingStockWord, rememberSectionStock, rememberedSectionStock, withStock } from '../lib/catalog/sectionStock';
+import { asksSectionStock, followSectionStock, listingStockWord, withStock } from '../lib/catalog/sectionStock';
 import { sectionTypeOf } from '../lib/catalog/listingModel';
 import type { CatalogTreeNode, CatalogTreeResponse } from '../lib/catalog/types';
 
@@ -76,42 +76,23 @@ export default function CategoryListing() {
   useEffect(load, [load]);
 
   const route = tree ? resolveListingRoute(tree.roots, categorySlug, subCategorySlug) : null;
-  const shown = route ? (route.all ? null : route.node) : fallback && fallback !== 'missing' && !fallback.root ? fallback.node : null;
+  // From the map, or from the category route for a section the map leaves out (an inactive root's «all» too).
+  const target = listingTarget(route, fallback);
+  // One section: its rows and its word. Never a root's «all», the whole department, whoever named it.
+  const shown = listingSection(target);
 
   // THE SECTION'S STOCK, EXACT (owner, 2026-11-11; DECISIONS rows 309 and 311). The map stops counting stock
   // past its cap (worker/routes/catalog.ts TREE_AVAILABILITY_CAP; the live shop is past it), so its rows would
   // say nothing; the section's counts (`/api/catalog/:slug/counts`) count every product of its subtree from
   // the cards' own states, up to CATEGORY_PAGE_CAP — one small answer, the same for every viewer and cached
-  // for all, not a build of the whole page. Asked only when the map did not count and the section is small
-  // enough to be exact; a decoration, so a failure simply leaves the line without it.
-  const stockSlug =
-    shown && (typeof shown.available_count !== 'number' || shown.preorder_count === undefined) && shown.product_count <= CATEGORY_PAGE_CAP
-      ? shown.slug
-      : null;
-  const [stock, setStock] = useState<{ slug: string; counts: Map<string, SectionStock> } | null>(null);
+  // for all, not a build of the whole page. Asked silently, only when the map did not count and the section is
+  // small enough to be exact, and remembered a minute with every descendant (src/lib/catalog/sectionStock.ts
+  // `asksSectionStock`, `followSectionStock`); a decoration, so a failure simply leaves the line without it.
+  const stockSlug = asksSectionStock(shown) ? shown.slug : null;
+  const [stock, setStock] = useState<{ slug: string; counts: ReadonlyMap<string, SectionStock> } | null>(null);
   useEffect(() => {
     if (!stockSlug || !shown) return;
-    const ids = [shown.id, ...(shown.children ?? []).map((c) => c.id)];
-    const known = rememberedSectionStock(ids);
-    if (known) {
-      setStock({ slug: stockSlug, counts: known });
-      return;
-    }
-    let alive = true;
-    // Silent, by id when the slug is too long to ask by: the page is already drawn, this only adds a word.
-    // Every visible descendant comes with it, so opening a child from here asks nothing again for a minute.
-    loadSectionCounts(listingCategory(shown))
-      .then((p) => {
-        rememberSectionStock(p.counts);
-        if (!alive) return;
-        const counts = new Map<string, SectionStock>();
-        for (const n of p.counts) counts.set(n.id, n);
-        setStock({ slug: stockSlug, counts });
-      })
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
+    return followSectionStock(shown, (counts) => setStock({ slug: stockSlug, counts }));
   }, [stockSlug, shown]);
   const rows = useBannerPhotos(
     useMemo(() => {
@@ -156,8 +137,6 @@ export default function CategoryListing() {
   }
   if (!tree || (!route && fallback === null)) return <ListingSkeleton />;
 
-  // From the map, or from the category route for a section the map leaves out (an inactive root's «all» too).
-  const target = listingTarget(route, fallback);
   if (!target) {
     return (
       <Shell title={loc('الفئة', 'Category')}>
