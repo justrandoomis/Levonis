@@ -1,40 +1,74 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ArrowDownToLine, ArrowUpLeft, BookOpen, CalendarDays, CheckCircle2, ChevronLeft, CircleDollarSign, Layers3, LayoutGrid, Megaphone, Package, RefreshCw, Search, ShieldCheck, Users, Wallet } from 'lucide-react';
+import { ArrowDownToLine, CalendarDays, CheckCircle2, ChevronLeft, Layers3, Package, RefreshCw, Search } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
-import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
+import { FreshOnReturnHold, useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { useLanguage } from '../../LanguageContext';
-import { Button, Empty, Loading, Row, Sheet, Status, Surface, formatMoney } from './ui';
+import { Button, Empty, Loading, Row, Sheet, Status, Surface } from './ui';
 import { currentMonth, financeDay, financePreset, financeRangeFromSearch, validFinanceRange, statusName, WORKSPACE_API, type DisplayUsdOrders, type FinanceOrder, type FinanceProduct, type FinanceSection, type FinanceSummary, type UsdOrderCents } from './types';
 import OrderProfitSheet, { type OrderFocus } from './OrderProfitSheet';
 import MonthlyCosts from './MonthlyCosts';
 import './finance-workspace.css';
 import { orderFinancePresentation } from './orderFinancePresentation';
-import { averageOrder, overviewNet } from './overviewFigures';
 import ReportDeductions from './ReportDeductions';
-import { CurrencyToggle, DisplayCurrencyContext, DisplayMoney, UsdBasisNote, centsAt, usdText, useDisplayCurrency, type DisplayCurrency } from './displayCurrency';
+import { CurrencyToggle, DisplayCurrencyContext, DisplayMoney, UsdBasisNote, centsAt, useDisplayCurrency, type DisplayCurrency } from './displayCurrency';
 import VariantImg from '../ui/VariantImg';
+import Overview from './Overview';
+import { compareRange, defaultCompare, type CompareMode } from './compare';
+import { fw, rangeText, type FwKey } from './overviewStrings';
+import ExpenseLedger from '../adminFinance/ExpenseLedger';
+import { financeStrings } from '../adminFinance/strings';
+import { isLatin } from '../adminFinance/format';
 
 const PeoplePanel = lazy(() => import('../financePeople/PeoplePanel'));
 const InvestorPanel = lazy(() => import('../financePeople/InvestorPanel'));
 const WithdrawalPanel = lazy(() => import('../financePeople/WithdrawalPanel'));
 const FinanceOperationsPanel = lazy(() => import('../adminOperations/FinanceOperationsPanel'));
-const ParticipantCharts = lazy(() => import('./ParticipantCharts'));
-const OverviewCharts = lazy(() => import('./OverviewCharts'));
 const MissingCostsSheet = lazy(() => import('./MissingCostsSheet'));
+
+/**
+ * «المال والأرباح» — THE FRAME (redesign step 2, owner 2026-11-11; DECISIONS row 315).
+ *
+ * Five sections instead of eight tabs, each page one of them: نظرة عامة; التقارير (orders,
+ * products); التكاليف (missing costs, the month's promotion, general expenses — rent and the
+ * like were hidden in a collapsed box); الأشخاص والدفعات (staff, investors, withdrawals —
+ * their screens unchanged); المحاسبة. One compact bar for all of them: the period (a preset,
+ * or two dates for a custom range), what the overview compares it with, the display currency
+ * and the export. The `finance=` link value of every earlier tab still opens its page.
+ *
+ * Kept between tabs: the period's summary is read once and serves the overview, the products
+ * and the badges; the comparison is read once per period and comparison; and a page the owner
+ * leaves stays mounted, hidden and holding its refreshes (FreshOnReturnHold), so coming back
+ * shows it at once instead of reading it again — until the period changes.
+ */
+type Main = 'overview' | 'reports' | 'costs' | 'people' | 'accounting';
+const MAIN_OF: Record<FinanceSection, Main> = { overview: 'overview', orders: 'reports', products: 'reports', missing: 'costs', monthly: 'costs', expenses: 'costs',
+  staff: 'people', investors: 'people', settlements: 'people', accounting: 'accounting' };
+const PAGES: Record<Main, FinanceSection[]> = { overview: ['overview'], reports: ['orders', 'products'], costs: ['missing', 'monthly', 'expenses'],
+  people: ['staff', 'investors', 'settlements'], accounting: ['accounting'] };
+const LABEL: Record<FinanceSection | Main, FwKey> = { overview: 'overview', reports: 'reports', costs: 'costs', people: 'people', accounting: 'accounting',
+  orders: 'orders', products: 'products', missing: 'missing', monthly: 'promotion', expenses: 'expenses', staff: 'staff', investors: 'investors', settlements: 'withdrawals' };
+const SECTIONS = Object.keys(MAIN_OF) as FinanceSection[];
+// Accounting is not kept: its journal tools and the old report open on demand and pause the summary's refresh.
+const KEPT: FinanceSection[] = SECTIONS.filter((s) => s !== 'accounting');
+const PRESETS: Array<['month' | '7days' | '30days' | 'previous' | 'year', FwKey]> = [['month', 'presetMonth'], ['7days', 'preset7'], ['30days', 'preset30'], ['previous', 'presetPrevious'], ['year', 'presetYear']];
 
 const initialSection = (): FinanceSection => {
   if (typeof window === 'undefined') return 'overview';
   const params = new URLSearchParams(window.location.search);
   const raw = params.get('finance') || params.get('section');
-  const aliases: Record<string, FinanceSection> = { withdrawals: 'settlements', people: 'staff', monthlycosts: 'monthly' };
+  const aliases: Record<string, FinanceSection> = { withdrawals: 'settlements', people: 'staff', monthlycosts: 'monthly', reports: 'orders', costs: 'missing', promotion: 'monthly' };
   const tab = raw ? aliases[raw] ?? raw : null;
-  return ['overview', 'orders', 'products', 'monthly', 'staff', 'investors', 'settlements', 'accounting'].includes(tab ?? '') ? tab as FinanceSection : 'overview';
+  return SECTIONS.includes(tab as FinanceSection) ? tab as FinanceSection : 'overview';
 };
+const presetOf = (r: { from: string; to: string }) => PRESETS.find(([p]) => { const x = financePreset(p); return x.from === r.from && x.to === r.to; })?.[0] ?? 'custom';
+/** The time of a read in Baghdad, Latin digits. */
+const clock = () => { const d = new Date(Date.now() + 3 * 3600000); return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`; };
 
 export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
-  const { loc, dir } = useLanguage();
-  const [section, setSection] = useState<FinanceSection>(initialSection);
+  const { loc, dir, lang } = useLanguage();
+  const L = lang as 'ar' | 'en' | 'ckb';
+  const [section, setSectionState] = useState<FinanceSection>(initialSection);
   const [month, setMonth] = useState(() => {
     const value = typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('financeMonth') ?? '';
     return /^\d{4}-(0[1-9]|1[0-2])$/.test(value) ? value : currentMonth();
@@ -43,16 +77,23 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   const [range, setRange] = useState(initialPeriod.range);
   const [draft, setDraft] = useState(initialPeriod.range);
   const [rangeError, setRangeError] = useState(initialPeriod.invalid);
-  // The select names the range it shows: the month so far unless the link carried its own dates.
-  const [preset, setPreset] = useState(() => { const m = financePreset('month'); return initialPeriod.range.from === m.from && initialPeriod.range.to === m.to ? 'month' : 'custom'; });
+  // The select names the range it shows: a preset when the dates are one, else «فترة مخصصة».
+  const [preset, setPreset] = useState<string>(() => presetOf(initialPeriod.range));
+  // The comparison follows the period (same days last month inside one month, else the period before) until the owner picks one.
+  const [comparePick, setComparePick] = useState<CompareMode | 'auto'>('auto');
+  const compareMode: CompareMode = comparePick === 'auto' ? defaultCompare(range) : comparePick;
+  const compared = compareRange(range, compareMode);
   const [data, setData] = useState<FinanceSummary | null>(null);
+  const [prev, setPrev] = useState<{ key: string; data: FinanceSummary } | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
+  const [updatedAt, setUpdatedAt] = useState('');
   // The owner's own session before the address is verified (DECISIONS row 185
   // amendment): the refusal is rendered BY CODE as the way to open this screen.
   const [mustVerify, setMustVerify] = useState(false);
   const [revision, setRevision] = useState(0);
-  const [automaticRevision, setAutomaticRevision] = useState(0);
+  // The orders list re-reads after a background refresh of the summary only while it is the page shown.
+  const [ordersPoll, setOrdersPoll] = useState(0);
   const summaryGeneration = useRef(0);
   const [orderId, setOrderId] = useState<string | null>(() => typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('order'));
   const [collections, setCollections] = useState(false);
@@ -60,31 +101,41 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   // a line of «التكاليف الناقصة» opens on that line.
   const [orderFocus, setOrderFocus] = useState<{ step?: OrderFocus; line?: string }>({});
   const openOrderAt = (id: string, step?: OrderFocus, line?: string) => { setOrderId(id); setOrderFocus({ step, line }); };
-  const [missingOpen, setMissingOpen] = useState(false);
-  // The people screens re-read their figures in place (scroll, open lists kept) after an
-  // order sheet in which the owner saved something closes (a held sale released).
+  // The people screens and the missing-costs page re-read their figures in place (scroll, open lists
+  // kept) after an order sheet in which the owner saved something closes (a held sale released, a cost priced).
   const [peopleRevision, setPeopleRevision] = useState(0);
   const orderChanged = useRef(false);
   const [advanced, setAdvanced] = useState(false);
   const [legacyOpen, setLegacyOpen] = useState(false);
   // «عملة العرض» (design P-A §8): IQD on every load, never stored, display only.
   const [currency, setCurrency] = useState<DisplayCurrency>('IQD');
+  const main = MAIN_OF[section];
   const showsCurrency = ['overview', 'orders', 'products'].includes(section);
   const display = currency === 'USD' ? '&display=USD' : '';
-  const usesRange = ['overview', 'orders', 'products', 'accounting', 'staff', 'investors', 'settlements'].includes(section);
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
+  // The pages the owner left in this period, kept mounted and hidden; another period starts afresh.
+  const keepKey = `${range.from}|${range.to}`;
+  const [kept, setKept] = useState<{ key: string; pages: FinanceSection[] }>({ key: keepKey, pages: [] });
+  const keptPages = kept.key === keepKey ? kept.pages : [];
+  const setSection = (next: FinanceSection) => {
+    if (next === section) return;
+    setKept({ key: keepKey, pages: [...keptPages.filter((p) => p !== section && p !== next), section].filter((p) => KEPT.includes(p)) });
+    setSectionState(next); setAdvanced(false); setLegacyOpen(false);
+  };
   useEffect(() => {
     const url = new URL(window.location.href);
     url.searchParams.set('finance', section); url.searchParams.set('from', range.from); url.searchParams.set('to', range.to);
     url.searchParams.set('financeMonth', month);
     window.history.replaceState(window.history.state, '', url);
   }, [section, range.from, range.to, month]);
+  // One read of the period serves every section: switching pages never reloads it, and a new
+  // period keeps the old figures on screen (dimmed) until its own arrive.
   useEffect(() => {
     const controller = new AbortController();
     const generation = ++summaryGeneration.current;
-    setBusy(true); setError(''); setData(null);
+    setBusy(true); setError('');
     api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${range.from}&to=${range.to}${display}`, { signal: controller.signal })
-      .then((r) => { if (!controller.signal.aborted) setData(r); })
+      .then((r) => { if (!controller.signal.aborted) { setData(r); setUpdatedAt(clock()); } })
       .catch((e) => {
         if (controller.signal.aborted) return;
         if (e instanceof ApiError && e.code === 'OWNER_EMAIL_UNVERIFIED') setMustVerify(true);
@@ -93,181 +144,96 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
       .finally(() => { if (!controller.signal.aborted) setBusy(false); });
     return () => { controller.abort(); summaryGeneration.current = generation + 1; };
   }, [range.from, range.to, revision, display]);
+  // The comparison period, read once per period, comparison, currency and refresh — when the overview first needs it.
+  const compareKey = compared ? `${compared.from}|${compared.to}|${display}|${revision}` : '';
+  const comparison = prev && prev.key === compareKey ? prev.data : null;
+  const wantsComparison = main === 'overview' && !!compareKey && !comparison;
+  useEffect(() => {
+    if (!wantsComparison) return;
+    const [from, to, query] = compareKey.split('|');
+    const controller = new AbortController();
+    api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${from}&to=${to}${query}`, { signal: controller.signal, mascot: 'silent' })
+      .then((r) => { if (!controller.signal.aborted) setPrev({ key: compareKey, data: r }); }).catch(() => { /* no comparison: the cards say nothing of a change */ });
+    return () => controller.abort();
+  }, [compareKey, wantsComparison]);
   // These reads only display work completed by the server. They never start a
   // financial posting and stop while hidden or while an editing sheet is open.
   useFreshOnReturn(async () => {
     const generation = summaryGeneration.current;
     const updated = await api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${range.from}&to=${range.to}${display}`, { mascot: 'silent' });
     if (generation !== summaryGeneration.current) return;
-    setData(updated); setAutomaticRevision(value => value + 1);
+    setData(updated); setUpdatedAt(clock()); if (section === 'orders') setOrdersPoll((value) => value + 1);
   }, { pollWhileVisibleMs: 30_000, minIntervalMs: 30_000,
     enabled: ['overview', 'orders', 'products'].includes(section) && (data?.totals.pending_costs ?? 0) > 0 && !busy && !orderId && !collections && !advanced && !legacyOpen });
-  const tabs = [
-    { id: 'overview', label: loc('نظرة عامة', 'Overview'), icon: LayoutGrid },
-    { id: 'orders', label: loc('الطلبات المستلمة', 'Delivered orders'), icon: Layers3 },
-    { id: 'products', label: loc('المنتجات', 'Products'), icon: Package },
-    { id: 'monthly', label: loc('تكاليف الشهر', 'Monthly costs'), icon: Megaphone },
-    { id: 'staff', label: loc('الموظفون', 'Staff'), icon: Users },
-    { id: 'investors', label: loc('المستثمرون', 'Investors'), icon: CircleDollarSign },
-    { id: 'settlements', label: loc('السحب والتسويات', 'Withdrawals', 'ڕاکێشان و یەکلاکردنەوەکان'), icon: Wallet },
-    { id: 'accounting', label: loc('المحاسبة', 'Accounting'), icon: BookOpen },
-  ] as const;
+  const apply = (event: React.FormEvent) => { event.preventDefault(); if (!validFinanceRange(draft)) { setRangeError(true); return; } setRange(draft); setRangeError(false); setPreset(presetOf(draft)); };
+  const missingLines = data?.missing_costs?.lines ?? 0;
+  const loading = <Loading text={fw(loc, 'loading')} />;
+  /** A page of the workspace: the one shown, or one the owner left in this period, kept hidden and holding its refreshes. */
+  const page = (id: FinanceSection, body: () => ReactNode) => (id === section || keptPages.includes(id)) && <FreshOnReturnHold.Provider key={id} value={id !== section}>
+    <div className="fw-body" style={id === section ? undefined : { display: 'none' }} data-finance-page={id}>{body()}</div></FreshOnReturnHold.Provider>;
   if (mustVerify) return <OwnerCostVerifyCard />;
   return <DisplayCurrencyContext.Provider value={showsCurrency || orderId ? currency : 'IQD'}><div className="fw fw-workspace" dir={dir} data-finance-workspace>
-    <header className="fw-header"><div><div className="fw-eyebrow">LEVONIS / {loc('الإدارة المالية', 'Finance')}</div><h1>{loc('المال والأرباح', 'Money & profit')}</h1>
-      <p>{loc('راقب الأداء، وافهم التكاليف، وراجع حصتك من كل طلب.', 'Track performance, understand costs and review your share of every order.')}</p></div>
-      <div className="fw-header-tools">{showsCurrency && <CurrencyToggle value={currency} onChange={setCurrency} />}{section === 'monthly' && <label className="fw-month-control"><CalendarDays size={16} aria-hidden />
-        <input type="month" value={month} aria-label={loc('شهر التكاليف والمستحقات', 'Costs and earnings month')} onChange={(e) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) setMonth(e.target.value); }} /></label>}
-        <Button className="fw-icon-button" variant="secondary" busy={busy} onClick={refresh} aria-label={loc('تحديث المالية', 'Refresh finance')}>
-          {!busy && <RefreshCw size={17} />}
-        </Button></div>
+    <header className="fw-top">
+      <div><div className="fw-muted">LEVONIS / {fw(loc, 'crumb')}</div><h1>{fw(loc, 'title')}</h1>
+        {section !== 'monthly' && <p data-finance-range><bdi>{rangeText(L, range.from, range.to)}</bdi>{compared && main === 'overview' && <span className="fw-muted"> · {fw(loc, 'vs', { range: rangeText(L, compared.from, compared.to) })}</span>}</p>}</div>
+      <div className="fw-top-tools">{updatedAt && <span className="fw-muted fw-updated">{fw(loc, 'updated', { time: updatedAt })}</span>}
+        <Button className="fw-icon-button" variant="secondary" busy={busy} onClick={refresh} aria-label={fw(loc, 'refresh')}>{!busy && <RefreshCw size={17} aria-hidden />}</Button></div>
     </header>
-    <nav className="fw-navigation" aria-label={loc('أقسام المالية', 'Finance sections')}>
-      {tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" className="fw-nav-item" aria-current={section === id ? 'page' : undefined}
-        onClick={() => { setSection(id); setAdvanced(false); setLegacyOpen(false); }}><Icon aria-hidden />{label}</button>)}
+    <nav className="fw-tabs" aria-label={fw(loc, 'sections')}>
+      {(Object.keys(PAGES) as Main[]).map((m) => <button key={m} type="button" className="fw-tab" aria-current={main === m ? 'page' : undefined} data-finance-section={m}
+        onClick={() => { if (main !== m) setSection(PAGES[m][0]); }}>{fw(loc, LABEL[m])}{m === 'costs' && missingLines > 0 && <span className="fw-missing">{missingLines}</span>}</button>)}
     </nav>
-    {usesRange && <form className="fw-period" onSubmit={(event) => { event.preventDefault(); if (!validFinanceRange(draft)) { setRangeError(true); return; } setRange(draft); setRangeError(false); }}>
-      <label className="fw-field"><span>{loc('فترة التقرير', 'Report period')}</span><select className="fw-select" value={preset} onChange={(event) => {
+    {PAGES[main].length > 1 && <div className="fw-filter-pills" role="group" aria-label={fw(loc, LABEL[main])}>
+      {PAGES[main].map((p) => <button key={p} type="button" className="fw-pill" aria-pressed={section === p} data-finance-subpage={p} onClick={() => setSection(p)}>{fw(loc, LABEL[p])}{p === 'missing' && missingLines > 0 ? ` · ${missingLines}` : ''}</button>)}
+    </div>}
+    {section !== 'monthly' && <form className="fw-bar" onSubmit={apply} data-finance-period>
+      <label className="fw-chip"><CalendarDays size={16} aria-hidden /><select className="fw-select" value={preset} aria-label={fw(loc, 'period')} onChange={(event) => {
         setPreset(event.target.value); if (event.target.value === 'custom') return;
         const next = financePreset(event.target.value as Parameters<typeof financePreset>[0]); setDraft(next); setRange(next); setRangeError(false);
-      }}><option value="custom">{loc('فترة مخصصة', 'Custom range')}</option><option value="month">{loc('هذا الشهر حتى اليوم', 'Month to date')}</option><option value="7days">{loc('آخر ٧ أيام', 'Last 7 days')}</option><option value="30days">{loc('آخر ٣٠ يومًا', 'Last 30 days')}</option><option value="previous">{loc('الشهر السابق', 'Previous month')}</option><option value="year">{loc('هذه السنة حتى اليوم', 'Year to date')}</option></select></label>
-      {(['from', 'to'] as const).map((key) => <label className="fw-field" key={key}><span>{key === 'from' ? loc('من', 'From') : loc('إلى', 'To')}</span><input type="date" className="fw-input" value={draft[key]} aria-invalid={rangeError || undefined} aria-describedby={rangeError ? 'fw-range-error' : undefined} onChange={(event) => { setDraft((v) => ({ ...v, [key]: event.target.value })); setPreset('custom'); }} /></label>)}
-      <button className="fw-button fw-button--primary" type="submit">{loc('عرض الفترة', 'Apply range')}</button>
-      {rangeError && <p id="fw-range-error" className="fw-error" role="alert">{loc('أدخل تاريخين صحيحين؛ البداية قبل النهاية والفترة لا تتجاوز سنة. يُعرض آخر نطاق صالح.', 'Enter valid dates in order, within one year. The last valid range remains displayed.')}</p>}
+      }}><option value="custom">{fw(loc, 'presetCustom')}</option>{PRESETS.map(([p, k]) => <option key={p} value={p}>{fw(loc, k)}</option>)}</select></label>
+      {/* Two dates only for a custom range: the header already says which days a preset is. */}
+      {(preset === 'custom' || rangeError) && <>
+        {(['from', 'to'] as const).map((key) => <label className="fw-chip" key={key}><span className="fw-muted">{fw(loc, key)}</span><input type="date" className="fw-input" lang={L === 'en' ? 'en-GB' : 'ar-IQ'} value={draft[key]} aria-invalid={rangeError || undefined} aria-describedby={rangeError ? 'fw-range-error' : undefined}
+          onChange={(event) => { setDraft((v) => ({ ...v, [key]: event.target.value })); setPreset('custom'); }} /></label>)}
+        {(draft.from !== range.from || draft.to !== range.to || rangeError) && <button className="fw-button fw-button--primary" type="submit">{fw(loc, 'apply')}</button>}
+      </>}
+      {main === 'overview' && <label className="fw-chip fw-compare"><span className="fw-muted">{fw(loc, 'compare')}</span><select className="fw-select" value={compareMode} data-finance-compare onChange={(event) => setComparePick(event.target.value as CompareMode)}>
+        <option value="month">{fw(loc, 'compareMonth')}</option><option value="previous">{fw(loc, 'comparePrevious')}</option><option value="none">{fw(loc, 'compareNone')}</option></select></label>}
+      {showsCurrency && <CurrencyToggle value={currency} onChange={setCurrency} />}
+      {(main === 'overview' || main === 'reports') && <a className="fw-button fw-button--ghost" href={`${WORKSPACE_API}/export.csv?from=${range.from}&to=${range.to}`} aria-label={fw(loc, 'exportCsv')} data-finance-export><ArrowDownToLine size={16} aria-hidden /><span>{fw(loc, 'exportCsv')}</span></a>}
+      {rangeError && <p id="fw-range-error" className="fw-error" role="alert">{fw(loc, 'rangeError')}</p>}
     </form>}
     <div className="fw-body">
-      {error && <div className="fw-error" role="alert">{error}<Button variant="ghost" onClick={refresh}>{loc('إعادة المحاولة', 'Retry')}</Button></div>}
-      {section === 'overview' && (busy && !data ? <Loading text={loc('تحميل أرقام الفترة…', 'Loading this period…')} /> : data && <Overview from={range.from} to={range.to} revision={revision} data={data} openOrder={setOrderId} onNavigate={setSection} onCollections={() => setCollections(true)} onMissing={() => setMissingOpen(true)} />)}
-      {section === 'orders' && <Orders from={range.from} to={range.to} revision={revision + automaticRevision} openOrder={setOrderId} />}
-      {section === 'products' && (busy && !data ? <Loading text={loc('تحميل المنتجات…', 'Loading products…')} /> : data && <Products data={data} onOpenOrders={() => setSection('orders')} />)}
-      {section === 'monthly' && <MonthlyCosts key={month} month={month} onChanged={refresh} />}
-      <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}>
-        {section === 'staff' && <PeoplePanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} />}
-        {section === 'investors' && <InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} />}
-        {section === 'settlements' && <WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} />}
-        {section === 'accounting' && <>
-          <Surface title={loc('المحاسبة', 'Accounting')} subtitle={loc('الأرصدة والقيود والتسويات المعتمدة', 'Balances, journals and verified settlements')}>
-            <Row label={loc('دفتر القيود وميزان المراجعة', 'Journal and trial balance', 'دەفتەری تۆمارەکان و هاوسەنگیی پێداچوونەوە')} value={null} onClick={() => setAdvanced(true)} />
-            <p className="fw-note">{loc('الأرقام اليومية تُحتسب تلقائيًا من العمليات. افتح هذه الأدوات لإدخال الأرصدة الافتتاحية ومراجعة الحسابات وإغلاق الشهر.', 'Daily figures follow operations automatically. Use these tools for opening balances, account review and closing the month.')}</p>
-          </Surface>
-          {advanced && <FinanceOperationsPanel from={range.from} to={range.to} initialTab="accounting" onChanged={refresh} />}
-          {legacy && <details className="fw-advanced" onToggle={(e) => setLegacyOpen(e.currentTarget.open)}><summary>{loc('التقرير المحاسبي قبل توزيع الأرباح', 'Accounting report before profit distribution')}</summary>{legacyOpen && <><p className="fw-note">{loc('هذا التقرير يراجع النشاط المحاسبي قبل حصص المستثمرين والتصحيحات الخاصة بالطلبات. استخدم «صافي حصتك» في النظرة العامة لمعرفة حصتك بعد التوزيع وتكاليف الشهر.', 'This report reviews accounting activity before investor distributions and order-specific corrections. Use “Your net share” in Overview for your share after distributions and monthly costs.')}</p>{legacy}</>}</details>}
-        </>}
-      </Suspense>
+      {error && <div className="fw-error" role="alert">{error}<Button variant="ghost" onClick={refresh}>{fw(loc, 'retry')}</Button></div>}
+      {page('overview', () => busy && !data ? loading : data && <div className={busy ? 'fw-reloading' : undefined}>
+        <Overview data={data} prev={compared ? comparison : null} compareFrom={compared?.from} compareTo={compared?.to} revision={revision} openOrder={(id, step) => openOrderAt(id, step)}
+          onNavigate={setSection} onCollections={() => setCollections(true)} onMissing={() => setSection('missing')} /></div>)}
+      {page('orders', () => <Orders from={range.from} to={range.to} revision={revision + ordersPoll} openOrder={setOrderId} />)}
+      {page('products', () => busy && !data ? loading : data && <Products data={data} onOpenOrders={() => setSection('orders')} />)}
+      {page('missing', () => <Suspense fallback={loading}><MissingCostsSheet inline reload={peopleRevision} from={range.from} to={range.to} onClose={() => setSection('overview')} onChanged={refresh} openOrder={(id, step, line) => openOrderAt(id, step, line)} /></Suspense>)}
+      {page('monthly', () => <><label className="fw-chip" style={{ justifySelf: 'start' }}><CalendarDays size={16} aria-hidden />
+        <input type="month" className="fw-input" value={month} aria-label={loc('شهر التكاليف والمستحقات', 'Costs and earnings month', 'مانگی تێچوو و شایستەکان')} onChange={(e) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) setMonth(e.target.value); }} /></label>
+        <MonthlyCosts key={month} month={month} onChanged={refresh} /></>)}
+      {page('expenses', () => <Surface title={fw(loc, 'expenses')}><ExpenseLedger from={range.from} to={range.to} s={financeStrings(loc)} latin={isLatin(lang)} dir={dir === 'rtl' ? 'rtl' : 'ltr'} onChanged={refresh} /></Surface>)}
+      {page('staff', () => <Suspense fallback={loading}><PeoplePanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} /></Suspense>)}
+      {page('investors', () => <Suspense fallback={loading}><InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} /></Suspense>)}
+      {page('settlements', () => <Suspense fallback={loading}><WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} /></Suspense>)}
+      {section === 'accounting' && <Suspense fallback={loading}>
+        <Surface title={fw(loc, 'accounting')} subtitle={loc('الأرصدة والقيود والتسويات المعتمدة', 'Balances, journals and verified settlements', 'باڵانس و تۆمار و یەکلاکردنەوە پەسەندکراوەکان')}>
+          <Row label={loc('دفتر القيود وميزان المراجعة', 'Journal and trial balance', 'دەفتەری تۆمارەکان و هاوسەنگیی پێداچوونەوە')} value={null} onClick={() => setAdvanced(true)} />
+          <p className="fw-note">{loc('الأرقام اليومية تُحتسب تلقائيًا من العمليات. افتح هذه الأدوات لإدخال الأرصدة الافتتاحية ومراجعة الحسابات وإغلاق الشهر.', 'Daily figures follow operations automatically. Use these tools for opening balances, account review and closing the month.', 'ژمارە ڕۆژانەکان خۆکارانە لە کارەکانەوە دەژمێردرێن. ئەم ئامرازانە بکەرەوە بۆ باڵانسی سەرەتایی و پێداچوونەوەی حیسابەکان و داخستنی مانگ.')}</p>
+        </Surface>
+        {advanced && <FinanceOperationsPanel from={range.from} to={range.to} initialTab="accounting" onChanged={refresh} />}
+        {legacy && <details className="fw-advanced" onToggle={(e) => setLegacyOpen(e.currentTarget.open)}><summary>{loc('التقرير المحاسبي قبل توزيع الأرباح', 'Accounting report before profit distribution', 'ڕاپۆرتی ژمێریاری پێش دابەشکردنی قازانج')}</summary>{legacyOpen && <><p className="fw-note">{loc('هذا التقرير يراجع النشاط المحاسبي قبل حصص المستثمرين والتصحيحات الخاصة بالطلبات. استخدم «صافي حصتك» في النظرة العامة لمعرفة حصتك بعد التوزيع وتكاليف الشهر.', 'This report reviews accounting activity before investor distributions and order-specific corrections. Use “Your net share” in Overview for your share after distributions and monthly costs.', 'ئەم ڕاپۆرتە چالاکیی ژمێریاری پێش بەشی وەبەرهێنەران و ڕاستکردنەوەکانی داواکاری پێداچوونەوە دەکات. «سافی بەشی تۆ» لە تێڕوانینی گشتی بەکاربهێنە بۆ زانینی بەشەکەت دوای دابەشکردن و تێچووی مانگ.')}</p>{legacy}</>}</details>}
+      </Suspense>}
     </div>
     {orderId && <OrderProfitSheet key={`${orderId}:${orderFocus.step ?? ''}:${orderFocus.line ?? ''}`} orderId={orderId} focus={orderFocus.step} focusLine={orderFocus.line}
       onClose={() => { setOrderId(null); setOrderFocus({}); if (orderChanged.current) { orderChanged.current = false; setPeopleRevision((v) => v + 1); } }}
       onChanged={refresh} onSaved={() => { orderChanged.current = true; }} />}
-    {missingOpen && <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}><MissingCostsSheet from={range.from} to={range.to} onClose={() => setMissingOpen(false)} onChanged={refresh}
-      openOrder={(id, step, line) => { setMissingOpen(false); openOrderAt(id, step, line); }} /></Suspense>}
-    {collections && <Sheet title={loc('التحصيل وشركات التوصيل', 'Collections and couriers')} onClose={() => setCollections(false)}>
-      <Suspense fallback={<Loading text={loc('تحميل…', 'Loading…')} />}><FinanceOperationsPanel from={range.from} to={range.to} initialTab="collections" onChanged={refresh} /></Suspense>
+    {collections && <Sheet title={loc('التحصيل وشركات التوصيل', 'Collections and couriers', 'وەرگرتن و کۆمپانیاکانی گەیاندن')} onClose={() => setCollections(false)}>
+      <Suspense fallback={loading}><FinanceOperationsPanel from={range.from} to={range.to} initialTab="collections" onChanged={refresh} /></Suspense>
     </Sheet>}
   </div></DisplayCurrencyContext.Provider>;
-}
-
-/** Exported for the render tests (tests/financeOverviewFigures.test.ts); the workspace above is its only screen. */
-export function Overview({ data, from, to, revision, openOrder, onNavigate, onCollections, onMissing }: { data: FinanceSummary; from: string; to: string; revision: number; openOrder: (id: string) => void; onNavigate: (section: FinanceSection) => void; onCollections: () => void; onMissing: () => void }) {
-  const { loc } = useLanguage();
-  const t = data.totals;
-  // Server cents when the owner chose USD and a rate exists; undefined keeps a figure in dinars.
-  const currency = useDisplayCurrency();
-  const u = currency === 'USD' && data.display_usd?.available ? data.display_usd : undefined;
-  const ut = u?.totals;
-  const c = (field: string) => centsAt(ut, field);
-  const incomplete = (t.unknown_lines ?? 0) + (t.pending_costs ?? 0);
-  // «صافي حصتك» after the order deductions, from the complete orders while some are not, with what rests on
-  // estimates named — worked out in overviewFigures (DECISIONS row 313); this component only words it.
-  const figures = overviewNet(data, u);
-  const { net, fromKnown: netFromKnown, marginBase, deductions } = figures;
-  const needsReview = figures.state === 'review';
-  const average = averageOrder(data, u);
-  const revenue = data.chart_data?.revenue_iqd;
-  // An incomplete total shows what the complete orders say, and says so — never a bare dash.
-  // `known` is null when no order of the period is complete: the tiles say «ناقص» and why.
-  const known = data.known ?? undefined, missing = data.missing_costs;
-  const knownOnly = (value: number | null | undefined) => value == null && !!known && known.incomplete_orders > 0;
-  const estimatedOrders = figures.estimated?.orders ?? 0;
-  // An amount in a note under a figure, in the figure's currency: in dollars only the server's cents (never
-  // dinars beside a dollar headline); without them, or without a value, the note leaves the amount out.
-  const noteAmount = (iqd: number | null | undefined, cents: number | null | undefined) => u ? (cents == null ? '' : usdText(cents)) : iqd == null ? '' : formatMoney(iqd);
-  const notePart = (label: string, part: { orders: number; net: number | null; cents: number | null | undefined }) => [label, noteAmount(part.net, part.cents), `(${part.orders})`].filter(Boolean).join(' ');
-  const estimateNote = figures.confirmed && figures.estimated && estimatedOrders > 0
-    ? `${notePart(loc('مؤكد', 'Confirmed', 'دڵنیاکراو'), figures.confirmed)} · ${notePart(loc('من طلبات فيها تكلفة تقديرية', 'from orders with estimated costs', 'لە داواکاری بە تێچووی خەمڵێنراو'), figures.estimated)}`
-    : '';
-  const deducted = noteAmount(deductions, figures.deductionsCents);
-  // The margin of the complete orders is over their own revenue, as their net carries only their share of the overhead.
-  // No net or no revenue: there is no margin to name, so the note says nothing of it (never a bare dash).
-  const margin = net != null && marginBase != null && marginBase > 0 ? `${(net / marginBase * 100).toFixed(1)}%` : null;
-  const costFromKnown = knownOnly(data.chart_data?.cost_iqd) && known!.cost_iqd != null;
-  const cost = data.chart_data?.cost_iqd ?? (costFromKnown ? known!.cost_iqd : null);
-  // In dollars, the complete orders' figures come from the server's cents too (none: «ناقص», never dinars among dollars).
-  const uk = u ? u.known ?? null : undefined;
-  const knownNote = known ? `${loc('من الطلبات المكتملة فقط', 'From complete orders only', 'تەنها لە داواکارییە تەواوەکانەوە')} (${known.orders_count}/${t.orders_count ?? data.orders.length})${(known.overhead_share_iqd ?? 0) > 0 ? loc('، مع حصتها من المصاريف العامة بنسبة إيرادها', ', with their revenue-based share of general expenses', '، لەگەڵ بەشیان لە خەرجییە گشتییەکان بەپێی داهاتەکەیان') : ''}` : '';
-  const metrics = [
-    { label: loc('صافي حصتك', 'Your net share', 'سافی بەشی تۆ'), value: net, cents: figures.cents,
-      note: [margin ? `${loc('هامش حصتك', 'Your share margin', 'پەراوێزی بەشەکەت')} ${margin}` : '', netFromKnown ? knownNote : '', estimateNote,
-        deductions > 0 ? `${loc('بعد الكوبونات وحماية السعر ورصيد الاستبدال المُعاد', 'After coupons, price protection and returned trade-in credit', 'دوای کۆپۆن و پاراستنی نرخ و باڵانسی گۆڕینەوەی گەڕاوە')}${deducted ? ` −${deducted}` : ''}` : ''].filter(Boolean).join(' · '), primary: true },
-    { label: loc('الإيراد', 'Revenue'), value: revenue, cents: u?.chart ? u.chart.revenue_cents : undefined, note: loc('بعد المرتجعات، مع إيراد التوصيل والدفع', 'After refunds, including delivery and payment income') },
-    { label: loc('إجمالي التكاليف', 'Total costs'), value: cost, cents: u?.chart ? costFromKnown ? uk?.cost_cents ?? null : u.chart.cost_cents : undefined, note: `${loc('البضاعة والتشغيل والترويج والمصاريف العامة، دون حصص المستثمرين', 'Goods, operations, promotion and general expenses, without investor shares', 'کاڵا و کارپێکردن و بانگەشە و خەرجییە گشتییەکان، بەبێ بەشی وەبەرهێنەران')}${costFromKnown ? ` · ${knownNote}` : ''}` },
-  ];
-  const sum = (a: number | null | undefined, b: number | null | undefined) => a == null || b == null ? null : a + b;
-  // A funded sale's share waits for its cash or its confirmed cost: one word for it wherever it is drawn.
-  const waiting = loc('ينتظر', 'Waiting', 'چاوەڕێ دەکات');
-  return <>
-    <div className="fw-overview-caption"><h2>{loc('الأداء المالي للفترة', 'Financial performance')}</h2>{needsReview ? <Status tone="warning">{loc('الحساب يحتاج مراجعة', 'Figures need review', 'ژمێریاری پێویستی بە پێداچوونەوەیە')}</Status>
-      : estimatedOrders > 0 ? <Status tone="warning">{loc('فيه تكلفة تقديرية', 'Includes estimated costs', 'تێچووی خەمڵێنراوی تێدایە')}</Status>
-        : <Status tone="positive"><ShieldCheck size={13} />{loc('كل التكاليف مؤكدة', 'All costs confirmed', 'هەموو تێچووەکان دڵنیاکراون')}</Status>}</div>
-    {currency === 'USD' && <UsdBasisNote available={!!data.display_usd?.available} atTimeCount={data.display_usd?.at_time_count} todayCount={data.display_usd?.today_count} todayRate={data.display_usd?.today_rate} batchLines={data.display_usd?.batch_cost_lines} />}
-    <div className="fw-metrics">{metrics.map((m) => <div className={`fw-metric${m.primary ? ' fw-metric--primary' : ''}`} key={m.label}><span>{m.label}</span><DisplayMoney iqd={m.value} cents={m.cents} /><small>{m.note}</small></div>)}
-      <div className="fw-metric"><span>{loc('الطلبات المستلمة', 'Delivered orders')}</span><strong>{t.orders_count ?? data.orders.length}</strong><small>{t.units ?? 0} {loc('قطعة مباعة', 'units sold')}{average && <> · <DisplayMoney iqd={average.iqd} cents={average.cents} compact /> {loc('متوسط الطلب', 'average order')}</>}</small></div>
-    </div>
-    {data.truncated && <p className="fw-error" role="alert">{loc('عدد الطلبات يتجاوز حد التقرير؛ راجع الفترة قبل اعتماد الإجمالي.', 'Order count exceeds the report limit. Review the period before accepting totals.')}</p>}
-    {missing && missing.lines > 0 && <div className="fw-note fw-missing-box" role="note">
-      <strong>{loc('ما ينقص لاكتمال الحساب', 'What the figures still lack', 'ئەوەی بۆ تەواوبوونی حیسابەکە ماوە')}</strong>
-      {missing.unknown_lines > 0 && <p>{loc('بنود بلا سعر شراء', 'Lines with no purchase price', 'بڕگەی بێ نرخی کڕین')}: {missing.unknown_lines} — {missing.unknown_products.map((p) => `⁨${p.name}⁩ (${p.qty})`).join(loc('، ', ', ', '، '))}. {loc('بسببها لا يكتمل صافي هذه الطلبات.', 'Because of them those orders have no complete net.', 'بەهۆیانەوە سافی ئەو داواکاریانە تەواو نابێت.')}</p>}
-      {missing.estimated_lines > 0 && <p>{loc('بنود بسعر تقديري من وقت البيع، غير مثبت', 'Lines priced only by a sale-time estimate, not confirmed', 'بڕگەی تەنها بە خەمڵاندنی کاتی فرۆشتن نرخدراو، جێگیرنەکراو')}: {missing.estimated_lines}</p>}
-      <Button onClick={onMissing}>{loc('أكمل التكاليف الناقصة', 'Complete the missing costs', 'تێچووە کەمەکان تەواو بکە')} ({missing.lines})</Button>
-    </div>}
-    {needsReview && (net == null || cost == null || (!!u && ((netFromKnown && uk?.owner_net_cents == null) || (costFromKnown && uk?.cost_cents == null)))) && <p className="fw-note">{loc('«ناقص» تعني قيمة لم تكتمل بعد، ولا تعني صفرًا. أكمل التكاليف أو سجّل النقد المستلم ليكتمل الصافي.', '«Missing» means a value that is not complete yet, not zero. Complete the costs or record the cash received to complete the net.', '«ناتەواو» واتە بەهایەک کە هێشتا تەواو نەبووە، نەک سفر. تێچووەکان تەواو بکە یان پارەی وەرگیراو تۆمار بکە بۆ ئەوەی ساف تەواو بێت.')}</p>}
-    <Suspense fallback={<Loading text={loc('تحميل الرسوم المالية…', 'Loading financial charts…')} />}><OverviewCharts data={data} usd={u} /><ParticipantCharts from={from} to={to} revision={revision} /></Suspense>
-    <details className="fw-advanced"><summary>{loc('تفصيل الحساب: من البيع إلى حصتك', 'Calculation breakdown: from sales to your share')}</summary><Surface>
-      <Row label={loc('ربح البضاعة', 'Goods profit')} value={<DisplayMoney iqd={t.gross_profit_iqd} cents={c('gross_profit_iqd')} />} />
-      <Row label={loc('أجور الموظفين', 'Staff earnings')} value={<DisplayMoney iqd={t.wages_iqd} cents={c('wages_iqd')} />} onClick={() => onNavigate('staff')}
-        hint={(t.pending_costs ?? 0) > 0 ? `${loc('لا يشمل أجورًا تنتظر تكلفتها', 'Excludes wages still waiting for their cost', 'ئەو کرێیانە ناگرێتەوە کە چاوەڕێی تێچووەکەیانن')} (${t.pending_costs})` : undefined} />
-      <Row label={loc('المواد والتكاليف الإضافية', 'Materials and extra costs')} value={<DisplayMoney iqd={t.materials_iqd == null || t.manual_direct_iqd == null ? null : t.materials_iqd + t.manual_direct_iqd} cents={ut ? sum(c('materials_iqd'), c('manual_direct_iqd')) : undefined} />} />
-      <Row label={loc('التوصيل على الزبائن', 'Delivery income')} value={<DisplayMoney iqd={t.shipping_income_iqd} cents={c('shipping_income_iqd')} />} />
-      <Row label={loc('رسوم الدفع عند الاستلام', 'Cash-on-delivery income')} value={<DisplayMoney iqd={t.cod_tax_iqd} cents={c('cod_tax_iqd')} />} />
-      <Row label={loc('أجور التوصيل والدفع', 'Courier and payment fees')} value={<DisplayMoney iqd={t.courier_fee_iqd == null || t.payment_fee_iqd == null ? null : t.courier_fee_iqd + t.payment_fee_iqd} cents={ut ? sum(c('courier_fee_iqd'), c('payment_fee_iqd')) : undefined} />} />
-      <Row label={loc('ترويج الشهر', 'Monthly promotion')} value={<DisplayMoney iqd={t.promotion_iqd} cents={c('promotion_iqd')} />} onClick={() => onNavigate('monthly')} />
-      {(t.unallocated_promotion_iqd ?? 0) > 0 && <Row label={loc('ترويج لم تُبع له قطع بعد', 'Promotion without sold units')} value={<DisplayMoney iqd={t.unallocated_promotion_iqd} cents={c('unallocated_promotion_iqd')} />} onClick={() => onNavigate('monthly')} />}
-      <Row label={loc('حصة المستثمرين', 'Investor share')} value={<DisplayMoney iqd={t.investor_iqd} cents={c('investor_iqd')} missing={waiting} />} onClick={() => onNavigate('investors')} hint={(t.investor_iqd ?? 0) < 0 ? loc('مساهمة المستثمر في الخسارة', 'Investor contribution to the loss') : undefined} />
-      <Row label={loc('المصاريف العامة', 'General expenses')} value={<DisplayMoney iqd={t.general_expenses_iqd} cents={c('general_expenses_iqd')} />} onClick={() => onNavigate('monthly')} />
-      {(t.general_waiting_iqd ?? 0) > 0 && <Row label={loc('تكاليف تنتظر تسليم طلباتها', 'Costs waiting for their orders to be delivered', 'تێچووی چاوەڕوانی گەیاندنی داواکارییەکانیان')} value={<DisplayMoney iqd={t.general_waiting_iqd} />}
-        hint={loc('سُجّلت في هذه الفترة لطلبات لم تُسلَّم بعد؛ تُحسب عند تسليمها، ولا تدخل هذا الصافي', 'Entered in this period for orders not delivered yet; they count on delivery, not in this net', 'لەم ماوەیەدا بۆ داواکاری نەگەیەندراو تۆمارکراون؛ لە کاتی گەیاندندا دەژمێردرێن، نەک لەم سافەدا')} />}
-      <Row label={loc('صافي المالك', 'Owner net')} value={<DisplayMoney iqd={t.owner_period_net_iqd !== undefined ? t.owner_period_net_iqd : t.owner_net_iqd} cents={t.owner_period_net_iqd !== undefined ? c('owner_period_net_iqd') : c('owner_net_iqd')} />} prominent />
-      <ReportDeductions totals={t} net={t.owner_period_net_after_report_adjustments_iqd} cents={ut ? { coupon: c('coupon_iqd'), credit: c('price_protection_iqd'), tradeIn: c('trade_in_credit_returned_iqd'), net: c('owner_period_net_after_report_adjustments_iqd') } : undefined} />
-    </Surface></details>
-    {data.kinds && <Surface title={loc('حسب نوع الطلب', 'By order type', 'بەپێی جۆری داواکاری')} subtitle={loc('الطلبات المستلمة في الفترة نفسها، مقسومة حسب طريقة إنشائها.', 'The same delivered orders, split by how each was placed.', 'هەمان داواکارییە گەیەندراوەکان، بەپێی شێوازی دروستکردنیان.')}>
-      {data.kinds.map((k) => <Row key={k.kind} label={orderKindName(k.kind, loc)}
-        hint={`${k.orders_count} ${loc('طلب', 'orders', 'داواکاری')} · ${loc('صافي البيع', 'Net sales', 'فرۆشی پوخت')} ${formatMoney(k.net_goods_iqd)}`}
-        value={<DisplayMoney iqd={k.gross_profit_iqd} cents={u?.kinds ? centsAt(u.kinds[k.kind], 'gross_profit_iqd') : undefined} />} />)}
-      <p className="fw-note">{loc('القيمة ربح البضاعة. الهدية تُطلب بـ0 د.ع وتبقى كلفة بضاعتها، فربحها السالب هو كلفة الهدايا. مبلغ الشراء السريع المحجوز في المحفظة ليس إيراداً؛ يدخل الطلب هنا بعد تسليمه فقط.', 'Values are goods profit. A gift is ordered at 0 IQD and keeps its goods cost, so its negative profit is what the gifts cost. A Quick Buy amount held in the wallet is not revenue; the order counts here only once delivered.', 'بەهاکان قازانجی کاڵایە. دیاری بە 0 دینار داوا دەکرێت و تێچووی کاڵاکەی دەمێنێتەوە، بۆیە قازانجە نەرێنییەکەی تێچووی دیارییەکانە. بڕی کڕینی خێرای گیراو لە جزدان داهات نییە؛ داواکاری تەنها دوای گەیاندن لێرە دەژمێردرێت.')}</p>
-    </Surface>}
-    <div className="fw-two-columns"><Surface title={loc('أحدث الطلبات المستلمة', 'Latest delivered orders')} action={<Button variant="ghost" onClick={() => onNavigate('orders')}>{loc('عرض الكل', 'View all')}<ArrowUpLeft size={15} /></Button>}>
-      {data.orders?.length ? <div className="fw-list">{data.orders.slice(0, 3).map((o) => <OrderRow order={o} usd={u?.orders?.[o.order_id || o.id]} key={o.id} onClick={() => openOrder(o.order_id || o.id)} />)}</div> : <Empty title={loc('لا طلبات مستلمة في الفترة', 'No delivered orders in this range')} text={loc('يمكن أن تبقى المصاريف العامة والترويج مستحقين حتى دون مبيعات.', 'General expenses and promotion may still apply without sales.')} />}
-    </Surface>
-    <Surface title={loc('المتابعة', 'Follow-up')}>
-      <Row label={loc('حصص المستثمرين', 'Investor shares')} value={<DisplayMoney iqd={t.investor_iqd} cents={c('investor_iqd')} missing={waiting} />} onClick={() => onNavigate('investors')}
-        hint={t.investor_iqd === null ? loc('حصة بيع ممول تنتظر تسجيل نقده أو تثبيت تكلفته', 'A funded sale waits for its cash to be recorded or its cost to be confirmed', 'بەشی فرۆشتنێکی دارایی چاوەڕێی تۆمارکردنی پارەکەی یان جێگیرکردنی تێچووەکەیەتی') : undefined} />
-      <Row label={loc('النقد المسجّل استلامه', 'Cash recorded as received', 'پارەی تۆمارکراو وەک وەرگیراو')} value={<DisplayMoney iqd={t.collected_iqd} cents={c('collected_iqd')} />} />
-      {/* What is due — paid at the door, or the instalment amount Gini owes (orderProfit: due on delivery + Gini − Gini refunds) — less what is recorded as received. */}
-      <Row label={loc('مستحق لم يُسجَّل استلامه', 'Due, not recorded as received yet', 'ماوە، هێشتا وەک وەرگیراو تۆمار نەکراوە')} value={<DisplayMoney iqd={t.collection_difference_iqd} cents={c('collection_difference_iqd')} />} onClick={onCollections}
-        hint={loc('ليس عجزًا: مبالغ الدفع عند التسليم أو من Gini التي لم يُسجَّل وصولها بعد', 'Not a shortfall: amounts paid on delivery or by Gini whose arrival is not recorded yet', 'کەمی نییە: بڕی پارەدان لە کاتی گەیاندن یان لە لایەن Gini کە گەیشتنی هێشتا تۆمار نەکراوە')} />
-      {needsReview && <Row label={loc('تكاليف أو تسويات تحتاج مراجعة', 'Costs or settlements need review')} value={<Status tone="warning">{incomplete || loc('مراجعة', 'Review')}</Status>} onClick={() => onNavigate('orders')} />}
-      <p className="fw-note">{loc('الربح يختلف عن النقد المحصل. المرتجعات وتصحيحات التكاليف تظهر في تفاصيل الطلب.', 'Profit differs from collected cash. Returns and financial corrections appear in order details.')}</p>
-    </Surface></div>
-  </>;
 }
 
 /** The order types of 0174, as every screen names them. */
@@ -326,7 +292,8 @@ function Orders({ from, to, revision, openOrder }: { from: string; to: string; r
     }, search ? 220 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [from, to, search, kind, offset, revision, currency]);
-  return <Surface title={loc('أرباح الطلبات المستلمة', 'Delivered order profits')} subtitle={loc('الطلبات المكتملة بالتسليم فقط، حسب يوم التسليم. تشمل الأرباح والتكاليف أثر المرتجعات المسجلة.', 'Completed deliveries only, by delivery date. Profit and costs include recorded returns.')} action={<Button variant="ghost" onClick={() => { window.location.href = `${WORKSPACE_API}/export.csv?from=${from}&to=${to}`; }} aria-label={loc('تصدير التقرير', 'Export report')}><ArrowDownToLine size={17} /></Button>}>
+  return <Surface title={loc('أرباح الطلبات المستلمة', 'Delivered order profits')} subtitle={loc('الطلبات المكتملة بالتسليم فقط، حسب يوم التسليم. تشمل الأرباح والتكاليف أثر المرتجعات المسجلة.', 'Completed deliveries only, by delivery date. Profit and costs include recorded returns.')}>
+    {/* The export is the period bar's «تصدير CSV», labelled, for every report (redesign step 2). */}
     <div className="fw-toolbar"><div className="fw-search"><Search aria-hidden /><input className="fw-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={loc('ابحث برقم الطلب أو اسم الزبون', 'Search order number or customer')} aria-label={loc('البحث عن الطلب', 'Find an order')} /></div>
       <select className="fw-select" style={{ width: 'auto', flexShrink: 0 }} value={kind} onChange={(e) => setKind(e.target.value)} aria-label={loc('نوع الطلب', 'Order kind')} data-finance-order-kind>
         <option value="">{loc('كل الطلبات', 'All orders')}</option>

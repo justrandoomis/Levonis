@@ -259,8 +259,10 @@ test('an open cash advance is refused by code until it is applied to the wages; 
     assert.ok(shown.includes(s.settle.refusal.advance) && shown.includes(s.settle.refusalAction.advance), lang);
   }
   // What to do names the screens as the reader sees them, in each language (the tabs carry ckb labels).
-  const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx'), operations = codeOf('src/components/adminOperations/FinanceOperationsPanel.tsx');
-  const tabs = { withdrawals: /loc\('([^']+)', '([^']+)', '([^']+)'\), icon: Wallet/.exec(workspace), payroll: /id: 'payroll', name: loc\('([^']+)', '([^']+)', '([^']+)'\)/.exec(operations), apply: /id: 'settlement', name: loc\('([^']+)', '([^']+)', '([^']+)'\)/.exec(operations) };
+  // Since the redesign's frame (step 2, DECISIONS row 315) the workspace's pages are named in one table, overviewStrings.ts.
+  const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx'), words = codeOf('src/components/financeWorkspace/overviewStrings.ts'), operations = codeOf('src/components/adminOperations/FinanceOperationsPanel.tsx');
+  assert.match(workspace, /settlements: 'withdrawals'/, 'the withdrawals page is labelled by that entry');
+  const tabs = { withdrawals: /withdrawals: \['([^']+)', '([^']+)', '([^']+)'\]/.exec(words), payroll: /id: 'payroll', name: loc\('([^']+)', '([^']+)', '([^']+)'\)/.exec(operations), apply: /id: 'settlement', name: loc\('([^']+)', '([^']+)', '([^']+)'\)/.exec(operations) };
   for (const [i, lang] of LANGS.entries()) {
     const action = PERSON_FINANCE_STRINGS[lang].settle.refusalAction;
     assert.ok(action.withdrawal.includes(tabs.withdrawals![i + 1]), `${lang}: «${tabs.withdrawals![i + 1]}» in ${action.withdrawal}`);

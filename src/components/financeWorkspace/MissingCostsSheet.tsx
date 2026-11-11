@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { Check, PackagePlus } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
-import { Button, Loading, Money, Sheet, Status } from './ui';
+import { Button, Loading, Money, Sheet, Status, Surface } from './ui';
 import { financeDay, WORKSPACE_API } from './types';
 
 /**
@@ -49,7 +49,12 @@ export function groupMissing(lines: Line[]): Group[] {
   return [...groups.values()].sort((a, b) => Number(b.lines.some((l) => l.cogs_iqd == null)) - Number(a.lines.some((l) => l.cogs_iqd == null)) || b.qty - a.qty);
 }
 
-export default function MissingCostsSheet({ from, to, onClose, onChanged, openOrder }: { from: string; to: string; onClose: () => void; onChanged: () => void; openOrder: OpenOrder }) {
+/**
+ * `inline`: the same list as a page of «التكاليف» (redesign step 2) instead of a sheet over the overview.
+ * `reload`: read the list again when it changes — the page stays open (and is kept while hidden) when the
+ * owner prices a line in its order's sheet, so the workspace bumps it when such a sheet closes after a save.
+ */
+export default function MissingCostsSheet({ from, to, onClose, onChanged, openOrder, inline = false, reload = 0 }: { from: string; to: string; onClose: () => void; onChanged: () => void; openOrder: OpenOrder; inline?: boolean; reload?: number }) {
   const { loc } = useLanguage();
   const [data, setData] = useState<Answer | null>(null);
   const [error, setError] = useState('');
@@ -64,7 +69,7 @@ export default function MissingCostsSheet({ from, to, onClose, onChanged, openOr
     setError('');
     api.get<Answer>(`${WORKSPACE_API}/missing-costs?from=${from}&to=${to}`).then((r) => { if (active) { setData(r); setStale(false); } }).catch((e) => { if (active) { setError(e instanceof Error ? e.message : String(e)); setStale(false); } });
     return () => { active = false; };
-  }, [from, to, revision]);
+  }, [from, to, revision, reload]);
   const groups = useMemo(() => groupMissing(data?.lines ?? []), [data]);
   const finished = useCallback((applied: Applied) => {
     // Orders still waiting from earlier groups stay named until a later group completes them.
@@ -72,7 +77,8 @@ export default function MissingCostsSheet({ from, to, onClose, onChanged, openOr
     setPending((before) => [...new Set([...before.filter((id) => !applied.cleared.includes(id)), ...applied.pending])]);
     setRevision((v) => v + 1); onChanged();
   }, [onChanged]);
-  return <Sheet title={loc('التكاليف الناقصة', 'Missing costs', 'تێچووە کەمەکان')} subtitle={loc('كل بند مُسلَّم لم تُثبَّت تكلفة بضاعته في هذه الفترة', 'Every delivered line in this period without a confirmed goods cost', 'هەموو بڕگەیەکی گەیەندراو لەم ماوەیەدا کە تێچووی کاڵاکەی جێگیر نەکراوە')} onClose={onClose}>
+  const title = loc('التكاليف الناقصة', 'Missing costs', 'تێچووە کەمەکان'), subtitle = loc('كل بند مُسلَّم لم تُثبَّت تكلفة بضاعته في هذه الفترة', 'Every delivered line in this period without a confirmed goods cost', 'هەموو بڕگەیەکی گەیەندراو لەم ماوەیەدا کە تێچووی کاڵاکەی جێگیر نەکراوە');
+  const body = <>
     {error && <div className="fw-error" role="alert">{error}<Button variant="ghost" onClick={() => setRevision((v) => v + 1)}>{loc('تحديث', 'Refresh', 'نوێکردنەوە')}</Button></div>}
     {!data && !error && <Loading text={loc('تحميل البنود الناقصة…', 'Loading missing lines…', 'بارکردنی بڕگە کەمەکان…')} />}
     {pending.length > 0 && <p className="fw-note" role="status">{loc('حُفظ السعر، لكن حساب هذه الطلبات لم يكتمل بعد؛ افتح كل طلب لترى ما ينتظره (منتج آخر بلا تكلفة مثبتة، أو تسوية لم تكتمل):', 'Price saved, but these orders are not complete yet; open each to see what it is waiting for (another product without a confirmed cost, or a settlement not finished):', 'نرخەکە پاشەکەوت کرا، بەڵام حیسابی ئەم داواکاریانە هێشتا تەواو نەبووە؛ هەر داواکارییەک بکەرەوە بۆ ئەوەی ببینیت چاوەڕێی چییە (بەرهەمێکی تر بێ تێچووی جێگیر، یان ڕێکخستنێکی تەواونەبوو):')}{' '}
@@ -85,7 +91,8 @@ export default function MissingCostsSheet({ from, to, onClose, onChanged, openOr
       return <MissingGroup key={g.key} g={g} stockNote={first && !(g.product_id && data!.stocked.includes(g.product_id))} locked={stale || (running !== null && running !== g.key)}
         onStart={() => setRunning(g.key)} onDone={finished} openOrder={openOrder} />;
     })}
-  </Sheet>;
+  </>;
+  return inline ? <Surface title={title} subtitle={subtitle}><div className="fw-missing-page" data-finance-missing-page>{body}</div></Surface> : <Sheet title={title} subtitle={subtitle} onClose={onClose}>{body}</Sheet>;
 }
 
 function MissingGroup({ g, stockNote, locked, onStart, onDone, openOrder }: { g: Group; stockNote: boolean; locked: boolean; onStart: () => void; onDone: (applied: Applied) => void; openOrder: OpenOrder }) {

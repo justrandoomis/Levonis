@@ -30,6 +30,11 @@
  * voided and out-of-period filters of the waiting costs, nor a cancelled order's cost in
  * dollars (M2); and the dollar headline's notes had no cents for the two parts.
  *
+ * Redesign step 3 (DECISIONS row 315) adds the server's half of the overview's statement: «known.totals»
+ * and «waiting» — the complete and the incomplete orders' sums, each with its share of the overheads, and
+ * what each incomplete order waits for — in dinars and in cents, with a statement that adds up to the
+ * server's own net, term by term.
+ *
  * Run: node --import tsx --test tests/financeFigures.test.ts
  */
 import { test } from 'node:test';
@@ -41,6 +46,7 @@ import { baghdadDay } from '../worker/lib/operations';
 import { overviewNet } from '../src/components/financeWorkspace/overviewFigures';
 import { centsAt } from '../src/components/financeWorkspace/displayCurrency';
 import type { FinanceSummary } from '../src/components/financeWorkspace/types';
+import { statementAddsUp, statementRows, type StatementRow } from '../src/components/financeWorkspace/statement';
 
 type Raw = ReturnType<typeof freshDb>;
 const month = () => baghdadDay().slice(0, 7);
@@ -378,4 +384,106 @@ test('the waiting costs and the general expenses leave out a voided expense and 
   const d = s.chart_data.daily.find((x: { day: string }) => x.day === day);
   assert.deepEqual([d.cost_iqd, d.owner_net_iqd], [24000, -24000], 'the day the costs were entered carries them');
   assert.deepEqual([u.chart.daily[day].cost_cents, u.chart.daily[day].owner_net_cents], [1600, -1600], 'in dollars too');
+});
+
+// ------------------------------------------------------------ redesign step 3 (DECISIONS row 315)
+/** The fields /summary sums over orders (sumRows), which the statement's columns are read from. */
+const SUMMED = ['net_goods_iqd', 'retained_revenue_iqd', 'cogs_iqd', 'gross_profit_iqd', 'shipping_income_iqd', 'cod_tax_iqd', 'direct_cost_iqd', 'wages_iqd', 'materials_iqd', 'manual_direct_iqd',
+  'courier_fee_iqd', 'payment_fee_iqd', 'promotion_iqd', 'investor_iqd', 'owner_net_iqd', 'coupon_iqd', 'price_protection_iqd', 'trade_in_credit_returned_iqd', 'net_after_report_adjustments_iqd',
+  'collected_iqd', 'collection_difference_iqd', 'pending_costs', 'unknown_lines', 'units'];
+const cellOf = (rows: StatementRow[], key: string, col: 0 | 1 | 2) => rows.find((r) => r.key === key)!.cells[col];
+
+test('the statement\'s columns come from the server: «known.totals» and «waiting» add up to the period, the overheads split by revenue, and each incomplete order says what it waits for (redesign step 3)', async () => {
+  const w = world();
+  usd(w.raw);
+  const day = baghdadDay();
+  order(w.raw, { id: 'fifo', coupon: 3000 });
+  order(w.raw, { id: 'est', qty: 1, unit: 20000, cost: null, estimate: 15000, product: 'esun', shipping: 0 });
+  order(w.raw, { id: 'mag', qty: 60, unit: 500, cost: null, product: 'magnet', shipping: 0 });
+  order(w.raw, { id: 'wage' });
+  order(w.raw, { id: 'inv' });
+  w.raw.exec(`INSERT INTO finance_order_costs(id,order_id,order_item_id,rule_id,rule_version,rule_name,group_key,staff_id,category_id,milestone,qty,amount_iqd,cost_day,state,snapshot) VALUES
+      ('c1','wage',NULL,'r1',1,'Packing wage','g1','staff_sajjad','rent','delivered',1,NULL,'${day}','pending_cost','{}'),
+      ('c2','fifo',NULL,'r2',1,'Packing wage','g2','staff_sajjad','rent','delivered',1,7500,'${day}','approved','{}'),
+      ('c3','fifo',NULL,'r3',1,'Box','g3',NULL,'rent','delivered',1,2000,'${day}','approved','{}');
+    INSERT INTO incoming_inventory(id,product_id,scope,scope_id,qty_ordered,qty_received,purchase_unit_iqd) VALUES ('batch','product','base','',2,2,10000);
+    INSERT INTO investment_contracts(id,incoming_id,user_id,name,principal_iqd,capital_share_bps,profit_share_bps,loss_share_bps,created_by,created_at,request_json,state) VALUES ('contract','batch','buyer','Funding',20000,10000,1000,1000,'admin','now','{}','active');
+    INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent1','rent',10001,'${day}','Rent','admin');`);
+  w.raw.prepare("UPDATE inventory_lots SET incoming_id='batch' WHERE id='inv:lot'").run();
+  const s = await w.read(`/f/summary?${period()}&display=USD`);
+  const k = s.known, wt = s.waiting, t = s.totals;
+  // Each incomplete order names the one thing it waits for, first match in the order the owner fixes them.
+  assert.equal(wt.orders_count, 3);
+  assert.deepEqual(wt.reasons, { no_price: ['mag'], wage_waits_cost: ['wage'], investor_waits: ['inv'] });
+  assert.deepEqual([k.orders_count, k.totals.orders_count, k.incomplete_orders], [2, 2, 3]);
+  // The complete orders and the waiting ones add up to the period, field by field, wherever both are known.
+  for (const f of SUMMED) {
+    if (k.totals[f] === null || wt.totals[f] === null) continue;
+    assert.equal(k.totals[f] + wt.totals[f], t[f], f);
+  }
+  assert.deepEqual([wt.totals.cogs_iqd, wt.totals.investor_iqd, wt.totals.owner_net_iqd], [null, null, null], 'what the waiting orders lack stays unknown, never 0');
+  assert.equal(wt.totals.pending_costs, 1);
+  // The rent is shared by revenue: what the complete orders carry is their known share, the rest waits with the others.
+  assert.equal(k.general_share_iqd, k.overhead_share_iqd);
+  assert.equal(k.general_share_iqd + wt.general_share_iqd, 10001, 'the period\'s general expenses, to the dinar');
+  assert.equal(k.unallocated_share_iqd + wt.unallocated_share_iqd, 0);
+  // The statement drawn from them: the «محسوبة» column adds up to the headline; the period waits.
+  const st = statementRows(s as FinanceSummary);
+  assert.equal(st.currency, 'IQD');
+  assert.equal(statementAddsUp(st.rows, 0), true);
+  assert.equal(cellOf(st.rows, 'net', 0), overviewNet(s as FinanceSummary).net, 'the column\'s net is «صافي حصتك»');
+  assert.deepEqual([cellOf(st.rows, 'wages', 0), cellOf(st.rows, 'materials', 0)], [7500, 2000]);
+  assert.equal(cellOf(st.rows, 'deductions', 0), 3000, 'the confirmed order\'s coupon');
+  assert.equal(statementAddsUp(st.rows, 2), null, 'the period waits for the magnets, the wage and the investor');
+  assert.deepEqual([cellOf(st.rows, 'cogs', 1), cellOf(st.rows, 'wages', 1), cellOf(st.rows, 'investor', 1), cellOf(st.rows, 'net', 1)], [null, null, null, null]);
+  for (const r of st.rows) if (r.cells[0] !== null && r.cells[1] !== null) assert.equal(r.cells[0] + r.cells[1], r.cells[2], `${r.key}: «محسوبة» + «تنتظر» = the period`);
+  // In dollars the same columns are the server's cents: the shares add up to the period's, the column to its net.
+  const u = s.display_usd;
+  assert.equal(u.known.general_share_cents + u.waiting.general_share_cents, u.totals.general_expenses_cents);
+  assert.equal(u.waiting.orders_count, 3);
+  for (const f of SUMMED.map((x) => x.replace(/_iqd$/, '_cents'))) {
+    if (!(f in u.totals) || u.known.totals[f] == null || u.waiting.totals[f] == null) continue;
+    assert.equal(u.known.totals[f] + u.waiting.totals[f], u.totals[f], f);
+  }
+  const su = statementRows(s as FinanceSummary, u);
+  assert.equal(su.currency, 'USD');
+  assert.equal(statementAddsUp(su.rows, 0), true, 'to the cent');
+  assert.equal(cellOf(su.rows, 'net', 0), u.known.net_after_report_adjustments_cents);
+  for (const r of su.rows) if (r.cells[0] !== null && r.cells[1] !== null) assert.equal(r.cells[0] + r.cells[1], r.cells[2], `${r.key} in cents`);
+});
+
+test('a complete period\'s statement adds up to the server\'s «صافي حصتك» term by term — goods, delivery, COD fee, wages, materials, a manual cost, the courier\'s fee, promotion, rent, coupon and credit — in dinars and to the cent in dollars (redesign step 3)', async () => {
+  const w = world();
+  usd(w.raw);
+  const day = baghdadDay(), m = month();
+  order(w.raw, { id: 'fifo', coupon: 3000 });
+  order(w.raw, { id: 'est', qty: 1, unit: 20000, cost: null, estimate: 15000, product: 'esun', shipping: 0 });
+  w.raw.exec(`UPDATE orders SET cod_tax_iqd=4000,total_iqd=total_iqd+4000,due_on_delivery_iqd=due_on_delivery_iqd+4000 WHERE id='fifo';
+    INSERT INTO finance_order_costs(id,order_id,order_item_id,rule_id,rule_version,rule_name,group_key,staff_id,category_id,milestone,qty,amount_iqd,cost_day,state,snapshot) VALUES
+      ('c2','fifo',NULL,'r2',1,'Packing wage','g2','staff_sajjad','rent','delivered',1,7508,'${day}','approved','{}'),
+      ('c3','fifo',NULL,'r3',1,'Box','g3',NULL,'rent','delivered',1,2108,'${day}','approved','{}');
+    INSERT INTO finance_order_adjustments(id,operation_id,order_id,order_item_id,field,old_value_iqd,new_value_iqd,delta_iqd,version,actor_id,created_at,allocations_json,before_json,after_json) VALUES
+      ('adj1','op-courier','fifo','fifo:item','courier_fee_iqd',0,3001,3001,1,'admin','now','[{"line_id":"fifo:item","delta_iqd":3001}]','{}','{}'),
+      ('adj2','op-manual','fifo','fifo:item','manual_direct_iqd',0,1499,1499,2,'admin','now','[{"line_id":"fifo:item","delta_iqd":1499}]','{}','{}');
+    INSERT INTO finance_order_versions(order_id,version) VALUES ('fifo',2);
+    INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,credited_iqd,state) VALUES ('pp1','buyer','fifo','fifo:item',25000,23000,1,2000,'credited');
+    INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent1','rent',10001,'${day}','Rent','admin'),('promo-exp','rent',6001,'${m}-01','Promotion','admin');
+    INSERT INTO finance_monthly_promotions(id,month,title,currency,amount_minor,exchange_rate,amount_iqd,enabled,expense_id,version,created_by,created_at,updated_at) VALUES ('promo','${m}','ترويج','IQD',6001,1,6001,1,'promo-exp',1,'admin','now','now');`);
+  const s = await w.read(`/f/summary?${period()}&display=USD`);
+  assert.equal(s.waiting, null, 'every order is complete');
+  assert.notEqual(s.totals.owner_period_net_after_report_adjustments_iqd, null);
+  const st = statementRows(s as FinanceSummary);
+  // Every term carries an amount, so the sum proves the order and the signs, not a run of zeros.
+  for (const key of ['cod', 'wages', 'materials', 'fees', 'promotion', 'general', 'deductions']) assert.ok((cellOf(st.rows, key, 2) ?? 0) > 0, key);
+  assert.equal(cellOf(st.rows, 'materials', 2), 2108 + 1499, 'the box and the manual cost');
+  assert.equal(cellOf(st.rows, 'deductions', 2), 3000 + 2000, 'the coupon and the credited price protection');
+  assert.equal(statementAddsUp(st.rows, 2), true);
+  assert.equal(cellOf(st.rows, 'net', 2), s.totals.owner_period_net_after_report_adjustments_iqd);
+  assert.deepEqual(st.rows.map((r) => r.cells[0]), st.rows.map((r) => r.cells[2]), 'nothing waits: «محسوبة» is the period');
+  // In dollars each field is converted on its own: 7,508 and 2,108 are 501 and 141 cents, their 9,616 only 641. Read as
+  // every direct cost that is not a wage, the materials row still lands on the server's net to the cent.
+  const su = statementRows(s as FinanceSummary, s.display_usd);
+  assert.equal(su.currency, 'USD');
+  assert.equal(statementAddsUp(su.rows, 2), true);
+  assert.equal(cellOf(su.rows, 'net', 2), s.display_usd.totals.owner_period_net_after_report_adjustments_cents);
 });

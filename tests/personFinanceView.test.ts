@@ -164,17 +164,23 @@ test('the missing-costs sheet groups by product and size, no-price groups first,
   assert.match(sheet, /locked=\{stale \|\| \(running !== null && running !== g\.key\)\}/);
   assert.match(sheet, /openOrder\(l\.order_id, 'cost', l\.line_id\)/);
   const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
-  // The headline is worked out in overviewFigures.ts since DECISIONS row 313 (after the order deductions);
-  // the overview draws that figure and its cents.
+  // The headline is worked out in overviewFigures.ts since DECISIONS row 313 (after the order deductions); since
+  // redesign step 3 (DECISIONS row 315) the overview is its own file and draws that figure and its cents.
   const figures = codeOf('src/components/financeWorkspace/overviewFigures.ts');
-  assert.match(workspace, /const figures = overviewNet\(data, u\);/);
-  assert.match(workspace, /value: net, cents: figures\.cents,/);
+  const overview = codeOf('src/components/financeWorkspace/Overview.tsx');
+  assert.match(overview, /const figures = overviewNet\(data, u\);/);
+  assert.match(overview, /value: <DisplayMoney iqd=\{figures\.net\} cents=\{figures\.cents\} \/>/);
   // No bare dash for an incomplete total: what complete orders say, and what is missing.
   assert.match(figures, /const knownNet = known \? \(known\.net_after_report_adjustments_iqd !== undefined \? known\.net_after_report_adjustments_iqd : known\.owner_net_iqd\) : null;/);
   assert.match(figures, /const net = full \?\? \(fromKnown \? knownNet : null\);/);
-  assert.match(workspace, /missing && missing\.lines > 0/);
-  assert.match(workspace, /onMissing=\{\(\) => setMissingOpen\(true\)\}/);
+  // The missing costs: the overview's banner and its list open the costs page (no longer a sheet over the overview).
+  assert.match(overview, /\{!!missing\?\.lines && <Button variant="primary" onClick=\{onMissing\}>/);
+  assert.match(overview, /if \(missing\?\.lines\) items\.push\(\{ key: 'costs'/);
+  assert.match(workspace, /onMissing=\{\(\) => setSection\('missing'\)\}/);
+  // The page stays open while a line is priced in its order's sheet: it reads its list again when that sheet closes after a save.
+  assert.match(workspace, /<MissingCostsSheet inline reload=\{peopleRevision\} from=\{range\.from\} to=\{range\.to\}/);
+  assert.match(sheet, /\}, \[from, to, revision, reload\]\);/);
   // In dollars the complete orders' figures are the server's cents, never dinars among dollars.
   assert.match(figures, /fromKnown \? \(uk \? \(uk\.net_after_report_adjustments_cents !== undefined \? uk\.net_after_report_adjustments_cents : uk\.owner_net_cents\) \?\? null : null\)/);
-  assert.match(workspace, /costFromKnown \? uk\?\.cost_cents \?\? null/);
+  assert.match(overview, /u\.known\?\.totals \? centsAt\(u\.known\.totals, 'gross_profit_iqd'\) : null/);
 });

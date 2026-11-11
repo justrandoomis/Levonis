@@ -34,6 +34,7 @@ import type { DisplayUsdSummary, FinanceSummary } from '../src/components/financ
 import ReportDeductions from '../src/components/financeWorkspace/ReportDeductions';
 import { DisplayCurrencyContext } from '../src/components/financeWorkspace/displayCurrency';
 import { LanguageProvider } from '../src/LanguageContext';
+import { FW } from '../src/components/financeWorkspace/overviewStrings';
 import { codeOf } from './fixtures/source';
 import { ROOT } from './fixtures/d1';
 
@@ -49,8 +50,8 @@ register(
        }`
     )
 );
-const { Overview, default: FinanceWorkspace } = await import('../src/components/financeWorkspace/FinanceWorkspace');
-const { default: OverviewCharts } = await import('../src/components/financeWorkspace/OverviewCharts');
+const { default: FinanceWorkspace } = await import('../src/components/financeWorkspace/FinanceWorkspace');
+const { default: Overview } = await import('../src/components/financeWorkspace/Overview');
 
 const summary = (over: Partial<FinanceSummary> & { totals?: FinanceSummary['totals'] }): FinanceSummary => ({
   range: { from: '2026-11-01', to: '2026-11-11' }, orders: [], kinds: null, products: [], categories: [], exceptions: [], promotions: [],
@@ -124,25 +125,29 @@ test('a returned trade-in credit reads in dollars wherever the deductions are dr
   assert.doesNotMatch(usd, /data-finance-missing/, 'the credit has its dollars');
   assert.doesNotMatch(draw('IQD'), /data-finance-missing/);
   assert.match(draw('USD', { coupon: 0, credit: 0, net: 1867 }), /data-finance-missing/, 'without them the row would say «ناقص»');
-  // So every caller that draws dollars passes the credit's cents beside the coupon's and the price protection's.
-  const calls = ['FinanceWorkspace.tsx', 'OrderProfitSheet.tsx']
+  // So every caller that draws dollars passes the credit's cents beside the coupon's and the price protection's: the product rows
+  // and the order sheet. Since step 3 the period's deductions are a row of the overview's statement, the credit in it in both currencies.
+  const calls = ['FinanceWorkspace.tsx', 'OrderProfitSheet.tsx', 'Overview.tsx']
     .flatMap((file) => codeOf(`src/components/financeWorkspace/${file}`).split('\n').filter((line) => line.includes('<ReportDeductions ')));
-  assert.equal(calls.length, 3, 'the period, the product rows and the order sheet');
+  assert.equal(calls.length, 2, 'the product rows and the order sheet');
   for (const call of calls) assert.match(call, /tradeIn: \w+\('trade_in_credit_returned_iqd'\)/, call.trim().slice(0, 160));
+  assert.match(codeOf('src/components/financeWorkspace/statement.ts'), /case 'deductions': return add\(v\('coupon_iqd'\), v\('price_protection_iqd'\), t\.trade_in_credit_returned_iqd \?\? 0\);/);
 });
 
 test('the note under «صافي حصتك» names the complete orders in Arabic, English and real Sorani; no Sorani on the screen is the Arabic', () => {
   const ARABIC_ONLY = /[ةىيك]/, SORANI_ONLY = /[ڕڵێۆەڤگچپژ]/;
-  const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
-  for (const ar of ['من الطلبات المكتملة فقط', '، مع حصتها من المصاريف العامة بنسبة إيرادها']) {
-    const words = new RegExp(`loc\\('${ar}', '([^']+)', '([^']+)'\\)`).exec(workspace);
-    assert.ok(words, `«${ar}» carries its English and its Sorani`);
-    assert.doesNotMatch(words[1], /[؀-ۿ]/, 'the English is English');
-    assert.notEqual(words[2], ar);
-    assert.match(words[2], SORANI_ONLY, words[2]);
-    assert.doesNotMatch(words[2], ARABIC_ONLY, words[2]);
+  // Since step 3 the overview's words are one table (overviewStrings.ts); the note's are these.
+  assert.match(FW.knownNote[0], /^من الطلبات المكتملة فقط /);
+  assert.equal(FW.overheadNote[0], '، مع حصتها من المصاريف العامة بنسبة إيرادها');
+  for (const key of ['knownNote', 'overheadNote', 'confirmedPart', 'estimatedPart', 'deducted', 'shareMargin'] as const) {
+    const [ar, en, ckb] = FW[key];
+    assert.doesNotMatch(en, /[؀-ۿ]/, `${key}: the English is English`);
+    assert.notEqual(ckb, ar, key);
+    assert.match(ckb, SORANI_ONLY, ckb);
+    assert.doesNotMatch(ckb, ARABIC_ONLY, ckb);
   }
-  const overview = [workspace, codeOf('src/components/financeWorkspace/OverviewCharts.tsx'), codeOf('src/components/financeWorkspace/displayCurrency.tsx')].join('\n');
+  const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
+  const overview = [workspace, codeOf('src/components/financeWorkspace/Overview.tsx'), codeOf('src/components/financeWorkspace/displayCurrency.tsx')].join('\n');
   for (const [, ar, , ckb] of overview.matchAll(/loc\('([^']*)', '([^']*)', '([^']*)'\)/g)) {
     assert.doesNotMatch(ckb, ARABIC_ONLY, `«${ckb}»`);
     if (/[؀-ۿ]/.test(ar.replace(/[،؛]/g, ''))) assert.notEqual(ckb, ar, `the Sorani of «${ar}» is the Arabic`);
@@ -180,18 +185,21 @@ test('what the note names as taken off is what came off the figure shown: the co
 });
 
 const noop = () => {};
-/** The overview as the owner sees it (the charts load lazily, so they are not part of this markup). */
-function screen(data: FinanceSummary, currency: 'IQD' | 'USD' = 'IQD', lang: 'ar' | 'en' | 'ckb' = 'ar') {
+/** The overview as the owner sees it, on its first render (the payouts it reads after mounting say they are loading). */
+function screen(data: FinanceSummary, currency: 'IQD' | 'USD' = 'IQD', lang: 'ar' | 'en' | 'ckb' = 'ar', prev: FinanceSummary | null = null) {
   LANG = lang;
   try {
     return renderToStaticMarkup(createElement(LanguageProvider, null, createElement(DisplayCurrencyContext.Provider, { value: currency },
-      createElement(Overview, { data, from: '2026-11-01', to: '2026-11-11', revision: 0, openOrder: noop, onNavigate: noop, onCollections: noop, onMissing: noop }))));
+      createElement(Overview, { data, prev, compareFrom: prev ? '2026-10-01' : undefined, compareTo: prev ? '2026-10-11' : undefined, openOrder: noop, onNavigate: noop, onCollections: noop, onMissing: noop }))));
   } finally { LANG = 'ar'; }
 }
-/** The note under «صافي حصتك»: the primary tile's own <small> (the accounting value's carries a class). */
-const headlineNote = (html: string) => /fw-metric--primary[\s\S]*?<small>([^<]*)<\/small>/.exec(html)?.[1] ?? '';
-/** One row of the overview, from its label to the end of its button. */
-const rowOf = (html: string, label: string) => { const at = html.indexOf(`class="fw-row-label">${label}`); assert.ok(at >= 0, `the row «${label}»`); return html.slice(at, html.indexOf('</button>', at)); };
+/** One card of the overview, from its label to the next card. */
+const cardOf = (html: string, key: string) => { const at = html.indexOf(`data-finance-kpi="${key}"`); assert.ok(at >= 0, `the card ${key}`); const next = html.indexOf('data-finance-kpi=', at + 20), end = next < 0 ? html.indexOf('class="fw-grid', at) : next; return html.slice(at, end); };
+/** The notes under «صافي حصتك»: the card's own <small>s (the accounting value's carries a class). */
+const headlineNote = (html: string) => [...cardOf(html, 'netShare').matchAll(/<small>([^<]*)<\/small>/g)].map((m) => m[1]).join(' · ');
+/** One row of the statement, label and cells. */
+const rowOf = (html: string, key: string) => { const m = new RegExp(`<tr[^>]*data-key="${key}">([\\s\\S]*?)</tr>`).exec(html); assert.ok(m, `the statement row ${key}`); return m[1]; };
+const chips = (html: string, word: string) => (html.match(new RegExp(`data-finance-missing="true">${word}<`, 'g')) ?? []).length;
 
 /** 1–11 Nov in shape: nine complete orders of thirteen; a 3,000 coupon on a confirmed order and 5,000 on an incomplete one. */
 const period = () => summary({
@@ -200,7 +208,7 @@ const period = () => summary({
   known: { orders_count: 9, incomplete_orders: 4, revenue_iqd: 4847211, cost_iqd: 3678427, owner_net_iqd: 1168784, net_after_report_adjustments_iqd: 1165784, overhead_share_iqd: 0,
     confirmed: { orders_count: 3, revenue_iqd: 3310000, owner_net_iqd: 784859, net_after_report_adjustments_iqd: 781859 },
     estimated: { orders_count: 6, revenue_iqd: 1537211, owner_net_iqd: 383925, net_after_report_adjustments_iqd: 383925 } },
-  display_usd: { available: true, at_time_count: 13, today_count: 0, totals: { owner_period_net_cents: null, owner_period_net_after_report_adjustments_cents: null, coupon_cents: 533, price_protection_cents: 0, trade_in_credit_returned_cents: 0, investor_cents: null },
+  display_usd: { available: true, at_time_count: 13, today_count: 0, totals: { owner_period_net_cents: null, owner_period_net_after_report_adjustments_cents: null, coupon_cents: 533, price_protection_cents: 0, trade_in_credit_returned_cents: 0, investor_cents: null, collected_cents: 0, collection_difference_cents: 133333 },
     known: { revenue_cents: 323147, cost_cents: 245228, owner_net_cents: 77919, net_after_report_adjustments_cents: 77719,
       confirmed: { orders_count: 3, owner_net_cents: 52324, net_after_report_adjustments_cents: 52124 }, estimated: { orders_count: 6, owner_net_cents: 25595, net_after_report_adjustments_cents: 25595 } },
     chart: { revenue_cents: 466511, cost_cents: null, owner_net_cents: null, investor_cents: null, daily: {}, expense_composition: [] } },
@@ -212,11 +220,15 @@ test('the overview: the note under «صافي حصتك» names the complete orde
   assert.match(iqd, /من طلبات فيها تكلفة تقديرية 383,925 د\.ع \(6\)/);
   assert.match(iqd, /−3,000 د\.ع/, 'the confirmed order\'s coupon came off the headline');
   assert.doesNotMatch(iqd, /8,000/, 'the incomplete order\'s coupon did not');
-  const usd = headlineNote(screen(period(), 'USD'));
+  assert.match(iqd, /من الطلبات المكتملة فقط \(9\/13\)/, 'and the basis of the figure is printed with it');
+  const usdHtml = screen(period(), 'USD'), usd = headlineNote(usdHtml);
   assert.match(usd, /مؤكد \$521\.24 \(3\)/);
   assert.match(usd, /من طلبات فيها تكلفة تقديرية \$255\.95 \(6\)/);
   assert.match(usd, /−\$2\.00/);
   assert.doesNotMatch(usd, /د\.ع/, 'no dinars beside a dollar headline');
+  // The other cards' notes too: the average order is the server's cents.
+  assert.match(cardOf(usdHtml, 'deliveredOrders'), /متوسط الطلب \$358\.85/);
+  assert.doesNotMatch(cardOf(usdHtml, 'deliveredOrders'), /د\.ع/);
   // A server without the parts' cents: the dollar note names the parts and leaves their amounts out.
   const older = period(); delete older.display_usd!.known!.confirmed; delete older.display_usd!.known!.estimated;
   const bare = headlineNote(screen(older, 'USD'));
@@ -224,28 +236,29 @@ test('the overview: the note under «صافي حصتك» names the complete orde
   assert.doesNotMatch(bare, /د\.ع/);
 });
 
-test('the overview: no margin is a bare «—»; a waiting investor share says «ينتظر» on both its rows (review nits)', () => {
+test('the overview: no margin is a bare «—»; a waiting investor share says «ينتظر», not «ناقص» (review nits)', () => {
   const html = screen(summary({ totals: { orders_count: 2, unknown_lines: 1, owner_net_iqd: null, owner_period_net_iqd: null, owner_period_net_after_report_adjustments_iqd: null, investor_iqd: null } }));
   const note = headlineNote(html);
   assert.doesNotMatch(note, /هامش حصتك|—/, `no net, no margin to name: «${note}»`);
-  for (const label of ['حصة المستثمرين', 'حصص المستثمرين']) {
-    const row = rowOf(html, label);
-    assert.match(row, /data-finance-missing[^>]*>ينتظر</, `«${label}» waits`);
-    assert.doesNotMatch(row, />ناقص</, `«${label}» is not «ناقص» on one row and «ينتظر» on the other`);
-  }
+  const investor = rowOf(html, 'investor');
+  assert.match(investor, /data-finance-missing="true">ينتظر</, 'the investor share waits');
+  assert.doesNotMatch(investor, />ناقص</);
   assert.match(headlineNote(screen(period())), /هامش حصتك 24\.1%/, 'with a net, the margin over the complete orders\' revenue');
 });
 
 test('the overview: money due and not recorded yet is named for what it holds — paid on delivery or by Gini — in Arabic, English and Sorani (review nit)', () => {
-  const words = { ar: ['مستحق لم يُسجَّل استلامه', 'ليس عجزًا: مبالغ الدفع عند التسليم أو من Gini'], en: ['Due, not recorded as received yet', 'on delivery or by Gini'], ckb: ['ماوە، هێشتا وەک وەرگیراو تۆمار نەکراوە', 'یان لە لایەن Gini'] } as const;
+  const words = { ar: ['مستحق لم يُسجَّل استلامه', 'ليس عجزًا: مبالغ الدفع عند التسليم أو من Gini', 'مستحق عند التسليم أو من Gini'], en: ['Due, not recorded as received yet', 'on delivery or by Gini', 'Due on delivery or from Gini'],
+    ckb: ['ماوە، هێشتا وەک وەرگیراو تۆمار نەکراوە', 'یان لە لایەن Gini', 'ماوە لە کاتی گەیاندن یان لە Gini'] } as const;
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const html = screen(period(), 'IQD', lang);
     for (const text of words[lang]) assert.ok(html.includes(text), `${lang}: «${text}»`);
-    assert.doesNotMatch(html, /عند التسليم ولم يُسجَّل استلامه|Due on delivery, not recorded yet|cash-on-delivery amounts whose arrival/, `${lang}: the old words, which left Gini out`);
+    assert.doesNotMatch(html, /عند التسليم ولم يُسجَّل استلامه|Due on delivery, not recorded yet|cash-on-delivery amounts whose arrival|يُحصَّل عند التسليم/, `${lang}: the old words, which left Gini out`);
   }
-  // On a phone a long hint beside a figure squeezed it until it split inside its digits («5,664,6» / «67 د.ع», in English
-  // since step 1 and in Sorani with these words; the screens showed it). The figure keeps its digits together: the
-  // value column never shrinks below them, and the figure may break only between the number and «د.ع».
+  // The cash card adds the server's two figures and nothing else: due = recorded + not recorded yet.
+  const cash = /data-finance-cash="true">([\s\S]*?)<\/dl>/.exec(screen(period()))![1];
+  assert.deepEqual([...cash.matchAll(/>([\d,]+) د\.ع</g)].map((m) => m[1]), ['2,000,000', '0', '2,000,000']);
+  // On a phone a long hint beside a figure squeezed it until it split inside its digits («5,664,6» / «67 د.ع»; the screens showed
+  // it). The rows that remain keep the figure whole: the value column never shrinks below it, and it breaks only before «د.ع».
   const css = readFileSync(join(ROOT, 'src/components/financeWorkspace/finance-workspace.css'), 'utf8');
   const phone = css.slice(css.indexOf('@media(max-width:600px)'));
   const rule = (selector: string) => new RegExp(`[{}]${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\{([^}]*)\\}`).exec(phone)?.[1];
@@ -254,25 +267,31 @@ test('the overview: money due and not recorded yet is named for what it holds �
   assert.match(rule('.fw-row-value .fw-money,.fw-sheet-footer .fw-money') ?? '', /overflow-wrap:normal/, 'a figure breaks only between the number and its currency');
 });
 
-test('the overview\'s tables say «ناقص» for an incomplete amount, never a bare dash, in dinars and dollars (review nit)', () => {
+test('the overview\'s tables say «ناقص» or «ينتظر» for an incomplete amount, never a bare dash, in dinars and dollars (review nit)', () => {
   const data = summary({
-    chart_data: { revenue_iqd: 55000, cost_iqd: null, owner_net_iqd: null, investor_iqd: 0, orders_count: 1, unknown_lines: 1, pending_costs: 1, basis: 'delivered_baghdad_day',
-      daily: [{ day: '2026-11-02', revenue_iqd: 55000, cost_iqd: null, owner_net_iqd: null, investor_iqd: 0, orders_count: 1, unknown_lines: 1, pending_costs: 1 }],
-      expense_composition: [{ key: 'goods', amount_iqd: null }, { key: 'wages', amount_iqd: null }, { key: 'delivery', amount_iqd: 0 }, { key: 'general', amount_iqd: 4000 }] } as unknown as FinanceSummary['chart_data'],
-    categories: [{ id: 'printers', name: 'الطابعات', level: 'main', qty: 1, owner_net_iqd: null }] as FinanceSummary['categories'],
+    totals: { orders_count: 1, unknown_lines: 1, pending_costs: 1, retained_revenue_iqd: 55000, cogs_iqd: null, gross_profit_iqd: null, shipping_income_iqd: 5000, cod_tax_iqd: 0, direct_cost_iqd: 0, wages_iqd: 0, materials_iqd: 0,
+      manual_direct_iqd: 0, courier_fee_iqd: 0, payment_fee_iqd: 0, promotion_iqd: 1500, investor_iqd: 0, owner_net_iqd: null, owner_period_net_iqd: null, owner_period_net_after_report_adjustments_iqd: null,
+      coupon_iqd: 0, price_protection_iqd: 0, trade_in_credit_returned_iqd: 0, general_expenses_iqd: 4000 },
+    products: [{ id: 'magnet', name: 'Magnet', qty: 60, retained_revenue_iqd: 55000, gross_profit_iqd: null }, { id: 'printer', name: 'Printer', qty: 1, retained_revenue_iqd: 100000, gross_profit_iqd: 25000 }] as FinanceSummary['products'],
+    display_usd: { available: true, totals: { retained_revenue_cents: 3667, cogs_cents: null, gross_profit_cents: null, shipping_income_cents: 333, cod_tax_cents: 0, direct_cost_cents: 0, wages_cents: 0, materials_cents: 0,
+      manual_direct_cents: 0, courier_fee_cents: 0, payment_fee_cents: 0, promotion_cents: 100, investor_cents: 0, coupon_cents: 0, price_protection_cents: 0, trade_in_credit_returned_cents: 0,
+      general_expenses_cents: 267, unallocated_promotion_cents: 0, owner_period_net_cents: null, owner_period_net_after_report_adjustments_cents: null },
+      products: { magnet: { retained_revenue_cents: 3667, gross_profit_cents: null }, printer: { retained_revenue_cents: 6667, gross_profit_cents: 1667 } } } as DisplayUsdSummary,
   });
-  const usd = { available: true, categories: { main: { printers: { owner_net_cents: null } }, sub: {} },
-    chart: { revenue_cents: 3667, cost_cents: null, owner_net_cents: null, investor_cents: 0, daily: { '2026-11-02': { revenue_cents: 3667, cost_cents: null, owner_net_cents: null, investor_cents: 0 } },
-      expense_composition: [{ key: 'goods', amount_cents: null }, { key: 'wages', amount_cents: null }, { key: 'delivery', amount_cents: 0 }, { key: 'general', amount_cents: 267 }] } } as DisplayUsdSummary;
-  for (const [currency, u] of [['IQD', undefined], ['USD', usd]] as const) {
-    LANG = 'ar';
-    const html = renderToStaticMarkup(createElement(LanguageProvider, null, createElement(OverviewCharts, { data, usd: u })));
-    const cells = [...html.matchAll(/<td>([\s\S]*?)<\/td>/g)].map((m) => m[1]);
-    assert.ok(cells.length > 0, currency);
-    for (const cell of cells) assert.doesNotMatch(cell, /^—$|>—</, `${currency}: a table cell is a bare dash: ${cell}`);
-    // The goods and the wages of the cost table, the day's cost and net, and the section's net.
-    assert.equal(cells.filter((cell) => /data-finance-missing[^>]*>ناقص</.test(cell)).length, 5, `${currency}: every incomplete amount says «ناقص»`);
+  for (const currency of ['IQD', 'USD'] as const) {
+    const html = screen(data, currency);
+    const tables = [...html.matchAll(/<table[\s\S]*?<\/table>/g)].map((m) => m[0]).join('');
+    const cells = [...tables.matchAll(/<td[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1]);
+    assert.ok(cells.length > 15, currency);
+    for (const c of cells) assert.doesNotMatch(c, /^—$|>—</, `${currency}: a table cell is a bare dash: ${c}`);
+    // The statement: the goods cost, the gross and the net are missing; the wages and the materials wait for the cost a wage
+    // waits for (a waiting cost is in neither sum yet). The products: the magnets' gross profit and margin.
+    assert.equal(chips(tables, 'ناقص'), 5, `${currency}: every incomplete amount says «ناقص»`);
+    assert.equal(chips(tables, 'ينتظر'), 2, `${currency}: what waits for a cost says «ينتظر»`);
+    assert.match(rowOf(html, 'materials'), /data-finance-missing="true">ينتظر</);
+    assert.match(rowOf(html, 'sales'), currency === 'USD' ? /\$36\.67/ : /55,000 د\.ع/, `${currency}: a known amount is drawn`);
   }
+  assert.match(screen(data, 'USD'), /data-finance-statement="USD"/, 'in dollars the statement is the server\'s cents');
 });
 
 test('the workspace opens on «هذا الشهر حتى اليوم», the range it shows; the wage row says when wages still wait for their cost (review coverage)', () => {
@@ -280,6 +299,40 @@ test('the workspace opens on «هذا الشهر حتى اليوم», the range 
   const workspace = renderToStaticMarkup(createElement(LanguageProvider, null, createElement(FinanceWorkspace)));
   assert.match(workspace, /<option value="month" selected="[^"]*">هذا الشهر حتى اليوم<\/option>/, 'not «فترة مخصصة» for the month so far');
   const waiting = screen(summary({ totals: { orders_count: 2, pending_costs: 2, wages_iqd: 7500 } }));
-  assert.match(rowOf(waiting, 'أجور الموظفين'), /لا يشمل أجورًا تنتظر تكلفتها \(2\)/);
-  assert.doesNotMatch(rowOf(screen(summary({ totals: { orders_count: 2, pending_costs: 0, wages_iqd: 7500 } })), 'أجور الموظفين'), /تنتظر تكلفتها/);
+  assert.match(rowOf(waiting, 'wages'), /أجور تنتظر تكلفتها: 2/);
+  assert.match(rowOf(waiting, 'wages'), /data-finance-missing="true">ينتظر</, 'and the period\'s wages are not shown as known');
+  const paid = rowOf(screen(summary({ totals: { orders_count: 2, pending_costs: 0, wages_iqd: 7500 } })), 'wages');
+  assert.doesNotMatch(paid, /تنتظر تكلفتها/);
+  assert.match(paid, /7,500 د\.ع/);
+});
+
+test('the overview, top to bottom: how much is calculated and what the rest waits for, the cards against the comparison, what needs the owner, the statement (redesign step 3)', () => {
+  const data = period();
+  data.totals = { ...data.totals, retained_revenue_iqd: 6858667, gross_profit_iqd: null, units: 166, general_expenses_iqd: 0 };
+  data.known = { ...data.known!, totals: { retained_revenue_iqd: 4813000, gross_profit_iqd: 1176000 } };
+  data.waiting = { orders_count: 4, totals: {}, reasons: { no_price: ['a', 'b'], wage_waits_cost: ['c'], investor_waits: ['ORD-X2D'] }, general_share_iqd: 0, unallocated_share_iqd: 0 };
+  data.missing_costs = { lines: 19, orders: 9, unknown_lines: 4, estimated_lines: 15, unknown_products: [] };
+  data.orders = [{ id: 'ORD-X2D', order_id: 'ORD-X2D', status: 'delivered', created_at: '2026-11-03', cost_confidence: 'verified', collection_difference_iqd: 2000000 }] as FinanceSummary['orders'];
+  const prev = summary({ totals: { orders_count: 33, retained_revenue_iqd: 19685330, gross_profit_iqd: 6000000, owner_period_net_iqd: 6338187, owner_period_net_after_report_adjustments_iqd: 6338187 } });
+  const html = screen(data, 'IQD', 'ar', prev);
+  // The banner counts, never implies: 9 of 13, 3 confirmed, 6 on estimates, 4 waiting and for what.
+  const banner = /data-finance-completeness="waiting"[\s\S]*?<\/button><\/div>/.exec(html)?.[0] ?? '';
+  assert.match(banner, /الطلبات المحسوبة: 9 من 13/);
+  assert.match(banner, /سعر شراء \(2\)، أجر ينتظر تثبيت التكلفة \(1\)، حصة مستثمر تنتظر تسجيل النقد أو تثبيت التكلفة \(1\)/);
+  assert.match(banner, /مؤكد 3[\s\S]*تقديري 6[\s\S]*ينتظر 4/);
+  assert.match(banner, /أكمل التكاليف الناقصة \(19\)/);
+  // Like with like: sales against sales; a gross or a net from complete orders only is a partial comparison, with no figure.
+  assert.match(cardOf(html, 'netSales'), /data-finance-delta="-0\.65[\d]*"[^>]*>[\s\S]*▼[\s\S]*65\.2%[\s\S]*عن 1–11 تشرين الأول 2026/);
+  assert.match(cardOf(html, 'grossProfit'), /data-finance-delta="partial"[^>]*>مقارنة جزئية</);
+  assert.match(cardOf(html, 'netShare'), /data-finance-delta="partial"/);
+  assert.match(cardOf(html, 'deliveredOrders'), /▼[\s\S]*60\.6%/);
+  assert.match(cardOf(html, 'grossProfit'), /1,176,000 د\.ع[\s\S]*هامش 24\.4%[\s\S]*من الطلبات المكتملة فقط \(9\/13\)/, 'the gross of the complete orders, over their own sales');
+  // What waits for the owner, each with its button: the costs first, then the cash, the investor share, the missing rent.
+  assert.deepEqual([...html.matchAll(/data-finance-attention-item="(\w+)"/g)].map((m) => m[1]), ['costs', 'cash', 'investor', 'expenses']);
+  assert.match(html, /2,000,000 د\.ع مستحق لم يُسجَّل استلامه · طلبات: 1/);
+  // The statement shows the three columns, «محسوبة» first on a phone.
+  assert.match(html, /data-phone-col="0"/);
+  assert.deepEqual([...html.matchAll(/<th scope="col" data-col="(\d)">([^<]*)</g)].map((m) => m[2]), ['محسوبة (9)', 'تنتظر (4)', 'الفترة (13)']);
+  // The payouts are read after the screen mounts; until then they say so.
+  assert.match(html, /تحميل المستحقات…/);
 });

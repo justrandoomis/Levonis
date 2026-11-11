@@ -1,4 +1,5 @@
-export type FinanceSection = 'overview' | 'orders' | 'products' | 'monthly' | 'staff' | 'investors' | 'settlements' | 'accounting';
+/** Every page of «المال والأرباح»; each belongs to one of the five sections (redesign step 2: overview, reports, costs, people, accounting). */
+export type FinanceSection = 'overview' | 'orders' | 'products' | 'missing' | 'monthly' | 'expenses' | 'staff' | 'investors' | 'settlements' | 'accounting';
 
 export interface ProfitTotals {
   net_goods_iqd?: number | null;
@@ -111,7 +112,11 @@ export interface DisplayUsdSummary {
   /** `known` in cents (null: no complete order); absent from a server that predates it. */
   known?: { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; net_after_report_adjustments_cents?: number | null;
     /** Its confirmed and estimated parts, sharing its overhead by revenue as in dinars (absent from a server that predates them). */
-    confirmed?: UsdKnownPart; estimated?: UsdKnownPart } | null;
+    confirmed?: UsdKnownPart; estimated?: UsdKnownPart;
+    /** The complete orders' sums in cents and their share of the overheads (the statement's «محسوبة» column in dollars). */
+    totals?: UsdCents; general_share_cents?: number; unallocated_share_cents?: number } | null;
+  /** `waiting` in cents: the incomplete orders' sums and the rest of the overheads (null: every order is complete; absent from an older server). */
+  waiting?: { orders_count: number; totals: UsdCents; general_share_cents: number; unallocated_share_cents: number } | null;
 }
 export interface UsdKnownPart { orders_count: number; owner_net_cents: number | null; net_after_report_adjustments_cents: number | null }
 /** `display_usd` of `GET /orders?display=USD`. */
@@ -124,12 +129,20 @@ export interface DisplayUsdOrder { available: boolean; today_rate?: string | nul
 export type FinanceKnownPart = { orders_count: number; revenue_iqd: number; owner_net_iqd: number | null; net_after_report_adjustments_iqd?: number | null; order_ids?: string[] };
 export type FinanceKnown = { orders_count: number; incomplete_orders: number; revenue_iqd: number | null; cost_iqd: number | null; owner_net_iqd: number | null; overhead_share_iqd?: number;
   /** After the order coupons and credits, as the headline (absent from a server that predates it). */
-  net_after_report_adjustments_iqd?: number | null; confirmed?: FinanceKnownPart; estimated?: FinanceKnownPart };
+  net_after_report_adjustments_iqd?: number | null; confirmed?: FinanceKnownPart; estimated?: FinanceKnownPart;
+  /** The complete orders' sums, and their revenue share of the period's overheads (the statement's «محسوبة» column). */
+  totals?: ProfitTotals; general_share_iqd?: number; unallocated_share_iqd?: number };
+/** The one thing an incomplete order waits for, first match in the order the owner fixes them. */
+export type FinanceWaitReason = 'no_price' | 'wage_waits_cost' | 'investor_waits' | 'refund_unknown' | 'other';
+/** The orders that are not complete: their sums (unknown parts null), what each waits for, and the rest of the overheads. */
+export type FinanceWaiting = { orders_count: number; totals: ProfitTotals; reasons: Partial<Record<FinanceWaitReason, string[]>>; general_share_iqd?: number; unallocated_share_iqd?: number };
 /** What keeps the period from being complete: lines without a confirmed purchase price. */
 export type FinanceMissingCosts = { lines: number; orders: number; unknown_lines: number; estimated_lines: number; unknown_products: { product_id: string | null; name: string; qty: number; lines: number }[] };
 export interface FinanceSummary {
   /** Absent from a server that predates them; null when no order of the period is complete. */
   known?: FinanceKnown | null;
+  /** Absent from a server that predates it; null when every order of the period is complete. */
+  waiting?: FinanceWaiting | null;
   missing_costs?: FinanceMissingCosts;
   /** Present only with `?display=USD`. */
   display_usd?: DisplayUsdSummary;

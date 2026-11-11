@@ -118,10 +118,18 @@ function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:numb
   const lines=missingCostLines(bases),unknown=lines.filter((l)=>l.cogs_iqd===null);
   const products=new Map<string,{product_id:string|null;name:string;qty:number;lines:number}>();
   for(const l of unknown){const key=l.product_id??l.name,p=products.get(key)??{product_id:l.product_id,name:l.name,qty:0,lines:0};p.qty+=l.cost_qty;p.lines++;products.set(key,p);}
+  // The orders that are not complete, and the one thing each waits for — the statement's «تنتظر» column
+  // and the overview's banner say it (redesign step 3). First match wins, in the order the owner fixes them.
+  const incomplete=bases.filter((b)=>!complete.includes(b));
+  const reasonOf=(b:OrderProfitBase):'no_price'|'wage_waits_cost'|'investor_waits'|'refund_unknown'|'other'=>
+    b.lines.some((l)=>l.cogs_iqd===null)?'no_price':n(b.totals.pending_costs)>0?'wage_waits_cost':b.totals.investor_iqd===null?'investor_waits':b.totals.gross_profit_iqd===null?'refund_unknown':'other';
+  const reasons:Record<string,string[]>={};for(const b of incomplete)(reasons[reasonOf(b)]??=[]).push(b.order_id);
   return {
     known:complete.length?{orders_count:complete.length,incomplete_orders:bases.length-complete.length,revenue_iqd:amounts.revenue_iqd,cost_iqd:amounts.cost_iqd,owner_net_iqd:amounts.owner_net_iqd,
       net_after_report_adjustments_iqd:known.net_after_report_adjustments_iqd===null||truncated?null:n(known.net_after_report_adjustments_iqd)-overheadTotal,
-      overhead_share_iqd:overheadTotal,confirmed:part(confirmed,confirmedOverhead),estimated:part(estimated,overheadTotal-confirmedOverhead)}:null,
+      overhead_share_iqd:overheadTotal,general_share_iqd:overhead.general,unallocated_share_iqd:overhead.unallocated,
+      totals:known,confirmed:part(confirmed,confirmedOverhead),estimated:part(estimated,overheadTotal-confirmedOverhead)}:null,
+    waiting:incomplete.length?{orders_count:incomplete.length,totals:sumRows(incomplete.map((b)=>b.totals)),reasons,general_share_iqd:general-overhead.general,unallocated_share_iqd:unallocated-overhead.unallocated}:null,
     missing_costs:{lines:lines.length,orders:new Set(lines.map((l)=>l.order_id)).size,unknown_lines:unknown.length,estimated_lines:lines.length-unknown.length,
       unknown_products:[...products.values()].sort((a,b)=>b.qty-a.qty)},
   };
@@ -330,11 +338,18 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
     return {orders_count:rows.length,owner_net_cents:truncated||t.owner_net_cents==null?null:t.owner_net_cents-overhead,
       net_after_report_adjustments_cents:truncated||t.net_after_report_adjustments_cents==null?null:t.net_after_report_adjustments_cents-overhead};};
   const confirmedOverhead=confirmedOverheadOf(done.complete,knownOverhead);
-  const known=knownCents?{...chartCents(knownCents,Math.round(general*done.share),Math.round(unallocated*done.share),truncated),
+  const knownGeneral=Math.round(general*done.share),knownUnallocated=Math.round(unallocated*done.share);
+  // The statement's «محسوبة» and «تنتظر» columns in cents (redesign step 3): each the sum of its orders' cents, with
+  // the overheads split as above, so in dollars too the two columns add up to the period's.
+  const known=knownCents?{...chartCents(knownCents,knownGeneral,knownUnallocated,truncated),
     net_after_report_adjustments_cents:truncated||knownCents.net_after_report_adjustments_cents==null?null:knownCents.net_after_report_adjustments_cents-knownOverhead,
     confirmed:partCents(done.complete.filter(restsOnConfirmedCosts),confirmedOverhead),
-    estimated:partCents(done.complete.filter((b)=>!restsOnConfirmedCosts(b)),knownOverhead-confirmedOverhead)}:null;
-  return {available:true as const,today_rate:steps?.today??null,...basisCounts(orders),approximate,known,
+    estimated:partCents(done.complete.filter((b)=>!restsOnConfirmedCosts(b)),knownOverhead-confirmedOverhead),
+    totals:knownCents,general_share_cents:knownGeneral,unallocated_share_cents:knownUnallocated}:null;
+  const incomplete=bases.filter((b)=>!done.complete.includes(b));
+  const waitingCents=incomplete.length?{orders_count:incomplete.length,totals:sum(incomplete.map((b)=>orders.get(b.order_id)!.cents)),
+    general_share_cents:general-knownGeneral,unallocated_share_cents:unallocated-knownUnallocated}:null;
+  return {available:true as const,today_rate:steps?.today??null,...basisCounts(orders),approximate,known,waiting:waitingCents,
     orders:orderBlock(orders),kinds,products:groupedCents(lines,'product',orders),
     categories:{main:groupedCents(lines,'main',orders),sub:groupedCents(lines,'sub',orders)},
     chart:{...chartCents(totals,general,unallocated,truncated),daily,expense_composition:expenseCompositionCents(totals,general,unallocated,pendingCosts,truncated)},

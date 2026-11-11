@@ -900,7 +900,7 @@ test('the three operations stylesheets stay outside every public static closure'
   const files = readdirSync(ASSETS).filter((f) => f.endsWith('.js'));
   const chunk = (name: string) => files.find((f) => f.startsWith(`${name}-`));
   const operationsCss = operationsCssFiles();
-  const privateNames = ['FinanceWorkspace', 'OverviewCharts', 'AdminInventory', 'PeoplePanel', 'InvestorPanel', 'WithdrawalPanel', 'MyEarnings', 'Earnings'];
+  const privateNames = ['FinanceWorkspace', 'AdminInventory', 'PeoplePanel', 'InvestorPanel', 'WithdrawalPanel', 'MyEarnings', 'Earnings'];
   const privateFiles = privateNames.map((name) => {
     const file = chunk(name);
     assert.ok(file, `${name} has no lazy chunk of its own`);

@@ -27,7 +27,7 @@
  *   - `enabled` lets a caller hold the refresh while the customer is mid-edit,
  *     so a reload never lands under a dialog they are typing in.
  */
-import { useEffect, useRef } from 'react';
+import { createContext, useContext, useEffect, useRef } from 'react';
 import { duringBackgroundRefresh } from './mascotRequest';
 
 export interface FreshOnReturnOptions {
@@ -42,10 +42,19 @@ export interface FreshOnReturnOptions {
   enabled?: boolean;
 }
 
+/**
+ * A screen kept mounted but out of sight — a page of «المال والأرباح» the owner left for
+ * another (redesign step 2) — holds its refreshes as a dialog does: nothing runs while it
+ * is hidden, and a wake it missed is replayed the moment it is shown again.
+ */
+export const FreshOnReturnHold = createContext(false);
+
 export function useFreshOnReturn(
   revalidate: () => void | Promise<void>,
-  { minIntervalMs = 10_000, pollWhileVisibleMs = 0, enabled = true }: FreshOnReturnOptions = {}
+  { minIntervalMs = 10_000, pollWhileVisibleMs = 0, enabled: wanted = true }: FreshOnReturnOptions = {}
 ): void {
+  const held = useContext(FreshOnReturnHold);
+  const enabled = wanted && !held;
   // The callback is read through a ref so a caller may pass an inline function
   // without re-subscribing the listeners on every render.
   const fnRef = useRef(revalidate);

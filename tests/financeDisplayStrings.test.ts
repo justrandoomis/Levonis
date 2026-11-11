@@ -77,5 +77,5 @@ test('the toggle starts at IQD on every load, is stored nowhere, and the client 
   assert.doesNotMatch(money, /exchangeRate|\* *rate\b|\/ *rate\b|toUsd|iqdTo/, 'no client-side conversion');
   // USD first, the accounting dinars beneath.
   assert.match(money, /PA_STRINGS\.accountingValue/);
-  for (const f of ['OrderProfitSheet.tsx', 'OverviewCharts.tsx']) assert.match(src(f), /usd|display/i, f);
+  for (const f of ['OrderProfitSheet.tsx', 'Overview.tsx']) assert.match(src(f), /usd|display/i, f);
 });
