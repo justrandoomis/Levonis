@@ -35,12 +35,17 @@
  * what each incomplete order waits for — in dinars and in cents, with a statement that adds up to the
  * server's own net, term by term.
  *
+ * The independent review of steps 2–3 (2026-11-11) adds every wait reason branch by branch (an investor share held
+ * by a posting error is a line to review, not cash to record) and each product's count of lines resting on the
+ * sale-time estimate.
+ *
  * Run: node --import tsx --test tests/financeFigures.test.ts
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { asD1, freshDb, get, json, post, stubApp } from './fixtures/app';
-import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
+import { adminFinanceWorkspaceRoutes, waitReason } from '../worker/routes/adminFinanceWorkspace';
+import type { OrderProfitBase } from '../worker/lib/orderProfit';
 import { monthlyPromotionShares } from '../worker/lib/orderProfit';
 import { baghdadDay } from '../worker/lib/operations';
 import { overviewNet } from '../src/components/financeWorkspace/overviewFigures';
@@ -486,4 +491,38 @@ test('a complete period\'s statement adds up to the server\'s «صافي حصت�
   assert.equal(su.currency, 'USD');
   assert.equal(statementAddsUp(su.rows, 2), true);
   assert.equal(cellOf(su.rows, 'net', 2), s.display_usd.totals.owner_period_net_after_report_adjustments_cents);
+});
+
+// The independent review of steps 2–3 (2026-11-11): every reason an incomplete order can give, each branch on its own; an investor share held by a
+// posting error is no investor waiting for cash (the banner and «يحتاج انتباهك» would send the owner to record cash that is not missing); and
+// each product says how many of its lines rest on the sale-time estimate, so the overview can name a margin built on one.
+test('each incomplete order names the one thing it waits for, first match in the order the owner fixes them; a posting error is a line to review, not an investor waiting for cash (review coverage)', () => {
+  const base = (over: { lines?: Array<{ cogs_iqd: number | null }>; totals?: Record<string, unknown> }, id = 'o') =>
+    ({ order_id: id, version: 1, order: {}, lines: over.lines ?? [{ cogs_iqd: 100 }], totals: { pending_costs: 0, investor_iqd: 0, gross_profit_iqd: 10, ...over.totals }, costs: [], warnings: [] }) as unknown as OrderProfitBase;
+  assert.equal(waitReason(base({ lines: [{ cogs_iqd: 100 }, { cogs_iqd: null }], totals: { pending_costs: 2, investor_iqd: null, gross_profit_iqd: null } })), 'no_price', 'a price first, whatever else waits');
+  assert.equal(waitReason(base({ totals: { pending_costs: 1, investor_iqd: null } })), 'wage_waits_cost');
+  assert.equal(waitReason(base({ totals: { investor_iqd: null } })), 'investor_waits', 'its cash or a confirmed cost — or a projection the server has still to make');
+  assert.equal(waitReason(base({ totals: { investor_iqd: null } }, 'err'), new Set(['err'])), 'other', 'a posting error waits for no cash and no price');
+  assert.equal(waitReason(base({ totals: { investor_iqd: null } }, 'ok'), new Set(['err'])), 'investor_waits', 'another order\'s error is not this one\'s');
+  assert.equal(waitReason(base({ totals: { gross_profit_iqd: null } })), 'refund_unknown', 'every cost known, the refund amount not');
+  assert.equal(waitReason(base({})), 'other', 'anything else: a line to review');
+});
+
+test('a funded sale held by a posting error is reported as a line to review; a product resting on the sale-time estimate says how many of its lines do (review coverage)', async () => {
+  const w = world();
+  order(w.raw, { id: 'fifo' });
+  order(w.raw, { id: 'est', qty: 1, unit: 20000, cost: null, estimate: 15000, product: 'esun', shipping: 0 });
+  order(w.raw, { id: 'inv' });
+  w.raw.exec(`INSERT INTO incoming_inventory(id,product_id,scope,scope_id,qty_ordered,qty_received,purchase_unit_iqd) VALUES ('batch','product','base','',2,2,10000);
+    INSERT INTO investment_contracts(id,incoming_id,user_id,name,principal_iqd,capital_share_bps,profit_share_bps,loss_share_bps,created_by,created_at,request_json,state) VALUES ('contract','batch','buyer','Funding',20000,10000,1000,1000,'admin','now','{}','active');`);
+  w.raw.prepare("UPDATE inventory_lots SET incoming_id='batch' WHERE id='inv:lot'").run();
+  const before = await w.read(`/f/summary?${period()}`);
+  assert.deepEqual(before.waiting.reasons, { investor_waits: ['inv'] }, 'its share has no projection yet: it waits for it');
+  // The products: the eSUN line's cost is the sale-time estimate; the printer's come from a priced batch.
+  const products = Object.fromEntries((before.products as Array<{ id: string; estimated_lines: number }>).map((p) => [p.id, p.estimated_lines]));
+  assert.deepEqual(products, { product: 0, esun: 1 });
+  w.raw.exec(`INSERT INTO finance_posting_errors(event_key,order_id,message,last_attempt_at) VALUES ('post:inv','inv','journal failed','2026-11-11T07:00:00Z');`);
+  const after = await w.read(`/f/summary?${period()}`);
+  assert.deepEqual(after.waiting.reasons, { other: ['inv'] }, 'a posting error: a line to review');
+  assert.ok((after.exceptions as Array<{ type: string; order_id: string }>).some((e) => e.type === 'posting_failed' && e.order_id === 'inv'), 'and the error itself is listed as before');
 });

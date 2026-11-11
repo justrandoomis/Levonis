@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useReducer, useRef, useState, type ReactNode } from 'react';
 import { ArrowDownToLine, CalendarDays, CheckCircle2, ChevronLeft, Layers3, Package, RefreshCw, Search } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import OwnerCostVerifyCard from '../auth/OwnerCostVerifyCard';
@@ -15,6 +15,7 @@ import { CurrencyToggle, DisplayCurrencyContext, DisplayMoney, UsdBasisNote, cen
 import VariantImg from '../ui/VariantImg';
 import Overview from './Overview';
 import { compareRange, defaultCompare, type CompareMode } from './compare';
+import { comparisonFor, keepKey, keptPages, missingBadge, navigate, NO_SUMMARY, NOTHING_KEPT, pageMount, summaryKey, summaryReducer, summaryShown, type ComparisonRead, type Kept } from './frameState';
 import { fw, rangeText, type FwKey } from './overviewStrings';
 import ExpenseLedger from '../adminFinance/ExpenseLedger';
 import { financeStrings } from '../adminFinance/strings';
@@ -25,6 +26,7 @@ const InvestorPanel = lazy(() => import('../financePeople/InvestorPanel'));
 const WithdrawalPanel = lazy(() => import('../financePeople/WithdrawalPanel'));
 const FinanceOperationsPanel = lazy(() => import('../adminOperations/FinanceOperationsPanel'));
 const MissingCostsSheet = lazy(() => import('./MissingCostsSheet'));
+const ParticipantCharts = lazy(() => import('./ParticipantCharts'));
 
 /**
  * «المال والأرباح» — THE FRAME (redesign step 2, owner 2026-11-11; DECISIONS row 315).
@@ -36,10 +38,12 @@ const MissingCostsSheet = lazy(() => import('./MissingCostsSheet'));
  * or two dates for a custom range), what the overview compares it with, the display currency
  * and the export. The `finance=` link value of every earlier tab still opens its page.
  *
- * Kept between tabs: the period's summary is read once and serves the overview, the products
- * and the badges; the comparison is read once per period and comparison; and a page the owner
+ * Kept between tabs (frameState.ts): the period's summary is read once and serves the overview,
+ * the products and the badges, and is shown only under the period and currency it was read for;
+ * the comparison is read once per period, comparison, currency and refresh; and a page the owner
  * leaves stays mounted, hidden and holding its refreshes (FreshOnReturnHold), so coming back
- * shows it at once instead of reading it again — until the period changes.
+ * shows it at once instead of reading it again — until the period, the currency or any figure
+ * changes (a save anywhere, «تحديث»), or it was left more than two minutes ago.
  */
 type Main = 'overview' | 'reports' | 'costs' | 'people' | 'accounting';
 const MAIN_OF: Record<FinanceSection, Main> = { overview: 'overview', orders: 'reports', products: 'reports', missing: 'costs', monthly: 'costs', expenses: 'costs',
@@ -51,6 +55,9 @@ const LABEL: Record<FinanceSection | Main, FwKey> = { overview: 'overview', repo
 const SECTIONS = Object.keys(MAIN_OF) as FinanceSection[];
 // Accounting is not kept: its journal tools and the old report open on demand and pause the summary's refresh.
 const KEPT: FinanceSection[] = SECTIONS.filter((s) => s !== 'accounting');
+const keepable = (page: FinanceSection) => KEPT.includes(page);
+// The pages drawn in the display currency; every other page is in dinars whatever the toggle says.
+const CURRENCY_PAGES: FinanceSection[] = ['overview', 'orders', 'products'];
 const PRESETS: Array<['month' | '7days' | '30days' | 'previous' | 'year', FwKey]> = [['month', 'presetMonth'], ['7days', 'preset7'], ['30days', 'preset30'], ['previous', 'presetPrevious'], ['year', 'presetYear']];
 
 const initialSection = (): FinanceSection => {
@@ -83,11 +90,10 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   const [comparePick, setComparePick] = useState<CompareMode | 'auto'>('auto');
   const compareMode: CompareMode = comparePick === 'auto' ? defaultCompare(range) : comparePick;
   const compared = compareRange(range, compareMode);
-  const [data, setData] = useState<FinanceSummary | null>(null);
-  const [prev, setPrev] = useState<{ key: string; data: FinanceSummary } | null>(null);
-  const [busy, setBusy] = useState(true);
-  const [error, setError] = useState('');
-  const [updatedAt, setUpdatedAt] = useState('');
+  // Every read of the summary tagged with its period and currency (frameState.ts): never one period's figures under another's dates.
+  // It opens loading the period of the address (the spinner from the first paint, not after the first effect).
+  const [summary, dispatch] = useReducer(summaryReducer, initialPeriod.range, (r) => ({ ...NO_SUMMARY, loading: summaryKey(r.from, r.to, 'IQD') }));
+  const [prev, setPrev] = useState<ComparisonRead>(null);
   // The owner's own session before the address is verified (DECISIONS row 185
   // amendment): the refusal is rendered BY CODE as the way to open this screen.
   const [mustVerify, setMustVerify] = useState(false);
@@ -110,16 +116,19 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   // «عملة العرض» (design P-A §8): IQD on every load, never stored, display only.
   const [currency, setCurrency] = useState<DisplayCurrency>('IQD');
   const main = MAIN_OF[section];
-  const showsCurrency = ['overview', 'orders', 'products'].includes(section);
+  const showsCurrency = CURRENCY_PAGES.includes(section);
   const display = currency === 'USD' ? '&display=USD' : '';
+  const readKey = summaryKey(range.from, range.to, currency);
+  // The figures shown: this period's and currency's; while another loads, the last ones dimmed; after its read failed, none.
+  const shown = summaryShown(summary, readKey), data = shown.data, busy = summary.loading !== null, error = summary.error;
   const refresh = useCallback(() => setRevision((v) => v + 1), []);
-  // The pages the owner left in this period, kept mounted and hidden; another period starts afresh.
-  const keepKey = `${range.from}|${range.to}`;
-  const [kept, setKept] = useState<{ key: string; pages: FinanceSection[] }>({ key: keepKey, pages: [] });
-  const keptPages = kept.key === keepKey ? kept.pages : [];
+  // The pages the owner left, kept mounted and hidden while nothing they show can have changed (frameState.ts).
+  const kept = keepKey(range.from, range.to, currency, revision);
+  const [keptState, setKept] = useState<Kept>(NOTHING_KEPT);
+  const hidden = keptPages(keptState, kept);
   const setSection = (next: FinanceSection) => {
     if (next === section) return;
-    setKept({ key: keepKey, pages: [...keptPages.filter((p) => p !== section && p !== next), section].filter((p) => KEPT.includes(p)) });
+    setKept((state) => navigate(state, kept, section, next, Date.now(), keepable));
     setSectionState(next); setAdvanced(false); setLegacyOpen(false);
   };
   useEffect(() => {
@@ -129,54 +138,63 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
     window.history.replaceState(window.history.state, '', url);
   }, [section, range.from, range.to, month]);
   // One read of the period serves every section: switching pages never reloads it, and a new
-  // period keeps the old figures on screen (dimmed) until its own arrive.
+  // period or currency keeps the old figures on screen (dimmed) until its own arrive — or its read fails.
   useEffect(() => {
     const controller = new AbortController();
     const generation = ++summaryGeneration.current;
-    setBusy(true); setError('');
-    api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${range.from}&to=${range.to}${display}`, { signal: controller.signal })
-      .then((r) => { if (!controller.signal.aborted) { setData(r); setUpdatedAt(clock()); } })
+    const key = summaryKey(range.from, range.to, currency);
+    dispatch({ type: 'start', key });
+    api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${range.from}&to=${range.to}${currency === 'USD' ? '&display=USD' : ''}`, { signal: controller.signal })
+      .then((r) => { if (!controller.signal.aborted) dispatch({ type: 'loaded', key, data: r, at: clock() }); })
       .catch((e) => {
         if (controller.signal.aborted) return;
+        // The owner before the address is verified: the whole workspace becomes the card that verifies it.
         if (e instanceof ApiError && e.code === 'OWNER_EMAIL_UNVERIFIED') setMustVerify(true);
-        else setError(e instanceof Error ? e.message : String(e));
-      })
-      .finally(() => { if (!controller.signal.aborted) setBusy(false); });
+        else dispatch({ type: 'failed', key, error: e instanceof Error ? e.message : String(e) });
+      });
     return () => { controller.abort(); summaryGeneration.current = generation + 1; };
-  }, [range.from, range.to, revision, display]);
+  }, [range.from, range.to, revision, currency]);
   // The comparison period, read once per period, comparison, currency and refresh — when the overview first needs it.
-  const compareKey = compared ? `${compared.from}|${compared.to}|${display}|${revision}` : '';
-  const comparison = prev && prev.key === compareKey ? prev.data : null;
-  const wantsComparison = main === 'overview' && !!compareKey && !comparison;
+  const compareKey = compared ? `${compared.from}|${compared.to}|${currency}|${revision}` : '';
+  const comparison = comparisonFor(prev, compareKey);
+  const wantsComparison = main === 'overview' && comparison.wanted;
   useEffect(() => {
     if (!wantsComparison) return;
-    const [from, to, query] = compareKey.split('|');
+    const [from, to, money] = compareKey.split('|');
     const controller = new AbortController();
-    api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${from}&to=${to}${query}`, { signal: controller.signal, mascot: 'silent' })
-      .then((r) => { if (!controller.signal.aborted) setPrev({ key: compareKey, data: r }); }).catch(() => { /* no comparison: the cards say nothing of a change */ });
+    api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${from}&to=${to}${money === 'USD' ? '&display=USD' : ''}`, { signal: controller.signal, mascot: 'silent' })
+      .then((r) => { if (!controller.signal.aborted) setPrev({ key: compareKey, data: r }); })
+      // No comparison: the header says it could not be read, and the cards show no change.
+      .catch(() => { if (!controller.signal.aborted) setPrev({ key: compareKey, data: null }); });
     return () => controller.abort();
   }, [compareKey, wantsComparison]);
   // These reads only display work completed by the server. They never start a
   // financial posting and stop while hidden or while an editing sheet is open.
   useFreshOnReturn(async () => {
-    const generation = summaryGeneration.current;
+    const generation = summaryGeneration.current, key = readKey;
     const updated = await api.get<FinanceSummary>(`${WORKSPACE_API}/summary?from=${range.from}&to=${range.to}${display}`, { mascot: 'silent' });
     if (generation !== summaryGeneration.current) return;
-    setData(updated); setUpdatedAt(clock()); if (section === 'orders') setOrdersPoll((value) => value + 1);
+    dispatch({ type: 'loaded', key, data: updated, at: clock() }); if (section === 'orders') setOrdersPoll((value) => value + 1);
   }, { pollWhileVisibleMs: 30_000, minIntervalMs: 30_000,
-    enabled: ['overview', 'orders', 'products'].includes(section) && (data?.totals.pending_costs ?? 0) > 0 && !busy && !orderId && !collections && !advanced && !legacyOpen });
+    enabled: showsCurrency && shown.current && (data?.totals.pending_costs ?? 0) > 0 && !busy && !orderId && !collections && !advanced && !legacyOpen });
   const apply = (event: React.FormEvent) => { event.preventDefault(); if (!validFinanceRange(draft)) { setRangeError(true); return; } setRange(draft); setRangeError(false); setPreset(presetOf(draft)); };
-  const missingLines = data?.missing_costs?.lines ?? 0;
+  const missingLines = missingBadge(summary, range.from, range.to);
   const loading = <Loading text={fw(loc, 'loading')} />;
-  /** A page of the workspace: the one shown, or one the owner left in this period, kept hidden and holding its refreshes. */
-  const page = (id: FinanceSection, body: () => ReactNode) => (id === section || keptPages.includes(id)) && <FreshOnReturnHold.Provider key={id} value={id !== section}>
-    <div className="fw-body" style={id === section ? undefined : { display: 'none' }} data-finance-page={id}>{body()}</div></FreshOnReturnHold.Provider>;
+  /** The figures of the shown period, dimmed while a read is in flight; nothing (the error above says why) when there are none. */
+  const figures = (body: (d: FinanceSummary) => ReactNode) => !data ? busy && loading : <div className={busy ? 'fw-reloading' : undefined}>{body(data)}</div>;
+  /**
+   * A page of the workspace: the one shown, or one the owner left that is still kept, hidden and holding its refreshes.
+   * Each page carries its own display currency, so moving between sections never flips a kept page's currency.
+   */
+  const page = (id: FinanceSection, body: () => ReactNode) => (id === section || hidden.includes(id)) && <FreshOnReturnHold.Provider key={pageMount(keptState, id)} value={id !== section}>
+    <DisplayCurrencyContext.Provider value={CURRENCY_PAGES.includes(id) ? currency : 'IQD'}>
+      <div className="fw-body" style={id === section ? undefined : { display: 'none' }} data-finance-page={id}>{body()}</div></DisplayCurrencyContext.Provider></FreshOnReturnHold.Provider>;
   if (mustVerify) return <OwnerCostVerifyCard />;
   return <DisplayCurrencyContext.Provider value={showsCurrency || orderId ? currency : 'IQD'}><div className="fw fw-workspace" dir={dir} data-finance-workspace>
     <header className="fw-top">
       <div><div className="fw-muted">LEVONIS / {fw(loc, 'crumb')}</div><h1>{fw(loc, 'title')}</h1>
-        {section !== 'monthly' && <p data-finance-range><bdi>{rangeText(L, range.from, range.to)}</bdi>{compared && main === 'overview' && <span className="fw-muted"> · {fw(loc, 'vs', { range: rangeText(L, compared.from, compared.to) })}</span>}</p>}</div>
-      <div className="fw-top-tools">{updatedAt && <span className="fw-muted fw-updated">{fw(loc, 'updated', { time: updatedAt })}</span>}
+        {section !== 'monthly' && <p data-finance-range><bdi>{rangeText(L, range.from, range.to)}</bdi>{compared && main === 'overview' && <span className="fw-muted" data-finance-compared={comparison.failed ? 'failed' : undefined}> · {fw(loc, comparison.failed ? 'vsFailed' : 'vsHeader', { range: rangeText(L, compared.from, compared.to) })}</span>}</p>}</div>
+      <div className="fw-top-tools">{shown.at && <span className="fw-muted fw-updated">{fw(loc, 'updated', { time: shown.at })}</span>}
         <Button className="fw-icon-button" variant="secondary" busy={busy} onClick={refresh} aria-label={fw(loc, 'refresh')}>{!busy && <RefreshCw size={17} aria-hidden />}</Button></div>
     </header>
     <nav className="fw-tabs" aria-label={fw(loc, 'sections')}>
@@ -205,18 +223,19 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
     </form>}
     <div className="fw-body">
       {error && <div className="fw-error" role="alert">{error}<Button variant="ghost" onClick={refresh}>{fw(loc, 'retry')}</Button></div>}
-      {page('overview', () => busy && !data ? loading : data && <div className={busy ? 'fw-reloading' : undefined}>
-        <Overview data={data} prev={compared ? comparison : null} compareFrom={compared?.from} compareTo={compared?.to} revision={revision} openOrder={(id, step) => openOrderAt(id, step)}
-          onNavigate={setSection} onCollections={() => setCollections(true)} onMissing={() => setSection('missing')} /></div>)}
-      {page('orders', () => <Orders from={range.from} to={range.to} revision={revision + ordersPoll} openOrder={setOrderId} />)}
-      {page('products', () => busy && !data ? loading : data && <Products data={data} onOpenOrders={() => setSection('orders')} />)}
+      {/* The comparison only beside this period's own figures: never old figures against the new period's comparison. */}
+      {page('overview', () => figures((d) => <Overview data={d} prev={shown.current ? comparison.data : null} compareFrom={compared?.from} compareTo={compared?.to} revision={revision} openOrder={(id, step) => openOrderAt(id, step)}
+        onNavigate={setSection} onCollections={() => setCollections(true)} onMissing={() => setSection('missing')} />))}
+      {page('orders', () => <Orders from={range.from} to={range.to} revision={revision + ordersPoll} openOrder={setOrderId} kinds={shown.current ? data : null} />)}
+      {page('products', () => figures((d) => <Products data={d} onOpenOrders={() => setSection('orders')} />))}
       {page('missing', () => <Suspense fallback={loading}><MissingCostsSheet inline reload={peopleRevision} from={range.from} to={range.to} onClose={() => setSection('overview')} onChanged={refresh} openOrder={(id, step, line) => openOrderAt(id, step, line)} /></Suspense>)}
       {page('monthly', () => <><label className="fw-chip" style={{ justifySelf: 'start' }}><CalendarDays size={16} aria-hidden />
         <input type="month" className="fw-input" value={month} aria-label={loc('شهر التكاليف والمستحقات', 'Costs and earnings month', 'مانگی تێچوو و شایستەکان')} onChange={(e) => { if (/^\d{4}-(0[1-9]|1[0-2])$/.test(e.target.value)) setMonth(e.target.value); }} /></label>
         <MonthlyCosts key={month} month={month} onChanged={refresh} /></>)}
       {page('expenses', () => <Surface title={fw(loc, 'expenses')}><ExpenseLedger from={range.from} to={range.to} s={financeStrings(loc)} latin={isLatin(lang)} dir={dir === 'rtl' ? 'rtl' : 'ltr'} onChanged={refresh} /></Surface>)}
       {page('staff', () => <Suspense fallback={loading}><PeoplePanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} /></Suspense>)}
-      {page('investors', () => <Suspense fallback={loading}><InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} /></Suspense>)}
+      {page('investors', () => <Suspense fallback={loading}><InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} />
+        <PeriodCharts from={range.from} to={range.to} revision={revision} /></Suspense>)}
       {page('settlements', () => <Suspense fallback={loading}><WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} /></Suspense>)}
       {section === 'accounting' && <Suspense fallback={loading}>
         <Surface title={fw(loc, 'accounting')} subtitle={loc('الأرصدة والقيود والتسويات المعتمدة', 'Balances, journals and verified settlements', 'باڵانس و تۆمار و یەکلاکردنەوە پەسەندکراوەکان')}>
@@ -234,6 +253,19 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
       <Suspense fallback={loading}><FinanceOperationsPanel from={range.from} to={range.to} initialTab="collections" onChanged={refresh} /></Suspense>
     </Sheet>}
   </div></DisplayCurrencyContext.Provider>;
+}
+
+/**
+ * The old overview's four charts of the period's people and batches (ParticipantCharts), behind a summary: the chart
+ * library and their read load only when the owner opens it, and close again with the page (independent review, 2026-11-11).
+ */
+function PeriodCharts({ from, to, revision }: { from: string; to: string; revision: number }) {
+  const { loc } = useLanguage();
+  const [open, setOpen] = useState(false);
+  return <details className="fw-advanced" onToggle={(e) => setOpen(e.currentTarget.open)} data-finance-period-charts>
+    <summary>{loc('الاستحقاق والتسديد، رأس المال، التسويات وحركة الدفعات في الفترة', 'Accrual and payments, capital, corrections and batch movement in the period', 'شایستە و پارەدان، سەرمایە، ڕاستکردنەوەکان و جووڵەی بارەکان لەم ماوەیەدا')}</summary>
+    {open && <Suspense fallback={<Loading text={fw(loc, 'loading')} />}><ParticipantCharts from={from} to={to} revision={revision} /></Suspense>}
+  </details>;
 }
 
 /** The order types of 0174, as every screen names them. */
@@ -266,7 +298,27 @@ function OrderRow({ order, usd, onClick }: { order: FinanceOrder; usd?: UsdOrder
   </button>;
 }
 
-function Orders({ from, to, revision, openOrder }: { from: string; to: string; revision: number; openOrder: (id: string) => void }) {
+/**
+ * «حسب نوع الطلب»: the period's delivered orders split by what made them (0174) — the cart, a Quick Buy, gifts only —
+ * from the summary. It stood on the old overview; the redesign keeps it with the orders (independent review, 2026-11-11).
+ */
+function OrderKinds({ data }: { data: FinanceSummary }) {
+  const { loc } = useLanguage();
+  const currency = useDisplayCurrency();
+  const u = currency === 'USD' && data.display_usd?.available ? data.display_usd : undefined;
+  if (!data.kinds?.length) return null;
+  const cents = (kind: string, field: string) => (u ? centsAt(u.kinds?.[kind] ?? {}, field) : undefined);
+  return <Surface title={loc('حسب نوع الطلب', 'By order type', 'بەپێی جۆری داواکاری')} subtitle={loc('الطلبات المستلمة في الفترة نفسها، مقسومة حسب طريقة إنشائها.', 'The same delivered orders, split by how each was placed.', 'هەمان داواکارییە گەیەندراوەکان، بەپێی شێوازی دروستکردنیان.')}>
+    <div className="fw-table-wrap"><table className="fw-table" data-finance-kinds>
+      <thead><tr><th scope="col">{loc('النوع', 'Type', 'جۆر')}</th><th scope="col">{loc('الطلبات', 'Orders', 'داواکارییەکان')}</th><th scope="col">{loc('صافي البيع', 'Net sales', 'فرۆشی پوخت')}</th><th scope="col">{loc('ربح البضاعة', 'Gross profit', 'قازانجی کاڵا')}</th></tr></thead>
+      <tbody>{data.kinds.map((k) => <tr key={k.kind}><th scope="row">{orderKindName(k.kind, loc)}</th><td>{k.orders_count}</td>
+        <td><DisplayMoney iqd={k.net_goods_iqd} cents={cents(k.kind, 'net_goods_iqd')} compact /></td><td><DisplayMoney iqd={k.gross_profit_iqd} cents={cents(k.kind, 'gross_profit_iqd')} compact /></td></tr>)}</tbody>
+    </table></div>
+    <p className="fw-note">{loc('الهدية تُطلب بـ0 د.ع وتبقى كلفة بضاعتها، فربحها السالب هو كلفة الهدايا. مبلغ الشراء السريع المحجوز في المحفظة ليس إيراداً؛ يدخل الطلب هنا بعد تسليمه فقط.', 'A gift is ordered at 0 IQD and keeps its goods cost, so its negative profit is what the gifts cost. A Quick Buy amount held in the wallet is not revenue; the order counts here only once delivered.', 'دیاری بە 0 دینار داوا دەکرێت و تێچووی کاڵاکەی دەمێنێتەوە، بۆیە قازانجە نەرێنییەکەی تێچووی دیارییەکانە. بڕی کڕینی خێرای گیراو لە جزدان داهات نییە؛ داواکاری تەنها دوای گەیاندن لێرە دەژمێردرێت.')}</p>
+  </Surface>;
+}
+
+function Orders({ from, to, revision, openOrder, kinds }: { from: string; to: string; revision: number; openOrder: (id: string) => void; kinds?: FinanceSummary | null }) {
   const { loc } = useLanguage();
   const currency = useDisplayCurrency();
   const [usd, setUsd] = useState<DisplayUsdOrders | undefined>(undefined);
@@ -292,7 +344,7 @@ function Orders({ from, to, revision, openOrder }: { from: string; to: string; r
     }, search ? 220 : 0);
     return () => { clearTimeout(timer); controller.abort(); };
   }, [from, to, search, kind, offset, revision, currency]);
-  return <Surface title={loc('أرباح الطلبات المستلمة', 'Delivered order profits')} subtitle={loc('الطلبات المكتملة بالتسليم فقط، حسب يوم التسليم. تشمل الأرباح والتكاليف أثر المرتجعات المسجلة.', 'Completed deliveries only, by delivery date. Profit and costs include recorded returns.')}>
+  return <>{kinds && <OrderKinds data={kinds} />}<Surface title={loc('أرباح الطلبات المستلمة', 'Delivered order profits')} subtitle={loc('الطلبات المكتملة بالتسليم فقط، حسب يوم التسليم. تشمل الأرباح والتكاليف أثر المرتجعات المسجلة.', 'Completed deliveries only, by delivery date. Profit and costs include recorded returns.')}>
     {/* The export is the period bar's «تصدير CSV», labelled, for every report (redesign step 2). */}
     <div className="fw-toolbar"><div className="fw-search"><Search aria-hidden /><input className="fw-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder={loc('ابحث برقم الطلب أو اسم الزبون', 'Search order number or customer')} aria-label={loc('البحث عن الطلب', 'Find an order')} /></div>
       <select className="fw-select" style={{ width: 'auto', flexShrink: 0 }} value={kind} onChange={(e) => setKind(e.target.value)} aria-label={loc('نوع الطلب', 'Order kind')} data-finance-order-kind>
@@ -305,7 +357,7 @@ function Orders({ from, to, revision, openOrder }: { from: string; to: string; r
     {currency === 'USD' && usd && <UsdBasisNote available={usd.available} atTimeCount={usd.at_time_count} todayCount={usd.today_count} todayRate={usd.today_rate} batchLines={usd.batch_cost_lines} />}
     {busy && !rows.length ? <Loading text={loc('تحميل الطلبات…', 'Loading orders…')} /> : rows.length ? <div className="fw-list" aria-busy={busy}>{rows.map((o) => <OrderRow order={o} usd={currency === 'USD' && usd?.available ? usd.orders?.[o.order_id || o.id] : undefined} key={o.id} onClick={() => openOrder(o.order_id || o.id)} />)}</div> : <Empty title={loc('لا توجد طلبات مستلمة مطابقة', 'No matching delivered orders')} text={loc('ابحث عن طلب مكتمل بالتسليم أو اختر فترة تسليم مختلفة.', 'Search for a completed delivery or choose another delivery date range.')} />}
     {total > pageSize && <div className="fw-pagination"><Button variant="ghost" disabled={busy || offset === 0} onClick={() => setOffset((v) => Math.max(0, v - pageSize))}>{loc('السابق', 'Previous')}</Button><span>{Math.floor(offset / pageSize) + 1} / {Math.ceil(total / pageSize)}</span><Button variant="ghost" disabled={busy || offset + rows.length >= total} onClick={() => setOffset((v) => v + pageSize)}>{loc('التالي', 'Next')}</Button></div>}
-  </Surface>;
+  </Surface></>;
 }
 
 function Products({ data, onOpenOrders }: { data: FinanceSummary; onOpenOrders: () => void }) {

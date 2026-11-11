@@ -102,8 +102,21 @@ function confirmedOverheadOf(complete:OrderProfitBase[],overhead:number){
   const revenue=complete.reduce((v,b)=>v+orderRevenue(b),0),confirmed=complete.filter(restsOnConfirmedCosts);
   return revenue>0?Math.round(overhead*confirmed.reduce((v,b)=>v+orderRevenue(b),0)/revenue):complete.length?Math.round(overhead*confirmed.length/complete.length):0;
 }
+/**
+ * The one thing an incomplete order waits for — the statement's «تنتظر» column and the overview's banner say it
+ * (redesign step 3). First match wins, in the order the owner fixes them: a purchase price; a wage that waits for
+ * the goods cost; an investor share that waits for its cash or a confirmed cost; a refund amount. An investor share
+ * held by a posting error waits for no cash and no price, so it is a line to review (independent review, 2026-11-11).
+ */
+export type WaitReason='no_price'|'wage_waits_cost'|'investor_waits'|'refund_unknown'|'other';
+export function waitReason(b:OrderProfitBase,postingErrors:ReadonlySet<string>=new Set()):WaitReason{
+  if(b.lines.some((l)=>l.cogs_iqd===null))return 'no_price';
+  if(n(b.totals.pending_costs)>0)return 'wage_waits_cost';
+  if(b.totals.investor_iqd===null)return postingErrors.has(b.order_id)?'other':'investor_waits';
+  return b.totals.gross_profit_iqd===null?'refund_unknown':'other';
+}
 /** The period's figures over the orders whose every amount is known (none: null), and what the rest lack. */
-function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean){
+function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean,postingErrors:ReadonlySet<string>=new Set()){
   const {complete,share}=completeOrders(bases);
   const overhead={general:Math.round(general*share),unallocated:Math.round(unallocated*share)};
   const known=sumRows(complete.map((b)=>b.totals));known.orders_count=complete.length;
@@ -118,12 +131,9 @@ function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:numb
   const lines=missingCostLines(bases),unknown=lines.filter((l)=>l.cogs_iqd===null);
   const products=new Map<string,{product_id:string|null;name:string;qty:number;lines:number}>();
   for(const l of unknown){const key=l.product_id??l.name,p=products.get(key)??{product_id:l.product_id,name:l.name,qty:0,lines:0};p.qty+=l.cost_qty;p.lines++;products.set(key,p);}
-  // The orders that are not complete, and the one thing each waits for — the statement's «تنتظر» column
-  // and the overview's banner say it (redesign step 3). First match wins, in the order the owner fixes them.
+  // The orders that are not complete, and the one thing each waits for (waitReason).
   const incomplete=bases.filter((b)=>!complete.includes(b));
-  const reasonOf=(b:OrderProfitBase):'no_price'|'wage_waits_cost'|'investor_waits'|'refund_unknown'|'other'=>
-    b.lines.some((l)=>l.cogs_iqd===null)?'no_price':n(b.totals.pending_costs)>0?'wage_waits_cost':b.totals.investor_iqd===null?'investor_waits':b.totals.gross_profit_iqd===null?'refund_unknown':'other';
-  const reasons:Record<string,string[]>={};for(const b of incomplete)(reasons[reasonOf(b)]??=[]).push(b.order_id);
+  const reasons:Record<string,string[]>={};for(const b of incomplete)(reasons[waitReason(b,postingErrors)]??=[]).push(b.order_id);
   return {
     known:complete.length?{orders_count:complete.length,incomplete_orders:bases.length-complete.length,revenue_iqd:amounts.revenue_iqd,cost_iqd:amounts.cost_iqd,owner_net_iqd:amounts.owner_net_iqd,
       net_after_report_adjustments_iqd:known.net_after_report_adjustments_iqd===null||truncated?null:n(known.net_after_report_adjustments_iqd)-overheadTotal,
@@ -144,7 +154,9 @@ function grouped(lines:ProfitLine[],kind:'product'|'main'|'sub'){
     if(kind==='sub'&&!id)continue;
     const key=id||'unclassified',name=kind==='product'?l.name_snapshot:kind==='main'?l.main_name:l.sub_name;
     const g=groups.get(key)??{name:name||'غير مصنف',lines:[]};g.lines.push(l);groups.set(key,g);}
-  return [...groups].map(([id,g])=>({id,name:g.name,level:kind,qty:g.lines.reduce((v,l)=>v+l.qty,0),...sumRows(g.lines),orders_count:new Set(g.lines.map((l)=>l.order_id)).size}));
+  // estimated_lines: the lines whose goods cost is the sale-time estimate, so the overview names a margin that rests on it (owner decision 3).
+  return [...groups].map(([id,g])=>({id,name:g.name,level:kind,qty:g.lines.reduce((v,l)=>v+l.qty,0),...sumRows(g.lines),orders_count:new Set(g.lines.map((l)=>l.order_id)).size,
+    estimated_lines:g.lines.filter((l)=>l.cogs_iqd!==null&&!isConfirmedOrderCost(l.cost_confidence)).length}));
 }
 /**
  * §21: the same delivered-order bases split by what made each order (0174) —
@@ -408,7 +420,7 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   for(const b of bases)for(const warning of b.warnings)exceptions.push({id:`${b.order_id}:${warning}`,order_id:b.order_id,type:warning.split(':')[0],message:warning.startsWith('cost:')?'تكلفة البضاعة تحتاج تثبيت FIFO أو تحققًا ماليًا خاصًا':warning==='investor:pending'?'توزيع المستثمر ينتظر التسوية':'يوجد بند مالي يحتاج مراجعة'});
   for(const b of bases)if(n(b.totals.pending_costs)>0)exceptions.push({id:`${b.order_id}:pending_cost`,order_id:b.order_id,type:'pending_cost',message:'الأجور أو المواد تنتظر تثبيت التكلفة'});
   const lines=bases.flatMap((b)=>b.lines);
-  const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated),orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sales_value'};
+  const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated,new Set((failures.results??[]).map((e)=>s(e.order_id)))),orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sales_value'};
   if(display==='IQD')return c.json(answer);
   return c.json({...answer,display_usd:await summaryInUsd(db,bases,r,expenseDays,unallocatedDays,truncated,n(totals.pending_costs)>0)});
 });

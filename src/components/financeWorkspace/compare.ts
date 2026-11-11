@@ -28,9 +28,17 @@ export function defaultCompare(range: FinanceRange): CompareMode {
   return range.from.slice(0, 7) === range.to.slice(0, 7) ? 'month' : 'previous';
 }
 
+/** The longest period /summary answers: its last day at most 365 days after its first (worker range(), validFinanceRange). */
+export const MAX_SPAN_DAYS = 365;
+
 export function compareRange(range: FinanceRange, mode: CompareMode): FinanceRange | null {
   if (mode === 'none') return null;
-  if (mode === 'month') return { from: monthEarlier(range.from), to: monthEarlier(range.to) };
+  if (mode === 'month') {
+    // A year-long range moved a month back can come out a day longer than the server answers (31 Mar – 30 Mar of the
+    // next year lands on 28 Feb – 29 Feb of a leap year): its first day moves up, so the comparison is always readable.
+    const from = monthEarlier(range.from), to = monthEarlier(range.to);
+    return { from: at(to) - at(from) > MAX_SPAN_DAYS * DAY ? iso(at(to) - MAX_SPAN_DAYS * DAY) : from, to };
+  }
   const days = Math.round((at(range.to) - at(range.from)) / DAY) + 1;
   const to = at(range.from) - DAY;
   return { from: iso(to - (days - 1) * DAY), to: iso(to) };
@@ -40,4 +48,10 @@ export function compareRange(range: FinanceRange, mode: CompareMode): FinanceRan
 export function change(now: number | null | undefined, before: number | null | undefined): number | null {
   if (now == null || before == null || before === 0) return null;
   return (now - before) / Math.abs(before);
+}
+
+/** A figure that crossed zero — a loss that became a profit (`up`) or the reverse (`down`) — has no meaningful percentage. */
+export function signFlip(now: number | null | undefined, before: number | null | undefined): 'up' | 'down' | null {
+  if (now == null || before == null || now === 0 || before === 0 || Math.sign(now) === Math.sign(before)) return null;
+  return now > 0 ? 'up' : 'down';
 }

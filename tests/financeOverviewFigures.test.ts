@@ -17,6 +17,11 @@
  * follow-up row of money still to be recorded counts Gini's amounts too; and the overview's
  * tables say «ناقص», never a bare dash. Every one of these failed on e4574a8a.
  *
+ * The independent review of steps 2–3 (2026-11-11): every figure resting on a sale-time estimate
+ * says so (the gross card, the statement's head, «تقديري» on a product); a change across zero is
+ * words, not a percentage; a net still missing is a partial comparison; a product sold at 0 has
+ * «بلا مبيعات» for a margin; and the net-sales sparkline is net sales by day.
+ *
  * The workspace imports its stylesheet; node has no CSS loader, so a resolve hook answers
  * `.css` with an empty module before the import (as tests/ordersListUi.test.ts).
  *
@@ -330,9 +335,48 @@ test('the overview, top to bottom: how much is calculated and what the rest wait
   // What waits for the owner, each with its button: the costs first, then the cash, the investor share, the missing rent.
   assert.deepEqual([...html.matchAll(/data-finance-attention-item="(\w+)"/g)].map((m) => m[1]), ['costs', 'cash', 'investor', 'expenses']);
   assert.match(html, /2,000,000 د\.ع مستحق لم يُسجَّل استلامه · طلبات: 1/);
-  // The statement shows the three columns, «محسوبة» first on a phone.
+  // The statement shows the three columns, «محسوبة» first on a phone, its head naming the six on sale-time estimates (owner decision 3).
   assert.match(html, /data-phone-col="0"/);
-  assert.deepEqual([...html.matchAll(/<th scope="col" data-col="(\d)">([^<]*)</g)].map((m) => m[2]), ['محسوبة (9)', 'تنتظر (4)', 'الفترة (13)']);
+  assert.deepEqual([...html.matchAll(/<th scope="col" data-col="(\d)">([^<]*)</g)].map((m) => m[2]), ['محسوبة (9 · تقديرية: 6)', 'تنتظر (4)', 'الفترة (13)']);
+  // So does the gross card: its figure rests on them too (independent review, 2026-11-11).
+  assert.match(cardOf(html, 'grossProfit'), /<small>طلبات بتكلفة تقديرية: 6<\/small>/);
   // The payouts are read after the screen mounts; until then they say so.
   assert.match(html, /تحميل المستحقات…/);
+});
+
+test('every figure resting on a sale-time estimate says so; a change across zero is no percentage; a net still missing is a partial comparison (independent review, 2026-11-11)', () => {
+  // The products: a margin whose goods cost is the sale-time estimate carries «تقديري» and the note says what that means;
+  // a product sold at 0 (a gift) has «بلا مبيعات» for a margin, never an empty cell.
+  const data = summary({ totals: { orders_count: 3, retained_revenue_iqd: 158000, gross_profit_iqd: 60000 },
+    products: [{ id: 'switch', name: 'Levo Switch', qty: 87, retained_revenue_iqd: 10527, gross_profit_iqd: 6039, estimated_lines: 2 }, { id: 'a2l', name: 'A2L', qty: 1, retained_revenue_iqd: 147473, gross_profit_iqd: 56000, estimated_lines: 0 },
+      { id: 'gift', name: 'Gift sticker', qty: 1, retained_revenue_iqd: 0, gross_profit_iqd: -2039 }] as FinanceSummary['products'],
+    missing_costs: { lines: 2, orders: 1, unknown_lines: 0, estimated_lines: 2, unknown_products: [] } });
+  const html = screen(data);
+  const table = /data-finance-top-products[\s\S]*?<\/table>/.exec(html)![0];
+  assert.match(table, /data-finance-estimated="true"><th scope="row">Levo Switch <span class="fw-status fw-status--warning">تقديري<\/span>/);
+  assert.equal((table.match(/data-finance-estimated/g) ?? []).length, 1, 'only the product with an estimated line');
+  assert.match(html, /«تقديري»: تكلفة بضاعته كلها أو بعضها تقدير وقت البيع/);
+  assert.match(table, /<th scope="row">Gift sticker<\/th>[\s\S]*?<td>بلا مبيعات<\/td>/);
+  // The gross card of a period whose every gross is known: how many orders rest on the estimate (the missing-costs count, no unknown line).
+  assert.match(cardOf(html, 'grossProfit'), /<small>طلبات بتكلفة تقديرية: 1<\/small>/);
+  assert.match(cardOf(screen(data, 'IQD', 'ckb'), 'grossProfit'), /داواکاری بە تێچووی خەمڵێنراو: 1/);
+  // A net that turned from a loss into a profit: no «▲10100.0%», but the words.
+  const now = summary({ totals: { orders_count: 5, owner_period_net_iqd: 1000000, owner_period_net_after_report_adjustments_iqd: 1000000, retained_revenue_iqd: 4000000 } });
+  const lost = summary({ totals: { orders_count: 0, owner_period_net_iqd: -10000, owner_period_net_after_report_adjustments_iqd: -10000, retained_revenue_iqd: 0 } });
+  const flip = cardOf(screen(now, 'IQD', 'ar', lost), 'netShare');
+  assert.match(flip, /data-finance-delta="loss-to-profit"[^>]*>[\s\S]*من خسارة إلى ربح/);
+  assert.doesNotMatch(flip, /%<\/bdi>/);
+  // A net still missing this period against a complete one: «مقارنة جزئية», not «لا شيء للمقارنة».
+  const missing = summary({ totals: { orders_count: 3, unknown_lines: 1, owner_period_net_iqd: null, owner_period_net_after_report_adjustments_iqd: null } });
+  assert.match(cardOf(screen(missing, 'IQD', 'ar', lost), 'netShare'), /data-finance-delta="partial"/);
+});
+
+test('the net-sales sparkline is net sales day by day, from the orders by Baghdad delivery day, not the revenue with delivery the curve shows (independent review nit)', () => {
+  const daily = ['2026-11-01', '2026-11-02', '2026-11-03'].map((day) => ({ day, revenue_iqd: day === '2026-11-03' ? 5000 : 0, cost_iqd: null, owner_net_iqd: null, investor_iqd: null, orders_count: 0, unknown_lines: 0, pending_costs: 0 }));
+  // One order delivered on 1 Nov at 23:30 Baghdad (20:30 UTC) with 100,000 of goods; 3 Nov has only a delivery fee.
+  const data = summary({ chart_data: { daily } as unknown as FinanceSummary['chart_data'], totals: { orders_count: 1, retained_revenue_iqd: 100000 },
+    orders: [{ id: 'o', order_id: 'o', status: 'delivered', created_at: '2026-11-01T20:00:00Z', delivered_at: '2026-11-01T20:30:00Z', retained_revenue_iqd: 100000 }] as FinanceSummary['orders'] });
+  const spark = /data-finance-kpi="netSales"[\s\S]*?<svg class="fw-spark"[\s\S]*?<\/svg>/.exec(screen(data))![0];
+  const points = /<polyline points="([^"]*)" style="fill:none/.exec(spark)![1].split(' ').map((p) => Number(p.split(',')[1]));
+  assert.deepEqual(points.map((y) => y < 10), [true, false, false], 'the peak is the first day\'s sales; the third day\'s delivery fee is not a sale');
 });

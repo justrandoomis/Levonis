@@ -82,6 +82,15 @@ export function statementRows(data: FinanceSummary, usd?: DisplayUsdSummary): St
 }
 
 /**
+ * The columns the screen draws: «محسوبة», «تنتظر» and «الفترة» while the period is split between complete
+ * and waiting orders; otherwise the period alone — a column with no orders in it would say «ناقص» on every
+ * line though nothing is missing from it, and the other would only repeat the period (independent review).
+ */
+export function statementColumns(calc: number, wait: number): Array<0 | 1 | 2> {
+  return calc > 0 && wait > 0 ? [0, 1, 2] : [2];
+}
+
+/**
  * The column's signed terms from «ربح البضاعة» down add up to its net, and its gross is its
  * sales less its goods cost — what a test asserts for every column it can (null: a term is unknown).
  */

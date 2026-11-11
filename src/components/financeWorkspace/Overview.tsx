@@ -5,10 +5,10 @@ import { useLanguage } from '../../LanguageContext';
 import { Button, Money, Status, Surface, formatMoney } from './ui';
 import { DisplayMoney, MissingValue, UsdBasisNote, centsAt, usdText, useDisplayCurrency } from './displayCurrency';
 import { averageOrder, overviewNet } from './overviewFigures';
-import { statementRows, type StatementKey } from './statement';
-import { change } from './compare';
+import { statementColumns, statementRows, type StatementKey } from './statement';
+import { change, signFlip } from './compare';
 import { fw, rangeText, type FwKey } from './overviewStrings';
-import type { DisplayUsdSummary, FinanceSection, FinanceSummary, FinanceWaitReason } from './types';
+import { financeDay, type DisplayUsdSummary, type FinanceSection, type FinanceSummary, type FinanceWaitReason } from './types';
 import type { OrderFocus } from './OrderProfitSheet';
 
 /**
@@ -25,7 +25,7 @@ import type { OrderFocus } from './OrderProfitSheet';
 type Lang = 'ar' | 'en' | 'ckb';
 /** One person of /finance-people/people: today's balances (what can be paid now, what is held). */
 export type PayoutPerson = { user_id: string | null; staff_id?: string; name: string; investor?: unknown; work?: unknown; combined?: { available_iqd?: number; held_iqd?: number } };
-type People = { list: PayoutPerson[] | null; error: boolean };
+export type People = { list: PayoutPerson[] | null; error: boolean };
 type OpenOrder = (id: string, step?: OrderFocus) => void;
 
 /** The payouts are today's balances, not the period's: read once per visit, and again on «تحديث». */
@@ -62,10 +62,14 @@ export default function Overview({ data, prev, compareFrom, compareTo, revision 
   // An amount in a note, in the figure's currency: in dollars only the server's cents; without them the note leaves it out.
   const noteAmount = (iqd: number | null | undefined, cents: number | null | undefined) => (u ? (cents == null ? '' : usdText(cents)) : iqd == null ? '' : formatMoney(iqd));
 
-  // A change is shown only between two figures on the same basis (in dinars, the accounting values); a partial one says so.
+  // A change is shown only between two figures on the same basis (in dinars, the accounting values); a partial one says so,
+  // and one across zero says which way it turned — a percentage of a loss means nothing.
   const delta = (now: number | null | undefined, before: number | null | undefined, partial = false) => {
     if (!prev) return null;
     if (partial) return <span className="fw-delta" title={fw(loc, 'partialWhy')} data-finance-delta="partial">{fw(loc, 'partial')}</span>;
+    const turn = signFlip(now, before);
+    if (turn) return <span className={`fw-delta ${turn === 'up' ? 'fw-up' : 'fw-down'}`} data-finance-delta={turn === 'up' ? 'loss-to-profit' : 'profit-to-loss'}>
+      <span aria-hidden>{turn === 'up' ? '▲' : '▼'}</span>{fw(loc, turn === 'up' ? 'lossToProfit' : 'profitToLoss')} {vsText}</span>;
     const c = change(now, before);
     if (c === null) return <span className="fw-delta" data-finance-delta="none">{fw(loc, 'noCompare')}</span>;
     return <span className={`fw-delta${c > 0 ? ' fw-up' : c < 0 ? ' fw-down' : ''}`} data-finance-delta={c}>
@@ -86,18 +90,26 @@ export default function Overview({ data, prev, compareFrom, compareTo, revision 
   const average = averageOrder(data, u);
   const daily = data.chart_data?.daily ?? [];
   const prevOrders = prev ? prev.totals.orders_count ?? prev.orders.length : null;
+  // The gross rests on sale-time estimates for these orders (owner decision 3: always named): of the complete orders when
+  // the gross is theirs; of the whole period — every order with an estimated line, as no goods cost is unknown — when it is the period's.
+  const grossEstimated = fullGross ? (data.missing_costs && !data.missing_costs.unknown_lines ? data.missing_costs.orders : 0) : known?.estimated?.orders_count ?? 0;
+  // The net-sales sparkline is net sales day by day (the orders' own, by Baghdad delivery day), not the revenue the curve shows.
+  const salesByDay = new Map<string, number>();
+  for (const o of data.orders) { const day = financeDay(o.delivered_at || o.created_at); salesByDay.set(day, (salesByDay.get(day) ?? 0) + (o.retained_revenue_iqd ?? 0)); }
 
   const cards: Array<{ key: FwKey; value: ReactNode; notes: string[]; delta: ReactNode; spark?: number[]; split?: boolean; primary?: boolean }> = [
     { key: 'netSales', value: <DisplayMoney iqd={sales} cents={u ? centsAt(u.totals, 'retained_revenue_iqd') : undefined} />, notes: [fw(loc, 'netSalesNote', { n: orders })],
-      delta: delta(sales, prev?.totals.retained_revenue_iqd), spark: daily.map((d) => d.revenue_iqd) },
+      delta: delta(sales, prev?.totals.retained_revenue_iqd), spark: daily.map((d) => salesByDay.get(d.day) ?? 0) },
     { key: 'grossProfit', value: <DisplayMoney iqd={gross} cents={grossCents} />,
-      notes: fullGross ? [grossPct ? fw(loc, 'grossNoteAll', { pct: grossPct }) : ''] : [grossPct ? fw(loc, 'grossMargin', { pct: grossPct }) : '', gross != null ? knownNote : ''],
+      notes: [...(fullGross ? [grossPct ? fw(loc, 'grossNoteAll', { pct: grossPct }) : ''] : [grossPct ? fw(loc, 'grossMargin', { pct: grossPct }) : '', gross != null ? knownNote : '']),
+        gross != null && grossEstimated > 0 ? fw(loc, 'estimatedOrders', { n: grossEstimated }) : ''],
       delta: delta(gross, prev?.totals.gross_profit_iqd, !fullGross || prev?.totals.gross_profit_iqd == null) },
     { key: 'netShare', value: <DisplayMoney iqd={figures.net} cents={figures.cents} />, primary: true, split: !!estimated && figures.net != null,
       notes: [sharePct ? fw(loc, 'shareMargin', { pct: sharePct }) : '',
         figures.fromKnown ? `${knownNote}${(known?.overhead_share_iqd ?? 0) > 0 ? fw(loc, 'overheadNote') : ''}` : figures.net != null ? fw(loc, 'netNote') : '',
         estimated && figures.confirmed ? `${part('confirmedPart', figures.confirmed)} · ${part('estimatedPart', estimated)}` : '', deducted],
-      delta: delta(figures.net, prevFigures?.net, figures.fromKnown || !!prevFigures?.fromKnown || prevFigures?.net == null) },
+      // A net still missing here is a partial comparison too, never «nothing to compare».
+      delta: delta(figures.net, prevFigures?.net, figures.net == null || figures.fromKnown || !!prevFigures?.fromKnown || prevFigures?.net == null) },
     { key: 'deliveredOrders', value: <strong>{orders}</strong>,
       notes: [fw(loc, 'units', { n: t.units ?? 0 }), average ? fw(loc, 'averageOrder', { amount: noteAmount(average.iqd, average.cents) }).trim() : ''],
       delta: delta(orders, prevOrders), spark: daily.map((d) => d.orders_count) },
@@ -173,7 +185,8 @@ function useNarrow() {
   }, [query?.media]); // eslint-disable-line react-hooks/exhaustive-deps
   return narrow;
 }
-const niceStep = (top: number) => { const raw = top / 4, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; };
+/** A round step for four or so gridlines over `top`; never under one whole dinar or dollar (no «0.25» on an axis of money). */
+export const niceStep = (top: number) => { const raw = Math.max(top, 4) / 4, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; };
 /** A period's revenue day by day, in the display currency: the server's cents in dollars (none: null — never dinars). */
 function dailyRevenue(s: FinanceSummary, usd: DisplayUsdSummary | undefined): number[] | null {
   const days = s.chart_data?.daily ?? [];
@@ -181,7 +194,7 @@ function dailyRevenue(s: FinanceSummary, usd: DisplayUsdSummary | undefined): nu
   return usd.chart ? days.map((d) => (usd.chart!.daily[d.day]?.revenue_cents ?? 0) / 100) : null;
 }
 /** Revenue accumulated day by day, this period against the comparison; one scale for both, labels in Latin digits. */
-function Curve({ data, prev, usd, compareLabel }: { data: FinanceSummary; prev: FinanceSummary | null; usd?: DisplayUsdSummary; compareLabel: string }) {
+export function Curve({ data, prev, usd, compareLabel }: { data: FinanceSummary; prev: FinanceSummary | null; usd?: DisplayUsdSummary; compareLabel: string }) {
   const { loc } = useLanguage();
   const narrow = useNarrow();
   const cum = (rows: number[] | null) => (rows ?? []).reduce<number[]>((acc, v) => [...acc, (acc[acc.length - 1] ?? 0) + v], []);
@@ -189,6 +202,8 @@ function Curve({ data, prev, usd, compareLabel }: { data: FinanceSummary; prev: 
   const now = cum(dailyRevenue(data, usd)), before = prev && (!usd || prevUsd) ? cum(dailyRevenue(prev, prevUsd)) : [];
   const n = Math.max(now.length, before.length);
   if (!n) return null;
+  // Nothing sold in either period: a flat line on an empty scale says less than these words.
+  if (![...now, ...before].some((v) => v > 0)) return <p className="fw-note" data-finance-curve="empty">{fw(loc, 'noRevenue')}</p>;
   const money = (v: number) => (usd ? usdText(Math.round(v * 100)) : formatMoney(v));
   const W = narrow ? 340 : 640, H = narrow ? 180 : 210, padL = 40, padR = 12, padT = 12, padB = 24;
   const top = Math.max(...now, ...before, 1), step = niceStep(top), max = Math.ceil(top / step) * step;
@@ -214,7 +229,7 @@ function Curve({ data, prev, usd, compareLabel }: { data: FinanceSummary; prev: 
 }
 
 /** What waits for the owner in this period, each with the button that does it. */
-function Attention({ data, usd, people, openOrder, onNavigate, onMissing, onCollections }: { data: FinanceSummary; usd?: DisplayUsdSummary; people: People; openOrder: OpenOrder;
+export function Attention({ data, usd, people, openOrder, onNavigate, onMissing, onCollections }: { data: FinanceSummary; usd?: DisplayUsdSummary; people: People; openOrder: OpenOrder;
   onNavigate: (section: FinanceSection) => void; onMissing: () => void; onCollections: () => void }) {
   const { loc } = useLanguage();
   const t = data.totals, missing = data.missing_costs, waiting = data.waiting?.reasons?.investor_waits ?? [];
@@ -246,23 +261,32 @@ function Attention({ data, usd, people, openOrder, onNavigate, onMissing, onColl
 const ROW: Record<StatementKey, FwKey> = { sales: 'netSales', cogs: 'cogs', gross: 'grossProfit', delivery: 'delivery', cod: 'cod', wages: 'wages', materials: 'materials', fees: 'fees',
   promotion: 'promo', investor: 'investor', general: 'expenses', deductions: 'deductions', net: 'netShare' };
 /** «من المبيعات إلى حصتك»: three columns on a wide screen, one at a time on a phone; in dollars the server's cents. */
-function Statement({ data, usd }: { data: FinanceSummary; usd?: DisplayUsdSummary }) {
+export function Statement({ data, usd }: { data: FinanceSummary; usd?: DisplayUsdSummary }) {
   const { loc } = useLanguage();
   const { rows, currency } = useMemo(() => statementRows(data, usd), [data, usd]);
   const t = data.totals, total = t.orders_count ?? data.orders.length, calc = data.known?.orders_count ?? 0, wait = data.waiting?.orders_count ?? 0;
-  const [pick, setCol] = useState<0 | 2>(0);
+  // The columns with orders in them: «محسوبة» and «تنتظر» only while the period is split between them, else the period alone
+  // (an empty column would say «ناقص» on every line though nothing is missing from it).
+  const visible = statementColumns(calc, wait);
+  const [pick, setCol] = useState<0 | 1 | 2>(visible[0]);
   // On a phone one column at a time: the calculated orders first while some wait, else the period.
-  const col = wait ? pick : 2;
-  const heads = [fw(loc, 'colCalculated', { n: calc }), fw(loc, 'colWaiting', { n: wait }), fw(loc, 'colPeriod', { n: total })];
-  const visible: Array<0 | 1 | 2> = wait ? [0, 1, 2] : [2];
+  const col = visible.includes(pick) ? pick : visible[0];
+  // Which orders rest on sale-time estimates (owner decision 3): the calculated ones, named in their column's head.
+  const est = data.known?.estimated?.orders_count ?? 0;
+  const heads = [fw(loc, est ? 'colCalculatedEst' : 'colCalculated', { n: calc, e: est }), fw(loc, 'colWaiting', { n: wait }),
+    fw(loc, est && visible.length === 1 ? 'colPeriodEst' : 'colPeriod', { n: total, e: est })];
   const cell = (v: number | null, i: 0 | 1 | 2, key: StatementKey) => v !== null ? (currency === 'USD' ? <span className="fw-money" dir="ltr">{usdText(v)}</span> : <Money value={v} />)
     : <MissingValue text={fw(loc, i === 1 || key === 'wages' || key === 'materials' || key === 'investor' ? 'waitingCell' : 'missingCell')} />;
+  // A negative investor share is the investors' part of a loss, added back: the row says so.
+  const investorLoss = rows.find((r) => r.key === 'investor')?.cells.some((v) => v !== null && v < 0) ?? false;
   const hint = (key: StatementKey) => key === 'fees' && (t.collected_iqd ?? 0) === 0 && (t.collection_difference_iqd ?? 0) > 0 ? fw(loc, 'feesNote')
     : key === 'wages' && (t.pending_costs ?? 0) > 0 ? fw(loc, 'wagesWaiting', { n: t.pending_costs ?? 0 })
-      : key === 'general' && (t.general_waiting_iqd ?? 0) > 0 ? fw(loc, 'generalWaiting', { amount: formatMoney(t.general_waiting_iqd) }) : '';
+      : key === 'investor' && investorLoss ? fw(loc, 'investorLoss')
+        // In dollars the server has no cents for it: the note names it without a dinar amount among dollar cells.
+        : key === 'general' && (t.general_waiting_iqd ?? 0) > 0 ? currency === 'USD' ? fw(loc, 'generalWaitingShort') : fw(loc, 'generalWaiting', { amount: formatMoney(t.general_waiting_iqd) }) : '';
   return <Surface title={fw(loc, 'statement')} subtitle={fw(loc, 'statementNote')}>
-    {wait > 0 && <div className="fw-seg" role="group" aria-label={fw(loc, 'statement')}>
-      {([0, 2] as const).map((i) => <button key={i} type="button" aria-pressed={col === i} onClick={() => setCol(i)}>{heads[i]}</button>)}</div>}
+    {visible.length > 1 && <div className="fw-seg" role="group" aria-label={fw(loc, 'statement')}>
+      {visible.map((i) => <button key={i} type="button" aria-pressed={col === i} onClick={() => setCol(i)}>{heads[i]}</button>)}</div>}
     <div className="fw-table-wrap"><table className="fw-table fw-pl" data-finance-statement={currency} data-phone-col={col}>
       <thead><tr><th scope="col"><span className="fw-sr">{fw(loc, 'statement')}</span></th>{visible.map((i) => <th key={i} scope="col" data-col={i}>{heads[i]}</th>)}</tr></thead>
       <tbody>{rows.map((r) => <tr key={r.key} className={r.sign === '=' ? 'fw-pl-sum' : undefined} data-key={r.key}>
@@ -277,14 +301,18 @@ function TopProducts({ data, usd, onNavigate }: { data: FinanceSummary; usd?: Di
   const { loc } = useLanguage();
   const rows = [...data.products].sort((a, b) => (b.gross_profit_iqd ?? -Infinity) - (a.gross_profit_iqd ?? -Infinity)).slice(0, 6);
   const cents = (id: string, field: string) => (usd ? centsAt(usd.products?.[id] ?? {}, field) : undefined);
+  // A gross that rests on a sale-time estimate says so on its row (owner decision 3); the server counts each product's estimated lines.
+  const estimated = (p: (typeof rows)[number]) => p.gross_profit_iqd != null && (p.estimated_lines ?? 0) > 0;
   return <Surface title={fw(loc, 'topProducts')} action={<Button variant="ghost" onClick={() => onNavigate('products')}>{fw(loc, 'fullReport')}<ArrowUpLeft size={15} aria-hidden /></Button>}>
     {rows.length ? <div className="fw-table-wrap"><table className="fw-table" data-finance-top-products>
       <thead><tr><th scope="col">{fw(loc, 'product')}</th><th scope="col" className="fw-wide">{fw(loc, 'pieces')}</th><th scope="col" className="fw-wide">{fw(loc, 'netSales')}</th><th scope="col">{fw(loc, 'grossProfit')}</th><th scope="col">{fw(loc, 'marginCol')}</th></tr></thead>
-      <tbody>{rows.map((p) => { const salesOf = p.retained_revenue_iqd ?? p.net_goods_iqd ?? null; return <tr key={p.id}><th scope="row">{p.name}</th><td className="fw-wide">{p.qty}</td>
+      <tbody>{rows.map((p) => { const salesOf = p.retained_revenue_iqd ?? p.net_goods_iqd ?? null; return <tr key={p.id} data-finance-estimated={estimated(p) || undefined}>
+        <th scope="row">{p.name}{estimated(p) && <> <Status tone="warning">{fw(loc, 'estimatedChip')}</Status></>}</th><td className="fw-wide">{p.qty}</td>
         <td className="fw-wide"><DisplayMoney iqd={salesOf} cents={cents(p.id, 'retained_revenue_iqd')} compact /></td>
         <td><DisplayMoney iqd={p.gross_profit_iqd} cents={cents(p.id, 'gross_profit_iqd')} compact /></td>
-        <td>{p.gross_profit_iqd == null ? <MissingValue /> : salesOf ? <bdi dir="ltr">{(p.gross_profit_iqd / salesOf * 100).toFixed(1)}%</bdi> : null}</td></tr>; })}</tbody>
+        <td>{p.gross_profit_iqd == null ? <MissingValue /> : salesOf ? <bdi dir="ltr">{(p.gross_profit_iqd / salesOf * 100).toFixed(1)}%</bdi> : fw(loc, 'noSales')}</td></tr>; })}</tbody>
     </table></div> : <p className="fw-note">{fw(loc, 'noProducts')}</p>}
+    {rows.some(estimated) && <p className="fw-note">{fw(loc, 'estimatedChipNote')}</p>}
   </Surface>;
 }
 
@@ -308,7 +336,7 @@ function Cash({ data, usd, onCollections }: { data: FinanceSummary; usd?: Displa
 }
 
 /** Who can be paid now and what is held — today's balances from «الأشخاص», in dinars as those screens keep them. */
-function Payouts({ people, onNavigate }: { people: People; onNavigate: (section: FinanceSection) => void }) {
+export function Payouts({ people, onNavigate }: { people: People; onNavigate: (section: FinanceSection) => void }) {
   const { loc } = useLanguage();
   const list = people.list ?? [];
   const payable = list.filter((p) => available(p) > 0).sort((a, b) => available(b) - available(a));

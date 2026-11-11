@@ -72,6 +72,8 @@ export interface FinanceProduct extends ProfitTotals {
   id: string;
   name: string;
   qty: number;
+  /** Its lines whose goods cost is the sale-time estimate, not a confirmed price (absent from a server that predates it). */
+  estimated_lines?: number;
   level?: 'product' | 'main' | 'sub';
   product_image?: string;
   image_url?: string;

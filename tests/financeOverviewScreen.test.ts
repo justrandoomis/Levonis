@@ -11,8 +11,15 @@
  *   · every word of the frame and the overview (overviewStrings.ts) in Arabic, English and
  *     real Sorani, never the Arabic pasted into the Sorani slot (DECISIONS row 183);
  *   · the frame itself: five sections, every old `finance=` link opening its page, and a
- *     period bar that asks for dates only for a custom range.
- * The server's half (known.totals, waiting) is in tests/financeFigures.test.ts; the overview
+ *     period bar that asks for dates only for a custom range;
+ *   · what the frame remembers (frameState.ts), driven as the screen drives it — the independent
+ *     review's two blockers: a failed read of a new period or currency leaves no figures of
+ *     another under its dates, and a page kept hidden is read afresh after a save anywhere, a
+ *     refresh, another period or currency, or two minutes away — and the review's edges: a
+ *     year-long comparison the server still answers, a change across zero, the statement's
+ *     columns with no orders in them, a negative investor share, a dinar hint among dollars,
+ *     a period with no revenue, and the payouts once the people are read.
+ * The hold of a hidden page is run in React in tests/freshOnReturnHold.test.ts. The server's half (known.totals, waiting) is in tests/financeFigures.test.ts; the overview
  * drawn end to end is in tests/financeOverviewFigures.test.ts.
  *
  * The workspace imports its stylesheet; node has no CSS loader, so a resolve hook answers
@@ -25,8 +32,11 @@ import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { change, compareRange, defaultCompare, monthEarlier } from '../src/components/financeWorkspace/compare';
-import { statementAddsUp, statementRows, type StatementRow } from '../src/components/financeWorkspace/statement';
+import { change, compareRange, defaultCompare, MAX_SPAN_DAYS, monthEarlier, signFlip } from '../src/components/financeWorkspace/compare';
+import { statementAddsUp, statementColumns, statementRows, type StatementRow } from '../src/components/financeWorkspace/statement';
+import { comparisonFor, KEEP_MS, keepKey, keptPages, missingBadge, navigate, NO_SUMMARY, NOTHING_KEPT, pageMount, summaryKey, summaryReducer, summaryShown } from '../src/components/financeWorkspace/frameState';
+import { DisplayCurrencyContext } from '../src/components/financeWorkspace/displayCurrency';
+import { validFinanceRange } from '../src/components/financeWorkspace/types';
 import { FW, fw, rangeText } from '../src/components/financeWorkspace/overviewStrings';
 import type { DisplayUsdSummary, FinanceSummary, ProfitTotals } from '../src/components/financeWorkspace/types';
 import { LanguageProvider } from '../src/LanguageContext';
@@ -39,6 +49,8 @@ register('data:text/javascript,' + encodeURIComponent(`export async function res
   return next(specifier, context);
 }`));
 const { default: FinanceWorkspace } = await import('../src/components/financeWorkspace/FinanceWorkspace');
+const { Attention, Curve, niceStep, Payouts, Statement } = await import('../src/components/financeWorkspace/Overview');
+type People = import('../src/components/financeWorkspace/Overview').People;
 
 const ARABIC = /[؀-ۿ]/, ARABIC_ONLY = /[ةىيك]/, SORANI_ONLY = /[ڕڵێۆەڤگچپژ]/;
 
@@ -232,7 +244,7 @@ test('one compact bar: a preset needs no dates (the header says them); a custom 
   assert.equal((custom.match(/type="date"/g) ?? []).length, 2);
   assert.match(custom, /<option value="previous" selected="[^"]*">الفترة السابقة بنفس الطول<\/option>/, 'a range across months is compared with the period before it');
   assert.match(custom, /data-finance-range[^>]*><bdi>15 أيلول – 14 تشرين الأول 2026<\/bdi>/);
-  assert.match(custom, /عن 16 آب – 14 أيلول 2026/, 'and the header says which days: the thirty before');
+  assert.match(custom, /مقارنةً بـ 16 آب – 14 أيلول 2026/, 'and the header says which days: the thirty before');
   // Only the overview compares; only its and the reports' bar exports; the month page has its own month.
   const people = open('?finance=staff');
   assert.doesNotMatch(people, /data-finance-compare|data-finance-export/);
@@ -241,23 +253,248 @@ test('one compact bar: a preset needs no dates (the header says them); a custom 
   assert.match(open('?finance=monthly'), /type="month"/);
 });
 
-test('a page the owner leaves is kept, hidden, until the period changes, and it holds its refreshes while hidden (redesign step 2)', () => {
+// ------------------------------------------------------------------ what the frame remembers (frameState.ts)
+// The independent review (2026-11-11) found two ways the frame showed figures that were not true any more: a failed
+// read of a new period left the old period's figures under the new dates (against the new comparison), and a page
+// kept hidden never read again after the owner paid or saved on another page. The frame keeps that memory in a pure
+// module; these tests drive it exactly as the screen does, then check the screen is wired to it.
+const nov = summary({ range: { from: '2026-11-01', to: '2026-11-11' }, totals: { retained_revenue_iqd: 6858667, orders_count: 13 }, missing_costs: { lines: 19, orders: 9, unknown_lines: 4, estimated_lines: 15, unknown_products: [] } });
+const oct = summary({ range: { from: '2026-10-01', to: '2026-10-31' }, totals: { retained_revenue_iqd: 19685330, orders_count: 33 } });
+
+test('a failed read of another period never leaves the old period\'s figures under the new dates; while it loads they stay dimmed, without a comparison (review blocker)', () => {
+  const NOV = summaryKey('2026-11-01', '2026-11-11', 'IQD'), OCT = summaryKey('2026-10-01', '2026-10-31', 'IQD');
+  let s = summaryReducer(NO_SUMMARY, { type: 'start', key: NOV });
+  assert.deepEqual(summaryShown(s, NOV), { data: null, current: false, at: '' }, 'the first read: a spinner, nothing to show yet');
+  s = summaryReducer(s, { type: 'loaded', key: NOV, data: nov, at: '10:50' });
+  assert.deepEqual(summaryShown(s, NOV), { data: nov, current: true, at: '10:50' });
+  // The owner picks «الشهر السابق»: while October loads, November's figures stay — dimmed (not current), so no comparison is drawn.
+  s = summaryReducer(s, { type: 'start', key: OCT });
+  assert.deepEqual(summaryShown(s, OCT), { data: nov, current: false, at: '' });
+  // October's read fails (a 503, the hourly read budget, a dropped line): November's figures go; the error stands alone.
+  s = summaryReducer(s, { type: 'failed', key: OCT, error: 'خطأ في الخادم (503)' });
+  assert.deepEqual(summaryShown(s, OCT), { data: null, current: false, at: '' }, 'no figures of another period under October\'s dates');
+  assert.equal(s.error, 'خطأ في الخادم (503)');
+  assert.equal(s.loading, null);
+  assert.equal(missingBadge(s, '2026-10-01', '2026-10-31'), 0, 'nor November\'s «التكاليف 19» on October');
+  // «إعادة المحاولة»: a spinner, not November again; then October's own figures.
+  s = summaryReducer(s, { type: 'start', key: OCT });
+  assert.equal(summaryShown(s, OCT).data, null);
+  s = summaryReducer(s, { type: 'loaded', key: OCT, data: oct, at: '10:52' });
+  assert.deepEqual(summaryShown(s, OCT), { data: oct, current: true, at: '10:52' });
+  assert.equal(s.error, '');
+});
+
+test('a failed switch to dollars drops the dinar figures rather than show them under the dollar toggle; the period\'s badge stays while the dollars load', () => {
+  const IQD = summaryKey('2026-11-01', '2026-11-11', 'IQD'), USD = summaryKey('2026-11-01', '2026-11-11', 'USD');
+  let s = summaryReducer(summaryReducer(NO_SUMMARY, { type: 'start', key: IQD }), { type: 'loaded', key: IQD, data: nov, at: '10:50' });
+  s = summaryReducer(s, { type: 'start', key: USD });
+  assert.deepEqual(summaryShown(s, USD), { data: nov, current: false, at: '' }, 'dimmed while the dollars load');
+  assert.equal(missingBadge(s, '2026-11-01', '2026-11-11'), 19, 'the same period: the badge does not blink');
+  s = summaryReducer(s, { type: 'failed', key: USD, error: 'no rate' });
+  assert.equal(summaryShown(s, USD).data, null, 'no dinars under «دولار»');
+  // Back to dinars: read again (the dinar read went with the failure), never the dollars' error over it.
+  s = summaryReducer(s, { type: 'start', key: IQD });
+  assert.equal(s.error, '');
+});
+
+test('a refresh of the same period that fails keeps its figures — they are that period\'s — with the time they were read; a later background read clears the error', () => {
+  const NOV = summaryKey('2026-11-01', '2026-11-11', 'IQD');
+  let s = summaryReducer(summaryReducer(NO_SUMMARY, { type: 'start', key: NOV }), { type: 'loaded', key: NOV, data: nov, at: '10:50' });
+  s = summaryReducer(summaryReducer(s, { type: 'start', key: NOV }), { type: 'failed', key: NOV, error: 'offline' });
+  assert.deepEqual(summaryShown(s, NOV), { data: nov, current: true, at: '10:50' });
+  assert.equal(s.error, 'offline');
+  // The 30-second background read lands without a «start» of its own.
+  s = summaryReducer(s, { type: 'loaded', key: NOV, data: nov, at: '10:51' });
+  assert.equal(s.error, '');
+  assert.equal(summaryShown(s, NOV).at, '10:51');
+});
+
+test('a kept page is read afresh after a save anywhere, a refresh, another period or currency, or two minutes away; accounting is never kept (review blocker)', () => {
+  const only = (page: string) => page !== 'accounting';
+  const key = (revision: number, currency = 'IQD', from = '2026-11-01') => keepKey(from, '2026-11-11', currency, revision);
+  const t0 = Date.UTC(2026, 10, 11, 7, 0);
+  // The owner reads «الموظفون», then pays on «السحب والتسويات»: Staff is kept, hidden.
+  let k = navigate(NOTHING_KEPT, key(0), 'overview', 'staff', t0, only);
+  k = navigate(k, key(0), 'staff', 'settlements', t0 + 5_000, only);
+  assert.deepEqual(keptPages(k, key(0)).sort(), ['overview', 'staff']);
+  // The payment calls onChanged → refresh(): the revision moves on, and no page from before it is kept — Staff
+  // mounts again when shown and reads «متاح الآن» after the payment, instead of the 161,178 from before it.
+  assert.deepEqual(keptPages(k, key(1)), [], 'a save or «تحديث» drops every hidden page');
+  k = navigate(k, key(1), 'settlements', 'staff', t0 + 9_000, only);
+  assert.deepEqual(keptPages(k, key(1)), ['settlements'], 'only the page just left is kept');
+  // And the other way: Withdrawals, kept, after a settlement on Staff — the same.
+  assert.deepEqual(keptPages(k, key(2)), []);
+  // Another period or currency drops them too.
+  assert.deepEqual(keptPages(k, key(1, 'USD')), []);
+  assert.deepEqual(keptPages(k, key(1, 'IQD', '2026-10-01')), []);
+  // Within two minutes a page comes back as it was left (no read); after them it mounts again (a fresh read):
+  // a request or a payment made elsewhere meanwhile is on it.
+  const before = pageMount(k, 'settlements');
+  const quick = navigate(k, key(1), 'staff', 'settlements', t0 + 9_000 + KEEP_MS, only);
+  assert.equal(pageMount(quick, 'settlements'), before, 'two minutes: kept as it was');
+  const late = navigate(k, key(1), 'staff', 'settlements', t0 + 9_001 + KEEP_MS, only);
+  assert.notEqual(pageMount(late, 'settlements'), before, 'over two minutes: read afresh');
+  assert.equal(pageMount(late, 'staff'), pageMount(k, 'staff'), 'the page left keeps its mount');
+  // Accounting is never kept; a page never keeps itself.
+  const acc = navigate(navigate(NOTHING_KEPT, key(0), 'overview', 'accounting', t0, only), key(0), 'accounting', 'overview', t0 + 1, only);
+  assert.deepEqual(keptPages(acc, key(0)), []);
+});
+
+test('the comparison is read once per key; a failed read says so instead of a silent card, and is not read again until the key moves', () => {
+  assert.deepEqual(comparisonFor(null, ''), { data: null, failed: false, wanted: false }, '«بلا مقارنة»: nothing to read');
+  assert.deepEqual(comparisonFor(null, 'a'), { data: null, failed: false, wanted: true });
+  assert.deepEqual(comparisonFor({ key: 'a', data: oct }, 'a'), { data: oct, failed: false, wanted: false });
+  assert.deepEqual(comparisonFor({ key: 'a', data: null }, 'a'), { data: null, failed: true, wanted: false }, 'failed: no retry loop');
+  assert.deepEqual(comparisonFor({ key: 'a', data: oct }, 'b'), { data: null, failed: false, wanted: true }, 'a new key reads again');
+});
+
+test('the frame is wired to that memory: figures only under their own period and currency, the comparison only beside them, hidden pages by the keep key with the revision, each page in its own currency', () => {
   const code = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
-  // Kept by period: another range starts afresh; accounting (on-demand tools that pause the summary's refresh) is not kept.
-  assert.match(code, /const keepKey = `\$\{range\.from\}\|\$\{range\.to\}`;/);
-  assert.match(code, /const keptPages = kept\.key === keepKey \? kept\.pages : \[\];/);
-  assert.match(code, /const KEPT: FinanceSection\[\] = SECTIONS\.filter\(\(s\) => s !== 'accounting'\);/);
-  assert.match(code, /<FreshOnReturnHold\.Provider key=\{id\} value=\{id !== section\}>/);
-  assert.match(code, /style=\{id === section \? undefined : \{ display: 'none' \}\}/);
-  // The orders list re-reads after the summary's background refresh only while it is shown.
+  assert.match(code, /const readKey = summaryKey\(range\.from, range\.to, currency\);/);
+  assert.match(code, /const shown = summaryShown\(summary, readKey\), data = shown\.data/);
+  assert.match(code, /<Overview data=\{d\} prev=\{shown\.current \? comparison\.data : null\}/);
+  assert.match(code, /const kept = keepKey\(range\.from, range\.to, currency, revision\);/);
+  assert.match(code, /const hidden = keptPages\(keptState, kept\);/);
+  assert.match(code, /setKept\(\(state\) => navigate\(state, kept, section, next, Date\.now\(\), keepable\)\);/);
+  assert.match(code, /<FreshOnReturnHold\.Provider key=\{pageMount\(keptState, id\)\} value=\{id !== section\}>/);
+  // A kept page's currency never flips when the owner moves to a section without the toggle (a hidden re-read each time).
+  assert.match(code, /<DisplayCurrencyContext\.Provider value=\{CURRENCY_PAGES\.includes\(id\) \? currency : 'IQD'\}>/);
   assert.match(code, /if \(section === 'orders'\) setOrdersPoll\(\(value\) => value \+ 1\);/);
   assert.match(code, /revision=\{revision \+ ordersPoll\}/);
-  // The hold: nothing polls while hidden, and a wake it missed runs when it is shown again.
-  const hook = codeOf('src/lib/useFreshOnReturn.ts');
-  assert.match(hook, /export const FreshOnReturnHold = createContext\(false\);/);
-  assert.match(hook, /const held = useContext\(FreshOnReturnHold\);\s*const enabled = wanted && !held;/);
-  assert.match(hook, /if \(!was && enabled && pendingRef\.current\)/);
-  // The comparison is read once per period, comparison, currency and refresh, and only for the overview.
-  assert.match(code, /const compareKey = compared \? `\$\{compared\.from\}\|\$\{compared\.to\}\|\$\{display\}\|\$\{revision\}` : '';/);
-  assert.match(code, /const wantsComparison = main === 'overview' && !!compareKey && !comparison;/);
+  // The hold itself is run in React in tests/freshOnReturnHold.test.ts.
+  assert.match(codeOf('src/lib/useFreshOnReturn.ts'), /const held = useContext\(FreshOnReturnHold\);\s*const enabled = wanted && !held;/);
+  // A failed comparison is named in the header (the cards then show no change).
+  const words = (lang: 'ar' | 'en' | 'ckb') => (a: string, e: string, k?: string) => (lang === 'en' ? e : lang === 'ckb' ? k ?? a : a);
+  assert.equal(fw(words('ar'), 'vsFailed', { range: '1–11 تشرين الأول 2026' }), 'لا مقارنة: تعذّرت قراءة 1–11 تشرين الأول 2026');
+  assert.match(code, /fw\(loc, comparison\.failed \? 'vsFailed' : 'vsHeader'/);
+});
+
+// ------------------------------------------------------------------ compare.ts, the edges
+test('«same days last month» on a year-long range stays readable: its first day moves up so the server never refuses it (review nit)', () => {
+  const c = compareRange({ from: '2023-03-31', to: '2024-03-30' }, 'month')!;
+  assert.deepEqual(c, { from: '2023-03-01', to: '2024-02-29' });
+  assert.equal((Date.parse(c.to) - Date.parse(c.from)) / 86400000, MAX_SPAN_DAYS);
+  // Every comparison of every valid range is a range the server answers, both ways.
+  for (let i = 0; i < 400; i += 1) {
+    const from = new Date(Date.UTC(2023, 0, 1) + ((i * 7919) % 1460) * 86400000).toISOString().slice(0, 10);
+    const to = new Date(Date.parse(from) + ((i * 104729) % 366) * 86400000).toISOString().slice(0, 10);
+    for (const mode of ['month', 'previous'] as const) assert.ok(validFinanceRange(compareRange({ from, to }, mode)!), `${mode} ${from}–${to}`);
+  }
+});
+
+test('a figure that crossed zero has no percentage: a loss that became a profit says so, and the reverse (review nit)', () => {
+  assert.equal(signFlip(1000000, -10000), 'up');
+  assert.equal(signFlip(-5000, 20000), 'down');
+  assert.equal(signFlip(110, 100), null);
+  assert.equal(signFlip(-50, -100), null, 'a smaller loss is a percentage');
+  assert.equal(signFlip(0, -100), null);
+  assert.equal(signFlip(null, -100), null);
+});
+
+// ------------------------------------------------------------------ the statement, the edges
+const drawStatement = (data: FinanceSummary, currency: 'IQD' | 'USD' = 'IQD', lang: 'ar' | 'en' | 'ckb' = 'ar') => {
+  LANG = lang;
+  try {
+    return renderToStaticMarkup(createElement(LanguageProvider, null, createElement(DisplayCurrencyContext.Provider, { value: currency },
+      createElement(Statement, { data, usd: currency === 'USD' ? data.display_usd : undefined }))));
+  } finally { LANG = 'ar'; }
+};
+const statementRow = (html: string, key: string) => new RegExp(`<tr[^>]*data-key="${key}">([\\s\\S]*?)</tr>`).exec(html)![1];
+
+test('the statement draws a column only when it has orders: none complete, or none waiting, is the period alone; split, a phone can show any of the three (review)', () => {
+  assert.deepEqual(statementColumns(9, 4), [0, 1, 2]);
+  assert.deepEqual(statementColumns(0, 3), [2], 'no complete order: no column of «ناقص» chips for an empty sum');
+  assert.deepEqual(statementColumns(13, 0), [2]);
+  // Three orders all waiting for a magnet price: one column, the period's, and it is the one a phone shows.
+  const waiting = summary({ totals: { orders_count: 3, retained_revenue_iqd: 30000, cogs_iqd: null, gross_profit_iqd: null, pending_costs: 0, general_expenses_iqd: 10001 }, known: null,
+    waiting: { orders_count: 3, totals: { retained_revenue_iqd: 30000, cogs_iqd: null }, reasons: { no_price: ['a', 'b', 'c'] }, general_share_iqd: 10001, unallocated_share_iqd: 0 } });
+  const none = drawStatement(waiting);
+  assert.deepEqual([...none.matchAll(/<th scope="col" data-col="(\d)">([^<]*)</g)].map((m) => m[2]), ['الفترة (3)']);
+  assert.doesNotMatch(none, /data-col="0"|data-col="1"/);
+  assert.match(none, /data-phone-col="2"/);
+  assert.doesNotMatch(none, /fw-seg/, 'one column: no switch');
+  // Split: the phone's switch offers all three — «تنتظر» too — and the heads name the estimates (owner decision 3).
+  const split = summary({ totals: { orders_count: 13, general_expenses_iqd: 0 }, known: { orders_count: 9, incomplete_orders: 4, revenue_iqd: 1, cost_iqd: null, owner_net_iqd: null, totals: {},
+    estimated: { orders_count: 6, revenue_iqd: 1, owner_net_iqd: 1 } }, waiting: { orders_count: 4, totals: {}, reasons: {} } });
+  const html = drawStatement(split);
+  assert.deepEqual([...html.matchAll(/<button type="button" aria-pressed="(?:true|false)">([^<]*)</g)].map((m) => m[1]), ['محسوبة (9 · تقديرية: 6)', 'تنتظر (4)', 'الفترة (13)']);
+  assert.match(html, /data-phone-col="0"/);
+  assert.match(html, /بأسعار شراء مؤكدة أو بتقدير وقت البيع/, 'the note says «محسوبة» includes sale-time estimates');
+  assert.match(drawStatement(split, 'IQD', 'ckb'), /ژمێردراو \(9 · خەمڵێنراو: 6\)/);
+  // All complete, six on estimates: the period's head names them.
+  const allIn = summary({ totals: { orders_count: 13 }, known: { orders_count: 13, incomplete_orders: 0, revenue_iqd: 1, cost_iqd: null, owner_net_iqd: 1, totals: {}, estimated: { orders_count: 6, revenue_iqd: 1, owner_net_iqd: 1 } }, waiting: null });
+  assert.match(drawStatement(allIn), /data-col="2">الفترة \(13 · تقديرية: 6\)</);
+});
+
+test('the statement explains a negative investor share, and in dollars names costs that wait for their orders without a dinar amount (review coverage)', () => {
+  const t: ProfitTotals = { ...full, investor_iqd: -6000, owner_net_iqd: full.owner_net_iqd! + 31000, net_after_report_adjustments_iqd: full.net_after_report_adjustments_iqd! + 31000, general_waiting_iqd: 12000, general_expenses_iqd: 0, orders_count: 1 };
+  t.owner_period_net_after_report_adjustments_iqd = t.net_after_report_adjustments_iqd;
+  const data = summary({ totals: t, known: null, waiting: null });
+  const iqd = drawStatement(data);
+  assert.match(statementRow(iqd, 'investor'), /سالبة: مساهمة المستثمرين في الخسارة/);
+  assert.match(statementRow(iqd, 'investor'), /-6,000 د\.ع/);
+  assert.match(statementRow(iqd, 'general'), /لا تشمل تكاليف تنتظر تسليم طلباتها: 12,000 د\.ع/);
+  assert.equal(statementAddsUp(statementRows(data).rows, 2), true, 'and the loss share still adds up');
+  const cents = { retained_revenue_cents: 66667, cogs_cents: 46667, gross_profit_cents: 20000, shipping_income_cents: 667, cod_tax_cents: 267, direct_cost_cents: 633, wages_cents: 500, materials_cents: 133,
+    manual_direct_cents: 100, courier_fee_cents: 200, payment_fee_cents: 67, promotion_cents: 400, investor_cents: -400, coupon_cents: 200, price_protection_cents: 133, trade_in_credit_returned_cents: 467,
+    general_expenses_cents: 0, unallocated_promotion_cents: 0 };
+  const net = 20000 + 667 + 267 - 500 - (633 - 500 + 100) - 267 - 400 + 400 - 0 - 800;
+  const usd = { available: true, totals: { ...cents, owner_period_net_after_report_adjustments_cents: net } } as DisplayUsdSummary;
+  const dollars = drawStatement({ ...data, display_usd: usd }, 'USD');
+  assert.match(dollars, /data-finance-statement="USD"/);
+  assert.equal(statementAddsUp(statementRows({ ...data, display_usd: usd }, usd).rows, 2), true, 'to the cent');
+  assert.match(statementRow(dollars, 'general'), /لا تشمل تكاليف تنتظر تسليم طلباتها</);
+  assert.doesNotMatch(dollars, /د\.ع/, 'no dinar amount among the dollar cells');
+  assert.match(statementRow(dollars, 'investor'), /سالبة/);
+});
+
+// ------------------------------------------------------------------ the curve and the people, the edges
+test('the revenue curve: a period with no revenue says so instead of a flat line on a scale of fractions; the axis never steps under one whole unit (review nit)', () => {
+  assert.equal(niceStep(1), 1);
+  assert.equal(niceStep(0), 1);
+  assert.equal(niceStep(3.5), 1, 'a few dollars: whole dollars');
+  assert.equal(niceStep(6997667), 2000000);
+  const draw = (data: FinanceSummary, prev: FinanceSummary | null = null) => renderToStaticMarkup(createElement(LanguageProvider, null, createElement(Curve, { data, prev, compareLabel: '1–11 تشرين الأول 2026' })));
+  const days = (values: number[]) => ({ daily: values.map((v, i) => ({ day: `2026-11-${String(i + 1).padStart(2, '0')}`, revenue_iqd: v, cost_iqd: null, owner_net_iqd: null, investor_iqd: null, orders_count: 0, unknown_lines: 0, pending_costs: 0 })) }) as unknown as FinanceSummary['chart_data'];
+  const empty = draw(summary({ chart_data: days([0, 0, 0]) }));
+  assert.match(empty, /data-finance-curve="empty"[^>]*>لا إيراد في الفترة</);
+  assert.doesNotMatch(empty, /<svg/);
+  const small = draw(summary({ chart_data: days([1, 0, 2]) }));
+  const labels = [...small.matchAll(/text-anchor="end"[^>]*>([^<]*)</g)].map((m) => m[1]);
+  assert.ok(labels.length >= 2 && labels.every((l) => /^\d+$/.test(l)), `whole units: ${labels.join(', ')}`);
+  // The comparison alone still draws: last month sold, this one has not yet.
+  assert.match(draw(summary({ chart_data: days([0, 0]) }), summary({ chart_data: days([5000, 7000]) })), /<svg/);
+  // A comparison longer than the period (31 days against 11): the axis runs to the longer one, and both end where they end.
+  const long = draw(summary({ chart_data: days([100, 200, 300]) }), summary({ chart_data: days([50, 50, 50, 50, 50]) }));
+  const xs = [...long.matchAll(/text-anchor="middle"[^>]*>(\d+)</g)].map((m) => Number(m[1]));
+  assert.equal(Math.max(...xs), 5, 'the day axis is the comparison\'s five days');
+  assert.match(long, /This period|هذه الفترة/);
+  // In dollars: the server's cents per day, labelled in whole dollars; a comparison without cents is not drawn beside them.
+  const usd = { available: true, chart: { daily: { '2026-11-01': { revenue_cents: 66667 }, '2026-11-02': { revenue_cents: 0 }, '2026-11-03': { revenue_cents: 133333 } } } } as unknown as DisplayUsdSummary;
+  const dollars = renderToStaticMarkup(createElement(LanguageProvider, null, createElement(Curve, { data: summary({ chart_data: days([1000000, 0, 2000000]) }), prev: summary({ chart_data: days([5, 5, 5]) }), usd, compareLabel: 'x' })));
+  const ticks = [...dollars.matchAll(/text-anchor="end"[^>]*>([^<]*)</g)].map((m) => m[1]);
+  assert.ok(ticks.length >= 2 && ticks.every((l) => /^\$\d+(k|M)?$/.test(l)), `dollar ticks: ${ticks.join(', ')}`);
+  assert.match(dollars, /\$2,000\.00/, 'the period\'s total in the legend, from the cents');
+  assert.doesNotMatch(dollars, /stroke-dasharray="5 4"/, 'no dinar comparison line among dollars');
+});
+
+test('«يحتاج انتباهك» and the payouts card once the people are read: who can be paid now, the largest first, and what is held (review coverage)', () => {
+  const people: People = { error: false, list: [
+    { user_id: 'u_sajjad', name: 'سجاد', investor: { state: 'active' }, combined: { available_iqd: 161178, held_iqd: 916971 } },
+    { user_id: null, staff_id: 'staff_hussein', name: 'حسين', investor: null, combined: { available_iqd: 75000, held_iqd: 0 } },
+    { user_id: 'u_m', name: 'منتضر', investor: { state: 'active' }, combined: { available_iqd: 0, held_iqd: 0 } }] };
+  const draw = (node: ReturnType<typeof createElement>, lang: 'ar' | 'en' = 'ar') => { LANG = lang; try { return renderToStaticMarkup(createElement(LanguageProvider, null, node)); } finally { LANG = 'ar'; } };
+  const noop = () => {};
+  const data = summary({ totals: { orders_count: 13, general_expenses_iqd: 5000 } });
+  const attention = draw(createElement(Attention, { data, people, openOrder: noop, onNavigate: noop, onMissing: noop, onCollections: noop }));
+  assert.deepEqual([...attention.matchAll(/data-finance-attention-item="(\w+)"/g)].map((m) => m[1]), ['payouts']);
+  assert.match(attention, /236,178 د\.ع لـ:/, 'the total ready to pay');
+  assert.match(attention, /<bdi>سجاد 161,178 د\.ع<\/bdi>[\s\S]*<bdi>حسين 75,000 د\.ع<\/bdi>/, 'the largest first, each name beside its own amount');
+  assert.doesNotMatch(attention, /منتضر/, 'nobody with nothing to pay');
+  assert.match(draw(createElement(Attention, { data, people, openOrder: noop, onNavigate: noop, onMissing: noop, onCollections: noop }), 'en'), /236,178 د\.ع to: [\s\S]*<bdi>سجاد 161,178 د\.ع<\/bdi>/, 'an Arabic name keeps its place in an English line');
+  const payouts = draw(createElement(Payouts, { people, onNavigate: noop }));
+  assert.match(payouts, /data-finance-payouts="true"><dt>جاهز للدفع<\/dt><dd>[\s\S]*236,178 د\.ع[\s\S]*<dt>محجوز<\/dt><dd>[\s\S]*916,971 د\.ع/);
+  assert.equal((payouts.match(/<li>/g) ?? []).length, 2, 'two people to pay; the third has nothing');
+  assert.match(draw(createElement(Payouts, { people: { list: null, error: false }, onNavigate: noop })), /role="status">تحميل المستحقات…</);
+  assert.match(draw(createElement(Payouts, { people: { list: [], error: true }, onNavigate: noop })), /role="alert">تعذّر تحميل المستحقات</);
 });
