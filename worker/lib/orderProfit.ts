@@ -144,6 +144,48 @@ export function totalProfit(lines: ProfitLine[]): ProfitTotals {
   total.pending_costs = lines.reduce((sum, l) => sum + n(l.pending_costs), 0);
   return total as ProfitTotals;
 }
+/**
+ * AN ORDER CANCELLED AFTER ITS DELIVERY, ON ITS SHEET (owner 2026-11-11, ruling 6.7.2; DECISIONS row 318): its sale reads as
+ * reversed like a full return, as the journal reverses it (reverseCancelledSale). Each line's net goods come back as its
+ * refund (nothing retained), its goods cost goes back to stock (none left on the order), and the delivery and the
+ * cash-on-delivery fee it carried are taken back too, for the cancel gives every dinar back (Q6 a). Nothing is left to share:
+ * no investor share, no promotion. What it leaves the owner is minus what stays on it — the wages and materials not taken
+ * back, the courier and payment fees, its extra costs (Q6 b) — and nothing is due on it any more: the collection difference
+ * is minus the cash collected, to give back. The order-level coupon and a returned trade-in credit went with the sale; a
+ * price protection already credited stays deducted, as on a return. Pure: the base, with its investors and its report
+ * deductions, is changed in place and returned.
+ */
+export function reverseLikeAReturn(base: OrderProfitBase) {
+  for (const l of base.lines) {
+    l.restored_cogs_iqd = l.cogs_iqd === null || l.restored_cogs_iqd === null ? null : l.restored_cogs_iqd + l.cogs_iqd;
+    Object.assign(l, { refund_iqd: l.net_goods_iqd, unknown_refund: 0, cogs_iqd: 0, shipping_income_iqd: 0, cod_tax_iqd: 0, investor_iqd: 0, promotion_iqd: 0 });
+  }
+  refreshProfit(base);
+  for (const row of [...base.lines, base.totals] as Row[]) {
+    Object.assign(row, { owner_net_iqd: row.profit_basis_iqd, coupon_iqd: 0, trade_in_credit_returned_iqd: 0 });
+    row.net_after_report_adjustments_iqd = row.owner_net_iqd === null ? null : n(row.owner_net_iqd) - n(row.price_protection_iqd);
+  }
+  Object.assign(base.totals, { investor_iqd: 0, promotion_iqd: 0, collection_difference_iqd: 0 - n(base.totals.collected_iqd) });
+  return base;
+}
+/** A reversal in force on an order cancelled after its delivery: its `order_cancel` entry and the entry it reverses. */
+export interface SaleReversalEntry { id: string; event_key: string; entry_day: string; reversal_of: string | null }
+/**
+ * What the journal did with the sale of an order cancelled after its delivery (DECISIONS row 318), in one read. Each chain its
+ * sale and goods cost start (`sale:`, `membership-sale:`, `cogs:`, through the UNIQUE `reversal_of`, as reverseCancelledSale
+ * reads them) ends in the books — an even depth, which the minute scan has still to reverse: `pending` — or in an
+ * `order_cancel` reversal: `entries`, the latest posted on `day`. Neither: nothing of it was ever booked.
+ */
+export async function saleReversalOf(db: D1Database, orderId: string) {
+  const tails = (await db.prepare(`WITH RECURSIVE chain(id,depth) AS (
+      SELECT id,0 FROM accounting_entries WHERE event_key IN ('sale:'||?1,'membership-sale:'||?1,'cogs:'||?1) AND state='posted'
+      UNION ALL SELECT r.id,c.depth+1 FROM chain c JOIN accounting_entries r ON r.reversal_of=c.id WHERE c.depth<50)
+    SELECT e.id,e.event_key,e.entry_day,e.reversal_of,c.depth FROM chain c JOIN accounting_entries e ON e.id=c.id
+    WHERE NOT EXISTS(SELECT 1 FROM accounting_entries x WHERE x.reversal_of=c.id) ORDER BY e.entry_day,e.event_key`).bind(orderId)
+    .all<SaleReversalEntry & { depth: number }>()).results ?? [];
+  const entries = tails.filter((t) => t.depth % 2 === 1).map((t): SaleReversalEntry => ({ id: t.id, event_key: t.event_key, entry_day: t.entry_day, reversal_of: t.reversal_of }));
+  return { pending: tails.some((t) => t.depth % 2 === 0), day: entries.length ? entries[entries.length - 1].entry_day : null, entries };
+}
 export function applyProfitAdjustment(base: OrderProfitBase, adjustment: ProfitAdjustment) {
   const key = fieldKey(adjustment.field);
   const values = JSON.parse(adjustment.allocations_json) as AdjustmentAllocation[];

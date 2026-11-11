@@ -6,7 +6,7 @@ import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { Button, Field, Loading, Money, Row, Sheet, Status, Surface, formatMoney } from './ui';
 import { financeDay, monthRange, statusName, WORKSPACE_API, type OrderProfit, type ProfitLine, type ProfitCost, type ProfitReviewIssue } from './types';
 import { hasPendingWagesWithConfirmedCosts, displayedCostAmount, groupOrderCosts } from './orderCostGroups';
-import { orderFinancePresentation, projectedLineCost, visibleOrderReviewReasons } from './orderFinancePresentation';
+import { orderFinancePresentation, projectedLineCost, saleReversalText, visibleOrderReviewReasons } from './orderFinancePresentation';
 import { PA_STRINGS, tri } from './displayCurrencyStrings';
 import ReportDeductions from './ReportDeductions';
 import { DisplayMoney, UsdBasisNote, centsAt, useDisplayCurrency } from './displayCurrency';
@@ -29,7 +29,7 @@ export type OrderFocus = 'collection' | 'cost';
 export default function OrderProfitSheet({ orderId, onClose, onChanged, onSaved, focus, focusLine }: {
   orderId: string; onClose: () => void; onChanged: () => void; onSaved?: () => void; focus?: OrderFocus; focusLine?: string;
 }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   // «عملة العرض» (design P-A §8): the workspace's choice; display only, edits stay in dinars.
   const currency = useDisplayCurrency();
   const display = currency === 'USD' ? '?display=USD' : '';
@@ -192,7 +192,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, onSaved,
     {error && <div className="fw-error" role="alert">{error}<Button variant="ghost" onClick={() => setRevision((v) => v + 1)}>{loc('تحديث', 'Refresh')}</Button></div>}
     {notice && <p className={noticePending ? 'fw-note' : 'fw-success'} role="status">{noticePending ? <Status tone="warning">{loc('التسوية معلقة', 'Reconciliation pending')}</Status> : <Check size={16} />}{notice}</p>}
     {data && <>
-      {data.order.status !== 'delivered' && <p className="fw-note"><Status>{statusName(data.order.status, loc)}</Status> {view?.expectsDelivery ? loc('توقع قبل المصاريف وليس ربحًا مستحقًا. يُعتمد الربح بعد التسليم وتثبيت التكاليف واستيفاء شروط التحصيل.', 'A forecast before expenses, not earned profit. Profit is recognised after delivery, confirmed costs and collection requirements.') : view?.hasFinancialActivity ? loc('تظهر الحركات المالية السابقة وتسوياتها؛ لا يُنشأ توقع بيع جديد لهذا الطلب.', 'Prior financial activity and its adjustments remain visible; this order creates no new sale forecast.') : loc('لا ربح متوقع أو مستحق من هذا الطلب.', 'This order has no expected or earned profit.')}</p>}
+      {data.order.status !== 'delivered' && <p className="fw-note"><Status>{statusName(data.order.status, loc)}</Status> {data.sale_reversal ? saleReversalText(loc, lang, data.sale_reversal) : view?.expectsDelivery ? loc('توقع قبل المصاريف وليس ربحًا مستحقًا. يُعتمد الربح بعد التسليم وتثبيت التكاليف واستيفاء شروط التحصيل.', 'A forecast before expenses, not earned profit. Profit is recognised after delivery, confirmed costs and collection requirements.') : view?.hasFinancialActivity ? loc('تظهر الحركات المالية السابقة وتسوياتها؛ لا يُنشأ توقع بيع جديد لهذا الطلب.', 'Prior financial activity and its adjustments remain visible; this order creates no new sale forecast.') : loc('لا ربح متوقع أو مستحق من هذا الطلب.', 'This order has no expected or earned profit.')}</p>}
       {warnings.length > 0 && <div className="fw-error" id="fw-order-warnings">{warnings.some((w) => w.startsWith('cost:')) && <p>{loc('بعض التكاليف تحتاج تثبيتًا. يظهر الحقل الناقص ومصدر التكلفة وخيار تصحيحه تحت المنتج المعني.', 'Some costs need verification. Missing fields, cost sources and correction actions appear under the affected product.')}</p>}{warnings.filter((w) => !w.startsWith('cost:')).map((w) => <p key={w}>{w === 'investor:pending' ? loc('توزيع حصة المستثمر بانتظار تثبيت التكلفة وتسوية الطلب.', 'Investor distribution is awaiting verified costs and order reconciliation.') : w}</p>)}</div>}
       {currency === 'USD' && data.display_usd && <UsdBasisNote available={data.display_usd.available} todayRate={data.display_usd.today_rate}
         single={data.display_usd.usd_basis && data.display_usd.fx_rate_snapshot ? { usd_basis: data.display_usd.usd_basis, fx_rate_snapshot: data.display_usd.fx_rate_snapshot } : undefined} batchLines={data.display_usd.batch_cost_lines} />}

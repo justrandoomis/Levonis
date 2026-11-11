@@ -332,7 +332,15 @@ export interface OrderProfit {
   history: FinancialHistory[];
   /** Present only with `?display=USD`. */
   display_usd?: DisplayUsdOrder;
+  /** Only on an order cancelled after its delivery, whose figures read as reversed like a return (DECISIONS row 318). */
+  sale_reversal?: SaleReversal;
 }
+/**
+ * What the journal did with the sale of an order cancelled after its delivery: reversed by `entries` (its `order_cancel`
+ * reversals in force), the latest posted on `day`; or `pending`, still in the books until the minute scan reverses it; or
+ * neither, when nothing of it was ever booked.
+ */
+export interface SaleReversal { pending: boolean; day: string | null; entries: Array<{ id: string; event_key: string; entry_day: string; reversal_of: string | null }> }
 
 export const WORKSPACE_API = '/api/admin/finance-workspace';
 

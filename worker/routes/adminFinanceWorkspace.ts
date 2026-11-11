@@ -12,7 +12,7 @@ import { auditStatements } from '../lib/audit';
 import { baghdadDay, dateValue, decimal, fence, periodOpen, requireCapability, whole } from '../lib/operations';
 import { serverMessage } from '@levonis/contracts/costRefusals';
 import { planExpenseAccounting } from '../lib/expenseAccounting';
-import { addOwnerPromotions, applyProfitAdjustment, getOrderProfitBase, getOrderProfitBases, monthlyPromotionShares, planProfitAdjustment, planWorkspaceAccounting, profitFields, profitSourceFingerprint, spread, workspaceInstalled, type OrderProfitBase, type ProfitAdjustment, type ProfitField, type ProfitLine } from '../lib/orderProfit';
+import { addOwnerPromotions, applyProfitAdjustment, getOrderProfitBase, getOrderProfitBases, monthlyPromotionShares, planProfitAdjustment, planWorkspaceAccounting, profitFields, profitSourceFingerprint, reverseLikeAReturn, saleReversalOf, spread, workspaceInstalled, type OrderProfitBase, type ProfitAdjustment, type ProfitField, type ProfitLine } from '../lib/orderProfit';
 import { investorFinanceInstalled, investorOrderSplit, investorProjectionStaleSql } from '../lib/investorFinance';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { enrichOrderProfitReview } from '../lib/orderProfitReview';
@@ -607,6 +607,8 @@ async function detail(db:D1Database,id:string,canVerify=true){
   const base=await getOrderProfitBase(db,id);if(base.order.seller_type!=='levonis')throw notFound('Order not found');
   await addInvestors(db,[base],true);
   applyReportAdjustments([base],await reportAdjustments(db,[base.order_id]));
+  // Cancelled after its delivery: its sale reads as reversed like a return, and `sale_reversal` says what the journal did (DECISIONS row 318).
+  if(base.order.status==='cancelled'&&base.order.delivered_at)Object.assign(reverseLikeAReturn(base),{sale_reversal:await saleReversalOf(db,base.order_id)});
   await enrichOrderCostProjections(db,[base],true);
   await enrichOrderProfitReview(db,base,canVerify);
   const history=await db.prepare('SELECT a.id,a.order_item_id line_id,a.field,a.old_value_iqd,a.new_value_iqd,a.version,a.actor_id,u.name actor_name,a.created_at,a.reason,a.journal_id FROM finance_order_adjustments a LEFT JOIN users u ON u.id=a.actor_id WHERE a.order_id=? ORDER BY a.version DESC LIMIT 200').bind(id).all<Row>();
