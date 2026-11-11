@@ -47,6 +47,21 @@ import DeliveryDayPicker from '../components/orders/DeliveryDayPicker';
  */
 import { baghdadDay } from '../../worker/lib/baghdadTime';
 import { dayLabel, deliveryWindow, resolveDeliveryDayPolicy } from '../../worker/lib/deliveryDay';
+/**
+ * «تُسلَّم كل الطلبات لمندوب شركة التوصيل الساعة ٧ مساءً» — the courier note's
+ * clock, tiers and words (DECISIONS row 324). A leaf beside the two above, read
+ * by this screen alone; it never feeds the day picker.
+ */
+import {
+  deliveryEta,
+  etaArrivalLine,
+  etaDetails,
+  etaHandoverLine,
+  etaLang,
+  ETA_TEXT,
+  leavesWithCourier,
+  resolveDeliveryHandover,
+} from '../../worker/lib/deliveryEta';
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
 import { CheckoutCouponsRow } from '../components/rewards/CartCoupons';
@@ -1485,6 +1500,48 @@ export default function Checkout() {
     setRequestedDay((prev) => (prev && !offeredDays.some((d) => d.day === prev) ? null : prev));
   }, [dayChoiceOffered, offeredDays]);
 
+  /**
+   * «تُسلَّم كل الطلبات لمندوب شركة التوصيل الساعة ٧ مساءً» — THE COURIER NOTE
+   * (owner, 2026-11-11; DECISIONS row 324). Under the chosen card, above the
+   * day picker: whether the order still makes today's handover, and when it
+   * should reach the chosen address's governorate, named, as an estimate.
+   *
+   *   * ONLY A COURIER METHOD: not pickup, and not the store's own same-day
+   *     «توصيل شخصي», which leaves with our driver (`leavesWithCourier`).
+   *   * ONLY A DIRECT CART, read exactly as the picker reads it: a pre-order's
+   *     journey is weeks of freight, not tonight's handover.
+   *   * NEVER BESIDE THE PRO 12-HOUR STRIP. `priority_delivery.eligible` is a
+   *     promise of delivery within 12 hours of the order, and «tomorrow
+   *     10 am – 3 pm» under it would contradict it; the strip is that order's
+   *     promise, so the note steps aside (by default PRO covers only
+   *     «توصيل شخصي», which has no note anyway).
+   *
+   * THE PICKER IS UNTOUCHED — the owner's «only add the note»: the offered
+   * days above and the server's checks are exactly what they were.
+   *
+   * ONE TIMEOUT keeps it true on a page left open: at the handover hour the
+   * line turns from «before 7 pm» to «tomorrow», and at Baghdad's midnight
+   * «tomorrow» becomes «today». The device clock is the only input, as for the
+   * picker; the note is an estimate and decides nothing.
+   */
+  const handoverPolicy = useMemo(() => resolveDeliveryHandover(settings?.deliveryHandover), [settings?.deliveryHandover]);
+  const [etaNow, setEtaNow] = useState(() => Date.now());
+  const etaGovernorate = addresses.find((a) => a.id === selectedAddressId)?.governorate ?? '';
+  const courierEta =
+    settings !== null &&
+    leavesWithCourier(selectedDelivery) &&
+    (quote ? quote.shipping_type === 'direct' : cartLooksDirect) &&
+    quote?.priority_delivery?.eligible !== true
+      ? deliveryEta({ nowMs: etaNow, governorate: etaGovernorate, policy: handoverPolicy })
+      : null;
+  const etaChangesAt = courierEta?.next_change_ms ?? null;
+  useEffect(() => {
+    if (etaChangesAt === null) return;
+    const timer = window.setTimeout(() => setEtaNow(Date.now()), Math.max(1_000, etaChangesAt - Date.now() + 1_000));
+    return () => window.clearTimeout(timer);
+  }, [etaChangesAt]);
+  const etaWords = ETA_TEXT[etaLang(lang)];
+
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
   const shippingIqd = quote ? quote.shipping.total_iqd : deliveryPrice;
   /** What the cash door costs over the wallet one, straight from the server.
@@ -2719,6 +2776,29 @@ export default function Checkout() {
                   <span className="lv-choice-mark ms-1"><Check className="h-3 w-3" aria-hidden="true" /></span>
                 </label>
                 {/*
+                  THE COURIER NOTE (DECISIONS row 324), under the chosen card
+                  and its fee, above the day it may be delivered on: the
+                  handover line, then the arrival in the address's governorate.
+                  Inert — it mounts with the card, so nothing rises under the
+                  reader — and `Note`'s quiet tone, the house margin note.
+                */}
+                {selected && courierEta && !unavailable ? (
+                  <Note
+                    tone="zinc"
+                    compact
+                    animate={false}
+                    icon={<CalendarClock className="w-4 h-4" strokeWidth={1.5} />}
+                    testId="checkout-courier-note"
+                  >
+                    <span className="block font-light" data-courier-handover={courierEta.handover.is_today ? 'today' : courierEta.handover.cutoff_passed ? 'passed' : 'closed'}>
+                      {etaHandoverLine(courierEta, lang)}
+                    </span>
+                    <span className="mt-1 block font-light" data-courier-arrival={courierEta.tier ?? 'generic'}>
+                      {etaArrivalLine(courierEta, lang)}
+                    </span>
+                  </Note>
+                ) : null}
+                {/*
                   UNDER THE CHOSEN METHOD, and only that one. The day is a
                   property of the delivery that was just picked, so it belongs
                   against that card rather than in a section of its own — and
@@ -3220,7 +3300,7 @@ export default function Checkout() {
             <SummaryInfo
               testId="delivery"
               label={loc('تكلفة التوصيل إلى البيت', 'Home delivery cost', 'تێچووی گەیاندن بۆ ماڵ')}
-              question={loc('كيف حُسبت تكلفة التوصيل؟', 'How is the delivery cost calculated?', 'تێچووی گەیاندن چۆن هەژمار کرا؟')}
+              question={courierEta ? etaWords.question : loc('كيف حُسبت تكلفة التوصيل؟', 'How is the delivery cost calculated?', 'تێچووی گەیاندن چۆن هەژمار کرا؟')}
               value={
                 quoteLoading ? (
                   <span className="text-text-muted font-light text-xs">{S.quoteLoading}</span>
@@ -3344,6 +3424,18 @@ export default function Checkout() {
                   <div className="text-[11px] uppercase tracking-widest text-text-muted">{S.whyTitle}</div>
                   {quote.shipping.reasons.map((r, i) => (
                     <p key={i} className="leading-relaxed">{r}</p>
+                  ))}
+                </div>
+              )}
+
+              {/* «متى يصل طلبك؟» — the long version of the courier note
+                  (DECISIONS row 324): the 7 pm rule, the three time groups as
+                  the owner's table stands, the Baghdad example, the estimate. */}
+              {courierEta && (
+                <div className="space-y-1 border-t border-white/5 pt-2" data-courier-details>
+                  <div className="text-[11px] font-medium text-text-muted">{etaWords.title}</div>
+                  {etaDetails(handoverPolicy, lang).lines.map((line, i) => (
+                    <p key={i} className="leading-relaxed">{line}</p>
                   ))}
                 </div>
               )}

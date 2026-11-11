@@ -75,6 +75,7 @@ import { addDays, baghdadDay, isDay } from '../lib/baghdadTime';
 import { dayLabel } from '../lib/deliveryDay';
 import { boardDayOf, boardDaySql, isBooked, lateReasonOf, leadBounds, leadDaysFor, leadDaysSql } from '../lib/deliveryLead';
 import { ARCHIVE_SORTS, DEFAULT_ARCHIVE_SORT, archiveOrderSql, doneLabelOf, isArchiveScope } from '../lib/orderArchive';
+import { handoverAdminView, validateDeliveryHandover } from '../lib/deliveryEta';
 import { classifyOrderSearch } from '../lib/orderSearch';
 import { arabicFoldSql, phoneDigitsSql } from '../lib/sqlFold';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
@@ -4563,10 +4564,11 @@ adminRoutes.get('/delivery-policy/resolve', async (c) => {
 
 /**
  * «إدارة التوصيل»: the policy as stored (normalized), plus the names and
- * sections of every product it names, so the page shows names, not ids.
+ * sections of every product it names, so the page shows names, not ids — and
+ * the courier handover (hour, time groups) the same page edits (DECISIONS row 324).
  */
 adminRoutes.get('/delivery-policy', async (c) => {
-  const policy = await getSetting(c.env.DB, 'deliveryPolicy');
+  const [policy, handover] = await Promise.all([getSetting(c.env.DB, 'deliveryPolicy'), getSetting(c.env.DB, 'deliveryHandover')]);
   const ids = deliveryPolicyTargets(policy).product_ids;
   const products: Record<string, { name_ar: string; name_en: string; name_ckb: string; category_id: string | null; sub_category_id: string | null }> = {};
   // D1 binds at most 100 parameters per statement.
@@ -4587,7 +4589,7 @@ adminRoutes.get('/delivery-policy', async (c) => {
       };
     }
   }
-  return c.json({ success: true, policy, products });
+  return c.json({ success: true, policy, products, handover, handover_view: handoverAdminView() });
 });
 
 adminRoutes.put('/settings/:key', async (c) => {
@@ -4842,13 +4844,25 @@ adminRoutes.put('/settings/:key', async (c) => {
       }
     }
     value = { ...checked.policy, updated_at: new Date().toISOString(), updated_by: adminUser.id };
+  } else if (key === 'deliveryHandover') {
+    // «تُسلَّم كل الطلبات لمندوب شركة التوصيل الساعة ٧ مساءً» (owner,
+    // 2026-11-11; DECISIONS row 324), edited in «إدارة التوصيل». Strict like
+    // deliveryPolicy: junk is refused in three languages, and what passes is
+    // stored as the resolver's canonical form — never as sent. Any admin, as
+    // the fees beside it: an estimate the checkout prints, not money.
+    const checked = validateDeliveryHandover(value);
+    if (!checked.ok) {
+      const m = checked.error.message;
+      throw badRequest(`${m.ar} / ${m.en} / ${m.ckb}`, 'DELIVERY_HANDOVER_INVALID', { field: checked.error.field, message: m });
+    }
+    value = checked.value;
   }
 
   await setSetting(c.env.DB, key, value);
   // A delivery fee the shop stops charging is money, and so is the courier
   // tax: the audit keeps the whole value as saved, not just the key.
   await audit(c.env.DB, adminUser.id, 'settings.update', key,
-    key === 'walletFreeDelivery' || key === 'deliveryPolicy' || key === 'serialPrepGate' || key === 'codTaxPerBlockIqd' || key === 'codTaxBlockIqd' ? { value } : {});
+    key === 'walletFreeDelivery' || key === 'deliveryPolicy' || key === 'deliveryHandover' || key === 'serialPrepGate' || key === 'codTaxPerBlockIqd' || key === 'codTaxBlockIqd' ? { value } : {});
   // P2a: the cached public answers this key feeds, and the isolate's pricing inputs.
   await afterSettingsWrite(c, key);
   return c.json({ success: true });

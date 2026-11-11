@@ -6,6 +6,13 @@
  *
  * Saved as ONE document: PUT /api/admin/settings/deliveryPolicy. The server's
  * strict validator is the authority; its refusals appear inline here.
+ *
+ * THE COURIER HANDOVER rides on the same page and the same Save (owner,
+ * 2026-11-11; DECISIONS row 324): the daily hour, the checkout note's switch
+ * and each governorate's time group — near, far, Kurdistan, with its window in
+ * words — beside its price. A second document, PUT
+ * /api/admin/settings/deliveryHandover, sent only when it changed; only the
+ * governorates moved off the owner's table are stored.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Save, Trash2, Truck, Check, CornerDownLeft } from 'lucide-react';
@@ -36,6 +43,38 @@ const MODES: Array<{ id: DeliveryMode; label: (loc: Loc) => string }> = [
 ];
 
 const newGroupId = () => `g_${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
+
+/**
+ * THE COURIER HANDOVER as the server answers it (worker/lib/deliveryEta.ts):
+ * the stored setting, normalised, and `handover_view` — the owner's table and
+ * this page's words, typed in three languages there and written out (the
+ * windows, the 24 hour labels). Read from the answer, not imported: the
+ * checkout is that module's only importer in the browser, which keeps it
+ * inside the checkout's chunk and out of the entry's preload map.
+ */
+type EtaTier = 'near' | 'far' | 'kurdistan';
+const ETA_TIERS: readonly EtaTier[] = ['near', 'far', 'kurdistan'];
+interface Handover {
+  enabled: boolean;
+  hour: number;
+  tiers: Partial<Record<string, EtaTier>>;
+  closed_weekdays: number[];
+}
+interface HandoverWords {
+  title: string;
+  intro: string;
+  enabled: string;
+  hour: string;
+  /** The select's accessible name: {gov}. */
+  tier: string;
+  tiers: Record<EtaTier, string>;
+  hours: string[];
+}
+interface HandoverView {
+  table: Record<string, EtaTier>;
+  words: Record<'ar' | 'en' | 'ckb', HandoverWords>;
+}
+type PolicyAnswer = { policy: DeliveryPolicy; products: Record<string, ProductInfo>; handover?: Handover; handover_view?: HandoverView };
 
 /** catalog id → itself and every parent, nearest first (the server's `catalogAncestry`). */
 function ancestry(catalogs: CatalogNode[]): Map<string, string[]> {
@@ -79,11 +118,16 @@ export default function DeliveryManagement() {
   const [loadError, setLoadError] = useState('');
   const [state, setState] = useState<SaveState>('idle');
   const [error, setError] = useState('');
+  // The courier handover (DECISIONS row 324) and which of the two documents the next Save sends.
+  const [handover, setHandover] = useState<Handover | null>(null);
+  const [handoverView, setHandoverView] = useState<HandoverView | null>(null);
+  const [policyDirty, setPolicyDirty] = useState(false);
+  const [handoverDirty, setHandoverDirty] = useState(false);
 
   useEffect(() => {
     let live = true;
     Promise.all([
-      api.get<{ policy: DeliveryPolicy; products: Record<string, ProductInfo> }>('/api/admin/delivery-policy'),
+      api.get<PolicyAnswer>('/api/admin/delivery-policy'),
       api.get<{ catalogs: CatalogNode[] }>('/api/admin/taxonomy/catalogs').catch(() => ({ catalogs: [] as CatalogNode[] })),
     ])
       .then(([p, c]) => {
@@ -91,6 +135,9 @@ export default function DeliveryManagement() {
         setPolicy(p.policy);
         setProducts(p.products ?? {});
         setCatalogs(c.catalogs ?? []);
+        // An older server sends neither: the page then simply has no handover controls.
+        setHandover(p.handover ?? null);
+        setHandoverView(p.handover_view ?? null);
       })
       .catch((e) => live && setLoadError(e instanceof Error ? e.message : String(e)));
     return () => {
@@ -133,9 +180,27 @@ export default function DeliveryManagement() {
 
   const update = (next: DeliveryPolicy) => {
     setPolicy(next);
+    setPolicyDirty(true);
     setState('dirty');
     setError('');
   };
+  const updateHandover = (next: Handover) => {
+    setHandover(next);
+    setHandoverDirty(true);
+    setState('dirty');
+    setError('');
+  };
+  /** The time group a governorate is in now: the owner's move, else the table. */
+  const tierOfRow = (id: string): EtaTier => handover?.tiers[id] ?? handoverView?.table[id] ?? 'far';
+  /** A governorate back on the owner's table drops its override; only real moves are stored. */
+  const setTier = (id: string, tier: EtaTier) => {
+    if (!handover || !handoverView) return;
+    const tiers = { ...handover.tiers };
+    if (tier === handoverView.table[id]) delete tiers[id];
+    else tiers[id] = tier;
+    updateHandover({ ...handover, tiers });
+  };
+  const handoverWords = handoverView ? handoverView.words[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'] : null;
   const setGroup = (id: string, patch: Partial<DeliveryRuleGroup>) =>
     update({ ...policy, groups: policy.groups.map((g) => (g.id === id ? { ...g, ...patch } : g)) });
   const removeGroup = (id: string) => update({ ...policy, groups: policy.groups.filter((g) => g.id !== id) });
@@ -170,10 +235,21 @@ export default function DeliveryManagement() {
     setState('saving');
     setError('');
     try {
-      await api.put('/api/admin/settings/deliveryPolicy', { value: policy });
-      const fresh = await api.get<{ policy: DeliveryPolicy; products: Record<string, ProductInfo> }>('/api/admin/delivery-policy');
+      // The handover only when it changed; the fees whenever they changed, or
+      // when nothing did (the button's behaviour before the handover existed).
+      if (handoverDirty && handover) {
+        await api.put('/api/admin/settings/deliveryHandover', { value: handover });
+        setHandoverDirty(false);
+      }
+      if (policyDirty || !handoverDirty) {
+        await api.put('/api/admin/settings/deliveryPolicy', { value: policy });
+        setPolicyDirty(false);
+      }
+      const fresh = await api.get<PolicyAnswer>('/api/admin/delivery-policy');
       setPolicy(fresh.policy);
       setProducts((prev) => ({ ...prev, ...fresh.products }));
+      setHandover(fresh.handover ?? null);
+      setHandoverView(fresh.handover_view ?? null);
       setState('saved');
     } catch (e) {
       setState('error');
@@ -355,6 +431,38 @@ export default function DeliveryManagement() {
             'نرخی پارێزگا تەنها جێگەی نرخی بنەڕەت دەگرێتەوە؛ یاساکانی بەشەکان لە هەموو پارێزگاکاندا وەک یەکن.'
           )}
         </p>
+        {/* The courier handover (DECISIONS row 324): the hour and the switch
+            here, each governorate's time group on its own row below. */}
+        {handover && handoverWords && (
+          <div className="space-y-2" data-delivery-handover>
+            <h4 className="text-sm font-semibold">{handoverWords.title}</h4>
+            <p className="text-sm text-text-secondary">{handoverWords.intro}</p>
+            <label className="inline-flex items-center gap-2 text-sm font-semibold">
+              <input
+                type="checkbox"
+                checked={handover.enabled}
+                onChange={(e) => updateHandover({ ...handover, enabled: e.target.checked })}
+                data-delivery-handover-enabled
+              />
+              {handoverWords.enabled}
+            </label>
+            <label className="block">
+              <span className="block text-[12px] text-text-secondary mb-1">{handoverWords.hour}</span>
+              <select
+                className="lv-input w-auto"
+                value={handover.hour}
+                onChange={(e) => updateHandover({ ...handover, hour: Number(e.target.value) })}
+                data-delivery-handover-hour
+              >
+                {handoverWords.hours.map((label, h) => (
+                  <option key={h} value={h}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
         <div className="divide-y divide-[var(--ap-border,transparent)]">
           {IRAQ_GOVERNORATES.map((gov) => {
             const rule: GovernorateRule | undefined = policy.governorates[gov.id];
@@ -390,6 +498,21 @@ export default function DeliveryManagement() {
                     value={rule.fee_iqd}
                     onChange={(e) => setRule({ fee_iqd: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
                   />
+                )}
+                {handover && handoverWords && (
+                  <select
+                    className="lv-input w-auto"
+                    value={tierOfRow(gov.id)}
+                    onChange={(e) => setTier(gov.id, e.target.value as EtaTier)}
+                    aria-label={handoverWords.tier.replace('{gov}', lang === 'en' ? gov.en : lang === 'ckb' ? gov.ckb : gov.ar)}
+                    data-delivery-tier={gov.id}
+                  >
+                    {ETA_TIERS.map((t) => (
+                      <option key={t} value={t}>
+                        {handoverWords.tiers[t]}
+                      </option>
+                    ))}
+                  </select>
                 )}
               </div>
             );

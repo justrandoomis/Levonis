@@ -1971,6 +1971,14 @@ export interface PublicSettings {
    */
   deliveryDayPolicy?: { enabled: boolean; max_days: number; allow_same_day: boolean };
   /**
+   * «تُسلَّم الطلبات لمندوب شركة التوصيل الساعة ٧ مساءً» — the courier note's
+   * hour, the governorates moved off the owner's time-group table, the closed
+   * weekdays and the switch (worker/lib/deliveryEta.ts; DECISIONS row 324).
+   * Read through `resolveDeliveryHandover`, so an absent or older value draws
+   * the shipped defaults rather than nothing.
+   */
+  deliveryHandover?: { enabled: boolean; hour: number; tiers: Partial<Record<string, 'near' | 'far' | 'kurdistan'>>; closed_weekdays: number[] };
+  /**
    * «خدمة التقسيط عبر تطبيق جني» as the owner configured it.
    *
    * Public because the product page draws «تريدها أقساط؟» for a SIGNED-OUT

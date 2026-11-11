@@ -13,6 +13,7 @@ import {
   resolveDeliveryDayPolicy,
   type DeliveryDayPolicy,
 } from './deliveryDay';
+import { DEFAULT_DELIVERY_HANDOVER, resolveDeliveryHandover, type DeliveryHandoverPolicy } from './deliveryEta';
 
 /** Typed access to the admin_settings key/value store, with safe defaults. */
 
@@ -319,8 +320,12 @@ export const SETTING_DEFAULTS = {
   // Where a WITHDRAWAL is paid — see `PayoutMethod` above for why this is not
   // `paymentMethods`. Seeded with the four channels the owner named.
   payoutMethods: DEFAULT_PAYOUT_METHODS as PayoutMethod[],
+  // The standard card names no duration (DECISIONS row 324): the courier note
+  // right under it says when the parcel leaves and when it should reach the
+  // customer's governorate, and «2-3 أيام عمل» beside it would contradict it.
+  // A stored row keeps whatever the owner saved (EARLIER_SHIPPED below).
   checkoutDeliveryMethods: [
-    { id: 'standard', titleAr: 'توصيل عادي', titleEn: 'Standard Delivery', titleCkb: 'گەیاندنی ئاسایی', descAr: '2-3 أيام عمل', descEn: '2-3 business days', descCkb: '2-3 ڕۆژی کار', price_iqd: 5000, icon: 'Truck', home_delivery: true },
+    { id: 'standard', titleAr: 'توصيل عادي', titleEn: 'Standard Delivery', titleCkb: 'گەیاندنی ئاسایی', descAr: 'عبر شركة التوصيل — الموعد حسب محافظتك', descEn: 'By courier — timing depends on your governorate', descCkb: 'لە ڕێگەی کۆمپانیای گەیاندنەوە — کاتەکەی بەپێی پارێزگاکەتە', price_iqd: 5000, icon: 'Truck', home_delivery: true },
     { id: 'personal', titleAr: 'توصيل شخصي', titleEn: 'Personal Delivery', titleCkb: 'گەیاندنی کەسی', descAr: 'نفس اليوم', descEn: 'Same day delivery', descCkb: 'هەمان ڕۆژ', price_iqd: 10000, icon: 'User', home_delivery: true },
     { id: 'pickup', titleAr: 'استلام من المخزن', titleEn: 'Store Pickup', titleCkb: 'وەرگرتن لە کۆگا', descAr: 'جاهز خلال ساعتين', descEn: 'Ready in 2 hours', descCkb: 'لە ماوەی دوو کاتژمێردا ئامادەیە', price_iqd: 0, icon: 'Store', home_delivery: false },
   ] as DeliveryMethod[],
@@ -396,6 +401,18 @@ export const SETTING_DEFAULTS = {
    * admin route validates with — so what is stored is what runs.
    */
   deliveryDayPolicy: DEFAULT_DELIVERY_DAY_POLICY as DeliveryDayPolicy,
+  /**
+   * «تُسلَّم كل الطلبات لمندوب شركة التوصيل الساعة ٧ مساءً» (owner,
+   * 2026-11-11; DECISIONS row 324): the daily courier handover hour, the
+   * governorates moved off the owner's time-group table, the closed weekdays
+   * (none) and the off switch — what the checkout note under a courier method
+   * says. It changes no price, no order and no offered day (the picker stays
+   * exactly as it is: the owner's «only add the note»). Shape, clamp and words
+   * in worker/lib/deliveryEta.ts; read through `resolveDeliveryHandover`,
+   * written through the strict `validateDeliveryHandover` in
+   * `PUT /api/admin/settings/deliveryHandover` from «إدارة التوصيل».
+   */
+  deliveryHandover: DEFAULT_DELIVERY_HANDOVER as DeliveryHandoverPolicy,
   /**
    * «توصيل عادي مجاني — للدفع الكامل من محفظة Levo» (owner brief 2026-10-06
    * §2): which orders paid in full from the Levo wallet get their delivery
@@ -814,6 +831,11 @@ export const PUBLIC_SETTING_KEYS: SettingKey[] = [
   // values are the offer itself — the same thing the picker puts on screen —
   // not internal policy.
   'deliveryDayPolicy',
+  // The checkout note «تُسلَّم الطلبات للمندوب الساعة ٧ مساءً» is drawn before
+  // an order exists, signed in or not yet quoted: the hour, the time group of
+  // each governorate the owner moved and the switch — the published estimate
+  // itself, nothing internal.
+  'deliveryHandover',
   // The offer «توصيل عادي مجاني — للدفع الكامل من محفظة Levo» as the checkout
   // explains it before a quote exists: switches, methods, section ids and
   // minimums — the published offer, nothing internal.
@@ -897,7 +919,11 @@ export function normalizeSerialPrepGate(value: unknown): SerialPrepGate {
  * Read time only. A Sorani the owner wrote is never replaced, and nothing is
  * written back; the admin form shows the lent text, so saving it keeps it.
  */
-function withShippedSorani(value: unknown, defaults: ReadonlyArray<Record<string, unknown>>): unknown {
+function withShippedSorani(
+  value: unknown,
+  defaults: ReadonlyArray<Record<string, unknown>>,
+  earlier: ReadonlyArray<{ id: string; descAr: string; descCkb: string }> = []
+): unknown {
   if (!Array.isArray(value)) return value;
   const byId = new Map(defaults.map((d) => [d.id, d]));
   const same = (a: unknown, b: unknown) => typeof a === 'string' && typeof b === 'string' && a.trim() === b.trim();
@@ -910,9 +936,25 @@ function withShippedSorani(value: unknown, defaults: ReadonlyArray<Record<string
     let out = r;
     if (blank(r.titleCkb) && typeof d.titleCkb === 'string' && same(r.titleAr, d.titleAr)) out = { ...out, titleCkb: d.titleCkb };
     if (blank(r.descCkb) && typeof d.descCkb === 'string' && same(r.descAr, d.descAr)) out = { ...out, descCkb: d.descCkb };
+    else if (blank(r.descCkb)) {
+      const old = earlier.find((e) => e.id === r.id && same(r.descAr, e.descAr));
+      if (old) out = { ...out, descCkb: old.descCkb };
+    }
     return out;
   });
 }
+
+/**
+ * WORDS WE SHIPPED BEFORE, still sitting in stored rows. A shop that saved its
+ * methods while the standard card said «2-3 أيام عمل» still carries OUR words
+ * there, not the owner's, so a Sorani reader keeps the Sorani they were
+ * shipped with — the default moving on (DECISIONS row 324) must not hand that
+ * reader the Arabic. The owner's own text is never replaced: changing the
+ * stored description itself is the owner's, in Store settings.
+ */
+const EARLIER_SHIPPED_DELIVERY_DESCRIPTIONS: ReadonlyArray<{ id: string; descAr: string; descCkb: string }> = [
+  { id: 'standard', descAr: '2-3 أيام عمل', descCkb: '2-3 ڕۆژی کار' },
+];
 
 function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeof SETTING_DEFAULTS)[K] {
   if (key === 'tradeInPolicy') {
@@ -952,7 +994,11 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
     ) as (typeof SETTING_DEFAULTS)[K];
   }
   if (key === 'checkoutDeliveryMethods' || key === 'cartShippingMethods') {
-    return withShippedSorani(value, SETTING_DEFAULTS[key] as unknown as Record<string, unknown>[]) as (typeof SETTING_DEFAULTS)[K];
+    return withShippedSorani(
+      value,
+      SETTING_DEFAULTS[key] as unknown as Record<string, unknown>[],
+      key === 'checkoutDeliveryMethods' ? EARLIER_SHIPPED_DELIVERY_DESCRIPTIONS : []
+    ) as (typeof SETTING_DEFAULTS)[K];
   }
   // Merged over the defaults like `bnplPolicy` below, but through the policy
   // module's own resolver rather than a bare spread: a stored `max_days` of 0
@@ -961,6 +1007,11 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
   // clamp belongs to the policy, so the read side calls it.
   if (key === 'deliveryDayPolicy') {
     return resolveDeliveryDayPolicy(value) as (typeof SETTING_DEFAULTS)[K];
+  }
+  // The same contract: the admin PUT refuses junk on the way in, and the read
+  // side clamps whatever a row holds, so what is stored is what the note says.
+  if (key === 'deliveryHandover') {
+    return resolveDeliveryHandover(value) as (typeof SETTING_DEFAULTS)[K];
   }
   if (key === 'payoutMethods') {
     return normalizePayoutMethods(value) as (typeof SETTING_DEFAULTS)[K];
