@@ -228,7 +228,7 @@ export function DeviceClaimOverlay({
       dismissOnScrim={false}
       z={60}
       testId="warranty-device-claim"
-      panelClassName="w-full max-w-md max-h-[90vh] overflow-y-auto"
+      panelClassName="w-full max-w-md max-h-[90dvh] overflow-y-auto"
     >
       <div className="p-6">
         <CloseX onClick={onClose} label={s.close} />

@@ -162,7 +162,7 @@ export function ClaimThreadOverlay({
       dismissOnScrim={false}
       z={60}
       testId="warranty-claim-thread"
-      panelClassName="w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
+      panelClassName="w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden"
     >
       <div className="p-5 border-b border-border-subtle flex items-start justify-between gap-3">
         <div className="min-w-0">

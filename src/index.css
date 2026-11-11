@@ -390,6 +390,23 @@ html {
     --tw-shadow: var(--clay-0);
   }
 
+  /* A WINDOW IS NEVER TALLER THAN THE SCREEN IT IS ON («the exit button on
+     iphone on safari on order admin does not present», owner 2026-11-11).
+     The layer a window is laid out in is `fixed inset-0`: on iOS Safari that
+     is the VISIBLE area, between the status bar and the toolbar, and in the
+     admin the toolbar never collapses (the shell scrolls inside itself). `vh`
+     is the LARGE viewport, as if the toolbar had gone. So the order window,
+     92vh tall and anchored to the bottom edge, overflowed ABOVE the top of the
+     screen, where nothing scrolls to — its header and its close X with it.
+     Capped at its layer (less the status bar, for a page drawn under it), a
+     panel keeps its top edge, and so its header, on the screen whatever unit
+     sized it. A caller's own `max-h-*` is a utility, a later layer, and still
+     wins: size windows in dvh. A dvh value a browser cannot read is dropped,
+     and this cap is what it falls back to. tests/overlayViewportFit.test.ts. */
+  [data-overlay-panel] {
+    max-height: calc(100% - env(safe-area-inset-top));
+  }
+
   .lv-section {
     padding-block: 1rem;
     border-block-end: 1px solid color-mix(in oklab, var(--color-border-subtle) 64%, transparent);

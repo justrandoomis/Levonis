@@ -69,7 +69,7 @@ export default function EditSerialDialog({
 
   return (
     <Overlay open onClose={onClose} labelledBy={titleId} placement="bottom" panelClassName="w-full sm:max-w-2xl" dirty={dirty} testId="serial-edit">
-      <form onSubmit={save} className={`${T.AP} p-4 sm:p-5 space-y-4 max-h-[85vh] overflow-y-auto`}>
+      <form onSubmit={save} className={`${T.AP} p-4 sm:p-5 space-y-4 max-h-[85dvh] overflow-y-auto`}>
         <div>
           <h2 id={titleId} className="text-[16px] font-bold text-[var(--ap-text-1)]">
             {t.editTitle}

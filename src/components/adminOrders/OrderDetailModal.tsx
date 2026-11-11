@@ -204,6 +204,17 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   // The old markup carried `role="dialog"` and `aria-modal="true"` with no
   // accessible name at all — the primitive still supplies both, and the title
   // that was already on screen now names the window through `labelledBy`.
+  //
+  // ITS HEIGHT IS dvh, NOT vh («the exit button on iphone on safari on order
+  // admin does not present», owner 2026-11-11). On iOS Safari `vh` measures
+  // the screen as if the toolbar had collapsed, and in the admin it never
+  // does (the shell scrolls inside itself), so 92vh was taller than what the
+  // phone showed. Rising from the bottom edge, the window put its top — this
+  // title and the X beside it — above the top of the screen, where nothing
+  // scrolls to. `dvh` is the screen as it is. Where a browser has no dvh, the
+  // height is dropped and the primitive's cap (src/index.css) is the fallback:
+  // the window is as tall as what it holds and never taller than the screen.
+  // tests/overlayViewportFit.test.ts.
   return (
     <Overlay
       open={open}
@@ -213,7 +224,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
       labelledBy="order-detail-title"
       z={200}
       testId="order-detail"
-      panelClassName="w-full sm:max-w-3xl h-[92vh] sm:h-[88vh] flex flex-col overflow-hidden"
+      panelClassName="w-full sm:max-w-3xl h-[92dvh] sm:h-[88dvh] flex flex-col overflow-hidden"
     >
       <div data-order-modal className="flex flex-col flex-1 min-h-0">
         {/* ---------------------------------------------------------- header */}

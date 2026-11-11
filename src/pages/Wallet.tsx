@@ -1850,7 +1850,7 @@ function RequestModal({
    * the app where an accidental dismissal costs the customer real work: three
    * steps, a typed amount, a destination account, and an uploaded receipt that
    * would have to be uploaded again. Its panel is also the scroll container
-   * (`max-h-[92vh] overflow-y-auto`), and a vertical drag competing with a
+   * (`max-h-[92dvh] overflow-y-auto`), and a vertical drag competing with a
    * vertical scroll is the classic way a sheet ends up fighting the finger.
    * So it keeps `placement="bottom"` — the same geometry the hand-rolled
    * window had, `items-end sm:items-center` — and gains the arrival and the
@@ -1878,7 +1878,7 @@ function RequestModal({
       dismissOnScrim={!submitting && !uploading}
       dismissOnEscape={!submitting && !uploading}
       testId={`wallet-${kind}`}
-      panelClassName="w-full sm:max-w-[460px] max-h-[92vh] overflow-y-auto"
+      panelClassName="w-full sm:max-w-[460px] max-h-[92dvh] overflow-y-auto"
     >
       <div data-wallet-modal={kind} className="relative flex flex-col p-5 sm:p-6">
         <button

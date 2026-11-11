@@ -496,11 +496,15 @@ export default function BarcodeScanner({
         </div>
       )}
 
-      {/* The camera picture: a dark subtree in both themes. */}
+      {/* The camera picture: a dark subtree in both themes. Capped in dvh —
+          what the phone shows — because the window around it has no height
+          of its own: on iOS Safari vh is the screen without its toolbar, and
+          a picture that tall pushed a small iPhone's window, its title and its
+          X past the top of the screen. */}
       <div
         data-theme="dark"
         className={`relative w-full bg-charcoal overflow-hidden select-none touch-manipulation ${
-          embedded ? 'aspect-[4/3] max-h-[46vh] rounded-2xl' : 'aspect-[3/4] sm:aspect-[4/3] max-h-[58vh]'
+          embedded ? 'aspect-[4/3] max-h-[46dvh] rounded-2xl' : 'aspect-[3/4] sm:aspect-[4/3] max-h-[58dvh]'
         }`}
         onPointerDown={live ? onViewportPointer : undefined}
       >

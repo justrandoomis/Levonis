@@ -288,7 +288,15 @@ export interface OverlayProps {
    * trigger's ref.
    */
   anchor?: React.RefObject<HTMLElement | null>;
-  /** Extra classes for the panel. Geometry only — the material is provided. */
+  /**
+   * Extra classes for the panel. Geometry only — the material is provided.
+   * Heights in `dvh`, never `vh`: the layer is the screen as it is (on iOS
+   * Safari, between the status bar and the toolbar) and `vh` the screen
+   * without its toolbar, which pushed a bottom window's header off the top.
+   * The panel is capped at its layer (`[data-overlay-panel]` in
+   * src/index.css); a `max-h-*` here replaces that cap, so it says dvh too
+   * (tests/overlayViewportFit.test.ts).
+   */
   panelClassName?: string;
   /**
    * Where the panel sits in the viewport. `dock` is a bottom sheet at EVERY
