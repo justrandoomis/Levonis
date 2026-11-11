@@ -104,9 +104,10 @@ type Rec = Record<string, any>; // eslint-disable-line @typescript-eslint/no-exp
 /**
  * One order placed through the real checkout at estimated prices: TPU
  * (`p_pre2`) and, when asked, PETG (`p_pre`), both by sea and both labelled —
- * cash on delivery, or prepaid in full from the wallet.
+ * cash on delivery, or prepaid in full from the wallet; delivered to the
+ * buyer's address, or collected from the warehouse.
  */
-async function world(o: { petg?: boolean; wallet?: boolean; qty?: number } = {}) {
+async function world(o: { petg?: boolean; wallet?: boolean; qty?: number; pickup?: boolean } = {}) {
   const raw = seedCatalogue();
   raw.exec(`
     INSERT INTO users (id,name,email,password_hash,role) VALUES ('helper','Mona','helper@x.co','h','admin');
@@ -135,6 +136,7 @@ async function world(o: { petg?: boolean; wallet?: boolean; qty?: number } = {})
     paymentMethodId: o.wallet ? 'wallet' : 'cash',
     useWallet: !!o.wallet,
     price_estimate_ack: ESTIMATE_NOTICE_VERSION,
+    ...(o.pickup ? { deliveryMethodId: 'pickup' } : {}),
   }));
   const placed = await json(res);
   assert.equal(res.status, 200, JSON.stringify(placed).slice(0, 400));
@@ -375,6 +377,56 @@ test('approve (cash on delivery, higher): the money moves exactly as 0140 plans 
   assert.deepEqual([rec.state, rec.adjustment_id, rec.final_unit_iqd, rec.decided_by], ['approved', pid, w.tpu.estimate_unit_iqd + 2000, 'buyer']);
   assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM wallet_transactions WHERE id LIKE 'wtx_padj_%'"), 0, 'the wallet is never debited again');
   assert.equal((await moveTo(w, 'confirmed')).status, 200);
+  await settle();
+});
+
+/**
+ * A CASH PICKUP CARRIES ITS APPROVED RISE TO THE WAREHOUSE COUNTER (payment
+ * policy 5, 3.1 and 3.2; DECISIONS row 312). 0140's money rule has no pickup
+ * branch: the rise joins `due_on_delivery_iqd`, which on a pickup is what
+ * payment 3.2 says is paid on collection, untaxed, and the invoice's next
+ * revision says the same; the counter's recorded collection of that amount
+ * settles the order. Purchase 4.16 and price_protection 5.6 still say the rise
+ * is «collected only at the door» — whether they move is the owner's open
+ * question in row 312 (tests/paymentCashAtPickup.test.ts lists them), and this
+ * is the fact the question rests on.
+ */
+test('approve (cash at warehouse pickup, higher): the rise joins what is paid on collection, untaxed, on the order and its invoice; the counter’s recorded collection settles it', async () => {
+  const w = await world({ pickup: true });
+  const before = orderOf(w);
+  assert.deepEqual(
+    [before.delivery_method_id, before.payment_method_id, before.cod_tax_iqd, before.wallet_applied_iqd, before.due_on_delivery_iqd],
+    ['pickup', 'cash', 0, 0, before.total_iqd],
+    'a cash pickup: no tax, nothing ahead, the whole total paid on collection'
+  );
+  const proposed = await confirm(w, [[w.tpu, w.tpu.estimate_unit_iqd + 2000]]);
+  assert.equal(proposed.status, 201, JSON.stringify(proposed.body).slice(0, 300));
+  const pid = proposed.body.adjustment.id as string;
+  const res = await post(w.buyer, `/api/orders/${w.orderId}/price-adjustment/${pid}/approve`);
+  assert.equal(res.status, 200, JSON.stringify(await json(res)).slice(0, 300));
+  await settle();
+  const after = orderOf(w);
+  assert.deepEqual(
+    [after.total_iqd, after.due_on_delivery_iqd, after.wallet_applied_iqd, after.cod_tax_iqd, after.delivery_method_id],
+    [before.total_iqd + 2000, before.due_on_delivery_iqd + 2000, 0, 0, 'pickup'],
+    'the rise is owed at the counter, untaxed, and nothing is taken from the wallet'
+  );
+  assert.equal(count(w.raw, "SELECT COUNT(*) AS n FROM wallet_transactions WHERE id LIKE 'wtx_padj_%'"), 0, 'the wallet is never debited for it');
+  const invoice = row<Rec>(
+    w.raw,
+    'SELECT amount_due_iqd, amount_paid_iqd, payment_status FROM invoices WHERE order_id = ? AND superseded_by IS NULL ORDER BY revision DESC LIMIT 1',
+    w.orderId
+  )!;
+  assert.deepEqual([invoice.amount_due_iqd, invoice.amount_paid_iqd, invoice.payment_status], [after.due_on_delivery_iqd, 0, 'cod_due'], 'the invoice owes what the counter collects');
+
+  // The team records the cash taken at the warehouse: the approved amount, once, and the order is paid.
+  const counter = stubApp(w.db, OWNER, (a) => a.route('/api/orders', orderRoutes), { publishV2: false, env: ENV });
+  const settled = await json(await post(counter, `/api/orders/${w.orderId}/settlement`, { amountIqd: after.due_on_delivery_iqd, eventKey: 'pickup-cash:estimate-1' }));
+  assert.equal(settled.success, true, JSON.stringify(settled).slice(0, 300));
+  assert.deepEqual(
+    [settled.settlement.collected_iqd, settled.settlement.outstanding_iqd, settled.settlement.fully_settled],
+    [after.total_iqd, 0, true]
+  );
   await settle();
 });
 
