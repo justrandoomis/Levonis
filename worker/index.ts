@@ -2,7 +2,7 @@ import { searchTrendingRoutes } from './routes/searchTrending';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
-import { ANONYMOUS_LIFETIME, canonicalKey, edgeMemo, noStoreUnlessSet, peekAnonymousCopy, productPurgePath, purgeCatalogueFromJob, setEdgeRefreshDispatcher } from './lib/edgePolicy';
+import { ANONYMOUS_LIFETIME, edgeMemo, noStoreUnlessSet, peekAnonymousCopy, productCardKey, purgeCatalogueFromJob, setEdgeRefreshDispatcher } from './lib/edgePolicy';
 import { openingLeadFromDetail } from './lib/productOpeningLead';
 import { securityEventsDoor } from './lib/securityEvents';
 import { HttpError, originCheck, requireMainHost, securityHeaders } from './lib/http';
@@ -24,7 +24,6 @@ import {
   MANIFEST_PATH,
   preloadImagePath,
   previewStoreRef,
-  PRODUCT_CARD_REVISION,
   productSlugFromPath,
   resolveProductPreview,
   resolveStorePreview,
@@ -964,12 +963,19 @@ function logDocumentRegion(c: Context<AppContext>, path: string, docMs: number):
 //     names (`trustedOrigin`, the apex on the live site, whatever host the
 //     document was asked on) and the slug;
 //   - under the product answer's own path, `/api/products/<slug>`, with a
-//     `__card` parameter no route declares, so no request can read or fill it,
-//     and every purge of that answer on the apex (the catalogue seam on an
-//     admin product write, a visibility flip, the FX and repricing jobs:
-//     `cataloguePaths`) retires the card in that colo at once;
+//     `__card` parameter no route declares, so no request can read or fill it
+//     (`productCardKey`), and every purge of that answer on the apex retires
+//     the card in that colo at once, by the path's marker and by name: the
+//     catalogue seam on an admin product write (a slug change drops the
+//     address it left too), a visibility flip, a CSV or TXT import, the
+//     catalogue import, the FX and repricing jobs (`cataloguePaths`);
 //   - for that answer's own lifetime (`ANONYMOUS_LIFETIME`), so another colo
 //     never shows a card older than the page's own answer it serves;
+//   - only a plain catalogue product's card (`kind`): a bundle's or a mystery
+//     box's page reads `/api/bundles/<slug>`, which no colo keeps and no
+//     catalogue purge names, and a merchant's product is edited and moderated
+//     through seams that never purge `/api/products/<slug>`, so those two are
+//     read on every view, as before (the S1 review);
 //   - only a card that names its picture (a failed picture read is served once,
 //     never kept), and only for a slug its purge spells the same way
 //     (`productPurgePath`): any other is read on every view, as before;
@@ -980,14 +986,8 @@ function logDocumentRegion(c: Context<AppContext>, path: string, docMs: number):
 // (`PRODUCT_CARD_REVISION`) keeps a copy of an older shape from being read.
 function catalogueCard(c: Context<AppContext>, slug: string, origin: string) {
   const build = () => resolveProductPreview(c.env.DB, slug, origin);
-  const path = productPurgePath(slug);
-  let key: Request | null = null;
-  try {
-    if (path) key = canonicalKey(new URL(`${path}?__card=${PRODUCT_CARD_REVISION}`, origin).toString(), ['__card']);
-  } catch {
-    key = null;
-  }
-  return key ? edgeMemo(c, key, ANONYMOUS_LIFETIME, build, (card) => !!card.image) : build();
+  const key = productCardKey(origin, slug);
+  return key ? edgeMemo(c, key, ANONYMOUS_LIFETIME, build, (card) => card.kind === 'catalogue' && !!card.image) : build();
 }
 
 async function assetWithPreview(c: Context<AppContext>): Promise<Response> {

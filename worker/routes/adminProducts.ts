@@ -2069,6 +2069,8 @@ adminProductsRoutes.post('/', async (c) => {
 
   const stored = await reloadForVerification(c.env.DB, doc.id);
   c.set('catalogueSlug', doc.slug); // the product page is purged with the listing
+  // …and an opt-in slug change drops the address it left: its cached answer and share card still name the product.
+  if (prev && prev.slug && prev.slug !== doc.slug) c.set('catalogueRenamedFrom', prev.slug);
   // The completeness hook re-evaluates THIS product: named, so it does not look the id up again by slug.
   c.set('completenessIds', [doc.id]);
   return c.json({

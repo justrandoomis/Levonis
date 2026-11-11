@@ -312,6 +312,12 @@ export type AppContext = {
     /** A product slug an admin catalogue write names, for `purgeCatalogueAfterWrite`. */
     catalogueSlug?: string;
     /**
+     * The slug a product save moved away from (an opt-in slug change), for
+     * `purgeCatalogueAfterWrite`: the old address's answer and share card are
+     * dropped with the new one's.
+     */
+    catalogueRenamedFrom?: string;
+    /**
      * Products a catalogue write changed, for the completeness recompute
      * (worker/lib/completenessHooks.ts `completenessAfterWrite`), when the
      * path does not name the product (a create, an import, a bulk save).

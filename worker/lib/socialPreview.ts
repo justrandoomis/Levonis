@@ -49,7 +49,7 @@
  * No invented text either. A product with an empty description keeps the
  * shop's default line rather than getting a sentence written for it here.
  */
-import { listing } from './listing';
+import { optimisticVisible, runListed } from './listing';
 import { canonicalProductMediaUrl, primaryMedia, upgradeMedia } from './productModel';
 import { isAnonymousPublicMediaKey } from './mediaStorage';
 import { productImageFromRelations } from './productSelectionImage';
@@ -286,9 +286,18 @@ interface PreviewRow {
   description_en?: unknown;
   images?: unknown;
   light_image?: unknown;
+  composition?: unknown;
 }
 
-/** Internal document metadata; never written into social tags or public JSON. */
+/**
+ * Internal document metadata; never written into social tags or public JSON.
+ *
+ * A catalogue card is kept in the colo (worker/index.ts `catalogueCard`, S1,
+ * DECISIONS row 314) under a key that carries `PRODUCT_CARD_REVISION`
+ * (worker/lib/edgePolicy.ts): bump it with any change to this shape or to what
+ * `resolveProductPreview` puts in it — tests/productCardEdgeCache.test.ts fails
+ * until the two move together.
+ */
 interface ProductPreview extends Pick<SocialPreview, 'title' | 'description' | 'image'> {
   /**
    * A catalogue product's opening picture in each theme when the preview's own
@@ -297,15 +306,17 @@ interface ProductPreview extends Pick<SocialPreview, 'title' | 'description' | '
    * Absent for a merchant product (its preload is unchanged).
    */
   lead?: OpeningLead | null;
+  /**
+   * What the card is of. Only a `catalogue` card — a plain `products` row — is
+   * kept in the colo: its page reads `/api/products/<slug>`, and the catalogue
+   * writes that change it purge that path. A `composition` (a bundle, a mystery box:
+   * its page reads `/api/bundles/<slug>`, which no colo keeps and no catalogue
+   * purge names) and a `community` product (a merchant's: its writes and its
+   * moderation purge the storefront, never `/api/products/<slug>`) are read on
+   * every view, as before S1.
+   */
+  kind: 'catalogue' | 'composition' | 'community';
 }
-
-/**
- * The shape of the card a product document keeps in its colo (worker/index.ts
- * `catalogueCard`, S1): part of the copy's key, so a copy an older build kept is
- * never read by a newer one. Bump it with any change to `ProductPreview` or to
- * what `resolveProductPreview` puts in it.
- */
-export const PRODUCT_CARD_REVISION = 'card-2026-11-11';
 
 /** Arabic first — the store's own default language — then English, then any. */
 function pickText(...candidates: unknown[]): string {
@@ -374,12 +385,19 @@ export async function resolveProductPreview(
   // catch served the shop's card, and no catalogue product ever unfurled as
   // itself — invisible to the fake-database tests, caught by a real one
   // (tests/storeShareCards.test.ts).
-  const product = await db
-    .prepare(
-      `SELECT id, name, name_ar, description, description_ar, light_image FROM products WHERE slug = ? AND ${(await listing(db)).visible('products')}`
-    )
-    .bind(slug)
-    .first<PreviewRow>();
+  //
+  // VISIBLE, asked as the product page asks it (`visibleProductBySlug`): the
+  // held clause rides on the read itself and is dropped only where the
+  // database has no such table (`runListed`). A probe first (`listing(db)`)
+  // cost a wave on every cold isolate and, when it failed for a moment, read
+  // the product as if nothing could be held — a card for a product its page
+  // answers 404, and one the colo would keep (the S1 review). A read that
+  // fails is a failed card: the document keeps the shop's.
+  const product = await runListed(
+    db,
+    `SELECT id, name, name_ar, description, description_ar, light_image, composition FROM products WHERE slug = ? AND ${optimisticVisible(db)}`,
+    (sql) => db.prepare(sql).bind(slug).first<PreviewRow>()
+  );
   // A community product unfurls only under the feed's own rule (push 1.4):
   // live, in a store, of a merchant the public may see.
   const row = product ??
@@ -451,6 +469,7 @@ async function previewFrom(
     description: shortDescription(pickText(row.description_ar, row.description, row.description_en)),
     image: absoluteImageUrl(image, origin),
     ...(product ? { lead } : {}),
+    kind: !product ? 'community' : String(product.composition ?? '') !== '' ? 'composition' : 'catalogue',
   };
 }
 

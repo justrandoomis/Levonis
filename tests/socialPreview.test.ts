@@ -397,7 +397,9 @@ test('only a published product is readable — a draft must not leak through a c
     // The catalogue's read asks the VISIBLE predicate (worker/lib/listing.ts, DECISIONS row 240):
     // `status = 'active'` and not held by the owner's «hide incomplete» switch for a catalogue gap. A
     // catalog-only product (shown, not priced yet) unfurls as itself — a share card carries no price.
-    assert.match(select, /\bstatus = 'active'|\.visible\('products'\)/, 'a draft or hidden product is not a card');
+    // It asks it as the product page does (`optimisticVisible` through `runListed`: no probe first, and
+    // a failed read is no card — the S1 review, DECISIONS row 314).
+    assert.match(select, /\bstatus = 'active'|\.visible\('products'\)|optimisticVisible\(db\)/, 'a draft or hidden product is not a card');
   }
   // And the slug is bound, never interpolated.
   assert.ok(!/\$\{slug\}/.test(source));

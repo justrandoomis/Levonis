@@ -35,6 +35,7 @@
 
 import { needsPricingIds, withoutLegacyPriceLines } from '../lib/pricingEngine/v2/legacyMoney';
 import { completenessAfterWrite } from '../lib/completenessHooks';
+import { afterCatalogueWrite } from '../lib/edgePolicy';
 import { fetchPageImages, pickPageImage, type PageImages } from '../lib/productPageImages';
 import { Hono, type Context } from 'hono';
 import { unzipSync } from 'fflate';
@@ -3497,6 +3498,15 @@ templateRoutes.post('/apply', async (c) => {
     // must not turn success into a false rollback or delete live media.
     console.error('template apply verified marker failed', error);
   });
+
+  // THE ANSWERS AN UPDATE CHANGED ARE DROPPED, as the product form's are (the S1 review): its page, public
+  // record and share card in this colo now — and the address it left, when the file moved the slug. A create
+  // is a draft, which no customer answer shows. Best effort: the product has been written either way.
+  if (isUpdate) {
+    await afterCatalogueWrite(c, [doc.slug, a.existing?.slug ?? ''].filter(Boolean)).catch((error) => {
+      console.error('template apply purge failed (the answers age out within their window):', error instanceof Error ? error.message : String(error));
+    });
+  }
 
   c.set('completenessIds', [doc.id]);
   // §11: the same gate as the export and /parse — the applied product is the

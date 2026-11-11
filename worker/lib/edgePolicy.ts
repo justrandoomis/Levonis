@@ -65,7 +65,8 @@
  * the site-media upload, the community gate PUT, every merchant write (one
  * middleware on the merchant routers), a store's rename and the two admin
  * sanctions, the admin product and benefit-rule writes and the PRO pause
- * (the catalogue seam), the printer-model PATCH.
+ * (the catalogue seam; the CSV and TXT imports and the structure save call it
+ * too), the printer-model PATCH.
  *
  * `caches` does not exist under Node, where the tests run: the same code then
  * builds every answer and still stamps the policy, the ETag and the 304, so
@@ -532,9 +533,11 @@ export async function peekAnonymousCopy(c: Context<AppContext>, path: string, li
 // throws or rejects; an unreadable copy: each is a build, as if nothing had ever
 // been kept. What stays best effort is what every guest answer's purge already
 // is: a marker the purge failed to WRITE is logged, and the copies it would have
-// retired age out within their window. And nothing here waits on a body it does
-// not read: an expired copy is released, never awaited (releasing a cloned body
-// can wait for ever on its other branch — Node's tee does — and an answer must not).
+// retired age out within their window — except the share card, which the purge
+// also drops by name (`productCardKey`), as it drops the product answer. And
+// nothing here waits on a body it does not read: an expired copy is released,
+// never awaited (releasing a cloned body can wait for ever on its other branch —
+// Node's tee does — and an answer must not).
 const memoRefreshing = new Map<string, Promise<void>>();
 
 export async function edgeMemo<T>(
@@ -642,6 +645,44 @@ export function productPurgePath(slug: string): string | null {
 }
 
 /**
+ * THE SHAPE OF THE SHARE CARD A PRODUCT DOCUMENT KEEPS (worker/index.ts
+ * `catalogueCard`, S1, DECISIONS row 314), in the key it is kept under, so a
+ * copy an older build kept is never read by a newer one. Bump it with any
+ * change to `ProductPreview` or to what `resolveProductPreview` puts in it
+ * (worker/lib/socialPreview.ts): tests/productCardEdgeCache.test.ts pins the
+ * code and this value together.
+ */
+export const PRODUCT_CARD_REVISION = 'card-2026-11-11b';
+
+/** The card's parameter: no route declares it, so no request can read or fill a card. */
+const PRODUCT_CARD_PARAM = '__card';
+
+/** The card kept under the product path `path` (the URL parser's spelling) on `host`. */
+function productCardKeyAt(host: string, path: string): Request {
+  return canonicalKey(`https://${host}${path}?${PRODUCT_CARD_PARAM}=${PRODUCT_CARD_REVISION}`, [PRODUCT_CARD_PARAM]);
+}
+
+/**
+ * WHERE A CATALOGUE PRODUCT'S SHARE CARD IS KEPT: under the product answer's
+ * own path on the host of the origin the card names, so the product purge
+ * retires it by that path's marker and drops it by this name
+ * (`purgeAnonymousCache`). Null for a slug `productPurgePath` refuses: that
+ * card is read on every view.
+ */
+export function productCardKey(origin: string, slug: string): Request | null {
+  const path = productPurgePath(slug);
+  if (!path) return null;
+  try {
+    return productCardKeyAt(new URL(origin).host, path);
+  } catch {
+    return null;
+  }
+}
+
+/** One product's path as `cataloguePaths` names it: its card is kept beside it. */
+const PRODUCT_ANSWER_PATH = /^\/api\/products\/[^/?#]+$/;
+
+/**
  * Serve `build()`'s answer under the anonymous policy — from the colo's cache
  * when it holds it — or, for a request that carries a session, run `build()`
  * as it always ran and mark the answer private.
@@ -674,6 +715,10 @@ export async function anonymousCached(
  * search), which a delete by name cannot reach, so a purge marker for the path
  * is written beside it and any copy read before the marker is a miss in this
  * colo from now on. Other colos keep their copies within their declared window.
+ *
+ * A product's path also drops the share card its document keeps under it
+ * (`productCardKey`) BY NAME, as its answer is: the marker alone would leave
+ * the card in this colo whenever the marker cannot be written (the S1 review).
  */
 export async function purgeAnonymousCache(origin: string, paths: readonly string[]): Promise<void> {
   const cache = edgeCache();
@@ -692,11 +737,13 @@ export async function purgeAnonymousCache(origin: string, paths: readonly string
               console.error('edge purge marker failed (parameterised copies age out within their window):', p, e instanceof Error ? e.message : e);
             })
         : undefined;
+      const failed = (e: unknown) => {
+        console.error('edge purge failed (the entry expires within s-maxage):', p, e instanceof Error ? e.message : e);
+      };
       await Promise.all([
         marked,
-        cache.delete(canonicalKey(`https://${host}${p}`)).catch((e) => {
-          console.error('edge purge failed (the entry expires within s-maxage):', p, e instanceof Error ? e.message : e);
-        }),
+        cache.delete(canonicalKey(`https://${host}${p}`)).catch(failed),
+        PRODUCT_ANSWER_PATH.test(p) ? cache.delete(productCardKeyAt(host, p)).catch(failed) : undefined,
       ]);
     })
   );
@@ -776,7 +823,8 @@ export function storefrontDocumentPaths(slug: string, id?: string): string[] {
  * either direction) drops their copies too. Each product named also drops its knowledge answer (the Bambu
  * import spec §G.1: `/api/products/<slug>/knowledge`, five minutes at the edge), so a product write — its
  * specifications, its documents, its visibility — is never answered from an older copy in this colo. The
- * product path's marker also retires the share card its document keeps (worker/index.ts `catalogueCard`, S1).
+ * product path also retires the share card its document keeps (worker/index.ts `catalogueCard`, S1), by its
+ * marker and by name (`purgeAnonymousCache`).
  */
 export function cataloguePaths(slugs: readonly string[] = []): string[] {
   const named = slugs.filter(Boolean);
@@ -869,7 +917,9 @@ export async function afterCatalogueWrite(c: Context<AppContext>, slugs: readonl
  * routers): after a successful non-GET, purge. A handler that knows the
  * product's slug records it with `c.set('catalogueSlug', slug)` before
  * answering so the product page is dropped too; the listing and the home are
- * dropped regardless.
+ * dropped regardless. A save that moved the product to a new slug records the
+ * one it left (`catalogueRenamedFrom`): the old address's answer and share card
+ * go too, so it stops naming the product at once (the S1 review).
  */
 export const purgeCatalogueAfterWrite: MiddlewareHandler<AppContext> = async (c, next) => {
   await next();
@@ -880,7 +930,8 @@ export const purgeCatalogueAfterWrite: MiddlewareHandler<AppContext> = async (c,
   const path = new URL(c.req.url).pathname;
   if (/\/pricing\/preview$/.test(path) || /^\/api\/admin\/offers\/[^/]+\/preview$/.test(path)) return;
   const slug = c.get('catalogueSlug') ?? (await catalogueSlugFromPath(c));
-  await afterCatalogueWrite(c, slug ? [slug] : []);
+  const left = c.get('catalogueRenamedFrom');
+  await afterCatalogueWrite(c, [slug, left].filter((s): s is string => !!s));
 };
 
 /** `/api/admin/products-v2/<id>/…` names a product by id; its slug is one read away. Best effort. */

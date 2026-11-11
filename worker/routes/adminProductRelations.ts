@@ -2,6 +2,7 @@ import { holdLegacyCellMoney, holdLegacyRelationMoney, nullLegacyPricesDeep } fr
 import { productV2Flag } from '../lib/engineInstalled';
 import { Hono } from 'hono';
 import { completenessAfterWrite } from '../lib/completenessHooks';
+import { afterCatalogueWrite } from '../lib/edgePolicy';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, notFound, str, int, HttpError, jsonObject } from '../lib/http';
 import { decideImportStock, isImportStockChoice } from '../lib/importStock';
@@ -400,6 +401,11 @@ adminProductRelationsRoutes.put('/:id/relations', async (c) => {
     throw e;
   }
   await saveProductAtomic(c.env.DB, plan);
+  // Its pictures are its page's and its share card's (the S1 review): dropped in this colo now, as the
+  // product form's own save drops them. Best effort: the structure has been written either way.
+  await afterCatalogueWrite(c, [String(existingRow.slug ?? '')].filter(Boolean)).catch((error) => {
+    console.error('relations purge failed (the answers age out within their window):', error instanceof Error ? error.message : String(error));
+  });
 
   const rel = await loadProductRelations(c.env.DB, productId);
   return c.json(

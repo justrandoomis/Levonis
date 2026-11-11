@@ -35,7 +35,8 @@
  */
 
 import { needsPricingIds, nullLegacyPricesDeep } from '../lib/pricingEngine/v2/legacyMoney';
-import { completenessAfterWrite } from '../lib/completenessHooks';
+import { AFTER_WRITE_MAX, completenessAfterWrite } from '../lib/completenessHooks';
+import { afterCatalogueWrite } from '../lib/edgePolicy';
 import { engineDbRefusal, engineDbRefusalCode } from '../lib/pricingDbRefusals';
 import { productEngineV2 } from '../lib/engineInstalled';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
@@ -2014,6 +2015,8 @@ adminImportRoutes.post('/confirm', async (c) => {
       }
     }
 
+    // Every slug a written row had or now has: their cached answers are dropped once the import has applied.
+    const writtenSlugs = new Set<string>();
     for (const [index, item] of products.entries()) {
       if (checkpoints.has(index)) continue;
       const key = String(item.key ?? '');
@@ -2021,6 +2024,7 @@ adminImportRoutes.post('/confirm', async (c) => {
       const productId = String(item.productId ?? '');
       const isCreate = item.action === 'create';
       let outcome: ReportRow | null = null;
+      let rowSlugs: string[] = [];
 
       try {
         await requireImportApplyLease(c.env.DB, importId, lease.token);
@@ -2120,6 +2124,7 @@ adminImportRoutes.post('/confirm', async (c) => {
         // statement. The row is also the crash-resume completion marker.
         plan.statements.push(importItemCheckpointStatement(c.env.DB, importId, index, lease.token, outcome));
         await requireImportApplyLease(c.env.DB, importId, lease.token);
+        rowSlugs = [doc.slug, prevDoc?.slug ?? ''];
         try {
           await saveProductAtomic(c.env.DB, plan);
         } catch (e) {
@@ -2127,6 +2132,7 @@ adminImportRoutes.post('/confirm', async (c) => {
           if (isLostRace(e)) throw conflict(`سطر ${line}: ${IMPORT_ROW_CHANGED_RETRY}`);
           throw e;
         }
+        for (const s of rowSlugs) if (s) writtenSlugs.add(s);
         checkpoints.set(index, {
           import_id: importId,
           item_index: index,
@@ -2146,6 +2152,7 @@ adminImportRoutes.post('/confirm', async (c) => {
         const committed = await loadImportItemCheckpoint(c.env.DB, importId, index);
         if (committed) {
           checkpoints.set(index, committed);
+          if (committed.action !== 'failed') for (const s of rowSlugs) if (s) writtenSlugs.add(s);
           continue;
         }
         if (
@@ -2246,6 +2253,17 @@ adminImportRoutes.post('/confirm', async (c) => {
       generation: lease.generation,
       brands_created: brandsCreated.filter((b) => b.created).map((b) => b.id),
     });
+
+    // THE ANSWERS THIS IMPORT CHANGED ARE DROPPED, as a product save drops its own (the S1 review): the
+    // listing, the home and each written product's page, public record and share card, in this colo now —
+    // a renamed product or a replaced picture is not shown from an older copy for another twelve minutes.
+    // The first AFTER_WRITE_MAX slugs, the bound of the recompute that follows; the rest age out within
+    // their window. Best effort: the import has applied either way.
+    try {
+      await afterCatalogueWrite(c, [...writtenSlugs].slice(0, AFTER_WRITE_MAX));
+    } catch (error) {
+      console.error('import purge failed (the answers age out within their window):', error instanceof Error ? error.message : String(error));
+    }
 
     // Owner brief 2026-10-10: the products this import wrote are re-evaluated against the
     // required-field list once it has answered (the first few here; the sweep catches the rest).
