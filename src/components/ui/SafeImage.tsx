@@ -1,5 +1,5 @@
 // Lucian UX/UI Prompt #258 · MIT License (c) 2026 Seokwoooo · https://lucianlabs.dev/uxui-prompt/#258
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ImageOff, RefreshCw } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { IMAGE_VARIANT_WIDTHS, variantSrcSet } from '../../../packages/contracts/src/imageSizing';
@@ -36,6 +36,24 @@ export { IMAGE_VARIANT_WIDTHS, variantSrcSet };
  * original.
  */
 export const LAZY_AUTO_SIZES = 'auto, 50vw';
+
+/**
+ * THE BLUR-UP PREVIEW ONLY UNDER A LARGE PICTURE (owner 2026-11-11: «the image
+ * size is large so it make the browser heavy»).
+ *
+ * The #258 preview is a SECOND download of the same picture — its 160 px copy,
+ * at low priority — blurred under the real one until that loads. Under a
+ * thumbnail or a phone card the real copy is itself only 320–640 px, so the
+ * preview costs a third to half of its bytes, starts at the same moment and,
+ * being low priority, rarely arrives first; it also adds one more 12 px blur
+ * for the phone to paint. This rule, simulated on the live build 2026-11-11 on a
+ * DPR-3 phone: /product/bambu-lab-a1 went from 41 picture files (205 KB) to 23
+ * (164 KB), the home page from 9 to 7 (24 to 14 on a desktop), the FDM
+ * section from 42 to 34. So a preview is drawn only when the box is wider than this
+ * many DEVICE pixels — a picture whose own copy is the 800 px one or larger —
+ * and a smaller picture keeps the pulse and the blur-in of `u258-photo`.
+ */
+export const PREVIEW_MIN_DEVICE_PX = 640;
 
 export default function SafeImage({
   src,
@@ -174,7 +192,17 @@ export default function SafeImage({
    * nothing the visitor can see happen. Eager images are simply there — and
    * so is a deferred one released while already on the screen.
    */
-  const preview = !placeholderSrc && reveal === 'blur' && !eager && !release.onScreen && release.near && isVariantSource(cleanSrc) && status === 'loading' ? `${cleanSrc}?w=160` : '';
+  const previewWanted = !placeholderSrc && reveal === 'blur' && !eager && !release.onScreen && release.near && isVariantSource(cleanSrc);
+  // Measured before paint, in the commit that lays the box out; a box with no
+  // width yet (a closed panel) gets no preview — only the pulse.
+  const [previewWide, setPreviewWide] = useState(false);
+  useLayoutEffect(() => {
+    if (!previewWanted) return;
+    const box = boxRef.current;
+    const ratio = typeof window !== 'undefined' && window.devicePixelRatio > 0 ? window.devicePixelRatio : 1;
+    setPreviewWide(!!box && box.getBoundingClientRect().width * ratio > PREVIEW_MIN_DEVICE_PX);
+  }, [previewWanted, cleanSrc]);
+  const preview = previewWanted && previewWide && status === 'loading' ? `${cleanSrc}?w=160` : '';
   const revealCls = reveal === 'none' || eager || release.onScreen
     ? 'opacity-100'
     : `u258-photo ${status === 'loaded' ? 'opacity-100' : 'is-lq'}`;
