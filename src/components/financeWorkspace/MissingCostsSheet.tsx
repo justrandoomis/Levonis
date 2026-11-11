@@ -79,8 +79,9 @@ export default function MissingCostsSheet({ from, to, onClose, onChanged, openOr
     setPending((before) => [...new Set([...before.filter((id) => !applied.cleared.includes(id)), ...applied.pending])]);
     setRevision((v) => v + 1); onChanged();
   }, [onChanged]);
-  // Redesign step 5 (DECISIONS row 317), the mockup's page: «19 بندًا بلا تكلفة مؤكدة», one line saying nothing is saved
-  // before the owner confirms, a card per product and size or colour, and the way to stop it happening again at the foot.
+  // Redesign step 5 (DECISIONS row 317), the mockup's page: «n بندًا بلا تكلفة مؤكدة» (each count agreeing with its noun), one
+  // line saying nothing is saved before the owner confirms, a card per product and size or colour, and the way to stop it
+  // happening again at the foot.
   const listed = !!data && groups.length > 0;
   const title = listed ? counted(lang, 'missingHead', data!.lines.length) : loc('التكاليف الناقصة', 'Missing costs', 'تێچووە کەمەکان');
   const subtitle = listed ? cs(loc, 'missSub') : loc('كل بند مُسلَّم لم تُثبَّت تكلفة بضاعته في هذه الفترة', 'Every delivered line in this period without a confirmed goods cost', 'هەموو بڕگەیەکی گەیەندراو لەم ماوەیەدا کە تێچووی کاڵاکەی جێگیر نەکراوە');
@@ -110,7 +111,14 @@ export function MissingGroup({ g, stockNote, locked, onStart, onDone, openOrder 
   const [error, setError] = useState('');
   const confirmId = useId();
   const confirmButton = useRef<HTMLDivElement>(null);
-  useEffect(() => { if (confirming) confirmButton.current?.querySelector<HTMLButtonElement>('button:last-child')?.focus(); }, [confirming]);
+  const reviewBox = useRef<HTMLDivElement>(null);
+  const reviewed = useRef(false);
+  // The confirmation opens on its sentence, never on «تأكيد السعر»: a second Enter on «راجِع وثبّت» confirms nothing unread.
+  // Closed, focus goes back to «راجِع وثبّت» (the independent review of step 5).
+  useEffect(() => {
+    if (confirming) { reviewed.current = true; confirmButton.current?.querySelector<HTMLElement>('p')?.focus(); }
+    else if (reviewed.current) { reviewed.current = false; reviewBox.current?.querySelector<HTMLButtonElement>('button')?.focus(); }
+  }, [confirming]);
   const unit = Number(price);
   const valid = price.trim() !== '' && Number.isSafeInteger(unit) && unit >= 0;
   const noCost = g.lines.filter((l) => l.cogs_iqd == null).length;
@@ -145,7 +153,9 @@ export function MissingGroup({ g, stockNote, locked, onStart, onDone, openOrder 
   };
   const count = (label: string, n: number) => <>{label}: {n}</>;
   // The mockup's card (redesign step 5): name · size or colour; lines, pieces kept and orders; the sale-time estimate per piece
-  // as a range, or «لا تقدير ولا سعر» in red; the price field and «راجِع وثبّت» beside it — under it on a phone.
+  // as a range, or «لا تقدير ولا سعر» in red; the price field and «راجِع وثبّت» beside it — under it on a phone. A card whose
+  // lines are partly estimated still names the ones with neither, in red (the independent review of step 5): they blank
+  // their orders' net whatever the others' estimate says.
   const range = estimateRange(g.estimates);
   return <section className="fw-missing-group" data-finance-missing-group={g.key}>
     <div className="fw-missing-head">
@@ -153,16 +163,18 @@ export function MissingGroup({ g, stockNote, locked, onStart, onDone, openOrder 
       <p className="fw-missing-meta"><span>{counted(lang, 'lines', g.lines.length)}</span><span>{counted(lang, 'pieces', g.qty)}</span><span>{counted(lang, 'orders', g.orders)}</span>
         {g.returned > 0 && <span>{count(loc('أُرجعت إلى المخزون (لا تُحسب)', 'Returned to stock (not counted)', 'گەڕێندرایەوە کۆگا (حیساب ناکرێت)'), g.returned)}</span>}
         {range ? <span data-finance-missing-estimate>{cs(loc, 'missEstimate', { range: '' })}<bdi dir="ltr" className="fw-num">{rangeFigures(range)} د.ع</bdi></span>
-          : noCost > 0 ? <b className="fw-neg" data-finance-missing-estimate="none">{cs(loc, 'missNoEstimate')}</b> : <span>{cs(loc, 'missSnapshot')}</span>}</p>
+          : noCost > 0 ? <b className="fw-neg" data-finance-missing-estimate="none">{cs(loc, 'missNoEstimate')}</b> : <span>{cs(loc, 'missSnapshot')}</span>}
+        {range && noCost > 0 && <b className="fw-neg" data-finance-missing-estimate="some-none">{counted(lang, 'linesNoPrice', noCost)}</b>}</p>
     </div>
-    {g.ready.length > 0 && <div className="fw-fields">
+    {g.ready.length > 0 && <div className="fw-fields" ref={reviewBox}>
       <label className="fw-field"><span>{cs(loc, 'missPerPiece')}</span>
         <input className="fw-input" type="number" inputMode="numeric" min="0" step="1" value={price} disabled={busy || locked} placeholder={range ? String(range.min) : ''}
           onChange={(e) => { setPrice(e.target.value); setConfirming(false); }} /></label>
       {!confirming && <Button variant="primary" disabled={!valid || busy || locked} onClick={() => setConfirming(true)}>{cs(loc, 'missReview')}</Button>}
     </div>}
-    {g.ready.length > 0 && confirming && <div className="fw-confirm" role="alertdialog" aria-labelledby={confirmId} ref={confirmButton}>
-      <p id={confirmId}>{loc('سعر القطعة', 'Price per piece', 'نرخی هەر پارچەیەک')} <Money value={unit} />. {count(loc('البنود', 'Lines', 'بڕگەکان'), g.ready.length)} · {count(loc('القطع المحسوبة', 'Pieces costed', 'پارچە حیسابکراوەکان'), pieces)} · {count(loc('الطلبات', 'Orders', 'داواکارییەکان'), orders)} · {loc('مجموع تكلفة البضاعة', 'Total goods cost', 'کۆی تێچووی کاڵا')} <Money value={unit * pieces} />. {loc('يُعاد حساب كل طلب.', 'Each order is recalculated.', 'هەر داواکارییەک دووبارە حیساب دەکرێتەوە.')}</p>
+    {g.ready.length > 0 && confirming && <div className="fw-confirm" role="alertdialog" aria-labelledby={confirmId} ref={confirmButton}
+      onKeyDown={(e) => { if (e.key === 'Escape' && !busy) { e.stopPropagation(); setConfirming(false); } }}>
+      <p id={confirmId} tabIndex={-1}>{loc('سعر القطعة', 'Price per piece', 'نرخی هەر پارچەیەک')} <Money value={unit} />. {count(loc('البنود', 'Lines', 'بڕگەکان'), g.ready.length)} · {count(loc('القطع المحسوبة', 'Pieces costed', 'پارچە حیسابکراوەکان'), pieces)} · {count(loc('الطلبات', 'Orders', 'داواکارییەکان'), orders)} · {loc('مجموع تكلفة البضاعة', 'Total goods cost', 'کۆی تێچووی کاڵا')} <Money value={unit * pieces} />. {loc('يُعاد حساب كل طلب.', 'Each order is recalculated.', 'هەر داواکارییەک دووبارە حیساب دەکرێتەوە.')}</p>
       <div className="fw-fields"><Button variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</Button>
         <Button variant="primary" busy={busy} disabled={locked} onClick={() => void apply()}><Check size={16} />{loc('تأكيد السعر', 'Confirm the price', 'نرخەکە پشتڕاست بکەرەوە')}</Button></div>
     </div>}

@@ -34,3 +34,20 @@ export function expenseWorld() {
     INSERT INTO finance_expense_links(expense_id,center_id) VALUES ('centre','shop');`);
   return w;
 }
+
+/**
+ * A period with more entries than GET /expenses lists (the independent review of step 5): three rents of 100,000 on the
+ * month's 1st, then `linked` costs of 1,000 linked to a delivered order, entered later — the wage, material and courier rows
+ * a busy quarter or year fills a period with. General: 300,000; linked to the delivered order: linked × 1,000.
+ */
+export function crowdedWorld(linked = 600) {
+  const w = world();
+  const day = baghdadDay(), m = month();
+  order(w.raw, { id: 'shipped' });
+  w.raw.exec(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES
+      ('rent-a','rent',100000,'${m}-01','Rent, shop','admin'),('rent-b','rent',100000,'${m}-01','Rent, store','admin'),('rent-c','rent',100000,'${m}-01','Rent, office','admin');
+    WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<${linked})
+      INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) SELECT 'linked-'||i,'rent',1000,'${day}','Packing '||i,'admin' FROM n;
+    INSERT INTO finance_expense_links(expense_id,order_id) SELECT id,'shipped' FROM operating_expenses WHERE id LIKE 'linked-%';`);
+  return w;
+}

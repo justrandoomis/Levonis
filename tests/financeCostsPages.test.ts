@@ -5,10 +5,17 @@
  * promotion's percent column adding up to exactly 100 after rounding, the period's entries grouped by where they count and
  * the general ones by category. Every new word is in Arabic, English and real Sorani (DECISIONS row 183), and no sentence of
  * the promotion page speaks of pieces or units — the month's promotion is shared by sales value (row 313). Then the pages as
- * the owner reads them, drawn on the server's own answers for invented worlds: «19 بندًا»-style headers that agree with their
+ * the owner reads them, drawn on the server's own answers for invented worlds: «23 بندًا»-style headers that agree with their
  * number, the missing-cost card with its range or «لا تقدير ولا سعر», who carries the promotion adding up to the month, its
  * history in words, the general expenses whose total is the statement's line and whose other entries say where they count,
  * the drawer's general line listing its entries, and the promotion's month following the period.
+ *
+ * The independent review of step 5 added: a page and a drawer past the server's limit (their emptiness, bars and headings
+ * from the totals; a cut list saying so), voided entries brought back only where they are owned, a month closed in
+ * accounting offering no edit, an edit sending only what changed, refusals in the reader's language, a card naming its
+ * unpriced lines beside a range, the promotion's form only on its own month's answer, labels that say «as invoiced», a past
+ * month with no sales, a gift month, a moved promotion, no letter glued to a placeholder, the drawer in dollars, and the
+ * ledger's embedded form in the reader's language.
  *
  * Every figure here is invented (DECISIONS row 316: no live order, day or amount in the repository).
  * Run: node --import tsx --test tests/financeCostsPages.test.ts
@@ -19,16 +26,18 @@ import { register } from 'node:module';
 import { createElement, type ReactNode } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { LanguageProvider } from '../src/LanguageContext';
-import { CS, COUNTED, counted } from '../src/components/financeWorkspace/costsStrings';
+import { CS, COUNTED, counted, refusalWords } from '../src/components/financeWorkspace/costsStrings';
 import { estimateRange, percentText, promotionTable, rangeFigures, sharePercents } from '../src/components/financeWorkspace/costFigures';
-import { categoryName, categoryShares, editableHere, ELSEWHERE, groupEntries, KIND_LABEL, type ExpenseEntryRow, type ExpenseKind, type ExpensesAnswer } from '../src/components/financeWorkspace/expenseKinds';
+import { categoryName, categoryShares, editableHere, editPatch, ELSEWHERE, entryDraft, groupEntries, inClosedMonth, KIND_LABEL, type ExpenseEntryRow, type ExpenseKind, type ExpensesAnswer } from '../src/components/financeWorkspace/expenseKinds';
+import { PA_STRINGS } from '../src/components/financeWorkspace/displayCurrencyStrings';
+import { amountText } from '../src/components/financeWorkspace/Reports';
 import { monthText } from '../src/components/financeWorkspace/overviewStrings';
 import { DisplayCurrencyContext } from '../src/components/financeWorkspace/displayCurrency';
 import type { FinanceSummary } from '../src/components/financeWorkspace/types';
 import type { PromotionsAnswer } from '../src/components/financeWorkspace/PromotionPage';
 import { everyState, month, order, period, world } from './fixtures/financeWorld';
-import { expenseWorld } from './fixtures/financeCosts';
-import { post } from './fixtures/app';
+import { crowdedWorld, expenseWorld } from './fixtures/financeCosts';
+import { post, send } from './fixtures/app';
 import { codeOf } from './fixtures/source';
 
 let LANG: 'ar' | 'en' | 'ckb' = 'ar';
@@ -40,7 +49,9 @@ register('data:text/javascript,' + encodeURIComponent(`export async function res
 }`));
 const { default: FinanceWorkspace } = await import('../src/components/financeWorkspace/FinanceWorkspace');
 const { MissingGroup, groupMissing } = await import('../src/components/financeWorkspace/MissingCostsSheet');
-const { Carriers, History, editText } = await import('../src/components/financeWorkspace/PromotionPage');
+const { default: PromotionPage, Carriers, History, editText } = await import('../src/components/financeWorkspace/PromotionPage');
+const { default: ExpenseLedger } = await import('../src/components/adminFinance/ExpenseLedger');
+const { financeStrings } = await import('../src/components/adminFinance/strings');
 const { ExpensesView, GeneralEntryList } = await import('../src/components/financeWorkspace/GeneralExpenses');
 const { FigureBody } = await import('../src/components/financeWorkspace/FigureDrawer');
 
@@ -122,20 +133,40 @@ test('every new word of the costs section is in Arabic, English and real Sorani,
     assert.equal(holes(c.ckb), 'n', key);
     assert.equal(holes(c.en[1]), 'n', key);
   }
-  // A count agrees with its noun in Arabic; English has one and many; Sorani keeps the noun.
-  assert.deepEqual([1, 2, 3, 10, 11, 19, 100, 101, 1200].map((n) => counted('ar', 'lines', n)), ['بند واحد', 'بندان', '3 بنود', '10 بنود', '11 بندًا', '19 بندًا', '100 بند', '101 بند', '1,200 بند']);
-  assert.equal(counted('ar', 'missingHead', 19), '19 بندًا بلا تكلفة مؤكدة', 'the mockup\'s header');
-  assert.deepEqual([counted('en', 'pieces', 1), counted('en', 'pieces', 30), counted('ckb', 'orders', 2)], ['1 piece', '30 pieces', '2 داواکاری']);
+  // A count agrees with its noun in Arabic; English has one and many; Sorani keeps the noun (invented counts).
+  assert.deepEqual([1, 2, 3, 10, 11, 23, 100, 101, 1200].map((n) => counted('ar', 'lines', n)), ['بند واحد', 'بندان', '3 بنود', '10 بنود', '11 بندًا', '23 بندًا', '100 بند', '101 بند', '1,200 بند']);
+  assert.equal(counted('ar', 'missingHead', 23), '23 بندًا بلا تكلفة مؤكدة', 'the mockup\'s header');
+  assert.deepEqual([counted('en', 'pieces', 1), counted('en', 'pieces', 24), counted('ckb', 'orders', 2)], ['1 piece', '24 pieces', '2 داواکاری']);
+  assert.deepEqual([2, 3].map((n) => counted('ar', 'linesNoPrice', n)), ['بندان بلا تقدير ولا سعر', '3 بنود بلا تقدير ولا سعر']);
+});
+
+test('no letter is glued to a placeholder: a Sorani suffix after an amount read «د.عەوە» (the independent review of step 5)', () => {
+  const glued = /\}\p{L}|\p{L}\{/u;
+  const slots = [...Object.entries(CS).flatMap(([key, tri]) => tri.map((s, i) => [`${key}.${['ar', 'en', 'ckb'][i]}`, s] as const)),
+    ...Object.entries(COUNTED).flatMap(([key, c]) => [...c.ar, ...c.en, c.ckb].map((s) => [key, s] as const)),
+    ...Object.entries(PA_STRINGS).filter(([key]) => key.startsWith('promotion')).flatMap(([key, t]) => Object.values(t).map((s) => [key, String(s)] as const))];
+  for (const [key, s] of slots) assert.doesNotMatch(s, glued, `${key}: «${s}»`);
+  // Drawn with an amount: the history of a dinar promotion, and a period across two months, in Sorani.
+  const ckb = (ar: string, en: string, k?: string) => k ?? ar;
+  const iqd = (amount: number) => ({ month: '2026-03', currency: 'IQD', amount, exchange_rate: 1, amount_iqd: amount, enabled: true });
+  const changed = editText(ckb, { id: 'h', version: 2, at: '2026-03-02T09:00:00Z', actor_id: 'admin', actor_name: 'Owner', before: iqd(200000), after: iqd(250000) }, 'ckb');
+  assert.equal(changed, 'گۆڕدرا: 200,000 د.ع ← 250,000 د.ع');
+  assert.doesNotMatch(changed, /د\.ع[ەە]/);
 });
 
 test('no sentence of the promotion page speaks of pieces or units: the month\'s promotion is shared by sales value (DECISIONS row 313)', () => {
-  const promotion = Object.entries(CS).filter(([key]) => /^(promo|hist)/.test(key));
+  const promotion: Array<[string, readonly [string, string, string]]> = Object.entries(CS).filter(([key]) => /^(promo|hist)/.test(key));
   assert.ok(promotion.length >= 25, `${promotion.length} promotion sentences`);
+  // The tables the page reuses are its sentences too (the review of step 5: the rate hint said «للوحدة الواحدة» / "one unit").
+  for (const [key, t] of Object.entries(PA_STRINGS)) if (key.startsWith('promotion')) promotion.push([key, [t.ar, t.en, t.ckb]]);
+  assert.ok(promotion.some(([key]) => key === 'promotionRateHint'));
   for (const [key, [ar, en, ckb]] of promotion) {
-    assert.doesNotMatch(ar, /قطع|قطعة/, `${key}: «${ar}»`);
+    assert.doesNotMatch(ar, /قطع|قطعة|وحدة/, `${key}: «${ar}»`);
     assert.doesNotMatch(en, /\b(pieces?|units?)\b/i, `${key}: ${en}`);
-    assert.doesNotMatch(ckb, /پارچە/, `${key}: «${ckb}»`);
+    assert.doesNotMatch(ckb, /پارچە|(?<!\p{L})یەکە(?!\p{L})/u, `${key}: «${ckb}»`);
   }
+  // The one promotion word naming pieces is a count column of «من يحمل الترويج» — what the invoice sold, not the rule.
+  assert.deepEqual(Object.entries(CS).filter(([, [ar]]) => /قطع/.test(ar)).map(([key]) => key).filter((key) => !key.startsWith('miss')), ['carriersPieces']);
   // The page writes its rule with these words, not with sentences of its own.
   const page = codeOf('src/components/financeWorkspace/PromotionPage.tsx');
   assert.doesNotMatch(page, /loc\('/, 'every word of the page is in costsStrings.ts or the tables it reuses');
@@ -163,6 +194,20 @@ test('«التكاليف الناقصة»: a card per product and size or colour
   }
   assert.match(text(card(groups[1], 'en')), /3 lines .*4 pieces .*3 orders .*Sale-time estimate: 12,000–12,500/);
   assert.match(text(card(groups[0], 'ckb')), /2 بڕگە .*24 پارچە .*2 داواکاری .*نە خەمڵاندن و نە نرخ/);
+  assert.doesNotMatch(filament, /data-finance-missing-estimate="some-none"/, 'every line estimated: nothing in red');
+  // A card whose lines are partly estimated and partly priced by nothing (the review of step 5): the range, and the
+  // unpriced ones named in red — they blank their orders' net whatever the estimate says.
+  const [mixed] = groupMissing([line('o6', 'f', 'fil', 'Blue', 1, 12000), line('o7', 'g', 'fil', 'Blue', 4, null), line('o8', 'h', 'fil', 'Blue', 6, null)]);
+  const html = card(mixed);
+  assert.match(text(html), /تقدير وقت البيع: 12,000 د.ع بندان بلا تقدير ولا سعر/);
+  assert.match(html, /<b class="fw-neg" data-finance-missing-estimate="some-none">بندان بلا تقدير ولا سعر<\/b>/);
+  assert.match(text(card(mixed, 'en')), /Sale-time estimate: 12,000 د.ع 2 lines with no estimate and no price/);
+  assert.match(text(card(mixed, 'ckb')), /2 بڕگە بێ خەمڵاندن و بێ نرخ/);
+  // The confirmation opens on its sentence (focusable), never on «تأكيد السعر»: a second Enter confirms nothing unread.
+  const sheet = codeOf('src/components/financeWorkspace/MissingCostsSheet.tsx');
+  assert.match(sheet, /confirmButton\.current\?\.querySelector<HTMLElement>\('p'\)\?\.focus\(\)/);
+  assert.doesNotMatch(sheet, /button:last-child/);
+  assert.match(sheet, /<p id=\{confirmId\} tabIndex=\{-1\}>/);
 });
 
 test('«ترويج الشهر»: who carries it adds up to the month exactly, a month without sales waits for them, and the history says each edit in words', async () => {
@@ -186,6 +231,21 @@ test('«ترويج الشهر»: who carries it adds up to the month exactly, a 
   assert.match(waiting, /ينتظر مبيعات الشهر 30,000 د.ع/);
   assert.ok(waiting.includes(CS.promoWaitingNote[0]));
   assert.ok(text(draw(createElement(Carriers, { data: { ...answer, products: [], total_iqd: 0 }, narrow: false }))).includes(CS.promoNone[0]));
+  // The review of step 5: the columns say what they hold — the pieces sold and the sales as the invoice has them, the basis of
+  // the shares — and a return or a refund does not move them (the reports' «القطع» and «صافي المبيعات» are kept and retained).
+  const heads = [...html.matchAll(/<th scope="col"[^>]*>([^<]*)</g)].map((m) => m[1]);
+  assert.deepEqual(heads.slice(1, 4), ['القطع المبيعة', 'المبيعات كما في الفاتورة', 'حصته من المبيعات']);
+  assert.ok(text(html).includes(CS.promoInvoiced[0]));
+  assert.match(text(draw(createElement(Carriers, { data: answer, narrow: false }), 'en')), /Pieces sold Sales as invoiced Share of sales Promotion share/);
+  // A month whose every line was free (gifts): the percent column follows the shares, and its header says so.
+  const gifts = draw(createElement(Carriers, { data: { ...answer, products: [{ product_id: 'a', name: 'Gift A', qty: 1, sales_iqd: 0, promotion_iqd: 5050 }, { product_id: 'b', name: 'Gift B', qty: 1, sales_iqd: 0, promotion_iqd: 5051 }] }, narrow: false }));
+  assert.ok([...gifts.matchAll(/<th scope="col"[^>]*>([^<]*)</g)].map((m) => m[1]).includes(CS.promoColShareGifts[0]));
+  assert.doesNotMatch(gifts, new RegExp(`>${CS.promoColShare[0]}<`));
+  // A month that is over and had no sale: nothing waits any more — the amount counted on its 1st (owner default 5.7.4).
+  const ended = text(draw(createElement(Carriers, { data: { ...answer, month: '2020-01', products: [], unallocated_iqd: 30000, total_iqd: 30000 }, narrow: false })));
+  assert.match(ended, /حُسب في يومه الأول 30,000 د.ع/);
+  assert.ok(ended.includes(CS.promoEndedNote[0]) && !ended.includes(CS.promoWaiting[0]));
+  assert.match(text(draw(createElement(Carriers, { data: { ...answer, month: '2999-01', products: [], unallocated_iqd: 30000, total_iqd: 30000 }, narrow: false }))), /ينتظر مبيعات الشهر/, 'a month still to come waits');
   // The history, newest first, in words.
   const usd = (amount: number, enabled = true) => ({ currency: 'USD', amount, exchange_rate: 1500, amount_iqd: amount * 1500, enabled });
   const edits = [{ id: 'h3', version: 3, at: '2026-03-02T09:30:00Z', actor_id: 'admin', actor_name: 'Owner', before: usd(120), after: usd(120, false) },
@@ -197,15 +257,43 @@ test('«ترويج الشهر»: who carries it adds up to the month exactly, a 
   assert.ok(history.indexOf('أُوقف') < history.indexOf('أُدخل'), 'newest first');
   assert.match(history, /Owner · 2 آذار 2026 12:30/, 'who and when, in Baghdad');
   assert.match(history, /مستخدم محذوف/, 'a deleted user is named as such, never a bare dash');
+  // A promotion moved to another month says so, in both months' histories; an edit that kept the amount says that too.
+  const moved = { id: 'h4', version: 4, at: '2026-03-03T09:00:00Z', actor_id: 'admin', actor_name: 'Owner', before: { ...usd(120), month: '2026-03' }, after: { ...usd(120), month: '2026-02' } };
+  assert.equal(editText(loc, moved), 'نُقل من شهر آذار 2026 إلى شهر شباط 2026 · المبلغ كما هو: 120 USD (180,000 د.ع)');
+  assert.equal(editText((a: string, e: string) => e, moved, 'en'), 'Moved from Mar 2026 to Feb 2026 · Amount unchanged: 120 USD (180,000 د.ع)');
+  // Older edits left out are said to be.
+  assert.ok(text(draw(createElement(History, { edits, truncated: true }))).includes('تُعرض آخر 3 من التعديلات'));
+  assert.doesNotMatch(text(draw(createElement(History, { edits }))), /تُعرض آخر/);
+});
+
+test('«ترويج الشهر»: its form stands only on the month\'s own answer — never another month\'s amount — and one condition holds Save and Enter', () => {
+  // First render (the read not back yet): no amount, no save, no rule to act on — the loading line only.
+  const first = draw(createElement(PromotionPage, { month: '2026-03', onMonth: noop, from: '2026-03-01', to: '2026-03-31', onChanged: noop }));
+  assert.match(first, /تحميل ترويج الشهر…/);
+  assert.doesNotMatch(first, /data-finance-promotion-amount|data-finance-promotion-save/);
+  const page = codeOf('src/components/financeWorkspace/PromotionPage.tsx');
+  // The form is drawn on `shown` (this month's answer) only; a failed read offers to read again instead.
+  assert.match(page, /\{!shown \? \(loading \? <Loading text=\{cs\(loc, 'promoLoading'\)\} \/> : <div className="fw-error" role="alert" data-finance-promotion-read-failed>/);
+  // One condition for the button and for Enter: nothing goes while the month is unread, loading, saving or missing its rate.
+  assert.match(page, /const blocked = loading \|\| !shown \|\| saving \|\| amount\.trim\(\) === '' \|\| \(foreign && !keepsRate && exchange\.trim\(\) === ''\);/);
+  assert.match(page, /const save = async \(\) => \{\n {4}if \(blocked\) return;/);
+  assert.match(page, /disabled=\{blocked\} onClick=\{save\}/);
+  // Disabling asks first (the month and its amount named) and says when it is done.
+  assert.match(page, /onClick=\{\(\) => setStopping\(true\)\}/);
+  assert.match(page, /cs\(loc, 'promoDisableAsk', \{ month: monthText\(L, month\), amount: promotionAmount\(selected\) \}\)/);
+  assert.match(page, /setNotice\(cs\(loc, 'promoDisabled'\)\)/);
+  // A refusal in the reader's language.
+  assert.doesNotMatch(page, /refusalText\(e\.code/);
+  assert.match(page, /refusalWords\(loc, lang, e,/);
 });
 
 test('«المصاريف العامة»: the total is the statement\'s line, every entry of the period is accounted for, and the other entries say where they count', async () => {
   const w = expenseWorld();
   const answer = await w.read(`/f/expenses?${period()}`) as ExpensesAnswer, s = await w.read(`/f/summary?${period()}`) as FinanceSummary;
-  const view = (lang: 'ar' | 'en' | 'ckb' = 'ar') => draw(createElement(ExpensesView, { data: answer, error: '', from: answer.range.from, to: answer.range.to, showVoided: false, onShowVoided: noop, onChanged: noop, openOrder: noop, onNavigate: noop }), lang);
+  const view = (lang: 'ar' | 'en' | 'ckb' = 'ar') => draw(createElement(ExpensesView, { data: answer, error: '', from: answer.range.from, to: answer.range.to, showVoided: false, onShowVoided: noop, onChanged: noop, openOrder: noop, onPromotion: noop }), lang);
   const html = view();
   assert.match(html, new RegExp(`data-finance-expenses-total="${s.totals.general_expenses_iqd}"`), 'the page\'s total is the statement\'s «المصاريف العامة»');
-  assert.match(text(html), /157,000 د.ع الرقم نفسه في سطر «المصاريف العامة»/);
+  assert.match(text(html), /157,000 د.ع الرقم نفسه، بالدينار، في سطر «المصاريف العامة»/, 'the same figure — in dinars, as this page always is');
   // Two "expenses" never stand side by side unexplained: every entry = general + what counts elsewhere.
   assert.match(text(html), /كل القيود المسجّلة في الفترة 418,500 د.ع = المصاريف العامة 157,000 د.ع \+ ما يُحسب في مكان آخر 261,500 د.ع/);
   // By category, with share bars; the entries are the general ones only.
@@ -226,19 +314,157 @@ test('«المصاريف العامة»: the total is the statement\'s line, eve
   assert.match(text(view('ckb')), /هەموو تۆمارەکانی ئەم ماوەیە، 418,500 د.ع/);
   // A period with no general expense: the empty state and its «أضف»; no bare figure under it.
   const none = await world().read(`/f/expenses?${period()}`) as ExpensesAnswer;
-  const empty = draw(createElement(ExpensesView, { data: none, error: '', from: none.range.from, to: none.range.to, showVoided: false, onShowVoided: noop, onChanged: noop, openOrder: noop, onNavigate: noop }));
+  const empty = draw(createElement(ExpensesView, { data: none, error: '', from: none.range.from, to: none.range.to, showVoided: false, onShowVoided: noop, onChanged: noop, openOrder: noop, onPromotion: noop }));
   assert.match(text(empty), /لا مصاريف عامة في الفترة/);
-  assert.match(empty, /data-finance-expenses-add-empty/);
+  assert.match(empty, /<button[^>]*aria-expanded="false"[^>]*data-finance-expenses-add-empty/, 'its «أضف» opens the form and closes it again');
   assert.doesNotMatch(text(empty), /—/, 'no bare dash');
+  // Each amount of the sentence stays whole on one line, in its own direction (a phone split «0» from «د.ع»).
+  assert.match(html, /<bdi style="white-space:nowrap"><span class="fw-money" dir="ltr">418,500 د.ع<\/span><\/bdi>/);
+  // The promotion entry opens its own month's promotion page, not the period's.
+  assert.match(elsewhere, new RegExp(`data-finance-expense-promotion="${month()}"`));
+});
+
+/** One answer of GET /expenses drawn as the page, in `lang`. */
+const page = (answer: ExpensesAnswer, extra: { showVoided?: boolean; from?: string; to?: string } = {}, lang: 'ar' | 'en' | 'ckb' = 'ar') => draw(createElement(ExpensesView,
+  { data: answer, error: '', from: extra.from ?? answer.range.from, to: extra.to ?? answer.range.to, showVoided: !!extra.showVoided, onShowVoided: noop, onChanged: noop, openOrder: noop, onPromotion: noop }), lang);
+
+test('a period past the server\'s limit: the page and the drawer take their emptiness, bars and headings from the totals, and a cut list says so', async () => {
+  const w = crowdedWorld(600);
+  const answer = await w.read(`/f/expenses?${period()}`) as ExpensesAnswer;
+  assert.equal(answer.truncated, true);
+  const html = page(answer);
+  assert.doesNotMatch(text(html), /لا مصاريف عامة في الفترة/, 'a 300,000 total never stands beside «no general expense»');
+  assert.match(html, /data-finance-expenses-total="300000"/);
+  assert.match(text(html), /حسب الفئة إيجار 300,000 د.ع 100\.0%/);
+  assert.equal((/data-finance-expenses-entries[^>]*>(.*?)<\/ul>/.exec(html)![1].match(/data-finance-expense="/g) ?? []).length, 3, 'every rent of the 1st');
+  assert.doesNotMatch(html, /data-finance-expenses-partial=""/, 'the general list is whole');
+  // The other group's heading is the period's sum, not the listed rows'; its list says how much of it is shown.
+  const delivered = /data-finance-expense-kind="order_delivered"[^>]*>(.*?)<\/section>/.exec(html)![1];
+  assert.match(text(delivered), /^ مرتبط بطلب مُسلَّم ← «المواد والتكاليف الإضافية» لذلك الطلب 600,000 د.ع/);
+  assert.match(text(delivered), /قيود هذا القسم: تُعرض 497 من 600؛ المجموع للفترة كلها\./);
+  // The drawer: every general entry and its total; nothing cut, nothing said.
+  const list = draw(createElement(GeneralEntryList, { rows: answer.rows, total: answer.totals.general_iqd, from: answer.range.from, to: answer.range.to, entries: 3 }));
+  assert.equal((list.match(/data-finance-drawer-entry=/g) ?? []).length, 3);
+  assert.match(text(list), /مجموع قيود الفترة \(كل الأعمدة\) 300,000 د.ع/);
+  assert.doesNotMatch(list, /data-finance-drawer-entries-partial/);
+  // A general list the server cut (more general entries than its page): the page and the drawer say how many of how many.
+  const cut: ExpensesAnswer = { ...answer, rows: answer.rows.filter((r) => r.counts_as_general).slice(0, 2), totals: { ...answer.totals, by_kind: { ...answer.totals.by_kind, general: { amount_iqd: 300000, entries: 3 } } } };
+  assert.match(text(page(cut)), /قيود هذا القسم: تُعرض 2 من 3/);
+  assert.match(text(draw(createElement(GeneralEntryList, { rows: cut.rows, total: 300000, from: cut.range.from, to: cut.range.to, entries: 3 }))), /تُعرض 2 من 3/);
+  // No general entry listed at all, the total not zero: the list and its total, never «no general expense».
+  const none = draw(createElement(GeneralEntryList, { rows: [], total: 300000, from: cut.range.from, to: cut.range.to, entries: 3 }));
+  assert.doesNotMatch(text(none), /لا مصاريف عامة في الفترة/);
+  assert.match(text(none), /مجموع قيود الفترة \(كل الأعمدة\) 300,000 د.ع .*تُعرض 0 من 3/);
+});
+
+test('voided entries come back only where they are owned; a month closed in accounting offers no edit; a promotion linked to an order is flagged', async () => {
+  const w = expenseWorld();
+  assert.equal((await send(w.app, 'DELETE', '/f/promotions/promo')).status, 200, 'the month\'s promotion disabled on its own page');
+  const voided = await w.read(`/f/expenses?${period()}&include_voided=1`) as ExpensesAnswer;
+  const html = page(voided, { showVoided: true });
+  const li = (id: string) => new RegExp(`<li data-finance-expense="${id}"[^>]*>(.*?)</li>`).exec(html)?.[1] ?? '';
+  assert.doesNotMatch(li('promo-exp'), /data-finance-expense-restore|استرجاع/, 'a disabled promotion is brought back on its page, not here (the database refuses it)');
+  assert.match(text(li('promo-exp')), /ملغى — أُوقف من صفحة الترويج/, 'its reason in the reader\'s language, not the server\'s Arabic');
+  assert.match(li('promo-exp'), /افتح ترويج الشهر/);
+  assert.match(text(page(voided, { showVoided: true }, 'en')), /Voided — Stopped on the promotion page/);
+  assert.match(li('void'), /data-finance-expense-restore/, 'a voided rent comes back here');
+  // An order's wage voided at its source (the database refuses any other change to its row) is not restored here either.
+  const wage = page({ ...voided, rows: voided.rows.map((r) => (r.id === 'wage-exp' ? { ...r, voided: true, void_reason: 'cancelled with its order' } : r)) }, { showVoided: true });
+  assert.doesNotMatch(/<li data-finance-expense="wage-exp"[^>]*>(.*?)<\/li>/.exec(wage)![1], /data-finance-expense-restore/);
+  // A closed month: no edit, no void, no restore; each entry and the page say why.
+  const m = month();
+  w.raw.exec(`INSERT INTO accounting_periods(month,closed_at,closed_by) VALUES ('${m}','2026-01-01T00:00:00Z','admin')`);
+  const closed = page(await w.read(`/f/expenses?${period()}&include_voided=1`) as ExpensesAnswer, { showVoided: true });
+  assert.doesNotMatch(closed, /data-finance-expense-edit|data-finance-expense-restore/);
+  assert.match(text(closed), new RegExp(`أشهر الفترة المغلقة محاسبيًا: ${monthText('ar', m)}\\.`));
+  assert.match(text(closed), /شهر مغلق محاسبيًا/);
+  assert.equal(inClosedMonth({ expense_day: `${m}-04` }, [m]), true);
+  assert.equal(inClosedMonth({ expense_day: '2020-01-04' }, [m]), false);
+  // A promotion's expense linked to an order (possible before this review): flagged — it counts twice.
+  const linked = expenseWorld();
+  linked.raw.exec("INSERT INTO finance_expense_links(expense_id,order_id) VALUES ('promo-exp','shipped')");
+  const flagged = page(await linked.read(`/f/expenses?${period()}`) as ExpensesAnswer);
+  assert.match(text(/<li data-finance-expense="promo-exp"[^>]*>(.*?)<\/li>/.exec(flagged)![1]), /مرتبط أيضًا بطلب، فيُحسب مرتين: في الترويج وفي تكاليف الطلب shipped/);
+});
+
+test('an entry\'s day keeps its year when the period spans two; an edit sends only what changed; a refusal is said in the reader\'s language', () => {
+  const r = row('rent', 'general', 600000, { expense_day: '2025-11-11', title: 'Shop rent' });
+  const answer: ExpensesAnswer = { range: { from: '2025-11-11', to: '2026-11-10' }, rows: [r, row('rent2', 'general', 600000, { expense_day: '2026-11-10' })], truncated: false,
+    totals: { general_iqd: 1200000, waiting_iqd: 0, all_iqd: 1200000, entries: 2, by_kind: { general: { amount_iqd: 1200000, entries: 2 }, order_ended: { amount_iqd: 0, entries: 0 }, promotion: { amount_iqd: 0, entries: 0 }, order_cost: { amount_iqd: 0, entries: 0 }, collection_fee: { amount_iqd: 0, entries: 0 }, order_delivered: { amount_iqd: 0, entries: 0 }, order_waiting: { amount_iqd: 0, entries: 0 } },
+      by_category: [{ category_id: 'rent', name_ar: 'إيجار', name_en: 'Rent', name_ckb: 'کرێی شوێن', amount_iqd: 1200000, entries: 2 }] }, closed_months: [] };
+  assert.match(text(page(answer)), /11 تشرين الثاني 2025 · إيجار/, 'a year-long period names the year, as the drawer and the reports do');
+  // The page without its answer: a failed read says so (no loading line under it); a read in flight shows the loading line only.
+  const view = (data: ExpensesAnswer | null, error: string) => draw(createElement(ExpensesView, { data, error, from: '2026-03-01', to: '2026-03-31', showVoided: false, onShowVoided: noop, onChanged: noop, openOrder: noop, onPromotion: noop }));
+  assert.match(view(null, 'تعذّر الاتصال'), /role="alert">تعذّر الاتصال</);
+  assert.doesNotMatch(view(null, 'تعذّر الاتصال'), /تحميل المصاريف/);
+  assert.match(view(null, ''), /تحميل المصاريف…/);
+  assert.doesNotMatch(view(null, ''), /data-finance-expenses-total/);
+  // Only the read of the period on screen is drawn: another period's answer never stands under these dates.
+  assert.match(codeOf('src/components/financeWorkspace/GeneralExpenses.tsx'), /const shown = data && data\.range\?\.from === from && data\.range\?\.to === to \? data : null;/);
+  // The edit: only the changed fields go (PATCH keeps the rest), so a value corrected elsewhere is never written back.
+  const d = entryDraft(r);
+  assert.deepEqual(editPatch(r, d), {}, 'nothing changed');
+  assert.deepEqual(editPatch(r, { ...d, title: 'Shop rent, November' }), { title: 'Shop rent, November' });
+  assert.deepEqual(editPatch(r, { ...d, amount: '650000', category_id: 'power' }), { amount_iqd: 650000, category_id: 'power' });
+  assert.deepEqual(editPatch(r, { ...d, amount: ' 600000 ' }), {}, 'the same amount, spaces around it');
+  // The editor opens on the entry as it is, closes back on «تعديل», and «إلغاء» never voids: the void asks first.
+  const src = codeOf('src/components/financeWorkspace/GeneralExpenses.tsx');
+  assert.match(src, /const open = \(\) => \{ setDraft\(entryDraft\(r\)\);/);
+  assert.match(src, /const close = \(\) => \{ setEditing\(false\); setVoiding\(false\); setError\(''\); setDraft\(entryDraft\(r\)\); editButton\.current\?\.querySelector<HTMLButtonElement>\('button'\)\?\.focus\(\); \};/);
+  assert.match(src, /void run\(\(\) => updateExpense\(r\.id, patch\)\)/);
+  assert.match(src, /onClick=\{\(\) => setVoiding\(true\)\} data-finance-expense-void>/);
+  assert.equal((src.match(/voidExpense\(/g) ?? []).length, 1, 'one void, behind its confirmation');
+  assert.match(src, /if \(e\.key === 'Escape'\)/);
+  assert.notEqual(CS.genVoidAction[0], 'إلغاء');
+  assert.notEqual(CS.genVoidAction[2], 'هەڵوەشاندنەوە', 'not the Sorani Cancel of the missing-cost confirmation');
+  // Refusals: this table's sentence for the costs pages' codes, the shop's table for its own, else the page's fallback.
+  const loc = (lang: 'ar' | 'en' | 'ckb') => (a: string, e: string, k?: string) => (lang === 'en' ? e : lang === 'ckb' ? k ?? a : a);
+  for (const [code, key] of [['PERIOD_CLOSED', 'refPeriodClosed'], ['CONFLICT', 'refConflict'], ['EXPENSE_VOIDED', 'refVoided'], ['CATEGORY_UNKNOWN', 'refCategory']] as const)
+    for (const [i, lang] of (['ar', 'en', 'ckb'] as const).entries()) assert.equal(refusalWords(loc(lang), lang, { code, message: 'This expense is voided — restore it before editing' }, 'fallback'), CS[key][i], `${code} ${lang}`);
+  assert.equal(refusalWords(loc('en'), 'en', { code: 'NO_SUCH_CODE', message: 'raw' }, 'fallback'), 'fallback');
+  assert.equal(refusalWords(loc('ar'), 'ar', new Error('network'), 'fallback'), 'fallback');
+});
+
+test('the ledger\'s form embedded on the page speaks the reader\'s language, names no problem before anything is typed, and shows no ledger', () => {
+  const s = financeStrings((a: string, e: string) => e);
+  const form = draw(createElement(ExpenseLedger, { formOnly: true, from: '2026-03-01', to: '2026-03-31', s, latin: true, dir: 'ltr', onChanged: noop,
+    categoryLabel: (c: { name_en: string }) => c.name_en, categoryPrompt: CS.genCategoryPick[1], errorText: () => 'x' }), 'en');
+  assert.match(form, /<option value=""[^>]*>Choose a category<\/option>/, 'a prompt, never a bare «—»');
+  assert.doesNotMatch(form, /data-finance-expense-problem/, 'no red «type an amount» on a form nobody touched');
+  assert.doesNotMatch(form, new RegExp(s.addExpense), 'the page\'s own heading names the form');
+  assert.doesNotMatch(form, new RegExp(s.periodTotal), 'no ledger under it: the page lists the entries itself');
+  assert.match(codeOf('src/components/adminFinance/ExpenseLedger.tsx'), /formOnly \? Promise\.resolve\(null\) : fetchExpenses\(/, 'and it does not read the ledger\'s rows either');
+  // The old report's whole ledger is unchanged: its heading, its «—», its problem line at once.
+  const ledger = draw(createElement(ExpenseLedger, { from: '2026-03-01', to: '2026-03-31', s, latin: true, dir: 'ltr', onChanged: noop }), 'en');
+  assert.match(ledger, new RegExp(s.addExpense));
+  assert.match(ledger, /<option value=""[^>]*>—<\/option>/);
+  assert.match(ledger, /data-finance-expense-problem/);
+  assert.match(ledger, new RegExp(s.periodTotal));
 });
 
 test('the drawer\'s «المصاريف العامة» line lists the period\'s general entries, and they add up to the statement\'s line', async () => {
   const w = everyState();
-  const s = await w.read(`/f/summary?${w.range}`) as FinanceSummary, e = await w.read(`/f/expenses?${w.range}`) as ExpensesAnswer;
+  const s = await w.read(`/f/summary?${w.range}&display=USD`) as FinanceSummary, e = await w.read(`/f/expenses?${w.range}`) as ExpensesAnswer;
   assert.equal(e.totals.general_iqd, s.totals.general_expenses_iqd);
   const list = draw(createElement(GeneralEntryList, { rows: e.rows, total: e.totals.general_iqd, from: w.from, to: w.to }));
   assert.equal((list.match(/data-finance-drawer-entry=/g) ?? []).length, e.rows.filter((r) => r.counts_as_general).length);
-  assert.match(text(list), new RegExp(`المجموع ${(s.totals.general_expenses_iqd ?? 0).toLocaleString('en-US')} د.ع`));
+  // Named for what it sums (every column), apart from the column's own «المجموع» above it (the review of step 5).
+  assert.match(text(list), new RegExp(`مجموع قيود الفترة \\(كل الأعمدة\\) ${(s.totals.general_expenses_iqd ?? 0).toLocaleString('en-US')} د.ع`));
+  assert.doesNotMatch(text(list), /المجموع \d/);
+  // In dollars: the entries stay in dinars, as recorded, and the sentence gives their total in dollars — the statement's own cents.
+  const usdCents = s.display_usd?.available ? s.display_usd.totals?.general_expenses_cents : undefined;
+  assert.equal(typeof usdCents, 'number', 'the every-state world has the shop\'s dollar rate');
+  const usd = text(draw(createElement(GeneralEntryList, { rows: e.rows, total: e.totals.general_iqd, from: w.from, to: w.to, usdCents })));
+  assert.ok(usd.replace(/ ،/g, '،').includes(`المبالغ هنا بالدينار كما سُجّلت؛ مجموعها بالدولار ${amountText(usdCents!, true)}، كما في سطر الكشف.`), usd);
+  assert.doesNotMatch(text(list), /بالدولار/, 'in dinars, no dollar sentence');
+  // The drawer hands the list the statement's dollars only when it shows dollars; the general line's note is one sentence.
+  const drawerSrc = codeOf('src/components/financeWorkspace/FigureDrawer.tsx');
+  assert.match(drawerSrc, /<DrawerGeneralEntries from=\{range\.from\} to=\{range\.to\} usdCents=\{u \? usd\?\.totals\?\.general_expenses_cents \?\? null : undefined\} \/>/);
+  assert.doesNotMatch(drawerSrc, /generalNote/);
+  // A period with no general expense: the list says so, with no «(0 د.ع)» note above it.
+  const empty = text(draw(createElement(GeneralEntryList, { rows: [], total: 0, from: w.from, to: w.to, entries: 0 })));
+  assert.match(empty, /لا مصاريف عامة في الفترة/);
+  assert.doesNotMatch(empty, /0 د.ع/);
   // The drawer opened on the general line reads them for its own period (a loading state while it does, never an empty list).
   const drawer = draw(createElement(DisplayCurrencyContext.Provider, { value: 'IQD' }, createElement(FigureBody, { data: s, figure: 'general', from: w.from, to: w.to, onClose: noop, openOrder: noop, onNavigate: noop })));
   assert.match(drawer, /تحميل المصاريف…/);
@@ -266,8 +492,11 @@ test('the promotion\'s month follows the period — its last month — unless th
   assert.equal(monthText('ckb', '2026-11'), 'تشرینی دووەم 2026');
   // The workspace wires the two pages and no longer the old ones.
   const ws = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
-  assert.match(ws, /page\('monthly', \(\) => <PromotionPage month=\{month\}/);
+  // One mount per month (the review of step 5, as MonthlyCosts had): nothing typed for one month stands in another's form.
+  assert.match(ws, /page\('monthly', \(\) => <PromotionPage key=\{month\} month=\{month\}/);
   assert.match(ws, /page\('expenses', \(\) => <GeneralExpenses from=\{range\.from\} to=\{range\.to\}/);
+  // A promotion entry opens its own month's promotion page.
+  assert.match(ws, /onPromotion=\{\(m\) => \{ setMonthPick\(m\); setSection\('monthly'\); \}\}/);
   assert.doesNotMatch(ws, /MonthlyCosts|ExpenseLedger/);
   assert.match(ws, /const setRange = \(next: FinanceRange\) => \{ setRangeState\(next\); setMonthPick\(null\); \};/, 'a new period: the month follows it again');
 });

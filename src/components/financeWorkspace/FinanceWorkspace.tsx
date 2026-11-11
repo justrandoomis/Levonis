@@ -258,9 +258,12 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
       {page('sections', () => figures((d) => <GroupsReport data={d} level={level} onLevel={setLevel} onOpenOrders={openOrders} onMissing={() => setSection('missing')} />))}
       {page('days', () => figures((d) => <DaysReport data={d} onOpenOrders={openOrders} />))}
       {page('missing', () => <Suspense fallback={loading}><MissingCostsSheet inline reload={peopleRevision} from={range.from} to={range.to} onClose={() => setSection('overview')} onChanged={refresh} openOrder={(id, step, line) => openOrderAt(id, step, line)} /></Suspense>)}
-      {/* Redesign step 5 (DECISIONS row 317): the month's promotion, its month following the period; the general expenses of the period. */}
-      {page('monthly', () => <PromotionPage month={month} onMonth={setMonthPick} from={range.from} to={range.to} revision={revision} onChanged={refresh} />)}
-      {page('expenses', () => <GeneralExpenses from={range.from} to={range.to} revision={revision} onChanged={refresh} openOrder={(id) => openOrderAt(id)} onNavigate={setSection} />)}
+      {/* Redesign step 5 (DECISIONS row 317): the month's promotion, its month following the period — mounted once per month, so
+          nothing typed for one month stands in another's form (the review of step 5); the general expenses of the period, whose
+          promotion entry opens its own month. */}
+      {page('monthly', () => <PromotionPage key={month} month={month} onMonth={setMonthPick} from={range.from} to={range.to} revision={revision} onChanged={refresh} />)}
+      {page('expenses', () => <GeneralExpenses from={range.from} to={range.to} revision={revision} onChanged={refresh} openOrder={(id) => openOrderAt(id)}
+        onPromotion={(m) => { setMonthPick(m); setSection('monthly'); }} />)}
       {page('staff', () => <Suspense fallback={loading}><PeoplePanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} /></Suspense>)}
       {page('investors', () => <Suspense fallback={loading}><InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} />
         <PeriodCharts from={range.from} to={range.to} revision={revision} /></Suspense>)}

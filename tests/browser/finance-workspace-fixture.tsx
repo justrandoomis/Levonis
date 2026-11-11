@@ -60,6 +60,33 @@ function fixtureSummary(from: string, to: string): FinanceSummary {
   if (hasOther) { const index = categories.findIndex((row) => row.id === 'filaments'), original = index >= 0 ? categories[index] : undefined; const row = { ...(original ?? {}), ...add([original ?? {}, otherTotals]), id: 'filaments', name: 'الفلمنت', level: 'main' as const, qty: (original?.qty ?? 0) + 1 }; if (index >= 0) categories[index] = row; else categories.push(row); }
   return { ...summary, range: { from, to }, totals: t, orders: selected, categories, products: hasPrimary ? summary.products : [], chart_data: { ...chartAmounts(t, general), basis: 'delivered_baghdad_day', daily, expense_composition: [{ key: 'goods', amount_iqd: t.cogs_iqd === null ? null : t.cogs_iqd ?? 0 }, { key: 'wages', amount_iqd: t.wages_iqd ?? 0 }, { key: 'materials', amount_iqd: t.materials_iqd ?? 0 }, { key: 'other', amount_iqd: t.manual_direct_iqd ?? 0 }, { key: 'delivery', amount_iqd: Number(t.courier_fee_iqd ?? 0) + Number(t.payment_fee_iqd ?? 0) }, { key: 'promotion', amount_iqd: t.promotion_iqd ?? 0 }, { key: 'general', amount_iqd: general }] } };
 }
+/**
+ * Redesign step 5 (DECISIONS row 317): Costs → General expenses and the drawer's general line read the workspace's own GET /expenses
+ * (the old ledger keeps /api/admin/finance/expenses), and the promotion page reads who carries the month and its history from
+ * GET /promotions — both in the shapes the server answers (the independent review of step 5), on the same figures as the summary:
+ * the 30,000 rent of the month's 1st is its general expense, and the month's promotion is shared by sales value.
+ */
+const KINDS = ['general', 'order_ended', 'promotion', 'order_cost', 'collection_fee', 'order_delivered', 'order_waiting'] as const;
+const RENT = { name_ar: 'إيجار', name_en: 'Rent', name_ckb: 'کرێی شوێن' }, MARKETING = { name_ar: 'ترويج شهري على المالك', name_en: 'Owner monthly marketing', name_ckb: 'بانگەشەی مانگانەی خاوەن' };
+const sum = (rows: Array<{ amount_iqd: number }>) => rows.reduce((v, r) => v + r.amount_iqd, 0);
+function fixtureExpenses(from: string, to: string) {
+  const has = params.get('state') !== 'empty' && from <= `${month}-01` && to >= `${month}-01`;
+  const entry = (id: string, title: string, amount: number, kind: (typeof KINDS)[number], category: typeof RENT, extra: Record<string, unknown> = {}) => ({ id, expense_day: `${month}-01`, amount_iqd: amount, title, note: '', series_id: null,
+    category_id: category === RENT ? 'rent' : 'marketing', category, kind, counts_as_general: kind === 'general' || kind === 'order_ended', order_id: null, order_status: null, promotion_month: null,
+    center_id: null, center_name: null, voided: false, void_reason: '', ...extra });
+  const rows = has ? [entry('expense-rent', 'إيجار المحل', 30000, 'general', RENT), ...(promo.enabled ? [entry('expense-promo', promo.title, promo.amount_iqd, 'promotion', MARKETING, { promotion_month: month })] : [])] : [];
+  const general = rows.filter((r) => r.counts_as_general);
+  return { range: { from, to }, rows, truncated: false, closed_months: [], totals: { general_iqd: sum(general), waiting_iqd: 0, all_iqd: sum(rows), entries: rows.length,
+    by_kind: Object.fromEntries(KINDS.map((k) => [k, { amount_iqd: sum(rows.filter((r) => r.kind === k)), entries: rows.filter((r) => r.kind === k).length }])),
+    by_category: general.length ? [{ category_id: 'rent', ...RENT, amount_iqd: sum(general), entries: general.length }] : [] } };
+}
+function fixturePromotions(m: string) {
+  const own = m === month && !!promo.enabled, total = own ? promo.amount_iqd : 0, sales = order.lines.map((l) => l.net_goods_iqd ?? 0), all = sales.reduce((a, b) => a + b, 0);
+  const first = all ? Math.round((total * sales[0]) / all) : 0;
+  const products = own ? order.lines.map((l, i) => ({ product_id: l.product_id ?? l.id, name: l.name_snapshot, qty: l.qty, sales_iqd: sales[i], promotion_iqd: i === 0 ? first : total - first })) : [];
+  return { month: m, promotions: m === month ? [promo] : [], total_iqd: total, unallocated_iqd: 0, allocation_basis: 'sales_value', rate_suggestion: null, products,
+    sales_iqd: own ? all : 0, lines_count: products.length, history: [], history_truncated: false };
+}
 const json = (value: object, status = 200) => new Response(JSON.stringify({ success: status < 400, ...value }), { status, headers: { 'content-type': 'application/json' } });
 window.fetch = async (input, init) => {
   const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, location.origin);
@@ -91,7 +118,7 @@ window.fetch = async (input, init) => {
     if (line) { line.wages_iqd = (line.wages_iqd ?? 0) + difference; line.owner_net_iqd = (line.owner_net_iqd ?? 0) - difference; }
     return json({ cost });
   }
-  if (url.pathname.endsWith('/promotions') && method === 'GET') return json({ promotions: [promo] });
+  if (url.pathname.endsWith('/promotions') && method === 'GET') return json(fixturePromotions(url.searchParams.get('month') ?? month));
   if (url.pathname.includes('/promotions')) {
     if (method === 'DELETE') promo.enabled = 0;
     else { promo = { ...promo, ...body, exchange_rate: body.exchange_rate ?? 1500, amount_iqd: body.amount * (body.currency === 'USD' ? body.exchange_rate ?? 1500 : 1), enabled: 1, version: promo.version + 1 }; summary.promotions = [promo]; }
@@ -99,7 +126,8 @@ window.fetch = async (input, init) => {
   }
   // The participants' panel (ParticipantCharts): without it the fixture showed a 404 note where the charts sit.
   if (url.pathname.endsWith('/participant-report')) return json({ participants: [{ kind: 'staff', earned_iqd: 420000, paid_iqd: 300000 }, { kind: 'investor', earned_iqd: 610000, paid_iqd: 450000 }], adjustments: [{ day: `${month}-04`, positive_iqd: 25000, negative_iqd: -10000 }], capital: { received_iqd: 4800000, recovered_iqd: 3100000, remaining_iqd: 1700000, paid_iqd: 2900000, period_recovered_iqd: 640000, period_paid_iqd: 500000 }, batches: [{ id: 'b1', name: 'A1 mini', received_qty: 15, remaining_qty: 12, sold_qty: 3 }, { id: 'b2', name: 'PLA Basic', received_qty: 40, remaining_qty: 24, sold_qty: 16 }] });
-  if (url.pathname.endsWith('/expense-categories')) return json({ categories: [] });
+  if (url.pathname.endsWith('/expense-categories')) return json({ categories: [{ id: 'rent', slug: 'rent', ...RENT, active: true }] });
+  if (url.pathname === '/api/admin/finance-workspace/expenses') return json(fixtureExpenses(url.searchParams.get('from') ?? `${month}-01`, url.searchParams.get('to') ?? `${month}-31`));
   if (url.pathname.endsWith('/expenses')) return json({ expenses: [] });
   return json({ error: `Fixture endpoint not configured: ${url.pathname}` }, 404);
 };

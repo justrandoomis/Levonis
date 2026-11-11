@@ -11,6 +11,7 @@ import { exportQuery, orderId } from './reportTable';
 import { financeDay, WORKSPACE_API, type FinanceSection, type FinanceSummary } from './types';
 import type { OrderFocus } from './OrderProfitSheet';
 import { DrawerGeneralEntries } from './GeneralExpenses';
+import { cs } from './costsStrings';
 
 /**
  * «فتح رقم» — THE FIGURE DRAWER (redesign step 4, owner 2026-11-11; DECISIONS row 316).
@@ -74,7 +75,8 @@ export function FigureBody({ data, figure, from, to, onClose, openOrder, onNavig
       <p className="fw-formula" data-finance-formula>{!formula.includes(' = ') && <><b aria-hidden>=</b> </>}{formula}</p>
       <UsdNote data={data} />
       {figure === 'fees' && (t.collected_iqd ?? 0) === 0 && (t.collection_difference_iqd ?? 0) > 0 && <p className="fw-note">{fw(loc, 'feesNote')}</p>}
-      {figure === 'general' && <p className="fw-note">{rs(loc, 'generalNote')}</p>}
+      {/* Step 5's review: one note for the general line — no order carries it, each column its share, the entries below. */}
+      {figure === 'general' && <p className="fw-note">{cs(loc, 'drawerGeneralNote')}</p>}
       <div className="fw-drawer-tools">
         {parts.length > 1 ? <div className="fw-seg fw-seg--on" role="group" aria-label={name}>
           {parts.map((p) => <button key={String(p)} type="button" aria-pressed={part === p} onClick={() => { setPick(p); setAll(false); }} data-finance-drawer-tab={String(p)}>{tab(p)}</button>)}</div>
@@ -100,7 +102,7 @@ export function FigureBody({ data, figure, from, to, onClose, openOrder, onNavig
         <li className="fw-rows-total" data-finance-drill-total><span>{rs(loc, 'total')}</span><span><b><Amount v={d.total} usd={u} missing={unknown} /></b>{d.total != null && estimatedTotal(loc, d.estimated)}</span></li>
       </ul> : figure !== 'general' && <p className="fw-note" role="status">{rs(loc, part === 2 ? 'noneInPeriod' : 'noOrdersHere')}</p>}
       {/* Redesign step 5 (DECISIONS row 317): the general line lists the period's entries, its total the period's figure. */}
-      {figure === 'general' && <DrawerGeneralEntries from={range.from} to={range.to} />}
+      {figure === 'general' && <DrawerGeneralEntries from={range.from} to={range.to} usdCents={u ? usd?.totals?.general_expenses_cents ?? null : undefined} />}
       {figure === 'promotion' && <Button variant="secondary" onClick={() => { onClose(); onNavigate('monthly'); }}>{rs(loc, 'openPromotion')}</Button>}
       {figure === 'general' && <Button variant="secondary" onClick={() => { onClose(); onNavigate('expenses'); }}>{rs(loc, 'openExpenses')}</Button>}
     </div>;

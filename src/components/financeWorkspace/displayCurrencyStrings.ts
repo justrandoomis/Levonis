@@ -31,10 +31,12 @@ export const PA_STRINGS = {
     en: 'Exchange rate actually paid',
     ckb: 'ئەو نرخی گۆڕینەوەیەی بەڕاستی دراوە',
   },
+  // The promotion page offers dollars and dinars only, so «per dollar» — never «per unit», a word the promotion's rule
+  // must not seem to use (the independent review of redesign step 5, DECISIONS row 317).
   promotionRateHint: {
-    ar: 'مطلوب لأي مبلغ بغير الدينار: كم دينارًا دفعت للوحدة الواحدة. يُثبَّت مع المصروف ولا يتبع سعر اليوم.',
-    en: 'Required for any amount not in dinars: how many dinars you paid for one unit. It is locked with the expense and never follows today’s rate.',
-    ckb: 'پێویستە بۆ هەر بڕێک کە بە دینار نییە: بۆ یەک یەکە چەند دینارت داوە. لەگەڵ خەرجییەکەدا جێگیر دەکرێت و بەدوای نرخی ئەمڕۆدا ناڕوات.',
+    ar: 'مطلوب لأي مبلغ بغير الدينار: كم دينارًا دفعت للدولار الواحد. يُثبَّت مع المصروف ولا يتبع سعر اليوم.',
+    en: 'Required for any amount not in dinars: how many dinars you paid per dollar. It is locked with the expense and never follows today’s rate.',
+    ckb: 'پێویستە بۆ هەر بڕێک کە بە دینار نییە: بۆ هەر دۆلارێک چەند دینارت داوە. لەگەڵ خەرجییەکەدا جێگیر دەکرێت و بەدوای نرخی ئەمڕۆدا ناڕوات.',
   },
   promotionRateKeep: {
     ar: 'فارغ = السعر المسجل لهذا الترويج: {rate}',

@@ -64,6 +64,7 @@ import {
 import { planExpenseAccounting } from '../lib/expenseAccounting';
 import { workspaceInstalled } from '../lib/orderProfit';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
+import { periodOpen } from '../lib/operations';
 
 /** An edited linked expense must also change the investor's payable projection. */
 async function syncExpenseOrders(env: Env, expenseId: string, actor: string): Promise<boolean> {
@@ -369,6 +370,9 @@ adminFinanceRoutes.post('/expenses', async (c) => {
 
   const days = expenseSeriesDays(day, repeat);
   if (days.length === 0) throw badRequest('expense_day could not be read as a calendar day', 'EXPENSE_DAY_INVALID');
+  // A closed accounting month refuses the row (migration 0162's trigger): say so with its code, before the write, not as a 500
+  // (the independent review of step 5 — Costs → General expenses adds and edits through these routes).
+  for (const m of new Set(days.map((d) => d.slice(0, 7)))) await periodOpen(c.env.DB, `${m}-01`);
   // A series id only when there IS a series: a lone row that carried one would
   // make the panel offer to "show the other months" of a group of one.
   const seriesId = days.length > 1 ? newId('exs') : null;
@@ -434,6 +438,9 @@ adminFinanceRoutes.patch('/expenses/:id', async (c) => {
   const day = body.expense_day === undefined ? row.expense_day : validateExpenseDay(body.expense_day, today());
   const title = body.title === undefined ? row.title : str(body.title, 'title', { min: 0, max: 120 });
   const note = body.note === undefined ? row.note : str(body.note, 'note', { min: 0, max: 1000 });
+  // The month it leaves and the month it moves to, as the trigger checks them: a closed one is a coded 409 (PERIOD_CLOSED).
+  await periodOpen(c.env.DB, row.expense_day);
+  if (day !== row.expense_day) await periodOpen(c.env.DB, day);
 
   const change=c.env.DB.prepare(
     `UPDATE operating_expenses
@@ -475,6 +482,7 @@ adminFinanceRoutes.delete('/expenses/:id', async (c) => {
   const reason = str(c.req.query('reason') ?? '', 'reason', { min: 0, max: 300 });
   const ts = nowIso();
   if(row.voided_at)return c.json({success:true,voided:false});
+  await periodOpen(c.env.DB, row.expense_day);
   const change=c.env.DB.prepare(
     `UPDATE operating_expenses SET voided_at = ?, voided_by = ?, void_reason = ?, updated_at = ?
       WHERE id = ? AND voided_at IS NULL`
@@ -513,6 +521,7 @@ adminFinanceRoutes.post('/expenses/:id/restore', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM operating_expenses WHERE id = ?').bind(id).first<ExpenseRow>();
   if (!row) throw notFound('Expense not found');
   if(!row.voided_at)return c.json({success:true,restored:false});
+  await periodOpen(c.env.DB, row.expense_day);
   const change=c.env.DB.prepare(
     `UPDATE operating_expenses SET voided_at = NULL, voided_by = NULL, void_reason = '', updated_at = ?
       WHERE id = ? AND voided_at IS NOT NULL`

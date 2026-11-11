@@ -20,7 +20,7 @@ import { reportAdjustments, type ReportAdjustments } from '../lib/financeReportO
 import { loadUsdRateSteps, usdRateAt, type UsdRateSteps } from '../lib/fx/historyRate';
 import { ADDITIVE_IQD_FIELDS, baghdadDayStart, batchCogsCents, centsOf, chartCents, expenseCompositionCents, iqdToCents, instantOf, rederive, sumCents, type Cents } from '../lib/financeUsdDisplay';
 import { loadLotUsdRates } from '../lib/batchSnapshot';
-import { EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
+import { CLOSED_MONTHS_SQL, EXPENSE_ROW_LIMIT, EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_LIMIT, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
 
 type Row=Record<string,unknown>;
 const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
@@ -702,13 +702,14 @@ adminFinanceWorkspaceRoutes.post('/missing-costs/lines',async(c)=>{
  * line shares every order carries (monthlyPromotionShares: the rule does not change; a bundle's parent is never a line of its
  * own, a drawn spool is filed under its offer), so the rows add up to `total_iqd` exactly — with the month's sales and line
  * count; and THE HISTORY of its edits (finance_promotion_history, migration 0163), newest first, each with who made it and the
- * amount before and after. `month` must be a month (400 otherwise).
+ * amount and month before and after (an edit can move a promotion to another month: both months list it, and the page says
+ * so), the latest PROMOTION_HISTORY_LIMIT of them and `history_truncated` when there are more. `month` must be a month (400).
  */
-type PromotionState={currency:string;amount:number;exchange_rate:number;amount_iqd:number;enabled:boolean};
+type PromotionState={month:string;currency:string;amount:number;exchange_rate:number;amount_iqd:number;enabled:boolean};
 function promotionState(json:string):PromotionState|null{
   let v:Row;try{v=JSON.parse(json) as Row;}catch{return null;}
   if(!v||typeof v!=='object'||v.amount_minor===undefined)return null;
-  return {currency:s(v.currency),amount:n(v.amount_minor)/(v.currency==='IQD'?1:100),exchange_rate:n(v.exchange_rate),amount_iqd:n(v.amount_iqd),enabled:n(v.enabled)===1||v.enabled===true};
+  return {month:s(v.month),currency:s(v.currency),amount:n(v.amount_minor)/(v.currency==='IQD'?1:100),exchange_rate:n(v.exchange_rate),amount_iqd:n(v.amount_iqd),enabled:n(v.enabled)===1||v.enabled===true};
 }
 adminFinanceWorkspaceRoutes.get('/promotions',async(c)=>{
   const month=text(c.req.query('month'),7)||baghdadDay().slice(0,7);
@@ -721,10 +722,10 @@ adminFinanceWorkspaceRoutes.get('/promotions',async(c)=>{
   const start=baghdadDayStart(`${month}-01`),steps=start===null?null:await usdSteps(c.env.DB,[start]),hit=usdRateAt(steps,start);
   const rate_suggestion=hit?{rate:hit.rate,date:`${month}-01`,usd_basis:hit.basis}:null;
   const edits=(await c.env.DB.prepare(PROMOTION_HISTORY_SQL).bind(month,month).all<Row>()).results??[];
-  const history=edits.map((h)=>({id:s(h.id),promotion_id:s(h.promotion_id),version:n(h.version),at:s(h.created_at),actor_id:s(h.actor_id),actor_name:h.actor_name==null?null:s(h.actor_name),
+  const history=edits.slice(0,PROMOTION_HISTORY_LIMIT).map((h)=>({id:s(h.id),promotion_id:s(h.promotion_id),version:n(h.version),at:s(h.created_at),actor_id:s(h.actor_id),actor_name:h.actor_name==null?null:s(h.actor_name),
     before:promotionState(s(h.before_json)),after:promotionState(s(h.after_json))}));
   return c.json({success:true,month,promotions:allocation.promotions,total_iqd:allocation.total_iqd,unallocated_iqd:allocation.unallocated_iqd,allocation_basis:'sales_value',rate_suggestion,
-    products:allocation.products,sales_iqd:allocation.sales_iqd,lines_count:allocation.lines_count,history});
+    products:allocation.products,sales_iqd:allocation.sales_iqd,lines_count:allocation.lines_count,history,history_truncated:edits.length>PROMOTION_HISTORY_LIMIT});
 });
 /**
  * «التكاليف ← المصاريف العامة» (redesign step 5, DECISIONS row 317): the period's expense entries, each with where it counts
@@ -735,18 +736,24 @@ adminFinanceWorkspaceRoutes.get('/promotions',async(c)=>{
  * entries by category (they add up to `general_iqd`), `by_kind` every entry, so the page can say why the ledger's total of
  * every entry is not the general figure. Voided rows only with `include_voided=1`, flagged, and never in a sum. The period is
  * at most a year (400), as /summary's; the door is the owner's (cost read), as for every route here.
+ *
+ * The independent review of step 5: the general entries are listed first (EXPENSE_ROWS_SQL), so the first EXPENSE_ROW_LIMIT
+ * rows cut the other kinds before the rent the page and the drawer list; `truncated` still says a row was left out, and the
+ * page takes every heading and its emptiness from the totals, never from the rows it was given. `closed_months` names the
+ * months of the period whose accounting is closed: their entries cannot change, so the page offers no edit there.
  */
-const EXPENSE_ROW_LIMIT=500;
 adminFinanceWorkspaceRoutes.get('/expenses',async(c)=>{
   const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to')),voided=['1','true'].includes(c.req.query('include_voided')??'')?1:0;
-  const [totals,rows]=await Promise.all([periodExpenses(db,r),db.prepare(EXPENSE_ROWS_SQL).bind(r.from,r.to,voided,EXPENSE_ROW_LIMIT+1).all<Row>()]);
+  const [totals,rows,closed]=await Promise.all([periodExpenses(db,r),db.prepare(EXPENSE_ROWS_SQL).bind(r.from,r.to,voided,EXPENSE_ROW_LIMIT+1).all<Row>(),
+    db.prepare(CLOSED_MONTHS_SQL).bind(r.from.slice(0,7),r.to.slice(0,7)).all<Row>()]);
   const list=(rows.results??[]).slice(0,EXPENSE_ROW_LIMIT).map((e)=>({id:s(e.id),expense_day:s(e.expense_day),amount_iqd:n(e.amount_iqd),title:s(e.title),note:s(e.note),series_id:e.series_id==null?null:s(e.series_id),
     category_id:s(e.category_id),category:{name_ar:s(e.category_name_ar),name_en:s(e.category_name_en),name_ckb:s(e.category_name_ckb)},
     kind:s(e.expense_kind),counts_as_general:isGeneralKind(s(e.expense_kind)),order_id:e.order_id==null?null:s(e.order_id),order_status:e.order_status==null?null:s(e.order_status),
     promotion_month:e.promotion_month==null?null:s(e.promotion_month),center_id:e.center_id==null?null:s(e.center_id),center_name:e.center_name==null?null:s(e.center_name),
     voided:e.voided_at!=null,void_reason:s(e.void_reason)}));
   const {general_iqd,waiting_iqd,all_iqd,entries,by_kind,by_category}=totals;
-  return c.json({success:true,range:r,rows:list,truncated:(rows.results??[]).length>EXPENSE_ROW_LIMIT,totals:{general_iqd,waiting_iqd,all_iqd,entries,by_kind,by_category}});
+  return c.json({success:true,range:r,rows:list,truncated:(rows.results??[]).length>EXPENSE_ROW_LIMIT,totals:{general_iqd,waiting_iqd,all_iqd,entries,by_kind,by_category},
+    closed_months:(closed.results??[]).map((m)=>s(m.month))});
 });
 async function promotionValues(db:D1Database,b:Row,old?:Row){
   const month=b.month===undefined?s(old?.month):text(b.month,7);if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw badRequest('الشهر غير صحيح');

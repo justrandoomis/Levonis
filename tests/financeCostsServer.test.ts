@@ -20,9 +20,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { get, json, patch, post, send, stubApp } from './fixtures/app';
 import { everyState, month, order, period, previousMonth, world } from './fixtures/financeWorld';
-import { expenseWorld } from './fixtures/financeCosts';
+import { crowdedWorld, expenseWorld } from './fixtures/financeCosts';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
-import { EXPENSE_KINDS, GENERAL_KINDS } from '../worker/lib/financeExpenseKinds';
+import { adminFinanceRoutes } from '../worker/routes/adminFinance';
+import { adminFinanceOperationsRoutes } from '../worker/routes/adminFinanceOperations';
+import { EXPENSE_KINDS, EXPENSE_ROW_LIMIT, GENERAL_KINDS, PROMOTION_HISTORY_LIMIT } from '../worker/lib/financeExpenseKinds';
 import { baghdadDay } from '../worker/lib/operations';
 
 type W = ReturnType<typeof world>;
@@ -190,8 +192,142 @@ test('the history lists every edit of the month newest first, with who made it a
     [1, 'admin', 'Owner', null, 10100, true],
   ]);
   assert.ok(p.history.every((h) => /^\d{4}-\d{2}-\d{2}T/.test(h.at)), 'each with its time');
-  assert.deepEqual(p.history[2].after, { currency: 'IQD', amount: 10100, exchange_rate: 1, amount_iqd: 10100, enabled: true });
+  assert.deepEqual(p.history[2].after, { month: month(), currency: 'IQD', amount: 10100, exchange_rate: 1, amount_iqd: 10100, enabled: true });
   // Another month's history is not this one's.
   assert.deepEqual((await w.read(`/f/promotions?month=${previousMonth()}`) as Promotions).history, []);
   for (const bad of ['2026-13', '2026-1', 'abc', '2026-11-01']) assert.equal((await get(w.app, `/f/promotions?month=${bad}`)).status, 400, bad);
+});
+
+// ------------------------------------------------------------------ the independent review of step 5
+
+/** The owner's app over a world's database with the old ledger's routes (/e) and the operations routes (/o) beside the workspace's (/f). */
+const ownerApp = (w: W) => stubApp(w.db, { id: 'admin', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, (a) => {
+  a.route('/f', adminFinanceWorkspaceRoutes); a.route('/e', adminFinanceRoutes); a.route('/o', adminFinanceOperationsRoutes);
+});
+const bounds = (range: string) => { const q = new URLSearchParams(range); return [q.get('from')!, q.get('to')!] as const; };
+/**
+ * /summary's general and waiting figures BEFORE step 5, as its own statements read them at 6b1b0243 (copied, not imported): the
+ * tests above hold /expenses equal to /summary, but both read periodExpenses(); these hold the shared fragment to the old rule.
+ */
+const OLD_GENERAL = `SELECT COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ?
+  AND NOT EXISTS(SELECT 1 FROM finance_expense_links l JOIN orders lo ON lo.id=l.order_id WHERE l.expense_id=e.id AND lo.status NOT IN ('cancelled','returned','refunded'))
+  AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id)
+  AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)
+  AND NOT EXISTS(SELECT 1 FROM finance_monthly_promotions p WHERE p.expense_id=e.id)`;
+const OLD_WAITING = `SELECT COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e JOIN finance_expense_links l ON l.expense_id=e.id JOIN orders lo ON lo.id=l.order_id
+  WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ? AND lo.status NOT IN ('delivered','cancelled','returned','refunded')`;
+const old = (w: W, sql: string, range: string) => Number((w.raw.prepare(sql).get(...bounds(range)) as { total: number }).total);
+
+test('the shared fragment is the old rule: /summary\'s general and waiting figures are what its own statements read before step 5, for every world and range', async () => {
+  const e = expenseWorld(), day = baghdadDay(), prev = previousMonth(), every = everyState();
+  const worlds: Array<[string, W, string[]]> = [
+    ['every kind', e, [period(), `from=${day}&to=${day}`, `from=${prev}-01&to=${prev}-28`, `from=${month()}-01&to=${month()}-01`]],
+    ['every state', every, [every.range, period()]], ['crowded', crowdedWorld(40), [period()]], ['none', world(), [period()]]];
+  for (const [name, w, ranges] of worlds) for (const range of ranges) {
+    const s = await w.read(`/f/summary?${range}`);
+    assert.equal(s.totals.general_expenses_iqd, old(w, OLD_GENERAL, range), `${name} ${range}: general expenses as before step 5`);
+    assert.equal(s.totals.general_waiting_iqd, old(w, OLD_WAITING, range), `${name} ${range}: costs waiting for their orders as before step 5`);
+  }
+  // Pinned by hand on the every-kind world, kind by kind: rent 100,000 + power 30,000 + the generator tagged to a cost centre
+  // 7,000, and the cancelled order's 20,000 — 157,000 of general expenses; waiting, the order on its way's 9,000.
+  const kinds = (await read(e, `/f/expenses?${period()}`)).totals.by_kind;
+  assert.deepEqual(Object.fromEntries(Object.entries(kinds).map(([k, v]) => [k, [v.amount_iqd, v.entries]])),
+    { general: [137000, 3], order_ended: [20000, 1], promotion: [240000, 1], order_cost: [7500, 1], collection_fee: [3000, 1], order_delivered: [2000, 1], order_waiting: [9000, 1] });
+  // The one documented difference (DECISIONS row 317): a promotion's expense linked to an order on its way was in «تنتظر
+  // تسليم طلباتها» as well as in the promotion; it now counts once, in the promotion. Such a link is refused since this review.
+  e.raw.exec("INSERT INTO finance_expense_links(expense_id,order_id) VALUES ('promo-exp','onway')");
+  const s = await e.read(`/f/summary?${period()}`);
+  assert.equal(old(e, OLD_WAITING, period()) - s.totals.general_waiting_iqd, 240000);
+  assert.equal(s.totals.general_expenses_iqd, old(e, OLD_GENERAL, period()), 'the general figure does not move');
+});
+
+test('a period with more entries than the page lists names its general ones first, and its totals stay the whole period\'s', async () => {
+  const w = crowdedWorld(600);
+  const e = await read(w, `/f/expenses?${period()}`), s = await w.read(`/f/summary?${period()}`);
+  assert.equal(e.truncated, true);
+  assert.equal(e.rows.length, EXPENSE_ROW_LIMIT);
+  // Before the review, newest-first over every kind cut all three rents of the 1st: the page and the drawer read «no general expense».
+  assert.deepEqual(e.rows.slice(0, 3).map((r) => [r.kind, r.amount_iqd]), [['general', 100000], ['general', 100000], ['general', 100000]], 'the general entries come first');
+  assert.equal(e.rows.filter((r) => r.counts_as_general).length, 3, 'every general entry is listed');
+  assert.equal(e.totals.general_iqd, 300000);
+  assert.equal(e.totals.general_iqd, s.totals.general_expenses_iqd, 'the statement\'s line');
+  assert.deepEqual([e.totals.by_kind.order_delivered.amount_iqd, e.totals.by_kind.order_delivered.entries], [600000, 600], 'every linked cost in the sums, not only the listed ones');
+  assert.equal(e.rows.filter((r) => r.kind === 'order_delivered').length, EXPENSE_ROW_LIMIT - 3);
+  assert.deepEqual(e.totals.by_category.map((c) => [c.category_id, c.amount_iqd, c.entries]), [['rent', 300000, 3]]);
+  // With the voided rows asked for, a voided general row is listed with the general ones, in no sum.
+  w.raw.exec("UPDATE operating_expenses SET voided_at='2026-01-01T00:00:00Z',voided_by='admin',void_reason='typo' WHERE id='rent-c'");
+  const v = await read(w, `/f/expenses?${period()}&include_voided=1`);
+  assert.deepEqual(v.rows.slice(0, 3).map((r) => [r.id, r.voided]).sort(), [['rent-a', false], ['rent-b', false], ['rent-c', true]]);
+  assert.equal(v.totals.general_iqd, 200000);
+});
+
+test('a promotion\'s expense is never linked to an order — it counted twice, in the promotion and in the order — while a cost centre stays allowed', async () => {
+  const w = expenseWorld(), app = ownerApp(w);
+  const linked = await post(app, '/o/expense-links', { expense_id: 'promo-exp', order_id: 'shipped', allocation_basis: 'none', target_type: 'all' });
+  assert.equal(linked.status, 400);
+  assert.equal((await json(linked)).code, 'EXPENSE_LINK_PROMOTION');
+  assert.equal((w.raw.prepare("SELECT COUNT(*) n FROM finance_expense_links WHERE expense_id='promo-exp'").get() as { n: number }).n, 0, 'nothing written');
+  assert.equal((await post(app, '/o/expense-links', { expense_id: 'promo-exp', center_id: 'shop', allocation_basis: 'none', target_type: 'all' })).status, 200, 'a cost centre, as before');
+  const e = await read(w, `/f/expenses?${period()}`);
+  const promo = e.rows.find((r) => r.id === 'promo-exp')!;
+  assert.deepEqual([promo.kind, promo.center_name, promo.order_id], ['promotion', 'Shop floor', null]);
+  // Any other expense still links to an order, as before.
+  assert.equal((await post(app, '/o/expense-links', { expense_id: 'rent', order_id: 'shipped', allocation_basis: 'none', target_type: 'all' })).status, 200);
+  assert.equal((await read(w, `/f/expenses?${period()}`)).rows.find((r) => r.id === 'rent')!.kind, 'order_delivered');
+});
+
+test('a month closed in accounting: GET /expenses names it, and the ledger\'s writes answer a coded 409 instead of the trigger\'s 500', async () => {
+  const w = expenseWorld(), app = ownerApp(w), m = month();
+  assert.deepEqual((await read(w, `/f/expenses?${period()}`) as { closed_months?: string[] }).closed_months, []);
+  w.raw.exec(`INSERT INTO accounting_periods(month,closed_at,closed_by) VALUES ('${m}','2026-01-01T00:00:00Z','admin')`);
+  assert.deepEqual((await read(w, `/f/expenses?${period()}`) as { closed_months?: string[] }).closed_months, [m]);
+  const refusals: Array<[string, Response]> = [
+    ['edit', await patch(app, '/e/expenses/rent', { title: 'Rent, corrected' })],
+    ['void', await send(app, 'DELETE', '/e/expenses/rent')],
+    ['restore', await post(app, '/e/expenses/void/restore')],
+    ['add', await post(app, '/e/expenses', { category_id: 'rent', amount_iqd: 5000, expense_day: `${m}-02` })],
+  ];
+  for (const [what, res] of refusals) {
+    assert.equal(res.status, 409, what);
+    assert.equal((await json(res)).code, 'PERIOD_CLOSED', what);
+  }
+  assert.deepEqual({ ...(w.raw.prepare("SELECT title,voided_at FROM operating_expenses WHERE id='rent'").get() as object) }, { title: 'Rent', voided_at: null }, 'nothing changed');
+  // Moving an entry of an open month into the closed one is refused too; an open month's entry still edits.
+  w.raw.exec(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('before','rent',4000,'${previousMonth()}-03','Earlier','admin')`);
+  assert.equal((await patch(app, '/e/expenses/before', { expense_day: `${m}-02` })).status, 409);
+  assert.equal((await patch(app, '/e/expenses/before', { title: 'Earlier, corrected' })).status, 200);
+  // A row already voided is still the no-op answer it was (its restore in the closed month is the refusal above).
+  assert.deepEqual(await json(await send(app, 'DELETE', '/e/expenses/void')), { success: true, voided: false });
+});
+
+test('the history names a move to another month in both months, and says when older edits were left out', async () => {
+  const w = await promotionWorld(), prev = previousMonth();
+  assert.equal((await patch(w.app, `/f/promotions/${w.id}`, { month: prev })).status, 200);
+  for (const m of [month(), prev]) {
+    const h = (await w.read(`/f/promotions?month=${m}`)).history as Array<{ before: { month?: string } | null; after: { month?: string } | null }>;
+    assert.deepEqual([h[0].before?.month, h[0].after?.month], [month(), prev], `${m}: the move, newest first`);
+  }
+  assert.equal((await w.read(`/f/promotions?month=${month()}`)).history_truncated, false);
+  // More edits than the page lists: the latest PROMOTION_HISTORY_LIMIT, and a flag.
+  w.raw.exec(`WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i+1 FROM n WHERE i<${PROMOTION_HISTORY_LIMIT})
+    INSERT INTO finance_promotion_history(id,promotion_id,operation_id,version,before_json,after_json,actor_id,created_at)
+    SELECT 'old-'||i,'${w.id}','old-op-'||i,100+i,'{}',json_object('month','${prev}','currency','IQD','amount_minor',1000+i,'amount_iqd',1000+i,'enabled',1),'admin','2026-01-01T00:00:00.000Z' FROM n;`);
+  const p = await w.read(`/f/promotions?month=${prev}`);
+  assert.equal(p.history.length, PROMOTION_HISTORY_LIMIT);
+  assert.equal(p.history_truncated, true);
+  assert.equal(p.history[0].after.month, prev, 'the newest first: the move');
+});
+
+test('who carries the promotion is worked out on the invoice: a return and its refund do not move the shares (the page says so)', async () => {
+  const w = world();
+  order(w.raw, { id: 'kept', qty: 2, unit: 25000, cost: 10000, shipping: 0 });
+  w.raw.exec(`INSERT INTO return_cases(id,order_id,order_item_id,user_id,qty,reason,state,resolution,decided_at) VALUES ('rc','kept','kept:item','buyer',1,'defective','resolved','refund','${new Date().toISOString()}');
+    INSERT INTO finance_refund_facts(case_id,order_id,refund_iqd,qty,disposition,cogs_iqd,channel,refunded_day) VALUES ('rc','kept',25000,1,'restock',10000,'wallet','${baghdadDay()}');`);
+  assert.equal((await post(w.app, '/f/promotions', { month: month(), currency: 'IQD', amount: 10000 })).status, 200);
+  const p = await w.read(`/f/promotions?month=${month()}`) as Promotions;
+  assert.deepEqual(p.products.map((r) => [r.qty, r.sales_iqd, r.promotion_iqd]), [[2, 50000, 10000]], 'the pieces sold and the sales as invoiced (DECISIONS row 313)');
+  // The reports read the same order after its refund: 25,000 retained — another figure, under another name.
+  const s = await w.read(`/f/summary?${period()}`);
+  assert.equal(s.totals.retained_revenue_iqd, 25000);
+  assert.equal(s.products[0].promotion_iqd, 10000, 'the order carries the same share');
 });

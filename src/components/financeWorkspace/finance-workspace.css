@@ -36,7 +36,7 @@ dialog.fw-sheet{position:fixed;inset:0;margin:auto;width:min(680px,calc(100vw - 
 .fw-missing-page{display:grid;gap:10px}.fw-missing-group{display:grid;grid-template-columns:minmax(0,1fr) minmax(200px,300px);align-items:end;gap:8px 16px;padding:14px;border:1px solid var(--fw-line);border-radius:16px;background:var(--fw-raised)}.fw-missing-group>:not(.fw-missing-head,.fw-fields){grid-column:1/-1}
 .fw-missing-head h3{font-size:15px}.fw-missing-meta{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:12px;color:var(--fw-muted);margin-top:4px}
 .fw-fields{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px}.fw-fields .fw-field{flex:1 1 160px}.fw-confirm{display:grid;gap:6px}
-@media(max-width:600px){.fw-missing-group{grid-template-columns:1fr}}
+@media(max-width:600px){.fw-missing-group{grid-template-columns:1fr}.fw-missing-group .fw-field{flex-basis:100%}}
 .fw-chips-wrap .fw-status{white-space:normal}
 .fw-link{background:none;border:0;padding:0;color:var(--fw-accent);text-decoration:underline;cursor:pointer;font:inherit}
 .fw-missing{display:inline-flex;align-items:center;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;color:var(--fw-warn);background:var(--fw-warn-soft);white-space:nowrap}

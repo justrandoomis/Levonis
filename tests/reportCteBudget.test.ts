@@ -145,11 +145,12 @@ test('every profit-report statement stays under D1’s subquery budget on SQLite
  * The finance workspace's expense statements count too (redesign step 5, DECISIONS row 317): where each expense counts, the
  * period's sums /summary and GET /expenses both read, the entries of «المصاريف العامة» and the promotion's history. Their cost is
  * written down, so a change that makes one dearer is seen here — and when step 6 retires the old report with this file, this
- * test moves, it does not go.
+ * test moves, it does not go. Step 5's independent review lists the general entries first (ordered by the kind's alias, so
+ * the entries' statement costs what it did) and adds the period's closed months.
  */
 test('the finance workspace\'s expense statements stay under D1’s subquery budget on SQLite 3.54', async () => {
   const { EXPENSE_STATEMENTS } = await import('../worker/lib/financeExpenseKinds');
   const costs = Object.fromEntries(Object.entries(EXPENSE_STATEMENTS).map(([name, sql]) => [name, subqueryBudget(sql)]));
-  assert.deepEqual(costs, { expenseTotals: 7, expenseRows: 11, promotionHistory: 2 });
+  assert.deepEqual(costs, { expenseTotals: 7, expenseRows: 11, promotionHistory: 2, closedMonths: 1 });
   for (const [name, cost] of Object.entries(costs)) assert.ok(cost < D1_SUBQUERY_BUDGET, `${name} costs ${cost}`);
 });

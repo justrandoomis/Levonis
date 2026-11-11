@@ -547,6 +547,12 @@ adminFinanceOperationsRoutes.post('/expense-links', async (c) => {
   const oldLink=await db.prepare('SELECT * FROM finance_expense_links WHERE expense_id=?').bind(expense).first<{center_id:string|null;order_id:string|null;allocation_basis:string;target_type:string;target_id:string}>();
   const orderId=text(b.order_id,60)||null;
   if(orderId && !await db.prepare('SELECT id FROM orders WHERE id=?').bind(orderId).first())throw badRequest('اختر طلبًا موجودًا');
+  // The month's promotion is carried by the month's sales, by their value (DECISIONS rows 313 and 317). Linked to an order as
+  // well, its expense counted twice: in the promotion, and again in that order's costs, which the staff and investor shares
+  // read too (the independent review of step 5). So it is never linked to an order, as an order's own costs and collections
+  // are not; a cost centre or a management allocation stays allowed, as before.
+  if(orderId && await db.prepare('SELECT 1 FROM finance_monthly_promotions WHERE expense_id=?').bind(expense).first())
+    throw badRequest('مصروف ترويج الشهر يتوزع على مبيعات شهره بقيمتها؛ لا يُربط بطلب', 'EXPENSE_LINK_PROMOTION');
   const changes=oldLink?fence(db,'EXISTS(SELECT 1 FROM finance_expense_links WHERE expense_id=? AND center_id IS ? AND order_id IS ? AND allocation_basis=? AND target_type=? AND target_id=?)',[expense,oldLink.center_id,oldLink.order_id,oldLink.allocation_basis,oldLink.target_type,oldLink.target_id]):fence(db,'NOT EXISTS(SELECT 1 FROM finance_expense_links WHERE expense_id=?)',[expense]);
   changes.push(db.prepare('INSERT INTO finance_expense_links(expense_id,center_id,order_id,allocation_basis,target_type,target_id) VALUES (?,?,?,?,?,?) ON CONFLICT(expense_id) DO UPDATE SET center_id=excluded.center_id,order_id=excluded.order_id,allocation_basis=excluded.allocation_basis,target_type=excluded.target_type,target_id=excluded.target_id')
     .bind(expense,text(b.center_id,60)||null,orderId,basis,target,targetId));

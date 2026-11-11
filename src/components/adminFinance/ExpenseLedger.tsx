@@ -67,6 +67,9 @@ export default function ExpenseLedger({
   dir,
   onChanged,
   formOnly = false,
+  categoryLabel,
+  categoryPrompt,
+  errorText,
 }: {
   from: string;
   to: string;
@@ -80,7 +83,17 @@ export default function ExpenseLedger({
    * period's entries itself, each with where it counts, and adds a new one here. The old report keeps the whole ledger.
    */
   formOnly?: boolean;
+  /**
+   * The page's own words, where it embeds the form (the independent review of step 5): a category's name in the reader's
+   * language (the ledger writes the Arabic), the select's prompt instead of a bare «—», and a refused write in the reader's
+   * language instead of the server's sentence. Each defaults to what the old report shows.
+   */
+  categoryLabel?: (c: ExpenseCategory) => string;
+  categoryPrompt?: string;
+  errorText?: (e: unknown) => string;
 }) {
+  const label = (c: ExpenseCategory) => (categoryLabel ? categoryLabel(c) : c.name_ar);
+  const failure = useCallback((e: unknown) => (errorText ? errorText(e) : e instanceof ApiError ? e.message : s.saveFailed), [errorText, s.saveFailed]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [rows, setRows] = useState<ExpenseEntry[]>([]);
   const [totalIqd, setTotalIqd] = useState(0);
@@ -92,6 +105,8 @@ export default function ExpenseLedger({
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  // Embedded (formOnly), the form names a problem once something was typed or sent — not in red on a form nobody touched yet.
+  const [touched, setTouched] = useState(!formOnly);
   /** The void reason being typed against each row, keyed by expense id. */
   const [pendingReason, setPendingReason] = useState<Record<string, string>>({});
 
@@ -191,13 +206,14 @@ export default function ExpenseLedger({
       // and over, and re-choosing them each time is how an owner stops using
       // the screen.
       setDraft((d) => ({ ...d, amount: '', title: '', note: '' }));
+      if (formOnly) setTouched(false);
       refresh();
     } catch (e: unknown) {
-      setError(e instanceof ApiError ? e.message : s.saveFailed);
+      setError(failure(e));
     } finally {
       setBusy(false);
     }
-  }, [problem, busy, draft, latin, refresh, s]);
+  }, [problem, busy, draft, latin, refresh, s, failure, formOnly]);
 
   const addCategory = useCallback(async () => {
     const name = newCategoryName.trim();
@@ -211,11 +227,11 @@ export default function ExpenseLedger({
       setDraft((d) => ({ ...d, category_id: res.category?.id ?? d.category_id }));
       setReloadKey((k) => k + 1);
     } catch (e: unknown) {
-      setError(e instanceof ApiError ? e.message : s.saveFailed);
+      setError(failure(e));
     } finally {
       setBusy(false);
     }
-  }, [newCategoryName, busy, s]);
+  }, [newCategoryName, busy, s, failure]);
 
   const toggleCategory = useCallback(
     async (cat: ExpenseCategory) => {
@@ -224,12 +240,12 @@ export default function ExpenseLedger({
         await updateExpenseCategory(cat.id, { active: !cat.active });
         setReloadKey((k) => k + 1);
       } catch (e: unknown) {
-        setError(e instanceof ApiError ? e.message : s.saveFailed);
+        setError(failure(e));
       } finally {
         setBusy(false);
       }
     },
-    [s.saveFailed]
+    [failure]
   );
 
   const doVoid = useCallback(
@@ -283,12 +299,15 @@ export default function ExpenseLedger({
       <form
         data-finance-expense-form
         className="lv-surface space-y-3 p-3 sm:p-4"
+        onChange={() => setTouched(true)}
         onSubmit={(e) => {
           e.preventDefault();
+          setTouched(true);
           void submit();
         }}
       >
-        <h4 className="text-[13px] leading-[1.5] font-black text-text-primary">{s.addExpense}</h4>
+        {/* Embedded, the page's own heading names the form already. */}
+        {!formOnly && <h4 className="text-[13px] leading-[1.5] font-black text-text-primary">{s.addExpense}</h4>}
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <label className="min-w-0">
@@ -298,10 +317,10 @@ export default function ExpenseLedger({
               value={draft.category_id}
               onChange={(e) => setDraft((d) => ({ ...d, category_id: e.target.value }))}
             >
-              <option value="">—</option>
+              <option value="">{categoryPrompt ?? '—'}</option>
               {activeCategories.map((c) => (
                 <option key={c.id} value={c.id}>
-                  {c.name_ar}
+                  {label(c)}
                 </option>
               ))}
             </select>
@@ -367,7 +386,7 @@ export default function ExpenseLedger({
         {/* The refusal is stated under the form, never as a disabled button
             with no explanation: a button that does nothing and says nothing is
             how an owner concludes the screen is broken. */}
-        {problem && (
+        {problem && touched && (
           <p data-finance-expense-problem className="text-[12px] leading-[1.6] text-danger">
             {problemText(problem)}
           </p>
@@ -398,7 +417,7 @@ export default function ExpenseLedger({
                 c.active ? 'text-text-primary' : 'text-text-muted line-through'
               }`}
             >
-              {c.name_ar}
+              {label(c)}
               <button
                 type="button"
                 onClick={() => void toggleCategory(c)}

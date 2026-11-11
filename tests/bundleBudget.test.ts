@@ -106,7 +106,9 @@ const CSS_BUDGET = 60 * KB;
  * never copied with a figure); steps 5 and 6 write theirs here. Step 5 (the costs
  * section; DECISIONS row 317) measured 9,032 B over the three sheets (the
  * finance sheet 4,646 B: the missing-cost cards and the costs pages' fields
- * added, the old promotion page's `.fw-promo-*` pruned); step 6 writes its own.
+ * added, the old promotion page's `.fw-promo-*` pruned), and 9,039 B after its
+ * independent review (the finance sheet 4,653 B: the missing-cost price field
+ * full width on a phone); step 6 writes its own.
  * Still owner-only and lazy, never on a storefront (the test below).
  */
 const OPERATIONS_CSS_BUDGET = 10.5 * KB;

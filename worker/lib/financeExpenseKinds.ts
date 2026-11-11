@@ -42,23 +42,35 @@ export const EXPENSE_TOTALS_SQL = `SELECT e.expense_day,${EXPENSE_KIND_SQL} expe
   WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ? GROUP BY 1,2,3`;
 
 /**
- * The period's entries, newest first, each with its kind, its category in three languages, its cost-centre tag and the
- * order (or the promotion's month) it counts with. Binds: from, to, include voided (0 or 1), limit.
+ * The period's entries, each with its kind, its category in three languages, its cost-centre tag and the order (or the
+ * promotion's month) it counts with. Binds: from, to, include voided (0 or 1), limit.
+ *
+ * THE GENERAL ENTRIES FIRST, then the rest, each newest first (the independent review of step 5): a period holds an
+ * operating_expenses row for every order's wage, material and courier fee, so a quarter or a year passes the page's limit,
+ * and newest-first over every kind dropped the rent of the 1st — the page and the drawer then read «no general expense»
+ * beside a total that had one. Ordered by the kind's alias (worked out once), so the statement's subquery count is unchanged.
  */
 export const EXPENSE_ROWS_SQL = `SELECT e.id,e.expense_day,e.amount_iqd,e.title,e.note,e.series_id,e.category_id,ec.name_ar category_name_ar,ec.name_en category_name_en,ec.name_ckb category_name_ckb,
   e.voided_at,e.void_reason,l.center_id,cc.name center_name,lo.status order_status,
   COALESCE(l.order_id,(SELECT oc.order_id FROM finance_order_costs oc WHERE oc.expense_id=e.id),(SELECT fc.order_id FROM finance_collections fc WHERE fc.expense_id=e.id LIMIT 1)) order_id,
   (SELECT p.month FROM finance_monthly_promotions p WHERE p.expense_id=e.id) promotion_month,${EXPENSE_KIND_SQL} expense_kind
   FROM ${EXPENSE_FROM} LEFT JOIN expense_categories ec ON ec.id=e.category_id LEFT JOIN finance_cost_centers cc ON cc.id=l.center_id
-  WHERE e.expense_day BETWEEN ? AND ? AND (e.voided_at IS NULL OR ?=1) ORDER BY e.expense_day DESC,e.rowid DESC LIMIT ?`;
+  WHERE e.expense_day BETWEEN ? AND ? AND (e.voided_at IS NULL OR ?=1) ORDER BY expense_kind NOT IN ('general','order_ended'),e.expense_day DESC,e.rowid DESC LIMIT ?`;
 
-/** A month's promotion edits, newest first, with who made each. Binds: the month (YYYY-MM), twice. */
+/** How many entries GET /expenses lists (the general ones first); the totals are always the whole period's. */
+export const EXPENSE_ROW_LIMIT = 500;
+/** How many edits of a month's promotion the page lists; the answer says when there are more. */
+export const PROMOTION_HISTORY_LIMIT = 50;
+/** A month's promotion edits, newest first, with who made each — one more than the page lists, so it knows there are more. Binds: the month (YYYY-MM), twice. */
 export const PROMOTION_HISTORY_SQL = `SELECT h.id,h.promotion_id,h.version,h.before_json,h.after_json,h.actor_id,u.name actor_name,h.created_at
   FROM finance_promotion_history h LEFT JOIN users u ON u.id=h.actor_id
-  WHERE json_extract(h.after_json,'$.month')=? OR json_extract(h.before_json,'$.month')=? ORDER BY h.created_at DESC,h.version DESC LIMIT 50`;
+  WHERE json_extract(h.after_json,'$.month')=? OR json_extract(h.before_json,'$.month')=? ORDER BY h.created_at DESC,h.version DESC LIMIT ${PROMOTION_HISTORY_LIMIT + 1}`;
+
+/** The months of a period whose accounting is closed (accounting_periods, migration 0162): no entry of theirs can change. Binds: the first and last month. */
+export const CLOSED_MONTHS_SQL = 'SELECT month FROM accounting_periods WHERE month BETWEEN ? AND ? ORDER BY month';
 
 /** The statements of this module, by name, for the subquery budget (tests/reportCteBudget.test.ts). */
-export const EXPENSE_STATEMENTS: Readonly<Record<string, string>> = { expenseTotals: EXPENSE_TOTALS_SQL, expenseRows: EXPENSE_ROWS_SQL, promotionHistory: PROMOTION_HISTORY_SQL };
+export const EXPENSE_STATEMENTS: Readonly<Record<string, string>> = { expenseTotals: EXPENSE_TOTALS_SQL, expenseRows: EXPENSE_ROWS_SQL, promotionHistory: PROMOTION_HISTORY_SQL, closedMonths: CLOSED_MONTHS_SQL };
 
 type Row = Record<string, unknown>;
 const n = (v: unknown) => Number(v ?? 0), s = (v: unknown) => String(v ?? '');
