@@ -26,10 +26,15 @@ export const usdText = (cents: number | null | undefined) => (cents == null ? '�
  * the accounting dinars beneath. With no cents for this figure (an IQD-only
  * figure, or USD unavailable) it stays in dinars.
  */
-export function DisplayMoney({ iqd, cents, compact = false }: { iqd: number | null | undefined; cents?: number | null; compact?: boolean }) {
+export function DisplayMoney({ iqd, cents, compact = false, missing }: { iqd: number | null | undefined; cents?: number | null; compact?: boolean;
+  /** What an incomplete value says instead of a bare dash (default «ناقص»); the row around it says why. */
+  missing?: string }) {
   const currency = useDisplayCurrency();
   const { loc } = useLanguage();
-  if (currency !== 'USD' || cents === undefined) return <Money value={iqd} compact={compact} />;
+  // An incomplete figure is never a bare «—» and never 0 (DECISIONS row 313).
+  const gap = <span className="fw-missing" data-finance-missing>{missing ?? loc('ناقص', 'Missing', 'ناتەواو')}</span>;
+  if (currency !== 'USD' || cents === undefined) return iqd == null ? gap : <Money value={iqd} compact={compact} />;
+  if (cents === null) return gap;
   return <span className="fw-money-dual" data-finance-usd>
     <span className={`fw-money${compact ? ' fw-money--compact' : ''}`} dir="ltr">{usdText(cents)}</span>
     {!compact && <small className="fw-money-accounting">{tri(loc, PA_STRINGS.accountingValue, { amount: formatMoney(iqd) })}</small>}

@@ -362,19 +362,33 @@ export async function syncOrderWorkspaceAccounting(db:D1Database,orderId:string,
   catch(e){if(/CHECK constraint|UNIQUE constraint/.test(String(e)))throw conflict('تغير مصدر ربح الطلب؛ أعد محاولة التسوية');throw e;}
 }
 
+/**
+ * THE MONTH'S PROMOTION, SHARED BY SALES VALUE (owner 2026-11-11, DECISIONS row 313).
+ * Every delivered Levonis line of the delivery's Baghdad month carries the month's
+ * promotion in proportion to its net sale as invoiced (after line coupons, membership,
+ * points and accepted price changes — `calculateGoods`, the report's own net goods).
+ * Until then it was spread per PIECE, so 87 switches worth 10,527 carried 125,915 of
+ * November's 240,250 while a 3,583,000 printer sale carried 4,341. Bundle parents are
+ * never a line of their own; a month whose lines are all free (gifts) shares it equally.
+ * The month total stays exact (`spread`). The owner's report only: staff and investor
+ * shares never include promotion (FINANCE-DECISIONS, owner 2026-10-23).
+ */
 export async function monthlyPromotionShares(db: D1Database, month: string) {
   if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw badRequest('الشهر غير صحيح');
   if (!await workspaceInstalled(db)) return { total_iqd: 0, shares: new Map<string, number>(), unallocated_iqd: 0, promotions: [] as Row[] };
-  const [promotions, lines] = await Promise.all([
+  const delivered = `o.status='delivered' AND o.seller_type='levonis' AND substr(date(o.delivered_at,'+3 hours'),1,7)=?`;
+  const [promotions, orders, items] = await Promise.all([
     db.prepare('SELECT *,CASE WHEN currency=\'IQD\' THEN amount_minor ELSE amount_minor/100.0 END amount FROM finance_monthly_promotions WHERE month=? ORDER BY id').bind(month).all<Row>(),
-    db.prepare(`SELECT i.id,i.qty FROM order_items i JOIN orders o ON o.id=i.order_id
-      WHERE o.status='delivered' AND o.seller_type='levonis' AND substr(date(o.delivered_at,'+3 hours'),1,7)=?
-      AND NOT EXISTS(SELECT 1 FROM order_items child WHERE child.bundle_parent_item_id=i.id) ORDER BY i.id LIMIT 10001`).bind(month).all<{ id: string; qty: number }>(),
+    db.prepare(`SELECT o.* FROM orders o WHERE ${delivered} ORDER BY o.id`).bind(month).all<Row>(),
+    db.prepare(`SELECT i.* FROM order_items i JOIN orders o ON o.id=i.order_id WHERE ${delivered} ORDER BY i.id LIMIT 20001`).bind(month).all<GoodsLine>(),
   ]);
   const total = (promotions.results ?? []).filter((p) => n(p.enabled) === 1).reduce((sum, p) => sum + n(p.amount_iqd), 0);
-  const sold = lines.results ?? [];
-  if (sold.length > 10000) throw badRequest('عدد بنود الشهر تجاوز حد التوزيع؛ لا يمكن توزيع جزئي للترويج');
-  const values = spread(total, sold.map((l) => l.qty));
+  const byOrder = new Map<string, GoodsLine[]>();
+  for (const item of items.results ?? []) { const rows = byOrder.get(s(item.order_id)) ?? []; rows.push(item); byOrder.set(s(item.order_id), rows); }
+  const sold = (orders.results ?? []).flatMap((order) => calculateGoods(order, byOrder.get(s(order.id)) ?? [], []).lines.map((l) => ({ id: s(l.id), value: Math.max(0, n(l.net_goods_iqd)) })))
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (sold.length > 10000 || (items.results ?? []).length > 20000) throw badRequest('عدد بنود الشهر تجاوز حد التوزيع؛ لا يمكن توزيع جزئي للترويج');
+  const values = spread(total, sold.map((l) => l.value));
   return { total_iqd: total, shares: new Map(sold.map((l, i) => [l.id, values[i] ?? 0])),
     unallocated_iqd: sold.length ? 0 : total, promotions: promotions.results ?? [] };
 }

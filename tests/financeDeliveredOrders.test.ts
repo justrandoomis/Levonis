@@ -106,7 +106,8 @@ test('delivered sales keep partial and full refund deductions in every finance r
     assert.equal(summary.chart_data.revenue_iqd, revenue+5000);
     const csv = await (await get(app, `/f/export.csv?${period}`)).text();
     assert.match(csv, /refunded-delivery/);
-    assert.match(csv, new RegExp(`"${refund}","${cost}",`));
+    // Amounts are numbers in the CSV since DECISIONS row 313 (a spreadsheet sums them).
+    assert.match(csv, new RegExp(`,${refund},${cost},`));
   }
   assert.equal(row(raw, "SELECT status FROM orders WHERE id='refunded-delivery'")?.status, 'delivered');
 });

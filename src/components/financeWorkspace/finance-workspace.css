@@ -27,3 +27,4 @@ dialog.fw-sheet{position:fixed;inset:0;margin:auto;width:min(680px,calc(100vw - 
 .fw-missing-price{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px}.fw-missing-price .fw-field{flex:1 1 180px}
 .fw-confirm{flex-basis:100%;display:grid;gap:6px}.fw-confirm p{margin:0}
 .fw-link{background:none;border:0;padding:0;color:var(--fw-accent);text-decoration:underline;cursor:pointer;font:inherit}
+.fw-missing{display:inline-flex;align-items:center;border-radius:999px;padding:1px 8px;font-size:11px;font-weight:700;color:var(--fw-warn);background:var(--fw-warn-soft);white-space:nowrap}

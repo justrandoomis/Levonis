@@ -31,10 +31,14 @@ export interface ProfitTotals {
   coupon_iqd?: number | null;
   /** P-A F5: price-protection credits paid back, deducted in this report only. */
   price_protection_iqd?: number | null;
-  /** `owner_net − coupon − price protection` — «الصافي بعد خصومات التقرير». */
+  /** A returned in-stock trade-in credit, deducted with the two above (S-P2, DECISIONS row 313 for the period). */
+  trade_in_credit_returned_iqd?: number | null;
+  /** `owner_net − coupon − price protection − returned trade-in credit` — «الصافي بعد خصومات التقرير». */
   net_after_report_adjustments_iqd?: number | null;
-  /** The period figure: `owner_period_net − coupon − price protection` (summary totals only). */
+  /** The period figure, the overview's «صافي حصتك»: the orders after their deductions, minus the period overheads (summary totals only). */
   owner_period_net_after_report_adjustments_iqd?: number | null;
+  /** Costs entered in the period for orders still on their way: not in this net, counted on delivery (summary totals only). */
+  general_waiting_iqd?: number;
   pending_costs?: number;
   unknown_lines?: number;
   orders_count?: number;
@@ -105,7 +109,7 @@ export interface DisplayUsdSummary {
     expense_composition: Array<{ key: string; amount_cents: number | null }> };
   totals?: UsdCents;
   /** `known` in cents (null: no complete order); absent from a server that predates it. */
-  known?: { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null } | null;
+  known?: { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; net_after_report_adjustments_cents?: number | null } | null;
 }
 /** `display_usd` of `GET /orders?display=USD`. */
 export interface DisplayUsdOrders { available: boolean; today_rate?: string | null; at_time_count?: number; today_count?: number; batch_cost_lines?: number; orders?: Record<string, UsdOrderCents> }
@@ -113,7 +117,11 @@ export interface DisplayUsdOrders { available: boolean; today_rate?: string | nu
 export interface DisplayUsdOrder { available: boolean; today_rate?: string | null; usd_basis?: 'at_time' | 'today'; fx_rate_snapshot?: string; cents?: UsdCents; lines?: Record<string, UsdCents>; batch_cost_lines?: number }
 
 /** The period over the orders whose every amount is known (owner 2026-11-10), with their share of the period's general expenses by revenue. */
-export type FinanceKnown = { orders_count: number; incomplete_orders: number; revenue_iqd: number | null; cost_iqd: number | null; owner_net_iqd: number | null; overhead_share_iqd?: number };
+/** The complete orders that rest only on confirmed costs, or on at least one sale-time estimate (DECISIONS row 313). */
+export type FinanceKnownPart = { orders_count: number; revenue_iqd: number; owner_net_iqd: number | null; net_after_report_adjustments_iqd?: number | null; order_ids?: string[] };
+export type FinanceKnown = { orders_count: number; incomplete_orders: number; revenue_iqd: number | null; cost_iqd: number | null; owner_net_iqd: number | null; overhead_share_iqd?: number;
+  /** After the order coupons and credits, as the headline (absent from a server that predates it). */
+  net_after_report_adjustments_iqd?: number | null; confirmed?: FinanceKnownPart; estimated?: FinanceKnownPart };
 /** What keeps the period from being complete: lines without a confirmed purchase price. */
 export type FinanceMissingCosts = { lines: number; orders: number; unknown_lines: number; estimated_lines: number; unknown_products: { product_id: string | null; name: string; qty: number; lines: number }[] };
 export interface FinanceSummary {

@@ -45,7 +45,7 @@ function range(fromValue?:string,toValue?:string){
   if(days<0||days>365)throw badRequest('اختر فترة لا تتجاوز سنة');
   return {from,to};
 }
-const sumFields=['net_goods_iqd','retained_revenue_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','direct_cost_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','contribution_profit_iqd','profit_basis_iqd','promotion_iqd','investor_iqd','owner_net_iqd','coupon_iqd','price_protection_iqd','net_after_report_adjustments_iqd','refunded_iqd','refund_iqd','collected_iqd','collection_difference_iqd','pending_costs','unknown_lines','units'];
+const sumFields=['net_goods_iqd','retained_revenue_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','direct_cost_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','contribution_profit_iqd','profit_basis_iqd','promotion_iqd','investor_iqd','owner_net_iqd','coupon_iqd','price_protection_iqd','trade_in_credit_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd','refunded_iqd','refund_iqd','collected_iqd','collection_difference_iqd','pending_costs','unknown_lines','units'];
 function sumRows(rows:Row[]):Row {
   const totals:Row={};
   for(const key of sumFields)totals[key]=rows.some((r)=>r[key]===null)?null:rows.reduce((v,r)=>v+n(r[key]),0);
@@ -85,18 +85,37 @@ function completeOrders(bases:OrderProfitBase[]){
   const allRevenue=revenue(bases),allUnits=units(bases);
   return {complete,share:allRevenue>0?revenue(complete)/allRevenue:allUnits>0?units(complete)/allUnits:bases.length?complete.length/bases.length:0};
 }
+/**
+ * A complete order rests on confirmed costs only when every line's goods cost is
+ * (FIFO from a priced batch, owner-verified, or a recorded snapshot); otherwise at
+ * least one line still counts the sale-time estimate. The owner keeps estimates in
+ * the net, always labelled (2026-11-11, DECISIONS row 313), so the two are told apart.
+ */
+const restsOnConfirmedCosts=(b:OrderProfitBase)=>b.lines.every((l)=>isConfirmedOrderCost(l.cost_confidence));
+const orderRevenue=(b:OrderProfitBase)=>Math.max(0,n(b.totals.retained_revenue_iqd)+n(b.totals.shipping_income_iqd)+n(b.totals.cod_tax_iqd));
 /** The period's figures over the orders whose every amount is known (none: null), and what the rest lack. */
 function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean){
   const {complete,share}=completeOrders(bases);
   const overhead={general:Math.round(general*share),unallocated:Math.round(unallocated*share)};
   const known=sumRows(complete.map((b)=>b.totals));known.orders_count=complete.length;
   const amounts=chartAmounts(known,overhead.general,overhead.unallocated,truncated);
+  // Confirmed and estimated orders take the complete orders' overhead by revenue; the
+  // estimated part is the remainder, so the two always add up to the known net exactly.
+  const confirmed=complete.filter(restsOnConfirmedCosts),estimated=complete.filter((b)=>!restsOnConfirmedCosts(b));
+  const overheadTotal=overhead.general+overhead.unallocated,completeRevenue=complete.reduce((v,b)=>v+orderRevenue(b),0);
+  const confirmedOverhead=completeRevenue>0?Math.round(overheadTotal*confirmed.reduce((v,b)=>v+orderRevenue(b),0)/completeRevenue):complete.length?Math.round(overheadTotal*confirmed.length/complete.length):0;
+  const part=(rows:OrderProfitBase[],share:number)=>{const t=sumRows(rows.map((b)=>b.totals));
+    return {orders_count:rows.length,revenue_iqd:rows.reduce((v,b)=>v+orderRevenue(b),0),
+      owner_net_iqd:t.owner_net_iqd===null||truncated?null:n(t.owner_net_iqd)-share,
+      net_after_report_adjustments_iqd:t.net_after_report_adjustments_iqd===null||truncated?null:n(t.net_after_report_adjustments_iqd)-share,
+      order_ids:rows.map((b)=>b.order_id)};};
   const lines=missingCostLines(bases),unknown=lines.filter((l)=>l.cogs_iqd===null);
   const products=new Map<string,{product_id:string|null;name:string;qty:number;lines:number}>();
   for(const l of unknown){const key=l.product_id??l.name,p=products.get(key)??{product_id:l.product_id,name:l.name,qty:0,lines:0};p.qty+=l.cost_qty;p.lines++;products.set(key,p);}
   return {
     known:complete.length?{orders_count:complete.length,incomplete_orders:bases.length-complete.length,revenue_iqd:amounts.revenue_iqd,cost_iqd:amounts.cost_iqd,owner_net_iqd:amounts.owner_net_iqd,
-      overhead_share_iqd:overhead.general+overhead.unallocated}:null,
+      net_after_report_adjustments_iqd:known.net_after_report_adjustments_iqd===null||truncated?null:n(known.net_after_report_adjustments_iqd)-overheadTotal,
+      overhead_share_iqd:overheadTotal,confirmed:part(confirmed,confirmedOverhead),estimated:part(estimated,overheadTotal-confirmedOverhead)}:null,
     missing_costs:{lines:lines.length,orders:new Set(lines.map((l)=>l.order_id)).size,unknown_lines:unknown.length,estimated_lines:lines.length-unknown.length,
       unknown_products:[...products.values()].sort((a,b)=>b.qty-a.qty)},
   };
@@ -195,7 +214,9 @@ async function addInvestors(db:D1Database,bases:OrderProfitBase[],live=false){
   const ids=JSON.stringify(bases.map((b)=>b.order_id));
   const [rows,funded,errors]=await Promise.all([
     db.prepare(`SELECT a.order_id,a.order_item_id,r.profit_iqd,r.loss_iqd,r.pending,r.snapshot,${investorProjectionStaleSql('r.contract_id')} projection_stale FROM investor_allocation_results r JOIN order_item_inventory_allocations a ON a.id=r.allocation_id WHERE a.order_id IN (SELECT value FROM json_each(?))`).bind(ids).all<Row>(),
-    db.prepare('SELECT DISTINCT a.order_id,a.order_item_id FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id JOIN investment_contracts c ON c.incoming_id=l.incoming_id WHERE a.order_id IN (SELECT value FROM json_each(?)) AND a.released_at IS NULL').bind(ids).all<Row>(),
+    // Funded = an ACTIVE agreement, as investorOrderSplit projects it: a voided one never gets a projection,
+    // so counting it here held the sale's net as unknown for ever (audit V1, DECISIONS row 313).
+    db.prepare("SELECT DISTINCT a.order_id,a.order_item_id FROM order_item_inventory_allocations a JOIN inventory_lots l ON l.id=a.lot_id JOIN investment_contracts c ON c.incoming_id=l.incoming_id AND c.state='active' WHERE a.order_id IN (SELECT value FROM json_each(?)) AND a.released_at IS NULL").bind(ids).all<Row>(),
     db.prepare('SELECT order_id FROM finance_posting_errors WHERE order_id IN (SELECT value FROM json_each(?))').bind(ids).all<Row>()]);
   for(const b of bases){let pending=false;
     for(const l of b.lines){const rr=(rows.results??[]).filter((r)=>r.order_id===b.order_id&&r.order_item_id===l.id),isFunded=(funded.results??[]).some((r)=>r.order_id===b.order_id&&r.order_item_id===l.id);
@@ -282,8 +303,10 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   const totals=sumCents([...orders.values()].map((o)=>o.cents));
   const ownerNet=totals.owner_net_cents??null;
   const periodNet=ownerNet===null||truncated?null:ownerNet-general-unallocated;
+  // As in dinars: the orders after their own deductions (a returned trade-in credit included), minus the period's overheads.
+  const afterDeductions=totals.net_after_report_adjustments_cents;
   Object.assign(totals,{general_expenses_cents:general,unallocated_promotion_cents:unallocated,owner_period_net_cents:periodNet,
-    owner_period_net_after_report_adjustments_cents:periodNet===null?null:periodNet-(totals.coupon_cents??0)-(totals.price_protection_cents??0)});
+    owner_period_net_after_report_adjustments_cents:periodNet===null||afterDeductions===null||afterDeductions===undefined?null:afterDeductions-general-unallocated});
   const byDay=new Map<string,Cents[]>();for(const b of bases){const day=deliveredDay(b),rows=byDay.get(day)??[];rows.push(orders.get(b.order_id)!.cents);byDay.set(day,rows);}
   const daily:Record<string,ReturnType<typeof chartCents>>={};
   for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10);
@@ -291,7 +314,9 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   const kinds=Object.fromEntries(ORDER_KINDS.map((kind)=>[kind,sumCents(bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal').map((b)=>orders.get(b.order_id)!.cents))]));
   const lines=bases.flatMap((b)=>b.lines.map((l)=>({...l,order_id:b.order_id})));
   // `known` (the complete orders, with their share of the period's overhead) in cents, as /summary's IQD `known`.
-  const known=done.complete.length?chartCents(sumCents(done.complete.map((b)=>orders.get(b.order_id)!.cents)),Math.round(general*done.share),Math.round(unallocated*done.share),truncated):null;
+  const knownCents=done.complete.length?sumCents(done.complete.map((b)=>orders.get(b.order_id)!.cents)):null,knownOverhead=Math.round(general*done.share)+Math.round(unallocated*done.share);
+  const known=knownCents?{...chartCents(knownCents,Math.round(general*done.share),Math.round(unallocated*done.share),truncated),
+    net_after_report_adjustments_cents:truncated||knownCents.net_after_report_adjustments_cents==null?null:knownCents.net_after_report_adjustments_cents-knownOverhead}:null;
   return {available:true as const,today_rate:steps?.today??null,...basisCounts(orders),approximate,known,
     orders:orderBlock(orders),kinds,products:groupedCents(lines,'product',orders),
     categories:{main:groupedCents(lines,'main',orders),sub:groupedCents(lines,'sub',orders)},
@@ -321,27 +346,37 @@ adminFinanceWorkspaceRoutes.get('/participant-report',async c=>{const r=range(c.
 adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to')),display=displayOf(c.req.query('display'));
   const {bases,truncated}=await selectOrders(db,r,{summary:true});
-  const [expenses,failures,promotions]=await Promise.all([
+  // An expense linked to an order is that order's cost while the order can still be
+  // delivered (it waits for it, and is counted on its delivery). Once the order ended
+  // without a delivery — cancelled, returned, refunded — it is a cost of the shop like
+  // rent, on its own day; before 2026-11-11 it vanished from every figure (DECISIONS row 313).
+  const [expenses,failures,promotions,waiting]=await Promise.all([
     db.prepare(`SELECT e.expense_day,COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ?
-      AND NOT EXISTS(SELECT 1 FROM finance_expense_links l WHERE l.expense_id=e.id AND l.order_id IS NOT NULL)
+      AND NOT EXISTS(SELECT 1 FROM finance_expense_links l JOIN orders lo ON lo.id=l.order_id WHERE l.expense_id=e.id AND lo.status NOT IN ('cancelled','returned','refunded'))
       AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id)
       AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)
       AND NOT EXISTS(SELECT 1 FROM finance_monthly_promotions p WHERE p.expense_id=e.id) GROUP BY e.expense_day`).bind(r.from,r.to).all<Row>(),
     db.prepare('SELECT event_key id,order_id,message,last_attempt_at FROM finance_posting_errors WHERE order_id IN (SELECT value FROM json_each(?)) ORDER BY last_attempt_at DESC LIMIT 100').bind(JSON.stringify(bases.map((b)=>b.order_id))).all<Row>(),
-    db.prepare("SELECT *,CASE WHEN currency='IQD' THEN amount_minor ELSE amount_minor/100.0 END amount FROM finance_monthly_promotions WHERE month BETWEEN ? AND ? ORDER BY month,id").bind(r.from.slice(0,7),r.to.slice(0,7)).all<Row>()]);
+    db.prepare("SELECT *,CASE WHEN currency='IQD' THEN amount_minor ELSE amount_minor/100.0 END amount FROM finance_monthly_promotions WHERE month BETWEEN ? AND ? ORDER BY month,id").bind(r.from.slice(0,7),r.to.slice(0,7)).all<Row>(),
+    // Costs entered in the period for orders still on their way: not in this period's net, and named so they are not lost.
+    db.prepare(`SELECT COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e JOIN finance_expense_links l ON l.expense_id=e.id JOIN orders lo ON lo.id=l.order_id
+      WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ? AND lo.status NOT IN ('delivered','cancelled','returned','refunded')`).bind(r.from,r.to).first<Row>()]);
   const expenseDays=expenses.results??[],totals=sumRows(bases.map((b)=>b.totals));totals.orders_count=bases.length;totals.general_expenses_iqd=expenseDays.reduce((v,e)=>v+n(e.total),0);
+  totals.general_waiting_iqd=n(waiting?.total);
   let unallocated=0;const unallocatedDays=new Map<string,number>();
   for(const month of new Set((promotions.results??[]).map((p)=>s(p.month))))if(`${month}-01`>=r.from&&`${month}-01`<=r.to){const amount=(await monthlyPromotionShares(db,month)).unallocated_iqd;unallocated+=amount;unallocatedDays.set(`${month}-01`,amount);}
   totals.unallocated_promotion_iqd=unallocated;
   totals.owner_period_net_iqd=totals.owner_net_iqd===null||truncated?null:n(totals.owner_net_iqd)-n(totals.general_expenses_iqd)-unallocated;
-  // F4/F5 at the period level: «الصافي بعد خصومات التقرير» beside «صافي المالك».
-  totals.owner_period_net_after_report_adjustments_iqd=totals.owner_period_net_iqd===null?null:n(totals.owner_period_net_iqd)-n(totals.coupon_iqd)-n(totals.price_protection_iqd);
+  // F4/F5 at the period level: «الصافي بعد خصومات التقرير» — the orders after their own
+  // deductions (coupon, credited price protection AND a returned trade-in credit, as each
+  // order and product already counts it), minus the period's overheads (DECISIONS row 313).
+  totals.owner_period_net_after_report_adjustments_iqd=totals.owner_period_net_iqd===null||totals.net_after_report_adjustments_iqd===null?null:n(totals.net_after_report_adjustments_iqd)-n(totals.general_expenses_iqd)-unallocated;
   if(truncated)totals.owner_net_iqd=null;
   const exceptions:Row[]=[...(failures.results??[]).map((e)=>({...e,type:'posting_failed'}))];
   for(const b of bases)for(const warning of b.warnings)exceptions.push({id:`${b.order_id}:${warning}`,order_id:b.order_id,type:warning.split(':')[0],message:warning.startsWith('cost:')?'تكلفة البضاعة تحتاج تثبيت FIFO أو تحققًا ماليًا خاصًا':warning==='investor:pending'?'توزيع المستثمر ينتظر التسوية':'يوجد بند مالي يحتاج مراجعة'});
   for(const b of bases)if(n(b.totals.pending_costs)>0)exceptions.push({id:`${b.order_id}:pending_cost`,order_id:b.order_id,type:'pending_cost',message:'الأجور أو المواد تنتظر تثبيت التكلفة'});
   const lines=bases.flatMap((b)=>b.lines);
-  const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated),orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sold_units'};
+  const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated),orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sales_value'};
   if(display==='IQD')return c.json(answer);
   return c.json({...answer,display_usd:await summaryInUsd(db,bases,r,expenseDays,unallocatedDays,truncated,n(totals.pending_costs)>0)});
 });
@@ -473,7 +508,7 @@ adminFinanceWorkspaceRoutes.get('/promotions',async(c)=>{
   // books a promotion at it unless that rate is sent as the rate actually paid.
   const start=baghdadDayStart(`${month}-01`),steps=start===null?null:await usdSteps(c.env.DB,[start]),hit=usdRateAt(steps,start);
   const rate_suggestion=hit?{rate:hit.rate,date:`${month}-01`,usd_basis:hit.basis}:null;
-  return c.json({success:true,month,promotions:allocation.promotions,total_iqd:allocation.total_iqd,unallocated_iqd:allocation.unallocated_iqd,allocation_basis:'sold_units',rate_suggestion});
+  return c.json({success:true,month,promotions:allocation.promotions,total_iqd:allocation.total_iqd,unallocated_iqd:allocation.unallocated_iqd,allocation_basis:'sales_value',rate_suggestion});
 });
 async function promotionValues(db:D1Database,b:Row,old?:Row){
   const month=b.month===undefined?s(old?.month):text(b.month,7);if(!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw badRequest('الشهر غير صحيح');
@@ -520,10 +555,12 @@ async function promotionWrite(db:D1Database,actor:string,id:string|null,b:Row,di
 adminFinanceWorkspaceRoutes.post('/promotions',async(c)=>{const actor=c.get('user')!;await requireCapability(c.env,actor,'accounting');return c.json({success:true,...await promotionWrite(c.env.DB,actor.id,null,await c.req.json<Row>())});});
 adminFinanceWorkspaceRoutes.patch('/promotions/:id',async(c)=>{const actor=c.get('user')!;await requireCapability(c.env,actor,'accounting');return c.json({success:true,...await promotionWrite(c.env.DB,actor.id,c.req.param('id'),await c.req.json<Row>())});});
 adminFinanceWorkspaceRoutes.delete('/promotions/:id',async(c)=>{const actor=c.get('user')!;await requireCapability(c.env,actor,'accounting');return c.json({success:true,...await promotionWrite(c.env.DB,actor.id,c.req.param('id'),{},true)});});
-const csvCell=(v:unknown)=>`"${s(v).replace(/^[=+\-@\t\r]/,"'$&").replace(/"/g,'""')}"`;
+// An amount is written as a number, so a spreadsheet sums it (a loss included); only
+// text that could start a formula gets the leading «'» (DECISIONS row 313).
+const csvCell=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)?String(v):`"${s(v).replace(/^[=+\-@\t\r]/,"'$&").replace(/"/g,'""')}"`;
 adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   const r=range(c.req.query('from'),c.req.query('to')),{bases,truncated}=await selectOrders(c.env.DB,r,{summary:true});if(truncated)throw badRequest('اختر فترة أضيق لتصدير جميع البنود');
-  const fields=['order_id','id','product_id','name_snapshot','sku_snapshot','qty','returned_qty','main_name','sub_name','net_goods_iqd','refund_iqd','cogs_iqd','cost_confidence','gross_profit_iqd','wages_iqd','materials_iqd','manual_direct_iqd','shipping_income_iqd','cod_tax_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd','investor_iqd','owner_net_iqd'];
+  const fields=['order_id','id','product_id','name_snapshot','sku_snapshot','qty','returned_qty','main_name','sub_name','net_goods_iqd','refund_iqd','cogs_iqd','cost_confidence','gross_profit_iqd','wages_iqd','materials_iqd','manual_direct_iqd','shipping_income_iqd','cod_tax_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd','investor_iqd','owner_net_iqd','pending_costs','coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd'];
   const rows=[fields.map(csvCell).join(','),...bases.flatMap((b)=>b.lines.map((l)=>fields.map((f)=>csvCell(f==='order_id'?b.order_id:l[f])).join(',')))];
   return new Response('\uFEFF'+rows.join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="finance-lines-${r.from}-${r.to}.csv"`}});
 });

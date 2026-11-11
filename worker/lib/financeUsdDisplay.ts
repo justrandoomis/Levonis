@@ -47,7 +47,7 @@ export function iqdToCents(iqd: unknown, rate: string): number | null {
 export const ADDITIVE_IQD_FIELDS = [
   'net_goods_iqd', 'refund_iqd', 'cogs_iqd', 'shipping_income_iqd', 'cod_tax_iqd', 'direct_cost_iqd', 'wages_iqd',
   'materials_iqd', 'manual_direct_iqd', 'courier_fee_iqd', 'payment_fee_iqd', 'promotion_iqd', 'investor_iqd',
-  'collected_iqd', 'collection_difference_iqd', 'coupon_iqd', 'price_protection_iqd',
+  'collected_iqd', 'collection_difference_iqd', 'coupon_iqd', 'price_protection_iqd', 'trade_in_credit_returned_iqd',
 ] as const;
 
 const cent = (field: string) => field.replace(/_iqd$/, '_cents');
@@ -67,7 +67,9 @@ const DERIVED: ReadonlyArray<readonly [string, (c: Cents) => number | null]> = [
   ['contribution_profit_iqd', (c) => combine(c, ['gross_profit_iqd', 'shipping_income_iqd', 'cod_tax_iqd'], ['direct_cost_iqd', 'manual_direct_iqd', 'courier_fee_iqd', 'payment_fee_iqd'])],
   ['profit_basis_iqd', (c) => v(c, 'contribution_profit_iqd')],
   ['owner_net_iqd', (c) => combine(c, ['profit_basis_iqd'], ['promotion_iqd', 'investor_iqd'])],
-  ['net_after_report_adjustments_iqd', (c) => combine(c, ['owner_net_iqd'], ['coupon_iqd', 'price_protection_iqd'])],
+  // A returned trade-in credit comes off like its dinar twin (DECISIONS row 313); a row
+  // that never carried one (a product, a category) simply has nothing to take off.
+  ['net_after_report_adjustments_iqd', (c) => { const net = combine(c, ['owner_net_iqd'], ['coupon_iqd', 'price_protection_iqd']); return net === null ? null : net - (c[cent('trade_in_credit_returned_iqd')] ?? 0); }],
 ];
 
 /**

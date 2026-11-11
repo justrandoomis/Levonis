@@ -291,8 +291,9 @@ in kind; returned credit is removed from retained revenue.
 Otherwise unlinked operating expenses, excluding the expense attached to a
 monthly promotion, use all sold units in the delivery's Baghdad month.
 Changes to that ordinary overhead or its sold-unit population invalidate
-affected balances for bounded reconciliation. Promotion still uses the
-monthly sold-unit allocation in the owner's report only. Adding, editing or
+affected balances for bounded reconciliation. Promotion is shared by
+sales value (each line's net sale in its delivery month) in the owner's
+report only (owner 2026-11-11, DECISIONS row 313). Adding, editing or
 disabling promotion cannot reduce or block participant balances. Missing inventory
 cost or other pending costs remain unknown rather than zero.
 

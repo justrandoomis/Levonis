@@ -109,7 +109,8 @@ export default function MonthlyCosts({ month, onChanged }: { month: string; onCh
     </Surface>}
     <Surface title={loc('كيف يؤثر على الأرباح؟', 'How does this affect profit?')}>
       <Row label={loc('نطاق التوزيع', 'Allocation scope')} value={loc('كل منتجات الشهر', 'All products sold this month')} />
-      <Row label={loc('طريقة التوزيع', 'Allocation method')} value={loc('حسب عدد القطع المباعة', 'By sold units')} />
+      <Row label={loc('طريقة التوزيع', 'Allocation method', 'شێوازی دابەشکردن')} value={loc('حسب قيمة المبيعات', 'By sales value', 'بەپێی بەهای فرۆشتن')}
+        hint={loc('كل منتج يحمل من ترويج الشهر بقدر حصته من مبيعات الشهر', 'Each product carries the month’s promotion in proportion to its share of the month’s sales', 'هەر بەرهەمێک بەپێی بەشی خۆی لە فرۆشتنی مانگەکە بانگەشەی مانگەکە هەڵدەگرێت')} />
       <Row label={loc('حصة الموظف والمستثمر', 'Staff and investor share')} value={loc('لا تخصم منها تكلفة الترويج', 'Unaffected by promotion')} />
       {unallocated > 0 && <Row label={loc('ترويج بانتظار مبيعات الشهر', 'Promotion awaiting this month’s sales')} value={<Money value={unallocated} />} hint={loc('يظهر الآن ضمن تكاليف المالك، ويتوزع عند بيع القطع.', 'Already included in owner costs; allocated when units sell.')} />}
       <p className="fw-note">{loc('عند تعديل المبلغ، تتحدث تفاصيل الطلبات والمنتجات وحصة المالك للشهر. يسجل النظام التعديل تلقائيًا.', 'Changing the amount updates orders, products and the owner’s monthly share. Changes are recorded automatically.')}</p>

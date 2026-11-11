@@ -10,6 +10,7 @@ import OrderProfitSheet, { type OrderFocus } from './OrderProfitSheet';
 import MonthlyCosts from './MonthlyCosts';
 import './finance-workspace.css';
 import { orderFinancePresentation } from './orderFinancePresentation';
+import { overviewNet } from './overviewFigures';
 import ReportDeductions from './ReportDeductions';
 import { CurrencyToggle, DisplayCurrencyContext, DisplayMoney, UsdBasisNote, centsAt, useDisplayCurrency, type DisplayCurrency } from './displayCurrency';
 import VariantImg from '../ui/VariantImg';
@@ -42,7 +43,8 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   const [range, setRange] = useState(initialPeriod.range);
   const [draft, setDraft] = useState(initialPeriod.range);
   const [rangeError, setRangeError] = useState(initialPeriod.invalid);
-  const [preset, setPreset] = useState('custom');
+  // The select names the range it shows: the month so far unless the link carried its own dates.
+  const [preset, setPreset] = useState(() => { const m = financePreset('month'); return initialPeriod.range.from === m.from && initialPeriod.range.to === m.to ? 'month' : 'custom'; });
   const [data, setData] = useState<FinanceSummary | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState('');
@@ -145,7 +147,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
         {section === 'settlements' && <WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} />}
         {section === 'accounting' && <>
           <Surface title={loc('المحاسبة', 'Accounting')} subtitle={loc('الأرصدة والقيود والتسويات المعتمدة', 'Balances, journals and verified settlements')}>
-            <Row label={loc('دفتر القيود وميزان المراجعة', 'Journal and trial balance')} value={<ArrowUpLeft size={18} />} onClick={() => setAdvanced(true)} />
+            <Row label={loc('دفتر القيود وميزان المراجعة', 'Journal and trial balance', 'دەفتەری تۆمارەکان و هاوسەنگیی پێداچوونەوە')} value={null} onClick={() => setAdvanced(true)} />
             <p className="fw-note">{loc('الأرقام اليومية تُحتسب تلقائيًا من العمليات. افتح هذه الأدوات لإدخال الأرصدة الافتتاحية ومراجعة الحسابات وإغلاق الشهر.', 'Daily figures follow operations automatically. Use these tools for opening balances, account review and closing the month.')}</p>
           </Surface>
           {advanced && <FinanceOperationsPanel from={range.from} to={range.to} initialTab="accounting" onChanged={refresh} />}
@@ -173,17 +175,21 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
   const ut = u?.totals;
   const c = (field: string) => centsAt(ut, field);
   const incomplete = (t.unknown_lines ?? 0) + (t.pending_costs ?? 0);
-  const needsReview = incomplete > 0 || t.owner_period_net_iqd === null;
-  const fullNet = t.owner_period_net_iqd !== undefined ? t.owner_period_net_iqd : t.owner_net_iqd;
+  // «صافي حصتك» after the order deductions, from the complete orders while some are not, with what rests on
+  // estimates named — worked out in overviewFigures (DECISIONS row 313); this component only words it.
+  const figures = overviewNet(data, u);
+  const { net, fromKnown: netFromKnown, marginBase, deductions } = figures;
+  const needsReview = figures.state === 'review';
   const revenue = data.chart_data?.revenue_iqd;
   // An incomplete total shows what the complete orders say, and says so — never a bare dash.
-  // `known` is null when no order of the period is complete: the tiles keep the dash and its note.
+  // `known` is null when no order of the period is complete: the tiles say «ناقص» and why.
   const known = data.known ?? undefined, missing = data.missing_costs;
   const knownOnly = (value: number | null | undefined) => value == null && !!known && known.incomplete_orders > 0;
-  const netFromKnown = knownOnly(fullNet) && known!.owner_net_iqd != null;
-  const net = fullNet ?? (netFromKnown ? known!.owner_net_iqd : null);
+  const estimatedOrders = figures.estimated?.orders ?? 0;
+  const estimateNote = figures.confirmed && figures.estimated && estimatedOrders > 0
+    ? `${loc('مؤكد', 'Confirmed', 'دڵنیاکراو')} ${formatMoney(figures.confirmed.net)} (${figures.confirmed.orders}) · ${loc('من طلبات فيها تكلفة تقديرية', 'from orders with estimated costs', 'لە داواکاری بە تێچووی خەمڵێنراو')} ${formatMoney(figures.estimated.net)} (${estimatedOrders})`
+    : '';
   // The margin of the complete orders is over their own revenue, as their net carries only their share of the overhead.
-  const marginBase = netFromKnown ? known!.revenue_iqd : revenue;
   const margin = net != null && marginBase != null && marginBase > 0 ? `${(net / marginBase * 100).toFixed(1)}%` : '—';
   const costFromKnown = knownOnly(data.chart_data?.cost_iqd) && known!.cost_iqd != null;
   const cost = data.chart_data?.cost_iqd ?? (costFromKnown ? known!.cost_iqd : null);
@@ -191,13 +197,17 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
   const uk = u ? u.known ?? null : undefined;
   const knownNote = known ? `${loc('من الطلبات المكتملة فقط', 'From complete orders only')} (${known.orders_count}/${t.orders_count ?? data.orders.length})${(known.overhead_share_iqd ?? 0) > 0 ? loc('، مع حصتها من المصاريف العامة بنسبة إيرادها', ', with their share of general expenses by revenue') : ''}` : '';
   const metrics = [
-    { label: loc('صافي حصتك', 'Your net share'), value: net, cents: ut ? netFromKnown ? uk?.owner_net_cents ?? null : (t.owner_period_net_iqd !== undefined ? ut.owner_period_net_cents : ut.owner_net_cents) ?? null : undefined, note: `${loc('هامش حصتك', 'Your share margin')} ${margin}${netFromKnown ? ` · ${knownNote}` : ''}`, primary: true },
+    { label: loc('صافي حصتك', 'Your net share', 'سافی بەشی تۆ'), value: net, cents: figures.cents,
+      note: [`${loc('هامش حصتك', 'Your share margin', 'پەراوێزی بەشەکەت')} ${margin}`, netFromKnown ? knownNote : '', estimateNote,
+        deductions > 0 ? `${loc('بعد الكوبونات وحماية السعر ورصيد الاستبدال المُعاد', 'After coupons, price protection and returned trade-in credit', 'دوای کۆپۆن و پاراستنی نرخ و باڵانسی گۆڕینەوەی گەڕاوە')} −${formatMoney(deductions)}` : ''].filter(Boolean).join(' · '), primary: true },
     { label: loc('الإيراد', 'Revenue'), value: revenue, cents: u?.chart ? u.chart.revenue_cents : undefined, note: loc('بعد المرتجعات، مع إيراد التوصيل والدفع', 'After refunds, including delivery and payment income') },
-    { label: loc('إجمالي التكاليف', 'Total costs'), value: cost, cents: u?.chart ? costFromKnown ? uk?.cost_cents ?? null : u.chart.cost_cents : undefined, note: `${loc('البضاعة والتشغيل والترويج والمصاريف العامة', 'Goods, operations, promotion and general expenses')}${costFromKnown ? ` · ${knownNote}` : ''}` },
+    { label: loc('إجمالي التكاليف', 'Total costs'), value: cost, cents: u?.chart ? costFromKnown ? uk?.cost_cents ?? null : u.chart.cost_cents : undefined, note: `${loc('البضاعة والتشغيل والترويج والمصاريف العامة، دون حصص المستثمرين', 'Goods, operations, promotion and general expenses, without investor shares', 'کاڵا و کارپێکردن و بانگەشە و خەرجییە گشتییەکان، بەبێ بەشی وەبەرهێنەران')}${costFromKnown ? ` · ${knownNote}` : ''}` },
   ];
   const sum = (a: number | null | undefined, b: number | null | undefined) => a == null || b == null ? null : a + b;
   return <>
-    <div className="fw-overview-caption"><h2>{loc('الأداء المالي للفترة', 'Financial performance')}</h2>{needsReview ? <Status tone="warning">{loc('الحساب يحتاج مراجعة', 'Figures need review')}</Status> : <Status><ShieldCheck size={13} />{loc('الطلبات المستلمة', 'Delivered orders')}</Status>}</div>
+    <div className="fw-overview-caption"><h2>{loc('الأداء المالي للفترة', 'Financial performance')}</h2>{needsReview ? <Status tone="warning">{loc('الحساب يحتاج مراجعة', 'Figures need review', 'ژمێریاری پێویستی بە پێداچوونەوەیە')}</Status>
+      : estimatedOrders > 0 ? <Status tone="warning">{loc('فيه تكلفة تقديرية', 'Includes estimated costs', 'تێچووی خەمڵێنراوی تێدایە')}</Status>
+        : <Status tone="positive"><ShieldCheck size={13} />{loc('كل التكاليف مؤكدة', 'All costs confirmed', 'هەموو تێچووەکان دڵنیاکراون')}</Status>}</div>
     {currency === 'USD' && <UsdBasisNote available={!!data.display_usd?.available} atTimeCount={data.display_usd?.at_time_count} todayCount={data.display_usd?.today_count} todayRate={data.display_usd?.today_rate} batchLines={data.display_usd?.batch_cost_lines} />}
     <div className="fw-metrics">{metrics.map((m) => <div className={`fw-metric${m.primary ? ' fw-metric--primary' : ''}`} key={m.label}><span>{m.label}</span><DisplayMoney iqd={m.value} cents={m.cents} /><small>{m.note}</small></div>)}
       <div className="fw-metric"><span>{loc('الطلبات المستلمة', 'Delivered orders')}</span><strong>{t.orders_count ?? data.orders.length}</strong><small>{t.units ?? 0} {loc('قطعة مباعة', 'units sold')} · <DisplayMoney iqd={revenue != null && (t.orders_count ?? 0) > 0 ? revenue / t.orders_count! : null} cents={u?.chart ? ((t.orders_count ?? 0) > 0 ? Math.round(u.chart.revenue_cents / t.orders_count!) : null) : undefined} compact /> {loc('متوسط الطلب', 'average order')}</small></div>
@@ -209,11 +219,12 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
       {missing.estimated_lines > 0 && <p>{loc('بنود بسعر تقديري من وقت البيع، غير مثبت', 'Lines priced only by a sale-time estimate, not confirmed', 'بڕگەی تەنها بە خەمڵاندنی کاتی فرۆشتن نرخدراو، جێگیرنەکراو')}: {missing.estimated_lines}</p>}
       <Button onClick={onMissing}>{loc('أكمل التكاليف الناقصة', 'Complete the missing costs', 'تێچووە کەمەکان تەواو بکە')} ({missing.lines})</Button>
     </div>}
-    {needsReview && (net == null || cost == null || (!!u && ((netFromKnown && uk?.owner_net_cents == null) || (costFromKnown && uk?.cost_cents == null)))) && <p className="fw-note">{loc('الشرطة (—) تعني قيمة لم تكتمل، ولا تعني صفرًا. راجع التكاليف أو توزيع الأرباح قبل اعتماد الصافي.', 'A dash (—) means an incomplete value, not zero. Review costs or profit distribution before accepting the net figure.')}</p>}
+    {needsReview && (net == null || cost == null || (!!u && ((netFromKnown && uk?.owner_net_cents == null) || (costFromKnown && uk?.cost_cents == null)))) && <p className="fw-note">{loc('«ناقص» تعني قيمة لم تكتمل بعد، ولا تعني صفرًا. أكمل التكاليف أو سجّل النقد المستلم ليكتمل الصافي.', '«Missing» means a value that is not complete yet, not zero. Complete the costs or record the cash received to complete the net.', '«ناتەواو» واتە بەهایەک کە هێشتا تەواو نەبووە، نەک سفر. تێچووەکان تەواو بکە یان پارەی وەرگیراو تۆمار بکە بۆ ئەوەی ساف تەواو بێت.')}</p>}
     <Suspense fallback={<Loading text={loc('تحميل الرسوم المالية…', 'Loading financial charts…')} />}><OverviewCharts data={data} usd={u} /><ParticipantCharts from={from} to={to} revision={revision} /></Suspense>
     <details className="fw-advanced"><summary>{loc('تفصيل الحساب: من البيع إلى حصتك', 'Calculation breakdown: from sales to your share')}</summary><Surface>
       <Row label={loc('ربح البضاعة', 'Goods profit')} value={<DisplayMoney iqd={t.gross_profit_iqd} cents={c('gross_profit_iqd')} />} />
-      <Row label={loc('أجور الموظفين', 'Staff earnings')} value={<DisplayMoney iqd={t.wages_iqd} cents={c('wages_iqd')} />} onClick={() => onNavigate('staff')} />
+      <Row label={loc('أجور الموظفين', 'Staff earnings')} value={<DisplayMoney iqd={t.wages_iqd} cents={c('wages_iqd')} />} onClick={() => onNavigate('staff')}
+        hint={(t.pending_costs ?? 0) > 0 ? `${loc('لا يشمل أجورًا تنتظر تكلفتها', 'Excludes wages still waiting for their cost', 'ئەو کرێیانە ناگرێتەوە کە چاوەڕێی تێچووەکەیانن')} (${t.pending_costs})` : undefined} />
       <Row label={loc('المواد والتكاليف الإضافية', 'Materials and extra costs')} value={<DisplayMoney iqd={t.materials_iqd == null || t.manual_direct_iqd == null ? null : t.materials_iqd + t.manual_direct_iqd} cents={ut ? sum(c('materials_iqd'), c('manual_direct_iqd')) : undefined} />} />
       <Row label={loc('التوصيل على الزبائن', 'Delivery income')} value={<DisplayMoney iqd={t.shipping_income_iqd} cents={c('shipping_income_iqd')} />} />
       <Row label={loc('رسوم الدفع عند الاستلام', 'Cash-on-delivery income')} value={<DisplayMoney iqd={t.cod_tax_iqd} cents={c('cod_tax_iqd')} />} />
@@ -222,8 +233,10 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
       {(t.unallocated_promotion_iqd ?? 0) > 0 && <Row label={loc('ترويج لم تُبع له قطع بعد', 'Promotion without sold units')} value={<DisplayMoney iqd={t.unallocated_promotion_iqd} cents={c('unallocated_promotion_iqd')} />} onClick={() => onNavigate('monthly')} />}
       <Row label={loc('حصة المستثمرين', 'Investor share')} value={<DisplayMoney iqd={t.investor_iqd} cents={c('investor_iqd')} />} onClick={() => onNavigate('investors')} hint={(t.investor_iqd ?? 0) < 0 ? loc('مساهمة المستثمر في الخسارة', 'Investor contribution to the loss') : undefined} />
       <Row label={loc('المصاريف العامة', 'General expenses')} value={<DisplayMoney iqd={t.general_expenses_iqd} cents={c('general_expenses_iqd')} />} onClick={() => onNavigate('monthly')} />
+      {(t.general_waiting_iqd ?? 0) > 0 && <Row label={loc('تكاليف تنتظر تسليم طلباتها', 'Costs waiting for their orders to be delivered', 'تێچووی چاوەڕوانی گەیاندنی داواکارییەکانیان')} value={<DisplayMoney iqd={t.general_waiting_iqd} />}
+        hint={loc('سُجّلت في هذه الفترة لطلبات لم تُسلَّم بعد؛ تُحسب عند تسليمها، ولا تدخل هذا الصافي', 'Entered in this period for orders not delivered yet; they count on delivery, not in this net', 'لەم ماوەیەدا بۆ داواکاری نەگەیەندراو تۆمارکراون؛ لە کاتی گەیاندندا دەژمێردرێن، نەک لەم سافەدا')} />}
       <Row label={loc('صافي المالك', 'Owner net')} value={<DisplayMoney iqd={t.owner_period_net_iqd !== undefined ? t.owner_period_net_iqd : t.owner_net_iqd} cents={t.owner_period_net_iqd !== undefined ? c('owner_period_net_iqd') : c('owner_net_iqd')} />} prominent />
-      <ReportDeductions totals={t} net={t.owner_period_net_after_report_adjustments_iqd} cents={ut ? { coupon: c('coupon_iqd'), credit: c('price_protection_iqd'), net: c('owner_period_net_after_report_adjustments_iqd') } : undefined} />
+      <ReportDeductions totals={t} net={t.owner_period_net_after_report_adjustments_iqd} cents={ut ? { coupon: c('coupon_iqd'), credit: c('price_protection_iqd'), tradeIn: c('trade_in_credit_returned_iqd'), net: c('owner_period_net_after_report_adjustments_iqd') } : undefined} />
     </Surface></details>
     {data.kinds && <Surface title={loc('حسب نوع الطلب', 'By order type', 'بەپێی جۆری داواکاری')} subtitle={loc('الطلبات المستلمة في الفترة نفسها، مقسومة حسب طريقة إنشائها.', 'The same delivered orders, split by how each was placed.', 'هەمان داواکارییە گەیەندراوەکان، بەپێی شێوازی دروستکردنیان.')}>
       {data.kinds.map((k) => <Row key={k.kind} label={orderKindName(k.kind, loc)}
@@ -235,9 +248,11 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
       {data.orders?.length ? <div className="fw-list">{data.orders.slice(0, 3).map((o) => <OrderRow order={o} usd={u?.orders?.[o.order_id || o.id]} key={o.id} onClick={() => openOrder(o.order_id || o.id)} />)}</div> : <Empty title={loc('لا طلبات مستلمة في الفترة', 'No delivered orders in this range')} text={loc('يمكن أن تبقى المصاريف العامة والترويج مستحقين حتى دون مبيعات.', 'General expenses and promotion may still apply without sales.')} />}
     </Surface>
     <Surface title={loc('المتابعة', 'Follow-up')}>
-      <Row label={loc('حصص المستثمرين', 'Investor shares')} value={<DisplayMoney iqd={t.investor_iqd} cents={c('investor_iqd')} />} onClick={() => onNavigate('investors')} />
-      <Row label={loc('المبالغ المحصلة', 'Cash collected')} value={<DisplayMoney iqd={t.collected_iqd} cents={c('collected_iqd')} />} />
-      <Row label={loc('فرق التحصيل', 'Collection difference')} value={<DisplayMoney iqd={t.collection_difference_iqd} cents={c('collection_difference_iqd')} />} onClick={onCollections} />
+      <Row label={loc('حصص المستثمرين', 'Investor shares')} value={<DisplayMoney iqd={t.investor_iqd} cents={c('investor_iqd')} missing={loc('ينتظر', 'Waiting', 'چاوەڕێ دەکات')} />} onClick={() => onNavigate('investors')}
+        hint={t.investor_iqd === null ? loc('حصة بيع ممول تنتظر تسجيل نقده أو تثبيت تكلفته', 'A funded sale waits for its cash to be recorded or its cost to be confirmed', 'بەشی فرۆشتنێکی دارایی چاوەڕێی تۆمارکردنی پارەکەی یان جێگیرکردنی تێچووەکەیەتی') : undefined} />
+      <Row label={loc('النقد المسجّل استلامه', 'Cash recorded as received', 'پارەی تۆمارکراو وەک وەرگیراو')} value={<DisplayMoney iqd={t.collected_iqd} cents={c('collected_iqd')} />} />
+      <Row label={loc('عند التسليم ولم يُسجَّل استلامه', 'Due on delivery, not recorded yet', 'لە کاتی گەیاندن، هێشتا تۆمار نەکراوە')} value={<DisplayMoney iqd={t.collection_difference_iqd} cents={c('collection_difference_iqd')} />} onClick={onCollections}
+        hint={loc('ليس عجزًا: مبالغ الدفع عند الاستلام التي لم يُسجَّل وصولها بعد', 'Not a shortfall: cash-on-delivery amounts whose arrival is not recorded yet', 'کەمی نییە: بڕی پارەدان لە کاتی وەرگرتن کە گەیشتنی هێشتا تۆمار نەکراوە')} />
       {needsReview && <Row label={loc('تكاليف أو تسويات تحتاج مراجعة', 'Costs or settlements need review')} value={<Status tone="warning">{incomplete || loc('مراجعة', 'Review')}</Status>} onClick={() => onNavigate('orders')} />}
       <p className="fw-note">{loc('الربح يختلف عن النقد المحصل. المرتجعات وتصحيحات التكاليف تظهر في تفاصيل الطلب.', 'Profit differs from collected cash. Returns and financial corrections appear in order details.')}</p>
     </Surface></div>
