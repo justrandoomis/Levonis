@@ -112,13 +112,16 @@ export function MissingGroup({ g, stockNote, locked, onStart, onDone, openOrder 
   const confirmId = useId();
   const confirmButton = useRef<HTMLDivElement>(null);
   const reviewBox = useRef<HTMLDivElement>(null);
-  const reviewed = useRef(false);
   // The confirmation opens on its sentence, never on «تأكيد السعر»: a second Enter on «راجِع وثبّت» confirms nothing unread.
-  // Closed, focus goes back to «راجِع وثبّت» (the independent review of step 5).
+  // Closed by «إلغاء» or Escape, focus goes back to «راجِع وثبّت» (the independent review of step 5) — and only then: closed by a
+  // keystroke in the price field, the focus stays in the field (its checker: the next digit went to «راجِع وثبّت», and Enter
+  // reopened the confirmation at the half-typed price).
+  const backToReview = useRef(false);
   useEffect(() => {
-    if (confirming) { reviewed.current = true; confirmButton.current?.querySelector<HTMLElement>('p')?.focus(); }
-    else if (reviewed.current) { reviewed.current = false; reviewBox.current?.querySelector<HTMLButtonElement>('button')?.focus(); }
+    if (confirming) confirmButton.current?.querySelector<HTMLElement>('p')?.focus();
+    else if (backToReview.current) { backToReview.current = false; reviewBox.current?.querySelector<HTMLButtonElement>('button')?.focus(); }
   }, [confirming]);
+  const cancel = () => { backToReview.current = true; setConfirming(false); };
   const unit = Number(price);
   const valid = price.trim() !== '' && Number.isSafeInteger(unit) && unit >= 0;
   const noCost = g.lines.filter((l) => l.cogs_iqd == null).length;
@@ -173,9 +176,9 @@ export function MissingGroup({ g, stockNote, locked, onStart, onDone, openOrder 
       {!confirming && <Button variant="primary" disabled={!valid || busy || locked} onClick={() => setConfirming(true)}>{cs(loc, 'missReview')}</Button>}
     </div>}
     {g.ready.length > 0 && confirming && <div className="fw-confirm" role="alertdialog" aria-labelledby={confirmId} ref={confirmButton}
-      onKeyDown={(e) => { if (e.key === 'Escape' && !busy) { e.stopPropagation(); setConfirming(false); } }}>
+      onKeyDown={(e) => { if (e.key === 'Escape' && !busy) { e.stopPropagation(); cancel(); } }}>
       <p id={confirmId} tabIndex={-1}>{loc('سعر القطعة', 'Price per piece', 'نرخی هەر پارچەیەک')} <Money value={unit} />. {count(loc('البنود', 'Lines', 'بڕگەکان'), g.ready.length)} · {count(loc('القطع المحسوبة', 'Pieces costed', 'پارچە حیسابکراوەکان'), pieces)} · {count(loc('الطلبات', 'Orders', 'داواکارییەکان'), orders)} · {loc('مجموع تكلفة البضاعة', 'Total goods cost', 'کۆی تێچووی کاڵا')} <Money value={unit * pieces} />. {loc('يُعاد حساب كل طلب.', 'Each order is recalculated.', 'هەر داواکارییەک دووبارە حیساب دەکرێتەوە.')}</p>
-      <div className="fw-fields"><Button variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</Button>
+      <div className="fw-fields"><Button variant="ghost" disabled={busy} onClick={cancel}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</Button>
         <Button variant="primary" busy={busy} disabled={locked} onClick={() => void apply()}><Check size={16} />{loc('تأكيد السعر', 'Confirm the price', 'نرخەکە پشتڕاست بکەرەوە')}</Button></div>
     </div>}
     {busy && <p className="fw-note" role="status">{done} / {g.ready.length}</p>}

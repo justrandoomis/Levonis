@@ -28,17 +28,21 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { LanguageProvider } from '../src/LanguageContext';
 import { CS, COUNTED, counted, refusalWords } from '../src/components/financeWorkspace/costsStrings';
 import { estimateRange, percentText, promotionTable, rangeFigures, sharePercents } from '../src/components/financeWorkspace/costFigures';
-import { categoryName, categoryShares, editableHere, editPatch, ELSEWHERE, entryDraft, groupEntries, inClosedMonth, KIND_LABEL, type ExpenseEntryRow, type ExpenseKind, type ExpensesAnswer } from '../src/components/financeWorkspace/expenseKinds';
+import { categoryName, categoryShares, editableHere, editPatch, ELSEWHERE, entryDraft, groupEntries, inClosedMonth, KIND_LABEL, movedFields, rebaseDraft, type ExpenseEntryRow, type ExpenseKind, type ExpensesAnswer } from '../src/components/financeWorkspace/expenseKinds';
+import { ApiError } from '../src/lib/api';
 import { PA_STRINGS } from '../src/components/financeWorkspace/displayCurrencyStrings';
 import { amountText } from '../src/components/financeWorkspace/Reports';
 import { monthText } from '../src/components/financeWorkspace/overviewStrings';
 import { DisplayCurrencyContext } from '../src/components/financeWorkspace/displayCurrency';
 import type { FinanceSummary } from '../src/components/financeWorkspace/types';
 import type { PromotionsAnswer } from '../src/components/financeWorkspace/PromotionPage';
-import { everyState, month, order, period, world } from './fixtures/financeWorld';
+import { everyState, month, order, period, previousMonth, world } from './fixtures/financeWorld';
 import { crowdedWorld, expenseWorld } from './fixtures/financeCosts';
-import { post, send } from './fixtures/app';
+import { json, patch, post, send, stubApp } from './fixtures/app';
 import { codeOf } from './fixtures/source';
+import { adminFinanceRoutes } from '../worker/routes/adminFinance';
+import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
+import { baghdadDay } from '../worker/lib/operations';
 
 let LANG: 'ar' | 'en' | 'ckb' = 'ar';
 (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => (k === 'levo_lang' ? LANG : null), setItem: () => {}, removeItem: () => {} };
@@ -407,6 +411,20 @@ test('an entry\'s day keeps its year when the period spans two; an edit sends on
   assert.deepEqual(editPatch(r, { ...d, title: 'Shop rent, November' }), { title: 'Shop rent, November' });
   assert.deepEqual(editPatch(r, { ...d, amount: '650000', category_id: 'power' }), { amount_iqd: 650000, category_id: 'power' });
   assert.deepEqual(editPatch(r, { ...d, amount: ' 600000 ' }), {}, 'the same amount, spaces around it');
+  // An editor kept open across a re-read, the entry's amount corrected elsewhere meanwhile (the checker of the review): diffed
+  // against the entry read again, the draft opened before sent the old amount back with the description.
+  const opened = { ...r, amount_iqd: 85000, title: 'Rent' }, now = { ...opened, amount_iqd: 90000 }, typed = { ...entryDraft(opened), title: 'Rent, shop' };
+  assert.deepEqual(editPatch(now, typed), { amount_iqd: 85000, title: 'Rent, shop' }, 'the write the review found');
+  assert.deepEqual(movedFields(opened, now), ['amount'], 'what the other screen changed');
+  assert.deepEqual(movedFields(opened, { ...opened }), [], 'a re-read that changed nothing');
+  // The draft follows the entry: the untouched amount takes 90,000, the typed description stays, and only it is sent.
+  const rebased = rebaseDraft(opened, now, typed);
+  assert.deepEqual(rebased, { ...typed, amount: '90000' });
+  assert.deepEqual(editPatch(now, rebased), { title: 'Rent, shop' });
+  // A field the owner typed in stays theirs, even one the other screen changed too; spaces around the same amount are untouched.
+  assert.equal(rebaseDraft(opened, now, { ...typed, amount: '87000' }).amount, '87000');
+  assert.equal(rebaseDraft(opened, now, { ...typed, amount: ' 85000 ' }).amount, '90000');
+  assert.deepEqual(rebaseDraft(opened, { ...now, title: 'Rent, March', category_id: 'power' }, typed), { ...typed, amount: '90000', category_id: 'power' }, 'every untouched field, and never the typed one');
   // The editor opens on the entry as it is, closes back on «تعديل», and «إلغاء» never voids: the void asks first.
   const src = codeOf('src/components/financeWorkspace/GeneralExpenses.tsx');
   assert.match(src, /const open = \(\) => \{ setDraft\(entryDraft\(r\)\);/);
@@ -419,10 +437,64 @@ test('an entry\'s day keeps its year when the period spans two; an edit sends on
   assert.notEqual(CS.genVoidAction[2], 'هەڵوەشاندنەوە', 'not the Sorani Cancel of the missing-cost confirmation');
   // Refusals: this table's sentence for the costs pages' codes, the shop's table for its own, else the page's fallback.
   const loc = (lang: 'ar' | 'en' | 'ckb') => (a: string, e: string, k?: string) => (lang === 'en' ? e : lang === 'ckb' ? k ?? a : a);
-  for (const [code, key] of [['PERIOD_CLOSED', 'refPeriodClosed'], ['CONFLICT', 'refConflict'], ['EXPENSE_VOIDED', 'refVoided'], ['CATEGORY_UNKNOWN', 'refCategory']] as const)
+  for (const [code, key] of [['PERIOD_CLOSED', 'refPeriodClosed'], ['CONFLICT', 'refConflict'], ['EXPENSE_VOIDED', 'refVoided'], ['CATEGORY_UNKNOWN', 'refCategory'],
+    ['CATEGORY_EXISTS', 'refCategoryExists'], ['NOT_FOUND', 'refNotFound'], ['EXPENSE_AMOUNT_INVALID', 'refAmount'], ['RATE_LIMITED', 'refRateLimited'], ['BAD_NUMBER', 'refNumber']] as const)
     for (const [i, lang] of (['ar', 'en', 'ckb'] as const).entries()) assert.equal(refusalWords(loc(lang), lang, { code, message: 'This expense is voided — restore it before editing' }, 'fallback'), CS[key][i], `${code} ${lang}`);
+  // A day the server refuses: the old ledger's own sentence for the same check, reused (never repeated in this table).
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const ledger = financeStrings(loc(lang));
+    assert.equal(refusalWords(loc(lang), lang, { code: 'EXPENSE_DAY_INVALID' }, 'fallback'), ledger.errDayNotADay);
+    assert.equal(refusalWords(loc(lang), lang, { code: 'EXPENSE_DAY_TOO_FAR' }, 'fallback'), ledger.errDayTooFar);
+  }
   assert.equal(refusalWords(loc('en'), 'en', { code: 'NO_SUCH_CODE', message: 'raw' }, 'fallback'), 'fallback');
   assert.equal(refusalWords(loc('ar'), 'ar', new Error('network'), 'fallback'), 'fallback');
+});
+
+test('every coded refusal the costs pages\' writes can meet is said in the reader\'s language, never «تعذّر الحفظ.» (the checker of step 5\'s review)', async () => {
+  // The routes the pages write through, refusing for real on an invented world: the old ledger's expense and category routes
+  // (the entries' edits and the embedded form), the promotions route, the closed month and the finance door's hourly budget.
+  const w = expenseWorld(), day = baghdadDay(), app = stubApp(w.db, { id: 'admin', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, (a) => {
+    a.route('/e', adminFinanceRoutes); a.route('/f', adminFinanceWorkspaceRoutes);
+  });
+  assert.equal((await post(app, '/e/expense-categories', { name_ar: 'صيانة' })).status, 200);
+  const refused = async (what: string, sent: Response | Promise<Response>) => {
+    const res = await sent, body = await json(res);
+    assert.ok(res.status >= 400 && res.status < 500, `${what}: ${res.status} ${JSON.stringify(body)}`);
+    return { what, error: new ApiError(res.status, String(body.error), body.code as string | undefined) };
+  };
+  const answers = [
+    await refused('a category added twice', post(app, '/e/expense-categories', { name_ar: 'صيانة' })),
+    await refused('a category that is gone', patch(app, '/e/expense-categories/gone', { active: false })),
+    await refused('an unknown category', post(app, '/e/expenses', { category_id: 'gone', amount_iqd: 5000, expense_day: day })),
+    await refused('an amount of nothing', post(app, '/e/expenses', { category_id: 'rent', amount_iqd: 0, expense_day: day })),
+    await refused('a day that is not one', post(app, '/e/expenses', { category_id: 'rent', amount_iqd: 5000, expense_day: '2026-02-30' })),
+    await refused('a day two years ahead', post(app, '/e/expenses', { category_id: 'rent', amount_iqd: 5000, expense_day: `${Number(day.slice(0, 4)) + 2}${day.slice(4)}` })),
+    await refused('an edit of a voided entry', patch(app, '/e/expenses/void', { title: 'Rent, again' })),
+    await refused('an entry that is gone', patch(app, '/e/expenses/gone', { title: 'Rent, again' })),
+    await refused('a promotion edited on a stale version', patch(app, '/f/promotions/promo', { version: 99, amount: 1000 })),
+    await refused('a dollar promotion without the rate paid', post(app, '/f/promotions', { month: previousMonth(), currency: 'USD', amount: 10 })),
+    await refused('a promotion under the smallest amount (the page lets 0.001 through)', post(app, '/f/promotions', { month: previousMonth(), currency: 'IQD', amount: 0.001 })),
+  ];
+  w.raw.exec(`INSERT INTO accounting_periods(month,closed_at,closed_by) VALUES ('${month()}','2026-01-01T00:00:00Z','admin')`);
+  answers.push(await refused('an edit in a month closed in accounting', patch(app, '/e/expenses/rent', { title: 'Rent, again' })));
+  const now = Math.floor(Date.now() / 1000);
+  w.raw.exec(`INSERT INTO rate_limits(key,window_start,count) VALUES ('finance-write:u:admin',${now - (now % 3600)},120) ON CONFLICT(key) DO UPDATE SET window_start=excluded.window_start,count=120`);
+  answers.push(await refused('the hour\'s finance writes spent', patch(app, '/e/expenses/rent', { title: 'Rent, again' })));
+  assert.deepEqual(answers.map((a) => a.error.code), ['CATEGORY_EXISTS', 'NOT_FOUND', 'CATEGORY_UNKNOWN', 'EXPENSE_AMOUNT_INVALID', 'EXPENSE_DAY_INVALID', 'EXPENSE_DAY_TOO_FAR',
+    'EXPENSE_VOIDED', 'NOT_FOUND', 'CONFLICT', 'PROMOTION_RATE_REQUIRED', 'BAD_NUMBER', 'PERIOD_CLOSED', 'RATE_LIMITED']);
+  // Each as the page words it (GeneralExpenses' errorText): the sentence, in the reader's language — never the fallback, never
+  // the server's own sentence (Arabic or English whatever the page's language).
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const loc = (a: string, e: string, k?: string) => (lang === 'en' ? e : lang === 'ckb' ? k ?? a : a), s = financeStrings(loc);
+    for (const { what, error } of answers) {
+      const said = refusalWords(loc, lang, error, error.code ? s.saveFailed : error.message);
+      assert.notEqual(said, s.saveFailed, `${lang} ${what} (${error.code}): «${said}»`);
+      assert.notEqual(said, error.message, `${lang} ${what}: not the server's sentence`);
+      if (lang === 'en') assert.doesNotMatch(said, /[؀-ۿ]/, `${what}: in English`);
+      else assert.match(said, /[؀-ۿ]/, `${lang} ${what}`);
+      if (lang === 'ckb') assert.match(said, SORANI_ONLY, `${what}: in Sorani, «${said}»`);
+    }
+  }
 });
 
 test('the ledger\'s form embedded on the page speaks the reader\'s language, names no problem before anything is typed, and shows no ledger', () => {
@@ -431,14 +503,17 @@ test('the ledger\'s form embedded on the page speaks the reader\'s language, nam
     categoryLabel: (c: { name_en: string }) => c.name_en, categoryPrompt: CS.genCategoryPick[1], errorText: () => 'x' }), 'en');
   assert.match(form, /<option value=""[^>]*>Choose a category<\/option>/, 'a prompt, never a bare «—»');
   assert.doesNotMatch(form, /data-finance-expense-problem/, 'no red «type an amount» on a form nobody touched');
+  // …and so no disabled «Save» with nothing said beside it: pressed, it names the problem (tests/financeCostsInteractions.test.ts).
+  assert.match(form, /<button type="submit" class="[^"]*">/, 'the untouched form\'s «Save» is offered');
   assert.doesNotMatch(form, new RegExp(s.addExpense), 'the page\'s own heading names the form');
   assert.doesNotMatch(form, new RegExp(s.periodTotal), 'no ledger under it: the page lists the entries itself');
   assert.match(codeOf('src/components/adminFinance/ExpenseLedger.tsx'), /formOnly \? Promise\.resolve\(null\) : fetchExpenses\(/, 'and it does not read the ledger\'s rows either');
-  // The old report's whole ledger is unchanged: its heading, its «—», its problem line at once.
+  // The old report's whole ledger is unchanged: its heading, its «—», its problem line at once, beside a held «Save».
   const ledger = draw(createElement(ExpenseLedger, { from: '2026-03-01', to: '2026-03-31', s, latin: true, dir: 'ltr', onChanged: noop }), 'en');
   assert.match(ledger, new RegExp(s.addExpense));
   assert.match(ledger, /<option value=""[^>]*>—<\/option>/);
   assert.match(ledger, /data-finance-expense-problem/);
+  assert.match(ledger, /<button type="submit" disabled="" class="[^"]*">/);
   assert.match(ledger, new RegExp(s.periodTotal));
 });
 

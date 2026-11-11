@@ -78,12 +78,34 @@ export const entryDraft = (r: Pick<ExpenseEntryRow, 'category_id' | 'amount_iqd'
  * every field it is not sent, so an amount corrected elsewhere since the page was read is never written back by an edit
  * of the description. Empty: nothing changed.
  */
-export function editPatch(r: Pick<ExpenseEntryRow, 'category_id' | 'amount_iqd' | 'expense_day' | 'title'>, d: EntryDraft): Partial<{ category_id: string; amount_iqd: number; expense_day: string; title: string }> {
+export function editPatch(r: EditedFields, d: EntryDraft): Partial<{ category_id: string; amount_iqd: number; expense_day: string; title: string }> {
   const out: Partial<{ category_id: string; amount_iqd: number; expense_day: string; title: string }> = {};
   if (d.category_id !== r.category_id) out.category_id = d.category_id;
   if (d.amount.trim() !== String(r.amount_iqd)) out.amount_iqd = Number(d.amount);
   if (d.expense_day !== r.expense_day) out.expense_day = d.expense_day;
   if (d.title !== r.title) out.title = d.title;
+  return out;
+}
+/** The fields of an entry an edit changes. */
+type EditedFields = Pick<ExpenseEntryRow, 'category_id' | 'amount_iqd' | 'expense_day' | 'title'>;
+const DRAFT_FIELDS: ReadonlyArray<keyof EntryDraft> = ['category_id', 'amount', 'expense_day', 'title'];
+/** A draft's field still holds `value` — an amount with spaces around it is the same amount, as editPatch reads it. */
+const holds = (k: keyof EntryDraft, field: string, value: string) => (k === 'amount' ? field.trim() === value : field === value);
+/** The fields one reading of an entry has with values another reading does not: what another screen changed meanwhile. */
+export const movedFields = (before: EditedFields, now: EditedFields): Array<keyof EntryDraft> => {
+  const was = entryDraft(before), is = entryDraft(now);
+  return DRAFT_FIELDS.filter((k) => was[k] !== is[k]);
+};
+/**
+ * AN EDITOR KEPT OPEN ACROSS A RE-READ (the checker of step 5's review). The page reads its entries again while an editor stays
+ * open — «أظهر الملغاة», the refresh, another entry saved — and another screen may have changed the entry meanwhile: its
+ * amount corrected, say. The draft still held the amount the editor opened on, and diffed against the entry read again, an
+ * edit of the description sent that old amount back. So the draft follows the entry: each field the owner has not touched
+ * (still what `before` had) takes the entry's value `now`, what they typed stays, and the editor diffs against `now`.
+ */
+export function rebaseDraft(before: EditedFields, now: EditedFields, d: EntryDraft): EntryDraft {
+  const was = entryDraft(before), is = entryDraft(now), out = { ...d };
+  for (const k of DRAFT_FIELDS) if (holds(k, d[k], was[k])) out[k] = is[k];
   return out;
 }
 

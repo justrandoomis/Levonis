@@ -14,7 +14,7 @@ import { cs, refusalWords, type CsKey } from './costsStrings';
 import { dayIn, fw, monthText, rangeText } from './overviewStrings';
 import { rs } from './reportStrings';
 import { Amount } from './Reports';
-import { categoryName, categoryShares, editableHere, editPatch, entryDraft, groupEntries, inClosedMonth, KIND_LABEL, type ExpenseEntryRow, type ExpensesAnswer } from './expenseKinds';
+import { categoryName, categoryShares, editableHere, editPatch, entryDraft, groupEntries, inClosedMonth, KIND_LABEL, movedFields, rebaseDraft, type ExpenseEntryRow, type ExpensesAnswer } from './expenseKinds';
 import { percentText } from './costFigures';
 
 /**
@@ -141,6 +141,9 @@ function EntryRow({ r, range, closed, categories, needCategories, onChanged, ope
   const [editing, setEditing] = useState(false);
   const [voiding, setVoiding] = useState(false);
   const [draft, setDraft] = useState(() => entryDraft(r));
+  // The entry the draft stands on: as the editor opened on it, then as each re-read finds it.
+  const [base, setBase] = useState(r);
+  const [moved, setMoved] = useState(false);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -157,9 +160,13 @@ function EntryRow({ r, range, closed, categories, needCategories, onChanged, ope
   const problem: ExpenseProblem = expenseProblem({ ...draft, repeat_months: 1 }, baghdadDay(Date.now()));
   const problems: Record<Exclude<ExpenseProblem, null>, string> = { no_category: s.errNoCategory, amount_not_a_number: s.errAmountNotNumber, amount_not_whole: s.errAmountNotWhole,
     amount_not_positive: s.errAmountNotPositive, amount_too_large: s.errAmountTooLarge, day_not_a_day: s.errDayNotADay, day_too_far: s.errDayTooFar, repeat_out_of_range: s.errRepeat };
-  const patch = editPatch(r, draft), changed = Object.keys(patch).length > 0;
+  // A re-read while the editor is open, the entry changed elsewhere meanwhile: the fields the owner has not touched take its
+  // new values, what they typed stays, and the patch is against the entry as it now is — a field they never touched is never
+  // sent with its old value (the checker of step 5's review: an edit of the description wrote back a corrected amount).
+  if (editing && movedFields(base, r).length > 0) { setDraft((d) => rebaseDraft(base, r, d)); setBase(r); setMoved(true); }
+  const patch = editPatch(base, draft), changed = Object.keys(patch).length > 0;
   // The editor opens on the entry as it is now and closes back on its «تعديل», what was typed in it gone.
-  const open = () => { setDraft(entryDraft(r)); setReason(''); setVoiding(false); setError(''); setEditing(true); needCategories(); };
+  const open = () => { setDraft(entryDraft(r)); setBase(r); setMoved(false); setReason(''); setVoiding(false); setError(''); setEditing(true); needCategories(); };
   const close = () => { setEditing(false); setVoiding(false); setError(''); setDraft(entryDraft(r)); editButton.current?.querySelector<HTMLButtonElement>('button')?.focus(); };
   const run = async (write: () => Promise<unknown>) => {
     setBusy(true); setError('');
@@ -203,6 +210,7 @@ function EntryRow({ r, range, closed, categories, needCategories, onChanged, ope
             {(categories ?? []).filter((c) => c.active || c.id === draft.category_id).map((c) => <option key={c.id} value={c.id}>{categoryName(lang, c)}</option>)}</select></Field>
           <Field label={s.fieldTitle}><input className="fw-input" value={draft.title} onChange={(e) => setDraft((d) => ({ ...d, title: e.target.value }))} /></Field>
         </div>
+        {moved && <p className="fw-note" role="status" data-finance-expense-moved>{cs(loc, 'genEditMoved')}</p>}
         {problem && <p className="fw-error" role="alert">{problems[problem]}</p>}
         {!problem && !changed && <p className="fw-note">{cs(loc, 'genNothingChanged')}</p>}
         {error && <p className="fw-error" role="alert">{error}</p>}

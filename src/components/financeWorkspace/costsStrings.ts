@@ -11,6 +11,7 @@
  * Placeholders are {name}; numbers stay Latin in all three, as on every money screen.
  */
 import { refusalText } from '../../lib/refusalStrings';
+import { financeStrings, type FinanceStrings } from '../adminFinance/strings';
 
 type Tri = readonly [ar: string, en: string, ckb: string];
 export const CS = {
@@ -129,6 +130,15 @@ export const CS = {
   refConflict: ['تغيّر هذا منذ فُتحت الصفحة؛ حدّثها ثم أعد المحاولة.', 'This changed since the page was opened; refresh it and try again.', 'ئەمە لەو کاتەوەی پەڕەکە کرایەوە گۆڕاوە؛ نوێی بکەرەوە و دووبارە هەوڵ بدەرەوە.'],
   refVoided: ['هذا القيد ملغى: استرجعه أولًا ثم عدّله.', 'This entry is voided: restore it first, then edit it.', 'ئەم تۆمارە هەڵوەشێنراوەتەوە: سەرەتا بیگەڕێنەوە، پاشان دەستکاری بکە.'],
   refCategory: ['الفئة غير موجودة؛ اختر فئة من القائمة.', 'That category does not exist; choose one from the list.', 'ئەو پۆلە بوونی نییە؛ پۆلێک لە لیستەکە هەڵبژێرە.'],
+  // Every other coded refusal of these writes (the checker of step 5's review: «تعذّر الحفظ.» said nothing of why).
+  refCategoryExists: ['توجد فئة بهذا الاسم؛ اخترها من القائمة، أو فعّلها من الفئات إن كانت معطّلة.', 'A category with this name already exists; choose it from the list, or activate it under the categories if it is deactivated.', 'پۆلێک بەم ناوە هەیە؛ لە لیستەکە هەڵیبژێرە، یان ئەگەر ناچالاکە لە پۆلەکاندا چالاکی بکە.'],
+  refNotFound: ['لم يعد هذا موجودًا؛ حدّث الصفحة.', 'This no longer exists; refresh the page.', 'ئەمە ئیتر بوونی نییە؛ پەڕەکە نوێ بکەرەوە.'],
+  refAmount: ['المبلغ عدد صحيح من الدنانير أكبر من صفر؛ راجع الرقم الذي كتبته.', 'The amount is a whole number of dinars above zero; check the number you typed.', 'بڕەکە ژمارەیەکی تەواوی دینارە و لە سفر گەورەترە؛ ئەو ژمارەیەی نووسیوتە دووبارە سەیر بکەرەوە.'],
+  refRateLimited: ['طلبات كثيرة خلال ساعة؛ أعد المحاولة لاحقًا.', 'Too many requests this hour; try again later.', 'داواکاری زۆر لەم کاتژمێرەدا؛ دواتر دووبارە هەوڵ بدەرەوە.'],
+  // The promotion's figures (an amount under the server's minimum of 0.01, a rate of 0): BAD_NUMBER.
+  refNumber: ['أحد الأرقام غير صالح (المبلغ أو سعر التحويل)؛ صحّحه ثم احفظ.', 'One of the figures is not valid (the amount or the rate); correct it and save.', 'یەکێک لە ژمارەکان دروست نییە (بڕەکە یان نرخی گۆڕینەوە)؛ ڕاستی بکەرەوە و پاشەکەوتی بکە.'],
+  // An editor kept open across a re-read while another screen changed the entry (the checker of step 5's review).
+  genEditMoved: ['تغيّر هذا القيد في مكان آخر منذ فتحته؛ الحقول التي لم تلمسها تعرض الآن قيمه الجديدة.', 'This entry changed elsewhere since you opened it; the fields you have not touched now show its new values.', 'ئەم تۆمارە لەو کاتەوەی کردتەوە لە شوێنێکی ترەوە گۆڕاوە؛ ئەو خانانەی دەستت لێ نەداون ئێستا بەها نوێیەکانی پیشان دەدەن.'],
 } as const satisfies Record<string, Tri>;
 export type CsKey = keyof typeof CS;
 
@@ -139,17 +149,26 @@ export function cs(loc: Loc, key: CsKey, vars: Record<string, string | number> =
   return loc(ar, en, ckb).replace(/\{(\w+)\}/g, (_, k: string) => String(vars[k] ?? `{${k}}`));
 }
 
-/** The codes the costs pages' writes are refused with, and their sentence here. */
-export const REFUSALS: Readonly<Record<string, CsKey>> = { PERIOD_CLOSED: 'refPeriodClosed', CONFLICT: 'refConflict', EXPENSE_VOIDED: 'refVoided', CATEGORY_UNKNOWN: 'refCategory' };
 /**
- * A refused write in the reader's language: this table's sentence for its code, else the shop's refusal table's
- * (PROMOTION_RATE_REQUIRED and the like), else `fallback` — never the server's own sentence, which is Arabic or English
- * whatever the page's language (the independent review of step 5).
+ * The codes the costs pages' writes are refused with, and their sentence here: the expense and category routes of the old
+ * ledger (/api/admin/finance) the page and its embedded form write through, the promotions route, and the finance door's
+ * write budget (RATE_LIMITED). tests/financeCostsPages.test.ts draws each from the real route.
+ */
+export const REFUSALS: Readonly<Record<string, CsKey>> = { PERIOD_CLOSED: 'refPeriodClosed', CONFLICT: 'refConflict', EXPENSE_VOIDED: 'refVoided', CATEGORY_UNKNOWN: 'refCategory',
+  CATEGORY_EXISTS: 'refCategoryExists', NOT_FOUND: 'refNotFound', EXPENSE_AMOUNT_INVALID: 'refAmount', RATE_LIMITED: 'refRateLimited', BAD_NUMBER: 'refNumber' };
+/** The refusals whose sentence the old ledger's form already has (its own check of the same day, before it sends). */
+const LEDGER_REFUSALS = { EXPENSE_DAY_INVALID: 'errDayNotADay', EXPENSE_DAY_TOO_FAR: 'errDayTooFar' } as const satisfies Record<string, keyof FinanceStrings>;
+/**
+ * A refused write in the reader's language: this table's sentence for its code, the old ledger's for a day it refuses, else
+ * the shop's refusal table's (PROMOTION_RATE_REQUIRED and the like), else `fallback` — never the server's own sentence, which
+ * is Arabic or English whatever the page's language (the independent review of step 5).
  */
 export function refusalWords(loc: Loc, lang: string, error: unknown, fallback: string): string {
   const code = error && typeof (error as { code?: unknown }).code === 'string' ? (error as { code: string }).code : '';
   const key = REFUSALS[code];
-  return key ? cs(loc, key) : refusalText(code, lang === 'en' || lang === 'ckb' ? lang : 'ar', fallback) || fallback;
+  if (key) return cs(loc, key);
+  if (Object.hasOwn(LEDGER_REFUSALS, code)) return financeStrings(loc)[LEDGER_REFUSALS[code as keyof typeof LEDGER_REFUSALS]];
+  return refusalText(code, lang === 'en' || lang === 'ckb' ? lang : 'ar', fallback) || fallback;
 }
 
 /**

@@ -385,7 +385,10 @@ export default function ExpenseLedger({
 
         {/* The refusal is stated under the form, never as a disabled button
             with no explanation: a button that does nothing and says nothing is
-            how an owner concludes the screen is broken. */}
+            how an owner concludes the screen is broken. Embedded and untouched,
+            the problem is not shown yet — so the button stays live: pressing it
+            (or Enter, which a disabled default button would swallow) names the
+            problem and sends nothing (the checker of step 5's review). */}
         {problem && touched && (
           <p data-finance-expense-problem className="text-[12px] leading-[1.6] text-danger">
             {problemText(problem)}
@@ -395,7 +398,7 @@ export default function ExpenseLedger({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="submit"
-            disabled={!!problem || busy}
+            disabled={busy || (!!problem && touched)}
             className="lv-button lv-button-primary press-scale min-h-[44px] px-4 text-[13px] font-bold disabled:opacity-50"
           >
             <Plus className="h-4 w-4" aria-hidden />
