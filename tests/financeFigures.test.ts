@@ -22,6 +22,14 @@
  * dollars come after the same deductions as the headline; and in dollars a period, or a
  * day, without a delivered order owes its overheads exactly as in dinars, never «ناقص».
  *
+ * The independent review of step 1 (2026-11-11) added the rest, each failing on e4574a8a:
+ * the note under the headline named an incomplete order's coupon as taken off it (R2); in
+ * dollars an order kind without orders read «ناقص» (R1); the CSV's deduction columns had
+ * no tested value and did not add up to the orders when a coupon passed the goods (R3, M3);
+ * nothing held the confirmed / estimated split of the overhead by revenue (M1), nor the
+ * voided and out-of-period filters of the waiting costs, nor a cancelled order's cost in
+ * dollars (M2); and the dollar headline's notes had no cents for the two parts.
+ *
  * Run: node --import tsx --test tests/financeFigures.test.ts
  */
 import { test } from 'node:test';
@@ -31,6 +39,7 @@ import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorksp
 import { monthlyPromotionShares } from '../worker/lib/orderProfit';
 import { baghdadDay } from '../worker/lib/operations';
 import { overviewNet } from '../src/components/financeWorkspace/overviewFigures';
+import { centsAt } from '../src/components/financeWorkspace/displayCurrency';
 import type { FinanceSummary } from '../src/components/financeWorkspace/types';
 
 type Raw = ReturnType<typeof freshDb>;
@@ -225,4 +234,148 @@ test('in dollars a period, or a day, without a delivered order owes its overhead
   assert.deepEqual([day.cost_iqd, day.owner_net_iqd], [15000, -15000]);
   assert.deepEqual([s.display_usd.chart.daily[other].cost_cents, s.display_usd.chart.daily[other].owner_net_cents], [1000, -1000]);
   assert.notEqual(s.display_usd.totals.owner_period_net_after_report_adjustments_cents, null);
+});
+
+/** On order `id` (one line): a credited price protection of 2,000 and a returned trade-in credit of 7,000 (one piece back, restocked). */
+function creditsOn(raw: Raw, id: string) {
+  const now = new Date().toISOString();
+  raw.exec(`INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,credited_iqd,state) VALUES ('${id}:pp','buyer','${id}','${id}:item',25000,23000,1,2000,'credited');
+    INSERT INTO trade_in_requests(id,user_id,order_id,order_item_id,family,created_at,updated_at) VALUES ('${id}:ti','buyer','old-order','old-item','fdm','${now}','${now}');
+    INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,cost_basis,received_at) VALUES ('${id}:ti:lot','product','base','',1,1,7000,'opening','${now}');
+    INSERT INTO trade_in_stock(request_id,lot_id,product_id,cost_basis_iqd,order_id,created_at) VALUES ('${id}:ti','${id}:ti:lot','product',7000,'old-order','${now}');
+    INSERT INTO return_cases(id,order_id,order_item_id,user_id,qty,reason,state,resolution,decided_at) VALUES ('${id}:rc','${id}','${id}:item','buyer',1,'defective','resolved','refund','${now}');
+    INSERT INTO finance_refund_facts(case_id,order_id,refund_iqd,qty,disposition,cogs_iqd,channel,refunded_day) VALUES ('${id}:rc','${id}',18000,1,'restock',10000,'wallet','${baghdadDay()}');
+    INSERT INTO trade_in_credit_reissues(id,request_id,coupon_id,order_id,reason,return_case_id,amount_iqd,ends_at,created_at) VALUES ('${id}:x','${id}:ti','cpn','${id}','returned','${id}:rc',7000,'2027-01-01T00:00:00.000Z','${now}');`);
+}
+
+/** The export as rows of named cells: a quoted cell is text (an empty one blank), a bare one a number. */
+function csvRows(text: string): Array<Record<string, string | number>> {
+  const cells = (line: string) => {
+    const out: Array<string | number> = [];
+    for (let i = 0; i <= line.length;) {
+      if (line[i] === '"') {
+        let j = i + 1, value = '';
+        while (j < line.length) { if (line[j] === '"' && line[j + 1] === '"') { value += '"'; j += 2; } else if (line[j] === '"') break; else value += line[j++]; }
+        out.push(value); i = j + 2;
+      } else {
+        const end = line.indexOf(',', i), stop = end < 0 ? line.length : end;
+        out.push(Number(line.slice(i, stop))); i = stop + 1;
+      }
+    }
+    return out;
+  };
+  const [head, ...lines] = text.replace(/^\uFEFF/, '').split('\r\n').filter(Boolean);
+  const names = cells(head) as string[];
+  return lines.map((line) => { const row = cells(line); return Object.fromEntries(names.map((name, i) => [name, row[i]])); });
+}
+
+test('the note under the headline names only what came off it: while orders are incomplete, the complete orders\' own deductions, never an incomplete order\'s coupon (review R2)', async () => {
+  const w = world();
+  usd(w.raw);
+  order(w.raw, { id: 'fifo' });
+  order(w.raw, { id: 'mag', qty: 60, unit: 500, cost: null, product: 'magnet', shipping: 0, coupon: 5000 });
+  const s = await w.read(`/f/summary?${period()}&display=USD`);
+  assert.equal(s.totals.coupon_iqd, 5000, 'the period has the never-priced order\'s coupon');
+  const f = overviewNet(s as FinanceSummary), fu = overviewNet(s as FinanceSummary, s.display_usd);
+  assert.deepEqual([f.fromKnown, f.net], [true, 35000], 'the headline is the complete order, which had no coupon');
+  assert.equal(f.deductions, 0, 'nothing came off it: the note must not say «−5,000 د.ع»');
+  assert.equal(fu.deductionsCents, 0);
+  // The same coupon on the complete order: it came off the headline, and the note names it, in dinars and dollars.
+  w.raw.exec("UPDATE orders SET coupon_discount_iqd=0 WHERE id='mag'; UPDATE orders SET coupon_discount_iqd=5000 WHERE id='fifo';");
+  const s2 = await w.read(`/f/summary?${period()}&display=USD`);
+  const g = overviewNet(s2 as FinanceSummary), gu = overviewNet(s2 as FinanceSummary, s2.display_usd);
+  assert.deepEqual([g.net, g.deductions], [30000, 5000]);
+  assert.equal(gu.deductionsCents, s2.display_usd.orders.fifo.cents.coupon_cents, 'the order\'s own coupon, in its cents');
+  assert.equal(gu.cents! + gu.deductionsCents!, s2.display_usd.known.owner_net_cents, 'headline + what came off = the complete orders before their deductions');
+});
+
+test('in dollars an order kind without orders is 0 in every column, as in dinars — never «ناقص» beside «0 طلب» (review R1)', async () => {
+  const w = world();
+  usd(w.raw);
+  order(w.raw, { id: 'sold' });
+  const s = await w.read(`/f/summary?${period()}&display=USD`);
+  const kinds = s.display_usd.kinds;
+  for (const kind of ['quick_buy', 'gift']) {
+    const iqd = s.kinds.find((k: { kind: string }) => k.kind === kind);
+    assert.deepEqual([iqd.orders_count, iqd.gross_profit_iqd], [0, 0], `${kind} in dinars`);
+    assert.equal(centsAt(kinds[kind], 'gross_profit_iqd'), 0, `${kind}: the row the overview draws reads $0.00`);
+    for (const field of Object.keys(kinds.normal)) assert.equal(kinds[kind][field], 0, `${kind}.${field}`);
+  }
+  assert.notEqual(kinds.normal.gross_profit_cents, 0, 'the kind that sold carries its figures');
+});
+
+test('the CSV deduction columns carry their values, and every column adds up to the orders: a coupon above the goods has its own order-level row (review R3, M3)', async () => {
+  const w = world();
+  order(w.raw, { id: 'paid', coupon: 3000 });
+  creditsOn(w.raw, 'paid');
+  // 10,000 of goods (cost 4,000), 5,000 of shipping and a 12,000 coupon: 2,000 of it cut the shipping.
+  order(w.raw, { id: 'big', qty: 1, unit: 10000, cost: 4000, coupon: 12000 });
+  const s = await w.read(`/f/summary?${period()}`), t = s.totals;
+  const r = await get(w.app, `/f/export.csv?${period()}`);
+  assert.equal(r.status, 200);
+  const rows = csvRows(await r.text());
+  const line = (id: string) => rows.find((x) => x.id === id)!;
+  const paid = line('paid:item');
+  assert.deepEqual([paid.row_kind, paid.coupon_iqd, paid.price_protection_iqd, paid.trade_in_credit_returned_iqd], ['line', 3000, 2000, 7000]);
+  assert.equal(paid.net_after_report_adjustments_iqd, (paid.owner_net_iqd as number) - 12000, 'the line\'s net after its coupon, credit and returned trade-in credit');
+  assert.equal(paid.net_after_report_adjustments_iqd, s.orders.find((o: { id: string }) => o.id === 'paid').net_after_report_adjustments_iqd);
+  const big = line('big:item');
+  assert.deepEqual([big.owner_net_iqd, big.coupon_iqd, big.net_after_report_adjustments_iqd], [11000, 10000, 1000], 'the goods carry the coupon up to their value');
+  const rest = rows.filter((x) => x.row_kind === 'order_level');
+  assert.equal(rest.length, 1, 'one order-level row: the order whose coupon passed its goods');
+  assert.deepEqual([rest[0].order_id, rest[0].id, rest[0].coupon_iqd, rest[0].price_protection_iqd, rest[0].trade_in_credit_returned_iqd, rest[0].net_after_report_adjustments_iqd, rest[0].owner_net_iqd],
+    ['big', '', 2000, 0, 0, -2000, ''], 'the 2,000 that cut the shipping, with no line and no owner net of its own');
+  const column = (f: string) => rows.reduce((v, x) => v + (typeof x[f] === 'number' ? x[f] as number : 0), 0);
+  assert.equal(column('owner_net_iqd'), t.owner_net_iqd);
+  assert.deepEqual([column('coupon_iqd'), column('price_protection_iqd'), column('trade_in_credit_returned_iqd')], [15000, 2000, 7000]);
+  assert.deepEqual([column('coupon_iqd'), column('price_protection_iqd'), column('trade_in_credit_returned_iqd')], [t.coupon_iqd, t.price_protection_iqd, t.trade_in_credit_returned_iqd], 'each deduction column is the period\'s');
+  assert.equal(column('net_after_report_adjustments_iqd'), t.net_after_report_adjustments_iqd, 'Σ net after deductions = the orders\' (15,000 − 1,000), not 2,000 over');
+  assert.equal(column('net_after_report_adjustments_iqd'), column('owner_net_iqd') - column('coupon_iqd') - column('price_protection_iqd') - column('trade_in_credit_returned_iqd'));
+});
+
+test('the complete orders\' overhead is shared between «مؤكد» and «فيها تكلفة تقديرية» by revenue, in dinars and in dollars (review M1)', async () => {
+  const w = world();
+  usd(w.raw);
+  order(w.raw, { id: 'fifo', qty: 1, unit: 100000, cost: 60000, shipping: 0 });
+  order(w.raw, { id: 'est', qty: 1, unit: 50000, cost: null, estimate: 30000, product: 'esun', shipping: 0, coupon: 2000 });
+  order(w.raw, { id: 'mag', qty: 10, unit: 500, cost: null, product: 'magnet', shipping: 0 });
+  w.raw.exec(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent1','rent',15500,'${baghdadDay()}','Rent','admin')`);
+  const s = await w.read(`/f/summary?${period()}&display=USD`), k = s.known;
+  assert.equal(k.overhead_share_iqd, 15000, 'the complete orders: 150,000 of 155,000 in revenue');
+  assert.deepEqual([k.confirmed.owner_net_iqd, k.estimated.owner_net_iqd], [30000, 15000], '10,000 and 5,000 of the overhead, by revenue — not 7,500 each (32,500 / 12,500)');
+  assert.deepEqual([k.confirmed.net_after_report_adjustments_iqd, k.estimated.net_after_report_adjustments_iqd], [30000, 13000], 'the estimated order after its 2,000 coupon');
+  // In dollars (1,500): the rent is 1,033 cents, the complete orders carry 1,000 of it, 667 and 333 by revenue.
+  const uk = s.display_usd.known;
+  assert.deepEqual([uk.confirmed.orders_count, uk.estimated.orders_count], [1, 1]);
+  assert.deepEqual([uk.confirmed.owner_net_cents, uk.estimated.owner_net_cents], [2000, 1000], '2,667 − 667 and 1,333 − 333 — not 500 each');
+  assert.deepEqual([uk.confirmed.net_after_report_adjustments_cents, uk.estimated.net_after_report_adjustments_cents], [2000, 867]);
+  assert.equal(uk.confirmed.owner_net_cents + uk.estimated.owner_net_cents, uk.owner_net_cents, 'the parts add up in dollars too');
+  assert.equal(uk.confirmed.net_after_report_adjustments_cents + uk.estimated.net_after_report_adjustments_cents, uk.net_after_report_adjustments_cents);
+  const f = overviewNet(s as FinanceSummary, s.display_usd);
+  assert.deepEqual([f.confirmed!.cents, f.estimated!.cents], [2000, 867], 'the overview names each part in the headline\'s dollars');
+  assert.equal(f.cents, 2867);
+});
+
+test('the waiting costs and the general expenses leave out a voided expense and one dated outside the period; in dollars a cancelled order\'s cost reaches the total and its own day (review M2)', async () => {
+  const w = world();
+  usd(w.raw);
+  order(w.raw, { id: 'order' });
+  order(w.raw, { id: 'gone', status: 'cancelled' });
+  order(w.raw, { id: 'later', status: 'confirmed', delivered: null });
+  // A day of the period without the delivered order, and a day of the month before it.
+  const day = baghdadDay().endsWith('-01') ? `${month()}-02` : `${month()}-01`;
+  const before = new Date(Date.UTC(Number(month().slice(0, 4)), Number(month().slice(5)) - 2, 15)).toISOString().slice(0, 10);
+  const now = new Date().toISOString();
+  w.raw.exec(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by,voided_at,voided_by) VALUES
+      ('pack1','rent',20000,'${day}','Special packing','admin',NULL,NULL),('pack2','rent',9000,'${day}','Prepaid customs','admin',NULL,NULL),('rent1','rent',4000,'${day}','Rent','admin',NULL,NULL),
+      ('void1','rent',3000,'${day}','Customs, voided','admin','${now}','admin'),('void2','rent',6000,'${day}','Packing, voided','admin','${now}','admin'),
+      ('old1','rent',7000,'${before}','Customs, last month','admin',NULL,NULL),('old2','rent',8000,'${before}','Packing, last month','admin',NULL,NULL);
+    INSERT INTO finance_expense_links(expense_id,order_id) VALUES ('pack1','gone'),('pack2','later'),('void1','later'),('void2','gone'),('old1','later'),('old2','gone');`);
+  const s = await w.read(`/f/summary?${period()}&display=USD`), u = s.display_usd;
+  assert.equal(s.totals.general_expenses_iqd, 24000, 'the rent and the cancelled order\'s cost — not a voided one, not last month\'s');
+  assert.equal(s.totals.general_waiting_iqd, 9000, 'what waits for the order on its way — not a voided cost, not last month\'s');
+  assert.equal(u.totals.general_expenses_cents, 1600, '24,000 at 1,500');
+  const d = s.chart_data.daily.find((x: { day: string }) => x.day === day);
+  assert.deepEqual([d.cost_iqd, d.owner_net_iqd], [24000, -24000], 'the day the costs were entered carries them');
+  assert.deepEqual([u.chart.daily[day].cost_cents, u.chart.daily[day].owner_net_cents], [1600, -1600], 'in dollars too');
 });

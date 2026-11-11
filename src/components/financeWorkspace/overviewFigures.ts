@@ -1,4 +1,4 @@
-import type { DisplayUsdSummary, FinanceKnownPart, FinanceSummary } from './types';
+import type { DisplayUsdSummary, FinanceKnownPart, FinanceSummary, UsdKnownPart } from './types';
 
 /**
  * THE OVERVIEW'S HEADLINE, AS DATA (redesign step 1, DECISIONS row 313).
@@ -19,15 +19,26 @@ export interface OverviewNet {
   fromKnown: boolean;
   /** What the margin is taken over: the complete orders' revenue on the known path. */
   marginBase: number | null | undefined;
-  confirmed: { orders: number; net: number | null } | null;
-  estimated: { orders: number; net: number | null } | null;
-  /** Coupons + credited price protection + returned trade-in credits of the period's orders. */
+  /** `cents`: the part in USD cents (undefined: dinars; null: the server sent none, and a dollar note leaves the amount out). */
+  confirmed: { orders: number; net: number | null; cents: number | null | undefined } | null;
+  estimated: { orders: number; net: number | null; cents: number | null | undefined } | null;
+  /**
+   * What came off the figure shown: the coupons, credited price protection and returned
+   * trade-in credits of the orders the headline is made of — on the known path the
+   * complete orders' own, never an incomplete order's (review R2). 0 when nothing came
+   * off, or when there is no figure for it to come off.
+   */
   deductions: number;
+  /** The same in USD cents (undefined: dinars; null: the server sent no cents for it). */
+  deductionsCents: number | null | undefined;
   /** review: something is unknown; estimated: complete but resting partly on estimates; confirmed: all costs confirmed. */
   state: 'review' | 'estimated' | 'confirmed';
 }
 
 const partNet = (p: FinanceKnownPart) => (p.net_after_report_adjustments_iqd !== undefined ? p.net_after_report_adjustments_iqd : p.owner_net_iqd);
+/** What lies between a figure before the deductions and the same figure after them; null when either is missing. */
+const between = (before: number | null | undefined, after: number | null | undefined) => (before == null || after == null ? null : before - after);
+const total = (values: Array<number | null | undefined>) => (values.some((v) => v == null) ? null : values.reduce<number>((a, v) => a + (v as number), 0));
 
 export function overviewNet(data: FinanceSummary, usd?: DisplayUsdSummary): OverviewNet {
   const t = data.totals, known = data.known ?? undefined;
@@ -41,14 +52,24 @@ export function overviewNet(data: FinanceSummary, usd?: DisplayUsdSummary): Over
   const cents = !ut ? undefined
     : fromKnown ? (uk ? (uk.net_after_report_adjustments_cents !== undefined ? uk.net_after_report_adjustments_cents : uk.owner_net_cents) ?? null : null)
       : (afterDeductions !== undefined ? ut.owner_period_net_after_report_adjustments_cents : t.owner_period_net_iqd !== undefined ? ut.owner_period_net_cents : ut.owner_net_cents) ?? null;
+  // The complete orders' two known figures carry the same share of the overhead, so what lies
+  // between them is exactly their own deductions; the period's figure took off every order's.
+  const deductions = net == null ? 0
+    : fromKnown ? between(known!.owner_net_iqd, known!.net_after_report_adjustments_iqd) ?? 0
+      : afterDeductions !== undefined ? (t.coupon_iqd ?? 0) + (t.price_protection_iqd ?? 0) + (t.trade_in_credit_returned_iqd ?? 0) : 0;
+  const deductionsCents = !ut ? undefined : deductions === 0 ? 0
+    : fromKnown ? between(uk?.owner_net_cents, uk?.net_after_report_adjustments_cents)
+      : total([ut.coupon_cents, ut.price_protection_cents, ut.trade_in_credit_returned_cents ?? 0]);
   const incomplete = (t.unknown_lines ?? 0) + (t.pending_costs ?? 0);
   const estimatedOrders = known?.estimated?.orders_count ?? 0;
+  // A part in cents: dinars without a USD block; null when the server sent none for it.
+  const inCents = (part: UsdKnownPart | undefined) => (!ut ? undefined : part ? part.net_after_report_adjustments_cents : null);
   return {
     net, cents, fromKnown,
     marginBase: fromKnown ? known!.revenue_iqd : data.chart_data?.revenue_iqd,
-    confirmed: known?.confirmed ? { orders: known.confirmed.orders_count, net: partNet(known.confirmed) } : null,
-    estimated: known?.estimated ? { orders: estimatedOrders, net: partNet(known.estimated) } : null,
-    deductions: (t.coupon_iqd ?? 0) + (t.price_protection_iqd ?? 0) + (t.trade_in_credit_returned_iqd ?? 0),
+    confirmed: known?.confirmed ? { orders: known.confirmed.orders_count, net: partNet(known.confirmed), cents: inCents(uk?.confirmed) } : null,
+    estimated: known?.estimated ? { orders: estimatedOrders, net: partNet(known.estimated), cents: inCents(uk?.estimated) } : null,
+    deductions, deductionsCents,
     state: incomplete > 0 || t.owner_period_net_iqd === null ? 'review' : estimatedOrders > 0 ? 'estimated' : 'confirmed',
   };
 }

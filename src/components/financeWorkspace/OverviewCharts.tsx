@@ -2,7 +2,7 @@ import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, Res
 import { useLanguage } from '../../LanguageContext';
 import { Empty, Money, Surface, formatMoney } from './ui';
 import type { DisplayUsdSummary, FinanceSummary } from './types';
-import { usdText } from './displayCurrency';
+import { MissingValue, usdText } from './displayCurrency';
 import { PA_STRINGS, tri } from './displayCurrencyStrings';
 
 const colors = { revenue: '#6d96d7', cost: '#c59957', net: '#9980ce', negative: '#ce7775' };
@@ -22,8 +22,10 @@ export default function OverviewCharts({ data, usd }: { data: FinanceSummary; us
     daily: source.daily.map((row) => { const c = u.daily[row.day]; return { ...row, revenue_iqd: c ? c.revenue_cents / 100 : 0, cost_iqd: dollars(c?.cost_cents), owner_net_iqd: dollars(c?.owner_net_cents), investor_iqd: dollars(c?.investor_cents) }; }),
     expense_composition: source.expense_composition.map((row) => ({ ...row, amount_iqd: dollars(u.expense_composition.find((x) => x.key === row.key)?.amount_cents) })),
   } : source;
-  const fmt = (value: number | null | undefined) => u ? (value == null ? '—' : usdText(Math.round(value * 100))) : formatMoney(value);
-  const Amount = ({ value }: { value: number | null | undefined }) => u ? <span className="fw-money" dir="ltr">{fmt(value)}</span> : <Money value={value} />;
+  // A tooltip on a day the calculation has not completed names it, as the tables do (never a bare dash).
+  const fmt = (value: number | null | undefined) => value == null ? loc('ناقص', 'Missing', 'ناتەواو') : u ? usdText(Math.round(value * 100)) : formatMoney(value);
+  // A table cell: an incomplete value says «ناقص», never a bare dash (DECISIONS row 313); the chart leaves it out.
+  const Amount = ({ value }: { value: number | null | undefined }) => value == null ? <MissingValue /> : u ? <span className="fw-money" dir="ltr">{fmt(value)}</span> : <Money value={value} />;
   if (!charts) return <Surface><Empty title={loc('بيانات الرسم غير متاحة', 'Chart data unavailable')} text={loc('يمكن مراجعة الأرقام وتفاصيل الطلبات أدناه.', 'You can review figures and order details below.')} /></Surface>;
   const labels = { revenue_iqd: loc('الإيراد', 'Revenue'), cost_iqd: loc('التكاليف', 'Costs'), owner_net_iqd: loc('صافي حصتك', 'Your net share') };
   const expenseNames = { goods: loc('البضاعة', 'Goods'), wages: loc('الأجور', 'Wages'), materials: loc('المواد', 'Materials'), other: loc('تكاليف إضافية', 'Additional costs'), delivery: loc('التوصيل والدفع', 'Delivery & payment'), promotion: loc('الترويج', 'Promotion'), general: loc('المصاريف العامة', 'General expenses') };
@@ -59,7 +61,7 @@ export default function OverviewCharts({ data, usd }: { data: FinanceSummary; us
           </BarChart></ResponsiveContainer>
         </div> : <Empty title={loc('لا تكاليف مثبتة للرسم', 'No confirmed costs to plot')} text={loc('القيم المجهولة تبقى غير مكتملة حتى مراجعتها.', 'Unknown values remain incomplete until reviewed.')} />}
         <details className="fw-advanced"><summary>{loc('عرض مبالغ التكاليف', 'View cost figures')}</summary><div className="fw-chart-table"><table><caption>{u ? tri(loc, PA_STRINGS.chartsInUsd) : loc('تفصيل التكاليف بالدينار', 'Cost breakdown in IQD')}</caption><thead><tr><th>{loc('البند', 'Cost item')}</th><th>{loc('المبلغ', 'Amount')}</th></tr></thead><tbody>{expenses.map((row) => <tr key={row.key}><th scope="row">{row.name}</th><td><Amount value={row.amount_iqd} /></td></tr>)}</tbody></table></div></details>
-        <p className="fw-note">{loc('الترويج يتوزع على مبيعات شهره كله حسب قيمتها. البند الناقص لا يظهر هنا حتى يكتمل. السالب يعني تخفيض تكلفة أو استردادًا.', 'Promotion is shared over its whole month’s sales by value. An incomplete item is left out here until it is complete. Negative costs are credits or reversals.', 'بانگەشە بەسەر هەموو فرۆشتنی مانگەکەیدا بەپێی بەها دابەش دەکرێت. بڕگەی ناتەواو لێرە دەرناکەوێت تا تەواو دەبێت. نەرێنی واتە کەمکردنەوەی تێچوو یان گەڕاندنەوە.')}</p>
+        <p className="fw-note">{loc('الترويج يتوزع على مبيعات شهره كله حسب قيمتها. البند الناقص لا يُرسم حتى يكتمل، والجدول يقول عنه «ناقص». السالب يعني تخفيض تكلفة أو استردادًا.', 'Promotion is shared over its whole month’s sales by value. An incomplete item is left out of the chart until it is complete; the table marks it “Missing”. Negative costs are credits or reversals.', 'بانگەشە بەسەر هەموو فرۆشتنی مانگەکەیدا بەپێی بەها دابەش دەکرێت. بڕگەی ناتەواو تا تەواو دەبێت لە هێڵکارییەکەدا نییە، و خشتەکە بە «ناتەواو» نیشانی دەدات. نەرێنی واتە کەمکردنەوەی تێچوو یان گەڕاندنەوە.')}</p>
       </Surface>
       <Surface title={loc('مساهمة الأقسام في حصتك', 'Sections contributing to your share')} subtitle={loc('أكثر ٨ أقسام رئيسية أثرًا، بعد التكاليف المخصصة وحصص المستثمرين.', 'The 8 main sections with greatest impact, after allocated costs and investor shares.')}>
         {ranked.length ? <div className="fw-chart fw-chart--bars" dir="ltr" role="img" aria-label={loc('صافي المالك لكل قسم؛ التفاصيل في الجدول.', 'Owner net by section; details in the table.')}>

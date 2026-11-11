@@ -12,7 +12,7 @@ import './finance-workspace.css';
 import { orderFinancePresentation } from './orderFinancePresentation';
 import { averageOrder, overviewNet } from './overviewFigures';
 import ReportDeductions from './ReportDeductions';
-import { CurrencyToggle, DisplayCurrencyContext, DisplayMoney, UsdBasisNote, centsAt, useDisplayCurrency, type DisplayCurrency } from './displayCurrency';
+import { CurrencyToggle, DisplayCurrencyContext, DisplayMoney, UsdBasisNote, centsAt, usdText, useDisplayCurrency, type DisplayCurrency } from './displayCurrency';
 import VariantImg from '../ui/VariantImg';
 
 const PeoplePanel = lazy(() => import('../financePeople/PeoplePanel'));
@@ -166,7 +166,8 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
   </div></DisplayCurrencyContext.Provider>;
 }
 
-function Overview({ data, from, to, revision, openOrder, onNavigate, onCollections, onMissing }: { data: FinanceSummary; from: string; to: string; revision: number; openOrder: (id: string) => void; onNavigate: (section: FinanceSection) => void; onCollections: () => void; onMissing: () => void }) {
+/** Exported for the render tests (tests/financeOverviewFigures.test.ts); the workspace above is its only screen. */
+export function Overview({ data, from, to, revision, openOrder, onNavigate, onCollections, onMissing }: { data: FinanceSummary; from: string; to: string; revision: number; openOrder: (id: string) => void; onNavigate: (section: FinanceSection) => void; onCollections: () => void; onMissing: () => void }) {
   const { loc } = useLanguage();
   const t = data.totals;
   // Server cents when the owner chose USD and a rate exists; undefined keeps a figure in dinars.
@@ -187,24 +188,32 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
   const known = data.known ?? undefined, missing = data.missing_costs;
   const knownOnly = (value: number | null | undefined) => value == null && !!known && known.incomplete_orders > 0;
   const estimatedOrders = figures.estimated?.orders ?? 0;
+  // An amount in a note under a figure, in the figure's currency: in dollars only the server's cents (never
+  // dinars beside a dollar headline); without them, or without a value, the note leaves the amount out.
+  const noteAmount = (iqd: number | null | undefined, cents: number | null | undefined) => u ? (cents == null ? '' : usdText(cents)) : iqd == null ? '' : formatMoney(iqd);
+  const notePart = (label: string, part: { orders: number; net: number | null; cents: number | null | undefined }) => [label, noteAmount(part.net, part.cents), `(${part.orders})`].filter(Boolean).join(' ');
   const estimateNote = figures.confirmed && figures.estimated && estimatedOrders > 0
-    ? `${loc('مؤكد', 'Confirmed', 'دڵنیاکراو')} ${formatMoney(figures.confirmed.net)} (${figures.confirmed.orders}) · ${loc('من طلبات فيها تكلفة تقديرية', 'from orders with estimated costs', 'لە داواکاری بە تێچووی خەمڵێنراو')} ${formatMoney(figures.estimated.net)} (${estimatedOrders})`
+    ? `${notePart(loc('مؤكد', 'Confirmed', 'دڵنیاکراو'), figures.confirmed)} · ${notePart(loc('من طلبات فيها تكلفة تقديرية', 'from orders with estimated costs', 'لە داواکاری بە تێچووی خەمڵێنراو'), figures.estimated)}`
     : '';
+  const deducted = noteAmount(deductions, figures.deductionsCents);
   // The margin of the complete orders is over their own revenue, as their net carries only their share of the overhead.
-  const margin = net != null && marginBase != null && marginBase > 0 ? `${(net / marginBase * 100).toFixed(1)}%` : '—';
+  // No net or no revenue: there is no margin to name, so the note says nothing of it (never a bare dash).
+  const margin = net != null && marginBase != null && marginBase > 0 ? `${(net / marginBase * 100).toFixed(1)}%` : null;
   const costFromKnown = knownOnly(data.chart_data?.cost_iqd) && known!.cost_iqd != null;
   const cost = data.chart_data?.cost_iqd ?? (costFromKnown ? known!.cost_iqd : null);
-  // In dollars, the complete orders' figures come from the server's cents too (none: a dash, never dinars among dollars).
+  // In dollars, the complete orders' figures come from the server's cents too (none: «ناقص», never dinars among dollars).
   const uk = u ? u.known ?? null : undefined;
   const knownNote = known ? `${loc('من الطلبات المكتملة فقط', 'From complete orders only', 'تەنها لە داواکارییە تەواوەکانەوە')} (${known.orders_count}/${t.orders_count ?? data.orders.length})${(known.overhead_share_iqd ?? 0) > 0 ? loc('، مع حصتها من المصاريف العامة بنسبة إيرادها', ', with their revenue-based share of general expenses', '، لەگەڵ بەشیان لە خەرجییە گشتییەکان بەپێی داهاتەکەیان') : ''}` : '';
   const metrics = [
     { label: loc('صافي حصتك', 'Your net share', 'سافی بەشی تۆ'), value: net, cents: figures.cents,
-      note: [`${loc('هامش حصتك', 'Your share margin', 'پەراوێزی بەشەکەت')} ${margin}`, netFromKnown ? knownNote : '', estimateNote,
-        deductions > 0 ? `${loc('بعد الكوبونات وحماية السعر ورصيد الاستبدال المُعاد', 'After coupons, price protection and returned trade-in credit', 'دوای کۆپۆن و پاراستنی نرخ و باڵانسی گۆڕینەوەی گەڕاوە')} −${formatMoney(deductions)}` : ''].filter(Boolean).join(' · '), primary: true },
+      note: [margin ? `${loc('هامش حصتك', 'Your share margin', 'پەراوێزی بەشەکەت')} ${margin}` : '', netFromKnown ? knownNote : '', estimateNote,
+        deductions > 0 ? `${loc('بعد الكوبونات وحماية السعر ورصيد الاستبدال المُعاد', 'After coupons, price protection and returned trade-in credit', 'دوای کۆپۆن و پاراستنی نرخ و باڵانسی گۆڕینەوەی گەڕاوە')}${deducted ? ` −${deducted}` : ''}` : ''].filter(Boolean).join(' · '), primary: true },
     { label: loc('الإيراد', 'Revenue'), value: revenue, cents: u?.chart ? u.chart.revenue_cents : undefined, note: loc('بعد المرتجعات، مع إيراد التوصيل والدفع', 'After refunds, including delivery and payment income') },
     { label: loc('إجمالي التكاليف', 'Total costs'), value: cost, cents: u?.chart ? costFromKnown ? uk?.cost_cents ?? null : u.chart.cost_cents : undefined, note: `${loc('البضاعة والتشغيل والترويج والمصاريف العامة، دون حصص المستثمرين', 'Goods, operations, promotion and general expenses, without investor shares', 'کاڵا و کارپێکردن و بانگەشە و خەرجییە گشتییەکان، بەبێ بەشی وەبەرهێنەران')}${costFromKnown ? ` · ${knownNote}` : ''}` },
   ];
   const sum = (a: number | null | undefined, b: number | null | undefined) => a == null || b == null ? null : a + b;
+  // A funded sale's share waits for its cash or its confirmed cost: one word for it wherever it is drawn.
+  const waiting = loc('ينتظر', 'Waiting', 'چاوەڕێ دەکات');
   return <>
     <div className="fw-overview-caption"><h2>{loc('الأداء المالي للفترة', 'Financial performance')}</h2>{needsReview ? <Status tone="warning">{loc('الحساب يحتاج مراجعة', 'Figures need review', 'ژمێریاری پێویستی بە پێداچوونەوەیە')}</Status>
       : estimatedOrders > 0 ? <Status tone="warning">{loc('فيه تكلفة تقديرية', 'Includes estimated costs', 'تێچووی خەمڵێنراوی تێدایە')}</Status>
@@ -232,7 +241,7 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
       <Row label={loc('أجور التوصيل والدفع', 'Courier and payment fees')} value={<DisplayMoney iqd={t.courier_fee_iqd == null || t.payment_fee_iqd == null ? null : t.courier_fee_iqd + t.payment_fee_iqd} cents={ut ? sum(c('courier_fee_iqd'), c('payment_fee_iqd')) : undefined} />} />
       <Row label={loc('ترويج الشهر', 'Monthly promotion')} value={<DisplayMoney iqd={t.promotion_iqd} cents={c('promotion_iqd')} />} onClick={() => onNavigate('monthly')} />
       {(t.unallocated_promotion_iqd ?? 0) > 0 && <Row label={loc('ترويج لم تُبع له قطع بعد', 'Promotion without sold units')} value={<DisplayMoney iqd={t.unallocated_promotion_iqd} cents={c('unallocated_promotion_iqd')} />} onClick={() => onNavigate('monthly')} />}
-      <Row label={loc('حصة المستثمرين', 'Investor share')} value={<DisplayMoney iqd={t.investor_iqd} cents={c('investor_iqd')} />} onClick={() => onNavigate('investors')} hint={(t.investor_iqd ?? 0) < 0 ? loc('مساهمة المستثمر في الخسارة', 'Investor contribution to the loss') : undefined} />
+      <Row label={loc('حصة المستثمرين', 'Investor share')} value={<DisplayMoney iqd={t.investor_iqd} cents={c('investor_iqd')} missing={waiting} />} onClick={() => onNavigate('investors')} hint={(t.investor_iqd ?? 0) < 0 ? loc('مساهمة المستثمر في الخسارة', 'Investor contribution to the loss') : undefined} />
       <Row label={loc('المصاريف العامة', 'General expenses')} value={<DisplayMoney iqd={t.general_expenses_iqd} cents={c('general_expenses_iqd')} />} onClick={() => onNavigate('monthly')} />
       {(t.general_waiting_iqd ?? 0) > 0 && <Row label={loc('تكاليف تنتظر تسليم طلباتها', 'Costs waiting for their orders to be delivered', 'تێچووی چاوەڕوانی گەیاندنی داواکارییەکانیان')} value={<DisplayMoney iqd={t.general_waiting_iqd} />}
         hint={loc('سُجّلت في هذه الفترة لطلبات لم تُسلَّم بعد؛ تُحسب عند تسليمها، ولا تدخل هذا الصافي', 'Entered in this period for orders not delivered yet; they count on delivery, not in this net', 'لەم ماوەیەدا بۆ داواکاری نەگەیەندراو تۆمارکراون؛ لە کاتی گەیاندندا دەژمێردرێن، نەک لەم سافەدا')} />}
@@ -249,11 +258,12 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
       {data.orders?.length ? <div className="fw-list">{data.orders.slice(0, 3).map((o) => <OrderRow order={o} usd={u?.orders?.[o.order_id || o.id]} key={o.id} onClick={() => openOrder(o.order_id || o.id)} />)}</div> : <Empty title={loc('لا طلبات مستلمة في الفترة', 'No delivered orders in this range')} text={loc('يمكن أن تبقى المصاريف العامة والترويج مستحقين حتى دون مبيعات.', 'General expenses and promotion may still apply without sales.')} />}
     </Surface>
     <Surface title={loc('المتابعة', 'Follow-up')}>
-      <Row label={loc('حصص المستثمرين', 'Investor shares')} value={<DisplayMoney iqd={t.investor_iqd} cents={c('investor_iqd')} missing={loc('ينتظر', 'Waiting', 'چاوەڕێ دەکات')} />} onClick={() => onNavigate('investors')}
+      <Row label={loc('حصص المستثمرين', 'Investor shares')} value={<DisplayMoney iqd={t.investor_iqd} cents={c('investor_iqd')} missing={waiting} />} onClick={() => onNavigate('investors')}
         hint={t.investor_iqd === null ? loc('حصة بيع ممول تنتظر تسجيل نقده أو تثبيت تكلفته', 'A funded sale waits for its cash to be recorded or its cost to be confirmed', 'بەشی فرۆشتنێکی دارایی چاوەڕێی تۆمارکردنی پارەکەی یان جێگیرکردنی تێچووەکەیەتی') : undefined} />
       <Row label={loc('النقد المسجّل استلامه', 'Cash recorded as received', 'پارەی تۆمارکراو وەک وەرگیراو')} value={<DisplayMoney iqd={t.collected_iqd} cents={c('collected_iqd')} />} />
-      <Row label={loc('عند التسليم ولم يُسجَّل استلامه', 'Due on delivery, not recorded yet', 'لە کاتی گەیاندن، هێشتا تۆمار نەکراوە')} value={<DisplayMoney iqd={t.collection_difference_iqd} cents={c('collection_difference_iqd')} />} onClick={onCollections}
-        hint={loc('ليس عجزًا: مبالغ الدفع عند الاستلام التي لم يُسجَّل وصولها بعد', 'Not a shortfall: cash-on-delivery amounts whose arrival is not recorded yet', 'کەمی نییە: بڕی پارەدان لە کاتی وەرگرتن کە گەیشتنی هێشتا تۆمار نەکراوە')} />
+      {/* What is due — paid at the door, or the instalment amount Gini owes (orderProfit: due on delivery + Gini − Gini refunds) — less what is recorded as received. */}
+      <Row label={loc('مستحق لم يُسجَّل استلامه', 'Due, not recorded as received yet', 'ماوە، هێشتا وەک وەرگیراو تۆمار نەکراوە')} value={<DisplayMoney iqd={t.collection_difference_iqd} cents={c('collection_difference_iqd')} />} onClick={onCollections}
+        hint={loc('ليس عجزًا: مبالغ الدفع عند التسليم أو من Gini التي لم يُسجَّل وصولها بعد', 'Not a shortfall: amounts paid on delivery or by Gini whose arrival is not recorded yet', 'کەمی نییە: بڕی پارەدان لە کاتی گەیاندن یان لە لایەن Gini کە گەیشتنی هێشتا تۆمار نەکراوە')} />
       {needsReview && <Row label={loc('تكاليف أو تسويات تحتاج مراجعة', 'Costs or settlements need review')} value={<Status tone="warning">{incomplete || loc('مراجعة', 'Review')}</Status>} onClick={() => onNavigate('orders')} />}
       <p className="fw-note">{loc('الربح يختلف عن النقد المحصل. المرتجعات وتصحيحات التكاليف تظهر في تفاصيل الطلب.', 'Profit differs from collected cash. Returns and financial corrections appear in order details.')}</p>
     </Surface></div>

@@ -109,8 +109,11 @@ export interface DisplayUsdSummary {
     expense_composition: Array<{ key: string; amount_cents: number | null }> };
   totals?: UsdCents;
   /** `known` in cents (null: no complete order); absent from a server that predates it. */
-  known?: { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; net_after_report_adjustments_cents?: number | null } | null;
+  known?: { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; net_after_report_adjustments_cents?: number | null;
+    /** Its confirmed and estimated parts, sharing its overhead by revenue as in dinars (absent from a server that predates them). */
+    confirmed?: UsdKnownPart; estimated?: UsdKnownPart } | null;
 }
+export interface UsdKnownPart { orders_count: number; owner_net_cents: number | null; net_after_report_adjustments_cents: number | null }
 /** `display_usd` of `GET /orders?display=USD`. */
 export interface DisplayUsdOrders { available: boolean; today_rate?: string | null; at_time_count?: number; today_count?: number; batch_cost_lines?: number; orders?: Record<string, UsdOrderCents> }
 /** `display_usd` of `GET /orders/:id?display=USD`. */

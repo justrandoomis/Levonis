@@ -93,17 +93,23 @@ function completeOrders(bases:OrderProfitBase[]){
  */
 const restsOnConfirmedCosts=(b:OrderProfitBase)=>b.lines.every((l)=>isConfirmedOrderCost(l.cost_confidence));
 const orderRevenue=(b:OrderProfitBase)=>Math.max(0,n(b.totals.retained_revenue_iqd)+n(b.totals.shipping_income_iqd)+n(b.totals.cod_tax_iqd));
+/**
+ * The confirmed orders' part of the complete orders' overhead: by revenue, as the overhead
+ * itself is shared, in dinars and in cents alike. The estimated part is the remainder, so
+ * the two always add up to the known net exactly.
+ */
+function confirmedOverheadOf(complete:OrderProfitBase[],overhead:number){
+  const revenue=complete.reduce((v,b)=>v+orderRevenue(b),0),confirmed=complete.filter(restsOnConfirmedCosts);
+  return revenue>0?Math.round(overhead*confirmed.reduce((v,b)=>v+orderRevenue(b),0)/revenue):complete.length?Math.round(overhead*confirmed.length/complete.length):0;
+}
 /** The period's figures over the orders whose every amount is known (none: null), and what the rest lack. */
 function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean){
   const {complete,share}=completeOrders(bases);
   const overhead={general:Math.round(general*share),unallocated:Math.round(unallocated*share)};
   const known=sumRows(complete.map((b)=>b.totals));known.orders_count=complete.length;
   const amounts=chartAmounts(known,overhead.general,overhead.unallocated,truncated);
-  // Confirmed and estimated orders take the complete orders' overhead by revenue; the
-  // estimated part is the remainder, so the two always add up to the known net exactly.
   const confirmed=complete.filter(restsOnConfirmedCosts),estimated=complete.filter((b)=>!restsOnConfirmedCosts(b));
-  const overheadTotal=overhead.general+overhead.unallocated,completeRevenue=complete.reduce((v,b)=>v+orderRevenue(b),0);
-  const confirmedOverhead=completeRevenue>0?Math.round(overheadTotal*confirmed.reduce((v,b)=>v+orderRevenue(b),0)/completeRevenue):complete.length?Math.round(overheadTotal*confirmed.length/complete.length):0;
+  const overheadTotal=overhead.general+overhead.unallocated,confirmedOverhead=confirmedOverheadOf(complete,overheadTotal);
   const part=(rows:OrderProfitBase[],share:number)=>{const t=sumRows(rows.map((b)=>b.totals));
     return {orders_count:rows.length,revenue_iqd:rows.reduce((v,b)=>v+orderRevenue(b),0),
       owner_net_iqd:t.owner_net_iqd===null||truncated?null:n(t.owner_net_iqd)-share,
@@ -314,12 +320,20 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   const daily:Record<string,ReturnType<typeof chartCents>>={};
   for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10);
     daily[day]=chartCents(sum(byDay.get(day)??[]),generalByDay.get(day)??0,unallocatedByDay.get(day)??0,truncated);}
-  const kinds=Object.fromEntries(ORDER_KINDS.map((kind)=>[kind,sumCents(bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal').map((b)=>orders.get(b.order_id)!.cents))]));
+  // A kind without orders is 0 in every column, as its dinar row (sumRows) — never «ناقص» beside «0 طلب».
+  const kinds=Object.fromEntries(ORDER_KINDS.map((kind)=>[kind,sum(bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal').map((b)=>orders.get(b.order_id)!.cents))]));
   const lines=bases.flatMap((b)=>b.lines.map((l)=>({...l,order_id:b.order_id})));
-  // `known` (the complete orders, with their share of the period's overhead) in cents, as /summary's IQD `known`.
+  // `known` (the complete orders, with their share of the period's overhead) in cents, as /summary's IQD `known`,
+  // with its confirmed and estimated parts, so the overview names them in dollars beside a dollar headline.
   const knownCents=done.complete.length?sumCents(done.complete.map((b)=>orders.get(b.order_id)!.cents)):null,knownOverhead=Math.round(general*done.share)+Math.round(unallocated*done.share);
+  const partCents=(rows:OrderProfitBase[],overhead:number)=>{const t=sum(rows.map((b)=>orders.get(b.order_id)!.cents));
+    return {orders_count:rows.length,owner_net_cents:truncated||t.owner_net_cents==null?null:t.owner_net_cents-overhead,
+      net_after_report_adjustments_cents:truncated||t.net_after_report_adjustments_cents==null?null:t.net_after_report_adjustments_cents-overhead};};
+  const confirmedOverhead=confirmedOverheadOf(done.complete,knownOverhead);
   const known=knownCents?{...chartCents(knownCents,Math.round(general*done.share),Math.round(unallocated*done.share),truncated),
-    net_after_report_adjustments_cents:truncated||knownCents.net_after_report_adjustments_cents==null?null:knownCents.net_after_report_adjustments_cents-knownOverhead}:null;
+    net_after_report_adjustments_cents:truncated||knownCents.net_after_report_adjustments_cents==null?null:knownCents.net_after_report_adjustments_cents-knownOverhead,
+    confirmed:partCents(done.complete.filter(restsOnConfirmedCosts),confirmedOverhead),
+    estimated:partCents(done.complete.filter((b)=>!restsOnConfirmedCosts(b)),knownOverhead-confirmedOverhead)}:null;
   return {available:true as const,today_rate:steps?.today??null,...basisCounts(orders),approximate,known,
     orders:orderBlock(orders),kinds,products:groupedCents(lines,'product',orders),
     categories:{main:groupedCents(lines,'main',orders),sub:groupedCents(lines,'sub',orders)},
@@ -561,9 +575,24 @@ adminFinanceWorkspaceRoutes.delete('/promotions/:id',async(c)=>{const actor=c.ge
 // An amount is written as a number, so a spreadsheet sums it (a loss included); only
 // text that could start a formula gets the leading «'» (DECISIONS row 313).
 const csvCell=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)?String(v):`"${s(v).replace(/^[=+\-@\t\r]/,"'$&").replace(/"/g,'""')}"`;
+/**
+ * What an order deducts beyond its lines: a line carries the order coupon only up to its own
+ * goods, so the rest of a coupon larger than the goods (it cut the shipping, then the COD fee)
+ * stays with the order (applyReportAdjustments). The export gives it its own order-level row
+ * (`row_kind` 'order_level'), so each deduction column, and the net after them, adds up to the
+ * orders' own figures (review R3, DECISIONS row 313). Null: nothing is left at the order level.
+ */
+const REPORT_DEDUCTIONS=['coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd'] as const;
+function orderLevelDeductions(b:OrderProfitBase):Row|null{
+  const totals=b.totals as unknown as Row,lines=b.lines as unknown as Row[];
+  const rest=Object.fromEntries(REPORT_DEDUCTIONS.map((f)=>[f,n(totals[f])-lines.reduce((v,l)=>v+n(l[f]),0)]));
+  if(REPORT_DEDUCTIONS.every((f)=>rest[f]===0))return null;
+  return {...rest,net_after_report_adjustments_iqd:b.totals.net_after_report_adjustments_iqd==null?null:-REPORT_DEDUCTIONS.reduce((v,f)=>v+rest[f],0),row_kind:'order_level'};
+}
 adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   const r=range(c.req.query('from'),c.req.query('to')),{bases,truncated}=await selectOrders(c.env.DB,r,{summary:true});if(truncated)throw badRequest('اختر فترة أضيق لتصدير جميع البنود');
-  const fields=['order_id','id','product_id','name_snapshot','sku_snapshot','qty','returned_qty','main_name','sub_name','net_goods_iqd','refund_iqd','cogs_iqd','cost_confidence','gross_profit_iqd','wages_iqd','materials_iqd','manual_direct_iqd','shipping_income_iqd','cod_tax_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd','investor_iqd','owner_net_iqd','pending_costs','coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd'];
-  const rows=[fields.map(csvCell).join(','),...bases.flatMap((b)=>b.lines.map((l)=>fields.map((f)=>csvCell(f==='order_id'?b.order_id:l[f])).join(',')))];
+  const fields=['order_id','id','product_id','name_snapshot','sku_snapshot','qty','returned_qty','main_name','sub_name','net_goods_iqd','refund_iqd','cogs_iqd','cost_confidence','gross_profit_iqd','wages_iqd','materials_iqd','manual_direct_iqd','shipping_income_iqd','cod_tax_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd','investor_iqd','owner_net_iqd','pending_costs','coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd','row_kind'];
+  const rows=[fields.map(csvCell).join(','),...bases.flatMap((b)=>{const rest=orderLevelDeductions(b);
+    return [...b.lines.map((l):Row=>({...l,row_kind:'line'})),...(rest?[rest]:[])].map((l)=>fields.map((f)=>csvCell(f==='order_id'?b.order_id:l[f])).join(','));})];
   return new Response('\uFEFF'+rows.join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="finance-lines-${r.from}-${r.to}.csv"`}});
 });

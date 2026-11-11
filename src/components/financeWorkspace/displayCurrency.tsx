@@ -22,6 +22,15 @@ export const useDisplayCurrency = () => useContext(DisplayCurrencyContext);
 export const usdText = (cents: number | null | undefined) => (cents == null ? '—' : formatUsdCents(cents));
 
 /**
+ * An incomplete value: never a bare «—» and never 0 (DECISIONS row 313). It says «ناقص»
+ * (or `text`, e.g. «ينتظر»); the row or the table around it says why.
+ */
+export function MissingValue({ text }: { text?: string }) {
+  const { loc } = useLanguage();
+  return <span className="fw-missing" data-finance-missing>{text ?? loc('ناقص', 'Missing', 'ناتەواو')}</span>;
+}
+
+/**
  * A figure in the chosen currency. In USD with server cents: the dollars, and
  * the accounting dinars beneath. With no cents for this figure (an IQD-only
  * figure, or USD unavailable) it stays in dinars.
@@ -31,8 +40,7 @@ export function DisplayMoney({ iqd, cents, compact = false, missing }: { iqd: nu
   missing?: string }) {
   const currency = useDisplayCurrency();
   const { loc } = useLanguage();
-  // An incomplete figure is never a bare «—» and never 0 (DECISIONS row 313).
-  const gap = <span className="fw-missing" data-finance-missing>{missing ?? loc('ناقص', 'Missing', 'ناتەواو')}</span>;
+  const gap = <MissingValue text={missing} />;
   if (currency !== 'USD' || cents === undefined) return iqd == null ? gap : <Money value={iqd} compact={compact} />;
   if (cents === null) return gap;
   return <span className="fw-money-dual" data-finance-usd>
