@@ -164,11 +164,17 @@ test('the missing-costs sheet groups by product and size, no-price groups first,
   assert.match(sheet, /locked=\{stale \|\| \(running !== null && running !== g\.key\)\}/);
   assert.match(sheet, /openOrder\(l\.order_id, 'cost', l\.line_id\)/);
   const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
+  // The headline is worked out in overviewFigures.ts since DECISIONS row 313 (after the order deductions);
+  // the overview draws that figure and its cents.
+  const figures = codeOf('src/components/financeWorkspace/overviewFigures.ts');
+  assert.match(workspace, /const figures = overviewNet\(data, u\);/);
+  assert.match(workspace, /value: net, cents: figures\.cents,/);
   // No bare dash for an incomplete total: what complete orders say, and what is missing.
-  assert.match(workspace, /fullNet \?\? \(netFromKnown \? known!\.owner_net_iqd : null\)/);
+  assert.match(figures, /const knownNet = known \? \(known\.net_after_report_adjustments_iqd !== undefined \? known\.net_after_report_adjustments_iqd : known\.owner_net_iqd\) : null;/);
+  assert.match(figures, /const net = full \?\? \(fromKnown \? knownNet : null\);/);
   assert.match(workspace, /missing && missing\.lines > 0/);
   assert.match(workspace, /onMissing=\{\(\) => setMissingOpen\(true\)\}/);
   // In dollars the complete orders' figures are the server's cents, never dinars among dollars.
-  assert.match(workspace, /netFromKnown \? uk\?\.owner_net_cents \?\? null/);
+  assert.match(figures, /fromKnown \? \(uk \? \(uk\.net_after_report_adjustments_cents !== undefined \? uk\.net_after_report_adjustments_cents : uk\.owner_net_cents\) \?\? null : null\)/);
   assert.match(workspace, /costFromKnown \? uk\?\.cost_cents \?\? null/);
 });

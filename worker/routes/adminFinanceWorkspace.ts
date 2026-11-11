@@ -300,7 +300,10 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   const generalByDay=new Map<string,number>();for(const e of expenses){const c=atDay(s(e.expense_day),n(e.total));if(c===null)return unavailableUsd();generalByDay.set(s(e.expense_day),c);}
   const unallocatedByDay=new Map<string,number>();for(const [day,amount] of unallocatedDays){const c=atDay(day,amount);if(c===null)return unavailableUsd();unallocatedByDay.set(day,c);}
   const general=[...generalByDay.values()].reduce((v,x)=>v+x,0),unallocated=[...unallocatedByDay.values()].reduce((v,x)=>v+x,0);
-  const totals=sumCents([...orders.values()].map((o)=>o.cents));
+  // The sum of no order is 0 in dollars as in dinars (sumRows): a period, or a day, without a delivered order
+  // owes only its overheads — never a missing headline, cost tile or chart day beside the dinar figure.
+  const sum=(rows:Cents[])=>rows.length?sumCents(rows):centsOf(sumRows([]),'1');
+  const totals=sum([...orders.values()].map((o)=>o.cents));
   const ownerNet=totals.owner_net_cents??null;
   const periodNet=ownerNet===null||truncated?null:ownerNet-general-unallocated;
   // As in dinars: the orders after their own deductions (a returned trade-in credit included), minus the period's overheads.
@@ -310,7 +313,7 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   const byDay=new Map<string,Cents[]>();for(const b of bases){const day=deliveredDay(b),rows=byDay.get(day)??[];rows.push(orders.get(b.order_id)!.cents);byDay.set(day,rows);}
   const daily:Record<string,ReturnType<typeof chartCents>>={};
   for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10);
-    daily[day]=chartCents(sumCents(byDay.get(day)??[]),generalByDay.get(day)??0,unallocatedByDay.get(day)??0,truncated);}
+    daily[day]=chartCents(sum(byDay.get(day)??[]),generalByDay.get(day)??0,unallocatedByDay.get(day)??0,truncated);}
   const kinds=Object.fromEntries(ORDER_KINDS.map((kind)=>[kind,sumCents(bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal').map((b)=>orders.get(b.order_id)!.cents))]));
   const lines=bases.flatMap((b)=>b.lines.map((l)=>({...l,order_id:b.order_id})));
   // `known` (the complete orders, with their share of the period's overhead) in cents, as /summary's IQD `known`.

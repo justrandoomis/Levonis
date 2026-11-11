@@ -17,6 +17,11 @@
  *   · the month's promotion is spread per PIECE sold, so a bag of cheap parts
  *     carries almost all of it; the owner chose «by sales value» (2026-11-11).
  *
+ * Two more, from the people-finance session's review of step 1 and the step's own review
+ * (also failing on 11262b04): «known» — the headline while orders are incomplete — and its
+ * dollars come after the same deductions as the headline; and in dollars a period, or a
+ * day, without a delivered order owes its overheads exactly as in dinars, never «ناقص».
+ *
  * Run: node --import tsx --test tests/financeFigures.test.ts
  */
 import { test } from 'node:test';
@@ -25,18 +30,20 @@ import { asD1, freshDb, get, json, post, stubApp } from './fixtures/app';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
 import { monthlyPromotionShares } from '../worker/lib/orderProfit';
 import { baghdadDay } from '../worker/lib/operations';
+import { overviewNet } from '../src/components/financeWorkspace/overviewFigures';
+import type { FinanceSummary } from '../src/components/financeWorkspace/types';
 
 type Raw = ReturnType<typeof freshDb>;
 const month = () => baghdadDay().slice(0, 7);
 const period = () => `from=${month()}-01&to=${new Date(Date.UTC(Number(month().slice(0, 4)), Number(month().slice(5)), 0)).toISOString().slice(0, 10)}`;
 
-interface O { id: string; qty?: number; unit?: number; cost?: number | null; estimate?: number; delivered?: string | null; status?: string; product?: string; shipping?: number }
+interface O { id: string; qty?: number; unit?: number; cost?: number | null; estimate?: number; delivered?: string | null; status?: string; product?: string; shipping?: number; coupon?: number }
 /** A Levonis order with one line; `cost` null = never priced, otherwise a priced FIFO lot backs it. */
 function order(raw: Raw, o: O) {
   const qty = o.qty ?? 2, unit = o.unit ?? 25000, sub = qty * unit, ship = o.shipping ?? 5000, total = sub + ship;
   const at = o.delivered === undefined ? new Date().toISOString() : o.delivered;
-  raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,cod_tax_iqd,points_discount_iqd,order_kind,created_at,delivered_at)
-    VALUES (?,'buyer',?,'{}','standard','{}','cash',?,1400,?,?,?,0,0,'normal',?,?)`).run(o.id, o.status ?? 'delivered', sub, total, total, ship, at ?? new Date().toISOString(), at);
+  raw.prepare(`INSERT INTO orders(id,user_id,status,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,shipping_iqd,cod_tax_iqd,points_discount_iqd,order_kind,created_at,delivered_at,coupon_discount_iqd)
+    VALUES (?,'buyer',?,'{}','standard','{}','cash',?,1400,?,?,?,0,0,'normal',?,?,?)`).run(o.id, o.status ?? 'delivered', sub, total, total, ship, at ?? new Date().toISOString(), at, o.coupon ?? 0);
   const cost = o.cost === undefined ? 10000 : o.cost, product = o.product ?? 'product';
   raw.prepare(`INSERT INTO order_items(id,order_id,product_id,name_snapshot,sku_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis) VALUES (?,?,?,?,'SKU',?,?,?,?,?)`)
     .run(`${o.id}:item`, o.id, product, product, qty, unit, sub, cost, cost === null ? 'unpriced' : 'snapshot');
@@ -164,4 +171,58 @@ test('a sale from a batch whose investor agreement was voided completes in the p
   assert.equal(sheet.totals.owner_net_iqd, 35000, 'the sheet: no active agreement, no investor share');
   assert.equal(s.totals.owner_period_net_iqd, 35000, 'the period agrees instead of waiting for ever');
   assert.equal(s.exceptions.some((e: { type: string }) => e.type === 'investor'), false);
+});
+
+/** The shop's dollar rate (1,500), applied since January: every order and day of the period has one. */
+const usd = (raw: Raw) => raw.exec(`UPDATE fx_rate_pairs SET effective_rate='1500', effective_version=1, drift_anchor_rate='1500', effective_source='provider' WHERE pair='USD_IQD';
+  INSERT INTO fx_rate_log(id,pair,event,trigger_kind,effective_before,effective_after,result,created_at) VALUES ('l1','USD_IQD','review_approved','owner',NULL,'1500','APPLIED','2026-01-01T00:00:00.000Z');`);
+
+test('«known» and its dollars come after the order deductions, as the headline they stand in for while orders are incomplete (people-finance review, 2026-11-11)', async () => {
+  const w = world();
+  usd(w.raw);
+  order(w.raw, { id: 'paid', coupon: 3000 });
+  order(w.raw, { id: 'mag', qty: 60, unit: 500, cost: null, product: 'magnet', shipping: 0 });
+  const now = new Date().toISOString();
+  w.raw.exec(`INSERT INTO price_protection_claims(id,user_id,order_id,order_item_id,original_unit_iqd,observed_unit_iqd,qty,credited_iqd,state) VALUES ('pp1','buyer','paid','paid:item',25000,23000,1,2000,'credited');
+    INSERT INTO trade_in_requests(id,user_id,order_id,order_item_id,family,created_at,updated_at) VALUES ('ti','buyer','old-order','old-item','fdm','${now}','${now}');
+    INSERT INTO inventory_lots(id,product_id,scope,scope_id,qty_received,qty_remaining,unit_cost_iqd,cost_basis,received_at) VALUES ('ti:lot','product','base','',1,1,7000,'opening','${now}');
+    INSERT INTO trade_in_stock(request_id,lot_id,product_id,cost_basis_iqd,order_id,created_at) VALUES ('ti','ti:lot','product',7000,'old-order','${now}');
+    INSERT INTO return_cases(id,order_id,order_item_id,user_id,qty,reason,state,resolution,decided_at) VALUES ('rc1','paid','paid:item','buyer',1,'defective','resolved','refund','${now}');
+    INSERT INTO finance_refund_facts(case_id,order_id,refund_iqd,qty,disposition,cogs_iqd,channel,refunded_day) VALUES ('rc1','paid',18000,1,'restock',10000,'wallet','${baghdadDay()}');
+    INSERT INTO trade_in_credit_reissues(id,request_id,coupon_id,order_id,reason,return_case_id,amount_iqd,ends_at,created_at) VALUES ('x1','ti','cpn','paid','returned','rc1',7000,'2027-01-01T00:00:00.000Z','${now}');
+    INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent1','rent',6000,'${baghdadDay()}','Rent','admin');`);
+  const s = await w.read(`/f/summary?${period()}&display=USD`);
+  const k = s.known, uk = s.display_usd.known, oc = s.display_usd.orders.paid.cents;
+  assert.equal(s.totals.owner_period_net_after_report_adjustments_iqd, null, 'the never-priced magnets leave the period incomplete');
+  assert.deepEqual([k.orders_count, k.incomplete_orders], [1, 1]);
+  assert.ok(k.overhead_share_iqd > 0, 'the complete order carries its revenue share of the rent');
+  assert.equal(k.net_after_report_adjustments_iqd, k.owner_net_iqd - 3000 - 2000 - 7000, 'the same overhead, after the coupon, the credited price protection and the returned trade-in credit');
+  assert.ok(oc.coupon_cents > 0 && oc.price_protection_cents > 0 && oc.trade_in_credit_returned_cents > 0);
+  assert.equal(uk.net_after_report_adjustments_cents, uk.owner_net_cents - oc.coupon_cents - oc.price_protection_cents - oc.trade_in_credit_returned_cents, 'in dollars, after the same three');
+  const f = overviewNet(s as FinanceSummary, s.display_usd);
+  assert.equal(f.fromKnown, true);
+  assert.equal(f.net, k.net_after_report_adjustments_iqd, '«صافي حصتك» is the complete orders after their deductions');
+  assert.equal(f.cents, uk.net_after_report_adjustments_cents, 'and its dollars are the server\'s, after the same deductions');
+  assert.equal(f.deductions, 12000);
+});
+
+test('in dollars a period, or a day, without a delivered order owes its overheads as in dinars — never a missing headline beside a dinar figure (step 1 review)', async () => {
+  const w = world();
+  usd(w.raw);
+  w.raw.exec(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent1','rent',15000,'${baghdadDay()}','Rent','admin')`);
+  const empty = await w.read(`/f/summary?${period()}&display=USD`), u = empty.display_usd;
+  assert.equal(empty.totals.owner_period_net_after_report_adjustments_iqd, -15000);
+  assert.equal(u.totals.owner_period_net_cents, -1000);
+  assert.equal(u.totals.owner_period_net_after_report_adjustments_cents, -1000, '15,000 at 1,500: −$10.00, not «ناقص»');
+  assert.deepEqual([u.chart.cost_cents, u.chart.owner_net_cents], [1000, -1000], 'the cost tile and the chart say the same');
+  assert.equal(overviewNet(empty as FinanceSummary, u).cents, -1000);
+  // With an order on another day, the rent's own day still carries the rent in dollars, as in dinars.
+  const other = baghdadDay().endsWith('-01') ? `${month()}-02` : `${month()}-01`;
+  w.raw.exec(`UPDATE operating_expenses SET expense_day='${other}' WHERE id='rent1'`);
+  order(w.raw, { id: 'sold' });
+  const s = await w.read(`/f/summary?${period()}&display=USD`);
+  const day = s.chart_data.daily.find((d: { day: string }) => d.day === other);
+  assert.deepEqual([day.cost_iqd, day.owner_net_iqd], [15000, -15000]);
+  assert.deepEqual([s.display_usd.chart.daily[other].cost_cents, s.display_usd.chart.daily[other].owner_net_cents], [1000, -1000]);
+  assert.notEqual(s.display_usd.totals.owner_period_net_after_report_adjustments_cents, null);
 });

@@ -85,7 +85,7 @@ export default function MonthlyCosts({ month, onChanged }: { month: string; onCh
     {notice && <p className="fw-success" role="status"><Check size={16} />{notice}</p>}
     {loading && !promotions.length ? <Loading text={loc('تحميل تكاليف الشهر…', 'Loading monthly costs…')} /> : <Surface className="fw-promo-hero">
       <div><h2>{loc('ترويج الشهر', 'Monthly promotion')}</h2>
-        <p className="fw-note">{loc('مبلغ واحد للشهر كله. يتوزع على قطع المنتجات المباعة ويُخصم من حصة المالك.', 'One amount for the whole month, allocated across sold units and borne by the owner.')}</p>
+        <p className="fw-note">{loc('مبلغ واحد للشهر كله. يتوزع على مبيعات الشهر حسب قيمتها ويُخصم من حصة المالك.', 'One amount for the whole month, shared over the month’s sales by value and borne by the owner.', 'یەک بڕ بۆ هەموو مانگەکە. بەپێی بەها بەسەر فرۆشتنەکانی مانگەکەدا دابەش دەکرێت و خاوەن هەڵیدەگرێت.')}</p>
         <div className="fw-promo-amount">
           <input type="number" inputMode="decimal" min="0" step="any" value={amount} placeholder="100" aria-label={loc('مبلغ الترويج', 'Promotion amount')}
             onFocus={(e) => e.target.select()} onChange={(e) => { setAmount(e.target.value); operation.current = crypto.randomUUID(); }}
@@ -112,7 +112,7 @@ export default function MonthlyCosts({ month, onChanged }: { month: string; onCh
       <Row label={loc('طريقة التوزيع', 'Allocation method', 'شێوازی دابەشکردن')} value={loc('حسب قيمة المبيعات', 'By sales value', 'بەپێی بەهای فرۆشتن')}
         hint={loc('كل منتج يحمل من ترويج الشهر بقدر حصته من مبيعات الشهر', 'Each product carries the month’s promotion in proportion to its share of the month’s sales', 'هەر بەرهەمێک بەپێی بەشی خۆی لە فرۆشتنی مانگەکە بانگەشەی مانگەکە هەڵدەگرێت')} />
       <Row label={loc('حصة الموظف والمستثمر', 'Staff and investor share')} value={loc('لا تخصم منها تكلفة الترويج', 'Unaffected by promotion')} />
-      {unallocated > 0 && <Row label={loc('ترويج بانتظار مبيعات الشهر', 'Promotion awaiting this month’s sales')} value={<Money value={unallocated} />} hint={loc('يظهر الآن ضمن تكاليف المالك، ويتوزع عند بيع القطع.', 'Already included in owner costs; allocated when units sell.')} />}
+      {unallocated > 0 && <Row label={loc('ترويج بانتظار مبيعات الشهر', 'Promotion awaiting this month’s sales', 'بانگەشەی چاوەڕێی فرۆشتنی مانگەکە')} value={<Money value={unallocated} />} hint={loc('يظهر الآن ضمن تكاليف المالك، ويتوزع على مبيعات الشهر عند تسليمها.', 'Already included in owner costs; shared over the month’s sales once they are delivered.', 'ئێستا لەناو تێچووەکانی خاوەندایە، و کاتێک فرۆشتنەکانی مانگەکە دەگەیەنرێن بەسەریاندا دابەش دەکرێت.')} />}
       <p className="fw-note">{loc('عند تعديل المبلغ، تتحدث تفاصيل الطلبات والمنتجات وحصة المالك للشهر. يسجل النظام التعديل تلقائيًا.', 'Changing the amount updates orders, products and the owner’s monthly share. Changes are recorded automatically.')}</p>
     </Surface>
     <details className="fw-advanced" onToggle={(e) => setExpensesOpen(e.currentTarget.open)}><summary><Plus size={16} />{loc('مصروفات أخرى للشهر', 'Other monthly expenses')}</summary>

@@ -52,3 +52,15 @@ export function overviewNet(data: FinanceSummary, usd?: DisplayUsdSummary): Over
     state: incomplete > 0 || t.owner_period_net_iqd === null ? 'review' : estimatedOrders > 0 ? 'estimated' : 'confirmed',
   };
 }
+
+/**
+ * The average delivered order. Null when the period has no order: there is
+ * nothing to average, so the tile says nothing rather than «ناقص», which means a
+ * value still to complete. A revenue the server could not total stays missing.
+ */
+export function averageOrder(data: FinanceSummary, usd?: DisplayUsdSummary): { iqd: number | null; cents: number | null | undefined } | null {
+  const count = data.totals.orders_count ?? data.orders?.length ?? 0;
+  if (!(count > 0)) return null;
+  const revenue = data.chart_data?.revenue_iqd;
+  return { iqd: revenue == null ? null : revenue / count, cents: usd?.chart ? Math.round(usd.chart.revenue_cents / count) : undefined };
+}

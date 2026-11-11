@@ -10,7 +10,7 @@ import OrderProfitSheet, { type OrderFocus } from './OrderProfitSheet';
 import MonthlyCosts from './MonthlyCosts';
 import './finance-workspace.css';
 import { orderFinancePresentation } from './orderFinancePresentation';
-import { overviewNet } from './overviewFigures';
+import { averageOrder, overviewNet } from './overviewFigures';
 import ReportDeductions from './ReportDeductions';
 import { CurrencyToggle, DisplayCurrencyContext, DisplayMoney, UsdBasisNote, centsAt, useDisplayCurrency, type DisplayCurrency } from './displayCurrency';
 import VariantImg from '../ui/VariantImg';
@@ -180,6 +180,7 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
   const figures = overviewNet(data, u);
   const { net, fromKnown: netFromKnown, marginBase, deductions } = figures;
   const needsReview = figures.state === 'review';
+  const average = averageOrder(data, u);
   const revenue = data.chart_data?.revenue_iqd;
   // An incomplete total shows what the complete orders say, and says so — never a bare dash.
   // `known` is null when no order of the period is complete: the tiles say «ناقص» and why.
@@ -195,7 +196,7 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
   const cost = data.chart_data?.cost_iqd ?? (costFromKnown ? known!.cost_iqd : null);
   // In dollars, the complete orders' figures come from the server's cents too (none: a dash, never dinars among dollars).
   const uk = u ? u.known ?? null : undefined;
-  const knownNote = known ? `${loc('من الطلبات المكتملة فقط', 'From complete orders only')} (${known.orders_count}/${t.orders_count ?? data.orders.length})${(known.overhead_share_iqd ?? 0) > 0 ? loc('، مع حصتها من المصاريف العامة بنسبة إيرادها', ', with their share of general expenses by revenue') : ''}` : '';
+  const knownNote = known ? `${loc('من الطلبات المكتملة فقط', 'From complete orders only', 'تەنها لە داواکارییە تەواوەکانەوە')} (${known.orders_count}/${t.orders_count ?? data.orders.length})${(known.overhead_share_iqd ?? 0) > 0 ? loc('، مع حصتها من المصاريف العامة بنسبة إيرادها', ', with their revenue-based share of general expenses', '، لەگەڵ بەشیان لە خەرجییە گشتییەکان بەپێی داهاتەکەیان') : ''}` : '';
   const metrics = [
     { label: loc('صافي حصتك', 'Your net share', 'سافی بەشی تۆ'), value: net, cents: figures.cents,
       note: [`${loc('هامش حصتك', 'Your share margin', 'پەراوێزی بەشەکەت')} ${margin}`, netFromKnown ? knownNote : '', estimateNote,
@@ -210,7 +211,7 @@ function Overview({ data, from, to, revision, openOrder, onNavigate, onCollectio
         : <Status tone="positive"><ShieldCheck size={13} />{loc('كل التكاليف مؤكدة', 'All costs confirmed', 'هەموو تێچووەکان دڵنیاکراون')}</Status>}</div>
     {currency === 'USD' && <UsdBasisNote available={!!data.display_usd?.available} atTimeCount={data.display_usd?.at_time_count} todayCount={data.display_usd?.today_count} todayRate={data.display_usd?.today_rate} batchLines={data.display_usd?.batch_cost_lines} />}
     <div className="fw-metrics">{metrics.map((m) => <div className={`fw-metric${m.primary ? ' fw-metric--primary' : ''}`} key={m.label}><span>{m.label}</span><DisplayMoney iqd={m.value} cents={m.cents} /><small>{m.note}</small></div>)}
-      <div className="fw-metric"><span>{loc('الطلبات المستلمة', 'Delivered orders')}</span><strong>{t.orders_count ?? data.orders.length}</strong><small>{t.units ?? 0} {loc('قطعة مباعة', 'units sold')} · <DisplayMoney iqd={revenue != null && (t.orders_count ?? 0) > 0 ? revenue / t.orders_count! : null} cents={u?.chart ? ((t.orders_count ?? 0) > 0 ? Math.round(u.chart.revenue_cents / t.orders_count!) : null) : undefined} compact /> {loc('متوسط الطلب', 'average order')}</small></div>
+      <div className="fw-metric"><span>{loc('الطلبات المستلمة', 'Delivered orders')}</span><strong>{t.orders_count ?? data.orders.length}</strong><small>{t.units ?? 0} {loc('قطعة مباعة', 'units sold')}{average && <> · <DisplayMoney iqd={average.iqd} cents={average.cents} compact /> {loc('متوسط الطلب', 'average order')}</>}</small></div>
     </div>
     {data.truncated && <p className="fw-error" role="alert">{loc('عدد الطلبات يتجاوز حد التقرير؛ راجع الفترة قبل اعتماد الإجمالي.', 'Order count exceeds the report limit. Review the period before accepting totals.')}</p>}
     {missing && missing.lines > 0 && <div className="fw-note fw-missing-box" role="note">
@@ -348,7 +349,7 @@ function Products({ data, onOpenOrders }: { data: FinanceSummary; onOpenOrders: 
       <div className="fw-line-metrics"><div className="fw-line-metric"><span>{loc('صافي البيع', 'Net sales')}</span><DisplayMoney iqd={p.net_goods_iqd} cents={pcs('net_goods_iqd')} /></div><div className="fw-line-metric"><span>{loc('تكلفة البضاعة', 'Goods cost')}</span><DisplayMoney iqd={p.cogs_iqd} cents={pcs('cogs_iqd')} /></div><div className="fw-line-metric"><span>{loc('الأجور والمواد', 'Wages and materials')}</span><DisplayMoney iqd={p.wages_iqd == null || p.materials_iqd == null ? null : p.wages_iqd + p.materials_iqd} cents={pc ? (pcs('wages_iqd') == null || pcs('materials_iqd') == null ? null : pcs('wages_iqd')! + pcs('materials_iqd')!) : undefined} /></div><div className="fw-line-metric"><span>{loc('نصيب الترويج', 'Promotion share')}</span><DisplayMoney iqd={p.promotion_iqd} cents={pcs('promotion_iqd')} /></div></div>
       <Row label={loc('حصة المستثمر', 'Investor share')} value={<DisplayMoney iqd={p.investor_iqd} cents={pcs('investor_iqd')} />} />
       <Row label={loc('صافي المالك', 'Owner net')} value={<DisplayMoney iqd={p.owner_net_iqd} cents={pcs('owner_net_iqd')} />} prominent />
-      <ReportDeductions totals={p} net={p.net_after_report_adjustments_iqd} cents={pc ? { coupon: pcs('coupon_iqd'), credit: pcs('price_protection_iqd'), net: pcs('net_after_report_adjustments_iqd') } : undefined} compact />
+      <ReportDeductions totals={p} net={p.net_after_report_adjustments_iqd} cents={pc ? { coupon: pcs('coupon_iqd'), credit: pcs('price_protection_iqd'), tradeIn: pcs('trade_in_credit_returned_iqd'), net: pcs('net_after_report_adjustments_iqd') } : undefined} compact />
     </Surface>; })}</div> : <Empty title={loc('لا توجد منتجات في هذه الفترة', 'No products in this period')} text={loc('تظهر منتجات الطلبات المستلمة خلال الفترة هنا.', 'Products from orders delivered in the selected range appear here.')} />}
     <p className="fw-note">{loc('تكلفة الترويج توزيع إداري على المنتجات، وتُحمّل على المالك فقط.', 'Promotion shares are a management allocation borne by the owner only.')}</p>
     <Button variant="ghost" onClick={onOpenOrders}><CheckCircle2 size={16} />{loc('راجع الطلبات الأصلية', 'Review source orders')}</Button>

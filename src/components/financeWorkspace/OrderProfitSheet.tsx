@@ -202,7 +202,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, onSaved,
         {!view?.expectsDelivery && view?.hasFinancialActivity && <div className="fw-metric"><span>{loc('حصة المستثمر', 'Investor share')}</span><DisplayMoney iqd={data.totals.investor_iqd} cents={orderCents('investor_iqd')} /></div>}
         {view?.amountKind !== 'not_earned' && <div className="fw-metric"><span>{amountLabel}</span><DisplayMoney iqd={view?.amount} cents={view?.amountKind === 'owner_net' ? orderCents('owner_net_iqd') : undefined} /></div>}
       </div>
-      {data.order.status === 'delivered' && <ReportDeductions totals={data.totals} net={data.totals.net_after_report_adjustments_iqd} cents={usd ? { coupon: orderCents('coupon_iqd'), credit: orderCents('price_protection_iqd'), net: orderCents('net_after_report_adjustments_iqd') } : undefined} />}
+      {data.order.status === 'delivered' && <ReportDeductions totals={data.totals} net={data.totals.net_after_report_adjustments_iqd} cents={usd ? { coupon: orderCents('coupon_iqd'), credit: orderCents('price_protection_iqd'), tradeIn: orderCents('trade_in_credit_returned_iqd'), net: orderCents('net_after_report_adjustments_iqd') } : undefined} />}
       {data.lines.map((line) => <Surface className="fw-line-item" key={line.id}>
         <div className="fw-line-heading" id={`fw-line-${line.id}`}>
           {line.image_snapshot || line.product_image || line.image_url ? <VariantImg sizes="48px" className="fw-product-image" src={line.image_snapshot || line.product_image || line.image_url} alt="" /> : <span className="fw-order-icon"><Package size={20} /></span>}
