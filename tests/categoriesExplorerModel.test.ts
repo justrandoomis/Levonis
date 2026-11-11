@@ -33,8 +33,9 @@ import {
   authoredPhoto,
   authoredSrc,
 } from '../src/lib/catalog/explorerModel';
-import { availableLabel, categoriesCount, countNoun, countWord, explorerSubline, resultCountLabel, sectionStockLabel, showCountLabel } from '../src/lib/catalog/copy';
-import { CATEGORY_PAGE_CAP, rememberSectionStock, rememberedSectionStock, withStock } from '../src/lib/catalog/sectionStock';
+import { availableLabel, availableParts, categoriesCount, countNoun, countWord, explorerSubline, resultCountLabel, sectionStockLabel, showCountLabel } from '../src/lib/catalog/copy';
+import { CATEGORY_PAGE_CAP, listingStockWord, rememberSectionStock, rememberedSectionStock, withStock } from '../src/lib/catalog/sectionStock';
+import { listingTarget } from '../src/lib/catalog/listingModel';
 import { cardStates, rollUpCounts } from '../worker/lib/catalogPresentation';
 import { CATEGORY_PAGE_CAP as SERVER_CATEGORY_PAGE_CAP } from '../worker/routes/catalog';
 import { LanguageProvider } from '../src/LanguageContext';
@@ -192,6 +193,72 @@ test('sectionStockLabel: in stock, pre-order, unavailable, and silence when unkn
   assert.equal(sectionStockLabel(s(0, null, null), 'product', 'ar'), null);
   assert.equal(sectionStockLabel(s(0, 0, 3), 'product', 'ar'), null, 'two of five are catalog-only or withheld: nothing is claimed');
   assert.equal(sectionStockLabel(s(0, 0, 0, 0), 'product', 'ar'), null);
+});
+
+/**
+ * THE HERO'S FIGURE AND WORDS ARE THE ROWS' OWN (row 309, live 2026-11-11: «مواد الطباعة»'s hero said
+ * «1 متوفرة الآن» above a row saying «1 متوفر الآن»). The hero draws `availableParts`; the rows and the
+ * listing header say `availableLabel`, which joins the same parts — for every count, kind and language.
+ * Sorani has its own words now, never the Arabic (DECISIONS row 183).
+ */
+test('availableParts: the hero’s figure and words are exactly what availableLabel joins — in three languages', () => {
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    for (const kind of ['product', 'printer'] as const) {
+      for (const total of [1, 2, 3, 10, 11, 17, 100]) {
+        for (const available of [null, -1, 0, 1, 2, 3, total - 1, total]) {
+          const parts = availableParts(available, total, lang, kind);
+          const label = availableLabel(available, total, lang, kind);
+          if (!parts) {
+            assert.equal(label, null, `${lang} ${kind} ${available}/${total}`);
+            continue;
+          }
+          assert.equal(label, parts.figure === null ? parts.words : `${parts.figure} ${parts.words}`, `${lang} ${kind} ${available}/${total}`);
+          if (lang === 'ckb') assert.notEqual(label, availableLabel(available, total, 'ar', kind), 'the Sorani is never a copy of the Arabic');
+        }
+      }
+    }
+  }
+  assert.deepEqual(availableParts(1, 17, 'ar', 'product'), { figure: 1, words: 'متوفر الآن' }, 'one product: «متوفر»');
+  assert.deepEqual(availableParts(1, 10, 'ar', 'printer'), { figure: 1, words: 'متوفرة الآن' }, 'one printer: «متوفرة»');
+  assert.deepEqual(availableParts(4, 10, 'ar', 'product'), { figure: 4, words: 'متوفرة الآن' });
+  assert.deepEqual(availableParts(1, 1, 'ar', 'product'), { figure: null, words: 'متوفر الآن' });
+  assert.deepEqual(availableParts(3, 3, 'ar', 'printer'), { figure: null, words: 'كلها متوفرة' });
+  assert.deepEqual(availableParts(1, 17, 'en', 'product'), { figure: 1, words: 'available now' });
+  assert.equal(availableLabel(1, 17, 'ckb'), '1 ئێستا بەردەستە');
+  assert.equal(availableLabel(1, 1, 'ckb', 'printer'), 'ئێستا بەردەستە');
+  assert.equal(availableLabel(4, 4, 'ckb'), 'هەموویان بەردەستن');
+  for (const w of ['ئێستا بەردەستە', 'هەموویان بەردەستن']) assert.doesNotMatch(w, /[ةىيك]/, 'no Arabic-only letter in the Sorani');
+  // A section's line in Sorani: the stock word is Sorani whatever the state.
+  const s = (available: number, preorder: number, unavailable: number, total = 5) => ({
+    product_count: total, available_count: available, preorder_count: preorder, unavailable_count: unavailable, withheld_count: 0,
+  });
+  assert.equal(sectionStockLabel(s(1, 4, 0, 17), 'product', 'ckb'), '1 ئێستا بەردەستە');
+  assert.equal(sectionStockLabel(s(1, 4, 0, 17), 'product', 'ar'), '1 متوفر الآن');
+});
+
+test('the listing header says its section’s word — never on a root’s «all», the map’s or an inactive one the category route named', () => {
+  const node = (over: Partial<CatalogTreeNode>) =>
+    ({ id: 'cat_makers', slug: 'makers-supply', parent_id: null, path: '/categories/makers-supply', product_count: 2, available_count: 1, preorder_count: 0, unavailable_count: 1, withheld_count: 0, product_type: null, is_printer_catalog: 0, children: [], ...over }) as unknown as CatalogTreeNode;
+  const root = node({});
+  const child = node({ id: 'cat_makers_new', slug: 'new-products', parent_id: 'cat_makers', path: '/categories/makers-supply/new-products' });
+  // An inactive root the map leaves out, answered by the category route (src/pages/CategoryListing.tsx `fallback`).
+  const inactiveAll = listingTarget(null, { node: root, root: true })!;
+  assert.deepEqual([inactiveAll.canonical, inactiveAll.wholeRoot], ['/categories/makers-supply/all', true]);
+  assert.equal(listingStockWord(inactiveAll, null, 'ar'), null, 'its «all» is the whole department: no section word');
+  assert.equal(listingStockWord({ ...inactiveAll, wholeRoot: false }, null, 'ar'), '1 متوفر الآن', 'the word it used to say there');
+  // An inactive section under it: its own word.
+  const inactiveChild = listingTarget(null, { node: child, root: false })!;
+  assert.deepEqual([inactiveChild.canonical, inactiveChild.wholeRoot], ['/categories/makers-supply/new-products', false]);
+  assert.equal(listingStockWord(inactiveChild, null, 'ar'), '1 متوفر الآن');
+  assert.equal(listingStockWord(inactiveChild, null, 'ckb'), '1 ئێستا بەردەستە');
+  // The map's own root and section, as before.
+  const mapAll = listingTarget({ node: root, root, all: true, canonical: '/categories/makers-supply/all' }, null)!;
+  assert.equal(mapAll.wholeRoot, true);
+  assert.equal(listingStockWord(mapAll, null, 'ar'), null);
+  const mapChild = listingTarget({ node: child, root, all: false, canonical: child.path }, { node: root, root: true })!;
+  assert.deepEqual([mapChild.node.id, mapChild.wholeRoot], ['cat_makers_new', false], 'the map wins over a stale fallback');
+  assert.equal(listingTarget(null, 'missing'), null);
+  assert.equal(listingTarget(null, null), null);
 });
 
 test('withStock lays the section answer’s counts over a map node, only when both counted the same products', () => {

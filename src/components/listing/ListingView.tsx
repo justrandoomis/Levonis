@@ -48,8 +48,9 @@ export interface ListingScope {
   /** The section's unfiltered product count, for «4 من 10»; null when unknown. */
   total: number | null;
   /**
-   * What the whole section can do now — «1 متوفرة الآن», «بطلب مسبق», «غير متوفرة حالياً» (`sectionStockLabel`,
-   * DECISIONS row 309) — drawn beside its count while no filter narrows the list. Absent: nothing is said.
+   * What the whole section can do now — «1 متوفر الآن», «بطلب مسبق», «غير متوفرة حالياً» (`sectionStockLabel`,
+   * DECISIONS row 309) — drawn beside its count while no filter narrows the list. Absent: nothing is said
+   * (never on a root's «all»: src/lib/catalog/sectionStock.ts `listingStockWord`).
    */
   stock?: string | null;
 }

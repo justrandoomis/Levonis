@@ -619,6 +619,33 @@ export function resolveListingRoute(roots: readonly CatalogTreeNode[], cat: stri
   return { ...hit, all: isRoot, canonical: isRoot ? `${hit.node.path}/all` : hit.node.path };
 }
 
+/** What a `/categories/:cat/:sub` page lists, once the map or the category route has named it. */
+export interface ListingTarget {
+  node: CatalogTreeNode;
+  canonical: string;
+  /**
+   * The whole of a root (`/categories/<root>/all`), not one section: the header then says no section word
+   * (DECISIONS row 309: «only for a section, never a root's all»).
+   */
+  wholeRoot: boolean;
+}
+
+/**
+ * The listing's section, from the map (`resolveListingRoute`) or — for a section the map leaves out, an
+ * inactive one that still holds products or a slug renamed away from — from the category route's answer, where
+ * a root (no parent) is listed whole at its «all», exactly as the map's root is. Before row 309's follow-up the
+ * page judged «all» by the map's answer alone, so an inactive root's «all» put its stock word in the header.
+ * Null when neither knows the slug.
+ */
+export function listingTarget(
+  route: ListingRoute | null,
+  fallback: { node: CatalogTreeNode; root: boolean } | 'missing' | null
+): ListingTarget | null {
+  if (route) return { node: route.node, canonical: route.canonical, wholeRoot: route.all };
+  if (!fallback || fallback === 'missing') return null;
+  return { node: fallback.node, canonical: fallback.root ? `${fallback.node.path}/all` : fallback.node.path, wholeRoot: fallback.root };
+}
+
 /**
  * An old `/products?category=<id or slug>` link → the canonical category URL,
  * keeping every other query parameter. Null when the server resolved no

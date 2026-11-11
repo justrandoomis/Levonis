@@ -7,7 +7,7 @@
  * CATEGORY_PAGE_CAP. Its counts are laid over the map's nodes here, and `sectionStockLabel` words them.
  */
 import type { CatalogTreeNode } from './types';
-import type { SectionStock } from './copy';
+import { nounKindFor, sectionStockLabel, type CatalogLang, type SectionStock } from './copy';
 
 /**
  * The products one category answer reads (worker/routes/catalog.ts CATEGORY_PAGE_CAP: every product of the
@@ -29,6 +29,22 @@ export function withStock(node: CatalogTreeNode, counts: ReadonlyMap<string, Sec
     unavailable_count: s.unavailable_count ?? null,
     withheld_count: s.withheld_count ?? null,
   };
+}
+
+/**
+ * THE LISTING HEADER'S SECTION WORD (DECISIONS row 309): beside the section's count, what it can do now —
+ * «1 متوفر الآن», «بطلب مسبق», «غير متوفرة حالياً» — from the map's node with the section's own counts laid
+ * over it. Nothing on a root's «all» (`wholeRoot`, src/lib/catalog/listingModel.ts `listingTarget`): that is the
+ * whole department, asked for as such, whether the map named the root or the category route did.
+ */
+export function listingStockWord(
+  target: { node: CatalogTreeNode; wholeRoot: boolean },
+  counts: ReadonlyMap<string, SectionStock> | null,
+  lang: CatalogLang
+): string | null {
+  if (target.wholeRoot) return null;
+  const { node } = target;
+  return sectionStockLabel(withStock(node, counts), nounKindFor(node.product_type, node.is_printer_catalog), lang);
 }
 
 /**

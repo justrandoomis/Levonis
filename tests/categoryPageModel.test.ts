@@ -276,3 +276,64 @@ test('a section with nothing on the shelf reads «بطلب مسبق» when it ca
     assert.equal(r.preorder_count ?? null, null, r.slug);
   }
 });
+
+/** `run` with the language provider opening in `lang`: it reads the stored choice once, as it mounts. */
+function inLanguage<T>(lang: 'ar' | 'en' | 'ckb', run: () => T): T {
+  const scope = globalThis as { localStorage?: unknown };
+  const had = scope.localStorage;
+  scope.localStorage = { getItem: (k: string) => (k === 'levo_lang' ? lang : null), setItem: () => {}, removeItem: () => {} };
+  try {
+    return run();
+  } finally {
+    if (had === undefined) delete scope.localStorage;
+    else scope.localStorage = had;
+  }
+}
+
+/** The hero's «متوفر الآن» stat as it reads: its figure and its words. */
+const heroAvailable = (html: string) =>
+  [...(/<div data-hero-available=""[^>]*>(.*?)<\/div>/.exec(html)?.[1] ?? '').matchAll(/<dd[^>]*>([^<]*)<\/dd>/g)].map((m) => m[1]).join(' ');
+
+/** What a row for the same section says after its count. */
+function rowStock(node: CategoryPayload['node']): string {
+  const html = renderToStaticMarkup(
+    createElement(LanguageProvider, { children: createElement(MemoryRouter, null, createElement(CategoryRowBanners, { rows: bannerRows([node], []), label: 'x' })) })
+  );
+  return (/<p class="line-clamp-1[^"]*">([^<]*)<\/p>/.exec(html)?.[1] ?? '').split(' · ').slice(1).join(' · ');
+}
+
+/**
+ * THE HERO SAYS WHAT ITS ROWS SAY (row 309). Live on 2026-11-11 the hero of «مواد الطباعة» and of «إكسسوارات
+ * الطابعات» said «1 متوفرة الآن» above a row saying «1 متوفر الآن»: the agreement fix had reached the rows, not
+ * the hero's own stat. Both now take the rule and the words from src/lib/catalog/copy.ts, in all three languages.
+ */
+test('the hero’s stat agrees as its rows do — «1 متوفر الآن» for a product, «1 متوفرة الآن» for a printer — in three languages', async () => {
+  // «makers-supply» with one of its two products sold out: one product on the shelf, through the real route.
+  const ring = 'prd_94dedaeb082243efb43a';
+  const makers = (await page('makers-supply', `UPDATE products SET stock = 0, stock_reserved = 0 WHERE id = '${ring}'; UPDATE product_variants SET stock = 0 WHERE product_id = '${ring}'`)).body;
+  assert.deepEqual([makers.node.product_count, makers.node.available_count], [2, 1]);
+  const printers = (await page('printers')).body;
+  assert.deepEqual([printers.node.product_count, printers.node.available_count], [10, 4]);
+  const onePrinter = { ...printers, node: { ...printers.node, available_count: 1 } };
+
+  const cases: Array<[CategoryPayload, Record<'ar' | 'en' | 'ckb', string>]> = [
+    [makers, { ar: '1 متوفر الآن', en: '1 available now', ckb: '1 ئێستا بەردەستە' }],
+    [onePrinter, { ar: '1 متوفرة الآن', en: '1 available now', ckb: '1 ئێستا بەردەستە' }],
+    [printers, { ar: '4 متوفرة الآن', en: '4 available now', ckb: '4 ئێستا بەردەستە' }],
+  ];
+  const term = { ar: 'التوفر', en: 'Availability', ckb: 'بەردەستبوون' };
+  for (const lang of ['en', 'ckb', 'ar'] as const) {
+    for (const [payload, want] of cases) {
+      const hero = inLanguage(lang, () => renderHero(payload));
+      const label = `${lang} ${payload.node.slug} ${payload.node.available_count}/${payload.node.product_count}`;
+      assert.equal(heroAvailable(hero), want[lang], `${label}: the hero`);
+      assert.equal(inLanguage(lang, () => rowStock(payload.node)), want[lang], `${label}: the row for the same section`);
+      assert.ok(hero.includes(`<dt class="sr-only">${term[lang]}</dt>`), `${label}: a screen reader hears the same words`);
+    }
+  }
+  assert.doesNotMatch(renderHero(makers), /متوفرة الآن/, 'never «1 متوفرة الآن» for one product (the live hero’s word)');
+  // A section of one, and one whose products are all on the shelf: the words alone, as the rows say them.
+  const one = { ...makers, node: { ...makers.node, product_count: 1, available_count: 1 } };
+  assert.equal(heroAvailable(renderHero(one)), 'متوفر الآن');
+  assert.equal(heroAvailable(renderHero({ ...printers, node: { ...printers.node, available_count: 10 } })), 'كلها متوفرة');
+});

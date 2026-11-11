@@ -11,8 +11,10 @@
  * Pure: no React, no DOM. `lang` is passed in, so the functions are testable
  * and usable from a model as well as from a component.
  *
- * OWNER: Sorani to be written by hand — every phrase here is ar/en only, and
- * Sorani falls back to Arabic (docs/DECISIONS.md row 11).
+ * OWNER: Sorani to be written by hand — the counted nouns here are ar/en
+ * only, and Sorani falls back to Arabic for them. The stock words a section's
+ * line says (`availableParts` / `availableLabel`, `sectionStockLabel`) are
+ * written in Sorani (docs/DECISIONS.md rows 183 and 309).
  */
 
 export type CatalogLang = 'ar' | 'en' | 'ckb';
@@ -129,25 +131,49 @@ export function resultCountLabel(shown: number, of: number | null, kind: NounKin
   return `${shown} من ${of <= 2 ? countNoun(of, kind, lang) : arabicPlural(of, NOUNS[kind])}`;
 }
 
+/** The «متوفرة الآن» stat in two parts: the figure (null when the words say it alone) and the words. */
+export interface AvailableParts {
+  figure: number | null;
+  words: string;
+}
+
+/**
+ * The «متوفرة الآن» stat as a figure and its words, for a page that draws the figure apart (the department
+ * hero, src/components/catalog/CategoryHero.tsx). `availableLabel` joins the very same two, so the hero and the
+ * rows under it never disagree: live on 2026-11-11 the hero of «مواد الطباعة» said «1 متوفرة الآن» above a row
+ * saying «1 متوفر الآن» (row 309). Sorani has no gender, so its words are the same for a product and a printer:
+ * «ئێستا بەردەستە», the unnegated «ئێستا بەردەست نییە» of `sectionStockLabel`.
+ */
+export function availableParts(available: number | null, total: number, lang: CatalogLang, kind: NounKind = 'product'): AvailableParts | null {
+  if (available === null || available <= 0) return null;
+  if (lang === 'en') {
+    if (total === 1) return { figure: null, words: 'Available now' };
+    if (available === total) return { figure: null, words: 'All available' };
+    return { figure: available, words: 'available now' };
+  }
+  if (lang === 'ckb') {
+    if (total === 1) return { figure: null, words: 'ئێستا بەردەستە' };
+    if (available === total) return { figure: null, words: 'هەموویان بەردەستن' };
+    return { figure: available, words: 'ئێستا بەردەستە' };
+  }
+  const one = kind === 'printer' ? 'متوفرة الآن' : 'متوفر الآن';
+  if (total === 1) return { figure: null, words: one };
+  if (available === total) return { figure: null, words: 'كلها متوفرة' };
+  return { figure: available, words: available === 1 ? one : 'متوفرة الآن' };
+}
+
 /**
  * The «متوفرة الآن» pill: «● 4 متوفرة الآن», «● متوفر الآن» for a single
  * product that is available, «● كلها متوفرة» when every one is. `null`
  * when none is available (the pill is not drawn) or the count is unknown.
  * One of them agrees with the noun (row 309): a product «متوفر», a printer
  * «متوفرة» — «17 منتجًا · 1 متوفر الآن», «طابعة واحدة · متوفرة الآن».
+ * Sorani: «4 ئێستا بەردەستە», «ئێستا بەردەستە», «هەموویان بەردەستن».
  */
 export function availableLabel(available: number | null, total: number, lang: CatalogLang, kind: NounKind = 'product'): string | null {
-  if (available === null || available <= 0) return null;
-  if (lang === 'en') {
-    if (total === 1) return 'Available now';
-    if (available === total) return 'All available';
-    return `${available} available now`;
-  }
-  const one = kind === 'printer' ? 'متوفرة الآن' : 'متوفر الآن';
-  if (total === 1) return one;
-  if (available === total) return 'كلها متوفرة';
-  if (available === 1) return `1 ${one}`;
-  return `${available} متوفرة الآن`;
+  const parts = availableParts(available, total, lang, kind);
+  if (!parts) return null;
+  return parts.figure === null ? parts.words : `${parts.figure} ${parts.words}`;
 }
 
 /** A section's counts by the card rule's states (worker/lib/catalogPresentation.ts `rollUpCounts`). */

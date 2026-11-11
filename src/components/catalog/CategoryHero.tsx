@@ -6,7 +6,7 @@ import CropPhoto from './CropPhoto';
 import { IMAGE_SIZES, cropHeroCompactSizes } from '../../../packages/contracts/src/imageSizes';
 import { compareHref, compareTray } from '../../lib/compareTray';
 import { isPrinterNode, nodeDescription, nodeName } from '../../lib/catalog/categoryPageModel';
-import { countWord, nounKindFor, sectionStockLabel } from '../../lib/catalog/copy';
+import { availableParts, countWord, nounKindFor, sectionStockLabel } from '../../lib/catalog/copy';
 import type { BannerPhoto } from '../../lib/catalog/explorerModel';
 import type { CategoryPayload } from '../../lib/catalog/types';
 
@@ -50,6 +50,10 @@ const CategoryHero = forwardRef<HTMLElement, {
   const compareTo = tray.type === 'printer' && tray.items.length ? compareHref(tray) : '/compare';
   const Sep = dir === 'rtl' ? ChevronLeft : ChevronRight;
   const avail = node.available_count;
+  // Something on the shelf: the rows' own rule and words (`availableLabel` joins these same parts), the figure
+  // drawn apart — «1 متوفر الآن» for a product, «1 متوفرة الآن» for a printer, «كلها متوفرة» (row 309: the hero
+  // said «1 متوفرة الآن» above a row saying «1 متوفر الآن»).
+  const available = availableParts(avail, node.product_count, lang, kind);
   // Nothing on the shelf: «بطلب مسبق» or «غير متوفرة حالياً» when the cards say so, else nothing (row 309).
   const stockWord = avail === 0 ? sectionStockLabel(node, kind, lang) : null;
   const band = !!photo && !photo.productPhoto;
@@ -126,13 +130,13 @@ const CategoryHero = forwardRef<HTMLElement, {
             <dd className="font-bold tabular-nums text-text-primary">{node.product_count}</dd>
             <dd>{countWord(node.product_count, kind, lang)}</dd>
           </div>
-          {avail !== null && avail > 0 ? (
-            <div className="flex items-center gap-1.5">
+          {available ? (
+            <div data-hero-available="" className="flex items-center gap-1.5">
               <span aria-hidden="true" className="text-text-muted">·</span>
               <span aria-hidden="true" className="size-1.5 rounded-full bg-success" />
-              <dt className="sr-only">{loc('متوفرة الآن', 'Available now')}</dt>
-              <dd className="font-bold tabular-nums text-text-primary">{avail}</dd>
-              <dd aria-hidden="true">{loc('متوفرة الآن', 'available now')}</dd>
+              <dt className="sr-only">{loc('التوفر', 'Availability', 'بەردەستبوون')}</dt>
+              {available.figure !== null ? <dd className="font-bold tabular-nums text-text-primary">{available.figure}</dd> : null}
+              <dd>{available.words}</dd>
             </div>
           ) : null}
           {stockWord ? (

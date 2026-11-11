@@ -9,13 +9,13 @@ import PageTopBar from '../components/catalog/PageTopBar';
 import CategoryRowBanners from '../components/catalog/CategoryRowBanners';
 import { useBannerPhotos } from '../components/catalog/useBannerPhotos';
 import { cachedTree, loadCategory, loadSectionCounts, loadTree } from '../lib/catalog/data';
-import { resolveListingRoute } from '../lib/catalog/listingModel';
+import { listingTarget, resolveListingRoute } from '../lib/catalog/listingModel';
 import { listingFirstPagePath, parseListing } from '../lib/catalog/listingQuery';
 import { listingCategory, listsBySlug, primeGet } from '../lib/bootFetch';
 import { nodeDescription, nodeName } from '../lib/catalog/categoryPageModel';
-import { nounKindFor, sectionStockLabel, type SectionStock } from '../lib/catalog/copy';
+import { nounKindFor, type SectionStock } from '../lib/catalog/copy';
 import { bannerRows } from '../lib/catalog/explorerModel';
-import { CATEGORY_PAGE_CAP, rememberSectionStock, rememberedSectionStock, withStock } from '../lib/catalog/sectionStock';
+import { CATEGORY_PAGE_CAP, listingStockWord, rememberSectionStock, rememberedSectionStock, withStock } from '../lib/catalog/sectionStock';
 import { sectionTypeOf } from '../lib/catalog/listingModel';
 import type { CatalogTreeNode, CatalogTreeResponse } from '../lib/catalog/types';
 
@@ -156,15 +156,9 @@ export default function CategoryListing() {
   }
   if (!tree || (!route && fallback === null)) return <ListingSkeleton />;
 
-  let node: CatalogTreeNode;
-  let canonical: string;
-  if (route) {
-    node = route.node;
-    canonical = route.canonical;
-  } else if (fallback && fallback !== 'missing') {
-    node = fallback.node;
-    canonical = fallback.root ? `${fallback.node.path}/all` : fallback.node.path;
-  } else {
+  // From the map, or from the category route for a section the map leaves out (an inactive root's «all» too).
+  const target = listingTarget(route, fallback);
+  if (!target) {
     return (
       <Shell title={loc('الفئة', 'Category')}>
         <NotFoundState
@@ -180,6 +174,7 @@ export default function CategoryListing() {
       </Shell>
     );
   }
+  const { node, canonical } = target;
 
   if (decodeURIComponent(location.pathname).replace(/\/+$/, '') !== decodeURIComponent(canonical)) {
     return <Navigate replace to={`${canonical}${location.search}`} />;
@@ -195,8 +190,9 @@ export default function CategoryListing() {
     kind,
     type: sectionTypeOf(node.product_type, node.is_printer_catalog),
     total: node.product_count,
-    // «17 منتجًا · 1 متوفرة الآن», «5 منتجات · بطلب مسبق» (row 309): only for a section, never a root's «all».
-    stock: route?.all ? null : sectionStockLabel(withStock(node, stock && stock.slug === node.slug ? stock.counts : null), kind, lang),
+    // «17 منتجًا · 1 متوفر الآن», «5 منتجات · بطلب مسبق» (row 309): only for a section, never a root's «all» —
+    // the map's root or an inactive one the category route answered.
+    stock: listingStockWord(target, stock && stock.slug === node.slug ? stock.counts : null, lang),
   };
   // Keyed by section: another section is another list, not a refinement of this one.
   return (
