@@ -1058,24 +1058,38 @@ const NET_LINE_IQD = `MAX(0, COALESCE(i.line_total_iqd, 0)
 /** SQLite promotes an overflowing integer product to REAL. Large legitimate
  * bulk orders must not lose dinars there. The common path uses integer SQL;
  * only overflowing products use binary multiply/divide, whose intermediates
- * stay below twice the input amount/divisor instead of multiplying them. */
-const exactProductCtes = (prefix: string, input: string): string => `
+ * stay below twice the input amount/divisor instead of multiplying them.
+ *
+ * EVERY CTE HERE IS READ ONCE, AND `carry` NAMES THE INPUT COLUMNS THE NEXT
+ * STEP NEEDS. Since SQLite 3.54 each reference to a CTE spends the statement's
+ * «VIEWs and/or subqueries nested too deep» budget again for that CTE's whole
+ * upstream chain, and D1 caps the budget at 100. Reading `_input` twice (seed
+ * and the products that cannot overflow) and joining `_exact` back to the CTE
+ * it came from doubled the chain at every allocation step: `ap_revenue` alone
+ * cost 98 and every report statement on D1 failed to prepare. A product that
+ * cannot overflow now enters `_multiply` already finished (multiplier 0), so
+ * `_exact` reads `_multiply` only; the row set and every figure are unchanged. */
+const exactProductCtes = (prefix: string, input: string, carry: readonly string[] = []): string => {
+  const extra = carry.map((c) => `,${c}`).join('');
+  const overflows = 'b>0 AND d>0 AND a>9223372036854775807/b';
+  return `
   ${prefix}_input AS (${input}),
-  ${prefix}_multiply(id,multiplier,denom,part_q,part_r,result_q,result_r) AS (
-    SELECT id,b,d,a/d,a%d,0,0 FROM ${prefix}_input
-     WHERE b>0 AND d>0 AND a>9223372036854775807/b
+  ${prefix}_multiply(id,multiplier,denom,part_q,part_r,result_q,result_r${extra}) AS (
+    SELECT id,CASE WHEN ${overflows} THEN b ELSE 0 END,d,
+      CASE WHEN ${overflows} THEN a/d ELSE 0 END,CASE WHEN ${overflows} THEN a%d ELSE 0 END,
+      CASE WHEN ${overflows} THEN 0 WHEN d>0 THEN a*b/d ELSE 0 END,
+      CASE WHEN ${overflows} THEN 0 WHEN d>0 THEN (a*b)%d ELSE 0 END${extra}
+    FROM ${prefix}_input
+     WHERE (${overflows}) OR b=0 OR d=0 OR a<=9223372036854775807/b
     UNION ALL
     SELECT id,multiplier/2,denom,part_q*2+(part_r*2)/denom,(part_r*2)%denom,
       result_q+CASE WHEN multiplier%2=1 THEN part_q+(result_r+part_r)/denom ELSE 0 END,
-      CASE WHEN multiplier%2=1 THEN (result_r+part_r)%denom ELSE result_r END
+      CASE WHEN multiplier%2=1 THEN (result_r+part_r)%denom ELSE result_r END${extra}
     FROM ${prefix}_multiply WHERE multiplier>0
   ), ${prefix}_exact AS (
-    SELECT id,CASE WHEN d>0 THEN a*b/d ELSE 0 END AS floor_iqd,
-      CASE WHEN d>0 THEN (a*b)%d ELSE 0 END AS remainder_iqd
-    FROM ${prefix}_input WHERE b=0 OR d=0 OR a<=9223372036854775807/b
-    UNION ALL
-    SELECT id,result_q,result_r FROM ${prefix}_multiply WHERE multiplier=0
+    SELECT id,result_q AS floor_iqd,result_r AS remainder_iqd${extra} FROM ${prefix}_multiply WHERE multiplier=0
   ),`;
+};
 
 /**
  * Accepted final-price changes belong to the delivered sale, including its
@@ -1089,6 +1103,8 @@ const exactProductCtes = (prefix: string, input: string): string => `
  * Only adjusted orders enter this CTE, so ordinary orders keep their exact
  * previous arithmetic and a pre-0140 database never references the new column.
  */
+/** `ap_totals`' columns after `id`, carried through the points product instead of joined back. */
+const AP_TOTALS_COLUMNS = ['order_id', 'qty', 'base_iqd', 'delta_iqd', 'points_iqd', 'goods_iqd'] as const;
 const priceAdjustmentCtes = (schema: SchemaFacts): string => !schema.hasPriceAdjustments ? '' : `
   ap_base AS (
     SELECT i.id,i.order_id,i.qty,${NET_LINE_IQD} AS base_iqd,
@@ -1097,10 +1113,10 @@ const priceAdjustmentCtes = (schema: SchemaFacts): string => !schema.hasPriceAdj
      WHERE COALESCE(o.price_adjustment_iqd,0)<>0 AND i.bundle_parent_item_id IS NULL
   ), ap_totals AS (
     SELECT *,SUM(base_iqd) OVER(PARTITION BY order_id) AS goods_iqd FROM ap_base
-  ), ${exactProductCtes('ap_point', 'SELECT id,MIN(goods_iqd,points_iqd) AS a,base_iqd AS b,goods_iqd AS d FROM ap_totals')}
+  ), ${exactProductCtes('ap_point', `SELECT id,MIN(goods_iqd,points_iqd) AS a,base_iqd AS b,goods_iqd AS d,${AP_TOTALS_COLUMNS.join(',')} FROM ap_totals`, AP_TOTALS_COLUMNS)}
   ap_points AS (
-    SELECT t.*,MIN(goods_iqd,points_iqd) AS applied_points,p.floor_iqd AS point_floor,p.remainder_iqd AS point_remainder
-    FROM ap_totals t JOIN ap_point_exact p ON p.id=t.id
+    SELECT id,${AP_TOTALS_COLUMNS.join(',')},MIN(goods_iqd,points_iqd) AS applied_points,floor_iqd AS point_floor,remainder_iqd AS point_remainder
+    FROM ap_point_exact
   ), ap_point_rank AS (
     SELECT *,SUM(point_floor) OVER(PARTITION BY order_id) AS point_floors,
       ROW_NUMBER() OVER(PARTITION BY order_id ORDER BY point_remainder DESC,id) AS point_rank
@@ -1113,10 +1129,10 @@ const priceAdjustmentCtes = (schema: SchemaFacts): string => !schema.hasPriceAdj
     FROM ap_point_rank
   ), ap_weight_totals AS (
     SELECT *,SUM(weight) OVER(PARTITION BY order_id) AS total_weight FROM ap_weights
-  ), ${exactProductCtes('ap_delta', 'SELECT id,ABS(goods_delta) AS a,weight AS b,total_weight AS d FROM ap_weight_totals')}
+  ), ${exactProductCtes('ap_delta', 'SELECT id,ABS(goods_delta) AS a,weight AS b,total_weight AS d,order_id,base_iqd,goods_delta FROM ap_weight_totals', ['order_id', 'base_iqd', 'goods_delta'])}
   ap_parts AS (
-    SELECT w.*,d.floor_iqd AS delta_floor,d.remainder_iqd AS delta_remainder
-    FROM ap_weight_totals w JOIN ap_delta_exact d ON d.id=w.id
+    SELECT id,order_id,base_iqd,goods_delta,floor_iqd AS delta_floor,remainder_iqd AS delta_remainder
+    FROM ap_delta_exact
   ), ap_ranked AS (
     SELECT *,SUM(delta_floor) OVER(PARTITION BY order_id) AS delta_floors,
       ROW_NUMBER() OVER(PARTITION BY order_id ORDER BY delta_remainder DESC,id) AS delta_rank
@@ -1156,10 +1172,10 @@ const refundPriceCtes = (schema: SchemaFacts): string => !schema.hasPriceAdjustm
   ), ap_child_totals AS (
     SELECT *,SUM(base_iqd) OVER(PARTITION BY parent_id) AS base_total,
       SUM(qty) OVER(PARTITION BY parent_id) AS qty_total FROM ap_child_base
-  ), ${exactProductCtes('ap_child_delta', 'SELECT id,ABS(delta_iqd) AS a,CASE WHEN base_total>0 THEN base_iqd ELSE qty END AS b,CASE WHEN base_total>0 THEN base_total ELSE qty_total END AS d FROM ap_child_totals')}
+  ), ${exactProductCtes('ap_child_delta', 'SELECT id,ABS(delta_iqd) AS a,CASE WHEN base_total>0 THEN base_iqd ELSE qty END AS b,CASE WHEN base_total>0 THEN base_total ELSE qty_total END AS d,parent_id,base_iqd,delta_iqd FROM ap_child_totals', ['parent_id', 'base_iqd', 'delta_iqd'])}
   ap_child_parts AS (
-    SELECT c.*,d.floor_iqd AS delta_floor,d.remainder_iqd AS delta_remainder
-    FROM ap_child_totals c JOIN ap_child_delta_exact d ON d.id=c.id
+    SELECT id,parent_id,base_iqd,delta_iqd,floor_iqd AS delta_floor,remainder_iqd AS delta_remainder
+    FROM ap_child_delta_exact
   ), ap_child_ranked AS (
     SELECT *,SUM(delta_floor) OVER(PARTITION BY parent_id) AS delta_floors,
       ROW_NUMBER() OVER(PARTITION BY parent_id ORDER BY delta_remainder DESC,id) AS delta_rank
