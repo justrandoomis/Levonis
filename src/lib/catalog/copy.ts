@@ -141,8 +141,10 @@ export interface AvailableParts {
  * The «متوفرة الآن» stat as a figure and its words, for a page that draws the figure apart (the department
  * hero, src/components/catalog/CategoryHero.tsx). `availableLabel` joins the very same two, so the hero and the
  * rows under it never disagree: live on 2026-11-11 the hero of «مواد الطباعة» said «1 متوفرة الآن» above a row
- * saying «1 متوفر الآن» (row 309). Sorani has no gender, so its words are the same for a product and a printer:
- * «ئێستا بەردەستە», the unnegated «ئێستا بەردەست نییە» of `sectionStockLabel`.
+ * saying «1 متوفر الآن» (row 309). Arabic agrees with the noun and the number, as «غير متوفر حالياً» does in
+ * `sectionStockLabel`: one product «متوفر», one printer «متوفرة»; two «متوفران» / «متوفرتان» (the dual, never
+ * «2 متوفرة الآن»); three and more «متوفرة», the plural of things. Sorani has no gender, so its words are the
+ * same for a product and a printer: «ئێستا بەردەستە», the unnegated «ئێستا بەردەست نییە» of `sectionStockLabel`.
  */
 export function availableParts(available: number | null, total: number, lang: CatalogLang, kind: NounKind = 'product'): AvailableParts | null {
   if (available === null || available <= 0) return null;
@@ -157,17 +159,19 @@ export function availableParts(available: number | null, total: number, lang: Ca
     return { figure: available, words: 'ئێستا بەردەستە' };
   }
   const one = kind === 'printer' ? 'متوفرة الآن' : 'متوفر الآن';
+  const two = kind === 'printer' ? 'متوفرتان الآن' : 'متوفران الآن';
   if (total === 1) return { figure: null, words: one };
   if (available === total) return { figure: null, words: 'كلها متوفرة' };
-  return { figure: available, words: available === 1 ? one : 'متوفرة الآن' };
+  return { figure: available, words: available === 1 ? one : available === 2 ? two : 'متوفرة الآن' };
 }
 
 /**
  * The «متوفرة الآن» pill: «● 4 متوفرة الآن», «● متوفر الآن» for a single
  * product that is available, «● كلها متوفرة» when every one is. `null`
  * when none is available (the pill is not drawn) or the count is unknown.
- * One of them agrees with the noun (row 309): a product «متوفر», a printer
- * «متوفرة» — «17 منتجًا · 1 متوفر الآن», «طابعة واحدة · متوفرة الآن».
+ * One or two agree with the noun (row 309): a product «متوفر», a printer
+ * «متوفرة» — «17 منتجًا · 1 متوفر الآن», «طابعة واحدة · متوفرة الآن» — and
+ * two «2 متوفران الآن» / «2 متوفرتان الآن».
  * Sorani: «4 ئێستا بەردەستە», «ئێستا بەردەستە», «هەموویان بەردەستن».
  */
 export function availableLabel(available: number | null, total: number, lang: CatalogLang, kind: NounKind = 'product'): string | null {

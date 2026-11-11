@@ -307,7 +307,7 @@ function rowStock(node: CategoryPayload['node']): string {
  * الطابعات» said «1 متوفرة الآن» above a row saying «1 متوفر الآن»: the agreement fix had reached the rows, not
  * the hero's own stat. Both now take the rule and the words from src/lib/catalog/copy.ts, in all three languages.
  */
-test('the hero’s stat agrees as its rows do — «1 متوفر الآن» for a product, «1 متوفرة الآن» for a printer — in three languages', async () => {
+test('the hero’s stat agrees as its rows do — «1 متوفر الآن» for a product, «1 متوفرة الآن» for a printer, the dual «2 متوفران / متوفرتان الآن» — in three languages', async () => {
   // «makers-supply» with one of its two products sold out: one product on the shelf, through the real route.
   const ring = 'prd_94dedaeb082243efb43a';
   const makers = (await page('makers-supply', `UPDATE products SET stock = 0, stock_reserved = 0 WHERE id = '${ring}'; UPDATE product_variants SET stock = 0 WHERE product_id = '${ring}'`)).body;
@@ -315,10 +315,15 @@ test('the hero’s stat agrees as its rows do — «1 متوفر الآن» for 
   const printers = (await page('printers')).body;
   assert.deepEqual([printers.node.product_count, printers.node.available_count], [10, 4]);
   const onePrinter = { ...printers, node: { ...printers.node, available_count: 1 } };
+  // The dual agrees as «غير متوفرين / متوفرتين» does (the third review): two of five products, two of ten printers.
+  const twoProducts = { ...makers, node: { ...makers.node, product_count: 5, available_count: 2 } };
+  const twoPrinters = { ...printers, node: { ...printers.node, available_count: 2 } };
 
   const cases: Array<[CategoryPayload, Record<'ar' | 'en' | 'ckb', string>]> = [
     [makers, { ar: '1 متوفر الآن', en: '1 available now', ckb: '1 ئێستا بەردەستە' }],
     [onePrinter, { ar: '1 متوفرة الآن', en: '1 available now', ckb: '1 ئێستا بەردەستە' }],
+    [twoProducts, { ar: '2 متوفران الآن', en: '2 available now', ckb: '2 ئێستا بەردەستە' }],
+    [twoPrinters, { ar: '2 متوفرتان الآن', en: '2 available now', ckb: '2 ئێستا بەردەستە' }],
     [printers, { ar: '4 متوفرة الآن', en: '4 available now', ckb: '4 ئێستا بەردەستە' }],
   ];
   const term = { ar: 'التوفر', en: 'Availability', ckb: 'بەردەستبوون' };

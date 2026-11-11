@@ -174,7 +174,10 @@ test('sectionStockLabel: in stock, pre-order, unavailable, and silence when unkn
   assert.equal(sectionStockLabel(s(0, 0, 5), 'product', 'en'), 'Unavailable now');
   assert.equal(sectionStockLabel(s(0, 0, 5), 'product', 'ckb'), 'ئێستا بەردەست نییە');
   for (const t of ['بە پێش-داواکاری', 'ئێستا بەردەست نییە']) assert.doesNotMatch(t, /[ةىيك]/, 'no Arabic-only letter in the Sorani');
-  // Agreement: one product, one printer, the dual, more.
+  // Agreement: one product, one printer, the dual, more — on the shelf and off it.
+  assert.equal(sectionStockLabel(s(2, 3, 0, 17), 'product', 'ar'), '2 متوفران الآن');
+  assert.equal(sectionStockLabel(s(2, 3, 0, 17), 'printer', 'ar'), '2 متوفرتان الآن');
+  assert.equal(sectionStockLabel(s(3, 2, 0, 17), 'printer', 'ar'), '3 متوفرة الآن');
   assert.equal(sectionStockLabel(s(0, 0, 1, 1), 'product', 'ar'), 'غير متوفر حالياً');
   assert.equal(sectionStockLabel(s(0, 0, 1, 1), 'printer', 'ar'), 'غير متوفرة حالياً');
   assert.equal(sectionStockLabel(s(0, 0, 2, 2), 'product', 'ar'), 'غير متوفرين حالياً');
@@ -220,6 +223,11 @@ test('availableParts: the hero’s figure and words are exactly what availableLa
   }
   assert.deepEqual(availableParts(1, 17, 'ar', 'product'), { figure: 1, words: 'متوفر الآن' }, 'one product: «متوفر»');
   assert.deepEqual(availableParts(1, 10, 'ar', 'printer'), { figure: 1, words: 'متوفرة الآن' }, 'one printer: «متوفرة»');
+  // The dual agrees as «غير متوفرين / متوفرتين» does (the third review): «2 متوفرة الآن» read as a mistake.
+  assert.deepEqual(availableParts(2, 17, 'ar', 'product'), { figure: 2, words: 'متوفران الآن' }, 'two products: «متوفران»');
+  assert.deepEqual(availableParts(2, 10, 'ar', 'printer'), { figure: 2, words: 'متوفرتان الآن' }, 'two printers: «متوفرتان»');
+  assert.deepEqual(availableParts(3, 10, 'ar', 'printer'), { figure: 3, words: 'متوفرة الآن' }, 'three and more: the plural of things');
+  assert.deepEqual(availableParts(11, 17, 'ar', 'product'), { figure: 11, words: 'متوفرة الآن' });
   assert.deepEqual(availableParts(4, 10, 'ar', 'product'), { figure: 4, words: 'متوفرة الآن' });
   assert.deepEqual(availableParts(1, 1, 'ar', 'product'), { figure: null, words: 'متوفر الآن' });
   assert.deepEqual(availableParts(3, 3, 'ar', 'printer'), { figure: null, words: 'كلها متوفرة' });
