@@ -228,7 +228,9 @@ test('five sections instead of eight tabs, and every earlier `finance=` link sti
     // Redesign step 4 (DECISIONS row 316): the reports' four pages; «reports» still opens the orders, «categories» the sections.
     ['sections', 'reports', 'sections'], ['days', 'reports', 'days'], ['categories', 'reports', 'sections'], ['reports', 'reports', 'orders'],
     // The courier's money (DECISIONS row 332): a second page under «المحاسبة», whose first is now «الدفاتر».
-    ['courier', 'accounting', 'courier']];
+    ['courier', 'accounting', 'courier'],
+    // The payout statements (DECISIONS row 336): a fourth page under «الأشخاص والدفعات».
+    ['statements', 'people', 'statements']];
   for (const [link, section, sub] of links) {
     const shown = open(`?finance=${link}`);
     assert.equal(current(shown), section, `?finance=${link} opens «${section}»`);

@@ -755,6 +755,7 @@
     "tests/ownership.test.ts": 0.4,
     "tests/pageImages.test.ts": 0.4,
     "tests/payoutMerchantDebt.test.ts": 23.6,
+    "tests/payoutStatements.test.ts": 6.0,
     "tests/phone.test.ts": 0.5,
     "tests/phoneInternational.test.ts": 0.4,
     "tests/pickFrom.test.ts": 0.4,

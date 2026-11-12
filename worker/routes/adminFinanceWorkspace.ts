@@ -994,6 +994,21 @@ async function staffStatementFile(c:Context<AppContext>,kind:'xlsx'|'print'){
   asDocument(c);
   return c.html(staffStatementHtml(st,lang,at));
 }
+/**
+ * THE PAYOUT STATEMENTS OF A PERIOD (the owner, 2026-11-13; DECISIONS row 336): every staff payment and every withdrawal not
+ * rejected or cancelled, newest first, for the «الكشوف» page to link each one's statement.
+ */
+adminFinanceWorkspaceRoutes.get('/statements',async(c)=>{
+  const r=range(c.req.query('from'),c.req.query('to')),db=c.env.DB;
+  const [staff,withdrawals]=await Promise.all([
+    db.prepare(`SELECT p.id,p.kind,p.payment_day AS day,p.amount_iqd,s.name AS person FROM finance_staff_payments p JOIN finance_staff s ON s.id=p.staff_id
+      WHERE p.payment_day BETWEEN ? AND ? ORDER BY p.payment_day DESC,p.created_at DESC,p.id LIMIT 200`).bind(r.from,r.to).all(),
+    db.prepare(`SELECT w.id,w.state,date(w.created_at,'+3 hours') AS day,w.amount_iqd,w.paid_iqd,COALESCE(u.name,u.email,w.user_id) AS person
+      FROM finance_withdrawals w LEFT JOIN users u ON u.id=w.user_id
+      WHERE w.state NOT IN ('rejected','cancelled') AND date(w.created_at,'+3 hours') BETWEEN ? AND ? ORDER BY w.created_at DESC,w.id LIMIT 200`).bind(r.from,r.to).all(),
+  ]);
+  return c.json({success:true,range:r,staff_payments:staff.results??[],withdrawals:withdrawals.results??[]});
+});
 adminFinanceWorkspaceRoutes.get('/statements/staff-payments/:id/export.xlsx',(c)=>staffStatementFile(c,'xlsx'));
 adminFinanceWorkspaceRoutes.get('/statements/staff-payments/:id/print',(c)=>staffStatementFile(c,'print'));
 /**

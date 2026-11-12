@@ -12,6 +12,7 @@ import GeneralExpenses from './GeneralExpenses';
 import AccountingChecks from './AccountingChecks';
 import AccountingActivity from './AccountingActivity';
 import CourierMoney from './CourierMoney';
+import PayoutStatements from './PayoutStatements';
 import './finance-workspace.css';
 import { CurrencyToggle, DisplayCurrencyContext, type DisplayCurrency } from './displayCurrency';
 import Overview from './Overview';
@@ -56,11 +57,11 @@ const ParticipantCharts = lazy(() => import('./ParticipantCharts'));
  */
 type Main = 'overview' | 'reports' | 'costs' | 'people' | 'accounting';
 const MAIN_OF: Record<FinanceSection, Main> = { overview: 'overview', orders: 'reports', products: 'reports', sections: 'reports', days: 'reports', missing: 'costs', monthly: 'costs', expenses: 'costs',
-  staff: 'people', investors: 'people', settlements: 'people', accounting: 'accounting', courier: 'accounting' };
+  staff: 'people', investors: 'people', settlements: 'people', statements: 'people', accounting: 'accounting', courier: 'accounting' };
 const PAGES: Record<Main, FinanceSection[]> = { overview: ['overview'], reports: ['orders', 'products', 'sections', 'days'], costs: ['missing', 'monthly', 'expenses'],
-  people: ['staff', 'investors', 'settlements'], accounting: ['accounting', 'courier'] };
+  people: ['staff', 'investors', 'settlements', 'statements'], accounting: ['accounting', 'courier'] };
 const LABEL: Record<FinanceSection | Main, FwKey> = { overview: 'overview', reports: 'reports', costs: 'costs', people: 'people', accounting: 'accounting',
-  orders: 'orders', products: 'products', sections: 'sectionsPage', days: 'daysPage', missing: 'missing', monthly: 'promotion', expenses: 'expenses', staff: 'staff', investors: 'investors', settlements: 'withdrawals', courier: 'courier' };
+  orders: 'orders', products: 'products', sections: 'sectionsPage', days: 'daysPage', missing: 'missing', monthly: 'promotion', expenses: 'expenses', staff: 'staff', investors: 'investors', settlements: 'withdrawals', statements: 'statementsPage', courier: 'courier' };
 /** A page's own name among its tab's pages, where it differs from the tab's: the books under «المحاسبة». */
 const PILL: Partial<Record<FinanceSection, FwKey>> = { accounting: 'books' };
 const SECTIONS = Object.keys(MAIN_OF) as FinanceSection[];
@@ -273,6 +274,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
       {page('investors', () => <Suspense fallback={loading}><InvestorPanel from={range.from} to={range.to} onChanged={refresh} openOrder={openOrderAt} revision={peopleRevision} />
         <PeriodCharts from={range.from} to={range.to} revision={revision} /></Suspense>)}
       {page('settlements', () => <Suspense fallback={loading}><WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} /></Suspense>)}
+      {page('statements', () => <PayoutStatements from={range.from} to={range.to} />)}
       {section === 'accounting' && <Suspense fallback={loading}>
         <AccountingChecks onOpenOrder={(id) => openOrderAt(id)} />
         <AccountingActivity from={range.from} to={range.to} onOpenOrder={(id) => openOrderAt(id)} />

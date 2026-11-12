@@ -1,5 +1,5 @@
 /** Every page of «المال والأرباح»; each belongs to one of the five sections (redesign step 2: overview, reports, costs, people, accounting; step 4 adds sections and days). */
-export type FinanceSection = 'overview' | 'orders' | 'products' | 'sections' | 'days' | 'missing' | 'monthly' | 'expenses' | 'staff' | 'investors' | 'settlements' | 'accounting' | 'courier';
+export type FinanceSection = 'overview' | 'orders' | 'products' | 'sections' | 'days' | 'missing' | 'monthly' | 'expenses' | 'staff' | 'investors' | 'settlements' | 'statements' | 'accounting' | 'courier';
 /** Where an order, a product or a section stands (the server's orderState / groupState, DECISIONS row 316). */
 export type FinanceState = 'confirmed' | 'estimated' | 'waiting';
 /** An order's cash: nothing due on delivery, all of it recorded as received, part of it, or none yet. */
