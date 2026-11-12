@@ -71,3 +71,16 @@ dialog.fw-sheet--side{margin:0;margin-inline-start:auto;width:min(440px,100vw);h
 @media(max-width:600px){.fw-courier-metrics{grid-template-columns:1fr}}
 /* The restyle (DECISIONS row 333): a touch screen keeps 44px targets, and its fields 16px text so Safari never zooms. */
 @media(pointer:coarse){.fw-button,.fw-tab,.fw-input,.fw-select{min-height:44px}.fw-pill{min-height:40px}.fw-input,.fw-select{font-size:16px!important}}
+/* The courier page's list and panel (DECISIONS row 335): the panel beside the list and in view on a wide screen; days as row
+   groups; a parcel a card on a phone. */
+.fw-courier-layout{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:16px;align-items:start}
+.fw-courier-panel{position:sticky;top:12px;border:1px solid var(--fw-line);border-radius:var(--fw-radius);padding:12px;background:var(--fw-surface)}
+.fw-courier-panel .fw-courier-h{margin-top:0}.fw-courier-panel .fw-courier-form{margin:0;padding:0;border:0;background:none}.fw-courier-panel .fw-fields{grid-template-columns:1fr}
+.fw-courier-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}.fw-courier-search{flex:1 1 220px;width:auto}
+.fw-courier-range{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--fw-muted)}.fw-courier-range .fw-input{width:auto;min-height:32px;padding:4px 8px}
+.fw-courier-table tr.fw-courier-day th{background:var(--fw-raised);text-align:start;font-size:12px;font-weight:600;padding:6px 10px}
+.fw-courier-table tr.fw-courier-day label{display:flex;align-items:center;gap:10px}.fw-courier-table tr.fw-courier-day .fw-muted{font-weight:400}
+@media(max-width:1000px){.fw-courier-layout{grid-template-columns:1fr}.fw-courier-panel{position:static}}
+@media(max-width:600px){.fw-courier-table thead{display:none}.fw-courier-table tbody tr[data-courier-parcel]{display:grid;grid-template-columns:28px 1fr 1fr;gap:2px 10px;padding:8px 4px;border-bottom:1px solid var(--fw-line)}
+.fw-courier-table tbody tr[data-courier-parcel] td{border:0;padding:2px 0;text-align:start;white-space:normal}.fw-courier-table tbody tr[data-courier-parcel] td:first-child{grid-row:span 4;width:auto}
+.fw-courier-table td[data-label]::before{content:attr(data-label);display:block;font-size:10px;color:var(--fw-muted)}}

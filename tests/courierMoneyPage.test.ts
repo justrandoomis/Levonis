@@ -206,3 +206,31 @@ test('a received transfer is checked once; a checked one says who checked it; a 
   assert.match(words(q(page.container, '[data-courier-transfer-parcels]')), /ORD-0D00000009.*50,000/);
   await page.unmount();
 });
+
+test('the list: days as groups with their box, a search, and «From / To» that ticks a transfer’s days (DECISIONS row 335)', async () => {
+  serve(OVERVIEW);
+  const page = await mount('en');
+  const ticked = () => qa(page.container, 'tr[data-courier-parcel][aria-selected="true"]').map((r) => r.getAttribute('data-courier-parcel'));
+  assert.deepEqual(qa(page.container, 'tr[data-courier-day]').map((r) => r.getAttribute('data-courier-day')), ['2026-10-20', '2026-11-03', '2026-11-05'], 'oldest day first');
+  assert.ok(q(page.container, '[data-courier-panel-empty]'), 'the panel says what to do before anything is ticked');
+  await act(async () => { click(q(page.container, 'tr[data-courier-day="2026-11-03"] input[data-courier-pick-day]')); });
+  await page.settle();
+  assert.deepEqual(ticked(), ['ORD-0D00000002'], 'a day’s box ticks that day');
+  await act(async () => { click(q(page.container, 'button[data-courier-clear]')); });
+  await page.settle();
+  assert.deepEqual(ticked(), []);
+  await act(async () => { type(q(page.container, 'input[data-courier-from]'), '2026-11-01'); });
+  await act(async () => { type(q(page.container, 'input[data-courier-to]'), '2026-11-05'); });
+  await page.settle();
+  await act(async () => { click(q(page.container, 'button[data-courier-pick-range]')); });
+  await page.settle();
+  assert.deepEqual(ticked(), ['ORD-0D00000002', 'ORD-0D00000003'], 'the days from–to, both ends kept');
+  assert.match(words(q(page.container, '[data-courier-form]')), /Parcels selected: 2/);
+  await act(async () => { type(q(page.container, 'input[data-courier-search]'), '0D00000001'); });
+  await page.settle();
+  assert.deepEqual(qa(page.container, 'tr[data-courier-parcel]').map((r) => r.getAttribute('data-courier-parcel')), ['ORD-0D00000001'], 'the search narrows the list');
+  await act(async () => { type(q(page.container, 'input[data-courier-search]'), 'nothing-like-this'); });
+  await page.settle();
+  assert.ok(q(page.container, '[data-courier-no-match]'));
+  await page.unmount();
+});

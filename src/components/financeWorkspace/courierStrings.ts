@@ -67,6 +67,17 @@ export const CS = {
   showParcels: ['الطرود', 'Parcels', 'پاکەتەکان'],
   hideParcels: ['إخفاء', 'Hide', 'شاردنەوە'],
   cancel: ['إلغاء', 'Cancel', 'پاشگەزبوونەوە'],
+  // The list's tools and the transfer panel (DECISIONS row 335).
+  search: ['ابحث برقم الطلب أو الزبون أو المحافظة', 'Search by order, customer or governorate', 'بگەڕێ بە ژمارەی داواکاری یان کڕیار یان پارێزگا'],
+  rangeFrom: ['من يوم', 'From', 'لە ڕۆژی'],
+  rangeTo: ['إلى يوم', 'To', 'تا ڕۆژی'],
+  selectRange: ['حدّد طرود هذه الأيام', 'Select these days’ parcels', 'پاکەتەکانی ئەم ڕۆژانە دیاری بکە'],
+  clearSelection: ['إلغاء التحديد', 'Clear selection', 'لابردنی دیاریکردن'],
+  pickDay: ['تحديد طرود يوم {day}', 'Select the parcels of {day}', 'پاکەتەکانی ڕۆژی {day} دیاری بکە'],
+  dayCount: ['{n} طرد', 'Parcels: {n}', '{n} پاکەت'],
+  panelTitle: ['التحويل', 'The transfer', 'گواستنەوەکە'],
+  noneSelected: ['حدّد من القائمة الطرود التي دفعها التحويل، أو اختر أيامها من «من يوم» و«إلى يوم».', 'Tick the parcels the transfer paid, or pick their days with «From» and «To».', 'ئەو پاکەتانە دیاری بکە کە گواستنەوەکە پارەکەیانی داوە، یان ڕۆژەکانیان بە «لە ڕۆژی» و «تا ڕۆژی» هەڵبژێرە.'],
+  noMatch: ['لا طرد يطابق البحث.', 'No parcel matches.', 'هیچ پاکەتێک ناگونجێت.'],
 } as const satisfies Record<string, Tri>;
 
 export type CsKey = keyof typeof CS;

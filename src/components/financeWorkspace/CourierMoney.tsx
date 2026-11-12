@@ -13,7 +13,9 @@ import { crs } from './courierStrings';
  * worker/lib/courierCollections.ts).
  *
  * Three figures: the cash still with Al-Zaeem, the same after the estimated fees, and what arrived but is not checked yet.
- * The parcels still with Al-Zaeem, oldest first: ticking them builds a transfer — each with its cash and its fee (the
+ * The parcels still with Al-Zaeem, oldest first, grouped by delivery day — a day's box ticks its parcels, a search narrows
+ * the list, and «من يوم / إلى يوم» ticks a transfer's days in one go (DECISIONS row 335); the transfer panel sits beside the
+ * list, in view while the owner ticks, and on a phone each parcel is a card. Ticking parcels builds a transfer — each with its cash and its fee (the
  * estimate until the owner types the invoice's), the amount that arrived (their cash less their fees until typed), the
  * day, the statement number, the fee category (the last one used) and a note. The owner's rule (2026-11-13): what a
  * delivery company pays is never less than the site's figure — a shortfall holds «سجّل التحويل» until a parcel is
@@ -44,6 +46,8 @@ export default function CourierMoney({ onOpenOrder, onChanged }: { onOpenOrder: 
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
+  const [query, setQuery] = useState('');
+  const [range, setRange] = useState({ from: '', to: '' });
   const operations = useRef(new Map<string, string>());
   const live = useRef<AbortController | null>(null);
 
@@ -68,13 +72,32 @@ export default function CourierMoney({ onOpenOrder, onChanged }: { onOpenOrder: 
   const difference = amount - expected;
   const fees = lines.reduce((n, l) => n + l.fee, 0);
 
-  const toggle = (p: CourierParcel, on: boolean) => setPicked((m) => {
+  /** What the list shows: every parcel, or those whose order, customer, governorate or tracking number holds the search. */
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return q ? parcels.filter((x) => [x.order_id, x.customer_name, x.governorate, x.tracking_no].some((v) => String(v ?? '').toLowerCase().includes(q))) : parcels;
+  }, [parcels, query]);
+  /** The shown parcels by delivery day, oldest day first (the server sends them oldest first). */
+  const days = useMemo(() => {
+    const m = new Map<string, CourierParcel[]>();
+    for (const x of shown) { const d = x.delivered_day ?? ''; m.set(d, [...(m.get(d) ?? []), x]); }
+    return [...m.entries()];
+  }, [shown]);
+  const toggleMany = (list: CourierParcel[], on: boolean) => setPicked((m) => {
     const next = new Map(m);
-    if (on) next.set(p.order_id, { cash: String(p.due_iqd), fee: String(Math.min(p.fee_estimate_iqd, p.due_iqd)) });
-    else next.delete(p.order_id);
+    for (const p of list) {
+      if (!on) next.delete(p.order_id);
+      else if (!next.has(p.order_id)) next.set(p.order_id, { cash: String(p.due_iqd), fee: String(Math.min(p.fee_estimate_iqd, p.due_iqd)) });
+    }
     return next;
   });
-  const toggleAll = (on: boolean) => setPicked(on ? new Map(parcels.map((p) => [p.order_id, { cash: String(p.due_iqd), fee: String(Math.min(p.fee_estimate_iqd, p.due_iqd)) }])) : new Map());
+  const toggle = (p: CourierParcel, on: boolean) => toggleMany([p], on);
+  const toggleAll = (on: boolean) => toggleMany(shown, on);
+  /** «من يوم / إلى يوم»: ticks every parcel delivered on those days (either end may be open), whatever the search shows. */
+  const pickRange = () => toggleMany(parcels.filter((x) => {
+    const d = x.delivered_day ?? '';
+    return d !== '' && (!range.from || d >= range.from) && (!range.to || d <= range.to);
+  }), true);
   const edit = (id: string, key: keyof Pick, value: string) => setPicked((m) => { const next = new Map(m); next.set(id, { ...next.get(id)!, [key]: digits(value) }); return next; });
 
   /** The same request keeps its operation id: a retry after a lost answer is the same transfer, never a second one. */
@@ -140,30 +163,51 @@ export default function CourierMoney({ onOpenOrder, onChanged }: { onOpenOrder: 
       {message && <p className="fw-note" role="status" data-courier-message>{message}</p>}
       {error && <div className="fw-error" role="alert" data-courier-error>{error}</div>}
 
-      <h3 className="fw-courier-h">{crs(loc, 'pendingTitle')}</h3>
+      <div className="fw-courier-layout">
+      <section className="fw-courier-list" aria-labelledby="fw-courier-pending">
+      <h3 id="fw-courier-pending" className="fw-courier-h">{crs(loc, 'pendingTitle')}</h3>
       {parcels.length === 0 ? <p className="fw-note" data-courier-none>{crs(loc, 'nonePending')}</p>
+        : <>
+        <div className="fw-courier-tools" data-courier-tools>
+          <input className="fw-input fw-courier-search" type="search" value={query} placeholder={crs(loc, 'search')} aria-label={crs(loc, 'search')} onChange={(e) => setQuery(e.target.value)} data-courier-search />
+          <label className="fw-courier-range">{crs(loc, 'rangeFrom')}<input className="fw-input" type="date" dir="ltr" value={range.from} onChange={(e) => setRange((r) => ({ ...r, from: e.target.value }))} data-courier-from /></label>
+          <label className="fw-courier-range">{crs(loc, 'rangeTo')}<input className="fw-input" type="date" dir="ltr" value={range.to} onChange={(e) => setRange((r) => ({ ...r, to: e.target.value }))} data-courier-to /></label>
+          <Button variant="secondary" disabled={!range.from && !range.to} onClick={pickRange} data-courier-pick-range>{crs(loc, 'selectRange')}</Button>
+          {picked.size > 0 && <Button variant="ghost" onClick={() => setPicked(new Map())} data-courier-clear>{crs(loc, 'clearSelection')}</Button>}
+        </div>
+        {shown.length === 0 ? <p className="fw-note" data-courier-no-match>{crs(loc, 'noMatch')}</p>
         : <div className="fw-table-wrap"><table className="fw-table fw-courier-table" data-courier-parcels>
           <thead><tr>
-            <th scope="col"><input data-courier-pick-all type="checkbox" aria-label={crs(loc, 'selectAll')} checked={picked.size === parcels.length} onChange={(e) => toggleAll(e.target.checked)} /></th>
+            <th scope="col"><input data-courier-pick-all type="checkbox" aria-label={crs(loc, 'selectAll')} checked={shown.every((x) => picked.has(x.order_id))} onChange={(e) => toggleAll(e.target.checked)} /></th>
             <th scope="col">{crs(loc, 'colOrder')}</th><th scope="col">{crs(loc, 'colCustomer')}</th><th scope="col">{crs(loc, 'colGovernorate')}</th>
             <th scope="col">{crs(loc, 'colDelivered')}</th><th scope="col">{crs(loc, 'colDays')}</th><th scope="col">{crs(loc, 'colCash')}</th>
             <th scope="col">{crs(loc, 'colFee')}</th><th scope="col">{crs(loc, 'colNet')}</th>
           </tr></thead>
-          <tbody>{parcels.map((x) => {
+          <tbody>{days.map(([day, list]) => <Fragment key={day}>
+            <tr className="fw-courier-day" data-courier-day={day}><th colSpan={9} scope="rowgroup"><label>
+              <input data-courier-pick-day type="checkbox" aria-label={crs(loc, 'pickDay', { day })} checked={list.every((x) => picked.has(x.order_id))} onChange={(e) => toggleMany(list, e.target.checked)} />
+              <bdi dir="ltr">{day}</bdi><span className="fw-muted">{crs(loc, 'dayCount', { n: list.length })} · <Money value={list.reduce((n, x) => n + x.due_iqd, 0)} /></span>
+            </label></th></tr>
+            {list.map((x) => {
             const pick = picked.get(x.order_id);
             const cash = pick ? num(pick.cash) : x.due_iqd, fee = pick ? num(pick.fee) : Math.min(x.fee_estimate_iqd, x.due_iqd);
             return <tr key={x.order_id} data-courier-parcel={x.order_id} aria-selected={!!pick}>
               <td><input data-courier-pick type="checkbox" aria-label={crs(loc, 'selectParcel', { id: x.order_id })} checked={!!pick} onChange={(e) => toggle(x, e.target.checked)} /></td>
-              <td dir="ltr"><button type="button" className="fw-link" onClick={() => onOpenOrder(x.order_id)}>{x.order_id}</button></td>
-              <td>{x.customer_name ?? ''}</td><td>{x.governorate ?? ''}</td><td dir="ltr">{x.delivered_day ?? ''}</td><td>{x.days}</td>
-              <td>{pick ? <input data-courier-cash className="fw-input fw-courier-num" dir="ltr" inputMode="numeric" aria-label={`${crs(loc, 'colCash')} ${x.order_id}`} value={pick.cash} onChange={(e) => edit(x.order_id, 'cash', e.target.value)} /> : <Money value={cash} />}</td>
-              <td>{pick ? <input data-courier-fee className="fw-input fw-courier-num" dir="ltr" inputMode="numeric" aria-label={`${crs(loc, 'colFee')} ${x.order_id}`} value={pick.fee} onChange={(e) => edit(x.order_id, 'fee', e.target.value)} /> : <Money value={fee} />}</td>
-              <td><Money value={cash - fee} /></td>
+              <td dir="ltr" data-label={crs(loc, 'colOrder')}><button type="button" className="fw-link" onClick={() => onOpenOrder(x.order_id)}>{x.order_id}</button></td>
+              <td data-label={crs(loc, 'colCustomer')}>{x.customer_name ?? ''}</td><td data-label={crs(loc, 'colGovernorate')}>{x.governorate ?? ''}</td>
+              <td dir="ltr" data-label={crs(loc, 'colDelivered')}>{x.delivered_day ?? ''}</td><td data-label={crs(loc, 'colDays')}>{x.days}</td>
+              <td data-label={crs(loc, 'colCash')}>{pick ? <input data-courier-cash className="fw-input fw-courier-num" dir="ltr" inputMode="numeric" aria-label={`${crs(loc, 'colCash')} ${x.order_id}`} value={pick.cash} onChange={(e) => edit(x.order_id, 'cash', e.target.value)} /> : <Money value={cash} />}</td>
+              <td data-label={crs(loc, 'colFee')}>{pick ? <input data-courier-fee className="fw-input fw-courier-num" dir="ltr" inputMode="numeric" aria-label={`${crs(loc, 'colFee')} ${x.order_id}`} value={pick.fee} onChange={(e) => edit(x.order_id, 'fee', e.target.value)} /> : <Money value={fee} />}</td>
+              <td data-label={crs(loc, 'colNet')}><Money value={cash - fee} /></td>
             </tr>;
-          })}</tbody>
+          })}</Fragment>)}</tbody>
         </table></div>}
+        </>}
+      </section>
 
-      {lines.length > 0 && <div className="fw-courier-form" data-courier-form>
+      <aside className="fw-courier-panel" aria-label={crs(loc, 'panelTitle')}>
+      <h3 className="fw-courier-h">{crs(loc, 'panelTitle')}</h3>
+      {lines.length === 0 ? <p className="fw-note" data-courier-panel-empty>{crs(loc, 'noneSelected')}</p> : <div className="fw-courier-form" data-courier-form>
         <p className="fw-courier-sum"><strong>{crs(loc, 'selected', { n: lines.length })}</strong> · {crs(loc, 'expected')}: <Money value={expected} /></p>
         {tooMany && <p className="fw-error" role="alert" data-courier-too-many>{crs(loc, 'tooMany', { max: MAX_PARCELS })}</p>}
         <div className="fw-fields">
@@ -185,6 +229,8 @@ export default function CourierMoney({ onOpenOrder, onChanged }: { onOpenOrder: 
           {saving && saving !== 'transfer' && <span className="fw-muted" role="status">{saving}</span>}
         </div>
       </div>}
+      </aside>
+      </div>
 
       <h3 className="fw-courier-h">{crs(loc, 'transfersTitle')}</h3>
       {data.remittances.length === 0 ? <p className="fw-note" data-courier-no-transfers>{crs(loc, 'noTransfers')}</p>
