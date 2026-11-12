@@ -108,6 +108,26 @@ export function rebaseDraft(before: EditedFields, now: EditedFields, d: EntryDra
   for (const k of DRAFT_FIELDS) if (holds(k, d[k], was[k])) out[k] = is[k];
   return out;
 }
+/** What an edit sent, as the entry carries it once it lands (the route trims the description): the draft's own fields. */
+export function sentFields(p: ReturnType<typeof editPatch>): Partial<EntryDraft> {
+  const out: Partial<EntryDraft> = {};
+  if (p.category_id !== undefined) out.category_id = p.category_id;
+  if (p.amount_iqd !== undefined) out.amount = String(p.amount_iqd);
+  if (p.expense_day !== undefined) out.expense_day = p.expense_day;
+  if (p.title !== undefined) out.title = p.title.trim();
+  return out;
+}
+/**
+ * THE OWNER'S OWN SAVE IS NOT A CHANGE MADE ELSEWHERE (the checker of step 5's second review). The owner saves a description
+ * and opens the editor again before the page's own re-read arrives: it stands on the entry as it was, and when the re-read
+ * lands the description just saved read as moved — «تغيّر هذا القيد في مكان آخر» for nothing but the owner's own save.
+ * `sent`: what this row last sent (or may have, when the answer never came), as `sentFields` writes it. The moved fields the
+ * re-read brings with exactly those values are the owner's own; the rest changed elsewhere.
+ */
+export const movedElsewhere = (before: EditedFields, now: EditedFields, sent: Partial<EntryDraft>): Array<keyof EntryDraft> => {
+  const is = entryDraft(now);
+  return movedFields(before, now).filter((k) => sent[k] !== is[k]);
+};
 
 /** A category's name in the reader's language; the Arabic stands in for a name never written in English or Sorani. */
 export const categoryName = (lang: string, c: ExpenseCategoryNames) => (lang === 'en' ? c.name_en : lang === 'ckb' ? c.name_ckb : '') || c.name_ar;

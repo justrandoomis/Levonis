@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, RotateCcw, Trash2 } from 'lucide-react';
 import { ApiError, isAborted, type ExpenseCategory, type ExpenseEntry } from '../../lib/api';
 import {
@@ -12,7 +12,7 @@ import {
 } from '../../lib/financeApi';
 import { countText, money } from './format';
 import { baghdadDay } from './period';
-import { expenseProblem, MAX_REPEAT_MONTHS, type ExpenseDraft, type ExpenseProblem } from './expenseForm';
+import { expenseProblem, MAX_REPEAT_MONTHS, writeUnanswered, type ExpenseDraft, type ExpenseProblem } from './expenseForm';
 import type { FinanceStrings } from './strings';
 
 /**
@@ -109,6 +109,16 @@ export default function ExpenseLedger({
   const [touched, setTouched] = useState(!formOnly);
   /** The void reason being typed against each row, keyed by expense id. */
   const [pendingReason, setPendingReason] = useState<Record<string, string>>({});
+  // The fields a problem names. A press that reveals the problem moves the focus to its field: the button the focus was on is
+  // held from then on, and a held button drops the focus to the page — the next Tab started again at the top (the checker of
+  // step 5's second review).
+  const categoryField = useRef<HTMLSelectElement>(null);
+  const amountField = useRef<HTMLInputElement>(null);
+  const dayField = useRef<HTMLInputElement>(null);
+  const repeatField = useRef<HTMLInputElement>(null);
+  // A write whose answer never came reads the ledger again; what the form says about it stays through that read (which
+  // otherwise clears the last read's error).
+  const keepError = useRef(false);
 
   // The server's own Baghdad day, mirrored client-side by the same arithmetic
   // the period control uses. NEVER `toISOString().slice(0,10)`, which answers
@@ -128,7 +138,8 @@ export default function ExpenseLedger({
   useEffect(() => {
     const ac = new AbortController();
     setLoading(true);
-    setError(null);
+    if (keepError.current) keepError.current = false;
+    else setError(null);
     Promise.all([
       fetchExpenseCategories({ signal: ac.signal }),
       formOnly ? Promise.resolve(null) : fetchExpenses({ from, to, include_voided: includeVoided, limit: 500 }, { signal: ac.signal }),
@@ -157,6 +168,13 @@ export default function ExpenseLedger({
   }, [from, to, includeVoided, reloadKey, s.loadFailed, formOnly]);
 
   const problem: ExpenseProblem = expenseProblem(draft, today);
+  const problemField = (p: ExpenseProblem): { focus(): void } | null => {
+    if (!p) return null;
+    if (p === 'no_category') return categoryField.current;
+    if (p === 'day_not_a_day' || p === 'day_too_far') return dayField.current;
+    if (p === 'repeat_out_of_range') return repeatField.current;
+    return amountField.current;
+  };
   const problemText = (p: ExpenseProblem): string => {
     switch (p) {
       case 'no_category':
@@ -210,6 +228,18 @@ export default function ExpenseLedger({
       refresh();
     } catch (e: unknown) {
       setError(failure(e));
+      // THE ANSWER NEVER CAME (the connection, the client's deadline, a 5xx with no refusal): the entry may be recorded. The
+      // page reads itself again, so its list shows whether it landed; embedded, where the page says so, the amount is cleared
+      // too, so a second press records nothing until it is typed again (the checker of step 5's second review: «تعذّر الحفظ.»
+      // with 600,000 still typed, a second press, and the rent counted twice). The old report keeps its own words and form.
+      if (writeUnanswered(e)) {
+        if (formOnly) {
+          setDraft((d) => ({ ...d, amount: '' }));
+          setTouched(false);
+        }
+        keepError.current = true;
+        refresh();
+      }
     } finally {
       setBusy(false);
     }
@@ -228,6 +258,11 @@ export default function ExpenseLedger({
       setReloadKey((k) => k + 1);
     } catch (e: unknown) {
       setError(failure(e));
+      // The category may have been added after all: its list is read again.
+      if (writeUnanswered(e)) {
+        keepError.current = true;
+        setReloadKey((k) => k + 1);
+      }
     } finally {
       setBusy(false);
     }
@@ -241,6 +276,10 @@ export default function ExpenseLedger({
         setReloadKey((k) => k + 1);
       } catch (e: unknown) {
         setError(failure(e));
+        if (writeUnanswered(e)) {
+          keepError.current = true;
+          setReloadKey((k) => k + 1);
+        }
       } finally {
         setBusy(false);
       }
@@ -303,6 +342,9 @@ export default function ExpenseLedger({
         onSubmit={(e) => {
           e.preventDefault();
           setTouched(true);
+          // A press that names the problem puts the focus on the field it names (see the refs above).
+          const field = problemField(problem);
+          if (field) field.focus();
           void submit();
         }}
       >
@@ -313,6 +355,7 @@ export default function ExpenseLedger({
           <label className="min-w-0">
             <span className={LABEL}>{s.fieldCategory}</span>
             <select
+              ref={categoryField}
               className="lv-input w-full text-[13px] leading-[1.6]"
               value={draft.category_id}
               onChange={(e) => setDraft((d) => ({ ...d, category_id: e.target.value }))}
@@ -329,6 +372,7 @@ export default function ExpenseLedger({
           <label className="min-w-0">
             <span className={LABEL}>{s.fieldAmount}</span>
             <input
+              ref={amountField}
               className="lv-input w-full text-[13px] leading-[1.6]"
               dir="ltr"
               inputMode="numeric"
@@ -340,6 +384,7 @@ export default function ExpenseLedger({
           <label className="min-w-0">
             <span className={LABEL}>{s.fieldDay}</span>
             <input
+              ref={dayField}
               className="lv-input w-full text-[13px] leading-[1.6]"
               dir="ltr"
               type="date"
@@ -351,6 +396,7 @@ export default function ExpenseLedger({
           <label className="min-w-0">
             <span className={LABEL}>{s.fieldRepeat}</span>
             <input
+              ref={repeatField}
               className="lv-input w-full text-[13px] leading-[1.6]"
               dir="ltr"
               inputMode="numeric"

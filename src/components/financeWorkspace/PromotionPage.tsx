@@ -6,6 +6,7 @@ import { Button, Field, formatMoney, Loading, Money, Status, Surface, useNarrow 
 import { currentMonth, financeDay, WORKSPACE_API, type Promotion } from './types';
 import { PA_STRINGS, tri } from './displayCurrencyStrings';
 import { cs, refusalWords } from './costsStrings';
+import { writeUnanswered } from '../adminFinance/expenseForm';
 import { dayText, fw, monthText, rangeText } from './overviewStrings';
 import { rs } from './reportStrings';
 import { percentText, promotionTable } from './costFigures';
@@ -127,7 +128,12 @@ export default function PromotionPage({ month, onMonth, from, to, revision = 0, 
       setNotice(cs(loc, 'promoSaved'));
       // The workspace reads every figure again — this page's shares and history with them (`revision`).
       onChanged();
-    } catch (e) { setError(refused(e)); }
+    } catch (e) {
+      setError(refused(e));
+      // The answer never came: the save may have landed, and the page reads itself again to show whether it did (the checker of
+      // step 5's second review). A second press never counts it twice: a month has one promotion, and an edit sets its amount.
+      if (writeUnanswered(e)) onChanged();
+    }
     finally { setSaving(false); }
   };
   const rateField = <Field label={tri(loc, PA_STRINGS.promotionRateLabel)} hint={keepsRate ? tri(loc, PA_STRINGS.promotionRateKeep, { rate: String(selected!.exchange_rate) }) : tri(loc, PA_STRINGS.promotionRateHint)}>
@@ -143,7 +149,7 @@ export default function PromotionPage({ month, onMonth, from, to, revision = 0, 
     if (!selected || saving) return;
     setSaving(true); setError(''); setNotice('');
     try { await api.delete(`${WORKSPACE_API}/promotions/${encodeURIComponent(selected.id)}`); setStopping(false); setNotice(cs(loc, 'promoDisabled')); onChanged(); }
-    catch (e) { setError(refused(e)); }
+    catch (e) { setError(refused(e)); if (writeUnanswered(e)) onChanged(); }
     finally { setSaving(false); }
   };
   return <>

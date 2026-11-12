@@ -1,20 +1,20 @@
 import { Fragment, useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ArrowDownToLine, Info, Plus, RotateCcw, Trash2 } from 'lucide-react';
-import { api, ApiError, type ExpenseCategory } from '../../lib/api';
+import { api, type ExpenseCategory } from '../../lib/api';
 import { fetchExpenseCategories, restoreExpense, updateExpense, voidExpense } from '../../lib/financeApi';
 import { useLanguage } from '../../LanguageContext';
 import ExpenseLedger from '../adminFinance/ExpenseLedger';
 import { financeStrings } from '../adminFinance/strings';
 import { isLatin } from '../adminFinance/format';
 import { baghdadDay } from '../adminFinance/period';
-import { expenseProblem, type ExpenseProblem } from '../adminFinance/expenseForm';
+import { expenseProblem, writeUnanswered, type ExpenseProblem } from '../adminFinance/expenseForm';
 import { Button, Empty, Field, formatMoney, Loading, Money, Status, Surface } from './ui';
 import { WORKSPACE_API } from './types';
 import { cs, refusalWords, type CsKey } from './costsStrings';
 import { dayIn, fw, monthText, rangeText } from './overviewStrings';
 import { rs } from './reportStrings';
 import { Amount } from './Reports';
-import { categoryName, categoryShares, editableHere, editPatch, entryDraft, groupEntries, inClosedMonth, KIND_LABEL, movedFields, rebaseDraft, type ExpenseEntryRow, type ExpensesAnswer } from './expenseKinds';
+import { categoryName, categoryShares, editableHere, editPatch, entryDraft, groupEntries, inClosedMonth, KIND_LABEL, movedElsewhere, movedFields, rebaseDraft, sentFields, type EntryDraft, type ExpenseEntryRow, type ExpensesAnswer } from './expenseKinds';
 import { percentText } from './costFigures';
 
 /**
@@ -38,6 +38,10 @@ import { percentText } from './costFigures';
  * of it is shown; an edit opens on the entry as it is now, sends only what changed, and closes back on «تعديل» (Escape too);
  * voiding asks first and says what leaves which figure; a voided promotion, wage or courier fee is brought back at its
  * source, never here; a month closed in accounting offers no edit; a refusal is said in the reader's language.
+ *
+ * The checker of its second review: a write whose answer never came (the connection, the client's deadline) is not said to
+ * have failed — it may have landed — and the page reads itself again to show whether it did; an editor reopened on a save
+ * whose re-read has not arrived does not call the owner's own save a change made elsewhere.
  */
 type Lang = 'ar' | 'en' | 'ckb';
 type OpenOrder = (id: string) => void;
@@ -90,7 +94,7 @@ export function ExpensesView({ data: shown, error, from, to, showVoided, onShowV
   // «أضف» opens the ledger's form and closes it again, from the empty state too.
   const toggleAdd = () => setAdding((v) => !v);
   const form = adding && <Surface title={cs(loc, 'genAdd')}><ExpenseLedger formOnly from={from} to={to} s={s} latin={isLatin(lang)} dir={dir === 'rtl' ? 'rtl' : 'ltr'} onChanged={onChanged}
-    categoryLabel={(c) => categoryName(lang, c)} categoryPrompt={cs(loc, 'genCategoryPick')} errorText={(e) => refusalWords(loc, lang, e, e instanceof ApiError && !e.code ? e.message : s.saveFailed)} /></Surface>;
+    categoryLabel={(c) => categoryName(lang, c)} categoryPrompt={cs(loc, 'genCategoryPick')} errorText={(e) => refusalWords(loc, lang, e, s.saveFailed)} /></Surface>;
   return <>
     <Surface title={fw(loc, 'expenses')} subtitle={<bdi>{rangeText(L, from, to)}</bdi>}
       action={<a className="fw-button fw-button--ghost" href={`${WORKSPACE_API}/export.csv?from=${from}&to=${to}&view=expenses`} data-finance-expenses-export><ArrowDownToLine size={16} aria-hidden /><span>{fw(loc, 'exportCsv')}</span></a>}>
@@ -151,7 +155,15 @@ function EntryRow({ r, range, closed, categories, needCategories, onChanged, ope
   const voidBox = useRef<HTMLDivElement>(null);
   const voidButton = useRef<HTMLDivElement>(null);
   const asked = useRef(false);
+  // What this row last sent — or may have, when the answer never came — as the entry carries it once it lands: a re-read that
+  // brings exactly these values is the owner's own save, never «changed elsewhere» (the checker of step 5's second review).
+  const sent = useRef<Partial<EntryDraft>>({});
   const voidId = useId();
+  // Seen on the entry, a sent value is spent: a later change of that field is another screen's.
+  useEffect(() => {
+    const is = entryDraft(r);
+    for (const k of Object.keys(sent.current) as Array<keyof EntryDraft>) if (sent.current[k] === is[k]) delete sent.current[k];
+  }, [r]);
   // The void's confirmation opens on its sentence; «تراجع» there gives the focus back to «ألغِ هذا القيد…».
   useEffect(() => {
     if (voiding) { asked.current = true; voidBox.current?.querySelector<HTMLElement>('p')?.focus(); }
@@ -163,18 +175,24 @@ function EntryRow({ r, range, closed, categories, needCategories, onChanged, ope
   // A re-read while the editor is open, the entry changed elsewhere meanwhile: the fields the owner has not touched take its
   // new values, what they typed stays, and the patch is against the entry as it now is — a field they never touched is never
   // sent with its old value (the checker of step 5's review: an edit of the description wrote back a corrected amount).
-  if (editing && movedFields(base, r).length > 0) { setDraft((d) => rebaseDraft(base, r, d)); setBase(r); setMoved(true); }
+  // A field the re-read brings with exactly what this row sent is the owner's own save: followed, and not said as moved.
+  if (editing && movedFields(base, r).length > 0) { setDraft((d) => rebaseDraft(base, r, d)); setBase(r); if (movedElsewhere(base, r, sent.current).length > 0) setMoved(true); }
   const patch = editPatch(base, draft), changed = Object.keys(patch).length > 0;
   // The editor opens on the entry as it is now and closes back on its «تعديل», what was typed in it gone.
   const open = () => { setDraft(entryDraft(r)); setBase(r); setMoved(false); setReason(''); setVoiding(false); setError(''); setEditing(true); needCategories(); };
   const close = () => { setEditing(false); setVoiding(false); setError(''); setDraft(entryDraft(r)); editButton.current?.querySelector<HTMLButtonElement>('button')?.focus(); };
-  const run = async (write: () => Promise<unknown>) => {
+  // A write whose answer never came may have landed: said so, the page reads itself again (it shows whether it did), and
+  // what was sent counts as this row's own — never «تعذّر الحفظ.» before a second press (the checker of step 5's second review).
+  const run = async (write: () => Promise<unknown>, sending: Partial<EntryDraft> = {}) => {
     setBusy(true); setError('');
-    try { await write(); close(); onChanged(); }
-    catch (e) { setError(refusalWords(loc, lang, e, e instanceof ApiError && !e.code ? e.message : s.saveFailed)); }
+    try { await write(); sent.current = { ...sent.current, ...sending }; close(); onChanged(); }
+    catch (e) {
+      setError(refusalWords(loc, lang, e, s.saveFailed));
+      if (writeUnanswered(e)) { sent.current = { ...sent.current, ...sending }; onChanged(); }
+    }
     finally { setBusy(false); }
   };
-  const save = () => { if (!busy && !problem && changed) void run(() => updateExpense(r.id, patch)); };
+  const save = () => { if (!busy && !problem && changed) void run(() => updateExpense(r.id, patch), sentFields(patch)); };
   const promotionMonth = r.promotion_month ?? r.expense_day.slice(0, 7);
   const orderLink = r.order_id ? <button type="button" className="fw-link" dir="ltr" onClick={() => openOrder(r.order_id!)} aria-label={rs(loc, 'openOrder', { id: r.order_id })}>{r.order_id}</button> : null;
   const where = r.kind === 'promotion' ? <><button type="button" className="fw-link" onClick={() => onPromotion(promotionMonth)} data-finance-expense-promotion={promotionMonth}>{rs(loc, 'openPromotion')}</button>

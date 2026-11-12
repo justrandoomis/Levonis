@@ -91,3 +91,21 @@ export function expenseProblem(draft: ExpenseDraft, today: string): ExpenseProbl
   }
   return null;
 }
+
+/**
+ * A WRITE WHOSE ANSWER NEVER CAME MAY HAVE LANDED (the checker of step 5's second review, DECISIONS row 317).
+ *
+ * The owner adds a rent of 600,000; the server records it, and the answer is lost on the phone's connection (the API
+ * client's NETWORK), or comes after its 20-second deadline (TIMEOUT), or arrives under another session and is dropped
+ * (ABORTED, src/lib/api.ts). The form used to say «تعذّر الحفظ.» with the amount still typed, and a second press recorded
+ * the rent twice. The same holds for a 5xx the server answers without a refusal of its own: no code, or the Worker's
+ * SERVICE_BUSY / SERVICE_SETUP (worker/index.ts), which can come after a batch committed — the rule the product form
+ * already follows (src/components/adminProducts/saveOutcome.ts `writeOutcomeUnknown`). True here means: do not say it
+ * failed; read the page again so it shows whether it landed. Duck-typed on `status` and `code`, as `ApiError` carries them.
+ */
+export function writeUnanswered(error: unknown): boolean {
+  const e = error && typeof error === 'object' ? (error as { status?: unknown; code?: unknown }) : null;
+  if (!e || typeof e.status !== 'number') return false;
+  if (e.status === 0) return true;
+  return e.status >= 500 && (!e.code || e.code === 'SERVICE_BUSY' || e.code === 'SERVICE_SETUP');
+}

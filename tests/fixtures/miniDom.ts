@@ -3,7 +3,8 @@
  *
  * tests/freshOnReturnHold.test.ts mounts a hook in a browser that draws nothing. The costs pages' interactions (step 5 of
  * the «المال والأرباح» redesign, DECISIONS row 317) need more: elements with children, text, attributes and styles; fields
- * that hold what was typed; the focus, which a removed element loses as in a browser and a disabled control never takes;
+ * that hold what was typed, and a single select whose options are exclusive; the focus, which a removed element loses as in
+ * a browser, a disabled control never takes and a control held while it has it gives up to the page;
  * and events that travel from their target up to the root react-dom listens on. A click on a submit button submits its
  * form; Enter in a field submits through the form's default button, unless that button is disabled (HTML's implicit
  * submission); Enter on a button presses it. No layout, no CSS, no selection.
@@ -177,12 +178,30 @@ export class FakeElement extends FakeNode {
       });
     }
     if (localName === 'option') {
-      Object.assign(this, { selected: false, defaultSelected: false });
+      // A single select's options are exclusive, as in a browser: react-dom marks only the chosen option selected and relies on
+      // the browser to clear the one chosen before — without this, select.value read the first option ever chosen (the checker
+      // of step 5's second review).
+      let selected = false;
+      Object.defineProperty(this, 'selected', {
+        get: () => selected,
+        set: (v: unknown) => {
+          selected = !!v;
+          const select = selected ? this.closest('select') : null;
+          if (select && !select.multiple) for (const o of select.querySelectorAll('option')) if (o !== this) o.selected = false;
+        },
+      });
+      Object.assign(this, { defaultSelected: false });
       Object.defineProperty(this, 'value', { get: () => this.getAttribute('value') ?? this.textContent, set: (v: string) => this.setAttribute('value', String(v)) });
     }
   }
   private key(name: string) { return this.namespaceURI === HTML_NS ? name.toLowerCase() : name; }
-  setAttribute(name: string, value: unknown) { this.attributes.set(this.key(name), String(value)); }
+  setAttribute(name: string, value: unknown) {
+    this.attributes.set(this.key(name), String(value));
+    // A control held while it has the focus loses it to the page, as in a browser (HTML's focus fixup): a press that holds the
+    // very button it was made on leaves the focus on <body> (the checker of step 5's second review).
+    const doc = this.ownerDocument, at = doc?.focused;
+    if (this.key(name) === 'disabled' && at && (!at.focusable || at.closest('fieldset[disabled]'))) doc.focused = null;
+  }
   getAttribute(name: string) { return this.attributes.get(this.key(name)) ?? null; }
   removeAttribute(name: string) { this.attributes.delete(this.key(name)); }
   hasAttribute(name: string) { return this.attributes.has(this.key(name)); }

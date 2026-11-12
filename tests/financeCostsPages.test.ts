@@ -38,11 +38,12 @@ import type { FinanceSummary } from '../src/components/financeWorkspace/types';
 import type { PromotionsAnswer } from '../src/components/financeWorkspace/PromotionPage';
 import { everyState, month, order, period, previousMonth, world } from './fixtures/financeWorld';
 import { crowdedWorld, expenseWorld } from './fixtures/financeCosts';
-import { json, patch, post, send, stubApp } from './fixtures/app';
+import { json, patch, post, send, stubApp, type App } from './fixtures/app';
 import { codeOf } from './fixtures/source';
 import { adminFinanceRoutes } from '../worker/routes/adminFinance';
 import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
 import { baghdadDay } from '../worker/lib/operations';
+import { dayParts } from '../worker/lib/baghdadTime';
 
 let LANG: 'ar' | 'en' | 'ckb' = 'ar';
 (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => (k === 'levo_lang' ? LANG : null), setItem: () => {}, removeItem: () => {} };
@@ -429,16 +430,19 @@ test('an entry\'s day keeps its year when the period spans two; an edit sends on
   const src = codeOf('src/components/financeWorkspace/GeneralExpenses.tsx');
   assert.match(src, /const open = \(\) => \{ setDraft\(entryDraft\(r\)\);/);
   assert.match(src, /const close = \(\) => \{ setEditing\(false\); setVoiding\(false\); setError\(''\); setDraft\(entryDraft\(r\)\); editButton\.current\?\.querySelector<HTMLButtonElement>\('button'\)\?\.focus\(\); \};/);
-  assert.match(src, /void run\(\(\) => updateExpense\(r\.id, patch\)\)/);
+  assert.match(src, /void run\(\(\) => updateExpense\(r\.id, patch\), sentFields\(patch\)\)/);
   assert.match(src, /onClick=\{\(\) => setVoiding\(true\)\} data-finance-expense-void>/);
   assert.equal((src.match(/voidExpense\(/g) ?? []).length, 1, 'one void, behind its confirmation');
   assert.match(src, /if \(e\.key === 'Escape'\)/);
   assert.notEqual(CS.genVoidAction[0], 'إلغاء');
   assert.notEqual(CS.genVoidAction[2], 'هەڵوەشاندنەوە', 'not the Sorani Cancel of the missing-cost confirmation');
-  // Refusals: this table's sentence for the costs pages' codes, the shop's table for its own, else the page's fallback.
+  // Refusals: this table's sentence for the costs pages' codes, the shop's table for its own; any other refusal is said as one,
+  // with the server's reason after it — never the bare fallback, which hid why (the checker of step 5's second review); the
+  // fallback only for what no request threw.
   const loc = (lang: 'ar' | 'en' | 'ckb') => (a: string, e: string, k?: string) => (lang === 'en' ? e : lang === 'ckb' ? k ?? a : a);
   for (const [code, key] of [['PERIOD_CLOSED', 'refPeriodClosed'], ['CONFLICT', 'refConflict'], ['EXPENSE_VOIDED', 'refVoided'], ['CATEGORY_UNKNOWN', 'refCategory'],
-    ['CATEGORY_EXISTS', 'refCategoryExists'], ['NOT_FOUND', 'refNotFound'], ['EXPENSE_AMOUNT_INVALID', 'refAmount'], ['RATE_LIMITED', 'refRateLimited'], ['BAD_NUMBER', 'refNumber']] as const)
+    ['CATEGORY_EXISTS', 'refCategoryExists'], ['NOT_FOUND', 'refNotFound'], ['EXPENSE_AMOUNT_INVALID', 'refAmount'], ['RATE_LIMITED', 'refRateLimited'], ['BAD_NUMBER', 'refNumber'],
+    ['UNAUTHORIZED', 'refSignedOut'], ['FORBIDDEN', 'refForbidden']] as const)
     for (const [i, lang] of (['ar', 'en', 'ckb'] as const).entries()) assert.equal(refusalWords(loc(lang), lang, { code, message: 'This expense is voided — restore it before editing' }, 'fallback'), CS[key][i], `${code} ${lang}`);
   // A day the server refuses: the old ledger's own sentence for the same check, reused (never repeated in this table).
   for (const lang of ['ar', 'en', 'ckb'] as const) {
@@ -446,16 +450,22 @@ test('an entry\'s day keeps its year when the period spans two; an edit sends on
     assert.equal(refusalWords(loc(lang), lang, { code: 'EXPENSE_DAY_INVALID' }, 'fallback'), ledger.errDayNotADay);
     assert.equal(refusalWords(loc(lang), lang, { code: 'EXPENSE_DAY_TOO_FAR' }, 'fallback'), ledger.errDayTooFar);
   }
-  assert.equal(refusalWords(loc('en'), 'en', { code: 'NO_SUCH_CODE', message: 'raw' }, 'fallback'), 'fallback');
+  for (const [i, lang] of (['ar', 'en', 'ckb'] as const).entries())
+    assert.equal(refusalWords(loc(lang), lang, { code: 'NO_SUCH_CODE', message: 'raw' }, 'fallback'), CS.refOther[i].replace('{reason}', 'raw'), `${lang}: a code no table words`);
   assert.equal(refusalWords(loc('ar'), 'ar', new Error('network'), 'fallback'), 'fallback');
 });
 
 test('every coded refusal the costs pages\' writes can meet is said in the reader\'s language, never «تعذّر الحفظ.» (the checker of step 5\'s review)', async () => {
   // The routes the pages write through, refusing for real on an invented world: the old ledger's expense and category routes
-  // (the entries' edits and the embedded form), the promotions route, the closed month and the finance door's hourly budget.
-  const w = expenseWorld(), day = baghdadDay(), app = stubApp(w.db, { id: 'admin', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, (a) => {
-    a.route('/e', adminFinanceRoutes); a.route('/f', adminFinanceWorkspaceRoutes);
-  });
+  // (the entries' edits and the embedded form), the promotions route, the closed month and the finance door's hourly budget —
+  // and, since the checker of the second review, the admin door in front of them all.
+  const routes = (a: App) => { a.route('/e', adminFinanceRoutes); a.route('/f', adminFinanceWorkspaceRoutes); };
+  const w = expenseWorld(), day = baghdadDay(), app = stubApp(w.db, { id: 'admin', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, routes);
+  // A day two years ahead of today's: the 15th of January of that year, which every year has (today's month and day were used:
+  // run on 29 February, that named no day, and the route said EXPENSE_DAY_INVALID — the checker of step 5's second review).
+  const twoYearsAhead = (today: string) => `${Number(today.slice(0, 4)) + 2}-01-15`;
+  // dayParts is the route's own calendar check (validateExpenseDay); isDay checks the shape only.
+  assert.ok(dayParts(twoYearsAhead('2028-02-29')), `from a leap day too, a day that exists: ${twoYearsAhead('2028-02-29')}`);
   assert.equal((await post(app, '/e/expense-categories', { name_ar: 'صيانة' })).status, 200);
   const refused = async (what: string, sent: Response | Promise<Response>) => {
     const res = await sent, body = await json(res);
@@ -468,12 +478,16 @@ test('every coded refusal the costs pages\' writes can meet is said in the reade
     await refused('an unknown category', post(app, '/e/expenses', { category_id: 'gone', amount_iqd: 5000, expense_day: day })),
     await refused('an amount of nothing', post(app, '/e/expenses', { category_id: 'rent', amount_iqd: 0, expense_day: day })),
     await refused('a day that is not one', post(app, '/e/expenses', { category_id: 'rent', amount_iqd: 5000, expense_day: '2026-02-30' })),
-    await refused('a day two years ahead', post(app, '/e/expenses', { category_id: 'rent', amount_iqd: 5000, expense_day: `${Number(day.slice(0, 4)) + 2}${day.slice(4)}` })),
+    await refused('a day two years ahead', post(app, '/e/expenses', { category_id: 'rent', amount_iqd: 5000, expense_day: twoYearsAhead(day) })),
     await refused('an edit of a voided entry', patch(app, '/e/expenses/void', { title: 'Rent, again' })),
     await refused('an entry that is gone', patch(app, '/e/expenses/gone', { title: 'Rent, again' })),
     await refused('a promotion edited on a stale version', patch(app, '/f/promotions/promo', { version: 99, amount: 1000 })),
     await refused('a dollar promotion without the rate paid', post(app, '/f/promotions', { month: previousMonth(), currency: 'USD', amount: 10 })),
     await refused('a promotion under the smallest amount (the page lets 0.001 through)', post(app, '/f/promotions', { month: previousMonth(), currency: 'IQD', amount: 0.001 })),
+    // The admin door: the owner's session lapsed, an account no longer an administrator, an administrator who is not the owner.
+    await refused('a session that has ended', patch(stubApp(w.db, null, routes), '/e/expenses/rent', { title: 'Rent, again' })),
+    await refused('an account no longer an administrator', patch(stubApp(w.db, { id: 'cust', email: 'c@x.co', role: 'customer' }, routes), '/e/expenses/rent', { title: 'Rent, again' })),
+    await refused('an administrator who is not the owner', patch(stubApp(w.db, { id: 'a2', email: 'other@x.co', role: 'admin', admin_scope: 'full' }, routes), '/e/expenses/rent', { title: 'Rent, again' })),
   ];
   w.raw.exec(`INSERT INTO accounting_periods(month,closed_at,closed_by) VALUES ('${month()}','2026-01-01T00:00:00Z','admin')`);
   answers.push(await refused('an edit in a month closed in accounting', patch(app, '/e/expenses/rent', { title: 'Rent, again' })));
@@ -481,20 +495,86 @@ test('every coded refusal the costs pages\' writes can meet is said in the reade
   w.raw.exec(`INSERT INTO rate_limits(key,window_start,count) VALUES ('finance-write:u:admin',${now - (now % 3600)},120) ON CONFLICT(key) DO UPDATE SET window_start=excluded.window_start,count=120`);
   answers.push(await refused('the hour\'s finance writes spent', patch(app, '/e/expenses/rent', { title: 'Rent, again' })));
   assert.deepEqual(answers.map((a) => a.error.code), ['CATEGORY_EXISTS', 'NOT_FOUND', 'CATEGORY_UNKNOWN', 'EXPENSE_AMOUNT_INVALID', 'EXPENSE_DAY_INVALID', 'EXPENSE_DAY_TOO_FAR',
-    'EXPENSE_VOIDED', 'NOT_FOUND', 'CONFLICT', 'PROMOTION_RATE_REQUIRED', 'BAD_NUMBER', 'PERIOD_CLOSED', 'RATE_LIMITED']);
+    'EXPENSE_VOIDED', 'NOT_FOUND', 'CONFLICT', 'PROMOTION_RATE_REQUIRED', 'BAD_NUMBER', 'UNAUTHORIZED', 'FORBIDDEN', 'COST_ACCESS_DENIED', 'PERIOD_CLOSED', 'RATE_LIMITED']);
   // Each as the page words it (GeneralExpenses' errorText): the sentence, in the reader's language — never the fallback, never
   // the server's own sentence (Arabic or English whatever the page's language).
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const loc = (a: string, e: string, k?: string) => (lang === 'en' ? e : lang === 'ckb' ? k ?? a : a), s = financeStrings(loc);
-    for (const { what, error } of answers) {
-      const said = refusalWords(loc, lang, error, error.code ? s.saveFailed : error.message);
+    const words = answers.map(({ what, error }) => ({ what, error, said: refusalWords(loc, lang, error, s.saveFailed) }));
+    for (const { what, error, said } of words) {
       assert.notEqual(said, s.saveFailed, `${lang} ${what} (${error.code}): «${said}»`);
       assert.notEqual(said, error.message, `${lang} ${what}: not the server's sentence`);
       if (lang === 'en') assert.doesNotMatch(said, /[؀-ۿ]/, `${what}: in English`);
       else assert.match(said, /[؀-ۿ]/, `${lang} ${what}`);
       if (lang === 'ckb') assert.match(said, SORANI_ONLY, `${what}: in Sorani, «${said}»`);
     }
+    // Each has a sentence of its own: none falls through to the frame that quotes the server's reason.
+    for (const { what, error, said } of words) assert.notEqual(said, loc(...CS.refOther).replace('{reason}', error.message.trim()), `${lang} ${what}: not the server's reason quoted`);
   }
+});
+
+test('a write whose answer never came is never said to have failed — it may have landed — and a refusal no table words still says why (the checker of step 5\'s second review)', async () => {
+  const { writeUnanswered } = await import('../src/components/adminFinance/expenseForm');
+  const { api, clearApiSessionRequests } = await import('../src/lib/api');
+  // Drawn from the API client itself (src/lib/api.ts), over a transport that fails as the owner's phone does.
+  const real = globalThis.fetch, drawn: Array<{ what: string; error: ApiError }> = [];
+  const failing = async (what: string, transport: (init?: RequestInit) => Promise<Response>, timeoutMs?: number) => {
+    globalThis.fetch = ((_: RequestInfo | URL, init?: RequestInit) => transport(init)) as typeof fetch;
+    try {
+      await api.post('/api/admin/finance/expenses', { category_id: 'rent', amount_iqd: 600000 }, timeoutMs ? { timeoutMs } : undefined);
+      assert.fail(`${what}: it answered`);
+    } catch (e) {
+      assert.ok(e instanceof ApiError, `${what}: ${String(e)}`);
+      drawn.push({ what, error: e });
+    } finally { globalThis.fetch = real; }
+  };
+  const answer = (status: number, body: object) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  await failing('the answer lost on the way back', async () => { throw new TypeError('Failed to fetch'); });
+  await failing('past the client\'s deadline', (init) => new Promise((_, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('The operation was aborted.', 'AbortError')))), 5);
+  await failing('an answer that came under another session', async () => { clearApiSessionRequests(); return answer(200, { success: true, ids: ['exp_1'] }); });
+  await failing('a server failure with no refusal of its own', async () => answer(500, { success: false, error: 'Something went wrong. Please try again.' }));
+  await failing('the database busy', async () => answer(500, { success: false, error: 'The store is busy right now. Please try again in a moment.', code: 'SERVICE_BUSY' }));
+  assert.deepEqual(drawn.map(({ error }) => [error.status, error.code ?? null]), [[0, 'NETWORK'], [0, 'TIMEOUT'], [0, 'ABORTED'], [500, null], [500, 'SERVICE_BUSY']]);
+  for (const [i, lang] of (['ar', 'en', 'ckb'] as const).entries()) {
+    const loc = (a: string, e: string, k?: string) => (lang === 'en' ? e : lang === 'ckb' ? k ?? a : a), s = financeStrings(loc);
+    for (const { what, error } of drawn) {
+      const said = refusalWords(loc, lang, error, s.saveFailed);
+      assert.notEqual(said, s.saveFailed, `${lang} ${what}: «${said}» — the write may have been recorded`);
+      assert.equal(said, CS.refUnanswered[i], `${lang} ${what}`);
+      assert.ok(writeUnanswered(error), what);
+    }
+    // A refusal no table words — the server's own validation, a code added later — says it was refused, and why.
+    for (const error of [new ApiError(400, 'title is too long (max 120 characters)'), new ApiError(503, 'تحديث مساحة العمل المالية لم يطبق بعد', 'NOT_CONFIGURED')]) {
+      assert.equal(writeUnanswered(error), false, error.message);
+      assert.equal(refusalWords(loc, lang, error, s.saveFailed), CS.refOther[i].replace('{reason}', error.message), `${lang}: ${error.message}`);
+    }
+    // What no request threw keeps the page's own fallback.
+    assert.equal(refusalWords(loc, lang, new Error('boom'), s.saveFailed), s.saveFailed);
+  }
+  // Refused before anything was written: never «it may have been saved».
+  for (const error of [new ApiError(409, 'x', 'PERIOD_CLOSED'), new ApiError(401, 'Authentication required', 'UNAUTHORIZED'), new ApiError(429, 'x', 'RATE_LIMITED'), new ApiError(503, 'x', 'NOT_CONFIGURED'), new Error('x'), null])
+    assert.equal(writeUnanswered(error), false, String(error));
+  // Every write of the costs pages reads the page again on such an answer, so the sentence's «تُقرأ الصفحة من جديد» holds.
+  const ledger = codeOf('src/components/adminFinance/ExpenseLedger.tsx'), page = codeOf('src/components/financeWorkspace/GeneralExpenses.tsx'), promo = codeOf('src/components/financeWorkspace/PromotionPage.tsx');
+  assert.equal((ledger.match(/if \(writeUnanswered\(e\)\)/g) ?? []).length, 3, 'the expense, a new category, a category switched on or off');
+  assert.match(ledger, /if \(writeUnanswered\(e\)\) \{\n {8}if \(formOnly\) \{\n {10}setDraft\(\(d\) => \(\{ \.\.\.d, amount: '' \}\)\);\n {10}setTouched\(false\);\n {8}\}\n {8}keepError\.current = true;\n {8}refresh\(\);/, 'the expense: the page read again, its sentence kept, the amount cleared');
+  assert.match(ledger, /if \(keepError\.current\) keepError\.current = false;\n {4}else setError\(null\);/, 'the read a lost answer starts keeps what the form says');
+  assert.match(page, /if \(writeUnanswered\(e\)\) \{ sent\.current = \{ \.\.\.sent\.current, \.\.\.sending \}; onChanged\(\); \}/, 'an entry\'s edit, void or restore');
+  assert.equal((promo.match(/if \(writeUnanswered\(e\)\) onChanged\(\);/g) ?? []).length, 2, 'the promotion\'s save and its stop');
+});
+
+test('an edit\'s own save is not a change made elsewhere: what a row sent, as the entry carries it once it lands (the checker of step 5\'s second review)', async () => {
+  const { movedElsewhere, sentFields } = await import('../src/components/financeWorkspace/expenseKinds');
+  const r = { category_id: 'utilities', amount_iqd: 12000, expense_day: '2026-03-04', title: 'Water' };
+  assert.deepEqual(sentFields(editPatch(r, { ...entryDraft(r), title: ' Water, tank ', amount: '13000' })), { amount: '13000', title: 'Water, tank' }, 'the route trims the description');
+  assert.deepEqual(sentFields({}), {});
+  // The editor reopened on the entry as it was; the re-read brings the description this row just saved.
+  const saved = { ...r, title: 'Water, tank' };
+  assert.deepEqual(movedFields(r, saved), ['title']);
+  assert.deepEqual(movedElsewhere(r, saved, { title: 'Water, tank' }), [], 'the owner\'s own save');
+  assert.deepEqual(movedElsewhere(r, saved, {}), ['title'], 'nothing sent: a change made elsewhere');
+  assert.deepEqual(movedElsewhere(r, { ...saved, amount_iqd: 14000 }, { title: 'Water, tank' }), ['amount'], 'and a field another screen changed meanwhile is still named');
+  assert.deepEqual(movedElsewhere(r, { ...r, title: 'Water, roof' }, { title: 'Water, tank' }), ['title'], 'a value other than the one sent');
 });
 
 test('the ledger\'s form embedded on the page speaks the reader\'s language, names no problem before anything is typed, and shows no ledger', () => {

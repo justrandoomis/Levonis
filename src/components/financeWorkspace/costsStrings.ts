@@ -10,8 +10,9 @@
  * Words the overview, the reports or the old ledger already have (FW, RS, financeStrings) are reused, never repeated.
  * Placeholders are {name}; numbers stay Latin in all three, as on every money screen.
  */
-import { refusalText } from '../../lib/refusalStrings';
+import { refusalLang, refusalText } from '../../lib/refusalStrings';
 import { financeStrings, type FinanceStrings } from '../adminFinance/strings';
+import { writeUnanswered } from '../adminFinance/expenseForm';
 
 type Tri = readonly [ar: string, en: string, ckb: string];
 export const CS = {
@@ -139,6 +140,15 @@ export const CS = {
   refNumber: ['أحد الأرقام غير صالح (المبلغ أو سعر التحويل)؛ صحّحه ثم احفظ.', 'One of the figures is not valid (the amount or the rate); correct it and save.', 'یەکێک لە ژمارەکان دروست نییە (بڕەکە یان نرخی گۆڕینەوە)؛ ڕاستی بکەرەوە و پاشەکەوتی بکە.'],
   // An editor kept open across a re-read while another screen changed the entry (the checker of step 5's review).
   genEditMoved: ['تغيّر هذا القيد في مكان آخر منذ فتحته؛ الحقول التي لم تلمسها تعرض الآن قيمه الجديدة.', 'This entry changed elsewhere since you opened it; the fields you have not touched now show its new values.', 'ئەم تۆمارە لەو کاتەوەی کردتەوە لە شوێنێکی ترەوە گۆڕاوە؛ ئەو خانانەی دەستت لێ نەداون ئێستا بەها نوێیەکانی پیشان دەدەن.'],
+  // The checker of step 5's second review: a write whose answer never came (the connection, the client's deadline) may have
+  // landed — never «تعذّر الحفظ.», after which a second press recorded the rent twice; the page reads itself again.
+  refUnanswered: ['لم يصل ردّ الخادم، فربما حُفظ رغم ذلك. تُقرأ الصفحة من جديد: راجعها قبل أن تعيد المحاولة، حتى لا يُسجَّل مرتين.', 'The server’s answer did not arrive, so this may have been saved anyway. The page is being read again: check it before you try again, so nothing is recorded twice.', 'وەڵامی ڕاژەکار نەگەیشت، بۆیە لەوانەیە هەر پاشەکەوت کرابێت. پەڕەکە دووبارە دەخوێندرێتەوە: پێش ئەوەی دووبارە هەوڵ بدەیتەوە سەیری بکە، تا هیچ شتێک دوو جار تۆمار نەکرێت.'],
+  // A session that lapsed (401 UNAUTHORIZED), an account no longer allowed (403 FORBIDDEN): refused before anything is written.
+  refSignedOut: ['لم تعد مسجّلًا الدخول، فلم يُحفظ شيء. سجّل الدخول من جديد ثم أعد المحاولة.', 'You are no longer signed in, so nothing was saved. Sign in again, then try once more.', 'ئیتر چوونەژوورەوەت نەماوە، بۆیە هیچ پاشەکەوت نەکرا. دووبارە بچۆ ژوورەوە و پاشان هەوڵ بدەرەوە.'],
+  refForbidden: ['هذا الحساب لا يملك صلاحية هذا التعديل، فلم يُحفظ شيء.', 'This account may not make this change, so nothing was saved.', 'ئەم هەژمارە مۆڵەتی ئەم گۆڕانکارییەی نییە، بۆیە هیچ پاشەکەوت نەکرا.'],
+  // Any other refusal — a code no table words yet, or none (the server's own validation): a refusal said in the reader's
+  // language with the server's reason after it, never a bare «تعذّر الحفظ.» that hides why.
+  refOther: ['رفض الخادم الحفظ: {reason}', 'The server refused the save: {reason}', 'ڕاژەکار پاشەکەوتکردنەکەی ڕەتکردەوە: {reason}'],
 } as const satisfies Record<string, Tri>;
 export type CsKey = keyof typeof CS;
 
@@ -151,24 +161,35 @@ export function cs(loc: Loc, key: CsKey, vars: Record<string, string | number> =
 
 /**
  * The codes the costs pages' writes are refused with, and their sentence here: the expense and category routes of the old
- * ledger (/api/admin/finance) the page and its embedded form write through, the promotions route, and the finance door's
- * write budget (RATE_LIMITED). tests/financeCostsPages.test.ts draws each from the real route.
+ * ledger (/api/admin/finance) the page and its embedded form write through, the promotions route, the finance door's write
+ * budget (RATE_LIMITED), and the admin door in front of them all — a session that lapsed (UNAUTHORIZED) or an account no
+ * longer an administrator (FORBIDDEN). tests/financeCostsPages.test.ts draws each from the real route.
  */
 export const REFUSALS: Readonly<Record<string, CsKey>> = { PERIOD_CLOSED: 'refPeriodClosed', CONFLICT: 'refConflict', EXPENSE_VOIDED: 'refVoided', CATEGORY_UNKNOWN: 'refCategory',
-  CATEGORY_EXISTS: 'refCategoryExists', NOT_FOUND: 'refNotFound', EXPENSE_AMOUNT_INVALID: 'refAmount', RATE_LIMITED: 'refRateLimited', BAD_NUMBER: 'refNumber' };
+  CATEGORY_EXISTS: 'refCategoryExists', NOT_FOUND: 'refNotFound', EXPENSE_AMOUNT_INVALID: 'refAmount', RATE_LIMITED: 'refRateLimited', BAD_NUMBER: 'refNumber',
+  UNAUTHORIZED: 'refSignedOut', FORBIDDEN: 'refForbidden' };
 /** The refusals whose sentence the old ledger's form already has (its own check of the same day, before it sends). */
 const LEDGER_REFUSALS = { EXPENSE_DAY_INVALID: 'errDayNotADay', EXPENSE_DAY_TOO_FAR: 'errDayTooFar' } as const satisfies Record<string, keyof FinanceStrings>;
 /**
- * A refused write in the reader's language: this table's sentence for its code, the old ledger's for a day it refuses, else
- * the shop's refusal table's (PROMOTION_RATE_REQUIRED and the like), else `fallback` — never the server's own sentence, which
- * is Arabic or English whatever the page's language (the independent review of step 5).
+ * A failed write in the reader's language. One whose answer never came may have landed (`writeUnanswered`: the connection,
+ * the client's deadline, a 5xx with no refusal of its own): it says so, and the caller reads the page again. A refusal: this
+ * table's sentence for its code, the old ledger's for a day it refuses, the shop's refusal table's (PROMOTION_RATE_REQUIRED,
+ * COST_ACCESS_DENIED and the like) — never the server's own sentence, which is Arabic or English whatever the page's
+ * language (the independent review of step 5). A refusal none of them words is said as one, with the server's reason after
+ * it (`refOther`), never as a bare «تعذّر الحفظ.» that hides why (the checker of step 5's second review). `fallback` only
+ * for what no request threw (no code, no status).
  */
 export function refusalWords(loc: Loc, lang: string, error: unknown, fallback: string): string {
-  const code = error && typeof (error as { code?: unknown }).code === 'string' ? (error as { code: string }).code : '';
+  const e = (error && typeof error === 'object' ? error : {}) as { code?: unknown; status?: unknown; message?: unknown };
+  const code = typeof e.code === 'string' ? e.code : '';
+  if (writeUnanswered(error)) return cs(loc, 'refUnanswered');
   const key = REFUSALS[code];
   if (key) return cs(loc, key);
   if (Object.hasOwn(LEDGER_REFUSALS, code)) return financeStrings(loc)[LEDGER_REFUSALS[code as keyof typeof LEDGER_REFUSALS]];
-  return refusalText(code, lang === 'en' || lang === 'ckb' ? lang : 'ar', fallback) || fallback;
+  const shop = refusalText(code, refusalLang(lang), '');
+  if (shop) return shop;
+  const reason = (code || typeof e.status === 'number') && typeof e.message === 'string' ? e.message.trim() : '';
+  return reason ? cs(loc, 'refOther', { reason }) : fallback;
 }
 
 /**

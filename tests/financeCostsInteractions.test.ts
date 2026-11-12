@@ -13,6 +13,16 @@
  * - a category added twice says it exists, in the reader's language (it said «تعذّر الحفظ.»);
  * - an entry's editor kept open across a re-read sends only the field the owner changed: an amount corrected elsewhere
  *   meanwhile stays corrected, and the editor shows it.
+ * The checker of the second review added:
+ * - an expense whose answer is lost on the way back (the server recorded it) is not said to have failed: the page says it may
+ *   be recorded, reads itself again and lists it, and the amount is cleared — a second press records nothing (it said
+ *   «تعذّر الحفظ.» with 600,000 still typed, and a second press recorded the rent twice);
+ * - an editor reopened right after its save, before the page's re-read arrives, does not call the owner's own save a change
+ *   made elsewhere — and still names one that was;
+ * - a press on the untouched form's «احفظ» puts the focus on the field the problem names (the held button dropped it to the
+ *   page);
+ * - the small browser's single select keeps one option chosen (the editor's category follows a re-read), and a control held
+ *   while it has the focus gives it up to the page.
  *
  * Every figure is invented (DECISIONS row 316). Run: node --import tsx --test tests/financeCostsInteractions.test.ts
  */
@@ -31,7 +41,7 @@ let LANG: 'ar' | 'en' | 'ckb' = 'ar';
 (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => (k === 'levo_lang' ? LANG : null), setItem: () => {}, removeItem: () => {} };
 
 // react-dom reads the document when it loads: everything that draws comes after installDom().
-const { createElement: h, act } = await import('react');
+const { createElement: h, act, useState } = await import('react');
 const { createRoot } = await import('react-dom/client');
 const { LanguageProvider } = await import('../src/LanguageContext');
 const { MissingGroup, groupMissing } = await import('../src/components/financeWorkspace/MissingCostsSheet');
@@ -45,20 +55,31 @@ const inLang = (lang: (typeof LANGS)[number]) => (ar: string, en: string, ckb?: 
 const s = financeStrings(inLang('ar'));
 const [from, to] = (() => { const q = new URLSearchParams(period()); return [q.get('from')!, q.get('to')!]; })();
 
-/** The owner's app over a world's database, the routes at their own paths; every request the pages send goes through it. */
-function serve(w: ReturnType<typeof world>) {
+/** Which requests the transport treats apart (see `serve`). */
+type Which = (method: string, path: string) => boolean;
+/**
+ * The owner's app over a world's database, the routes at their own paths; every request the pages send goes through it.
+ * `lose`: the server answers those, and the answer is lost on the way back (the API client's NETWORK). `hold`: their answers
+ * wait, outside what settle() waits for, until `release()` — a slow re-read.
+ */
+function serve(w: ReturnType<typeof world>, { lose, hold }: { lose?: Which; hold?: Which } = {}) {
   const app = stubApp(w.db, { id: 'admin', email: 'boss@x.co', role: 'admin', admin_scope: 'full' }, (a) => {
     a.route('/api/admin/finance-workspace', adminFinanceWorkspaceRoutes);
     a.route('/api/admin/finance', adminFinanceRoutes);
   });
   const sent: Array<{ method: string; path: string; body: unknown }> = [];
   const inflight = new Set<Promise<unknown>>();
+  const held: Array<() => void> = [];
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const path = String(input), method = init?.method ?? 'GET';
     sent.push({ method, path, body: typeof init?.body === 'string' ? JSON.parse(init.body) : undefined });
     const answer = Promise.resolve(app.request(path, { method, headers: { ...(init?.headers as Record<string, string>), 'CF-Connecting-IP': '1.2.3.4' }, body: init?.body }, undefined, ctx));
     inflight.add(answer);
-    try { return await answer; } finally { inflight.delete(answer); }
+    let res: Response;
+    try { res = await answer; } finally { inflight.delete(answer); }
+    if (lose?.(method, path)) throw new TypeError('Failed to fetch');
+    if (hold?.(method, path)) await new Promise<void>((resolve) => held.push(resolve));
+    return res;
   }) as typeof fetch;
   /** Until every request the page started has its answer drawn. */
   const settle = async () => {
@@ -68,7 +89,13 @@ function serve(w: ReturnType<typeof world>) {
       idle = inflight.size === 0 ? idle + 1 : 0;
     }
   };
-  return { sent, settle, writes: () => sent.filter((r) => r.method !== 'GET') };
+  /** The held answers arrive, and the page draws them. */
+  const release = async () => {
+    assert.ok(held.length > 0, 'an answer was held');
+    await act(async () => { for (const go of held.splice(0)) go(); await new Promise((r) => setImmediate(r)); });
+    await settle();
+  };
+  return { sent, settle, release, writes: () => sent.filter((r) => r.method !== 'GET') };
 }
 
 /** `node` mounted in the page's own language frame, in `lang`. */
@@ -84,6 +111,26 @@ const focusOn = (el: FakeElement | null | undefined, message: string) => {
   const at = dom.document.activeElement;
   assert.ok(!!el && at === el, `${message} — the focus is on <${at.localName}> «${words(at).slice(0, 60)}»`);
 };
+
+// ------------------------------------------------------------------ the small browser
+
+test('the small browser: a single select keeps one option chosen, and a control held while it has the focus gives it up to the page', () => {
+  const doc = dom.document, select = doc.createElement('select');
+  const [rent, power, other] = ['rent', 'power', 'other'].map((v) => { const o = doc.createElement('option'); o.setAttribute('value', v); return select.appendChild(o); });
+  rent.selected = true;
+  // react-dom marks only the option it chooses, and leaves clearing the one chosen before to the browser.
+  power.selected = true;
+  assert.deepEqual([rent.selected, power.selected, other.selected], [false, true, false], 'choosing one clears the one chosen before');
+  assert.equal(select.value, 'power');
+  const box = dom.container(), button = box.appendChild(doc.createElement('button'));
+  button.focus();
+  assert.equal(doc.activeElement, button);
+  button.setAttribute('disabled', '');
+  assert.equal(doc.activeElement, doc.body, 'held, the button gives the focus up to the page (HTML\'s focus fixup)');
+  button.removeAttribute('disabled');
+  assert.equal(doc.activeElement, doc.body, 'and does not take it back');
+  box.parentNode?.removeChild(box);
+});
 
 // ------------------------------------------------------------------ التكاليف الناقصة
 
@@ -127,13 +174,21 @@ test('«التكاليف الناقصة»: a keystroke in the price field while 
 // seeding what it reads: the empty period first, then the entries the later ones add.
 const w = world();
 const pageOf = () => h(GeneralExpenses, { from, to, onChanged: noop, openOrder: noop, onPromotion: noop });
+/** The page as the workspace mounts it: a write's onChanged reads every figure again (`revision`), the page's entries with them. */
+function Workspace() {
+  const [revision, setRevision] = useState(0);
+  return h(GeneralExpenses, { from, to, revision, onChanged: () => setRevision((v) => v + 1), openOrder: noop, onPromotion: noop });
+}
 const form = (root: FakeElement) => root.querySelector('form[data-finance-expense-form]')!;
+/** The form's field under the label that reads `label`. */
+const fieldOf = (root: FakeElement, label: string) => named(form(root), 'label', label).querySelector('input')!;
 /** What an element says, or null when it is not on the page. */
 const said = (el: FakeElement | null) => (el ? words(el) : null);
 /** The page's «أضف»: the empty state's while the period has no general expense, else «أضف مصروفًا». */
 const addButton = (root: FakeElement) => root.querySelector('[data-finance-expenses-add-empty]') ?? root.querySelector('[data-finance-expenses-add]')!;
+const rowsTitled = (title: string) => (w.raw.prepare('SELECT id FROM operating_expenses WHERE title=? AND voided_at IS NULL').all(title) as Array<{ id: string }>).map((r) => r.id);
 
-test('the ledger\'s form embedded on the page: pressed untouched, or Enter in a field, it names the problem and sends nothing; filled, it records the entry', async () => {
+test('the ledger\'s form embedded on the page: pressed untouched, or Enter in a field, it names the problem, puts the focus on its field and sends nothing; filled, it records the entry', async () => {
   const io = serve(w), page = await mount(pageOf());
   await io.settle();
   // An empty period: the empty state's «أضف» opens the ledger's own form.
@@ -145,9 +200,11 @@ test('the ledger\'s form embedded on the page: pressed untouched, or Enter in a 
   await act(async () => { click(add()); });
   assert.equal(said(problem()), s.errAmountNotNumber, 'pressed, it names what is missing');
   assert.equal(add().disabled, true, 'and only then holds the button, with its reason beside it');
+  // The press held the very button the focus was on, which gives the focus up to the page: the next Tab started at the top.
+  focusOn(fieldOf(page.container, s.fieldAmount), 'the focus goes to the field the problem names, not to the page');
   assert.deepEqual(io.writes(), [], 'nothing was sent');
   // Filled, it records the entry through the old ledger's route, as before.
-  await act(async () => { type(named(form(page.container), 'label', s.fieldAmount).querySelector('input')!, '25000'); });
+  await act(async () => { type(fieldOf(page.container, s.fieldAmount), '25000'); });
   assert.ok(!problem());
   await act(async () => { click(add()); });
   await io.settle();
@@ -159,9 +216,10 @@ test('the ledger\'s form embedded on the page: pressed untouched, or Enter in a 
   await again.settle();
   await act(async () => { click(second.container.querySelector('[data-finance-expenses-add]')!); });
   await again.settle();
-  await act(async () => { click(named(form(second.container), 'label', s.fieldAmount).querySelector('input')!); });
+  await act(async () => { click(fieldOf(second.container, s.fieldTitle)); });
   await act(async () => { pressKey('Enter'); });
   assert.equal(said(form(second.container).querySelector('[data-finance-expense-problem]')), s.errAmountNotNumber, 'Enter names the problem');
+  focusOn(fieldOf(second.container, s.fieldAmount), 'Enter in the description puts the focus on the amount it names');
   assert.deepEqual(again.writes(), []);
   await second.unmount();
 });
@@ -186,30 +244,109 @@ test('a category added twice says that it exists, in the reader\'s language — 
   }
 });
 
-test('an entry\'s editor kept open across a re-read sends only the field the owner changed: an amount corrected elsewhere meanwhile stays corrected', async () => {
+test('an entry\'s editor kept open across a re-read sends only the field the owner changed: an amount and a category corrected elsewhere meanwhile stay corrected', async () => {
+  w.raw.exec("INSERT INTO expense_categories(id,slug,name_ar,sort) VALUES ('power','power','كهرباء',999)");
   w.raw.exec(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent','rent',85000,'${baghdadDay()}','Rent','admin')`);
   const io = serve(w), page = await mount(pageOf());
   await io.settle();
   const row = () => page.container.querySelector('li[data-finance-expense="rent"]')!;
   const editor = () => row().querySelector('[data-finance-expense-editor]')!;
   const field = (label: string) => named(editor(), 'label', label).querySelector('input')!;
+  const category = () => named(editor(), 'label', s.fieldCategory).querySelector('select')!;
   await act(async () => { click(row().querySelector('[data-finance-expense-edit]')!); });
   await io.settle();
   assert.equal(field(s.fieldAmount).value, '85000', 'the editor opens on the entry');
+  assert.equal(category().value, 'rent');
   // The owner changes only the description…
   await act(async () => { type(field(s.fieldTitle), 'Rent, shop'); });
-  // …meanwhile the amount is corrected elsewhere (the old report's ledger, another tab): 90,000…
-  w.raw.exec("UPDATE operating_expenses SET amount_iqd=90000 WHERE id='rent'");
+  // …meanwhile the amount and the category are corrected elsewhere (the old report's ledger, another tab): 90,000, power…
+  w.raw.exec("UPDATE operating_expenses SET amount_iqd=90000, category_id='power' WHERE id='rent'");
   // …and the page reads its entries again while the editor stays open («أظهر الملغاة»; a refresh or another save does the same).
   await act(async () => { click(named(page.container, 'label', s.showVoided).querySelector('input')!); });
   await io.settle();
   assert.equal(field(s.fieldAmount).value, '90000', 'the field the owner never touched shows the entry as it now is');
+  // The rent option comes first in the select: a browser that kept it chosen beside power would read 'rent' here.
+  assert.ok(category().querySelectorAll('option').findIndex((o: FakeElement) => o.value === 'rent') < category().querySelectorAll('option').findIndex((o: FakeElement) => o.value === 'power'));
+  assert.equal(category().value, 'power', 'and so does the category');
   assert.equal(field(s.fieldTitle).value, 'Rent, shop', 'what the owner typed stays');
   assert.ok(words(editor()).includes(CS.genEditMoved[0]), 'and the editor says the entry changed since it opened');
   await act(async () => { click(named(editor(), 'button', CS.genSave[0])); });
   await io.settle();
   assert.deepEqual(io.writes().map((r) => [r.method, r.path, r.body]), [['PATCH', '/api/admin/finance/expenses/rent', { title: 'Rent, shop' }]], 'only the field the owner changed is sent');
-  assert.deepEqual({ ...(w.raw.prepare("SELECT amount_iqd,title FROM operating_expenses WHERE id='rent'").get() as object) }, { amount_iqd: 90000, title: 'Rent, shop' },
+  assert.deepEqual({ ...(w.raw.prepare("SELECT amount_iqd,category_id,title FROM operating_expenses WHERE id='rent'").get() as object) }, { amount_iqd: 90000, category_id: 'power', title: 'Rent, shop' },
     'the corrected amount stands (the edit wrote 85,000 back)');
+  await page.unmount();
+});
+
+test('an expense whose answer is lost on the way back is not said to have failed: the page says it may be recorded, reads itself again and lists it, and clears the amount — a second press records nothing', async () => {
+  for (const [i, lang] of LANGS.entries()) {
+    const io = serve(w, { lose: (method, path) => method === 'POST' && path === '/api/admin/finance/expenses' });
+    const page = await mount(h(Workspace), lang);
+    await io.settle();
+    await act(async () => { click(addButton(page.container)); });
+    await io.settle();
+    const local = financeStrings(inLang(lang)), title = `Shop rent, answer lost (${lang})`;
+    await act(async () => { type(fieldOf(page.container, local.fieldAmount), '600000'); });
+    await act(async () => { type(fieldOf(page.container, local.fieldTitle), title); });
+    const before = io.sent.length;
+    await act(async () => { click(named(form(page.container), 'button', local.save)); });
+    await io.settle();
+    // The server recorded the rent; only its answer was lost.
+    const [id] = rowsTitled(title);
+    assert.ok(id, `${lang}: the server recorded it`);
+    const shown = words(form(page.container));
+    assert.ok(!shown.includes(local.saveFailed), `${lang}: not «${local.saveFailed}» — the rent was recorded, in «${shown.slice(-200)}»`);
+    assert.ok(shown.includes(CS.refUnanswered[i]), `${lang}: «${CS.refUnanswered[i]}»`);
+    // The page read its entries again, and lists the rent that landed.
+    assert.ok(io.sent.slice(before).some((r) => r.method === 'GET' && r.path.startsWith('/api/admin/finance-workspace/expenses?')), `${lang}: the page read its entries again`);
+    assert.ok(page.container.querySelector(`li[data-finance-expense="${id}"]`), `${lang}: and lists the rent the server recorded`);
+    assert.equal(fieldOf(page.container, local.fieldAmount).value, '', `${lang}: the amount is cleared (600,000 stood ready for a second press)`);
+    // A second press records nothing until the amount is typed again.
+    await act(async () => { click(named(form(page.container), 'button', local.save)); });
+    await io.settle();
+    assert.deepEqual(io.writes().map((r) => [r.method, r.path]), [['POST', '/api/admin/finance/expenses']], `${lang}: one write`);
+    assert.equal(rowsTitled(title).length, 1, `${lang}: one rent of 600,000, not two`);
+    await page.unmount();
+  }
+});
+
+test('an editor reopened right after its save, before the page\'s re-read arrives, does not call the owner\'s own save a change made elsewhere — and still names one that was', async () => {
+  w.raw.exec(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('water','rent',12000,'${baghdadDay()}','Water','admin')`);
+  let slow = false;
+  const io = serve(w, { hold: (method, path) => slow && method === 'GET' && path.startsWith('/api/admin/finance-workspace/expenses?') });
+  const page = await mount(h(Workspace));
+  await io.settle();
+  const row = () => page.container.querySelector('li[data-finance-expense="water"]')!;
+  const editor = () => row().querySelector('[data-finance-expense-editor]');
+  const field = (label: string) => named(editor()!, 'label', label).querySelector('input')!;
+  const edit = async () => { await act(async () => { click(row().querySelector('[data-finance-expense-edit]')!); }); await io.settle(); };
+  const save = async () => { await act(async () => { click(named(editor()!, 'button', CS.genSave[0])); }); await io.settle(); };
+  await edit();
+  await act(async () => { type(field(s.fieldTitle), 'Water, tank'); });
+  // The page's re-read after the save is slow to come back, and the owner opens the editor again before it does.
+  slow = true;
+  await save();
+  assert.equal(editor(), null, 'the save closed the editor');
+  await edit();
+  slow = false;
+  await io.release();
+  assert.equal(field(s.fieldTitle).value, 'Water, tank', 'the editor follows the entry: the description just saved');
+  assert.ok(!words(editor()!).includes(CS.genEditMoved[0]), 'and does not call the owner\'s own save a change made elsewhere');
+  await act(async () => { type(field(s.fieldAmount), '13000'); });
+  await save();
+  assert.deepEqual(io.writes().map((r) => r.body), [{ title: 'Water, tank' }, { amount_iqd: 13000 }], 'each save sends only what it changed');
+  // The same window with a change made elsewhere too: the description saved again while another screen corrects the amount.
+  await edit();
+  await act(async () => { type(field(s.fieldTitle), 'Water, tank 2'); });
+  w.raw.exec("UPDATE operating_expenses SET amount_iqd=14000 WHERE id='water'");
+  slow = true;
+  await save();
+  await edit();
+  slow = false;
+  await io.release();
+  assert.equal(field(s.fieldAmount).value, '14000', 'the amount corrected elsewhere');
+  assert.equal(field(s.fieldTitle).value, 'Water, tank 2', 'the description the owner saved');
+  assert.ok(words(editor()!).includes(CS.genEditMoved[0]), 'and the change made elsewhere is named');
+  assert.deepEqual({ ...(w.raw.prepare("SELECT amount_iqd,title FROM operating_expenses WHERE id='water'").get() as object) }, { amount_iqd: 14000, title: 'Water, tank 2' });
   await page.unmount();
 });

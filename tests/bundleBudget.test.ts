@@ -108,8 +108,10 @@ const CSS_BUDGET = 60 * KB;
  * finance sheet 4,646 B: the missing-cost cards and the costs pages' fields
  * added, the old promotion page's `.fw-promo-*` pruned), and 9,039 B after its
  * independent review (the finance sheet 4,653 B: the missing-cost price field
- * full width on a phone), the same 9,039 B after its second review (no rule
- * changed); step 6 writes its own.
+ * full width on a phone), the same 9,039 B after its second review and after
+ * its third (no rule changed) — all measured on step 4's second round. On top
+ * of step 4's final sheet the three sheets measure 9,088 B (the finance sheet
+ * 4,702 B); step 6 writes its own.
  * Still owner-only and lazy, never on a storefront (the test below).
  */
 const OPERATIONS_CSS_BUDGET = 10.5 * KB;
