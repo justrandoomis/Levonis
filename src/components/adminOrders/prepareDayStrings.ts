@@ -68,10 +68,13 @@ export const PREPARE_DAY_STRINGS = {
     en: 'Its courier shipment is booked, but no pick-up status has arrived — sync the courier status or move it by hand',
     ckb: 'بارنامەی گەیاندنی دروستکراوە بەڵام دۆخی وەرگرتنی نەگەیشتووە — دۆخی گەیەنەر نوێ بکەرەوە یان بە دەست بیگوازەرەوە',
   },
-  /** The visible reason after «متأخر ·» for a parcel with the courier. */
-  lateCourier: { ar: 'مع المندوب', en: 'with the courier', ckb: 'لای گەیەنەر' },
-  /** The visible reason after «متأخر ·» for a booked shipment nothing moved. */
-  lateBooked: { ar: 'شحنته محجوزة', en: 'shipment booked', ckb: 'بارنامە دروستکراوە' },
+  /**
+   * The visible reason after «متأخر ·» for a parcel with the courier — one
+   * unbreakable phrase, so a narrow row breaks after the «·», never inside it.
+   */
+  lateCourier: { ar: 'مع\u00a0المندوب', en: 'with\u00a0the\u00a0courier', ckb: 'لای\u00a0گەیەنەر' },
+  /** The visible reason after «متأخر ·» for a booked shipment nothing moved — one phrase too. */
+  lateBooked: { ar: 'شحنته\u00a0محجوزة', en: 'shipment\u00a0booked', ckb: 'بارنامە\u00a0دروستکراوە' },
 } satisfies Record<string, Tri>;
 
 /** The reader's sentence through the screen's own `loc`, with the server's day label in it. */

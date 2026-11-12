@@ -155,8 +155,12 @@ test('«متأخر» says in words which lateness it is: the shelf, a booked shi
     assert.ok(html.includes(`<span class="sr-only"> — ${sentence}</span>`), `${lang} ${reason}: the screen reader hears why`);
     assert.match(html, /class="text-\[11px\] leading-\[1\.4\] font-bold text-danger"/, 'the one red thing');
   }
-  // The reason after the word never starts a line on its own: a no-break space before the «·».
-  assert.ok(renderToStaticMarkup(createElement(LateMark, { reason: 'courier', loc: locIn('ar') })).includes(`متأخر${NBSP}· مع المندوب`));
+  // The «·» never starts a line (a no-break space before it), and the reason is one unbreakable
+  // phrase: a narrow row breaks after the «·», never inside «مع المندوب» / "shipment booked".
+  assert.ok(renderToStaticMarkup(createElement(LateMark, { reason: 'courier', loc: locIn('ar') })).includes(`متأخر${NBSP}· مع${NBSP}المندوب`));
+  for (const key of ['lateCourier', 'lateBooked'] as const) {
+    for (const [lang, s] of Object.entries(PREPARE_DAY_STRINGS[key])) assert.ok(!s.includes(' ') && s.includes(NBSP), `${key}.${lang}: ${JSON.stringify(s)}`);
+  }
   assert.doesNotMatch(chip('ar', { label: 'غدًا', bucket: 'today' }), /data-order-overdue/);
 });
 
