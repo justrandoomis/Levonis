@@ -93,6 +93,7 @@ export default {
         'GET /missing-costs': 'cost_read',
         'POST /missing-costs/lines': 'cost_write',
         'GET /accounting-checks': 'cost_read',
+        'GET /activity': 'cost_read',
         'GET /orders': 'cost_read',
         'GET /orders/:id': 'cost_read',
         'POST /orders/:id/adjustments': 'cost_write',

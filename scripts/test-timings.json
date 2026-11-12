@@ -3,6 +3,7 @@
   "source": "run 40552347129 (f73dd7f7); the smart-pricing test files measured locally, three at a time, on 2026-11-01",
   "concurrency": 3,
   "files": {
+    "tests/accountingActivityPage.test.ts": 7.6,
     "tests/accountingChecksPage.test.ts": 6.5,
     "tests/addressContract.test.ts": 69.2,
     "tests/adminBundlesRoutes.test.ts": 126.8,

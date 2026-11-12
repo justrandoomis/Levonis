@@ -10,6 +10,7 @@ import OrderProfitSheet, { type OrderFocus } from './OrderProfitSheet';
 import PromotionPage from './PromotionPage';
 import GeneralExpenses from './GeneralExpenses';
 import AccountingChecks from './AccountingChecks';
+import AccountingActivity from './AccountingActivity';
 import './finance-workspace.css';
 import { CurrencyToggle, DisplayCurrencyContext, type DisplayCurrency } from './displayCurrency';
 import Overview from './Overview';
@@ -271,6 +272,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
       {page('settlements', () => <Suspense fallback={loading}><WithdrawalPanel from={range.from} to={range.to} onChanged={refresh} /></Suspense>)}
       {section === 'accounting' && <Suspense fallback={loading}>
         <AccountingChecks onOpenOrder={(id) => openOrderAt(id)} />
+        <AccountingActivity from={range.from} to={range.to} onOpenOrder={(id) => openOrderAt(id)} />
         <Surface title={fw(loc, 'accounting')} subtitle={loc('الأرصدة والقيود والتسويات المعتمدة', 'Balances, journals and verified settlements', 'باڵانس و تۆمار و یەکلاکردنەوە پەسەندکراوەکان')}>
           <Row label={loc('دفتر القيود وميزان المراجعة', 'Journal and trial balance', 'دەفتەری تۆمارەکان و هاوسەنگیی پێداچوونەوە')} value={null} onClick={() => setAdvanced(true)} />
           <p className="fw-note">{loc('الأرقام اليومية تُحتسب تلقائيًا من العمليات. افتح هذه الأدوات لإدخال الأرصدة الافتتاحية ومراجعة الحسابات وإغلاق الشهر.', 'Daily figures follow operations automatically. Use these tools for opening balances, account review and closing the month.', 'ژمارە ڕۆژانەکان خۆکارانە لە کارەکانەوە دەژمێردرێن. ئەم ئامرازانە بکەرەوە بۆ باڵانسی سەرەتایی و پێداچوونەوەی حیسابەکان و داخستنی مانگ.')}</p>

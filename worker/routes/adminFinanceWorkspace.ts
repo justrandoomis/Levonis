@@ -920,6 +920,40 @@ function dayBuckets(daily:Row[],by:'week'|'month'):Row[]{
  * alert runs the same set.
  */
 adminFinanceWorkspaceRoutes.get('/accounting-checks',async(c)=>c.json({success:true,...await runFinanceChecks(c.env.DB)}));
+/**
+ * THE FINANCE ACTIVITY LOG (the owner's brief, 2026-11-12, part 4: «audit logs … traceable»): the rows every finance write
+ * leaves in audit_log (DECISIONS row 326) — expenses, wages and their payments, withdrawals, collections, the journal,
+ * promotions, order corrections, investors, stock costs — and the admin's own acts on members' wallets (approvals, payouts,
+ * hand credits and adjustments; never a member's own request, which is theirs, not a change by the staff). Newest first,
+ * ACTIVITY_PAGE at a time, `before` (a row id) for the next page. The period is Baghdad days, as every finance read. By
+ * default only what a person did: `auto=1` adds what the system did by itself (a wage recomputed, a cost that waited and
+ * was fixed), which can be many rows. `q` keeps the rows whose target, detail or person holds it.
+ */
+const ACTIVITY_PAGE=50;
+export const ACTIVITY_WALLET_ACTIONS=['wallet.manual_adjust','wallet.manual_credit','wallet.adjustment','wallet.rounding_drift','wallet.rounding_drift.run',
+  'wallet.deposit.approved','wallet.deposit.rejected','wallet.withdrawal.approved_for_processing','wallet.withdrawal.processing','wallet.withdrawal.paid',
+  'wallet.withdrawal.rejected','wallet.withdrawal.failed','wallet.withdrawal.cancelled','wallet.withdrawal.reconciliation_flagged',
+  'wallet.withdrawal.reconciliation_cleared','wallet.withdrawal_fee.changed','wallet.store_hold_released','wallet.reconciliation.anomalies','wallet.review.closed'] as const;
+export const ACTIVITY_SQL=`SELECT a.id,a.actor_id,u.name AS actor_name,a.action,a.target,a.detail,a.created_at
+  FROM audit_log a LEFT JOIN users u ON u.id=a.actor_id
+  WHERE a.created_at>=?1 AND a.created_at<?2
+    AND (a.action LIKE 'finance.%' OR a.action LIKE 'investment.%' OR a.action LIKE 'accounting.%'
+      OR a.action IN ('operations.permission_changed','stock.lot_cost_adjusted',${ACTIVITY_WALLET_ACTIONS.map((x)=>`'${x}'`).join(',')}))
+    AND (?3=1 OR a.actor_id IS NOT NULL)
+    AND (?4='' OR instr(a.target,?4)>0 OR instr(a.detail,?4)>0 OR instr(COALESCE(u.name,''),?4)>0)
+    AND (?5=0 OR a.id<?5)
+  ORDER BY a.id DESC LIMIT ?6`;
+adminFinanceWorkspaceRoutes.get('/activity',async(c)=>{
+  const r=range(c.req.query('from'),c.req.query('to'));
+  const start=baghdadDayStart(r.from),end=baghdadDayStart(r.to);
+  if(start===null||end===null)throw badRequest('اختر فترة صحيحة');
+  const auto=c.req.query('auto')==='1'?1:0,q=(c.req.query('q')??'').trim().slice(0,100),beforeId=Number(c.req.query('before')??0);
+  if(!Number.isSafeInteger(beforeId)||beforeId<0)throw badRequest('صفحة غير معروفة / Unknown page','ACTIVITY_PAGE_INVALID');
+  const rows=(await c.env.DB.prepare(ACTIVITY_SQL).bind(new Date(start).toISOString(),new Date(end+86400000).toISOString(),auto,q,beforeId,ACTIVITY_PAGE+1).all<Row>()).results??[];
+  const page=rows.slice(0,ACTIVITY_PAGE).map((row)=>{let detail:unknown={};try{detail=JSON.parse(s(row.detail)||'{}');}catch{detail={};}
+    return {id:n(row.id),actor_id:row.actor_id??null,actor_name:row.actor_name??null,action:s(row.action),target:s(row.target),detail,at:s(row.created_at)};});
+  return c.json({success:true,range:r,rows:page,next:rows.length>ACTIVITY_PAGE?page[page.length-1].id:null});
+});
 adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   const view=c.req.query('view')||'lines',level=c.req.query('level')||'main';
   if(!(EXPORT_VIEWS as readonly string[]).includes(view))throw badRequest('عرض التصدير غير معروف / Unknown export view','EXPORT_VIEW_INVALID');
