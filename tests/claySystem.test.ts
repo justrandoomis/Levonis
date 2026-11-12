@@ -532,7 +532,9 @@ test('the census refinements remove false positives only: a hand-drawn field, bu
     assert.match(src, /import \* as T from '[./]*(?:adminProducts\/)?theme'|import \{[^}]*\bT\b[^}]*\} from '\.\/shared'/, `${file}: T is not the admin kit`);
   }
   const fw = read('src/components/financeWorkspace/finance-workspace.css');
-  assert.match(fw, /\.fw-input,\.fw-select\{[^}]*border:1px solid var\(--clay-field\);[^}]*background:var\(--clay-well-bg\);box-shadow:var\(--clay-well\)/, 'a finance field is not a well');
+  // «المال والأرباح» left the clay look on the owner's brief (2026-11-12, part 5; DECISIONS row 333): its fields are flat, on
+  // the surface, with the clay field border kept for contrast — the rest of the site keeps its wells.
+  assert.match(fw, /\.fw-input,\.fw-select\{[^}]*border:1px solid var\(--clay-field\);[^}]*background:var\(--fw-surface\);box-shadow:none/, 'a finance field is not flat');
   assert.match(read('src/components/auth/authLeave.css'), /\.lv-copyrow__value \{[^}]*border: 1px solid var\(--clay-field\);[^}]*box-shadow: var\(--clay-well\);/, 'the /auth copy row is not a well');
   assert.match(read('src/components/auth/auth.css'), /\.lv-cpick__search \{[^}]*box-shadow:\s*var\(--clay-well\);/, 'the country search is not a well');
 });
