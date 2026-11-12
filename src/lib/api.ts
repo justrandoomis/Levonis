@@ -1546,7 +1546,10 @@ export type OrderDueBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later'
  * not a bucket — «فصلها في الطلبات المسبقة» — because a container in transit
  * is a different kind of waiting from a box that must go out this morning.
  */
-export type AdminOrderScope = 'open' | 'preorder' | 'all' | 'delivered' | 'cancelled';
+export type AdminOrderScope = 'open' | 'preorder' | 'all' | 'prepare' | 'delivered' | 'cancelled';
+
+/** «الأحدث أولًا / الأقدم أولًا» — the archive's order (DECISIONS row 323). */
+export type AdminArchiveSort = 'newest' | 'oldest';
 
 /**
  * Which reading of the search box won. One box, four readings, tried in a
@@ -1598,6 +1601,15 @@ export interface AdminOrderRow extends ApiOrder {
   /** The board day, labelled by the server like `due_label` — sent only when
    *  it is a different day from the delivery day, '' otherwise. */
   prepare_label?: string;
+  /** When a cancelled order was cancelled (kept by migration 0081's triggers). */
+  cancelled_at?: string | null;
+  /**
+   * The day a finished order was delivered or cancelled, labelled by the
+   * server — «اليوم», «الثلاثاء ١٠ تشرين الثاني», with the year when it is not
+   * this year (DECISIONS row 323). '' for a live order or an unknown time.
+   * A finished row shows «سُلّم …» / «أُلغي …» with it, never a delivery day.
+   */
+  done_label?: string;
   /**
    * THE ONE-TAP MOVE, decided by the server — the next stage on THIS order's
    * own path, already labelled in the caller's language. `null` at the end of
@@ -1632,6 +1644,12 @@ export interface AdminOrdersResponse {
   due: string | null;
   type: string | null;
   status: string | null;
+  /**
+   * The archive's order as the server applied it (row 323): the rows are one
+   * half of the archive, by when each was finished. Null on the live board and
+   * for a pierced lookup; absent on an older server.
+   */
+  sort?: AdminArchiveSort | null;
   /** The three anchors the buckets were computed against. */
   today: string;
   tomorrow: string;

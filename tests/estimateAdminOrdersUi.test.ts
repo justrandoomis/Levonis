@@ -491,7 +491,7 @@ test('the board filter «بانتظار تأكيد السعر»: the live board 
   const src = code(BOARD);
   assert.match(src, /const \[priceEstimate, setPriceEstimate\] = useState\(false\);/);
   assert.match(src, /if \(priceEstimate && !archive\) params\.set\('price_estimate', '1'\);/);
-  assert.match(src, /\[archive, archiveScope, journey, status, query, page, lang, priceHold, priceEstimate\]/, 'a toggle re-reads the board');
+  assert.match(src, /\[archive, archiveScope, archiveSort, journey, status, query, page, lang, priceHold, priceEstimate\]/, 'a toggle re-reads the board');
   // Absence-tolerant: no count from an older server, none from a database without 0218 — no button.
   assert.match(src, /\(priceEstimate \|\| \(data\?\.price_estimate_count \?\? 0\) > 0\) && \(\s*<button\s+type="button"\s+data-order-filter="price-estimate"/);
   assert.match(src, /\{!archive && \(priceHold \|\| priceEstimate \|\| \(data\?\.price_hold_count \?\? 0\) > 0 \|\| \(data\?\.price_estimate_count \?\? 0\) > 0\) && \(/);

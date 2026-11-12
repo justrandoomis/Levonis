@@ -14,7 +14,8 @@
  *   THE BOUNDARY  20:59Z and 21:00Z are two Baghdad days.
  *   THE COUNTS    each count equals the rows it describes, and the five `due`
  *                 values split every live scope with no row lost or repeated.
- *   THE ARCHIVE   filed and ordered by the customer's day exactly as before.
+ *   THE ARCHIVE   filed by the customer's day exactly as before (lead 0); its
+ *                 order is its own since row 323 (tests/orderArchiveRoute.test.ts).
  *   THE PLANS     the route's own statements — captured as the route ran them
  *                 — read through idx_orders_board_open: rows and COUNT in every
  *                 live scope and `due`, the facet whenever `due` is set; and
@@ -372,7 +373,7 @@ test('the order: the board day first, PRO first inside it, then the earlier deli
 // THE ARCHIVE
 // =========================================================================
 
-test('the archive is filed and ordered by the customer’s day, exactly as before', async () => {
+test('the archive is filed by the customer’s day, exactly as before — and ordered by when each was finished (row 323)', async () => {
   const seeds: Seed[] = [
     { id: 'ORD-ARCH00001', stage: 'delivered', day: '2026-11-10' },
     { id: 'ORD-ARCH00002', stage: 'delivered', day: TODAY, priority: 1 },
@@ -384,17 +385,12 @@ test('the archive is filed and ordered by the customer’s day, exactly as befor
   ];
   const { app, raw } = seed(seeds);
   const delivered = await at(NOON, () => board(app, 'scope=delivered'));
-  // The order the board used for every scope before row 322, run directly.
-  const before = (
-    raw
-      .prepare(
-        `SELECT o.id FROM orders o WHERE o.status = 'delivered'
-          ORDER BY o.delivery_due_day IS NULL, o.delivery_due_day ASC, o.priority DESC,
-                   (o.priority_due_at IS NULL), o.priority_due_at ASC, o.created_at ASC, o.id ASC`
-      )
-      .all() as Array<{ id: string }>
+  // Its order is the archive's own since row 323 — when each was delivered,
+  // newest first (tests/orderArchiveRoute.test.ts) — and never the board day's.
+  const archiveOrder = (
+    raw.prepare("SELECT o.id FROM orders o WHERE o.status = 'delivered' ORDER BY o.delivered_at DESC, o.id DESC").all() as Array<{ id: string }>
   ).map((r) => r.id);
-  assert.deepEqual(ids(delivered), before);
+  assert.deepEqual(ids(delivered), archiveOrder);
   const rows = byId(delivered);
   assert.deepEqual([rows.get('ORD-ARCH00001')!.due_bucket, rows.get('ORD-ARCH00001')!.lead_days], ['overdue', 0]);
   assert.equal(rows.get('ORD-ARCH00003')!.due_bucket, 'today');

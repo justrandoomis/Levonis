@@ -8,6 +8,7 @@
  */
 import type { AdminOrderRow, OrderDueBucket, OrderShippingType } from '../../lib/api';
 import { PREPARE_DAY_STRINGS, dayLine } from './prepareDayStrings';
+import { doneText } from './archiveSort';
 
 /** The context's own `loc`, passed down rather than re-derived per badge. */
 type Loc = (ar: string, en: string, ckb?: string) => string;
@@ -161,6 +162,28 @@ export function DayChip({
           {loc('مؤجل', 'Moved', 'دواخرا')}
         </span>
       )}
+    </span>
+  );
+}
+
+/**
+ * A FINISHED ORDER'S DAY (DECISIONS row 323), in the place of the delivery day:
+ * «سُلّم الثلاثاء ١٠ تشرين الثاني» / «أُلغي اليوم» — when it was delivered or
+ * cancelled, labelled by the server (`done_label`), which is also what the
+ * completed orders are sorted by. It is drawn exactly as the day chip is, and
+ * never red: a finished order is not late, so «متأخر» stays the one red thing
+ * and keeps meaning late — in the archive, and for a finished order an order-
+ * or phone-number lookup finds on the live board.
+ */
+export function DoneChip({ status, label, loc }: { status: 'delivered' | 'cancelled'; label?: string; loc: Loc }) {
+  return (
+    <span
+      data-order-done={status}
+      className={`inline-flex items-center rounded-md px-1.5 py-0.5 text-[12px] leading-[1.4] font-bold ${
+        label ? 'bg-surface-selected text-text-primary' : 'text-text-muted'
+      }`}
+    >
+      {doneText(loc, status, label)}
     </span>
   );
 }

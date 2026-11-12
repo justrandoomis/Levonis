@@ -313,7 +313,7 @@ test('`status` still narrows inside the open scope, and still selects the isolat
 
 test('a bad parameter is a 400 with a message, not a silently empty board', async () => {
   const { app } = seed([{ id: 'ORD-V000000001', day: TODAY }]);
-  for (const qs of ['scope=everything', 'due=someday', 'type=teleport']) {
+  for (const qs of ['scope=everything', 'due=someday', 'type=teleport', 'sort=sideways']) {
     const res = await at(NOON, () => get(app, `/api/admin/orders?${qs}`));
     assert.equal(res.status, 400, qs);
   }

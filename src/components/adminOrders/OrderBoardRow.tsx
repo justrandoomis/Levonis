@@ -43,8 +43,9 @@ import { Check, ChevronsRight, Loader2, ScanLine, Trash2 } from 'lucide-react';
 import { formatIqd, type AdminOrderRow, type OrderStatus } from '../../lib/api';
 import { SERIAL_STRINGS } from './serials/strings';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
-import { DayChip, OrderKindBadge, PriceHoldBadge, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
+import { DayChip, DoneChip, OrderKindBadge, PriceHoldBadge, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
 import { DeliveryMethodBadge } from './deliveryMethod';
+import { isFinished } from './archiveSort';
 
 /**
  * «يظهر بشكل صغير سطر بجانب رقم الطلب المنتجات التي طلبها» — WHAT IS IN THE
@@ -126,14 +127,20 @@ export default function OrderBoardRow({
     >
       <div className="min-w-0 flex-1 space-y-1">
         <div className="flex flex-wrap items-center gap-1.5">
-          <DayChip
-            label={order.due_label}
-            bucket={order.due_bucket}
-            postponed={!!order.delivery_day_changed_at}
-            prepareLabel={order.prepare_label}
-            handedOver={order.stage === 'out_for_delivery'}
-            loc={loc}
-          />
+          {/* A finished order says when it was delivered or cancelled (row
+              323) — never its delivery day, so never «متأخر». */}
+          {isFinished(order.status) ? (
+            <DoneChip status={order.status} label={order.done_label} loc={loc} />
+          ) : (
+            <DayChip
+              label={order.due_label}
+              bucket={order.due_bucket}
+              postponed={!!order.delivery_day_changed_at}
+              prepareLabel={order.prepare_label}
+              handedOver={order.stage === 'out_for_delivery'}
+              loc={loc}
+            />
+          )}
           <ProBadge order={order} />
           <PriceHoldBadge order={order} loc={loc} />
           <OrderKindBadge order={order} loc={loc} />
@@ -180,8 +187,9 @@ export default function OrderBoardRow({
           {formatIqd(order.total_iqd)}
         </p>
         <div className="flex items-center gap-1.5">
-          {/* Cancelled orders are kept for thirty days; this is the owner's
-              deliberate override, and it only exists where it can apply. */}
+          {/* Cancelled orders are kept for seven days
+              (CANCELLED_ORDER_RETENTION_DAYS); this is the owner's deliberate
+              override, and it only exists where it can apply. */}
           {order.status === 'cancelled' && (
             <button
               type="button"

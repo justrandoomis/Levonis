@@ -74,6 +74,7 @@ import { langOf, mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SE
 import { addDays, baghdadDay, isDay } from '../lib/baghdadTime';
 import { dayLabel } from '../lib/deliveryDay';
 import { boardDayOf, boardDaySql, leadBounds, leadDaysFor, leadDaysSql } from '../lib/deliveryLead';
+import { ARCHIVE_SORTS, DEFAULT_ARCHIVE_SORT, archiveOrderSql, doneLabelOf, isArchiveScope } from '../lib/orderArchive';
 import { classifyOrderSearch } from '../lib/orderSearch';
 import { arabicFoldSql, phoneDigitsSql } from '../lib/sqlFold';
 import { getOrderPointsSnapshots } from '../lib/pointsOps';
@@ -1715,7 +1716,9 @@ const BOARD_TYPES = ['direct', 'preorder_air', 'preorder_sea', 'preorder_land'] 
  *           order already with the courier (`out_for_delivery`), delivered or
  *           cancelled — those are filed by the customer's day, so last night's
  *           hand-over is not red this morning, a courier who is late still is,
- *           and the archive reads exactly as it did.
+ *           and the archive's `?due=` and day counts mean what they did (the
+ *           archive is ordered and shown by when each order was finished,
+ *           row 323, and never by a board day).
  * Groups, counts, `?due=`, the order and «متأخر» all go by it: OVERDUE IS A
  * BOARD DAY BEFORE TODAY — a box not handed over on its day, or a parcel not
  * delivered on its day. The row still says the customer's day (`due_label`).
@@ -1747,15 +1750,12 @@ export const BOARD_ORDER_SQL =
   `ORDER BY ${BOARD_DAY_SQL} IS NULL, ${BOARD_DAY_SQL} ASC, o.priority DESC, o.delivery_due_day ASC,` +
   ' (o.priority_due_at IS NULL), o.priority_due_at ASC, o.created_at ASC, o.id ASC';
 
-/**
- * THE ARCHIVE'S ORDER (scope=delivered|cancelled), word for word the order the
- * whole board used before row 322. A finished order has no day left to
- * prepare, and how the completed orders sort is a decision of its own — it
- * changes here, never by reusing the live board's order.
+/*
+ * THE ARCHIVE'S ORDER (scope=delivered|cancelled) is its own (DECISIONS row
+ * 323): when each order was finished, newest or oldest first —
+ * `archiveOrderSql` in worker/lib/orderArchive.ts. A finished order has no day
+ * left to prepare, so nothing of the board day above sorts or groups it.
  */
-const ARCHIVE_ORDER_SQL =
-  'ORDER BY o.delivery_due_day IS NULL, o.delivery_due_day ASC, o.priority DESC,' +
-  ' (o.priority_due_at IS NULL), o.priority_due_at ASC, o.created_at ASC, o.id ASC';
 
 const LEAD_BOUNDS = leadBounds();
 
@@ -1913,6 +1913,11 @@ adminRoutes.get('/orders', async (c) => {
   let scope = oneOf(scopeRaw || 'open', 'scope', BOARD_SCOPES);
   const due = dueRaw ? oneOf(dueRaw, 'due', BOARD_DUE) : '';
   const type = typeRaw ? oneOf(typeRaw, 'type', BOARD_TYPES) : '';
+  // «الأحدث أولًا / الأقدم أولًا» (row 323). Checked on every scope — a typo is
+  // a 400 like `type=teleport`, never a silent default — and applied to the
+  // archive only: the live board's order is the day to prepare.
+  const sortRaw = str(c.req.query('sort'), 'sort', { max: 10, required: false });
+  const sort = sortRaw ? oneOf(sortRaw, 'sort', ARCHIVE_SORTS) : DEFAULT_ARCHIVE_SORT;
 
   // COMPATIBILITY, AND IT IS NOT COSMETIC. `status` predates `scope` and the
   // existing screen's dropdown still sends `status=delivered`. Under the new
@@ -2177,8 +2182,17 @@ adminRoutes.get('/orders', async (c) => {
    */
   const FROM = 'FROM orders o LEFT JOIN users u ON u.id = o.user_id';
 
-  // The live board sorts by the day to prepare; the archive keeps its own order.
-  const orderBy = scope === 'delivered' || scope === 'cancelled' ? ARCHIVE_ORDER_SQL : BOARD_ORDER_SQL;
+  /**
+   * THE LIVE BOARD SORTS BY THE DAY TO PREPARE; THE ARCHIVE BY WHEN EACH ORDER
+   * WAS FINISHED (row 323), newest first unless `sort=oldest`.
+   *
+   * A PIERCED LOOKUP KEEPS THE WORK LIST'S ORDER, from either half: an order or
+   * phone number ignores the scope, so its rows are not one half of the archive
+   * — they may be live, delivered and cancelled together — and one completion
+   * column cannot order them. `sort` is then echoed as null.
+   */
+  const archiveScope = !pierces && isArchiveScope(scope) ? scope : null;
+  const orderBy = archiveScope ? archiveOrderSql(archiveScope, sort) : BOARD_ORDER_SQL;
 
   const [{ results }, countRow, facetRows, heldRow, estimateRow] = await Promise.all([
     // `board_day` and `board_lead_days` ride on the row so its bucket is the
@@ -2383,6 +2397,16 @@ adminRoutes.get('/orders', async (c) => {
       delivery_waived: Number(o.delivery_waived) || 0,
       membership_tier_snapshot: o.membership_tier_snapshot ?? 'free',
       delivered_at: o.delivered_at ?? null,
+      /** When a cancelled order was cancelled (0081's triggers keep it); the archive's «ملغاة» half sorts by it. */
+      cancelled_at: o.cancelled_at ?? null,
+      /**
+       * THE DAY IT WAS FINISHED (row 323), labelled like every day here — «اليوم»,
+       * «الثلاثاء ١٠ تشرين الثاني», plus the year when it is not this year — from
+       * `delivered_at` or `cancelled_at` by the status; '' for a live order. A
+       * finished row shows «سُلّم …» / «أُلغي …» instead of its delivery day, so
+       * no finished order is ever marked «متأخر».
+       */
+      done_label: doneLabelOf(o, today, lang),
       /** «يستطيع اختيار وتغيير يوم التوصيل» — the day itself, and when it moved. */
       delivery_due_day: day || null,
       delivery_day_changed_at: o.delivery_day_changed_at ?? null,
@@ -2412,6 +2436,14 @@ adminRoutes.get('/orders', async (c) => {
     due: due || null,
     type: type || null,
     status: status || null,
+    /**
+     * THE ARCHIVE'S ORDER, AS APPLIED (row 323): 'newest' or 'oldest' when the
+     * rows are one half of the archive in completion order — the screen then
+     * renders them as ONE list in exactly this order, because grouping them by
+     * day would scramble it — and null on the live board and for a pierced
+     * lookup, whose rows are in the work list's order.
+     */
+    sort: archiveScope ? sort : null,
     /** The three anchors the buckets were computed against, so the screen can
      *  label a header without deriving a day from the browser's clock. */
     today,

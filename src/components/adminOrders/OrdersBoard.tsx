@@ -20,6 +20,12 @@
  *   4. THE LIST, GROUPED BY DAY with sticky headers. No click is needed for
  *      the question the owner asks every morning.
  *
+ * THE ARCHIVE («المكتملة») IS NOT A DAY LIST (DECISIONS row 323): one list by
+ * when each order was delivered or cancelled — «الأحدث أولًا», or «الأقدم
+ * أولًا» on its own switch — each row saying «سُلّم …» / «أُلغي …», and a
+ * header line of the half shown and its total. A finished order has no day
+ * left to be late on.
+ *
  * WHAT REPLACED WHAT. Seven status chips bound to one `statusFilter`, plus a
  * per-row status dropdown, plus a phone card and an 820px table that both
  * identified the customer by their EMAIL. The chips are two selects and a
@@ -102,6 +108,15 @@ import OrderBoardRow from './OrderBoardRow';
 import OrderSearchField from './OrderSearchField';
 import { countText } from './OrderBoardBadges';
 import { PREPARE_DAY_STRINGS, dayLine } from './prepareDayStrings';
+import {
+  ARCHIVE_SORTS,
+  ARCHIVE_STRINGS,
+  archiveRowsOf,
+  readArchiveSort,
+  saveArchiveSort,
+  say,
+  type ArchiveSort,
+} from './archiveSort';
 import { apiRefusal, refusalText } from '../../lib/refusalStrings';
 import { estimateRefusalText } from '../../../packages/contracts/src/priceEstimates';
 import { gateRefusalOf } from './serials/SerialGateRefusal';
@@ -227,6 +242,17 @@ export default function OrdersBoard() {
    */
   const [priceEstimate, setPriceEstimate] = useState(false);
   const [archiveScope, setArchiveScope] = useState<ArchiveScope>('delivered');
+  /**
+   * «الأحدث أولًا / الأقدم أولًا» (row 323) — the archive's order, by when each
+   * order was delivered or cancelled. Newest first unless this browser chose
+   * otherwise; remembered per browser as a convenience only (archiveSort.ts
+   * reads and writes it inside try/catch).
+   */
+  const [archiveSort, setArchiveSort] = useState<ArchiveSort>(() => readArchiveSort());
+  const chooseArchiveSort = (s: ArchiveSort) => {
+    setArchiveSort(s);
+    saveArchiveSort(s);
+  };
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
 
@@ -275,6 +301,8 @@ export default function OrdersBoard() {
       // journey" this half understands; see the header note.
       params.set('scope', archiveScope);
       if (journey !== 'all' && journey !== 'prepare') params.set('type', journey);
+      // When each order was finished, newest or oldest first — the archive only.
+      params.set('sort', archiveSort);
     } else if (journey === 'prepare') {
       // «يجب تجهيزها» — direct orders from «تم تأكيد الطلب» until they leave,
       // and pre-orders in «جارٍ تجهيز التوصيل المحلي». Its own server scope
@@ -315,7 +343,7 @@ export default function OrdersBoard() {
     } finally {
       setLoading(false);
     }
-  }, [archive, archiveScope, journey, status, query, page, lang, priceHold, priceEstimate]);
+  }, [archive, archiveScope, archiveSort, journey, status, query, page, lang, priceHold, priceEstimate]);
 
   useEffect(() => {
     loadOrders();
@@ -341,15 +369,31 @@ export default function OrdersBoard() {
   const groupCount = (id: GroupKey): number =>
     id === 'today' ? counts.today + counts.overdue : counts[id];
 
+  /**
+   * THE ARCHIVE IS ONE LIST, IN THE SERVER'S ORDER (row 323): by when each
+   * order was delivered or cancelled, newest or oldest first. Filed under day
+   * headers it would put this morning's delivery under the day it was due and
+   * scramble that order — so the day groups below are the live board's only.
+   * Null on the live board's answer.
+   */
+  const archiveRows = useMemo(() => archiveRowsOf(data), [data]);
+
   // The rows come back in day order already (day ascending, NULLs last), so
   // bucketing them preserves the server's ordering inside every group —
   // including the PRO pin, which is a tie-break WITHIN a day.
   const groups = useMemo(() => {
+    if (archiveRowsOf(data)) return [];
     const rows = data?.orders ?? [];
     return GROUPS.map((g) => ({ ...g, rows: rows.filter((o) => groupOf(o.due_bucket) === g.id) })).filter(
       (g) => g.rows.length > 0
     );
   }, [data]);
+
+  /** The archive's header: which half and how many — or, for an order- or
+   *  phone-number lookup, which ignores the half chosen, the results. */
+  const archiveTitle = data?.search?.pierced
+    ? ARCHIVE_STRINGS.results
+    : (ARCHIVE_SCOPES.find((s) => s.id === data?.scope) ?? ARCHIVE_SCOPES[0]);
 
   /**
    * The PRO segment counts the rows ON THIS PAGE, because the server's counts
@@ -439,6 +483,21 @@ export default function OrdersBoard() {
     }
   };
 
+  /** One row, the same in the day groups and in the archive's one list. */
+  const rowOf = (o: AdminOrderRow) => (
+    <OrderBoardRow
+      key={o.id}
+      order={o}
+      loc={loc}
+      onOpen={setOpenOrderId}
+      onDelete={deleteCancelled}
+      onAdvance={advance}
+      advancing={advancing === o.id}
+      deleting={deletingId === o.id}
+      latin={latin}
+    />
+  );
+
   return (
     <div className="space-y-4 min-w-0">
       {/* ------------------------------------------------- 1. THE HEADER LINE */}
@@ -448,40 +507,50 @@ export default function OrdersBoard() {
             {loc('الطلبات', 'Orders', 'داواکارییەکان')}
           </h2>
           {/* TEXT, NOT CHIPS. Four numbers an owner reads in one glance on a
-              busy morning; the only coloured one is the one that means "late". */}
+              busy morning; the only coloured one is the one that means "late".
+              The archive has no day to be late on (row 323): its line is the
+              half shown and its total. */}
           <p data-order-buckets className="mt-1 text-[13px] leading-[1.6] text-text-secondary">
-            <span className="tabular-nums">
-              {loc('اليوم', 'Today', 'ئەمڕۆ')} {countText(counts.today + counts.overdue, latin)}
-            </span>
-            <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
-            <span className="tabular-nums">
-              {loc('غدًا', 'Tomorrow', 'بەیانی')} {countText(counts.tomorrow, latin)}
-            </span>
-            {counts.overdue > 0 && (
+            {archiveRows ? (
+              <span data-order-archive-total className="tabular-nums">
+                {say(loc, archiveTitle)} {countText(total, latin)}
+              </span>
+            ) : (
               <>
-                <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
-                <span data-order-overdue-count className="tabular-nums font-bold text-danger">
-                  {loc('متأخر', 'Overdue', 'دواکەوتوو')} {countText(counts.overdue, latin)}
+                <span className="tabular-nums">
+                  {loc('اليوم', 'Today', 'ئەمڕۆ')} {countText(counts.today + counts.overdue, latin)}
                 </span>
-              </>
-            )}
-            {proHere > 0 && (
-              <>
                 <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
                 <span className="tabular-nums">
-                  PRO {countText(proHere, latin)}
-                  {pages > 1 && (
-                    <span className="ms-1 text-text-muted">
-                      {loc('(هذه الصفحة)', '(this page)', '(ئەم پەڕەیە)')}
-                    </span>
-                  )}
+                  {loc('غدًا', 'Tomorrow', 'بەیانی')} {countText(counts.tomorrow, latin)}
                 </span>
+                {counts.overdue > 0 && (
+                  <>
+                    <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
+                    <span data-order-overdue-count className="tabular-nums font-bold text-danger">
+                      {loc('متأخر', 'Overdue', 'دواکەوتوو')} {countText(counts.overdue, latin)}
+                    </span>
+                  </>
+                )}
+                {proHere > 0 && (
+                  <>
+                    <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
+                    <span className="tabular-nums">
+                      PRO {countText(proHere, latin)}
+                      {pages > 1 && (
+                        <span className="ms-1 text-text-muted">
+                          {loc('(هذه الصفحة)', '(this page)', '(ئەم پەڕەیە)')}
+                        </span>
+                      )}
+                    </span>
+                  </>
+                )}
               </>
             )}
           </p>
           {/* WHY AN ORDER FOR TOMORROW IS UNDER «اليوم» (row 322), once, in
-              muted words — the live board only: the archive is filed by the
-              day each order reached the customer. */}
+              muted words — the live board only: the archive is one list by
+              when each order was delivered or cancelled (row 323). */}
           {!archive && (
             <p data-order-board-note className="mt-0.5 text-[12px] leading-[1.5] text-text-muted">
               {dayLine(loc, PREPARE_DAY_STRINGS.boardNote)}
@@ -611,6 +680,36 @@ export default function OrdersBoard() {
         </button>
       </div>
 
+      {/* «الأحدث أولًا / الأقدم أولًا» (owner, row 323) — the archive only, by
+          when each order was delivered or cancelled. Its own row under the
+          three controls, never a fourth inside theirs (the e2e pins that row
+          at three), in the slot the live board's price filters use. A choice
+          starts again from the first page, like every control here. */}
+      {archive && (
+        <div
+          data-order-archive-sort
+          role="group"
+          aria-label={say(loc, ARCHIVE_STRINGS.sortGroup)}
+          className="flex flex-wrap gap-2 min-w-0"
+        >
+          {ARCHIVE_SORTS.map((s) => (
+            <button
+              key={s}
+              type="button"
+              data-order-sort={s}
+              aria-pressed={archiveSort === s}
+              onClick={() => {
+                chooseArchiveSort(s);
+                setPage(0);
+              }}
+              className="lv-choice press-scale inline-flex min-h-[44px] items-center px-3 text-[13px] leading-[1.4] font-bold"
+            >
+              {say(loc, ARCHIVE_STRINGS[s])}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* THE TWO PRICE HOLDS, side by side — each shown only while some order
           is held that way (or its filter is on), with the board-wide count:
             «بانتظار موافقة الزبون على السعر» (0140) — the customer decides;
@@ -671,7 +770,17 @@ export default function OrdersBoard() {
           headers inside an `overflow-x-auto` table do not stick — the overflow
           box becomes the scrollport — and that failure appears only at the
           desktop breakpoint, which is the one nobody re-checks after testing
-          the phone. */}
+          the phone.
+
+          THE ARCHIVE IS ONE TRAY (row 323), its rows exactly in the server's
+          order — when each was delivered or cancelled, newest or oldest first
+          — with no day headers: each row says its own day, «سُلّم …». `groups`
+          is empty for its answer, so only one of the two lists ever draws. */}
+      {archiveRows && archiveRows.length > 0 && (
+        <section data-order-group="archive" data-order-sorted={data?.sort ?? ''} className="min-w-0">
+          <div className="lv-surface divide-y divide-border-subtle overflow-hidden">{archiveRows.map(rowOf)}</div>
+        </section>
+      )}
       {groups.map((g) => (
         <section key={g.id} data-order-group={g.id} className="min-w-0">
           {/* On the canvas now (the admin's same-colour panel is gone), so
@@ -684,21 +793,7 @@ export default function OrdersBoard() {
             {loc(g.ar, g.en, g.ckb)}
             <span className="tabular-nums text-text-muted">({countText(groupCount(g.id), latin)})</span>
           </h3>
-          <div className="lv-surface divide-y divide-border-subtle overflow-hidden">
-            {g.rows.map((o) => (
-              <OrderBoardRow
-                key={o.id}
-                order={o}
-                loc={loc}
-                onOpen={setOpenOrderId}
-                onDelete={deleteCancelled}
-                onAdvance={advance}
-                advancing={advancing === o.id}
-                deleting={deletingId === o.id}
-                latin={latin}
-              />
-            ))}
-          </div>
+          <div className="lv-surface divide-y divide-border-subtle overflow-hidden">{g.rows.map(rowOf)}</div>
         </section>
       ))}
 
