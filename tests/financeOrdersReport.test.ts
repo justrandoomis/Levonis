@@ -95,7 +95,11 @@ test('the workbook is the CSV’s rows in the brief’s columns, with the overhe
   const sheet = files.get('xl/worksheets/sheet1.xml')!;
   assert.match(sheet, /rightToLeft="1"/);
   const grid = cells(sheet);
-  const header = 6; // four heading lines, a blank, then the header
+  const header = 7; // four heading lines, a blank, the column groups, then the header
+  assert.deepEqual(['A', 'E', 'G', 'M', 'O'].map((c) => grid.get(header - 1)!.get(c)!.value), ['الطلب', 'الإيراد', 'التكاليف', 'الحصص والخصومات', 'النتيجة'], 'the groups over the header');
+  assert.match(sheet, /<mergeCell ref="A6:D6"\/><mergeCell ref="E6:F6"\/><mergeCell ref="G6:L6"\/>/);
+  assert.match(sheet, /<autoFilter ref="A7:P\d+"\/>/, 'a filter on the header');
+  assert.match(sheet, /<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"\/>/);
   assert.equal(grid.get(header)!.get('A')!.value, 'رقم الطلب');
   assert.equal(grid.get(header)!.get(LETTER.net)!.value, 'صافي الربح');
   const data = [...grid.keys()].filter((k) => k > header).sort((a, b) => a - b);
@@ -140,14 +144,20 @@ test('the printed page: a stand-alone document, A4 landscape, the print dialog i
   assert.equal(res.headers.get('content-security-policy'), documentCsp());
   const html = await res.text();
   assert.match(html, /<html lang="en" dir="ltr">/);
-  assert.ok(html.includes('@page { size: A4 landscape; margin: 8mm; }'));
+  assert.ok(html.includes('@page { size: A4 landscape;') && html.includes('counter(page) " / " counter(pages)'), 'A4 landscape, pages numbered');
   assert.equal(html.match(/<script>/g)?.length, 1);
   assert.ok(html.includes(`<script>${AUTO_PRINT_SCRIPT}</script>`));
   assert.ok(html.includes('&lt;b&gt;Buyer&lt;/b&gt; &amp; &quot;co&quot;') && !html.includes('<b>Buyer</b>'), 'escaped');
-  assert.ok(html.includes('<th scope="col">Net profit</th>') && html.includes('<tfoot><tr><th scope="row">Total</th>'));
+  assert.match(html, /<th scope="col"[^>]*>Net profit<\/th>/);
+  assert.ok(html.includes('<tfoot><tr><th scope="row">Total</th>'));
+  // The arrangement (DECISIONS row 334): the brand, the groups over the header, the figures with the net marked, the
+  // general expenses set apart.
+  assert.ok(html.includes('LEVONIS') && html.includes('<tr class="grp"><th scope="colgroup" colspan="4">Order</th>'));
+  assert.match(html, /<div class="fig key[^"]*"><span>Net profit<\/span>/);
+  assert.match(html, /<tr class="adj">/);
   const ar = await (await get(w.app, `/f/print?view=orders&${period()}`)).text();
   assert.match(ar, /<html lang="ar" dir="rtl">/);
-  assert.ok(ar.includes('<th scope="col">صافي الربح</th>'));
+  assert.match(ar, /<th scope="col"[^>]*>صافي الربح<\/th>/);
 });
 
 test('three languages: the words, the direction, and the Sorani its own', async () => {

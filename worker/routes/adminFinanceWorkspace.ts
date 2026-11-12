@@ -23,8 +23,8 @@ import { ADDITIVE_IQD_FIELDS, baghdadDayStart, batchCogsCents, centsOf, chartCen
 import { loadLotUsdRates } from '../lib/batchSnapshot';
 import { runFinanceChecks } from '../lib/financeChecks';
 import { xlsxResponse, xlsxWorkbook } from '../lib/xlsx';
-import { ordersReportHtml, ordersReportSheet, productsOf, type ReportLang } from '../lib/financeOrdersReport';
-import { staffPaymentStatement, staffStatementSheet, statementHtml, statementsHtml, withdrawalSheets, withdrawalStatement } from '../lib/financeStatements';
+import { ordersReportHtml, ordersReportWorkbook, productsOf, type ReportLang } from '../lib/financeOrdersReport';
+import { staffPaymentStatement, staffStatementHtml, staffStatementSheet, withdrawalSheets, withdrawalStatement, withdrawalStatementHtml } from '../lib/financeStatements';
 import { asDocument } from '../lib/securityPolicy';
 import { courierInstalled, courierOverview, courierRemittance, MAX_REMITTANCE_PARCELS, reconcileRemittance, recordRemittance } from '../lib/courierCollections';
 import { CLOSED_MONTHS_SQL, EXPENSE_ROW_LIMIT, EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_LIMIT, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
@@ -976,7 +976,7 @@ async function ordersReportFile(c:Context<AppContext>,kind:'xlsx'|'print'){
   const filtered=!!(f.q||f.state||f.kind||f.scope||f.cash);
   const {orders,bases}=await exportOrderRows(c.env.DB,r,f.part||filtered?f:{...f,part:'period'});
   const input={from:r.from,to:r.to,lang,at:new Date(),orders,products:productsOf(bases,lang)};
-  if(kind==='xlsx')return xlsxResponse(xlsxWorkbook([ordersReportSheet(input)]),`finance-orders-${r.from}-${r.to}`);
+  if(kind==='xlsx')return xlsxResponse(xlsxWorkbook(ordersReportWorkbook(input)),`finance-orders-${r.from}-${r.to}`);
   asDocument(c);
   return c.html(ordersReportHtml(input));
 }
@@ -989,11 +989,10 @@ adminFinanceWorkspaceRoutes.get('/export.xlsx',(c)=>ordersReportFile(c,'xlsx'));
 async function staffStatementFile(c:Context<AppContext>,kind:'xlsx'|'print'){
   const lang:ReportLang=c.req.query('lang')==='en'?'en':c.req.query('lang')==='ckb'?'ckb':'ar';
   const id=(c.req.param('id')??'').slice(0,80);
-  const st=await staffPaymentStatement(c.env.DB,id);
-  const sheet=staffStatementSheet(st,lang,new Date());
-  if(kind==='xlsx')return xlsxResponse(xlsxWorkbook([sheet]),`staff-payment-${st.payment.payment_day}-${id}`);
+  const st=await staffPaymentStatement(c.env.DB,id),at=new Date();
+  if(kind==='xlsx')return xlsxResponse(xlsxWorkbook([staffStatementSheet(st,lang,at)]),`staff-payment-${st.payment.payment_day}-${id}`);
   asDocument(c);
-  return c.html(statementHtml(sheet,lang));
+  return c.html(staffStatementHtml(st,lang,at));
 }
 adminFinanceWorkspaceRoutes.get('/statements/staff-payments/:id/export.xlsx',(c)=>staffStatementFile(c,'xlsx'));
 adminFinanceWorkspaceRoutes.get('/statements/staff-payments/:id/print',(c)=>staffStatementFile(c,'print'));
@@ -1005,10 +1004,10 @@ adminFinanceWorkspaceRoutes.get('/statements/staff-payments/:id/print',(c)=>staf
 async function withdrawalStatementFile(c:Context<AppContext>,kind:'xlsx'|'print'){
   const lang:ReportLang=c.req.query('lang')==='en'?'en':c.req.query('lang')==='ckb'?'ckb':'ar';
   const id=(c.req.param('id')??'').slice(0,80);
-  const sheets=withdrawalSheets(await withdrawalStatement(c.env.DB,id,lang),lang,new Date());
-  if(kind==='xlsx')return xlsxResponse(xlsxWorkbook(sheets),`withdrawal-${id}`);
+  const st=await withdrawalStatement(c.env.DB,id,lang),at=new Date();
+  if(kind==='xlsx')return xlsxResponse(xlsxWorkbook(withdrawalSheets(st,lang,at)),`withdrawal-${id}`);
   asDocument(c);
-  return c.html(statementsHtml(sheets,lang));
+  return c.html(withdrawalStatementHtml(st,lang,at));
 }
 adminFinanceWorkspaceRoutes.get('/statements/withdrawals/:id/export.xlsx',(c)=>withdrawalStatementFile(c,'xlsx'));
 adminFinanceWorkspaceRoutes.get('/statements/withdrawals/:id/print',(c)=>withdrawalStatementFile(c,'print'));

@@ -131,7 +131,10 @@ test('the printed statement holds both tables, a page apart; an unknown withdraw
   assert.equal(html.match(/<script>/g)?.length, 1, 'one script: the print dialog');
   assert.ok(html.includes('.page-break { break-before: page; }') && html.includes('<div class="page-break"></div>'));
   assert.equal(html.match(/class="no-print"/g)?.length, 1, 'the print hint once');
-  assert.ok(html.includes('<th scope="col">This withdrawal</th>') && html.includes('<th scope="col">Investor’s profit</th>'));
+  assert.match(html, /<th scope="col"[^>]*>This withdrawal<\/th>/);
+  assert.match(html, /<th scope="col"[^>]*>Investor’s profit<\/th>/);
+  assert.match(html, /<div class="fig key"><span>This withdrawal<\/span><strong><span dir="ltr">28,000<\/span>/, 'the figure the statement is about');
+  assert.ok(html.includes('<h2>Units sold</h2>') && html.includes('<span>Received by</span><i></i>'));
   assert.equal((await get(w.app, '/f/statements/withdrawals/nope/export.xlsx')).status, 404);
 });
 

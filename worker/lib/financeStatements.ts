@@ -14,9 +14,7 @@
  * (financeOrdersReport.ts), in Arabic, English and Sorani.
  */
 import type { XlsxColumn, XlsxSheet } from './xlsx';
-import { xmlText } from './xlsx';
-import { AUTO_PRINT_SCRIPT } from './securityPolicy';
-import { PRINT_FONT_LINK, printBaseCss } from './printDocument';
+import { financeDocumentHtml, type DocFigure } from './financeDocument';
 import { effectiveStaffCostSql, staffAdvanceSql, staffPaymentBudget } from './financeParticipants';
 import { notFound } from './http';
 import { SURPLUS_PREFIX, SURPLUS_ROWS_SQL, surplusInstalled } from './investorSurplus';
@@ -48,6 +46,18 @@ export const STATEMENT_WORDS = {
   profit: ['{pct}% من الربح', '{pct}% of the profit', '{pct}% لە قازانج'],
   revenue: ['{pct}% من المبيعات', '{pct}% of the sales', '{pct}% لە فرۆشتن'],
   print: ['طباعة أو حفظ PDF من نافذة الطباعة', 'Print, or save as PDF from the print window', 'چاپ بکە، یان لە پەنجەرەی چاپ وەک PDF پاشەکەوت بکە'],
+  // The arrangement (DECISIONS row 334).
+  gWage: ['الأجر', 'The wage', 'کرێکە'],
+  gAmounts: ['المبالغ', 'Amounts', 'بڕەکان'],
+  fPaidHere: ['دُفع بهذه الدفعة', 'Paid by this payment', 'بەم پارەدانە دراوە'],
+  fEarned: ['المستحق عن هذه الأجور', 'Earned on these wages', 'شایستەی ئەم کرێیانە'],
+  fPaidBefore: ['دُفع قبلها', 'Paid before', 'پێشتر دراوە'],
+  fStillDue: ['الباقي منها', 'Still due on them', 'ماوەیان'],
+  fPayable: ['المستحق للدفع اليوم', 'Payable today', 'شایستەی پارەدانی ئەمڕۆ'],
+  fAdvances: ['سلف لم تُسوَّ', 'Advances not yet set against wages', 'پێشینەی یەکلانەکراوە'],
+  signReceiver: ['توقيع المستلم', 'Received by', 'واژووی وەرگر'],
+  signOwner: ['توقيع المالك', 'Paid by', 'واژووی خاوەن'],
+  signDate: ['التاريخ', 'Date', 'ڕێکەوت'],
 } as const satisfies Record<string, Tri>;
 const W = STATEMENT_WORDS;
 
@@ -133,41 +143,39 @@ export function staffStatementSheet(st: StaffPaymentStatement, lang: ReportLang,
     totalLabel: pick(lang, W.total),
     columns: STAFF_STATEMENT_COLUMNS.map((c) => ({ key: c.key, kind: c.kind, header: pick(lang, c.header), ...(c.key === 'base' ? { total: false } : {}), ...(c.key === 'products' ? { width: 40 } : {}) })),
     rows: st.rows.map((r) => ({ ...r, how: howCounted(lang, r.basis, r.rule_amount, r.qty), base: r.basis === 'profit_percent' || r.basis === 'revenue_percent' ? r.base : null })),
+    groups: [{ label: pick(lang, W.gWage), span: 6 }, { label: pick(lang, W.gAmounts), span: 4 }],
+    strong: ['paid_here'],
   };
 }
 
-/** Escaped text with its days and times kept left to right inside an Arabic line. */
-const textHtml = (s: string) => xmlText(s).replace(/\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2})?/g, (m) => `<span dir="ltr">${m}</span>`);
-
-/** Any statement sheet as a stand-alone print document (asDocument): its heading, its table, its totals. */
-export function statementHtml(sheet: XlsxSheet, lang: ReportLang): string {
-  const dir = lang === 'en' ? 'ltr' : 'rtl';
-  const [title, ...lines] = sheet.heading ?? [];
-  const totals = sheet.columns.map((c, j) => {
-    if (j === 0) return `<th scope="row">${xmlText(sheet.totalLabel ?? '')}</th>`;
-    if (c.kind === 'text' || c.kind === 'date' || c.total === false) return '<td></td>';
-    let sum = 0;
-    for (const r of sheet.rows) if (isNum(r[c.key])) sum += r[c.key] as number;
-    return `<td class="num"><span dir="ltr">${money(sum)}</span></td>`;
-  }).join('');
-  const body = sheet.rows.map((r) => `<tr>${sheet.columns.map((c) => c.kind === 'text' || c.kind === 'date'
-    ? `<td>${textHtml(String(r[c.key] ?? ''))}</td>`
-    : `<td class="num"><span dir="ltr">${money(r[c.key])}</span></td>`).join('')}</tr>`).join('');
-  return `<!doctype html><html lang="${lang}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${xmlText(title ?? '')}</title>${PRINT_FONT_LINK}<style>${printBaseCss(10)}
-  @page { size: A4 landscape; margin: 10mm; }
-  h1 { font-size: 16px; margin: 0 0 6px; }
-  p { margin: 0 0 2px; font-size: 11px; color: #3a4048; }
-  table { font-size: 10px; margin-top: 10px; }
-  th, td { border: 1px solid #c9ced6; padding: 4px 5px; text-align: start; vertical-align: top; }
-  thead th { background: #e8eef2; font-weight: 700; }
-  td.num { text-align: end; white-space: nowrap; }
-  tfoot th, tfoot td { font-weight: 700; border-top: 2px solid #8899a6; }
-</style></head><body>
-<h1>${xmlText(title ?? '')}</h1>${lines.map((l) => `<p>${textHtml(l)}</p>`).join('')}<p class="no-print">${xmlText(pick(lang, W.print))}</p>
-<table><thead><tr>${sheet.columns.map((c) => `<th scope="col">${xmlText(c.header)}</th>`).join('')}</tr></thead>
-<tbody>${body}</tbody><tfoot><tr>${totals}</tr></tfoot></table>
-<script>${AUTO_PRINT_SCRIPT}</script></body></html>`;
+/** The staff statement to print: the payment and the person, its figures, the wages it paid, lines to sign. */
+export function staffStatementHtml(st: StaffPaymentStatement, lang: ReportLang, at: Date): string {
+  const sheet = staffStatementSheet(st, lang, at), p = st.payment;
+  const total = (k: string) => sheet.rows.reduce((n, r) => n + (isNum(r[k]) ? (r[k] as number) : 0), 0);
+  const figures: DocFigure[] = [
+    { label: pick(lang, W.fPaidHere), value: total('paid_here'), kind: 'money', tone: 'key' },
+    { label: pick(lang, W.fEarned), value: total('earned'), kind: 'money' },
+    { label: pick(lang, W.fPaidBefore), value: total('paid_before'), kind: 'money' },
+    { label: pick(lang, W.fStillDue), value: total('still_due'), kind: 'money' },
+    { label: pick(lang, W.fPayable), value: st.payable_today_iqd, kind: 'money' },
+    { label: pick(lang, W.fAdvances), value: st.advances_iqd, kind: 'money' },
+  ];
+  return financeDocumentHtml({
+    lang,
+    title: pick(lang, W.staffTitle),
+    meta: [
+      fill(pick(lang, W.staff), { name: p.staff_name }),
+      fill(pick(lang, p.kind === 'advance' ? W.advance : W.payment), { amount: money(p.amount_iqd), day: p.payment_day }),
+      ...(p.note ? [fill(pick(lang, W.note), { note: p.note })] : []),
+      ...(st.unsettled_iqd !== null ? [fill(pick(lang, W.unsettled), { amount: money(st.unsettled_iqd) })] : []),
+      fill(pick(lang, W.made), { at: baghdadClock(at) }),
+    ],
+    figures,
+    tables: [{ sheet }],
+    notes: st.rows.length ? [] : [pick(lang, W.none)],
+    signatures: [pick(lang, W.signReceiver), pick(lang, W.signOwner), pick(lang, W.signDate)],
+    printHint: pick(lang, W.print),
+  });
 }
 
 // ─────────────────────────────────────────────────────────────── an investor's withdrawal
@@ -199,6 +207,21 @@ export const WITHDRAWAL_WORDS = {
   counted: ['محتسب', 'Counted', 'ژمێردراو'],
   waiting: ['ينتظر', 'Waiting', 'چاوەڕێ'],
   note: ['الأرباح ورأس المال المسترد كما سجّلها الدفتر حتى اليوم؛ الباقي = المكتسب − ما دفعته سحوبات سابقة − هذا السحب.', 'Profit and capital returned as the ledger recorded them to date; remaining = earned − paid by earlier withdrawals − this withdrawal.', 'قازانج و سەرمایەی گەڕاوە وەک دەفتەر تا ئەمڕۆ تۆماری کردوون؛ ماوە = بەدەستهاتوو − ئەوەی ڕاکێشانی پێشوو داویانە − ئەم ڕاکێشانە.'],
+  // The arrangement (DECISIONS row 334).
+  gInvestment: ['الاستثمار', 'Investment', 'وەبەرهێنان'],
+  gEarned: ['ما كُسب', 'Earned', 'بەدەستهاتوو'],
+  gWithdrawal: ['السحب', 'Withdrawal', 'ڕاکێشان'],
+  gUnit: ['الوحدة', 'The unit', 'یەکەکە'],
+  gSale: ['البيع والتكلفة', 'Sale and cost', 'فرۆشتن و تێچوو'],
+  gShare: ['حصة المستثمر', 'Investor’s share', 'بەشی وەبەرهێنەر'],
+  gState: ['الحالة', 'State', 'دۆخ'],
+  fThis: ['هذا السحب', 'This withdrawal', 'ئەم ڕاکێشانە'],
+  fPaid: ['دُفع منه', 'Paid of it', 'لێی دراوە'],
+  fProfit: ['الربح المكتسب', 'Profit earned', 'قازانجی بەدەستهاتوو'],
+  fCapital: ['رأس المال المسترد', 'Capital returned', 'سەرمایەی گەڕاوە'],
+  fBefore: ['دفعته سحوبات سابقة', 'Paid by earlier withdrawals', 'ڕاکێشانی پێشوو دایانە'],
+  fRemaining: ['الباقي', 'Remaining', 'ماوە'],
+  signInvestor: ['توقيع المستثمر', 'Received by', 'واژووی وەبەرهێنەر'],
 } as const satisfies Record<string, Tri>;
 const WW = WITHDRAWAL_WORDS;
 
@@ -312,21 +335,39 @@ export function withdrawalSheets(st: WithdrawalStatement, lang: ReportLang, at: 
   ];
   const cols = (list: StatementColumn[]) => list.map((c) => ({ key: c.key, kind: c.kind, header: pick(lang, c.header), ...(c.key === 'invested' ? { total: false } : {}) }));
   return [
-    { name: pick(lang, WW.summary), rtl: lang !== 'en', heading, totalLabel: pick(lang, W.total), columns: cols(WITHDRAWAL_SUMMARY_COLUMNS), rows: st.summary },
+    { name: pick(lang, WW.summary), rtl: lang !== 'en', heading, totalLabel: pick(lang, W.total), columns: cols(WITHDRAWAL_SUMMARY_COLUMNS), rows: st.summary,
+      groups: [{ label: pick(lang, WW.gInvestment), span: 3 }, { label: pick(lang, WW.gEarned), span: 2 }, { label: pick(lang, WW.gWithdrawal), span: 3 }], strong: ['this'] },
     { name: pick(lang, WW.units), rtl: lang !== 'en', heading: [pick(lang, WW.units), fill(pick(lang, WW.investor), { name: w.user_name })], totalLabel: pick(lang, W.total),
-      columns: cols(WITHDRAWAL_UNIT_COLUMNS), rows: st.units },
+      columns: cols(WITHDRAWAL_UNIT_COLUMNS), rows: st.units,
+      groups: [{ label: pick(lang, WW.gUnit), span: 5 }, { label: pick(lang, WW.gSale), span: 4 }, { label: pick(lang, WW.gShare), span: 4 }, { label: pick(lang, WW.gState), span: 1 }],
+      strong: ['earning'] },
   ];
 }
 
-/** Several statement sheets as one stand-alone print document: each sheet's heading, table and totals, a page apart. */
-export function statementsHtml(sheets: XlsxSheet[], lang: ReportLang): string {
-  if (sheets.length === 1) return statementHtml(sheets[0], lang);
-  const first = statementHtml(sheets[0], lang);
-  const bodies = sheets.map((s, i) => {
-    const html = statementHtml(s, lang);
-    const body = html.slice(html.indexOf('<body>') + 6, html.lastIndexOf('<script>'));
-    // The «print or save as PDF» hint once, above the first table.
-    return i === 0 ? body : `<div class="page-break"></div>${body.replace(/<p class="no-print">[^<]*<\/p>/, '')}`;
-  }).join('');
-  return `${first.slice(0, first.indexOf('</style>'))}  .page-break { break-before: page; }\n${first.slice(first.indexOf('</style>'), first.indexOf('<body>') + 6)}${bodies}<script>${AUTO_PRINT_SCRIPT}</script></body></html>`;
+/** The withdrawal statement to print: the investor and the withdrawal, its figures, the summary, the units a page on, lines to sign. */
+export function withdrawalStatementHtml(st: WithdrawalStatement, lang: ReportLang, at: Date): string {
+  const [summary, units] = withdrawalSheets(st, lang, at), w = st.withdrawal;
+  const total = (k: string) => st.summary.reduce((n, r) => n + (isNum(r[k]) ? (r[k] as number) : 0), 0);
+  return financeDocumentHtml({
+    lang,
+    title: pick(lang, WW.title),
+    meta: [
+      fill(pick(lang, WW.investor), { name: w.user_name }),
+      fill(pick(lang, WW.request), { amount: money(w.amount_iqd), day: String(w.created_at).slice(0, 10), paid: money(w.paid_iqd) }),
+      fill(pick(lang, W.made), { at: baghdadClock(at) }),
+    ],
+    figures: [
+      { label: pick(lang, WW.fThis), value: total('this'), kind: 'money', tone: 'key' },
+      { label: pick(lang, WW.fPaid), value: w.paid_iqd, kind: 'money' },
+      { label: pick(lang, WW.fProfit), value: total('profit'), kind: 'money' },
+      { label: pick(lang, WW.fCapital), value: total('capital'), kind: 'money' },
+      { label: pick(lang, WW.fBefore), value: total('paid_before'), kind: 'money' },
+      { label: pick(lang, WW.fRemaining), value: total('remaining'), kind: 'money' },
+    ],
+    tables: [{ caption: pick(lang, WW.summary), sheet: summary }, { caption: pick(lang, WW.units), sheet: units, newPage: true }],
+    notes: [pick(lang, WW.note)],
+    signatures: [pick(lang, WW.signInvestor), pick(lang, W.signOwner), pick(lang, W.signDate)],
+    printHint: pick(lang, W.print),
+  });
 }
+

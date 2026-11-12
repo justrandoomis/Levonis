@@ -17,9 +17,14 @@
  *   null    an empty cell — an unknown amount is never 0, so a column's SUM is the sum of what is known, as on the screens.
  * The totals row sums each money and int column with SUM over the data rows and carries the computed value too (`<v>`), so a
  * viewer that does not recalculate still shows it.
+ *
+ * THE ARRANGEMENT (the owner, 2026-11-13: «need more improvement of arrangement on pdf and excel»). Column groups may sit
+ * over the header (merged, centred); the header wraps and is bordered; a negative amount is red; the figure a table is
+ * about can be bold; the header row carries a filter; and every sheet prints A4 landscape, one page wide, its header rows
+ * repeated on each page and «page n / N» at the foot.
  */
 
-export type XlsxKind = 'text' | 'money' | 'int' | 'date';
+export type XlsxKind = 'text' | 'money' | 'int' | 'date' | 'pct';
 
 export interface XlsxColumn {
   key: string;
@@ -29,6 +34,8 @@ export interface XlsxColumn {
   width?: number;
   /** Whether the totals row sums this column (money and int columns by default). */
   total?: boolean;
+  /** A row's own kind for this column (a summary sheet's values are money, counts and percentages). */
+  kindOf?: (row: Record<string, unknown>) => XlsxKind;
 }
 
 export interface XlsxSheet {
@@ -42,6 +49,10 @@ export interface XlsxSheet {
   heading?: string[];
   /** The totals row's first cell (e.g. «المجموع»); no totals row when absent. */
   totalLabel?: string;
+  /** Column groups over the header row, in column order: a label and how many columns it spans. */
+  groups?: ReadonlyArray<{ label: string; span: number }>;
+  /** Columns written bold: the figure the table is about. */
+  strong?: readonly string[];
 }
 
 // ─────────────────────────────────────────────────────────────── XML
@@ -62,25 +73,28 @@ export function columnName(index: number): string {
 const sheetNameOf = (name: string, i: number) => (name.replace(/[[\]:*?/\\]/g, ' ').trim().slice(0, 31) || `Sheet${i + 1}`);
 
 // Style ids in styles.xml's cellXfs, in order.
-const S = { plain: 0, header: 1, money: 2, int: 3, totalLabel: 4, totalMoney: 5, totalInt: 6, heading: 7, date: 8 } as const;
+const S = { plain: 0, header: 1, money: 2, int: 3, totalLabel: 4, totalMoney: 5, totalInt: 6, heading: 7, date: 8, group: 9, pct: 10, strongMoney: 11 } as const;
 
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
-<numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/></numFmts>
+<numFmts count="3"><numFmt numFmtId="164" formatCode="yyyy-mm-dd"/><numFmt numFmtId="165" formatCode="#,##0;[Red]-#,##0"/><numFmt numFmtId="166" formatCode="0.0%"/></numFmts>
 <fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="13"/><name val="Calibri"/></font></fonts>
-<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF2"/><bgColor indexed="64"/></patternFill></fill></fills>
-<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top style="thin"><color rgb="FF8899A6"/></top><bottom/><diagonal/></border></borders>
+<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFE8EEF2"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD3DCE5"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="3"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top style="thin"><color rgb="FF8899A6"/></top><bottom/><diagonal/></border><border><left style="thin"><color rgb="FFB8C2CC"/></left><right style="thin"><color rgb="FFB8C2CC"/></right><top style="thin"><color rgb="FFB8C2CC"/></top><bottom style="thin"><color rgb="FFB8C2CC"/></bottom><diagonal/></border></borders>
 <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
-<cellXfs count="9">
+<cellXfs count="12">
 <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
-<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
-<xf numFmtId="3" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 <xf numFmtId="1" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
 <xf numFmtId="0" fontId="1" fillId="0" borderId="1" xfId="0" applyFont="1" applyBorder="1"/>
-<xf numFmtId="3" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>
+<xf numFmtId="165" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>
 <xf numFmtId="1" fontId="1" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1"/>
 <xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
 <xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="1" fillId="3" borderId="2" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center"/></xf>
+<xf numFmtId="166" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="165" fontId="1" fillId="0" borderId="0" xfId="0" applyNumberFormat="1" applyFont="1"/>
 </cellXfs>
 <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
 </styleSheet>`;
@@ -112,19 +126,47 @@ function cell(ref: string, kind: XlsxKind, value: unknown, style?: number): stri
   }
   const n = numberOf(value);
   if (n === null) return '';
-  return `<c r="${ref}" s="${style ?? (kind === 'money' ? S.money : S.int)}"><v>${n}</v></c>`;
+  return `<c r="${ref}" s="${style ?? (kind === 'money' ? S.money : kind === 'pct' ? S.pct : S.int)}"><v>${n}</v></c>`;
 }
 
-function sheetXml(sheet: XlsxSheet): string {
+/** Where a sheet's parts sit: the heading lines, a blank row, the column groups when there are any, the header, the rows. */
+function layoutOf(sheet: XlsxSheet) {
   const heading = sheet.heading ?? [];
-  const headerRow = heading.length + (heading.length ? 2 : 1); // a blank line between the heading and the table
-  const firstData = headerRow + 1, lastData = headerRow + sheet.rows.length;
+  const groupRow = sheet.groups?.length ? heading.length + (heading.length ? 2 : 1) : 0;
+  const headerRow = groupRow ? groupRow + 1 : heading.length + (heading.length ? 2 : 1); // a blank line between the heading and the table
+  return { heading, groupRow, headerRow, firstData: headerRow + 1, lastData: headerRow + sheet.rows.length };
+}
+const lastColumn = (sheet: XlsxSheet) => columnName(Math.max(0, sheet.columns.length - 1));
+/** A sheet name inside a formula or a defined name: quoted, its quotes doubled. */
+const quotedSheet = (name: string) => `'${name.replace(/'/g, "''")}'`;
+
+function sheetXml(sheet: XlsxSheet): string {
+  const { heading, groupRow, headerRow, firstData, lastData } = layoutOf(sheet);
   const rows: string[] = [];
+  const merges: string[] = [];
   heading.forEach((line, i) => rows.push(`<row r="${i + 1}">${cell(`A${i + 1}`, 'text', line, S.heading)}</row>`));
-  rows.push(`<row r="${headerRow}">${sheet.columns.map((c, j) => cell(`${columnName(j)}${headerRow}`, 'text', c.header, S.header)).join('')}</row>`);
+  if (groupRow) {
+    // Each group labels its first cell; the cells it spans carry the same fill and border, and are merged.
+    const cells: string[] = [];
+    let at = 0;
+    for (const g of sheet.groups ?? []) {
+      const span = Math.max(1, Math.min(g.span, sheet.columns.length - at));
+      if (span <= 0) break;
+      cells.push(cell(`${columnName(at)}${groupRow}`, 'text', g.label, S.group) || `<c r="${columnName(at)}${groupRow}" s="${S.group}"/>`);
+      for (let k = 1; k < span; k++) cells.push(`<c r="${columnName(at + k)}${groupRow}" s="${S.group}"/>`);
+      if (span > 1) merges.push(`${columnName(at)}${groupRow}:${columnName(at + span - 1)}${groupRow}`);
+      at += span;
+    }
+    rows.push(`<row r="${groupRow}" ht="20" customHeight="1">${cells.join('')}</row>`);
+  }
+  rows.push(`<row r="${headerRow}" ht="32" customHeight="1">${sheet.columns.map((c, j) => cell(`${columnName(j)}${headerRow}`, 'text', c.header, S.header)).join('')}</row>`);
+  const strong = new Set(sheet.strong ?? []);
   sheet.rows.forEach((r, i) => {
     const n = firstData + i;
-    rows.push(`<row r="${n}">${sheet.columns.map((c, j) => cell(`${columnName(j)}${n}`, c.kind, r[c.key])).join('')}</row>`);
+    rows.push(`<row r="${n}">${sheet.columns.map((c, j) => {
+      const kind = c.kindOf?.(r) ?? c.kind;
+      return cell(`${columnName(j)}${n}`, kind, r[c.key], kind === 'money' && strong.has(c.key) ? S.strongMoney : undefined);
+    }).join('')}</row>`);
   });
   if (sheet.totalLabel !== undefined) {
     const n = lastData + 1;
@@ -152,8 +194,26 @@ function sheetXml(sheet: XlsxSheet): string {
   });
   const cols = `<cols>${widths.map((w, j) => `<col min="${j + 1}" max="${j + 1}" width="${w}" customWidth="1"/>`).join('')}</cols>`;
   const view = `<sheetViews><sheetView workbookViewId="0"${sheet.rtl ? ' rightToLeft="1"' : ''}><pane ySplit="${headerRow}" topLeftCell="A${firstData}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`;
+  // The header row filters the rows (not the totals); then the merged groups; then printing: one page wide, A4 landscape.
+  const filter = sheet.rows.length && sheet.columns.length > 1 ? `<autoFilter ref="A${headerRow}:${lastColumn(sheet)}${lastData}"/>` : '';
+  const merged = merges.length ? `<mergeCells count="${merges.length}">${merges.map((m) => `<mergeCell ref="${m}"/>`).join('')}</mergeCells>` : '';
+  const print = '<printOptions horizontalCentered="1"/><pageMargins left="0.4" right="0.4" top="0.5" bottom="0.6" header="0.3" footer="0.3"/>'
+    + '<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"/><headerFooter><oddFooter>&amp;C&amp;P / &amp;N</oddFooter></headerFooter>';
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">${view}<sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${rows.join('')}</sheetData></worksheet>`;
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetPr><pageSetUpPr fitToPage="1"/></sheetPr>${view}<sheetFormatPr defaultRowHeight="15"/>${cols}<sheetData>${rows.join('')}</sheetData>${filter}${merged}${print}</worksheet>`;
+}
+
+/** Each sheet's printed header rows (repeated on every page) and its filter range, as the workbook names them. */
+function definedNames(sheets: XlsxSheet[], names: string[]): string {
+  const out: string[] = [];
+  sheets.forEach((s, i) => {
+    const { groupRow, headerRow, lastData } = layoutOf(s);
+    const q = quotedSheet(names[i]);
+    if (s.rows.length && s.columns.length > 1)
+      out.push(`<definedName name="_xlnm._FilterDatabase" localSheetId="${i}" hidden="1">${xmlText(`${q}!$A$${headerRow}:$${lastColumn(s)}$${lastData}`)}</definedName>`);
+    out.push(`<definedName name="_xlnm.Print_Titles" localSheetId="${i}">${xmlText(`${q}!$${groupRow || headerRow}:$${headerRow}`)}</definedName>`);
+  });
+  return out.length ? `<definedNames>${out.join('')}</definedNames>` : '';
 }
 
 /** The workbook's files, by path, as text. */
@@ -171,7 +231,7 @@ export function xlsxParts(sheets: XlsxSheet[]): Array<[string, string]> {
     ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>`],
     ['xl/workbook.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView${sheets[0].rtl ? ' rightToLeft="1"' : ''}/></bookViews><sheets>${names.map((n, i) => `<sheet name="${xmlText(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets><calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`],
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView${sheets[0].rtl ? ' rightToLeft="1"' : ''}/></bookViews><sheets>${names.map((n, i) => `<sheet name="${xmlText(n)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('')}</sheets>${definedNames(sheets, names)}<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>`],
     ['xl/_rels/workbook.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`).join('')}<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
     ['xl/styles.xml', STYLES],

@@ -64,7 +64,8 @@ test('the zip a spreadsheet program reads: every part stored with its CRC, and t
   assert.match(files.get('xl/workbook.xml')!, /<sheet name="الطلبات" sheetId="1" r:id="rId1"\/>/);
   assert.match(files.get('xl/workbook.xml')!, /<workbookView rightToLeft="1"\/>/);
   assert.match(files.get('[Content_Types].xml')!, /PartName="\/xl\/worksheets\/sheet1.xml"/);
-  assert.match(files.get('xl/styles.xml')!, /<xf numFmtId="3" fontId="0"/, 'the #,##0 dinar format');
+  assert.match(files.get('xl/styles.xml')!, /<numFmt numFmtId="165" formatCode="#,##0;\[Red\]-#,##0"\/>/, 'the #,##0 dinar format, a negative in red');
+  assert.match(files.get('xl/styles.xml')!, /<xf numFmtId="165" fontId="0"/);
   // One input, one file: the same bytes twice.
   assert.deepEqual(xlsxWorkbook([SHEET]), xlsxWorkbook([SHEET]));
 });

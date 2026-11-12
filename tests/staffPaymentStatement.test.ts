@@ -122,7 +122,10 @@ test('the printed statement: a stand-alone document with the same rows and total
   assert.equal(res.headers.get('content-security-policy'), documentCsp());
   const html = await res.text();
   assert.ok(html.includes('Note: &lt;i&gt;bonus&lt;/i&gt;') && !html.includes('<i>bonus</i>'));
-  assert.ok(html.includes('<th scope="col">Paid by this payment</th>'));
+  assert.match(html, /<th scope="col"[^>]*>Paid by this payment<\/th>/);
+  // The arrangement (DECISIONS row 334): the figures with what this payment paid marked, the groups, lines to sign.
+  assert.match(html, /<div class="fig key"><span>Paid by this payment<\/span><strong><span dir="ltr">6,500<\/span>/);
+  assert.ok(html.includes('<th scope="colgroup" colspan="6">The wage</th>') && html.includes('<span>Received by</span><i></i>'));
   assert.ok(html.includes('<tfoot><tr><th scope="row">Total</th>'));
   assert.ok(html.includes('<span dir="ltr">6,500</span>'), 'the paid-here total');
 });

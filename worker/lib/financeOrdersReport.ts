@@ -15,9 +15,7 @@
  * (orderProfit.ts, overlay deductions), only grouped as the brief names it.
  */
 import type { XlsxColumn, XlsxSheet } from './xlsx';
-import { xmlText } from './xlsx';
-import { AUTO_PRINT_SCRIPT } from './securityPolicy';
-import { PRINT_FONT_LINK, printBaseCss } from './printDocument';
+import { financeDocumentHtml, type DocFigure } from './financeDocument';
 
 export type ReportLang = 'ar' | 'en' | 'ckb';
 type Tri = readonly [ar: string, en: string, ckb: string];
@@ -36,6 +34,22 @@ const W = {
   waiting: ['ينتظر', 'Waiting', 'چاوەڕێ'],
   sheet: ['الطلبات', 'Orders', 'داواکارییەکان'],
   print: ['طباعة أو حفظ PDF من نافذة الطباعة', 'Print, or save as PDF from the print window', 'چاپ بکە، یان لە پەنجەرەی چاپ وەک PDF پاشەکەوت بکە'],
+  // The arrangement (DECISIONS row 334): the column groups, the summary figures and the summary sheet.
+  gOrder: ['الطلب', 'Order', 'داواکاری'],
+  gRevenue: ['الإيراد', 'Revenue', 'داهاتەکان'],
+  gCosts: ['التكاليف', 'Costs', 'تێچووەکان'],
+  gShares: ['الحصص والخصومات', 'Shares and discounts', 'بەش و داشکاندن'],
+  gResult: ['النتيجة', 'Result', 'ئەنجام'],
+  fOrders: ['الطلبات', 'Orders', 'داواکارییەکان'],
+  fSales: ['المبيعات', 'Sales', 'فرۆشتن'],
+  fDelivery: ['التوصيل المحصّل', 'Delivery charged', 'گەیاندنی وەرگیراو'],
+  fCosts: ['التكاليف', 'Costs', 'تێچووەکان'],
+  fShares: ['الحصص والخصومات', 'Shares and discounts', 'بەش و داشکاندن'],
+  fNet: ['صافي الربح', 'Net profit', 'قازانجی پوخت'],
+  fMargin: ['الهامش من المبيعات والتوصيل', 'Margin on sales and delivery', 'ڕێژەی قازانج لە فرۆشتن و گەیاندن'],
+  summarySheet: ['الملخص', 'Summary', 'کورتە'],
+  item: ['البند', 'Item', 'بڕگە'],
+  value: ['القيمة', 'Value', 'بەها'],
 } as const satisfies Record<string, Tri>;
 
 const COLUMNS: Array<{ key: string; kind: XlsxColumn['kind']; header: Tri }> = [
@@ -75,7 +89,7 @@ export function reportRow(o: Row, products: ReadonlyMap<string, string>, lang: R
   if (o.row_kind === 'overhead') {
     return { order_id: '', delivered_day: '', customer_name: pick(lang, W.overhead), products: '', sales: null, delivery: null, cogs: null, courier: null,
       wages: null, materials: null, promotion: amount(o.promotion_iqd), other: amount(o.general_expenses_iqd), investor: null, discounts: null,
-      net: amount(o.net_after_report_adjustments_iqd), state: '' };
+      net: amount(o.net_after_report_adjustments_iqd), state: '', __kind: 'overhead' };
   }
   const state = o.finance_state === 'confirmed' ? W.confirmed : o.finance_state === 'estimated' ? W.estimated : o.finance_state === 'waiting' ? W.waiting : null;
   return {
@@ -110,48 +124,61 @@ export function ordersReportSheet(input: OrdersReportInput): XlsxSheet {
     totalLabel: pick(lang, W.total),
     columns: COLUMNS.map((c) => ({ key: c.key, kind: c.kind, header: pick(lang, c.header), ...(c.key === 'products' ? { width: 48 } : {}) })),
     rows: input.orders.map((o) => reportRow(o, input.products, lang)),
+    // Left to right as the net is built: the order, what came in, what it cost, what went to others, what is left.
+    groups: [
+      { label: pick(lang, W.gOrder), span: 4 }, { label: pick(lang, W.gRevenue), span: 2 }, { label: pick(lang, W.gCosts), span: 6 },
+      { label: pick(lang, W.gShares), span: 2 }, { label: pick(lang, W.gResult), span: 2 },
+    ],
+    strong: ['net'],
   };
 }
 
-const money = (v: unknown) => (isNum(v) ? v.toLocaleString('en-US') : '');
-/** Escaped text with its days and times kept left to right: inside an Arabic line «2026-11-12» would read «12-11-2026». */
-const textHtml = (s: string) => xmlText(s).replace(/\d{4}-\d{2}-\d{2}(?: \d{2}:\d{2})?/g, (m) => `<span dir="ltr">${m}</span>`);
+/** The figures a reader looks for first: the orders, what came in, what it cost, what went to others, the net and its margin. */
+export function ordersReportFigures(sheet: XlsxSheet, lang: ReportLang): DocFigure[] {
+  const sum = (...keys: string[]) => sheet.rows.reduce((n, r) => n + keys.reduce((m, k) => m + (isNum(r[k]) ? (r[k] as number) : 0), 0), 0);
+  const sales = sum('sales'), delivery = sum('delivery'), net = sum('net');
+  return [
+    { label: pick(lang, W.fOrders), value: sheet.rows.filter((r) => r.__kind !== 'overhead').length, kind: 'int' },
+    { label: pick(lang, W.fSales), value: sales, kind: 'money' },
+    { label: pick(lang, W.fDelivery), value: delivery, kind: 'money' },
+    { label: pick(lang, W.fCosts), value: sum('cogs', 'courier', 'wages', 'materials', 'promotion', 'other'), kind: 'money' },
+    { label: pick(lang, W.fShares), value: sum('investor', 'discounts'), kind: 'money' },
+    { label: pick(lang, W.fNet), value: net, kind: 'money', tone: 'key' },
+    { label: pick(lang, W.fMargin), value: sales + delivery > 0 ? net / (sales + delivery) : null, kind: 'pct' },
+  ];
+}
+
+/** The workbook: the orders first (as it always was), then the summary figures on their own sheet. */
+export function ordersReportWorkbook(input: OrdersReportInput): XlsxSheet[] {
+  const sheet = ordersReportSheet(input), { lang } = input;
+  return [sheet, {
+    name: pick(lang, W.summarySheet),
+    rtl: lang !== 'en',
+    heading: [pick(lang, W.title), fill(pick(lang, W.period), { from: input.from, to: input.to }), fill(pick(lang, W.made), { at: baghdadClock(input.at) })],
+    columns: [
+      { key: 'label', kind: 'text', header: pick(lang, W.item), width: 34 },
+      { key: 'value', kind: 'money', header: pick(lang, W.value), width: 18, kindOf: (r) => (r.kind === 'pct' ? 'pct' : r.kind === 'int' ? 'int' : 'money') },
+    ],
+    rows: ordersReportFigures(sheet, lang).map((f) => ({ label: f.label, value: f.value, kind: f.kind })),
+  }];
+}
 
 /**
- * The report as a stand-alone print document (asDocument; the one hashed script opens the print dialog, where «Save as
- * PDF» is the PDF — Arabic is shaped by the browser itself). A4 landscape, the header repeated on every sheet, the totals
- * row last, every value escaped.
+ * The report as a stand-alone print document (financeDocument.ts: the header band, the summary figures, the grouped
+ * table, the totals, page numbers; the one hashed script opens the print dialog, where «Save as PDF» is the PDF — Arabic
+ * is shaped by the browser itself). A4 landscape, every value escaped.
  */
 export function ordersReportHtml(input: OrdersReportInput): string {
-  const sheet = ordersReportSheet(input), dir = input.lang === 'en' ? 'ltr' : 'rtl';
-  const totals = sheet.columns.map((c, j) => {
-    if (j === 0) return `<th scope="row">${xmlText(sheet.totalLabel ?? '')}</th>`;
-    if (c.kind === 'text' || c.kind === 'date') return '<td></td>';
-    let sum = 0;
-    for (const r of sheet.rows) if (isNum(r[c.key])) sum += r[c.key] as number;
-    return `<td class="num"><span dir="ltr">${money(sum)}</span></td>`;
-  }).join('');
-  const body = sheet.rows.map((r) => `<tr>${sheet.columns.map((c) => c.kind === 'text' || c.kind === 'date'
-    ? `<td${c.key === 'products' ? ' class="products"' : ''}>${textHtml(String(r[c.key] ?? ''))}</td>`
-    : `<td class="num"><span dir="ltr">${money(r[c.key])}</span></td>`).join('')}</tr>`).join('');
-  const [title, ...lines] = sheet.heading ?? [];
-  return `<!doctype html><html lang="${input.lang === 'ckb' ? 'ckb' : input.lang}" dir="${dir}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${xmlText(title ?? '')}</title>${PRINT_FONT_LINK}<style>${printBaseCss(8)}
-  @page { size: A4 landscape; margin: 8mm; }
-  h1 { font-size: 15px; margin: 0 0 4px; }
-  p { margin: 0 0 2px; font-size: 10px; color: #3a4048; }
-  .hint { margin: 0 0 10px; }
-  table { font-size: 9px; margin-top: 8px; }
-  th, td { border: 1px solid #c9ced6; padding: 3px 4px; text-align: start; vertical-align: top; }
-  thead th { background: #e8eef2; font-weight: 700; }
-  td.num { text-align: end; white-space: nowrap; }
-  td.products { max-width: 240px; }
-  tfoot th, tfoot td { font-weight: 700; border-top: 2px solid #8899a6; }
-</style></head><body>
-<h1>${xmlText(title ?? '')}</h1>${lines.map((l) => `<p>${textHtml(l)}</p>`).join('')}<p class="hint no-print">${xmlText(pick(input.lang, W.print))}</p>
-<table><thead><tr>${sheet.columns.map((c) => `<th scope="col">${xmlText(c.header)}</th>`).join('')}</tr></thead>
-<tbody>${body}</tbody><tfoot><tr>${totals}</tr></tfoot></table>
-<script>${AUTO_PRINT_SCRIPT}</script></body></html>`;
+  const sheet = ordersReportSheet(input), { lang } = input;
+  return financeDocumentHtml({
+    lang,
+    title: pick(lang, W.title),
+    meta: [fill(pick(lang, W.period), { from: input.from, to: input.to }), fill(pick(lang, W.made), { at: baghdadClock(input.at) })],
+    figures: ordersReportFigures(sheet, lang),
+    tables: [{ sheet }],
+    notes: [pick(lang, W.note)],
+    printHint: pick(lang, W.print),
+  });
 }
 
 export const REPORT_LANGS: readonly ReportLang[] = ['ar', 'en', 'ckb'];
