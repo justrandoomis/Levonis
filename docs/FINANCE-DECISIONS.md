@@ -2,14 +2,18 @@
 
 # The owner's accounting rules
 
-Four questions decide every number on the financial dashboard. The owner
-answered all four on 2026-09-19, and the answers are recorded here because a
-rule that lives only in a chat message is a rule the next reader will
-re-litigate — and because two of these choices are the kind that look like
-implementation details until a figure moves and nobody can say why.
+Four questions decide every number in «المال والأرباح». The owner answered all
+four on 2026-09-19 and amended the second on 2026-11-11, and the answers are
+recorded here because a rule that lives only in a chat message is a rule the
+next reader will re-litigate — and because two of these choices are the kind
+that look like implementation details until a figure moves and nobody can say
+why.
 
-`worker/lib/financeReport.ts` implements them. If this file and that file ever
-disagree, **this file is the specification** and the code is the defect.
+`worker/routes/adminFinanceWorkspace.ts` implements them for every period
+figure, report and file, over `worker/lib/orderProfit.ts` for each order's own
+figures; the accounting journal (`worker/lib/operations.ts`) records the same
+events on their own days. If this file and that code ever disagree, **this file
+is the specification** and the code is the defect.
 
 ---
 
@@ -36,20 +40,39 @@ answer to that: a separate figure for **مقبوض ولم يُسلَّم بعد*
 against undelivered orders. It is not profit and is never added to profit; it
 is the other half of the picture, shown beside it rather than mixed into it.
 
-## 2. A refund is deducted from the month it HAPPENS
+> Flagged 2026-11-11, not changed: no screen shows a «مقبوض ولم يُسلَّم بعد»
+> figure today, neither «المال والأرباح» nor the old report. This paragraph
+> waits for the owner's decision.
 
-A January sale returned in March reduces March, not January.
+## 2. A refund is deducted from its SALE's period (amended 2026-11-11)
 
-**Why.** January is closed. The owner has seen that number, may have printed
-it, may have decided something on it. A report whose past silently rewrites
-itself two months later cannot be reconciled against anything — not against a
-cash count, not against a previous screenshot, not against a decision already
-taken.
+A January sale returned in March reduces January, not March. «المال والأرباح»
+counts every refund against the period in which its sale was delivered: the
+order's row, its product's and section's rows, the Days table and «من المبيعات
+إلى حصتك» carry the sale net of its return, and the wages and the investors'
+share the sale carries are the sale's own. Each refunded amount is shown on its
+line in the order's sheet. The accounting journal does not change:
+`postStoredRefund` (`worker/lib/orderFinance.ts`) records each refund
+(`refund:<case>`) on its own day, `finance_refund_facts.refunded_day`.
 
-**What this costs.** A month carrying returns for old sales looks weaker than
-its own trading deserves. So the returns figure is shown as its own line inside
-that month rather than folded invisibly into profit, and it names how much of
-it belongs to sales from earlier periods.
+**Why (the owner's ruling of 2026-11-11, replacing the rule of 2026-09-19).** A
+refund belongs to the sale it undoes. A period shown with a sale and without its
+return overstates that period for good, and a later month that carries old
+sales' returns looks weaker than its own trading. The participants' shares (§7)
+already read each order whole; the owner's reports now agree with them.
+
+**What this costs.** A past period's figures change when a refund for one of its
+sales arrives later. So a closed month is reconciled against the journal, which
+keeps each refund on its own day, not against an earlier screenshot or file of
+the same period; a file exported before the refund keeps the figures of the day
+it was exported.
+
+**A delivered order that is cancelled later** is reversed like a full return
+(owner, 2026-11-11): the reports, which count delivered orders only, leave it
+out of its delivery period, and the journal reverses its sale and its goods'
+cost on the day of the cancellation (DECISIONS row 318). An order a refunded
+return has already given part of back is not cancelled: the rest of it is
+returned too (DECISIONS row 319).
 
 ## 3. Orders sold before the cost snapshot are ESTIMATED, and say so
 
@@ -100,23 +123,29 @@ serializer.
 
 ---
 
-## Two profits, never one
+## Two profits, and general expenses only in the period's net (amended 2026-11-11)
 
-- **الربح الإجمالي** — revenue minus the cost of the goods sold. Available per
-  product, per category and per sub-category, because every part of it belongs
-  to a product.
-- **الربح الصافي** — gross profit minus operating expenses. Per period ONLY.
+- **ربح البضاعة — gross profit**: the goods' sales the customers kept, minus the
+  cost of those goods. Per order, product, main and sub section, day and period.
+- **«صافيك» — your net**: what is left to the owner after every cost that
+  belongs to a sale. For an order, a product or a section it is **«قبل المصاريف
+  العامة»** (before general expenses) and says so wherever it is shown: the
+  goods' gross profit with its share of the delivery the customers paid and of
+  the cash-on-delivery fee, after its wages, materials and extra costs, the
+  courier and payment fees, the month's promotion by sales value, the
+  investors' share and its share of coupons and credits (a coupon or credit
+  larger than an order's goods is its own «خصومات على مستوى الطلب» row). Only
+  the period's net, «صافي حصتك» in «من المبيعات إلى حصتك», then takes off the
+  general expenses (rent and the like, in full on the day they are entered) and
+  the promotion of a month without sales.
 
-Rent, salaries and advertising belong to no product. Splitting them across
-products by revenue share is an invention, and an invented per-product net
-profit is exactly the kind of number that gets a real decision wrong. So the
-dashboard refuses to compute it and says why where the owner would look for it.
-
-> Note (2026-11-11, owner default for step 4 of the «المال والأرباح» redesign,
-> DECISIONS row 316): Reports → Products and Sections show a per-product and
-> per-section «صافيك» labelled «قبل المصاريف العامة» — after promotion and the
-> investors' share, with general expenses never spread over products. This
-> section is amended in step 6.
+General expenses belong to no product, so they are never spread over products,
+sections or orders: there is no per-product figure after general expenses, and
+no screen draws one. Wages are not general expenses: each order carries the
+wages its rules give it. The month's promotion is shared by sales value in the
+owner's reports only (owner 2026-11-11, DECISIONS row 313; §7). (Replaces the
+rule of 2026-09-19 "net profit per period only; no per-product net" and step
+4's note; owner default 4.7.2, DECISIONS row 316.)
 
 ## 5. A waived fee is not a smaller fee — it is a cost the store paid
 
@@ -164,6 +193,10 @@ That figure answers a question the owner has never been able to ask: what does
 the PRO and PRIME programme actually cost per month, against the extra sales it
 brings. A benefit whose cost is invisible is a benefit nobody can price.
 
+> Flagged 2026-11-11, not changed: no screen shows the «تكلفة امتيازات الأعضاء»
+> line or its breakdown by tier and source today, neither «المال والأرباح» nor
+> the old report. This section waits for the owner's decision.
+
 ### The rule that keeps the two profits honest
 
 The waived amount belongs to the ORDER, not to the product — the same reason
@@ -176,15 +209,19 @@ stays the margin on that product.
 The later owner requirements add managerial allocation alongside the original
 accounting report. The workspace labels the owner's net share separately:
 goods, delivery, payment fees, discounts, staff, investor distributions and
-recorded expenses all affect it. Monthly promotion is allocated across the
-whole month's sold units; narrowing the report's from/to filter does not move
-the entire month's advertising bill onto the remaining products. The original
-accounting view remains explicitly labelled as before profit distribution.
+recorded expenses all affect it. Monthly promotion is shared by the month's
+sales value (owner 2026-11-11, DECISIONS row 313); narrowing the report's
+from/to filter does not move the entire month's advertising bill onto the
+remaining products.
 
-The overview supports inclusive report dates in Baghdad time, up to 365 days,
-and daily revenue/cost/net, expense composition and main-section comparison
-charts. Unknown costs remain unknown in figures and chart gaps. Monthly cost
-entry retains its own month selector independently of the report's date range.
+The overview reads inclusive report dates in Baghdad time, up to 365 days. It
+shows how much of the period is calculated and how much of that rests on
+estimates, four cards that each compare like with like, the revenue curve
+against the comparison period, what waits for the owner, the statement from
+sales to «صافي حصتك», the top products, the cash due and still open, and the
+payouts; the curve and its sparklines are drawn without a chart library.
+Unknown costs remain unknown in the figures, never zero. Monthly cost entry
+retains its own month selector independently of the report's date range.
 
 An employee's work start date is an **exclusive Baghdad delivery-day cutoff**,
 as requested: a start date of 20 September makes deliveries from 21 September
