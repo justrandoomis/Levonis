@@ -187,7 +187,7 @@ test('a received transfer is checked once; a checked one says who checked it; a 
   const page = await mount('en');
   assert.match(words(q(page.container, '[data-courier-howto]')), /When a transfer arrives/);
   assert.equal(q(page.container, '[data-courier-opening]'), null);
-  assert.match(words(q(page.container, '[data-courier-unchecked]')), /49,000.*1 transfers/);
+  assert.match(words(q(page.container, '[data-courier-unchecked]')), /49,000.*Transfers: 1/);
   assert.match(words(q(page.container, 'tr[data-courier-transfer="rem-1"]')), /Opening balance.*Checked by Owner on 2026-11-02/);
   await act(async () => { click(q(page.container, 'tr[data-courier-transfer="rem-2"] button[data-courier-reconcile]')); });
   await page.settle();

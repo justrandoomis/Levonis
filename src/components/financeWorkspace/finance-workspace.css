@@ -65,7 +65,7 @@ dialog.fw-sheet--side{margin:0;margin-inline-start:auto;width:min(440px,100vw);h
 .fw-courier-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.fw-courier-metrics small{display:block;margin-top:4px;font-size:11px;line-height:1.5}
 .fw-courier-h{font-size:13px;font-weight:600;margin:18px 0 8px}.fw-courier-table th:first-child,.fw-courier-table td:first-child{min-width:0;width:28px;text-align:center}
 .fw-courier-table input[type=checkbox]{width:16px;height:16px;margin:0}.fw-courier-table tr[aria-selected=true] td{background:var(--fw-raised)}
-.fw-courier-num{width:96px;padding:4px 6px;text-align:end}
+.fw-courier-num{width:104px;min-height:32px;padding:4px 8px;border-radius:6px;font-size:13px!important;text-align:end}
 .fw-courier-form{margin-top:12px;padding:12px;border:1px solid var(--fw-line);border-radius:6px;background:var(--fw-raised);display:grid;gap:10px}
 .fw-courier-sum,.fw-courier-diff{margin:0;font-size:12px}.fw-courier-actions,.fw-courier-check{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
 @media(max-width:600px){.fw-courier-metrics{grid-template-columns:1fr}}

@@ -48,7 +48,7 @@ export const AS = {
   courier_money_overdue: ['نقد لدى شركة التوصيل منذ أكثر من 14 يومًا', 'Cash with the courier for over 14 days', 'پارە لای کۆمپانیای گەیاندن زیاتر لە 14 ڕۆژە'],
   courier_money_overdueNote: ['طرود سُلّمت ولم يدفع نقدَها أي تحويل؛ سجّل تحويل الزعيم من «أموال لدى شركة التوصيل» أو طالِب به.', 'Parcels delivered whose cash no transfer has paid yet; record Al-Zaeem’s transfer under «Money with the courier», or ask for it.', 'پاکەتی گەیەنراو کە هێشتا هیچ گواستنەوەیەک پارەکەی نەداوە؛ گواستنەوەکە لە «پارە لای کۆمپانیای گەیاندن» تۆمار بکە، یان داوای بکە.'],
   courier_transfers_unchecked: ['تحويلات من شركة التوصيل لم تُطابَق منذ أكثر من 7 أيام', 'Courier transfers not checked for over 7 days', 'گواستنەوەی کۆمپانیای گەیاندن کە زیاتر لە 7 ڕۆژە بەراورد نەکراون'],
-  courier_transfers_uncheckedNote: ['طابِق كل تحويل مع كشف الزعيم، ثم اضغط «تمت المطابقة» في «أموال لدى شركة التوصيل».', 'Check each transfer against Al-Zaeem’s statement, then press «Checked» under «Money with the courier».', 'هەر گواستنەوەیەک لەگەڵ کەشفی کۆمپانیاکە بەراورد بکە، پاشان لە «پارە لای کۆمپانیای گەیاندن» «بەراوردکرا» دابگرە.'],
+  courier_transfers_uncheckedNote: ['طابِق كل تحويل مع كشف الزعيم، ثم اضغط «تمت المطابقة» في «أموال لدى شركة التوصيل».', 'Check each transfer against Al-Zaeem’s statement, then press «Mark checked» under «Money with the courier».', 'هەر گواستنەوەیەک لەگەڵ کەشفی کۆمپانیاکە بەراورد بکە، پاشان لە «پارە لای کۆمپانیای گەیاندن» «بەراوردکرا» دابگرە.'],
 } as const satisfies Record<string, Tri>;
 
 export type AsKey = keyof typeof AS;
