@@ -1133,6 +1133,7 @@
     "tests/speedPanelUi.test.ts": 1,
     "tests/sqlLikeBytes.test.ts": 0.4,
     "tests/sqlSplit.test.ts": 2.5,
+    "tests/staffPaymentStatement.test.ts": 9.5,
     "tests/staffReconciliationRunner.test.ts": 0.6,
     "tests/stockAlertConcurrency.test.ts": 26.9,
     "tests/stockAlertDegraded.test.ts": 39.5,

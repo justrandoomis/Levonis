@@ -201,3 +201,21 @@ test('the page: the search is sent once the typing stops, the switch adds the sy
   assert.ok(sent.at(-1)!.includes('auto=1'), sent.at(-1));
   await page.unmount();
 });
+
+test('a staff payment’s row opens its statement, as Excel and as a page to print (DECISIONS row 330)', async () => {
+  serve([{ rows: [
+    ROW(9, 'finance.staff_paid', 'pay-1', { staff_id: 'staff_a', kind: 'payment', amount_iqd: 6500, payment_day: '2026-11-12' }, 'boss', '2026-11-12T07:00:00.000Z'),
+    ROW(8, 'finance.cost_approved', 'cost-1', {}, 'boss', '2026-11-12T06:00:00.000Z'),
+  ], next: null }]);
+  const page = await mount();
+  const rows = rowsOf(page.container);
+  const links = rows[0].querySelectorAll('a') as unknown as FakeElement[];
+  assert.deepEqual(links.map((a) => a.getAttribute('href')), [
+    '/api/admin/finance-workspace/statements/staff-payments/pay-1/export.xlsx?lang=ar',
+    '/api/admin/finance-workspace/statements/staff-payments/pay-1/print?lang=ar',
+  ]);
+  assert.equal(links[1].getAttribute('target'), '_blank', 'the page to print opens in its own tab');
+  assert.equal((rows[1].querySelectorAll('a') as unknown as FakeElement[]).length, 0, 'other rows have none');
+  assert.ok(words(rows[0]).includes('6,500 د.ع'), 'the payment’s amount, now on its row');
+  await page.unmount();
+});

@@ -235,5 +235,5 @@ export const XLSX_CONTENT_TYPE = 'application/vnd.openxmlformats-officedocument.
 /** A download response; `name` without its extension, kept to safe characters. */
 export function xlsxResponse(bytes: Uint8Array, name: string): Response {
   const safe = name.replace(/[^A-Za-z0-9._-]+/g, '-').slice(0, 120) || 'report';
-  return new Response(bytes, { headers: { 'Content-Type': XLSX_CONTENT_TYPE, 'Content-Disposition': `attachment; filename="${safe}.xlsx"`, 'Cache-Control': 'no-store' } });
+  return new Response(bytes, { headers: { 'Content-Type': XLSX_CONTENT_TYPE, 'Content-Disposition': `attachment; filename="${safe}.xlsx"`, 'Cache-Control': 'private, no-store' } });
 }

@@ -24,6 +24,7 @@ import { loadLotUsdRates } from '../lib/batchSnapshot';
 import { runFinanceChecks } from '../lib/financeChecks';
 import { xlsxResponse, xlsxWorkbook } from '../lib/xlsx';
 import { ordersReportHtml, ordersReportSheet, productsOf, type ReportLang } from '../lib/financeOrdersReport';
+import { staffPaymentStatement, staffStatementSheet, statementHtml } from '../lib/financeStatements';
 import { asDocument } from '../lib/securityPolicy';
 import { CLOSED_MONTHS_SQL, EXPENSE_ROW_LIMIT, EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_LIMIT, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
 
@@ -977,6 +978,22 @@ async function ordersReportFile(c:Context<AppContext>,kind:'xlsx'|'print'){
   return c.html(ordersReportHtml(input));
 }
 adminFinanceWorkspaceRoutes.get('/export.xlsx',(c)=>ordersReportFile(c,'xlsx'));
+/**
+ * A STAFF PAYMENT'S STATEMENT (the owner's brief, 2026-11-12, part 2; DECISIONS row 330; worker/lib/financeStatements.ts): the
+ * wages one payment or advance paid — each one's order, task, how it is counted, earned, paid before, paid here, still due —
+ * with the totals and the balance today, as a workbook or a page to print. `lang` as the reports.
+ */
+async function staffStatementFile(c:Context<AppContext>,kind:'xlsx'|'print'){
+  const lang:ReportLang=c.req.query('lang')==='en'?'en':c.req.query('lang')==='ckb'?'ckb':'ar';
+  const id=(c.req.param('id')??'').slice(0,80);
+  const st=await staffPaymentStatement(c.env.DB,id);
+  const sheet=staffStatementSheet(st,lang,new Date());
+  if(kind==='xlsx')return xlsxResponse(xlsxWorkbook([sheet]),`staff-payment-${st.payment.payment_day}-${id}`);
+  asDocument(c);
+  return c.html(statementHtml(sheet,lang));
+}
+adminFinanceWorkspaceRoutes.get('/statements/staff-payments/:id/export.xlsx',(c)=>staffStatementFile(c,'xlsx'));
+adminFinanceWorkspaceRoutes.get('/statements/staff-payments/:id/print',(c)=>staffStatementFile(c,'print'));
 adminFinanceWorkspaceRoutes.get('/print',(c)=>ordersReportFile(c,'print'));
 adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   const view=c.req.query('view')||'lines',level=c.req.query('level')||'main';

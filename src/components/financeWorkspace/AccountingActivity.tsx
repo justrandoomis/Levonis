@@ -15,6 +15,9 @@ import { aas, actionWords } from './activityStrings';
  * nothing. A table on a wide screen; on a phone each act is one item of the attention list, its money at the end, so nothing
  * hides behind a sideways scroll.
  *
+ * A PAYMENT'S STATEMENT (the owner's brief, 2026-11-12, part 2; DECISIONS row 330). A staff payment's row carries its
+ * statement — every wage it paid, traced — as Excel and as a page to print or save as PDF, in the reader's language.
+ *
  * ON WHAT. The order the act concerns when there is one — its own target, or the order its detail names (a collection, an
  * approved wage) — as a button that opens its sheet; otherwise the row's own id.
  *
@@ -53,7 +56,7 @@ export function activityNote(detail: unknown): string {
 }
 
 export default function AccountingActivity({ from, to, onOpenOrder }: { from: string; to: string; onOpenOrder: (orderId: string) => void }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const narrow = useNarrow();
   const [rows, setRows] = useState<ActivityRow[] | null>(null);
   const [next, setNext] = useState<number | null>(null);
@@ -91,6 +94,12 @@ export default function AccountingActivity({ from, to, onOpenOrder }: { from: st
     return order ? <button type="button" className="fw-link" onClick={() => onOpenOrder(order)}>{order}</button> : <span dir="ltr">{r.target}</span>;
   };
   const who = (r: ActivityRow) => r.actor_name || r.actor_id || aas(loc, 'system');
+  const statement = (r: ActivityRow): ReactNode => {
+    if (r.action !== 'finance.staff_paid' || !r.target) return null;
+    const base = `${WORKSPACE_API}/statements/staff-payments/${encodeURIComponent(r.target)}`;
+    return <small data-finance-activity-statement>{aas(loc, 'statement')}: <a className="fw-link" href={`${base}/export.xlsx?lang=${lang}`}>Excel</a>
+      {' · '}<a className="fw-link" href={`${base}/print?lang=${lang}`} target="_blank" rel="noopener">PDF</a></small>;
+  };
 
   return <Surface title={aas(loc, 'title')} subtitle={aas(loc, 'sub')}>
     <div data-finance-activity aria-busy={busy}>
@@ -105,7 +114,7 @@ export default function AccountingActivity({ from, to, onOpenOrder }: { from: st
               const note = activityNote(r.detail);
               return <li key={r.id} data-finance-activity-row={r.action}>
                 <small dir="ltr">{whenOf(r.at).slice(5)}</small>
-                <div><strong>{actionWords(loc, r.action)}</strong><small>{who(r)} · {on(r)}{note && <> · {note}</>}</small></div>
+                <div><strong>{actionWords(loc, r.action)}</strong><small>{who(r)} · {on(r)}{note && <> · {note}</>}</small>{statement(r)}</div>
                 <span>{money(r)}</span>
               </li>;
             })}</ul>
@@ -114,7 +123,7 @@ export default function AccountingActivity({ from, to, onOpenOrder }: { from: st
                 <tbody>{rows.map((r) => {
                   const note = activityNote(r.detail);
                   return <tr key={r.id} data-finance-activity-row={r.action}>
-                    <th scope="row"><div>{actionWords(loc, r.action)}</div>{note && <small>{note}</small>}</th>
+                    <th scope="row"><div>{actionWords(loc, r.action)}</div>{note && <small>{note}</small>}{statement(r)}</th>
                     <td dir="ltr">{whenOf(r.at)}</td>
                     <td>{who(r)}</td>
                     <td>{on(r)}</td>

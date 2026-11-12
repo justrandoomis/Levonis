@@ -22,6 +22,8 @@ export const AAS = {
   colOn: ['على', 'On', 'لەسەر'],
   colAmount: ['المبلغ', 'Amount', 'بڕ'],
   system: ['النظام', 'System', 'سیستەم'],
+  // A payment's statement, opened from its row (DECISIONS row 330).
+  statement: ['الكشف', 'Statement', 'کەشف'],
 } as const satisfies Record<string, Tri>;
 
 export const ACTION_WORDS: Record<string, Tri> = {

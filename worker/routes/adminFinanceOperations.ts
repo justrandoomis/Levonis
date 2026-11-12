@@ -487,7 +487,8 @@ adminFinanceOperationsRoutes.post('/staff/:id/payments', async (c) => {
     ).statements,
   );
   await commitParticipantStatements(db,statements);
-  await audit(db, user.id, 'finance.staff_paid', id, { staff_id: staff, kind });
+  // The amount and the day, so the activity log shows them and opens the payment's statement (DECISIONS row 330).
+  await audit(db, user.id, 'finance.staff_paid', id, { staff_id: staff, kind, amount_iqd: amount, payment_day: day });
   return c.json({ success: true });
 });
 adminFinanceOperationsRoutes.post('/staff/:id/advance-settlements', async (c) => {

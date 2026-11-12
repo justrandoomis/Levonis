@@ -96,6 +96,8 @@ export default {
         'GET /activity': 'cost_read',
         'GET /export.xlsx': 'cost_read',
         'GET /print': 'cost_read',
+        'GET /statements/staff-payments/:id/export.xlsx': 'cost_read',
+        'GET /statements/staff-payments/:id/print': 'cost_read',
         'GET /orders': 'cost_read',
         'GET /orders/:id': 'cost_read',
         'POST /orders/:id/adjustments': 'cost_write',
