@@ -6,7 +6,7 @@
  * and counted and one still waiting, an earlier withdrawal that paid 10,000 of the profit, and this withdrawal taking profit,
  * capital and a purchase's capital surplus: the summary names, per agreement, what was invested, the share, the profit and
  * capital the ledger recorded, what the earlier withdrawal paid, what this one takes and what remains, the surplus as its
- * own line, with totals; the units sheet lists every sold unit behind the agreement with its sale, cost, expenses, profit,
+ * own line under its invoice number, with totals; the units sheet lists every sold unit behind the agreement with its sale, cost, expenses, profit,
  * the investor's profit and the capital returned, a waiting unit named so; the page to print holds both tables; an unknown
  * withdrawal is 404; the words keep the Sorani rules (DECISIONS row 183).
  *
@@ -63,6 +63,13 @@ function agreement() {
     `('${allocation}','ct1',${profit},${capital},0,${eligible},${pending},'${JSON.stringify(snapshot)}',1)`;
   w.raw.exec(`INSERT INTO users(id,email,name,role) VALUES ('inv1','inv1@x.co','مستثمر تجريبي','customer');
     INSERT INTO incoming_inventory(id,product_id,scope,scope_id,qty_ordered,qty_received,purchase_unit_iqd) VALUES ('batch1','product','base','',4,4,10000);
+    INSERT INTO investment_profiles(user_id,state,default_profit_share_bps,created_by,created_at,updated_at) VALUES ('inv1','active',5000,'admin','2026-10-01T08:00:00.000Z','2026-10-01T08:00:00.000Z');
+    INSERT INTO purchase_orders(id,invoice_no,currency,exchange_rate,purchase_day,status,created_by,created_at,updated_at)
+      VALUES ('po_surplus_1','PO-77','IQD',1,'2026-10-01','received','admin','2026-10-01T08:00:00.000Z','2026-10-01T08:00:00.000Z');
+    INSERT INTO purchase_investor_agreements(purchase_id,user_id,agreed_iqd,allocated_iqd,batch_cost_iqd,profit_share_bps,loss_share_bps,actor_id,created_at,request_json)
+      VALUES ('po_surplus_1','inv1',45000,40000,40000,5000,5000,'admin','2026-10-01T08:00:00.000Z','{}');
+    INSERT INTO purchase_investor_receipts(id,purchase_id,amount_iqd,allocated_iqd,payment_day,reference,actor_id,created_at,request_json)
+      VALUES ('rcpt1','po_surplus_1',45000,40000,'2026-10-01','zain cash','admin','2026-10-01T08:00:00.000Z','{}');
     INSERT INTO investment_contracts(id,incoming_id,user_id,name,principal_iqd,capital_share_bps,profit_share_bps,loss_share_bps,created_by,created_at,request_json,state)
       VALUES ('ct1','batch1','inv1','دفعة الطابعات',40000,10000,5000,5000,'admin','2026-10-01T08:00:00.000Z','{}','active');
     INSERT INTO investor_allocation_results(allocation_id,contract_id,profit_iqd,capital_iqd,loss_iqd,eligible,pending,snapshot,version) VALUES
@@ -79,7 +86,7 @@ function agreement() {
       ('wd0','investor_profit','invprofit:ct1',10000,10000),
       ('wd1','investor_profit','invprofit:ct1',11000,0),
       ('wd1','investor_capital','invcapital:ct1',14000,0),
-      ('wd1','investor_capital','invsurplus:PO-77',3000,0);`);
+      ('wd1','investor_capital','invsurplus:po_surplus_1',3000,0);`);
   return w;
 }
 
@@ -95,10 +102,10 @@ test('the summary: per agreement what was invested, earned, paid before, taken n
   const { rows, total } = table(g, 'الاتفاق');
   assert.deepEqual(rows.map((r) => [r.get(S.name), r.get(S.invested) ?? null, r.get(S.share) ?? null, r.get(S.profit) ?? null, r.get(S.capital), r.get(S.paid_before), r.get(S.this), r.get(S.remaining) ?? null]), [
     ['دفعة الطابعات', 40000, '50%', 21000, 30000, 10000, 25000, 16000],
-    ['فائض رأس مال: PO-77', null, null, null, 3000, 0, 3000, null],
+    ['فائض رأس مال: PO-77', null, null, null, 5000, 0, 3000, 2000],
   ]);
   assert.deepEqual([total.get(S.profit), total.get(S.capital), total.get(S.paid_before), total.get(S.this), total.get(S.remaining), total.get(S.invested) ?? null],
-    [21000, 33000, 10000, 28000, 16000, null], 'the withdrawal is the total of «this withdrawal»; the invested amount is not summed');
+    [21000, 35000, 10000, 28000, 18000, null], 'the withdrawal is the total of «this withdrawal»; the invested amount is not summed');
 });
 
 test('the units: every sold unit behind the agreement, traced, a waiting one named so, with totals', async () => {
@@ -123,6 +130,7 @@ test('the printed statement holds both tables, a page apart; an unknown withdraw
   assert.equal(html.match(/<table>/g)?.length, 2);
   assert.equal(html.match(/<script>/g)?.length, 1, 'one script: the print dialog');
   assert.ok(html.includes('.page-break { break-before: page; }') && html.includes('<div class="page-break"></div>'));
+  assert.equal(html.match(/class="no-print"/g)?.length, 1, 'the print hint once');
   assert.ok(html.includes('<th scope="col">This withdrawal</th>') && html.includes('<th scope="col">Investor’s profit</th>'));
   assert.equal((await get(w.app, '/f/statements/withdrawals/nope/export.xlsx')).status, 404);
 });

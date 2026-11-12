@@ -19,6 +19,7 @@ import { AUTO_PRINT_SCRIPT } from './securityPolicy';
 import { PRINT_FONT_LINK, printBaseCss } from './printDocument';
 import { effectiveStaffCostSql, staffAdvanceSql, staffPaymentBudget } from './financeParticipants';
 import { notFound } from './http';
+import { SURPLUS_PREFIX, SURPLUS_ROWS_SQL, surplusInstalled } from './investorSurplus';
 import type { ReportLang } from './financeOrdersReport';
 
 type Tri = readonly [ar: string, en: string, ckb: string];
@@ -230,7 +231,7 @@ export const WITHDRAWAL_UNIT_COLUMNS: StatementColumn[] = [
 ];
 
 export interface WithdrawalStatement {
-  withdrawal: { id: string; user_name: string; amount_iqd: number; paid_iqd: number; state: string; created_at: string };
+  withdrawal: { id: string; user_id: string; user_name: string; amount_iqd: number; paid_iqd: number; state: string; created_at: string };
   summary: Row[];
   units: Row[];
 }
@@ -242,7 +243,7 @@ const snap = (v: unknown, key: string): number | null => {
 
 /** The statement of one withdrawal, from the rows it reserved and the ledger's own figures. */
 export async function withdrawalStatement(db: D1Database, withdrawalId: string, lang: ReportLang): Promise<WithdrawalStatement> {
-  const w = await db.prepare(`SELECT w.id,COALESCE(u.name,u.email,w.user_id) AS user_name,w.amount_iqd,w.paid_iqd,w.state,w.created_at
+  const w = await db.prepare(`SELECT w.id,w.user_id,COALESCE(u.name,u.email,w.user_id) AS user_name,w.amount_iqd,w.paid_iqd,w.state,w.created_at
       FROM finance_withdrawals w LEFT JOIN users u ON u.id=w.user_id WHERE w.id=?`).bind(withdrawalId).first<WithdrawalStatement['withdrawal']>();
   if (!w) throw notFound('Withdrawal not found');
   const allocs = (await db.prepare(`SELECT a.source_kind,a.source_id,a.amount_iqd,
@@ -262,14 +263,24 @@ export async function withdrawalStatement(db: D1Database, withdrawalId: string, 
     return { name: c.name, invested: c.principal_iqd, share: pct(c.profit_share_bps), profit: c.profit ?? 0, capital: c.capital ?? 0,
       paid_before: paidBefore, this: here, remaining: Math.max(0, earned - paidBefore - here) };
   });
+  // A purchase's capital surplus, as the withdrawal page itself reads it (investorSurplus.ts): its invoice number and the
+  // whole surplus; one no longer listed (a contract took the cash since) keeps its id's tail and no total.
+  const surplusIds = allocs.filter((a) => a.source_id.startsWith(SURPLUS_PREFIX)).map((a) => a.source_id);
+  const surplus = new Map<string, { title: string; amount_iqd: number }>();
+  if (surplusIds.length && await surplusInstalled(db)) {
+    for (const r of (await db.prepare(`SELECT id,title,amount_iqd FROM (${SURPLUS_ROWS_SQL}) WHERE id IN (SELECT value FROM json_each(?))`)
+      .bind(w.user_id, JSON.stringify(surplusIds)).all<{ id: string; title: string; amount_iqd: number }>()).results ?? []) surplus.set(r.id, r);
+  }
   for (const a of allocs.filter((x) => !contractOf(x.source_id))) {
     if (a.source_kind === 'staff') {
       const cost = await db.prepare(`SELECT c.rule_name,c.order_id,${effectiveStaffCostSql('c')} AS earned FROM finance_order_costs c WHERE c.id=?`).bind(a.source_id).first<Row>();
       summary.push({ name: fill(pick(lang, WW.wage), { task: `${String(cost?.rule_name ?? a.source_id)} — ${String(cost?.order_id ?? '')}` }), invested: null, share: '',
         profit: cost?.earned ?? null, capital: null, paid_before: a.paid_before, this: a.amount_iqd, remaining: null });
     } else {
-      summary.push({ name: fill(pick(lang, WW.surplus), { title: a.source_id.replace(/^invsurplus:/, '') }), invested: null, share: '', profit: null,
-        capital: a.amount_iqd + Number(a.paid_before), paid_before: a.paid_before, this: a.amount_iqd, remaining: null });
+      const s = surplus.get(a.source_id), whole = s ? s.amount_iqd : null;
+      summary.push({ name: fill(pick(lang, WW.surplus), { title: s?.title ?? a.source_id.slice(SURPLUS_PREFIX.length).slice(-8) }), invested: null, share: '',
+        profit: null, capital: whole, paid_before: a.paid_before, this: a.amount_iqd,
+        remaining: whole === null ? null : Math.max(0, whole - Number(a.paid_before) - Number(a.amount_iqd)) });
     }
   }
   const units = contractIds.length ? (await db.prepare(`SELECT r.contract_id,c.name AS agreement,c.profit_share_bps,a.order_id,date(o.delivered_at,'+3 hours') AS day,
@@ -314,7 +325,8 @@ export function statementsHtml(sheets: XlsxSheet[], lang: ReportLang): string {
   const bodies = sheets.map((s, i) => {
     const html = statementHtml(s, lang);
     const body = html.slice(html.indexOf('<body>') + 6, html.lastIndexOf('<script>'));
-    return i === 0 ? body : `<div class="page-break"></div>${body}`;
+    // The «print or save as PDF» hint once, above the first table.
+    return i === 0 ? body : `<div class="page-break"></div>${body.replace(/<p class="no-print">[^<]*<\/p>/, '')}`;
   }).join('');
   return `${first.slice(0, first.indexOf('</style>'))}  .page-break { break-before: page; }\n${first.slice(first.indexOf('</style>'), first.indexOf('<body>') + 6)}${bodies}<script>${AUTO_PRINT_SCRIPT}</script></body></html>`;
 }
