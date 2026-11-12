@@ -41,6 +41,7 @@ import { productRoutes } from '../worker/routes/products';
 import { bundlesRoutes } from '../worker/routes/bundles';
 import { adminMysteryRoutes } from '../worker/routes/mystery';
 import { adminFinanceReportRoutes, resetFinanceSchemaMemo } from '../worker/routes/adminFinanceReport';
+import { adminFinanceWorkspaceRoutes } from '../worker/routes/adminFinanceWorkspace';
 import { moveOrderStage } from '../worker/lib/orderStageOps';
 import { baghdadDay } from '../worker/lib/baghdadTime';
 import { seedCatalogue, orderBody } from './lib/bundles';
@@ -536,5 +537,37 @@ test('the finance report stops treating mystery revenue as costless, and files t
       !(revenue > 0 && cogs === 0) || Number(r.totals.uncosted_revenue_iqd ?? 0) === revenue,
       `a category with revenue and no cost must say its revenue is uncosted, not imply 100% margin: ${JSON.stringify(r)}`
     );
+  }
+});
+
+// «المال والأرباح» Reports → Products and Sections (redesign step 4, DECISIONS row 316) group the same sale from the workspace's
+// /summary. A drawn spool's line has no product on purpose, so it was a product row of its own, named after the box, in no
+// section; it is filed under the offer it was sold as, as the report above files it. The plan's mystery check before retirement.
+test('the workspace\'s products and sections file a mystery box under its offer, revenue and cost in one row, as the report does', async () => {
+  const raw = seedCatalogue();
+  seedFilaments(raw);
+  const db = asD1(raw);
+  const { offerId } = await composeOffer(db);
+  const { drawn } = await buyOneBox(raw, db, offerId);
+  const expectedCogs = drawn.reduce((sum, id) => sum + COST_OF[id], 0);
+  const orderId = String(row<{ id: string }>(raw, 'SELECT id FROM orders LIMIT 1')!.id);
+  for (const stage of ['confirmed', 'preparing', 'out_for_delivery', 'delivered'] as const) {
+    await moveOrderStage({ DB: db } as never, { orderId, to: stage, source: 'manual', changedBy: boss.id, note: '' });
+  }
+  const day = baghdadDay(Date.now());
+  const workspace = stubApp(db, boss, (a) => a.route('/f', adminFinanceWorkspaceRoutes), OWNER_ENV);
+  const s = await json(await get(workspace, `/f/summary?from=${day}&to=${day}`));
+  assert.equal(s.success, true, JSON.stringify(s).slice(0, 300));
+  type Group = { id: string; level: string; retained_revenue_iqd: number; cogs_iqd: number | null; gross_profit_iqd: number | null; order_ids: string[] };
+  const products = s.products as Group[];
+  assert.deepEqual(products.map((p) => p.id), [offerId], 'one row, the offer\'s — not one per drawn spool');
+  assert.deepEqual([products[0].retained_revenue_iqd, products[0].cogs_iqd, products[0].gross_profit_iqd], [60_000, expectedCogs, 60_000 - expectedCogs], 'revenue and cost meet in it');
+  assert.deepEqual(products[0].order_ids, [orderId]);
+  for (const id of drawn) assert.ok(!products.some((p) => p.id === id), 'a spool is not a sale of the filament product');
+  for (const level of ['main', 'sub']) {
+    const rows = (s.categories as Group[]).filter((c) => c.level === level);
+    assert.equal(rows.reduce((v, r) => v + Number(r.cogs_iqd ?? 0), 0), expectedCogs, `${level}: the sections add up to the period's cost`);
+    assert.equal(rows.reduce((v, r) => v + r.retained_revenue_iqd, 0), 60_000, `${level}: and to its revenue`);
+    for (const r of rows) assert.ok(!(r.retained_revenue_iqd > 0 && !r.cogs_iqd) && !(r.retained_revenue_iqd === 0 && (r.cogs_iqd ?? 0) > 0), `${level}: revenue without its cost, or a cost without its revenue: ${JSON.stringify(r)}`);
   }
 });

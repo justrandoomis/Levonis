@@ -169,6 +169,9 @@ test('summary withholds a persisted investor split after a linked expense change
 test('financial exports and numeric mutations enforce financial scope and emit safe source CSV',async()=>{
   const {app,assistant,raw}=setup();assert.equal((await get(assistant,`/f/summary?${period()}`)).status,403);assert.equal((await get(assistant,`/f/export.csv?${period()}`)).status,403);assert.equal((await edit(assistant,'cogs_iqd',1)).status,403);
   raw.exec("UPDATE order_items SET name_snapshot='=HYPERLINK(\"https://x\")'");const response=await get(app,`/f/export.csv?${period()}`);assert.equal(response.status,200);assert.match(await response.text(),/'=HYPERLINK/);
+  // Redesign step 4 (DECISIONS row 316): every report's own file is behind the same door, and guards its text the same way.
+  for(const view of ['orders','products','sections','sections&level=sub','days','orders&part=calculated','orders&part=waiting'])assert.equal((await get(assistant,`/f/export.csv?${period()}&view=${view}`)).status,403,view);
+  const products=await get(app,`/f/export.csv?${period()}&view=products`);assert.equal(products.status,200);assert.match(await products.text(),/'=HYPERLINK/);
 });
 test('chart days reconcile revenue, costs and owner result without reallocating month promotion on a date filter',async()=>{
   const {raw,db,add,app}=setup();

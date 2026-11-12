@@ -112,6 +112,12 @@ products by revenue share is an invention, and an invented per-product net
 profit is exactly the kind of number that gets a real decision wrong. So the
 dashboard refuses to compute it and says why where the owner would look for it.
 
+> Note (2026-11-11, owner default for step 4 of the «المال والأرباح» redesign,
+> DECISIONS row 316): Reports → Products and Sections show a per-product and
+> per-section «صافيك» labelled «قبل المصاريف العامة» — after promotion and the
+> investors' share, with general expenses never spread over products. This
+> section is amended in step 6.
+
 ## 5. A waived fee is not a smaller fee — it is a cost the store paid
 
 Added 2026-09-19, and it refines rule 4 rather than replacing it.

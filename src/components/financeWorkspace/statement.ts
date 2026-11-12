@@ -27,7 +27,7 @@ type Part = { t: ProfitTotals; pending: number; general: number; unallocated: nu
 
 const add = (...xs: (number | null | undefined)[]) => (xs.some((x) => x == null) ? null : xs.reduce<number>((v, x) => v + (x as number), 0));
 /** A cents row read by the dinar names of its fields. */
-const byIqdNames = (c: UsdCents): ProfitTotals => Object.fromEntries(Object.entries(c).map(([k, v]) => [k.replace(/_cents$/, '_iqd'), v])) as ProfitTotals;
+export const byIqdNames = (c: UsdCents): ProfitTotals => Object.fromEntries(Object.entries(c).map(([k, v]) => [k.replace(/_cents$/, '_iqd'), v])) as ProfitTotals;
 
 function column(p: Part, key: StatementKey): number | null {
   if (!p) return null;
@@ -57,6 +57,17 @@ const ORDER: Array<[StatementKey, StatementRow['sign']]> = [
 const pendingOf = (t: ProfitTotals | undefined) => t?.pending_costs ?? 0;
 const after = (withDeductions: number | null | undefined, before: number | null | undefined) => (withDeductions !== undefined ? withDeductions : before ?? null);
 const rowsOf = (calc: Part, wait: Part, period: Part) => ORDER.map(([key, sign]): StatementRow => ({ key, sign, cells: [column(calc, key), column(wait, key), column(period, key)] }));
+/** The statement's lines in the order the server applies them, with their signs (redesign step 4: the figure drawer opens each). */
+export const STATEMENT_ORDER: ReadonlyArray<readonly [StatementKey, StatementRow['sign']]> = ORDER;
+/**
+ * ONE ORDER'S TERM OF THE STATEMENT (redesign step 4, DECISIONS row 316): the cell it would have were it a column of its own —
+ * the same arithmetic, field for field, with no share of the overheads (an order carries none). The figure drawer lists
+ * these, so its rows and the statement's cell can only differ by the overheads it names. `pending`: the order's costs still
+ * waiting (in dollars the cents row has none, so the caller passes the dinar row's).
+ */
+export function termOf(t: ProfitTotals, key: StatementKey, pending = pendingOf(t)): number | null {
+  return column({ t, pending, general: 0, unallocated: 0, net: after(t.net_after_report_adjustments_iqd, t.owner_net_iqd) }, key);
+}
 
 /**
  * The rows in dinars, or — with the server's dollar block, when it carries every column the

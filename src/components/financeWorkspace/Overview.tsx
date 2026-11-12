@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useState, type ReactNode } from 'react';
 import { ArrowUpLeft, CheckCircle2 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
-import { Button, Money, Status, Surface, formatMoney } from './ui';
+import { Button, Money, Status, Surface, cardClick, formatMoney, useNarrow } from './ui';
 import { DisplayMoney, MissingValue, UsdBasisNote, centsAt, usdText, useDisplayCurrency } from './displayCurrency';
 import { averageOrder, overviewNet } from './overviewFigures';
 import { statementColumns, statementRows, type StatementKey } from './statement';
@@ -10,6 +10,9 @@ import { change, signFlip } from './compare';
 import { fw, rangeText, type FwKey } from './overviewStrings';
 import { financeDay, type DisplayUsdSummary, type FinanceSection, type FinanceSummary, type FinanceWaitReason } from './types';
 import type { OrderFocus } from './OrderProfitSheet';
+import { columnEstimates, type FigureKey } from './drill';
+import { piecesOf } from './reportTable';
+import { rs } from './reportStrings';
 
 /**
  * «نظرة عامة» — THE OVERVIEW OF «المال والأرباح» (redesign step 3, owner 2026-11-11).
@@ -43,9 +46,11 @@ const available = (p: PayoutPerson) => p.combined?.available_iqd ?? 0;
 /** The page a person's payout is reviewed on: an investor's on «المستثمرون», anyone else's on «الموظفون». */
 const pageOf = (p: PayoutPerson): FinanceSection => (p.investor ? 'investors' : 'staff');
 
-export default function Overview({ data, prev, compareFrom, compareTo, revision = 0, openOrder, onNavigate, onMissing, onCollections }: {
+export default function Overview({ data, prev, compareFrom, compareTo, revision = 0, openOrder, onNavigate, onMissing, onCollections, onFigure }: {
   data: FinanceSummary; prev: FinanceSummary | null; compareFrom?: string; compareTo?: string; revision?: number;
   openOrder: OpenOrder; onNavigate: (section: FinanceSection) => void; onMissing: () => void; onCollections: () => void;
+  /** Opens a figure on the orders that make it (redesign step 4, the figure drawer). */
+  onFigure?: (key: FigureKey) => void;
 }) {
   const { loc, lang } = useLanguage();
   const L = lang as Lang;
@@ -64,9 +69,14 @@ export default function Overview({ data, prev, compareFrom, compareTo, revision 
 
   // A change is shown only between two figures on the same basis (in dinars, the accounting values); a partial one says so,
   // and one across zero says which way it turned — a percentage of a loss means nothing.
-  const delta = (now: number | null | undefined, before: number | null | undefined, partial = false) => {
+  const uid = useId();
+  const whyOf = (key: FwKey) => `${uid}-why-${key}`;
+  const delta = (now: number | null | undefined, before: number | null | undefined, partial = false, key?: FwKey) => {
     if (!prev) return null;
-    if (partial) return <span className="fw-delta" title={fw(loc, 'partialWhy')} data-finance-delta="partial">{fw(loc, 'partial')}</span>;
+    // The reason in words too, not only as a tooltip; nothing covers the card (cardClick), so the tooltip shows and a click on it opens the card.
+    // The third review of step 4: the card's button is described by it (a screen reader says why), the keyboard's focus on that
+    // button shows it (the stylesheet), and a drag across the figures never copies it.
+    if (partial) return <span className="fw-delta" title={fw(loc, 'partialWhy')} data-finance-delta="partial">{fw(loc, 'partial')}<span className="fw-sr" id={key && whyOf(key)}>: {fw(loc, 'partialWhy')}</span></span>;
     const turn = signFlip(now, before);
     if (turn) return <span className={`fw-delta ${turn === 'up' ? 'fw-up' : 'fw-down'}`} data-finance-delta={turn === 'up' ? 'loss-to-profit' : 'profit-to-loss'}>
       <span aria-hidden>{turn === 'up' ? '▲' : '▼'}</span>{fw(loc, turn === 'up' ? 'lossToProfit' : 'profitToLoss')} {vsText}</span>;
@@ -97,22 +107,24 @@ export default function Overview({ data, prev, compareFrom, compareTo, revision 
   const salesByDay = new Map<string, number>();
   for (const o of data.orders) { const day = financeDay(o.delivered_at || o.created_at); salesByDay.set(day, (salesByDay.get(day) ?? 0) + (o.retained_revenue_iqd ?? 0)); }
 
-  const cards: Array<{ key: FwKey; value: ReactNode; notes: string[]; delta: ReactNode; spark?: number[]; split?: boolean; primary?: boolean }> = [
+  const grossPartial = !fullGross || prev?.totals.gross_profit_iqd == null;
+  // A net still missing here is a partial comparison too, never «nothing to compare».
+  const netPartial = figures.net == null || figures.fromKnown || !!prevFigures?.fromKnown || prevFigures?.net == null;
+  const cards: Array<{ key: FwKey; value: ReactNode; notes: string[]; delta: ReactNode; spark?: number[]; split?: boolean; primary?: boolean; open?: () => void; partial?: boolean }> = [
     { key: 'netSales', value: <DisplayMoney iqd={sales} cents={u ? centsAt(u.totals, 'retained_revenue_iqd') : undefined} />, notes: [fw(loc, 'netSalesNote', { n: orders })],
-      delta: delta(sales, prev?.totals.retained_revenue_iqd), spark: daily.map((d) => salesByDay.get(d.day) ?? 0) },
+      delta: delta(sales, prev?.totals.retained_revenue_iqd), spark: daily.map((d) => salesByDay.get(d.day) ?? 0), open: onFigure && (() => onFigure('sales')) },
     { key: 'grossProfit', value: <DisplayMoney iqd={gross} cents={grossCents} />,
       notes: [...(fullGross ? [grossPct ? fw(loc, 'grossNoteAll', { pct: grossPct }) : ''] : [grossPct ? fw(loc, 'grossMargin', { pct: grossPct }) : '', gross != null ? knownNote : '']),
         gross != null && grossEstimated > 0 ? fw(loc, 'estimatedOrders', { n: grossEstimated }) : ''],
-      delta: delta(gross, prev?.totals.gross_profit_iqd, !fullGross || prev?.totals.gross_profit_iqd == null) },
+      delta: delta(gross, prev?.totals.gross_profit_iqd, grossPartial, 'grossProfit'), partial: grossPartial, open: onFigure && (() => onFigure('gross')) },
     { key: 'netShare', value: <DisplayMoney iqd={figures.net} cents={figures.cents} />, primary: true, split: !!estimated && figures.net != null,
       notes: [sharePct ? fw(loc, 'shareMargin', { pct: sharePct }) : '',
         figures.fromKnown ? `${knownNote}${(known?.overhead_share_iqd ?? 0) > 0 ? fw(loc, 'overheadNote') : ''}` : figures.net != null ? fw(loc, 'netNote') : '',
         estimated && figures.confirmed ? `${part('confirmedPart', figures.confirmed)} · ${part('estimatedPart', estimated)}` : '', deducted],
-      // A net still missing here is a partial comparison too, never «nothing to compare».
-      delta: delta(figures.net, prevFigures?.net, figures.net == null || figures.fromKnown || !!prevFigures?.fromKnown || prevFigures?.net == null) },
+      delta: delta(figures.net, prevFigures?.net, netPartial, 'netShare'), partial: netPartial, open: onFigure && (() => onFigure('net')) },
     { key: 'deliveredOrders', value: <strong>{orders}</strong>,
       notes: [fw(loc, 'units', { n: t.units ?? 0 }), average ? fw(loc, 'averageOrder', { amount: noteAmount(average.iqd, average.cents) }).trim() : ''],
-      delta: delta(orders, prevOrders), spark: daily.map((d) => d.orders_count) },
+      delta: delta(orders, prevOrders), spark: daily.map((d) => d.orders_count), open: onFigure && (() => onNavigate('orders')) },
   ];
   const confirmedShare = figures.confirmed?.net != null && figures.net ? Math.max(0, Math.min(100, Math.round(figures.confirmed.net / figures.net * 100))) : 0;
 
@@ -120,8 +132,9 @@ export default function Overview({ data, prev, compareFrom, compareTo, revision 
     {currency === 'USD' && <UsdBasisNote available={!!data.display_usd?.available} atTimeCount={data.display_usd?.at_time_count} todayCount={data.display_usd?.today_count} todayRate={data.display_usd?.today_rate} batchLines={data.display_usd?.batch_cost_lines} />}
     {data.truncated && <p className="fw-error" role="alert">{fw(loc, 'truncated')}</p>}
     <Completeness data={data} onMissing={onMissing} />
-    <div className="fw-kpis">{cards.map((c) => <div key={c.key} className={`fw-metric${c.primary ? ' fw-metric--primary' : ''}`} data-finance-kpi={c.key}>
-      <span>{fw(loc, c.key)}</span>{c.value}{c.delta}
+    {/* A card opens on its label's button (the keyboard's way) or a click anywhere on it, its figures still selectable (cardClick). */}
+    <div className="fw-kpis">{cards.map((c) => <div key={c.key} className={`fw-metric${c.primary ? ' fw-metric--primary' : ''}${c.open ? ' fw-metric--open' : ''}`} data-finance-kpi={c.key} onClick={c.open && cardClick(c.open)}>
+      <span>{c.open ? <button type="button" className="fw-open" onClick={c.open} data-finance-open={c.key} aria-describedby={prev && c.partial ? whyOf(c.key) : undefined}>{fw(loc, c.key)}</button> : fw(loc, c.key)}</span>{c.value}{c.delta}
       {c.spark?.some((v) => v > 0) && <Spark values={c.spark} />}
       {c.split && <div className="fw-stack" aria-hidden><i className="fw-ok" style={{ width: `${confirmedShare}%` }} /><i className="fw-est" style={{ flex: 1 }} /></div>}
       {c.notes.filter(Boolean).map((n) => <small key={n}>{n}</small>)}
@@ -130,10 +143,10 @@ export default function Overview({ data, prev, compareFrom, compareTo, revision 
       <Surface title={fw(loc, 'chartTitle')} subtitle={fw(loc, 'chartNote')}><Curve data={data} prev={prev} usd={u} compareLabel={compareFrom && compareTo ? rangeText(L, compareFrom, compareTo) : ''} /></Surface>
       <Attention data={data} usd={u} people={people} openOrder={openOrder} onNavigate={onNavigate} onMissing={onMissing} onCollections={onCollections} />
     </div>
-    <Statement data={data} usd={u} />
+    <Statement data={data} usd={u} onOpen={onFigure} />
     <div className="fw-grid">
       <TopProducts data={data} usd={u} onNavigate={onNavigate} />
-      <div className="fw-body"><Cash data={data} usd={u} onCollections={onCollections} /><Payouts people={people} onNavigate={onNavigate} /></div>
+      <div className="fw-body"><Cash data={data} usd={u} onCollections={onCollections} onFigure={onFigure} /><Payouts people={people} onNavigate={onNavigate} /></div>
     </div>
   </div>;
 }
@@ -148,7 +161,7 @@ function Completeness({ data, onMissing }: { data: FinanceSummary; onMissing: ()
   const waits = data.waiting ? data.waiting.orders_count : known ? known.incomplete_orders : data.totals.owner_period_net_iqd === null ? total : 0;
   const estimated = known?.estimated?.orders_count ?? 0, confirmed = known ? known.confirmed?.orders_count ?? known.orders_count - estimated : 0;
   if (!waits && !estimated) return <div className="fw-banner fw-banner--ok" role="status" data-finance-completeness="confirmed"><CheckCircle2 size={18} aria-hidden /><strong>{fw(loc, 'completeAll')}</strong></div>;
-  const reasonKey: Record<FinanceWaitReason, FwKey> = { no_price: 'reasonNoPrice', wage_waits_cost: 'reasonWage', investor_waits: 'reasonInvestor', refund_unknown: 'reasonRefund', other: 'reasonOther' };
+  const reasonKey: Record<FinanceWaitReason, FwKey> = { no_price: 'reasonNoPrice', return_cost: 'reasonReturnCost', wage_waits_cost: 'reasonWage', investor_waits: 'reasonInvestor', refund_unknown: 'reasonRefund', other: 'reasonOther' };
   // In the order the owner fixes them: a price first, then what waits on a price, then the cash.
   const list = (Object.keys(reasonKey) as FinanceWaitReason[]).map((r) => [r, data.waiting?.reasons?.[r] ?? []] as const).filter(([, ids]) => ids.length)
     .map(([r, ids]) => fw(loc, reasonKey[r], { n: ids.length })).join(loc('، ', ', ', '، '));
@@ -173,18 +186,6 @@ function Spark({ values }: { values: number[] }) {
     <polyline points={pts} style={{ fill: 'none', stroke: 'var(--color-info)', strokeWidth: 1.6 }} /></svg>;
 }
 
-/** A phone-width screen (the stylesheet's 600 px), followed as it changes; wide when rendered without a window. */
-function useNarrow() {
-  const query = typeof window === 'undefined' || !window.matchMedia ? null : window.matchMedia('(max-width: 600px)');
-  const [narrow, setNarrow] = useState(() => !!query?.matches);
-  useEffect(() => {
-    if (!query) return;
-    const update = () => setNarrow(query.matches);
-    query.addEventListener('change', update);
-    return () => query.removeEventListener('change', update);
-  }, [query?.media]); // eslint-disable-line react-hooks/exhaustive-deps
-  return narrow;
-}
 /** A round step for four or so gridlines over `top`; never under one whole dinar or dollar (no «0.25» on an axis of money). */
 export const niceStep = (top: number) => { const raw = Math.max(top, 4) / 4, p = 10 ** Math.floor(Math.log10(raw)), m = raw / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; };
 /** A period's revenue day by day, in the display currency: the server's cents in dollars (none: null — never dinars). */
@@ -261,7 +262,7 @@ export function Attention({ data, usd, people, openOrder, onNavigate, onMissing,
 const ROW: Record<StatementKey, FwKey> = { sales: 'netSales', cogs: 'cogs', gross: 'grossProfit', delivery: 'delivery', cod: 'cod', wages: 'wages', materials: 'materials', fees: 'fees',
   promotion: 'promo', investor: 'investor', general: 'expenses', deductions: 'deductions', net: 'netShare' };
 /** «من المبيعات إلى حصتك»: three columns on a wide screen, one at a time on a phone; in dollars the server's cents. */
-export function Statement({ data, usd }: { data: FinanceSummary; usd?: DisplayUsdSummary }) {
+export function Statement({ data, usd, onOpen }: { data: FinanceSummary; usd?: DisplayUsdSummary; onOpen?: (key: StatementKey) => void }) {
   const { loc } = useLanguage();
   const { rows, currency } = useMemo(() => statementRows(data, usd), [data, usd]);
   const t = data.totals, total = t.orders_count ?? data.orders.length, calc = data.known?.orders_count ?? 0, wait = data.waiting?.orders_count ?? 0;
@@ -271,10 +272,11 @@ export function Statement({ data, usd }: { data: FinanceSummary; usd?: DisplayUs
   const [pick, setCol] = useState<0 | 1 | 2>(visible[0]);
   // On a phone one column at a time: the calculated orders first while some wait, else the period.
   const col = visible.includes(pick) ? pick : visible[0];
-  // Which orders rest on sale-time estimates (owner decision 3): the calculated ones, named in their column's head.
-  const est = data.known?.estimated?.orders_count ?? 0;
-  const heads = [fw(loc, est ? 'colCalculatedEst' : 'colCalculated', { n: calc, e: est }), fw(loc, 'colWaiting', { n: wait }),
-    fw(loc, est && visible.length === 1 ? 'colPeriodEst' : 'colPeriod', { n: total, e: est })];
+  // How many orders each column's known figures rest on a sale-time estimate for (owner decision 3), named in its head: the calculated
+  // ones; since the fourth review of step 4 also the waiting ones and the period's, once their goods cost is known (drill.ts columnEstimates).
+  const [eCalc, eWait, ePeriod] = useMemo(() => columnEstimates(data, usd), [data, usd]);
+  const heads = [fw(loc, eCalc ? 'colCalculatedEst' : 'colCalculated', { n: calc, e: eCalc }), fw(loc, eWait ? 'colWaitingEst' : 'colWaiting', { n: wait, e: eWait }),
+    fw(loc, ePeriod ? 'colPeriodEst' : 'colPeriod', { n: total, e: ePeriod })];
   const cell = (v: number | null, i: 0 | 1 | 2, key: StatementKey) => v !== null ? (currency === 'USD' ? <span className="fw-money" dir="ltr">{usdText(v)}</span> : <Money value={v} />)
     : <MissingValue text={fw(loc, i === 1 || key === 'wages' || key === 'materials' || key === 'investor' ? 'waitingCell' : 'missingCell')} />;
   // A negative investor share is the investors' part of a loss, added back: the row says so.
@@ -290,7 +292,7 @@ export function Statement({ data, usd }: { data: FinanceSummary; usd?: DisplayUs
     <div className="fw-table-wrap"><table className="fw-table fw-pl" data-finance-statement={currency} data-phone-col={col}>
       <thead><tr><th scope="col"><span className="fw-sr">{fw(loc, 'statement')}</span></th>{visible.map((i) => <th key={i} scope="col" data-col={i}>{heads[i]}</th>)}</tr></thead>
       <tbody>{rows.map((r) => <tr key={r.key} className={r.sign === '=' ? 'fw-pl-sum' : undefined} data-key={r.key}>
-        <th scope="row"><span className="fw-pl-op" aria-hidden>{r.sign}</span>{fw(loc, ROW[r.key])}{hint(r.key) && <small>{hint(r.key)}</small>}</th>
+        <th scope="row"><span className="fw-pl-op" aria-hidden>{r.sign}</span>{onOpen ? <button type="button" className="fw-open" onClick={() => onOpen(r.key)} title={rs(loc, 'drawerOpen', { name: fw(loc, ROW[r.key]) })} data-finance-open={r.key}>{fw(loc, ROW[r.key])}</button> : fw(loc, ROW[r.key])}{hint(r.key) && <small>{hint(r.key)}</small>}</th>
         {visible.map((i) => <td key={i} data-col={i}>{cell(r.cells[i], i, r.key)}</td>)}
       </tr>)}</tbody>
     </table></div>
@@ -307,7 +309,7 @@ function TopProducts({ data, usd, onNavigate }: { data: FinanceSummary; usd?: Di
     {rows.length ? <div className="fw-table-wrap"><table className="fw-table" data-finance-top-products>
       <thead><tr><th scope="col">{fw(loc, 'product')}</th><th scope="col" className="fw-wide">{fw(loc, 'pieces')}</th><th scope="col" className="fw-wide">{fw(loc, 'netSales')}</th><th scope="col">{fw(loc, 'grossProfit')}</th><th scope="col">{fw(loc, 'marginCol')}</th></tr></thead>
       <tbody>{rows.map((p) => { const salesOf = p.retained_revenue_iqd ?? p.net_goods_iqd ?? null; return <tr key={p.id} data-finance-estimated={estimated(p) || undefined}>
-        <th scope="row">{p.name}{estimated(p) && <> <Status tone="warning">{fw(loc, 'estimatedChip')}</Status></>}</th><td className="fw-wide">{p.qty}</td>
+        <th scope="row">{p.name}{estimated(p) && <> <Status tone="warning">{fw(loc, 'estimatedChip')}</Status></>}</th><td className="fw-wide">{piecesOf(p)}</td>
         <td className="fw-wide"><DisplayMoney iqd={salesOf} cents={cents(p.id, 'retained_revenue_iqd')} compact /></td>
         <td><DisplayMoney iqd={p.gross_profit_iqd} cents={cents(p.id, 'gross_profit_iqd')} compact /></td>
         <td>{p.gross_profit_iqd == null ? <MissingValue /> : salesOf ? <bdi dir="ltr">{(p.gross_profit_iqd / salesOf * 100).toFixed(1)}%</bdi> : fw(loc, 'noSales')}</td></tr>; })}</tbody>
@@ -317,7 +319,7 @@ function TopProducts({ data, usd, onNavigate }: { data: FinanceSummary; usd?: Di
 }
 
 /** Profit is not cash: what is due on delivery or from Gini, and how much of it is recorded as received. */
-function Cash({ data, usd, onCollections }: { data: FinanceSummary; usd?: DisplayUsdSummary; onCollections: () => void }) {
+function Cash({ data, usd, onCollections, onFigure }: { data: FinanceSummary; usd?: DisplayUsdSummary; onCollections: () => void; onFigure?: (key: FigureKey) => void }) {
   const { loc } = useLanguage();
   const t = data.totals, open = t.collection_difference_iqd ?? 0, recorded = t.collected_iqd ?? 0, due = open + recorded;
   if (due <= 0) return null;
@@ -327,9 +329,9 @@ function Cash({ data, usd, onCollections }: { data: FinanceSummary; usd?: Displa
   return <Surface title={fw(loc, 'cash')} subtitle={fw(loc, 'cashNote')}>
     <div className="fw-stack" aria-hidden><i className="fw-ok" style={{ width: `${(recorded / due * 100).toFixed(2)}%` }} /><i className="fw-info" style={{ flex: 1 }} /></div>
     <dl className="fw-kv" data-finance-cash>
-      <dt>{fw(loc, 'cashDue')}</dt><dd><DisplayMoney iqd={due} cents={dueC} /></dd>
+      <dt>{onFigure ? <button type="button" className="fw-open" onClick={() => onFigure('cashDue')} data-finance-open="cashDue">{fw(loc, 'cashDue')}</button> : fw(loc, 'cashDue')}</dt><dd><DisplayMoney iqd={due} cents={dueC} /></dd>
       <dt><i className="fw-dot fw-ok" />{fw(loc, 'cashRecorded')}</dt><dd><DisplayMoney iqd={recorded} cents={recordedC} /></dd>
-      <dt><i className="fw-dot fw-info" />{fw(loc, 'cashOpen')}<small>{fw(loc, 'cashOpenNote')}</small></dt><dd><DisplayMoney iqd={open} cents={openC} /></dd>
+      <dt><i className="fw-dot fw-info" />{onFigure ? <button type="button" className="fw-open" onClick={() => onFigure('cashOpen')} data-finance-open="cashOpen">{fw(loc, 'cashOpen')}</button> : fw(loc, 'cashOpen')}<small>{fw(loc, 'cashOpenNote')}</small></dt><dd><DisplayMoney iqd={open} cents={openC} /></dd>
     </dl>
     {open > 0 && <Button variant="primary" onClick={onCollections}>{fw(loc, 'aCash')}</Button>}
   </Surface>;

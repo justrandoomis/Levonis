@@ -1,5 +1,5 @@
 import { participantReport } from '../lib/financeParticipantReports';
-import { isConfirmedOrderCost } from '../lib/financeLedger';
+import { hasUnknownRefund, isConfirmedOrderCost } from '../lib/financeLedger';
 import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, notFound, requireAdmin, str, unavailable } from '../lib/http';
@@ -18,7 +18,7 @@ import { enrichOrderProfitReview } from '../lib/orderProfitReview';
 import { enrichOrderCostProjections } from '../lib/orderCostProjection';
 import { reportAdjustments, type ReportAdjustments } from '../lib/financeReportOverlay';
 import { loadUsdRateSteps, usdRateAt, type UsdRateSteps } from '../lib/fx/historyRate';
-import { baghdadDayStart, batchCogsCents, centsOf, chartCents, expenseCompositionCents, iqdToCents, instantOf, sumCents, type Cents } from '../lib/financeUsdDisplay';
+import { ADDITIVE_IQD_FIELDS, baghdadDayStart, batchCogsCents, centsOf, chartCents, expenseCompositionCents, iqdToCents, instantOf, rederive, sumCents, type Cents } from '../lib/financeUsdDisplay';
 import { loadLotUsdRates } from '../lib/batchSnapshot';
 
 type Row=Record<string,unknown>;
@@ -78,8 +78,10 @@ function missingCostLines(bases:OrderProfitBase[]):MissingCostLine[]{
  * by sold units: many cheap pieces (magnets) must not shift the overhead onto the
  * few dear ones and make a period that is a loss look like a profit (review 2026-11-11).
  */
+/** An order whose every amount is known: «known», the statement's «محسوبة» column, the order list's state and the CSV all ask this one question. */
+const isComplete=(b:OrderProfitBase)=>b.totals.owner_net_iqd!=null&&b.totals.profit_basis_iqd!=null;
 function completeOrders(bases:OrderProfitBase[]){
-  const complete=bases.filter((b)=>b.totals.owner_net_iqd!=null&&b.totals.profit_basis_iqd!=null);
+  const complete=bases.filter(isComplete);
   const revenue=(rows:OrderProfitBase[])=>rows.reduce((v,b)=>v+Math.max(0,n(b.totals.retained_revenue_iqd)+n(b.totals.shipping_income_iqd)+n(b.totals.cod_tax_iqd)),0);
   const units=(rows:OrderProfitBase[])=>rows.reduce((v,b)=>v+n(b.totals.units),0);
   const allRevenue=revenue(bases),allUnits=units(bases);
@@ -107,13 +109,60 @@ function confirmedOverheadOf(complete:OrderProfitBase[],overhead:number){
  * (redesign step 3). First match wins, in the order the owner fixes them: a purchase price; a wage that waits for
  * the goods cost; an investor share that waits for its cash or a confirmed cost; a refund amount. An investor share
  * held by a posting error waits for no cash and no price, so it is a line to review (independent review, 2026-11-11).
+ * A goods cost that is unknown only because a piece RETURNED TO STOCK has no known cost (the line's own cost is confirmed)
+ * is no missing purchase price: «التكاليف الناقصة» does not list it, so it waits for that cost in the order itself
+ * (`return_cost`, the independent review of step 4).
  */
-export type WaitReason='no_price'|'wage_waits_cost'|'investor_waits'|'refund_unknown'|'other';
+export type WaitReason='no_price'|'return_cost'|'wage_waits_cost'|'investor_waits'|'refund_unknown'|'other';
+/** A line with no goods cost because its own price is not known — what «التكاليف الناقصة» lists — not a returned piece's. */
+const noPrice=(l:ProfitLine)=>l.cogs_iqd===null&&!isConfirmedOrderCost(l.cost_confidence);
 export function waitReason(b:OrderProfitBase,postingErrors:ReadonlySet<string>=new Set()):WaitReason{
-  if(b.lines.some((l)=>l.cogs_iqd===null))return 'no_price';
+  if(b.lines.some(noPrice))return 'no_price';
+  if(b.lines.some((l)=>l.cogs_iqd===null))return 'return_cost';
   if(n(b.totals.pending_costs)>0)return 'wage_waits_cost';
   if(b.totals.investor_iqd===null)return postingErrors.has(b.order_id)?'other':'investor_waits';
   return b.totals.gross_profit_iqd===null?'refund_unknown':'other';
+}
+/**
+ * WHERE AN ORDER STANDS (redesign step 4, DECISIONS row 316): complete on confirmed costs only, complete with at least one
+ * sale-time estimate, or waiting — and then for what (waitReason). The order list, the statement's columns and every CSV view
+ * read this one answer, so a row never says «مؤكد» while the statement counts it as waiting.
+ */
+export type FinanceState='confirmed'|'estimated'|'waiting';
+export function orderState(b:OrderProfitBase,postingErrors:ReadonlySet<string>=new Set()):{finance_state:FinanceState;wait_reason:WaitReason|null}{
+  if(!isComplete(b))return {finance_state:'waiting',wait_reason:waitReason(b,postingErrors)};
+  return {finance_state:restsOnConfirmedCosts(b)?'confirmed':'estimated',wait_reason:null};
+}
+/**
+ * A product's or a section's state, from its own lines, by the same rule in the same order: a line without a purchase
+ * price first, then a returned piece's unknown cost, a wage that waits for the cost, an investor share (a line to review when every share it waits for
+ * is held by a posting error), a refund amount; complete lines are confirmed, or estimated if one rests on the estimate.
+ */
+function groupState(lines:ProfitLine[],postingErrors:ReadonlySet<string>):{finance_state:FinanceState;wait_reason:WaitReason|null}{
+  const t=sumRows(lines);
+  if(t.owner_net_iqd!==null&&t.profit_basis_iqd!==null)return {finance_state:lines.every((l)=>isConfirmedOrderCost(l.cost_confidence))?'confirmed':'estimated',wait_reason:null};
+  const held=lines.filter((l)=>l.investor_iqd===null);
+  const reason:WaitReason=t.cogs_iqd===null?(lines.some(noPrice)?'no_price':'return_cost'):n(t.pending_costs)>0?'wage_waits_cost'
+    :held.length?(held.every((l)=>postingErrors.has(s(l.order_id)))?'other':'investor_waits'):t.gross_profit_iqd===null?'refund_unknown':'other';
+  return {finance_state:'waiting',wait_reason:reason};
+}
+/**
+ * The cash of an order: nothing was due on delivery (paid before it), every amount due is recorded as received, part of it
+ * is, or none yet. `collection_difference_iqd` is what is due (on delivery or from Gini, less a refund through Gini) and not
+ * recorded; with what is recorded it makes what was due.
+ */
+export type CashState='prepaid'|'recorded'|'part'|'not_recorded';
+export function cashState(t:Row):CashState{
+  const recorded=n(t.collected_iqd),open=n(t.collection_difference_iqd);
+  if(recorded+open<=0&&recorded<=0)return 'prepaid';
+  if(open<=0)return 'recorded';
+  return recorded>0?'part':'not_recorded';
+}
+/** The orders that carry a posting error: their investor share waits for no cash and no price (waitReason). One read for /summary, /orders and the export. */
+async function postingErrorOrders(db:D1Database,bases:OrderProfitBase[]):Promise<Set<string>>{
+  if(!bases.length)return new Set();
+  const rows=await db.prepare('SELECT DISTINCT order_id FROM finance_posting_errors WHERE order_id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(bases.map((b)=>b.order_id))).all<{order_id:string}>();
+  return new Set((rows.results??[]).map((r)=>s(r.order_id)));
 }
 /** The period's figures over the orders whose every amount is known (none: null), and what the rest lack. */
 function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean,postingErrors:ReadonlySet<string>=new Set()){
@@ -144,19 +193,70 @@ function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:numb
       unknown_products:[...products.values()].sort((a,b)=>b.qty-a.qty)},
   };
 }
-function orderRow(base:OrderProfitBase){return {...base.order,...base.totals,id:base.order_id,order_id:base.order_id,version:base.version,
+/**
+ * One order of the period as the screens and the export read it. Redesign step 4 (DECISIONS row 316) adds what the reports
+ * table shows beside its sums: `revenue_iqd` (net sales, delivery and the COD fee — the margin's base and the chart's revenue),
+ * where the order stands (orderState) and its cash (cashState) — each from the one function the export uses too.
+ * `unknown_refunds`: its lines with a refunded return whose amount nobody recorded. Their sales count that refund as 0
+ * (orderProfit, as everywhere the period's sales are read), so the tables name it beside the figure instead of passing it
+ * off as known (the independent review of step 4).
+ */
+const unknownRefunds=(lines:ProfitLine[])=>lines.filter((l)=>hasUnknownRefund(l)).length;
+function orderRow(base:OrderProfitBase,postingErrors:ReadonlySet<string>=new Set()){return {...base.order,...base.totals,id:base.order_id,order_id:base.order_id,version:base.version,
   has_financial_activity:base.has_financial_activity,projected_finance:base.projected_finance,
   review_reasons:[...base.lines.flatMap(l=>l.cost_review?.issues??[]),...base.costs.flatMap(c=>Array.isArray(c.review_reasons)?c.review_reasons:[])],
-  cost_confidence:base.lines.every((l)=>isConfirmedOrderCost(l.cost_confidence))?'verified':base.lines.some((l)=>l.cogs_iqd===null)?'unknown':'snapshot'};}
-function grouped(lines:ProfitLine[],kind:'product'|'main'|'sub'){
+  cost_confidence:base.lines.every((l)=>isConfirmedOrderCost(l.cost_confidence))?'verified':base.lines.some((l)=>l.cogs_iqd===null)?'unknown':'snapshot',
+  revenue_iqd:n(base.totals.retained_revenue_iqd)+n(base.totals.shipping_income_iqd)+n(base.totals.cod_tax_iqd),
+  unknown_refunds:unknownRefunds(base.lines),
+  ...orderState(base,postingErrors),cash_state:cashState(base.totals)};}
+/**
+ * The period's lines by product, by main section or by subsection. Every line counts in each grouping — one with no
+ * section (or no subsection) under 'unclassified' — so each table adds up to the period (redesign step 4). `qty` is every
+ * piece sold, as before; `kept_qty` the pieces the customers kept and `returned_qty` the pieces they returned (owner
+ * default 2026-11-11: the tables count what was kept, with the returned pieces shown apart). `order_ids` lets a row open
+ * the orders it comes from; a product row names its main section (`main_id`, `main_name`).
+ */
+const groupKey=(l:ProfitLine,kind:'product'|'main'|'sub')=>(kind==='product'?l.product_id||s((l as Row).offer_product_id)||l.id:kind==='main'?l.main_catalog_id:l.sub_catalog_id)||'unclassified';
+/**
+ * A DRAWN SPOOL IS FILED UNDER ITS OFFER (redesign step 4, the plan's mystery-box check). A mystery box's spool lines carry
+ * its money and its cost but no product of their own — the pick stays hidden (worker/routes/orders.ts) — so grouped by
+ * product each spool was a row of its own named after the box, and its sections «غير مصنف». As the old report files them
+ * (financeReport.ts, MYSTERY_SPOOL_SQL: the offer's id is the product of the line the spool belongs to), such a line is
+ * grouped under that line's product and its sections. Only the offer's id and sections cross; nothing of the drawn spool.
+ */
+async function fileUnderOffer(db:D1Database,bases:OrderProfitBase[]){
+  const spools=bases.flatMap((b)=>b.lines).filter((l)=>!l.product_id&&l.bundle_parent_item_id);
+  if(!spools.length)return;
+  const parents=new Map(((await db.prepare(`SELECT i.id,i.product_id,COALESCE(p.category_id,'') main_id,COALESCE(p.sub_category_id,'') sub_id,COALESCE(mc.name_ar,'') main_name,COALESCE(sc.name_ar,'') sub_name
+    FROM order_items i LEFT JOIN products p ON p.id=i.product_id LEFT JOIN catalogs mc ON mc.id=p.category_id LEFT JOIN catalogs sc ON sc.id=p.sub_category_id
+    WHERE i.id IN (SELECT value FROM json_each(?))`).bind(JSON.stringify([...new Set(spools.map((l)=>s(l.bundle_parent_item_id)))])).all<Row>()).results??[]).map((p)=>[s(p.id),p]));
+  for(const l of spools){const p=parents.get(s(l.bundle_parent_item_id));if(!p?.product_id)continue;
+    Object.assign(l,{offer_product_id:s(p.product_id)},l.main_catalog_id?{}:{main_catalog_id:s(p.main_id),main_name:s(p.main_name)},l.sub_catalog_id?{}:{sub_catalog_id:s(p.sub_id),sub_name:s(p.sub_name)});}
+}
+function grouped(lines:ProfitLine[],kind:'product'|'main'|'sub',postingErrors:ReadonlySet<string>=new Set()){
   const groups=new Map<string,{name:string;lines:ProfitLine[]}>();
-  for(const l of lines){const id=kind==='product'?l.product_id||l.id:kind==='main'?l.main_catalog_id:l.sub_catalog_id;
-    if(kind==='sub'&&!id)continue;
-    const key=id||'unclassified',name=kind==='product'?l.name_snapshot:kind==='main'?l.main_name:l.sub_name;
+  for(const l of lines){
+    const key=groupKey(l,kind),name=kind==='product'?l.name_snapshot:kind==='main'?l.main_name:l.sub_name;
     const g=groups.get(key)??{name:name||'غير مصنف',lines:[]};g.lines.push(l);groups.set(key,g);}
   // estimated_lines: the lines whose goods cost is the sale-time estimate, so the overview names a margin that rests on it (owner decision 3).
+  // unknown_lines: its lines with no goods cost, as an order's (totalProfit). A line carries no count of its own, so the sum of its
+  // lines (sumRows) was always 0 — a file read «0 unknown lines» beside an empty goods cost (the second review of step 4).
   return [...groups].map(([id,g])=>({id,name:g.name,level:kind,qty:g.lines.reduce((v,l)=>v+l.qty,0),...sumRows(g.lines),orders_count:new Set(g.lines.map((l)=>l.order_id)).size,
-    estimated_lines:g.lines.filter((l)=>l.cogs_iqd!==null&&!isConfirmedOrderCost(l.cost_confidence)).length}));
+    unknown_lines:g.lines.filter((l)=>l.cogs_iqd===null).length,
+    estimated_lines:g.lines.filter((l)=>l.cogs_iqd!==null&&!isConfirmedOrderCost(l.cost_confidence)).length,
+    kept_qty:g.lines.reduce((v,l)=>v+Math.max(0,n(l.qty)-n(l.returned_qty)),0),returned_qty:g.lines.reduce((v,l)=>v+n(l.returned_qty),0),unknown_refunds:unknownRefunds(g.lines),
+    order_ids:[...new Set(g.lines.map((l)=>s(l.order_id)))],...groupState(g.lines,postingErrors),
+    ...(kind==='product'?{main_id:g.lines[0].main_catalog_id||'unclassified',main_name:g.lines[0].main_name||'غير مصنف'}:{})}));
+}
+/**
+ * The sections' names in Arabic, English and Sorani, from `catalogs` by id; the frozen Arabic snapshot of the sale
+ * (`name`) stands in when the section is gone. The screen words «غير مصنف» itself.
+ */
+async function withSectionNames(db:D1Database,rows:Array<Row&{id:string;name:string}>){
+  const ids=[...new Set(rows.map((r)=>r.id).filter((id)=>id&&id!=='unclassified'))];
+  const found=ids.length?(await db.prepare('SELECT id,name_ar,name_en,name_ckb FROM catalogs WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(ids)).all<Row>()).results??[]:[];
+  const live=new Map(found.map((c)=>[s(c.id),c]));
+  return rows.map((r)=>{const c=live.get(r.id);return {...r,name_ar:s(c?.name_ar)||r.name,name_en:s(c?.name_en),name_ckb:s(c?.name_ckb)};});
 }
 /**
  * §21: the same delivered-order bases split by what made each order (0174) —
@@ -170,23 +270,38 @@ function byKind(bases:OrderProfitBase[]){
   return ORDER_KINDS.map((kind)=>{const rows=bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal');
     return {kind,...sumRows(rows.map((b)=>b.totals)),orders_count:rows.length};});
 }
-/** Charts use the same delivered-order bases and full-month promotion shares as the report. */
+/**
+ * Charts use the same delivered-order bases and full-month promotion shares as the report. Redesign step 4 (DECISIONS
+ * row 316) adds the day's coupons, credited price protection and returned trade-in credits (`deductions_iqd`) and its net
+ * after them (`net_after_report_adjustments_iqd`): «صافيك» on Reports → Days is the statement's, after the deductions, so
+ * revenue − costs − investor share − deductions = the net on every day, and the days add up to «صافي حصتك».
+ */
 function chartAmounts(t:Row,general=0,unallocated=0,truncated=false){
   const revenue=n(t.retained_revenue_iqd)+n(t.shipping_income_iqd)+n(t.cod_tax_iqd);
   const cost=t.profit_basis_iqd===null||truncated?null:n(t.cogs_iqd)+n(t.direct_cost_iqd)+n(t.manual_direct_iqd)+n(t.courier_fee_iqd)+n(t.payment_fee_iqd)+n(t.promotion_iqd)+general+unallocated;
   return {revenue_iqd:revenue,cost_iqd:cost,owner_net_iqd:t.owner_net_iqd===null||truncated?null:n(t.owner_net_iqd)-general-unallocated,
-    investor_iqd:t.investor_iqd===null||truncated?null:n(t.investor_iqd),orders_count:n(t.orders_count),unknown_lines:n(t.unknown_lines),pending_costs:n(t.pending_costs)};
+    investor_iqd:t.investor_iqd===null||truncated?null:n(t.investor_iqd),orders_count:n(t.orders_count),unknown_lines:n(t.unknown_lines),pending_costs:n(t.pending_costs),
+    deductions_iqd:n(t.coupon_iqd)+n(t.price_protection_iqd)+n(t.trade_in_credit_returned_iqd),
+    net_after_report_adjustments_iqd:t.owner_net_iqd===null||t.net_after_report_adjustments_iqd===null||truncated?null:n(t.net_after_report_adjustments_iqd)-general-unallocated};
 }
 /** The Baghdad day an order was delivered on — the chart's bucket. */
 function deliveredDay(b:OrderProfitBase){const at=s(b.order.delivered_at).replace(' ','T'),stamp=Date.parse(/(?:Z|[+-]\d{2}:?\d{2})$/i.test(at)?at:`${at}Z`);
   return new Date(stamp+3*3600000).toISOString().slice(0,10);}
+/**
+ * WHAT A DAY'S SUMS STAND ON (the second review of step 4): its orders whose known goods cost rests on a sale-time estimate —
+ * a waiting order's too, whose cost is known while its investor share waits (`estimated_orders`, «تقديري n» beside a known cost
+ * or net: owner decision 3) — and its orders whose sales count a refund nobody recorded as 0 (`unknown_refund_orders`, «مرتجع
+ * غير مثبت n»). Reports → Days counts the same orders from /summary's own (reportTable.ts groupDays); its file says them too.
+ */
+const dayCounts=(day:OrderProfitBase[])=>({estimated_orders:day.filter((b)=>b.totals.profit_basis_iqd!=null&&!restsOnConfirmedCosts(b)).length,
+  unknown_refund_orders:day.filter((b)=>unknownRefunds(b.lines)>0).length});
 function summaryCharts(bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocated:Map<string,number>,totals:Row,truncated:boolean){
-  const groups=new Map<string,Row[]>(),generalByDay=new Map(expenses.map((e)=>[s(e.expense_day),n(e.total)]));
-  for(const b of bases){const day=deliveredDay(b),rows=groups.get(day)??[];rows.push(b.totals);groups.set(day,rows);}
+  const groups=new Map<string,OrderProfitBase[]>(),generalByDay=new Map(expenses.map((e)=>[s(e.expense_day),n(e.total)]));
+  for(const b of bases){const day=deliveredDay(b),rows=groups.get(day)??[];rows.push(b);groups.set(day,rows);}
   const daily=[];
-  for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10),rows=groups.get(day)??[],t=sumRows(rows);t.orders_count=rows.length;
+  for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10),rows=groups.get(day)??[],t=sumRows(rows.map((b)=>b.totals));t.orders_count=rows.length;
     const general=generalByDay.get(day)??0;
-    daily.push({day,...chartAmounts(t,general,unallocated.get(day)??0,truncated)});}
+    daily.push({day,...chartAmounts(t,general,unallocated.get(day)??0,truncated),...dayCounts(rows)});}
   const pending=n(totals.pending_costs)>0;
   const expense_composition=[
     {key:'goods',amount_iqd:totals.cogs_iqd===null||truncated?null:n(totals.cogs_iqd)},
@@ -310,11 +425,30 @@ function ordersInUsd(bases:OrderProfitBase[],steps:UsdRateSteps|null,lotRates:Re
 }
 const basisCounts=(orders:Map<string,OrderUsd>)=>{const today=[...orders.values()].filter((o)=>o.usd_basis==='today').length;return {at_time_count:orders.size-today,today_count:today,batch_cost_lines:[...orders.values()].reduce((v,o)=>v+o.batch_lines,0)};};
 const orderBlock=(orders:Map<string,OrderUsd>)=>Object.fromEntries([...orders].map(([id,o])=>[id,{usd_basis:o.usd_basis,fx_rate_snapshot:o.fx_rate_snapshot,cents:o.cents}]));
-function groupedCents(lines:ProfitLine[],kind:'product'|'main'|'sub',orders:Map<string,OrderUsd>){
+/**
+ * AN ORDER'S LINES IN CENTS THAT ADD UP TO THE ORDER'S (the independent review of step 4, money lens). Each line converts on
+ * its own, so two lines of 25,001 IQD at 1,500 made 3,334¢ against the order's 3,333¢, and a product's or a section's dollar
+ * total drifted from the orders' by up to a cent a line and a field. Where the lines add up to their order in dinars, the
+ * order's own cents are shared over them by their dinars (largest remainder, `spread`) and the figures derived from them
+ * worked out again (rederive); where they do not — a coupon larger than the goods — the order-level row takes the rest
+ * (orderLevelOf). For the products' and sections' dollars only: the order sheet keeps each line's own conversion.
+ */
+function linesAddingUp(b:OrderProfitBase,o:OrderUsd):Map<string,Cents>{
+  const out=new Map(b.lines.map((l)=>[l.id,{...(o.lines.get(l.id)??{})}])),totals=b.totals as unknown as Row,row=(l:ProfitLine)=>l as unknown as Row;
+  for(const f of ADDITIVE_IQD_FIELDS){
+    const k=f.replace(/_iqd$/,'_cents'),target=o.cents[k];
+    if(target==null||totals[f]==null||b.lines.some((l)=>row(l)[f]==null||out.get(l.id)![k]==null))continue;
+    if(b.lines.reduce((v,l)=>v+n(row(l)[f]),0)!==n(totals[f]))continue;
+    const rest=target-b.lines.reduce((v,l)=>v+(out.get(l.id)![k] as number),0);
+    if(rest)spread(rest,b.lines.map((l)=>Math.abs(n(row(l)[f])))).forEach((x,i)=>{const c=out.get(b.lines[i].id)!;c[k]=(c[k] as number)+x;});
+  }
+  for(const c of out.values())rederive(c);
+  return out;
+}
+function groupedCents(lines:ProfitLine[],kind:'product'|'main'|'sub',cents:ReadonlyMap<string,Cents>){
   const groups=new Map<string,Cents[]>();
-  for(const l of lines){const id=kind==='product'?l.product_id||l.id:kind==='main'?l.main_catalog_id:l.sub_catalog_id;
-    if(kind==='sub'&&!id)continue;
-    const key=id||'unclassified',rows=groups.get(key)??[];rows.push(orders.get(s(l.order_id))?.lines.get(l.id)??{});groups.set(key,rows);}
+  // The same keys as grouped() (groupKey): a line with no subsection under 'unclassified', a spool under its offer (redesign step 4).
+  for(const l of lines){const key=groupKey(l,kind),rows=groups.get(key)??[];rows.push(cents.get(l.id)??{});groups.set(key,rows);}
   return Object.fromEntries([...groups].map(([id,rows])=>[id,sumCents(rows)]));
 }
 async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocatedDays:Map<string,number>,truncated:boolean,pendingCosts:boolean,done=completeOrders(bases)){
@@ -343,6 +477,13 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   // A kind without orders is 0 in every column, as its dinar row (sumRows) — never «ناقص» beside «0 طلب».
   const kinds=Object.fromEntries(ORDER_KINDS.map((kind)=>[kind,sum(bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal').map((b)=>orders.get(b.order_id)!.cents))]));
   const lines=bases.flatMap((b)=>b.lines.map((l)=>({...l,order_id:b.order_id})));
+  // The lines' cents adding up to their orders' (linesAddingUp), and what no line carries — the order-level row of the
+  // products and the sections, as in dinars: the order's deductions less its lines', its net less the lines' nets.
+  const lineCents=new Map<string,Cents>(),levelRows:Cents[]=[];
+  for(const b of bases){const o=orders.get(b.order_id)!,own=linesAddingUp(b,o);for(const [id,c] of own)lineCents.set(id,c);
+    if(!orderLevelDeductions(b))continue;
+    const rest=Object.fromEntries(REPORT_DEDUCTIONS.map((f)=>{const k=f.replace(/_iqd$/,'_cents');return [k,n(o.cents[k])-b.lines.reduce((v,l)=>v+n(own.get(l.id)?.[k]),0)];}));
+    levelRows.push({...rest,net_after_report_adjustments_cents:o.cents.net_after_report_adjustments_cents==null?null:-Object.values(rest).reduce((v,x)=>v+x,0)});}
   // `known` (the complete orders, with their share of the period's overhead) in cents, as /summary's IQD `known`,
   // with its confirmed and estimated parts, so the overview names them in dollars beside a dollar headline.
   const knownCents=done.complete.length?sumCents(done.complete.map((b)=>orders.get(b.order_id)!.cents)):null,knownOverhead=Math.round(general*done.share)+Math.round(unallocated*done.share);
@@ -362,8 +503,8 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   const waitingCents=incomplete.length?{orders_count:incomplete.length,totals:sum(incomplete.map((b)=>orders.get(b.order_id)!.cents)),
     general_share_cents:general-knownGeneral,unallocated_share_cents:unallocated-knownUnallocated}:null;
   return {available:true as const,today_rate:steps?.today??null,...basisCounts(orders),approximate,known,waiting:waitingCents,
-    orders:orderBlock(orders),kinds,products:groupedCents(lines,'product',orders),
-    categories:{main:groupedCents(lines,'main',orders),sub:groupedCents(lines,'sub',orders)},
+    orders:orderBlock(orders),kinds,products:groupedCents(lines,'product',lineCents),
+    categories:{main:groupedCents(lines,'main',lineCents),sub:groupedCents(lines,'sub',lineCents)},order_level:levelRows.length?sumCents(levelRows):null,
     chart:{...chartCents(totals,general,unallocated,truncated),daily,expense_composition:expenseCompositionCents(totals,general,unallocated,pendingCosts,truncated)},
     totals};
 }
@@ -387,14 +528,19 @@ async function selectOrders(db:D1Database,r:{from:string;to:string},opts:{q?:str
   if(!opts.summary)await enrichOrderCostProjections(db,bases);return {bases,total:total?.total??0,truncated:false};
 }
 adminFinanceWorkspaceRoutes.get('/participant-report',async c=>{const r=range(c.req.query('from'),c.req.query('to'));return c.json({success:true,...await participantReport(c.env.DB,r)});});
-adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
-  const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to')),display=displayOf(c.req.query('display'));
+/**
+ * THE PERIOD, READ ONCE (redesign step 4, DECISIONS row 316): /summary and every view of /export.csv but the line file
+ * are built here, so a file never disagrees with the screen it was exported from. One set of queries, one set of rules:
+ * the orders and their state, the products and sections, the days, «known» and «waiting», the overheads.
+ */
+async function periodFigures(db:D1Database,r:{from:string;to:string}){
   const {bases,truncated}=await selectOrders(db,r,{summary:true});
+  await fileUnderOffer(db,bases);
   // An expense linked to an order is that order's cost while the order can still be
   // delivered (it waits for it, and is counted on its delivery). Once the order ended
   // without a delivery — cancelled, returned, refunded — it is a cost of the shop like
   // rent, on its own day; before 2026-11-11 it vanished from every figure (DECISIONS row 313).
-  const [expenses,failures,promotions,waiting]=await Promise.all([
+  const [expenses,failures,promotions,waiting,postingErrors]=await Promise.all([
     db.prepare(`SELECT e.expense_day,COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ?
       AND NOT EXISTS(SELECT 1 FROM finance_expense_links l JOIN orders lo ON lo.id=l.order_id WHERE l.expense_id=e.id AND lo.status NOT IN ('cancelled','returned','refunded'))
       AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id)
@@ -404,7 +550,8 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
     db.prepare("SELECT *,CASE WHEN currency='IQD' THEN amount_minor ELSE amount_minor/100.0 END amount FROM finance_monthly_promotions WHERE month BETWEEN ? AND ? ORDER BY month,id").bind(r.from.slice(0,7),r.to.slice(0,7)).all<Row>(),
     // Costs entered in the period for orders still on their way: not in this period's net, and named so they are not lost.
     db.prepare(`SELECT COALESCE(SUM(e.amount_iqd),0) total FROM operating_expenses e JOIN finance_expense_links l ON l.expense_id=e.id JOIN orders lo ON lo.id=l.order_id
-      WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ? AND lo.status NOT IN ('delivered','cancelled','returned','refunded')`).bind(r.from,r.to).first<Row>()]);
+      WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ? AND lo.status NOT IN ('delivered','cancelled','returned','refunded')`).bind(r.from,r.to).first<Row>(),
+    postingErrorOrders(db,bases)]);
   const expenseDays=expenses.results??[],totals=sumRows(bases.map((b)=>b.totals));totals.orders_count=bases.length;totals.general_expenses_iqd=expenseDays.reduce((v,e)=>v+n(e.total),0);
   totals.general_waiting_iqd=n(waiting?.total);
   let unallocated=0;const unallocatedDays=new Map<string,number>();
@@ -420,7 +567,14 @@ adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   for(const b of bases)for(const warning of b.warnings)exceptions.push({id:`${b.order_id}:${warning}`,order_id:b.order_id,type:warning.split(':')[0],message:warning.startsWith('cost:')?'تكلفة البضاعة تحتاج تثبيت FIFO أو تحققًا ماليًا خاصًا':warning==='investor:pending'?'توزيع المستثمر ينتظر التسوية':'يوجد بند مالي يحتاج مراجعة'});
   for(const b of bases)if(n(b.totals.pending_costs)>0)exceptions.push({id:`${b.order_id}:pending_cost`,order_id:b.order_id,type:'pending_cost',message:'الأجور أو المواد تنتظر تثبيت التكلفة'});
   const lines=bases.flatMap((b)=>b.lines);
-  const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated,new Set((failures.results??[]).map((e)=>s(e.order_id)))),orders:bases.map(orderRow),kinds:byKind(bases),products:grouped(lines,'product'),categories:[...grouped(lines,'main'),...grouped(lines,'sub')],chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sales_value'};
+  const categories=await withSectionNames(db,[...grouped(lines,'main',postingErrors),...grouped(lines,'sub',postingErrors)]);
+  const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated,postingErrors),orders:bases.map((b)=>orderRow(b,postingErrors)),kinds:byKind(bases),products:grouped(lines,'product',postingErrors),categories,
+    order_level:orderLevelOf(bases),chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sales_value'};
+  return {answer,bases,truncated,expenseDays,unallocatedDays,totals};
+}
+adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
+  const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to')),display=displayOf(c.req.query('display'));
+  const {answer,bases,truncated,expenseDays,unallocatedDays,totals}=await periodFigures(db,r);
   if(display==='IQD')return c.json(answer);
   return c.json({...answer,display_usd:await summaryInUsd(db,bases,r,expenseDays,unallocatedDays,truncated,n(totals.pending_costs)>0)});
 });
@@ -438,7 +592,8 @@ adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
   const kind=text(c.req.query('kind'),20);if(kind&&!['normal','quick_buy','gift'].includes(kind))throw badRequest('نوع الطلب غير معروف');
   const display=displayOf(c.req.query('display'));
   const result=await selectOrders(c.env.DB,r,{offset,q:text(c.req.query('q'),100),kind});
-  const answer={success:true,orders:result.bases.map(orderRow),total:result.total,offset,range:r};
+  const postingErrors=await postingErrorOrders(c.env.DB,result.bases);
+  const answer={success:true,orders:result.bases.map((b)=>orderRow(b,postingErrors)),total:result.total,offset,range:r};
   if(display==='IQD')return c.json(answer);
   const steps=await usdSteps(c.env.DB,result.bases.map((b)=>instantOf(b.order.created_at)));
   const orders=ordersInUsd(result.bases,steps,await lotRatesOf(c.env.DB,result.bases));
@@ -600,8 +755,12 @@ adminFinanceWorkspaceRoutes.post('/promotions',async(c)=>{const actor=c.get('use
 adminFinanceWorkspaceRoutes.patch('/promotions/:id',async(c)=>{const actor=c.get('user')!;await requireCapability(c.env,actor,'accounting');return c.json({success:true,...await promotionWrite(c.env.DB,actor.id,c.req.param('id'),await c.req.json<Row>())});});
 adminFinanceWorkspaceRoutes.delete('/promotions/:id',async(c)=>{const actor=c.get('user')!;await requireCapability(c.env,actor,'accounting');return c.json({success:true,...await promotionWrite(c.env.DB,actor.id,c.req.param('id'),{},true)});});
 // An amount is written as a number, so a spreadsheet sums it (a loss included); only
-// text that could start a formula gets the leading «'» (DECISIONS row 313).
-const csvCell=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)?String(v):`"${s(v).replace(/^[=+\-@\t\r]/,"'$&").replace(/"/g,'""')}"`;
+// text that could start a formula gets the leading «'» (DECISIONS row 313). Since the
+// independent review of step 4 that includes text starting with white space (a line feed,
+// a space — a spreadsheet that trims it would read the formula behind it) and with the
+// full-width ＝ ＋ － ＠: a customer writes their own name. A finance file is never read
+// back in, so nothing has to take the quote off again.
+const csvCell=(v:unknown)=>typeof v==='number'&&Number.isFinite(v)?String(v):`"${s(v).replace(/^[\s=+\-@＝＋－＠]/,"'$&").replace(/"/g,'""')}"`;
 /**
  * What an order deducts beyond its lines: a line carries the order coupon only up to its own
  * goods, so the rest of a coupon larger than the goods (it cut the shipping, then the COD fee)
@@ -616,10 +775,158 @@ function orderLevelDeductions(b:OrderProfitBase):Row|null{
   if(REPORT_DEDUCTIONS.every((f)=>rest[f]===0))return null;
   return {...rest,net_after_report_adjustments_iqd:b.totals.net_after_report_adjustments_iqd==null?null:-REPORT_DEDUCTIONS.reduce((v,f)=>v+rest[f],0),row_kind:'order_level'};
 }
+/**
+ * WHAT NO PRODUCT AND NO SECTION CARRIES (the independent review of step 4, money lens). The rest above — a coupon larger
+ * than the goods, a price protection or a returned trade-in credit no line carries — is on the order but on no product and
+ * no section, so the products' and the sections' «صافيك» added up to more than the orders', with nothing on screen to say
+ * why. /summary names it once (`order_level`, the same rest for the products and both levels of sections), and their tables
+ * and files give it a row of its own, so each grouping adds up to the orders. Its net is unknown while an order it comes
+ * from has none, as a product's is. Null: nothing is left at the order level.
+ */
+function orderLevelOf(bases:OrderProfitBase[]){
+  const rows=bases.flatMap((b):Row[]=>{const r=orderLevelDeductions(b);return r?[{...r,order_id:b.order_id}]:[];});
+  if(!rows.length)return null;
+  const sum=(f:string)=>rows.some((r)=>r[f]===null)?null:rows.reduce((v,r)=>v+n(r[f]),0);
+  return {coupon_iqd:n(sum('coupon_iqd')),price_protection_iqd:n(sum('price_protection_iqd')),trade_in_credit_returned_iqd:n(sum('trade_in_credit_returned_iqd')),
+    net_after_report_adjustments_iqd:sum('net_after_report_adjustments_iqd'),order_ids:rows.map((r)=>s(r.order_id)),orders_count:rows.length};
+}
+/** The order-level row's name in the files' name columns (the screens word it themselves). */
+const ORDER_LEVEL_NAMES=['خصومات على مستوى الطلب','Order-level deductions','داشکاندنەکانی ئاستی داواکاری'] as const;
+/**
+ * THE EXPORT FOLLOWS THE PAGE (redesign step 4, DECISIONS row 316). `view=lines` (the default) is the line file it always
+ * was, byte for byte. `view=orders` is Reports → Orders, one row per order with where it stands and its cash;
+ * `&part=calculated|waiting` keeps the orders of one column of the statement and adds that column's share of the
+ * period's overheads as a last row (`row_kind` 'overhead'), so the file adds up to the column, as the figure drawer
+ * does. `view=products` and `view=sections&level=main|sub` are the products and sections tables (the pieces kept and
+ * returned apart), `view=days` the days. Every view but the lines is built from periodFigures, the read /summary
+ * answers from. An unknown amount is an empty cell, never 0, so a spreadsheet's sum is the known sum the screen shows.
+ * The independent review of step 4 adds what the page shows (exportFilter), the order-level row of the products and the
+ * sections (orderLevelOf), `&part=period` (the drawer of a period with no order: its overheads alone), and the wages and
+ * materials of a row whose costs still wait (`pending_costs`) as empty cells, as the screens show them. The second review adds
+ * a product's and a section's own `unknown_lines` (grouped) and each day's `estimated_orders` and `unknown_refund_orders`
+ * (dayCounts). The line file still writes a waiting wage's approved part: its bytes stay as they were (the owner's question).
+ * The fourth review adds each order's `estimated_cost`: 1 when its known goods cost rests on a sale-time estimate (a waiting order's
+ * too, as Reports → Orders names it), 0 when it is confirmed, empty beside an unknown one — so the column adds up to the goods-cost
+ * total's «تقديري n», which the orders' `finance_state` alone cannot give.
+ */
+const EXPORT_VIEWS=['lines','orders','products','sections','days'] as const;
+const csvFile=(rows:Row[],fields:readonly string[],name:string)=>new Response('\uFEFF'+[fields.map(csvCell).join(','),...rows.map((row)=>fields.map((f)=>csvCell(row[f])).join(','))].join('\r\n'),
+  {headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${name}"`}});
+const MONEY_COLUMNS=['retained_revenue_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd'] as const;
+const NET_COLUMNS=['investor_iqd','owner_net_iqd','coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd'] as const;
+const ORDER_COLUMNS=['order_id','delivered_day','customer_name','order_kind','finance_state','wait_reason','cash_state','revenue_iqd',...MONEY_COLUMNS,'general_expenses_iqd',...NET_COLUMNS,'collected_iqd','collection_difference_iqd','pending_costs','unknown_lines','unknown_refunds','estimated_cost','row_kind'] as const;
+const GROUP_COLUMNS=['kept_qty','returned_qty',...MONEY_COLUMNS,...NET_COLUMNS,'finance_state','wait_reason','estimated_lines','orders_count','pending_costs','unknown_lines','unknown_refunds','row_kind'] as const;
+// Since the second review of step 4 a day also says how many of its orders stand on a sale-time estimate and how many count an
+// unrecorded refund as 0 (dayCounts), as the page does beside its cost, net and revenue; since the third, the estimates only
+// beside a known cost (exportView), where the page names them.
+const DAY_COLUMNS=['day','orders_count','revenue_iqd','cost_iqd','investor_iqd','deductions_iqd','net_after_report_adjustments_iqd','owner_net_iqd','unknown_lines','pending_costs','estimated_orders','unknown_refund_orders'] as const;
+/** A week or a month of Reports → Days: its first and last day in the period, then the day's columns. */
+const BUCKET_COLUMNS=['from','to',...DAY_COLUMNS.slice(1)] as const;
+/** «غير مصنف» in the file's three name columns: a line with no section, or no subsection. */
+const UNCLASSIFIED={main:['غير مصنف','Unclassified','پۆلێننەکراو'],sub:['بلا قسم فرعي','No subsection','بێ بەشی لاوەکی']} as const;
+/**
+ * THE FILE IS THE PAGE AS IT IS SHOWN (the independent review of step 4). A filtered page exported every row of the period
+ * and a week view eleven days, so neither added up to its screen. The page sends what it shows — Reports → Orders its search
+ * (`q`), status (`state`: a state or `reason:<why>`), type (`kind`) and the row or days it was opened on (`scope`:
+ * `product:`, `main:` or `sub:` and an id, or `days:<from>:<to>`); a cash figure of the drawer the orders whose cash is due
+ * or not recorded yet (`cash=due|open`); the products and the sections their search; the days their grouping (`by`) — and
+ * the server applies it to its own rows by the screen's rules (reportTable.ts filterOrders, scopeIds, filterGroups,
+ * groupDays). A value it does not know, or one the view does not read, is a 400, as an unknown view is.
+ */
+const WAIT_REASONS=['no_price','return_cost','wage_waits_cost','investor_waits','refund_unknown','other'] as const;
+const EXPORT_READS:Record<string,readonly string[]>={lines:[],orders:['part','q','state','kind','scope','cash'],products:['q'],sections:['q'],days:['by']};
+type ExportFilter={part:string;q:string;state:string;kind:string;scope:string;cash:string;by:string};
+function exportFilter(get:(key:string)=>string|undefined,view:string):ExportFilter{
+  const f:ExportFilter={part:get('part')||'',q:(get('q')||'').trim().slice(0,100),state:get('state')||'',kind:get('kind')||'',scope:(get('scope')||'').slice(0,300),cash:get('cash')||'',by:get('by')||''};
+  if(!['','calculated','waiting','period'].includes(f.part)||(f.part&&!EXPORT_READS[view].includes('part')))throw badRequest('جزء الطلبات غير معروف / Unknown order part','EXPORT_PART_INVALID');
+  const known=(f.state===''||['confirmed','estimated','waiting',...WAIT_REASONS.map((r)=>`reason:${r}`)].includes(f.state))&&['','normal','quick_buy','gift'].includes(f.kind)
+    &&(f.scope===''||/^(?:(?:product|main|sub):.+|days:\d{4}-\d{2}-\d{2}:\d{4}-\d{2}-\d{2})$/.test(f.scope))&&['','due','open'].includes(f.cash)&&['','day','week','month'].includes(f.by);
+  if(!known||(['q','state','kind','scope','cash','by'] as const).some((k)=>f[k]&&!EXPORT_READS[view].includes(k)))throw badRequest('فلتر التصدير غير معروف / Unknown export filter','EXPORT_FILTER_INVALID');
+  return f;
+}
+/** The orders a page was opened on (reportTable.ts scopeIds): a product's or a section's own, the order-level row's, or those delivered on those days. */
+function scopeOrders(scope:string,answer:{products:Row[];categories:Row[];order_level:{order_ids:string[]}|null},days:ReadonlyMap<string,string>):Set<string>|null{
+  if(!scope)return null;
+  const [kind,...rest]=scope.split(':');
+  if(kind==='days'){const [from,to]=rest;return new Set([...days].filter(([,d])=>d>=from&&d<=to).map(([id])=>id));}
+  const id=rest.join(':');
+  if(id==='order_level')return new Set(answer.order_level?.order_ids??[]);
+  const rows=kind==='product'?answer.products:answer.categories.filter((c)=>c.level===kind);
+  return new Set((rows.find((r)=>r.id===id)?.order_ids as string[]|undefined)??[]);
+}
+/** Reports → Days by week (from Saturday, the old report's bucketKeyOf) or by month, as reportTable.ts groupDays sums them: an amount unknown on one of its days is unknown. */
+const weekOf=(day:string)=>{const t=Date.parse(`${day}T00:00:00Z`),dow=new Date(t).getUTCDay();return new Date(t-((dow+1)%7)*86400000).toISOString().slice(0,10);};
+function dayBuckets(daily:Row[],by:'week'|'month'):Row[]{
+  const out=new Map<string,Row>(),plus=(a:unknown,b:unknown)=>(a===null||b===null?null:n(a)+n(b));
+  for(const d of daily){const day=s(d.day),key=by==='month'?day.slice(0,7):weekOf(day),row=out.get(key);
+    if(!row){out.set(key,{...d,from:day,to:day});continue;}
+    out.set(key,{from:row.from,to:day,orders_count:n(row.orders_count)+n(d.orders_count),revenue_iqd:n(row.revenue_iqd)+n(d.revenue_iqd),cost_iqd:plus(row.cost_iqd,d.cost_iqd),
+      investor_iqd:plus(row.investor_iqd,d.investor_iqd),deductions_iqd:n(row.deductions_iqd)+n(d.deductions_iqd),
+      net_after_report_adjustments_iqd:plus(row.net_after_report_adjustments_iqd,d.net_after_report_adjustments_iqd),owner_net_iqd:plus(row.owner_net_iqd,d.owner_net_iqd),
+      unknown_lines:n(row.unknown_lines)+n(d.unknown_lines),pending_costs:n(row.pending_costs)+n(d.pending_costs),
+      estimated_orders:n(row.estimated_orders)+n(d.estimated_orders),unknown_refund_orders:n(row.unknown_refund_orders)+n(d.unknown_refund_orders)});}
+  return [...out.values()];
+}
 adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
+  const view=c.req.query('view')||'lines',level=c.req.query('level')||'main';
+  if(!(EXPORT_VIEWS as readonly string[]).includes(view))throw badRequest('عرض التصدير غير معروف / Unknown export view','EXPORT_VIEW_INVALID');
+  if(!['main','sub'].includes(level))throw badRequest('مستوى الأقسام غير معروف / Unknown section level','EXPORT_LEVEL_INVALID');
+  const filter=exportFilter((key)=>c.req.query(key),view);
+  if(view!=='lines')return exportView(c.env.DB,range(c.req.query('from'),c.req.query('to')),view as Exclude<(typeof EXPORT_VIEWS)[number],'lines'>,level as 'main'|'sub',filter);
   const r=range(c.req.query('from'),c.req.query('to')),{bases,truncated}=await selectOrders(c.env.DB,r,{summary:true});if(truncated)throw badRequest('اختر فترة أضيق لتصدير جميع البنود');
   const fields=['order_id','id','product_id','name_snapshot','sku_snapshot','qty','returned_qty','main_name','sub_name','net_goods_iqd','refund_iqd','cogs_iqd','cost_confidence','gross_profit_iqd','wages_iqd','materials_iqd','manual_direct_iqd','shipping_income_iqd','cod_tax_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd','investor_iqd','owner_net_iqd','pending_costs','coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd','row_kind'];
   const rows=[fields.map(csvCell).join(','),...bases.flatMap((b)=>{const rest=orderLevelDeductions(b);
     return [...b.lines.map((l):Row=>({...l,row_kind:'line'})),...(rest?[rest]:[])].map((l)=>fields.map((f)=>csvCell(f==='order_id'?b.order_id:l[f])).join(','));})];
   return new Response('\uFEFF'+rows.join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="finance-lines-${r.from}-${r.to}.csv"`}});
 });
+async function exportView(db:D1Database,r:{from:string;to:string},view:'orders'|'products'|'sections'|'days',level:'main'|'sub',f:ExportFilter){
+  const {answer,bases,truncated}=await periodFigures(db,r);if(truncated)throw badRequest('اختر فترة أضيق لتصدير جميع البنود');
+  const filtered=!!(f.q||f.state||f.kind||f.scope||f.cash);
+  const file=(rows:Row[],fields:readonly string[])=>csvFile(rows,fields,`finance-${view}${view==='sections'?`-${level}`:''}${f.part?`-${f.part}`:''}${f.by&&f.by!=='day'?`-${f.by}`:''}${filtered?'-filtered':''}-${r.from}-${r.to}.csv`);
+  // A cost that waits for the goods cost (a profit-based wage) is in no sum yet, so a row with one has no known wages or
+  // materials — the statement's rule (statement.ts) and the tables' — never the part that happens to be approved.
+  const settled=(row:Row):Row=>(n(row.pending_costs)>0?{...row,wages_iqd:null,materials_iqd:null}:row);
+  // A row's estimates are named beside its known cost, as the page names them: beside an empty cost the count is empty too (the
+  // third review of step 4), so the column adds up to the costs total's «تقديري n» — and, over the rows with a net, to the net's.
+  const besideCost=(rows:Row[])=>rows.map((row)=>(row.cost_iqd===null?{...row,estimated_orders:null}:row));
+  if(view==='days'){const daily=answer.chart_data.daily as Row[];return f.by==='week'||f.by==='month'?file(besideCost(dayBuckets(daily,f.by)),BUCKET_COLUMNS):file(besideCost(daily),DAY_COLUMNS);}
+  // Products and sections: the rows whose name holds the search (any language the server has), then — on the whole table only,
+  // as the screen draws it — the order-level row, so the file adds up to the orders.
+  const needle=f.q.toLocaleLowerCase(),named=(x:Row)=>!needle||[x.name,x.name_ar,x.name_en,x.name_ckb].some((v)=>typeof v==='string'&&v.toLocaleLowerCase().includes(needle));
+  const level0=needle?null:answer.order_level;
+  const orderLevelRow=(names:Row):Row=>({...Object.fromEntries(GROUP_COLUMNS.map((k)=>[k,0])),...names,coupon_iqd:level0!.coupon_iqd,price_protection_iqd:level0!.price_protection_iqd,
+    trade_in_credit_returned_iqd:level0!.trade_in_credit_returned_iqd,net_after_report_adjustments_iqd:level0!.net_after_report_adjustments_iqd,finance_state:'',wait_reason:'',orders_count:level0!.orders_count,row_kind:'order_level'});
+  if(view==='products'){const rows=(answer.products as Row[]).filter(named).map((p)=>settled({...p,product_id:p.id,row_kind:'product'}));
+    if(level0)rows.push(orderLevelRow({product_id:'order_level',name:ORDER_LEVEL_NAMES[0],main_id:'',main_name:''}));
+    return file(rows,['product_id','name','main_id','main_name',...GROUP_COLUMNS]);}
+  if(view==='sections'){const [ar,en,ckb]=UNCLASSIFIED[level];
+    const rows=(answer.categories as Row[]).filter((x)=>x.level===level&&named(x)).map((x)=>settled({...x,section_id:x.id,row_kind:'section',...(x.id==='unclassified'?{name_ar:ar,name_en:en,name_ckb:ckb}:{})}));
+    if(level0){const [lar,len,lckb]=ORDER_LEVEL_NAMES;rows.push(orderLevelRow({section_id:'order_level',name_ar:lar,name_en:len,name_ckb:lckb}));}
+    return file(rows,['section_id','name_ar','name_en','name_ckb',...GROUP_COLUMNS]);}
+  const days=new Map(bases.map((b)=>[b.order_id,deliveredDay(b)]));
+  const scope=scopeOrders(f.scope,{products:answer.products as Row[],categories:answer.categories as Row[],order_level:answer.order_level},days),q=f.q.toLocaleLowerCase();
+  const orders=(answer.orders as Row[]).filter((o)=>{
+    const id=s(o.order_id),state=s(o.finance_state);
+    if(f.part&&f.part!=='period'&&(f.part==='waiting')!==(state==='waiting'))return false;
+    if(scope&&!scope.has(id))return false;
+    if(q&&!`${id} ${s(o.customer_name)}`.toLocaleLowerCase().includes(q))return false;
+    if(f.kind&&(s(o.order_kind)||'normal')!==f.kind)return false;
+    if(f.state&&(f.state.startsWith('reason:')?state!=='waiting'||o.wait_reason!==f.state.slice(7):state!==f.state))return false;
+    // The drawer's cash figures list the orders with cash due, or with some of it not recorded yet (drill.ts).
+    if(f.cash==='due'&&n(o.collection_difference_iqd)+n(o.collected_iqd)===0)return false;
+    if(f.cash==='open'&&n(o.collection_difference_iqd)===0)return false;
+    return true;
+  }).map((o):Row=>settled({...o,delivered_day:days.get(s(o.order_id))??'',general_expenses_iqd:0,
+    // Named beside a known goods cost only, as the page names it (reportTable.ts costOnEstimate; the fourth review of step 4).
+    estimated_cost:o.cogs_iqd==null?null:o.cost_confidence==='verified'?0:1,row_kind:'order'}));
+  // The column's share of the overheads, as the statement and the drawer carry it: rent and the like, and a month's promotion with
+  // no sales — the period's own for `part=period`. A file filtered by anything else is that page's rows, with no share.
+  const totals=answer.totals as Row;
+  const share=filtered||!f.part?null:f.part==='calculated'?answer.known:f.part==='waiting'?answer.waiting:{general_share_iqd:n(totals.general_expenses_iqd),unallocated_share_iqd:n(totals.unallocated_promotion_iqd)};
+  const general=n(share?.general_share_iqd),unallocated=n(share?.unallocated_share_iqd);
+  // They come off the calculated column's net, and the period's while every order of it is known; the waiting column has none.
+  const net=f.part==='calculated'||(f.part==='period'&&orders.every((o)=>o.net_after_report_adjustments_iqd!=null))?-general-unallocated:null;
+  if(share&&(general||unallocated))orders.push({...Object.fromEntries(ORDER_COLUMNS.map((k)=>[k,0])),order_id:'',delivered_day:'',customer_name:'',order_kind:'',finance_state:'',wait_reason:'',cash_state:'',
+    promotion_iqd:unallocated,general_expenses_iqd:general,owner_net_iqd:net,net_after_report_adjustments_iqd:net,row_kind:'overhead'});
+  return file(orders,ORDER_COLUMNS);
+}

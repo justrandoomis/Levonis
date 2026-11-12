@@ -17,6 +17,9 @@ export const FW = {
   accounting: ['المحاسبة', 'Accounting', 'ژمێریاری'],
   orders: ['الطلبات', 'Orders', 'داواکارییەکان'],
   products: ['المنتجات', 'Products', 'بەرهەمەکان'],
+  // Redesign step 4 (DECISIONS row 316): two more report pages.
+  sectionsPage: ['الأقسام', 'Sections', 'بەشەکان'],
+  daysPage: ['الأيام', 'Days', 'ڕۆژەکان'],
   missing: ['التكاليف الناقصة', 'Missing costs', 'تێچووە کەمەکان'],
   promotion: ['ترويج الشهر', 'Monthly promotion', 'بانگەشەی مانگ'],
   expenses: ['المصاريف العامة', 'General expenses', 'خەرجییە گشتییەکان'],
@@ -51,10 +54,14 @@ export const FW = {
   completeTitle: ['الطلبات المحسوبة: {n} من {m}', 'Calculated orders: {n} of {m}', 'داواکارییە ژمێردراوەکان: {n} لە {m}'],
   estimatedTitle: ['كل الطلبات محسوبة؛ على تكلفة تقديرية: {n}', 'Every order is calculated; on estimated costs: {n}', 'هەموو داواکارییەکان ژمێردراون؛ لەسەر تێچووی خەمڵێنراو: {n}'],
   confirmedN: ['مؤكد {n}', 'Confirmed {n}', 'دڵنیاکراو {n}'],
-  estimatedN: ['تقديري {n}', 'Estimated {n}', 'خەمڵێنراو {n}'],
-  waitingN: ['ينتظر {n}', 'Waiting {n}', 'چاوەڕوان {n}'],
+  // A no-break space holds a count to its word: a chip that wraps (a narrow totals cell) never leaves the number alone on a line
+  // (the third review of step 4).
+  estimatedN: ['تقديري\u00A0{n}', 'Estimated\u00A0{n}', 'خەمڵێنراو\u00A0{n}'],
+  waitingN: ['ينتظر\u00A0{n}', 'Waiting\u00A0{n}', 'چاوەڕوان\u00A0{n}'],
   waitsFor: ['ما تنتظره الطلبات الباقية: {list}.', 'What the other orders wait for: {list}.', 'ئەوەی داواکارییەکانی تر چاوەڕێی دەکەن: {list}.'],
   reasonNoPrice: ['سعر شراء ({n})', 'a purchase price ({n})', 'نرخی کڕین ({n})'],
+  // The independent review of step 4: a piece returned to stock with no known cost — fixed in its order, not on «التكاليف الناقصة».
+  reasonReturnCost: ['تكلفة قطعة مرتجعة إلى المخزون ({n})', 'the cost of a piece returned to stock ({n})', 'تێچووی پارچەیەکی گەڕاوە بۆ کۆگا ({n})'],
   reasonWage: ['أجر ينتظر تثبيت التكلفة ({n})', 'a wage waiting for a confirmed cost ({n})', 'کرێیەک چاوەڕێی جێگیرکردنی تێچووە ({n})'],
   reasonInvestor: ['حصة مستثمر تنتظر تسجيل النقد أو تثبيت التكلفة ({n})', 'an investor share waiting for its cash or a confirmed cost ({n})', 'بەشی وەبەرهێنەرێک چاوەڕێی تۆمارکردنی پارە یان جێگیرکردنی تێچووە ({n})'],
   reasonRefund: ['مبلغ مرتجع غير مثبت ({n})', 'an unconfirmed refund amount ({n})', 'بڕی گەڕاندنەوەی جێگیرنەکراو ({n})'],
@@ -118,6 +125,8 @@ export const FW = {
   colCalculated: ['محسوبة ({n})', 'Calculated ({n})', 'ژمێردراو ({n})'],
   colCalculatedEst: ['محسوبة ({n} · تقديرية: {e})', 'Calculated ({n} · estimated: {e})', 'ژمێردراو ({n} · خەمڵێنراو: {e})'],
   colWaiting: ['تنتظر ({n})', 'Waiting ({n})', 'چاوەڕوان ({n})'],
+  // The fourth review of step 4: a waiting column whose known goods cost rests on sale-time estimates names them, as «محسوبة» does.
+  colWaitingEst: ['تنتظر ({n} · تقديرية: {e})', 'Waiting ({n} · estimated: {e})', 'چاوەڕوان ({n} · خەمڵێنراو: {e})'],
   colPeriod: ['الفترة ({n})', 'Period ({n})', 'کۆی ماوە ({n})'],
   colPeriodEst: ['الفترة ({n} · تقديرية: {e})', 'Period ({n} · estimated: {e})', 'کۆی ماوە ({n} · خەمڵێنراو: {e})'],
   cogs: ['تكلفة البضاعة', 'Cost of goods', 'تێچووی کاڵا'],
@@ -177,6 +186,18 @@ const MONTHS: Record<'ar' | 'en' | 'ckb', readonly string[]> = {
   en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
   ckb: ['کانوونی دووەم', 'شوبات', 'ئازار', 'نیسان', 'ئایار', 'حوزەیران', 'تەمموز', 'ئاب', 'ئەیلوول', 'تشرینی یەکەم', 'تشرینی دووەم', 'کانوونی یەکەم'],
 };
+/** One day without its year, for a table's cell: "10 تشرين الثاني", "Nov 10", "10 تشرینی دووەم"; Latin digits. */
+export function dayText(lang: 'ar' | 'en' | 'ckb', day: string): string {
+  const m = (MONTHS[lang] ?? MONTHS.ar)[Number(day.slice(5, 7)) - 1], d = Number(day.slice(8, 10));
+  return lang === 'en' ? `${m} ${d}` : `${d} ${m}`;
+}
+/**
+ * A day in a table of the period `range`: without its year (dayText) — with it when the period spans two calendar years,
+ * so a year-long range never shows two rows both «11 تشرين الثاني» (the independent review of step 4).
+ */
+export function dayIn(lang: 'ar' | 'en' | 'ckb', day: string, range?: { from: string; to: string }): string {
+  return range && range.from.slice(0, 4) !== range.to.slice(0, 4) ? rangeText(lang, day, day) : dayText(lang, day);
+}
 /** "1–11 تشرين الثاني 2026", "Nov 1–11, 2026", across months and years as needed; Latin digits. */
 export function rangeText(lang: 'ar' | 'en' | 'ckb', from: string, to: string): string {
   const [fy, fm, fd] = [Number(from.slice(0, 4)), Number(from.slice(5, 7)) - 1, Number(from.slice(8, 10))];

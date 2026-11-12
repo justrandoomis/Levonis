@@ -35,7 +35,8 @@ import { register } from 'node:module';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { averageOrder, overviewNet } from '../src/components/financeWorkspace/overviewFigures';
-import type { DisplayUsdSummary, FinanceSummary } from '../src/components/financeWorkspace/types';
+import { groupMoney, groupNet, netOf, orderMoney } from '../src/components/financeWorkspace/reportTable';
+import type { DisplayUsdSummary, FinanceOrder, FinanceProduct, FinanceSummary } from '../src/components/financeWorkspace/types';
 import ReportDeductions from '../src/components/financeWorkspace/ReportDeductions';
 import { DisplayCurrencyContext } from '../src/components/financeWorkspace/displayCurrency';
 import { LanguageProvider } from '../src/LanguageContext';
@@ -130,12 +131,19 @@ test('a returned trade-in credit reads in dollars wherever the deductions are dr
   assert.doesNotMatch(usd, /data-finance-missing/, 'the credit has its dollars');
   assert.doesNotMatch(draw('IQD'), /data-finance-missing/);
   assert.match(draw('USD', { coupon: 0, credit: 0, net: 1867 }), /data-finance-missing/, 'without them the row would say «ناقص»');
-  // So every caller that draws dollars passes the credit's cents beside the coupon's and the price protection's: the product rows
-  // and the order sheet. Since step 3 the period's deductions are a row of the overview's statement, the credit in it in both currencies.
-  const calls = ['FinanceWorkspace.tsx', 'OrderProfitSheet.tsx', 'Overview.tsx']
+  // So every caller that draws dollars passes the credit's cents beside the coupon's and the price protection's: the order sheet.
+  // Since step 3 the period's deductions are a row of the overview's statement, the credit in it in both currencies; since step 4
+  // (DECISIONS row 316) the reports draw each order's, product's and section's «صافيك» after its deductions — the server's
+  // net_after_report_adjustments, in dollars its cents (which take the credit off too) — instead of the product cards' rows.
+  const calls = ['FinanceWorkspace.tsx', 'OrderProfitSheet.tsx', 'Overview.tsx', 'Reports.tsx', 'FigureDrawer.tsx']
     .flatMap((file) => codeOf(`src/components/financeWorkspace/${file}`).split('\n').filter((line) => line.includes('<ReportDeductions ')));
-  assert.equal(calls.length, 2, 'the product rows and the order sheet');
+  assert.equal(calls.length, 1, 'the order sheet');
   for (const call of calls) assert.match(call, /tradeIn: \w+\('trade_in_credit_returned_iqd'\)/, call.trim().slice(0, 160));
+  const product = { id: 'p', name: 'P', qty: 1, owner_net_iqd: 35000, net_after_report_adjustments_iqd: 28000 } as FinanceProduct;
+  const order = { id: 'o', status: 'delivered', created_at: '', owner_net_iqd: 35000, net_after_report_adjustments_iqd: 28000 } as FinanceOrder;
+  const dollars = { available: true, products: { p: { owner_net_cents: 2333, net_after_report_adjustments_cents: 1867 } }, orders: { o: { usd_basis: 'at_time', fx_rate_snapshot: '1500', cents: { owner_net_cents: 2333, net_after_report_adjustments_cents: 1867 } } } } as unknown as DisplayUsdSummary;
+  assert.deepEqual([groupNet(product, groupMoney(undefined, 'product')), groupNet(product, groupMoney(dollars, 'product'))], [28000, 1867], 'a product: after its credit, in dinars and dollars');
+  assert.deepEqual([netOf(order, orderMoney(undefined)), netOf(order, orderMoney(dollars))], [28000, 1867], 'an order: the same');
   assert.match(codeOf('src/components/financeWorkspace/statement.ts'), /case 'deductions': return add\(v\('coupon_iqd'\), v\('price_protection_iqd'\), t\.trade_in_credit_returned_iqd \?\? 0\);/);
 });
 
@@ -324,7 +332,7 @@ test('the overview, top to bottom: how much is calculated and what the rest wait
   const banner = /data-finance-completeness="waiting"[\s\S]*?<\/button><\/div>/.exec(html)?.[0] ?? '';
   assert.match(banner, /الطلبات المحسوبة: 9 من 13/);
   assert.match(banner, /سعر شراء \(2\)، أجر ينتظر تثبيت التكلفة \(1\)، حصة مستثمر تنتظر تسجيل النقد أو تثبيت التكلفة \(1\)/);
-  assert.match(banner, /مؤكد 3[\s\S]*تقديري 6[\s\S]*ينتظر 4/);
+  assert.match(banner, /مؤكد 3[\s\S]*تقديري\u00A06[\s\S]*ينتظر\u00A04/);
   assert.match(banner, /أكمل التكاليف الناقصة \(19\)/);
   // Like with like: sales against sales; a gross or a net from complete orders only is a partial comparison, with no figure.
   assert.match(cardOf(html, 'netSales'), /data-finance-delta="-0\.65[\d]*"[^>]*>[\s\S]*▼[\s\S]*65\.2%[\s\S]*عن 1–11 تشرين الأول 2026/);

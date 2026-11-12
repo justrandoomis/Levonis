@@ -93,8 +93,20 @@ const CSS_BUDGET = 60 * KB;
  * Staff tabs and «أرباحي» (capital bar, why money is held, work status;
  * DECISIONS row 304) measured 8,204 B over the three sheets; the owner's and
  * the person's own pages, lazy, never on a storefront.
+ * 8.5 KB → 10.5 KB (2026-11-11, the owner told before steps 4–6 of the
+ * «المال والأرباح» redesign): one raise for the three steps left. Step 4 (the
+ * reports' tables and the figure drawer; DECISIONS row 316) measured 9,048 B
+ * over the three sheets (the finance sheet 4,662 B, from 4,188 B after steps
+ * 2–3; the old order rows and paging pruned), 9,182 B after its
+ * independent review (the finance sheet 4,796 B: the tables kept whole inside
+ * the admin shell, the drawer's «عرض الكل»), 9,116 B after its second
+ * review (the finance sheet 4,730 B: no column hidden at any width, the cards
+ * without their overlay), and 9,165 B after its third (the finance sheet
+ * 4,779 B: a partial comparison's reason shown on the keyboard's focus and
+ * never copied with a figure); steps 5 and 6 write theirs here.
+ * Still owner-only and lazy, never on a storefront (the test below).
  */
-const OPERATIONS_CSS_BUDGET = 8.5 * KB;
+const OPERATIONS_CSS_BUDGET = 10.5 * KB;
 
 const gz = (path: string) => gzipSync(readFileSync(path), { level: 9 }).length;
 const kb = (n: number) => `${(n / KB).toFixed(1)} KB`;

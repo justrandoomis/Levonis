@@ -1,5 +1,9 @@
-/** Every page of «المال والأرباح»; each belongs to one of the five sections (redesign step 2: overview, reports, costs, people, accounting). */
-export type FinanceSection = 'overview' | 'orders' | 'products' | 'missing' | 'monthly' | 'expenses' | 'staff' | 'investors' | 'settlements' | 'accounting';
+/** Every page of «المال والأرباح»; each belongs to one of the five sections (redesign step 2: overview, reports, costs, people, accounting; step 4 adds sections and days). */
+export type FinanceSection = 'overview' | 'orders' | 'products' | 'sections' | 'days' | 'missing' | 'monthly' | 'expenses' | 'staff' | 'investors' | 'settlements' | 'accounting';
+/** Where an order, a product or a section stands (the server's orderState / groupState, DECISIONS row 316). */
+export type FinanceState = 'confirmed' | 'estimated' | 'waiting';
+/** An order's cash: nothing due on delivery, all of it recorded as received, part of it, or none yet. */
+export type CashState = 'prepaid' | 'recorded' | 'part' | 'not_recorded';
 
 export interface ProfitTotals {
   net_goods_iqd?: number | null;
@@ -16,6 +20,8 @@ export interface ProfitTotals {
   materials_iqd?: number | null;
   manual_direct_iqd?: number | null;
   contribution_profit_iqd?: number | null;
+  /** What the goods, delivery and fees left before promotion and investors: null while a goods cost or a cost that waits on it is unknown. */
+  profit_basis_iqd?: number | null;
   promotion_iqd?: number | null;
   unallocated_promotion_iqd?: number | null;
   investor_iqd?: number | null;
@@ -60,6 +66,14 @@ export interface FinanceOrder extends ProfitTotals {
   cost_confidence?: string;
   /** What made the order (0174): the cart, a Quick Buy session, or gifts only. */
   order_kind?: 'normal' | 'quick_buy' | 'gift';
+  /** Net sales, delivery and the COD fee: the margin's base (redesign step 4; absent from a server that predates it). */
+  revenue_iqd?: number;
+  /** Where the order stands and, waiting, for what; its cash (redesign step 4; absent from a server that predates them). */
+  finance_state?: FinanceState;
+  wait_reason?: FinanceWaitReason | null;
+  cash_state?: CashState;
+  /** Its lines with a refunded return whose amount nobody recorded: its sales count that refund as 0 (the review of step 4). */
+  unknown_refunds?: number;
 }
 
 /** §21: the period's delivered orders by what made them; the rows add up to the totals. */
@@ -77,7 +91,30 @@ export interface FinanceProduct extends ProfitTotals {
   level?: 'product' | 'main' | 'sub';
   product_image?: string;
   image_url?: string;
+  /** Redesign step 4 (absent from a server that predates it): the pieces the customers kept and those they returned. */
+  kept_qty?: number;
+  returned_qty?: number;
+  /** The orders its lines come from, so a row can open them. */
+  order_ids?: string[];
+  orders_count?: number;
+  finance_state?: FinanceState;
+  wait_reason?: FinanceWaitReason | null;
+  /** A product's main section (its id; the names come from that section's own row). */
+  main_id?: string;
+  main_name?: string;
+  /** A section's name in each language, from the live section; `name` is the sale's Arabic snapshot. */
+  name_ar?: string;
+  name_en?: string;
+  name_ckb?: string;
+  /** Its lines with an unrecorded refund amount (the review of step 4). */
+  unknown_refunds?: number;
 }
+/**
+ * What no product and no section carries (the review of step 4): the rest of a coupon larger than the goods, a price
+ * protection or a returned trade-in credit no line carries — on the orders, so the products' and sections' tables give it
+ * a row of its own and add up to the orders. Null: nothing is left at the order level.
+ */
+export interface FinanceOrderLevel { coupon_iqd: number; price_protection_iqd: number; trade_in_credit_returned_iqd: number; net_after_report_adjustments_iqd: number | null; order_ids: string[]; orders_count: number }
 
 export interface Promotion {
   id: string;
@@ -108,7 +145,7 @@ export interface DisplayUsdSummary {
   products?: Record<string, UsdCents>;
   categories?: { main: Record<string, UsdCents>; sub: Record<string, UsdCents> };
   chart?: { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; investor_cents: number | null;
-    daily: Record<string, { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; investor_cents: number | null }>;
+    daily: Record<string, UsdDay>;
     expense_composition: Array<{ key: string; amount_cents: number | null }> };
   totals?: UsdCents;
   /** `known` in cents (null: no complete order); absent from a server that predates it. */
@@ -119,8 +156,13 @@ export interface DisplayUsdSummary {
     totals?: UsdCents; general_share_cents?: number; unallocated_share_cents?: number } | null;
   /** `waiting` in cents: the incomplete orders' sums and the rest of the overheads (null: every order is complete; absent from an older server). */
   waiting?: { orders_count: number; totals: UsdCents; general_share_cents: number; unallocated_share_cents: number } | null;
+  /** The order-level row of the products and the sections in cents (the review of step 4). */
+  order_level?: UsdCents | null;
 }
 export interface UsdKnownPart { orders_count: number; owner_net_cents: number | null; net_after_report_adjustments_cents: number | null }
+/** One day in cents; the deductions and the net after them since redesign step 4 (absent from a server that predates them). */
+export interface UsdDay { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; investor_cents: number | null;
+  deductions_cents?: number; net_after_report_adjustments_cents?: number | null }
 /** `display_usd` of `GET /orders?display=USD`. */
 export interface DisplayUsdOrders { available: boolean; today_rate?: string | null; at_time_count?: number; today_count?: number; batch_cost_lines?: number; orders?: Record<string, UsdOrderCents> }
 /** `display_usd` of `GET /orders/:id?display=USD`. */
@@ -134,8 +176,11 @@ export type FinanceKnown = { orders_count: number; incomplete_orders: number; re
   net_after_report_adjustments_iqd?: number | null; confirmed?: FinanceKnownPart; estimated?: FinanceKnownPart;
   /** The complete orders' sums, and their revenue share of the period's overheads (the statement's «محسوبة» column). */
   totals?: ProfitTotals; general_share_iqd?: number; unallocated_share_iqd?: number };
-/** The one thing an incomplete order waits for, first match in the order the owner fixes them. */
-export type FinanceWaitReason = 'no_price' | 'wage_waits_cost' | 'investor_waits' | 'refund_unknown' | 'other';
+/**
+ * The one thing an incomplete order waits for, first match in the order the owner fixes them. `return_cost` (the review of
+ * step 4): its own price is confirmed, but a piece returned to stock has no known cost — fixed in the order, not on «التكاليف الناقصة».
+ */
+export type FinanceWaitReason = 'no_price' | 'return_cost' | 'wage_waits_cost' | 'investor_waits' | 'refund_unknown' | 'other';
 /** The orders that are not complete: their sums (unknown parts null), what each waits for, and the rest of the overheads. */
 export type FinanceWaiting = { orders_count: number; totals: ProfitTotals; reasons: Partial<Record<FinanceWaitReason, string[]>>; general_share_iqd?: number; unallocated_share_iqd?: number };
 /** What keeps the period from being complete: lines without a confirmed purchase price. */
@@ -155,6 +200,8 @@ export interface FinanceSummary {
   kinds?: FinanceKindTotals[];
   products: FinanceProduct[];
   categories: FinanceProduct[];
+  /** Absent from a server that predates it; null when nothing is left at the order level. */
+  order_level?: FinanceOrderLevel | null;
   exceptions: Array<{ id?: string; order_id?: string; message?: string; type?: string }>;
   promotions: Promotion[];
   truncated: boolean;
@@ -170,9 +217,16 @@ export interface FinanceChartAmounts {
   orders_count: number;
   unknown_lines: number;
   pending_costs: number;
+  /** The day's coupons, credited price protection and returned trade-in credits, and its net after them (redesign step 4; absent from a server that predates them). */
+  deductions_iqd?: number;
+  net_after_report_adjustments_iqd?: number | null;
 }
 export interface FinanceCharts extends FinanceChartAmounts {
-  daily: Array<FinanceChartAmounts & { day: string }>;
+  /**
+   * Each day of the period. Since the second review of step 4 a day also counts its orders whose known goods cost rests on a sale-time
+   * estimate and those whose sales count an unrecorded refund as 0 (for its file; Reports → Days counts the same from the orders).
+   */
+  daily: Array<FinanceChartAmounts & { day: string; estimated_orders?: number; unknown_refund_orders?: number }>;
   expense_composition: Array<{ key: 'goods' | 'wages' | 'materials' | 'other' | 'delivery' | 'promotion' | 'general'; amount_iqd: number | null }>;
   basis: 'delivered_baghdad_day';
 }

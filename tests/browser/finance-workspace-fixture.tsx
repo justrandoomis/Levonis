@@ -33,14 +33,16 @@ const order: OrderProfit = {
 };
 const otherTotals = { net_goods_iqd: 115000, retained_revenue_iqd: 115000, cogs_iqd: 80000, gross_profit_iqd: 35000, shipping_income_iqd: 5000, cod_tax_iqd: 0, direct_cost_iqd: 1500, wages_iqd: 1500, materials_iqd: 0, manual_direct_iqd: 0, courier_fee_iqd: 5000, payment_fee_iqd: 0, contribution_profit_iqd: 33500, promotion_iqd: 25000, investor_iqd: 0, owner_net_iqd: 8500, units: 1, pending_costs: 0, unknown_lines: 0, collected_iqd: 120000, collection_difference_iqd: 0 };
 const summary: FinanceSummary = { totals, truncated: false, exceptions: [], promotions: [promo],
-  orders: [{ ...order.order, ...order.totals }, { id: 'LV-2026-00417', status: 'delivered', customer_name: 'حسين أحمد', created_at: '2026-10-01T09:00:00Z', delivered_at: '2026-10-01T12:00:00Z', ...otherTotals }],
+  // Redesign step 4 (DECISIONS row 316): where each order stands, its cash and its revenue, as /summary answers them.
+  orders: [{ ...order.order, ...order.totals, finance_state: 'confirmed', wait_reason: null, cash_state: 'recorded', revenue_iqd: 1_067_000 },
+    { id: 'LV-2026-00417', status: 'delivered', customer_name: 'حسين أحمد', created_at: '2026-10-01T09:00:00Z', delivered_at: '2026-10-01T12:00:00Z', ...otherTotals, finance_state: 'confirmed', wait_reason: null, cash_state: 'recorded', revenue_iqd: 120_000 }],
   products: order.lines.map((l) => ({ ...l, id: l.product_id ?? l.id, name: l.name_snapshot })),
   categories: [{ ...order.lines[0], id: 'printers', name: 'الطابعات', qty: 1, level: 'main' }, { ...order.lines[1], id: 'filaments', name: 'الفلمنت', qty: 4, level: 'main' }],
 };
 if (params.get('state') === 'unknown') {
   order.totals.cogs_iqd = null; order.totals.owner_net_iqd = null; order.warnings = ['cost:item-printer:unknown'];
   order.lines[0].cogs_iqd = null; order.lines[0].owner_net_iqd = null; order.lines[0].cost_confidence = 'unknown';
-  summary.orders[0].cogs_iqd = null; summary.orders[0].owner_net_iqd = null; summary.orders[0].unknown_lines = 1;
+  summary.orders[0].cogs_iqd = null; summary.orders[0].owner_net_iqd = null; summary.orders[0].unknown_lines = 1; summary.orders[0].finance_state = 'waiting'; summary.orders[0].wait_reason = 'no_price';
   summary.products[0].cogs_iqd = null; summary.products[0].owner_net_iqd = null;
   summary.categories[0].cogs_iqd = null; summary.categories[0].owner_net_iqd = null;
 }

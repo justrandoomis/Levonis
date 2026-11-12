@@ -40,7 +40,7 @@ import { validFinanceRange } from '../src/components/financeWorkspace/types';
 import { FW, fw, rangeText } from '../src/components/financeWorkspace/overviewStrings';
 import type { DisplayUsdSummary, FinanceSummary, ProfitTotals } from '../src/components/financeWorkspace/types';
 import { LanguageProvider } from '../src/LanguageContext';
-import { codeOf } from './fixtures/source';
+import { codeOf, sourceOf } from './fixtures/source';
 
 let LANG: 'ar' | 'en' | 'ckb' = 'ar';
 (globalThis as { localStorage?: unknown }).localStorage = { getItem: (k: string) => (k === 'levo_lang' ? LANG : null), setItem: () => {}, removeItem: () => {} };
@@ -179,15 +179,19 @@ test('every word of the frame and the overview is in Arabic, English and real So
   assert.equal(fw(loc('ckb'), 'completeTitle', { n: 9, m: 13 }), 'داواکارییە ژمێردراوەکان: 9 لە 13');
   assert.equal(fw(loc('en'), 'completeTitle', { n: 9, m: 13 }), 'Calculated orders: 9 of 13');
   assert.equal(fw(loc('ar'), 'completeTitle', { n: 9, m: 13 }), 'الطلبات المحسوبة: 9 من 13');
-  // The new screens' own loc() calls, outside the table, carry their Sorani too: the frame (the workspace's
-  // own component, above the reports it still hosts unchanged until step 4) and the overview.
-  const workspace = codeOf('src/components/financeWorkspace/FinanceWorkspace.tsx');
-  const frame = workspace.slice(0, workspace.indexOf('function orderKindName('));
-  for (const [file, code] of [['FinanceWorkspace.tsx', frame], ['Overview.tsx', codeOf('src/components/financeWorkspace/Overview.tsx')]] as const) {
+  // The new screens' own loc() calls, outside the table, carry their Sorani too: the frame (since step 4, DECISIONS row 316, the
+  // whole file — the old orders list and product cards, with their Arabic-and-English-only words, are gone), the overview, and
+  // the reports and the figure drawer of step 4.
+  // The independent review of step 4 adds the sheet's own words (ui.tsx) and, for every three-language loc() of these files, the
+  // tables' Sorani-letter rule — save «داخستن» (Close), the shop's word for it on every admin screen, written without one.
+  const SORANI_LETTER = /[ڕڵێۆەڤگچپژیک]/, SORANI_WORDS = new Set(['داخستن']);
+  const files = ['FinanceWorkspace.tsx', 'Overview.tsx', 'Reports.tsx', 'FigureDrawer.tsx', 'ui.tsx'];
+  for (const [file, code] of files.map((name) => [name, codeOf(`src/components/financeWorkspace/${name}`)] as const)) {
     assert.ok(code.length > 2000 && !code.includes('function OrderRow('), file);
     for (const [, ar, , ckb] of code.matchAll(/loc\('([^']*)', '([^']*)', '([^']*)'\)/g)) {
       assert.doesNotMatch(ckb, ARABIC_ONLY, `${file}: «${ckb}»`);
       if (ARABIC.test(ar.replace(/[،؛]/g, ''))) assert.notEqual(ckb, ar, `${file}: the Sorani of «${ar}» is the Arabic`);
+      if (!SORANI_WORDS.has(ckb) && ckb.replace(/\{\w+\}|[\d\s().,:·…/–،؛-]/g, '').length > 4) assert.match(ckb, SORANI_LETTER, `${file}: «${ckb}» has no Sorani letter`);
     }
     assert.doesNotMatch(code, /loc\('[^'\n]*[؀-ۿ][^'\n]*', '[^'\n]*'\)/, `${file}: a string without its Sorani`);
   }
@@ -220,7 +224,9 @@ test('five sections instead of eight tabs, and every earlier `finance=` link sti
   for (const word of ['نظرة عامة', 'التقارير', 'التكاليف', 'الأشخاص والدفعات', 'المحاسبة']) assert.ok(html.includes(`>${word}`), word);
   const links: Array<[string, string, string | undefined]> = [['overview', 'overview', undefined], ['orders', 'reports', 'orders'], ['products', 'reports', 'products'], ['monthly', 'costs', 'monthly'],
     ['monthlycosts', 'costs', 'monthly'], ['staff', 'people', 'staff'], ['people', 'people', 'staff'], ['investors', 'people', 'investors'], ['settlements', 'people', 'settlements'],
-    ['withdrawals', 'people', 'settlements'], ['accounting', 'accounting', undefined], ['missing', 'costs', 'missing'], ['expenses', 'costs', 'expenses'], ['nonsense', 'overview', undefined]];
+    ['withdrawals', 'people', 'settlements'], ['accounting', 'accounting', undefined], ['missing', 'costs', 'missing'], ['expenses', 'costs', 'expenses'], ['nonsense', 'overview', undefined],
+    // Redesign step 4 (DECISIONS row 316): the reports' four pages; «reports» still opens the orders, «categories» the sections.
+    ['sections', 'reports', 'sections'], ['days', 'reports', 'days'], ['categories', 'reports', 'sections'], ['reports', 'reports', 'orders']];
   for (const [link, section, sub] of links) {
     const shown = open(`?finance=${link}`);
     assert.equal(current(shown), section, `?finance=${link} opens «${section}»`);
@@ -245,10 +251,13 @@ test('one compact bar: a preset needs no dates (the header says them); a custom 
   assert.match(custom, /<option value="previous" selected="[^"]*">الفترة السابقة بنفس الطول<\/option>/, 'a range across months is compared with the period before it');
   assert.match(custom, /data-finance-range[^>]*><bdi>15 أيلول – 14 تشرين الأول 2026<\/bdi>/);
   assert.match(custom, /مقارنةً بـ 16 آب – 14 أيلول 2026/, 'and the header says which days: the thirty before');
-  // Only the overview compares; only its and the reports' bar exports; the month page has its own month.
+  // Only the overview compares; only the overview's bar exports (the period's line file, above); the month page has its own month.
   const people = open('?finance=staff');
   assert.doesNotMatch(people, /data-finance-compare|data-finance-export/);
-  assert.match(open('?finance=orders'), /data-finance-export/);
+  // Since the independent review of step 4 (DECISIONS row 316) each report exports its own table AS SHOWN — its search, filters,
+  // row or days, grouping — from its toolbar (tests/financeReportTables.test.ts): the bar's file of every row of the period, under
+  // a filtered or scoped page, never added up to it.
+  for (const link of ['orders', 'products', 'sections', 'days']) assert.doesNotMatch(open(`?finance=${link}`), /data-finance-export/, link);
   assert.doesNotMatch(open('?finance=monthly'), /data-finance-period/);
   assert.match(open('?finance=monthly'), /type="month"/);
 });
@@ -359,8 +368,44 @@ test('the frame is wired to that memory: figures only under their own period and
   assert.match(code, /<FreshOnReturnHold\.Provider key=\{pageMount\(keptState, id\)\} value=\{id !== section\}>/);
   // A kept page's currency never flips when the owner moves to a section without the toggle (a hidden re-read each time).
   assert.match(code, /<DisplayCurrencyContext\.Provider value=\{CURRENCY_PAGES\.includes\(id\) \? currency : 'IQD'\}>/);
-  assert.match(code, /if \(section === 'orders'\) setOrdersPoll\(\(value\) => value \+ 1\);/);
-  assert.match(code, /revision=\{revision \+ ordersPoll\}/);
+  // Since step 4 (DECISIONS row 316) the orders page is the summary's own orders: a background refresh of the summary is the
+  // orders' refresh, so they never read on their own (no second list to keep in step with the figures beside it).
+  assert.match(code, /\{page\('orders', \(\) => figures\(\(d\) => <OrdersReport data=\{d\}/);
+  assert.doesNotMatch(code, /ordersPoll|\/orders\?/);
+  // A row opens the orders page on itself, kept as that row (reportTable ScopeRef), never as ids; the overview's and the
+  // drawer's way to the orders page is the period's orders, never a row's chip left from before.
+  assert.match(code, /useState<ScopeRef \| null>\(null\)/);
+  assert.match(code, /const toPage = \(next: FinanceSection\) => \{ if \(next === 'orders'\) setScope\(null\); setSection\(next\); \};/);
+  assert.equal((code.match(/onNavigate=\{toPage\}/g) ?? []).length, 2, 'the overview and the drawer');
+  // The figure drawer stands on the read on screen (the independent review of step 4): it opens only from figures that are this
+  // period's and currency's own (`shown.current` — never the dimmed ones while another loads), takes its dates from that read,
+  // and closes when the period or currency moves on or the read goes (a failed read), never to open again by itself.
+  assert.match(code, /\{figure && data && shown\.current && <DisplayCurrencyContext\.Provider value=\{currency\}><FigureDrawer data=\{data\} figure=\{figure\} from=\{data\.range\?\.from \?\? range\.from\} to=\{data\.range\?\.to \?\? range\.to\}/);
+  assert.match(code, /<Overview data=\{d\}[\s\S]{0,600}?onFigure=\{shown\.current \? openOn\(screen\) : undefined\} \/>/);
+  assert.match(code, /useEffect\(\(\) => \{ setFigure\(null\); \}, \[readKey\]\);/);
+  assert.match(code, /useEffect\(\(\) => \{ if \(!data\) setFigure\(null\); \}, \[data\]\);/);
+  // The fourth review: a card's open waits out a double click (cardClick), so it opens only on the read and the page it was asked on —
+  // the owner who moved on in the meantime (another period, currency or page) gets no drawer, over that page or once the next read lands.
+  assert.match(code, /const screen = `\$\{readKey\}\|\$\{section\}`, onScreen = useRef\(screen\);\s*onScreen\.current = screen;/);
+  assert.match(code, /const openOn = \(asked: string\) => \(key: FigureKey\) => \{ if \(onScreen\.current === asked\) setFigure\(key\); \};/);
+  assert.equal((code.match(/setFigure\(/g) ?? []).length, 4, 'opened only through onFigure, on the screen it was asked on; closed by the drawer, a new read key, a read gone');
+  // What the gate rests on: while another period loads the figures shown are not current; after its read fails there are none.
+  let st = summaryReducer(summaryReducer(NO_SUMMARY, { type: 'start', key: 'nov' }), { type: 'loaded', key: 'nov', data: nov, at: '10:50' });
+  st = summaryReducer(st, { type: 'start', key: 'oct' });
+  assert.deepEqual([summaryShown(st, 'oct').data === nov, summaryShown(st, 'oct').current], [true, false], 'November\'s figures, dimmed: no drawer opens on them under October');
+  assert.equal(summaryShown(summaryReducer(st, { type: 'failed', key: 'oct', error: 'x' }), 'oct').data, null);
+  // The drawer's own dates are the read's (FigureDrawer: data.range), never the bar's.
+  assert.match(codeOf('src/components/financeWorkspace/FigureDrawer.tsx'), /const range = props\.data\.range \?\? \{ from: props\.from, to: props\.to \};/);
+  // The layout the owner reads it in (the admin shell, a sidebar beside it): a page shrinks with the workspace so its table
+  // scrolls inside its card instead of being cut by <main>. The second review of step 4: no column steps aside (the promotion and
+  // a product's section were hidden on every laptop in the shell; tests/financeReportTables.test.ts), and a card opens on a click
+  // anywhere on it with nothing laid over its figures (cardClick, the test below) — no stretched overlay, no delta raised above one.
+  const css = codeOf('src/components/financeWorkspace/finance-workspace.css');
+  assert.match(css, /\.fw-body>\*\{min-width:0\}/);
+  assert.doesNotMatch(css, /@container|container-type|fw-low/);
+  assert.doesNotMatch(css, /fw-open--card|\.fw-delta\{[^}]*z-index/);
+  assert.match(css, /\.fw-metric--open\{cursor:pointer\}/);
+  assert.match(codeOf('src/components/financeWorkspace/Overview.tsx'), /className=\{`fw-metric\$\{c\.primary \? ' fw-metric--primary' : ''\}\$\{c\.open \? ' fw-metric--open' : ''\}`\} data-finance-kpi=\{c\.key\} onClick=\{c\.open && cardClick\(c\.open\)\}>/);
   // The hold itself is run in React in tests/freshOnReturnHold.test.ts.
   assert.match(codeOf('src/lib/useFreshOnReturn.ts'), /const held = useContext\(FreshOnReturnHold\);\s*const enabled = wanted && !held;/);
   // A failed comparison is named in the header (the cards then show no change).
@@ -497,4 +542,140 @@ test('«يحتاج انتباهك» and the payouts card once the people are rea
   assert.equal((payouts.match(/<li>/g) ?? []).length, 2, 'two people to pay; the third has nothing');
   assert.match(draw(createElement(Payouts, { people: { list: null, error: false }, onNavigate: noop })), /role="status">تحميل المستحقات…</);
   assert.match(draw(createElement(Payouts, { people: { list: [], error: true }, onNavigate: noop })), /role="alert">تعذّر تحميل المستحقات</);
+});
+
+// ------------------------------------------------------------------ the second review of step 4
+test('a card opens on a click anywhere on it — its figure, its comparison, its notes — while its figures stay selectable; the label\'s button stays the keyboard\'s way (second review, safety)', async () => {
+  // The first round laid a stretched button over the card: a press on the figure opened the drawer, but no figure could be selected,
+  // and the «مقارنة جزئية» line raised above it no longer opened anything. Now nothing covers the card: a click opens it unless it
+  // ends a selection or lands on a control of its own (the label's button has opened it already).
+  const { cardClick } = await import('../src/components/financeWorkspace/ui');
+  const noop = () => {};
+  let opened = 0, selection = '';
+  const click = cardClick(() => { opened += 1; }, () => selection);
+  const on = (control: boolean) => ({ target: { closest: (selector: string) => (control && selector.includes('button') ? {} : null) } as unknown as EventTarget });
+  click(on(false));
+  assert.equal(opened, 1, 'a click on the figure (or the comparison, or a note) opens the drawer');
+  click(on(true));
+  assert.equal(opened, 1, 'a click on the label\'s button: that button opened it, not twice');
+  selection = '4,321,000';
+  click(on(false));
+  assert.equal(opened, 1, 'a drag that selected the figure opens nothing: the owner copies it');
+  selection = '';
+  click({ target: null });
+  assert.equal(opened, 2);
+  // The card's own button takes the focus before the drawer opens, so closing the drawer gives it back to the card (as row 316 says of every window).
+  const focused: string[] = [];
+  click({ target: on(false).target, currentTarget: { querySelector: (selector: string) => ({ focus: () => focused.push(selector) }) } as unknown as EventTarget });
+  assert.deepEqual([opened, focused], [3, ['button']]);
+  click({ target: on(true).target, currentTarget: { querySelector: (selector: string) => ({ focus: () => focused.push(selector) }) } as unknown as EventTarget });
+  assert.deepEqual([opened, focused], [3, ['button']], 'a press on the button itself: the browser focused it already');
+  // Drawn on the invented 1–11 November: each card that opens says so (a pointer over it) and keeps its label's button, with nothing laid over it.
+  const { default: Overview } = await import('../src/components/financeWorkspace/Overview');
+  const { november } = await import('./fixtures/financeSampleMonth');
+  const html = renderToStaticMarkup(createElement(LanguageProvider, null, createElement(Overview, { data: november, prev: null, openOrder: noop, onNavigate: noop, onMissing: noop, onCollections: noop, onFigure: noop })));
+  for (const [card, open] of [['netSales', 'netSales'], ['grossProfit', 'grossProfit'], ['netShare', 'netShare'], ['deliveredOrders', 'deliveredOrders']])
+    assert.match(html, new RegExp(`<div class="fw-metric[^"]* fw-metric--open" data-finance-kpi="${card}"><span><button type="button" class="fw-open" data-finance-open="${open}">`), card);
+  assert.doesNotMatch(html, /fw-open--card/);
+  const closed = renderToStaticMarkup(createElement(LanguageProvider, null, createElement(Overview, { data: november, prev: null, openOrder: noop, onNavigate: noop, onMissing: noop, onCollections: noop })));
+  assert.doesNotMatch(closed, /fw-metric--open/, 'no drawer to open (another period loading): no card says it opens');
+});
+
+// ------------------------------------------------------------------ the third review of step 4
+test('a double click on a card selects its figure and opens nothing: a pointer\'s click waits out a double click, and its second click — or a word it selected — calls the open off (third review, screens)', async () => {
+  // Opening on the first click of a double click flashed the drawer (the second click fell on its backdrop), or opened an order sheet
+  // over it, or the first order of Reports → Orders under «الطلبات المستلمة»; and the figure was never selected.
+  const { cardClick, DOUBLE_CLICK_MS } = await import('../src/components/financeWorkspace/ui');
+  assert.ok(DOUBLE_CLICK_MS >= 250 && DOUBLE_CLICK_MS <= 500, 'the wait is a double click\'s, no longer');
+  let opened = 0, selection = '';
+  const waiting: Array<() => void> = [], cancelled: Array<() => void> = [];
+  const later = (run: () => void) => { waiting.push(run); const cancel = () => { cancelled.push(run); }; return cancel; };
+  const fire = () => { for (const run of waiting.splice(0)) if (!cancelled.includes(run)) run(); };
+  const focused: string[] = [];
+  const card = { querySelector: (selector: string) => ({ focus: () => focused.push(selector) }) } as unknown as EventTarget;
+  const figure = { closest: () => null } as unknown as EventTarget;
+  const click = cardClick(() => { opened += 1; }, () => selection, later);
+  // One click on the figure: nothing yet; when the wait ends, the card's button takes the focus and the drawer opens.
+  click({ target: figure, currentTarget: card, detail: 1 });
+  assert.deepEqual([opened, focused.length], [0, 0], 'a pointer\'s click waits');
+  fire();
+  assert.deepEqual([opened, focused], [1, ['button']], 'then opens, the focus on the card\'s button first');
+  // A double click: the second click calls the first one's open off — the word under it is selected, nothing opens.
+  click({ target: figure, currentTarget: card, detail: 1 });
+  click({ target: figure, currentTarget: card, detail: 2 });
+  fire();
+  assert.equal(opened, 1, 'a double click opens nothing');
+  // A handler drawn again between the two clicks (a re-render) cannot call the first off: the selection the double click made does.
+  click({ target: figure, currentTarget: card, detail: 1 });
+  selection = '1,234,567';
+  fire();
+  assert.equal(opened, 1, 'the selection is read when the wait ends');
+  selection = '';
+  // A third click (a triple click selects the line) opens nothing either; a click with no pointer (a script's) opens at once.
+  click({ target: figure, currentTarget: card, detail: 3 });
+  fire();
+  assert.equal(opened, 1);
+  click({ target: figure, currentTarget: card, detail: 0 });
+  assert.equal(opened, 2, 'no pointer, no double click to wait for');
+  // Two single clicks in a row open once.
+  click({ target: figure, currentTarget: card, detail: 1 });
+  click({ target: figure, currentTarget: card, detail: 1 });
+  fire();
+  assert.equal(opened, 3);
+  // The label's button is the card's own control: its click is its own, at once (Overview.tsx), and the card's handler leaves it.
+  click({ target: { closest: (selector: string) => (selector.includes('button') ? {} : null) } as unknown as EventTarget, currentTarget: card, detail: 1 });
+  fire();
+  assert.equal(opened, 3);
+  assert.match(codeOf('src/components/financeWorkspace/Overview.tsx'), /<button type="button" className="fw-open" onClick=\{c\.open\}/, 'the label\'s button opens at once');
+});
+
+// ------------------------------------------------------------------ the fourth review of step 4
+test('a card the owner left within its wait opens nothing: gone from the page, or on a page now hidden, when the wait ends (fourth review, nit)', async () => {
+  // The open waited out a double click and was never called off: a click on a card, then the «التقارير» tab within 0.3 s, opened the
+  // drawer over Reports. Another period or currency leaves the card on screen; FinanceWorkspace drops that open (the pins above, and
+  // tests/financeDrawerFocus.test.ts in a real engine).
+  const { cardClick } = await import('../src/components/financeWorkspace/ui');
+  let opened = 0;
+  const waiting: Array<() => void> = [];
+  const later = (run: () => void) => { waiting.push(run); return () => {}; };
+  const fire = () => { for (const run of waiting.splice(0)) run(); };
+  const click = cardClick(() => { opened += 1; }, () => '', later);
+  const figure = { closest: () => null } as unknown as EventTarget;
+  // A card as the page has it: connected, and with a box while its page is shown (`display:none` leaves it none).
+  const card = (state: { connected: boolean; boxes: number }) => ({ querySelector: () => ({ focus: () => {} }), get isConnected() { return state.connected; },
+    getClientRects: () => ({ length: state.boxes }) }) as unknown as EventTarget;
+  const shown = { connected: true, boxes: 1 };
+  click({ target: figure, currentTarget: card(shown), detail: 1 });
+  fire();
+  assert.equal(opened, 1, 'a card still on screen when the wait ends opens');
+  const hidden = { connected: true, boxes: 1 };
+  click({ target: figure, currentTarget: card(hidden), detail: 1 });
+  hidden.boxes = 0;
+  fire();
+  assert.equal(opened, 1, 'its page hidden meanwhile (another section): nothing opens');
+  const gone = { connected: true, boxes: 1 };
+  click({ target: figure, currentTarget: card(gone), detail: 1 });
+  gone.connected = false;
+  fire();
+  assert.equal(opened, 1, 'taken off the page meanwhile: nothing opens');
+});
+
+test('«مقارنة جزئية» says why to a keyboard and a screen reader too, and never into a copied figure (third review, nit)', async () => {
+  // The reason was a mouse's tooltip only, and a drag across the figures pasted its visually hidden copy.
+  const { default: Overview } = await import('../src/components/financeWorkspace/Overview');
+  const { november } = await import('./fixtures/financeSampleMonth');
+  const noop = () => {};
+  // The same period as its own comparison: a gross and a net from the complete orders only, so both are partial comparisons.
+  const html = renderToStaticMarkup(createElement(LanguageProvider, null, createElement(Overview, { data: november, prev: november, compareFrom: '2026-10-01', compareTo: '2026-10-11',
+    openOrder: noop, onNavigate: noop, onMissing: noop, onCollections: noop, onFigure: noop })));
+  const escape = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const card of ['grossProfit', 'netShare']) {
+    const id = new RegExp(`data-finance-open="${card}" aria-describedby="([^"]+)"`).exec(html)?.[1];
+    assert.ok(id, `${card}: the card's button is described by the reason`);
+    assert.match(html, new RegExp(`<span class="fw-sr" id="${escape(id!)}">: ${escape(FW.partialWhy[0])}</span>`), `${card}: by its words`);
+  }
+  assert.doesNotMatch(html, /data-finance-open="netSales" aria-describedby/, 'a comparison with a figure needs no reason');
+  const css = sourceOf('src/components/financeWorkspace/finance-workspace.css');
+  assert.match(css, /\.fw-sr\{[^}]*user-select:none\}/, 'what only a screen reader reads is never copied');
+  assert.match(css, /\.fw-metric:has\(\.fw-open:focus-visible\) \.fw-delta \.fw-sr\{position:static;width:auto;height:auto;clip:auto\}/, 'the keyboard\'s focus on the card shows the reason');
 });

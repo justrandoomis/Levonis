@@ -90,6 +90,17 @@ export function centsOf(row: Row, rate: string, override: Partial<Record<(typeof
   return out;
 }
 
+/**
+ * The derived cents of a row worked out again from its additive cents, by the same formulas — after its additive cents
+ * were shared so a product's lines add up to their order (the workspace route's linesAddingUp, the independent review of
+ * redesign step 4). A derived field that is unknown (null) stays unknown: it is unknown for a reason its formula does not
+ * see (an unrecorded refund amount, a cost that waits).
+ */
+export function rederive(c: Cents): Cents {
+  for (const [f, formula] of DERIVED) { const k = cent(f); if (k in c && c[k] !== null) c[k] = formula(c); }
+  return c;
+}
+
 /** The parts of a profit line this module reads to cost it at its batches' rates. */
 export interface BatchCostedLine {
   cogs_iqd: number | null;
@@ -132,7 +143,10 @@ export function sumCents(rows: readonly Cents[]): Cents {
   return out;
 }
 
-/** The overview's revenue / cost / owner net in cents — `chartAmounts` of the workspace route, on cents. */
+/**
+ * The overview's revenue / cost / owner net in cents — `chartAmounts` of the workspace route, on cents. With the
+ * deductions and the net after them (redesign step 4, DECISIONS row 316): Reports → Days in dollars, as in dinars.
+ */
 export function chartCents(t: Cents, general: number, unallocated: number, truncated: boolean) {
   const n = (f: string) => v(t, f) ?? 0;
   const revenue = n('retained_revenue_iqd') + n('shipping_income_iqd') + n('cod_tax_iqd');
@@ -143,6 +157,9 @@ export function chartCents(t: Cents, general: number, unallocated: number, trunc
     cost_cents: cost,
     owner_net_cents: v(t, 'owner_net_iqd') === null || truncated ? null : n('owner_net_iqd') - general - unallocated,
     investor_cents: v(t, 'investor_iqd') === null || truncated ? null : n('investor_iqd'),
+    deductions_cents: n('coupon_iqd') + n('price_protection_iqd') + n('trade_in_credit_returned_iqd'),
+    net_after_report_adjustments_cents: v(t, 'owner_net_iqd') === null || v(t, 'net_after_report_adjustments_iqd') === null || truncated ? null
+      : n('net_after_report_adjustments_iqd') - general - unallocated,
   };
 }
 
