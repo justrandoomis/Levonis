@@ -1542,6 +1542,15 @@ export interface OrderTrackingPublic {
 export type OrderDueBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later' | 'unscheduled';
 
 /**
+ * Which lateness an `overdue` row is (the review of DECISIONS row 322),
+ * decided by the server: `courier` — with the courier past its delivery day;
+ * `booked` — a shipment booked with the delivery company, but no pick-up moved
+ * its stage; `prepare` — still on our shelf, its day to pack and hand over
+ * passed.
+ */
+export type OrderLateReason = 'prepare' | 'booked' | 'courier';
+
+/**
  * `scope` IS THE BOARD, `type`/`status` narrow it. Pre-orders are a SCOPE and
  * not a bucket — «فصلها في الطلبات المسبقة» — because a container in transit
  * is a different kind of waiting from a box that must go out this morning.
@@ -1595,12 +1604,16 @@ export interface AdminOrderRow extends ApiOrder {
   /** The day to prepare, `'YYYY-MM-DD'` (row 322): the delivery day less
    *  `lead_days`. The bucket is filed by it. Null with no day. */
   board_day?: string | null;
-  /** 1 for the courier; 0 for the store's same-day methods and for an order
-   *  already with the courier or finished. Null with no day. */
+  /** 1 for the courier; 0 for the store's same-day methods, for an order
+   *  already with the courier or finished, and for a stored day that is no
+   *  calendar day (its board day is its own text). Null with no day. */
   lead_days?: number | null;
   /** The board day, labelled by the server like `due_label` — sent only when
    *  it is a different day from the delivery day, '' otherwise. */
   prepare_label?: string;
+  /** Which lateness «متأخر» is — set only on an `overdue` row of a live order;
+   *  null otherwise, absent on an older server. */
+  overdue_reason?: OrderLateReason | null;
   /** When a cancelled order was cancelled (kept by migration 0081's triggers). */
   cancelled_at?: string | null;
   /**
@@ -1721,6 +1734,8 @@ export interface AdminOrderDetail extends ApiOrder {
   board_day?: string | null;
   /** The day to prepare, labelled — only when it differs from the delivery day, '' otherwise. */
   prepare_label?: string;
+  /** The board's «متأخر» for this order: why it is late, or null when it is not. */
+  overdue_reason?: OrderLateReason | null;
   /** «بانتظار تأكيد السعر النهائي» (migration 0218): an estimated line still waits; absent on an older server. */
   price_estimate_open?: boolean;
   membership_tier_snapshot?: string;

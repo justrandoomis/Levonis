@@ -73,7 +73,7 @@ import { applyRelations, loadRelationsViews, type ProductRelationsView } from '.
 import { langOf, mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
 import { addDays, baghdadDay, isDay } from '../lib/baghdadTime';
 import { dayLabel } from '../lib/deliveryDay';
-import { boardDayOf, boardDaySql, leadBounds, leadDaysFor, leadDaysSql } from '../lib/deliveryLead';
+import { boardDayOf, boardDaySql, lateReasonOf, leadBounds, leadDaysFor, leadDaysSql } from '../lib/deliveryLead';
 import { ARCHIVE_SORTS, DEFAULT_ARCHIVE_SORT, archiveOrderSql, doneLabelOf, isArchiveScope } from '../lib/orderArchive';
 import { classifyOrderSearch } from '../lib/orderSearch';
 import { arabicFoldSql, phoneDigitsSql } from '../lib/sqlFold';
@@ -1745,6 +1745,16 @@ export const BOARD_DAY_SQL = boardDaySql();
  *
  * It was never index order — the board has sorted in a temp B-tree since
  * `delivery_due_day IS NULL` led it — so an expression key costs no plan.
+ *
+ * PAGING IS BY OFFSET OVER A KEY THAT CAN MOVE BY ITSELF. The order is total
+ * (it ends in the id), so a still board pages with no row lost or repeated.
+ * But a stage now moves a row's key: when the courier's pick-up moves an order
+ * to `out_for_delivery`, its lead drops to 0 and its board day moves a day
+ * later between two page loads — and in the archive, newest-first, every new
+ * completion pushes each page down a row. For that one click a row can show
+ * on two pages, or on none (the review of row 322). At 30 rows a page that is
+ * accepted; keyset paging (`after=<board day, …, id>`) is the fix if it ever
+ * matters.
  */
 export const BOARD_ORDER_SQL =
   `ORDER BY ${BOARD_DAY_SQL} IS NULL, ${BOARD_DAY_SQL} ASC, o.priority DESC, o.delivery_due_day ASC,` +
@@ -2352,6 +2362,7 @@ adminRoutes.get('/orders', async (c) => {
     const day = typeof o.delivery_due_day === 'string' ? o.delivery_due_day : '';
     // The SQL's own board day (row 322) — the one `due` and the COUNT used.
     const boardDay = isDay(o.board_day) ? o.board_day : '';
+    const bucket = dueBucketOf(boardDay, today, tomorrow, weekEnd);
     // An order held by unsettled estimated lines (0218) offers no one-tap move:
     // the gate would refuse it — the row shows the badge instead of a button.
     const estimateHeld = itemsHoldOrder(byOrder.get(String(o.id)) ?? []);
@@ -2418,8 +2429,18 @@ adminRoutes.get('/orders', async (c) => {
        * one only when the two differ.
        */
       board_day: boardDay || null,
-      lead_days: day ? Number(o.board_lead_days) || 0 : null,
-      due_bucket: dueBucketOf(boardDay, today, tomorrow, weekEnd),
+      // The lead APPLIED: 0 where the board day is the stored day itself — the
+      // same-day methods, an order with the courier or finished, and a stored
+      // day that is no calendar day (deliveryLead.ts `boardDayOf`).
+      lead_days: day ? (boardDay === day ? 0 : Number(o.board_lead_days) || 0) : null,
+      due_bucket: bucket,
+      /**
+       * WHICH LATENESS «متأخر» IS (the review of row 322): 'courier' (with the
+       * courier past its day), 'booked' (a shipment booked, but no pick-up
+       * moved the stage) or 'prepare' (still on our shelf) — null unless the
+       * row is late, and for a finished order. The row says it in words.
+       */
+      overdue_reason: bucket === 'overdue' ? lateReasonOf(o) : null,
       due_label: day ? dayLabel(day, today, lang).label : '',
       prepare_label: boardDay && boardDay !== day ? dayLabel(boardDay, today, lang).label : '',
     };
@@ -2523,16 +2544,23 @@ adminRoutes.delete('/orders/:id', async (c) => {
  * the reader's language, by the board's own rule (`leadDaysFor` is
  * `BOARD_LEAD_SQL` read in TypeScript; tests/deliveryLead.test.ts holds the two
  * together). No day («في أقرب وقت») is no line.
+ *
+ * `overdue_reason` is the board's «متأخر» for the same order (the review of
+ * row 322): its board day is before the server's Baghdad today, and the reason
+ * is the row's own (`lateReasonOf`) — so a packer who opens a late order reads
+ * that its day passed, not an ordinary schedule. Null when it is not late.
  */
 function orderDayLabels(o: Record<string, unknown>, nowMs: number, lang: string) {
   const day = isDay(o.delivery_due_day) ? o.delivery_due_day : '';
-  if (!day) return { delivery_day_label: '', board_day: null, prepare_label: '' };
+  if (!day) return { delivery_day_label: '', board_day: null, prepare_label: '', overdue_reason: null };
   const today = baghdadDay(nowMs);
   const boardDay = boardDayOf(day, leadDaysFor(o));
   return {
     delivery_day_label: dayLabel(day, today, lang).label,
     board_day: boardDay || null,
     prepare_label: boardDay && boardDay !== day ? dayLabel(boardDay, today, lang).label : '',
+    // The board's own test: a board day before today (dueBucketOf's `overdue`).
+    overdue_reason: boardDay && boardDay < today ? lateReasonOf(o) : null,
   };
 }
 

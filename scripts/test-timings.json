@@ -691,6 +691,7 @@
     "tests/orderArchive.test.ts": 0.2,
     "tests/orderArchiveRoute.test.ts": 10.4,
     "tests/orderArchiveUi.test.ts": 0.6,
+    "tests/orderBoardLateness.test.ts": 12.5,
     "tests/orderBoardPrepareFilter.test.ts": 17.6,
     "tests/orderBoardRowItems.test.ts": 6.3,
     "tests/orderCancelAtomic.test.ts": 29.9,

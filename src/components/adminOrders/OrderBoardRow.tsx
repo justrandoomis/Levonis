@@ -43,7 +43,7 @@ import { Check, ChevronsRight, Loader2, ScanLine, Trash2 } from 'lucide-react';
 import { formatIqd, type AdminOrderRow, type OrderStatus } from '../../lib/api';
 import { SERIAL_STRINGS } from './serials/strings';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
-import { DayChip, DoneChip, OrderKindBadge, PriceHoldBadge, ProBadge, TypeBadge, countText } from './OrderBoardBadges';
+import { DayChip, DoneChip, OrderKindBadge, PriceHoldBadge, ProBadge, TypeBadge, countText, lateReasonOfRow } from './OrderBoardBadges';
 import { DeliveryMethodBadge } from './deliveryMethod';
 import { isFinished } from './archiveSort';
 
@@ -102,6 +102,7 @@ export default function OrderBoardRow({
   advancing,
   deleting,
   latin = false,
+  flat = false,
 }: {
   order: AdminOrderRow;
   loc: (ar: string, en: string, ckb?: string) => string;
@@ -112,6 +113,8 @@ export default function OrderBoardRow({
   deleting: boolean;
   /** English reads Latin digits; Arabic and Sorani read ٠-٩. */
   latin?: boolean;
+  /** In a list with no day headers (a lookup's results): the row names its day to prepare itself. */
+  flat?: boolean;
 }) {
   const gov = order.address?.governorate ? GOVERNORATE_LABELS[order.address.governorate] : undefined;
   const govLabel = gov ? loc(gov.ar, gov.en, gov.ckb) : '';
@@ -137,7 +140,8 @@ export default function OrderBoardRow({
               bucket={order.due_bucket}
               postponed={!!order.delivery_day_changed_at}
               prepareLabel={order.prepare_label}
-              handedOver={order.stage === 'out_for_delivery'}
+              lateReason={lateReasonOfRow(order)}
+              flat={flat}
               loc={loc}
             />
           )}

@@ -6,8 +6,8 @@
  * neither owns them: the counts across the top are written in the same digits
  * as the day chips under them, and a PRO badge drawn two ways is two badges.
  */
-import type { AdminOrderRow, OrderDueBucket, OrderShippingType } from '../../lib/api';
-import { PREPARE_DAY_STRINGS, dayLine } from './prepareDayStrings';
+import type { AdminOrderRow, OrderDueBucket, OrderLateReason, OrderShippingType } from '../../lib/api';
+import { PREPARE_DAY_STRINGS, dayLine, type Tri } from './prepareDayStrings';
 import { doneText } from './archiveSort';
 
 /** The context's own `loc`, passed down rather than re-derived per badge. */
@@ -102,26 +102,30 @@ export function ProBadge({ order }: { order: AdminOrderRow }) {
  *
  * `prepareLabel` is that day, labelled by the server, sent only when it differs
  * from the delivery day; it is shown away from «اليوم», whose header already
- * says when to pack it. `handedOver` (the parcel is with the courier) picks
- * which lateness «متأخر» means.
+ * says when to pack it — and on every row of a list with no day headers
+ * (`flat`: an order- or phone-number lookup), where nothing else says it.
+ * `lateReason` (the server's `overdue_reason`) picks which lateness «متأخر»
+ * means.
  */
 export function DayChip({
   label,
   bucket,
   postponed,
   prepareLabel,
-  handedOver = false,
+  lateReason = 'prepare',
+  flat = false,
   loc,
 }: {
   label?: string;
   bucket?: OrderDueBucket;
   postponed: boolean;
   prepareLabel?: string;
-  handedOver?: boolean;
+  lateReason?: OrderLateReason;
+  flat?: boolean;
   loc: Loc;
 }) {
   const none = !label;
-  const showPrepare = !!prepareLabel && (bucket === 'tomorrow' || bucket === 'week' || bucket === 'later');
+  const showPrepare = !!prepareLabel && (flat || bucket === 'tomorrow' || bucket === 'week' || bucket === 'later');
   return (
     <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
       <span
@@ -139,17 +143,8 @@ export function DayChip({
       )}
       {/* The one red thing on the row, for the same reason it is the one red
           thing in the header: a box that should have gone out on Tuesday is
-          today's work, and the most urgent of it. Two lates share the word,
-          so its title says which: still on our shelf, or with the courier. */}
-      {bucket === 'overdue' && (
-        <span
-          data-order-overdue={handedOver ? 'courier' : 'prepare'}
-          className="text-[11px] leading-[1.4] font-bold text-danger"
-          title={dayLine(loc, handedOver ? PREPARE_DAY_STRINGS.overdueCourier : PREPARE_DAY_STRINGS.overduePrepare)}
-        >
-          {loc('متأخر', 'Overdue', 'دواکەوتوو')}
-        </span>
-      )}
+          today's work, and the most urgent of it. */}
+      {bucket === 'overdue' && <LateMark reason={lateReason} loc={loc} />}
       {/* NOT DECORATION. The day moved after checkout, so this order sank down
           a list the admin already read this morning — without this marker it
           looks to them like an order that vanished. */}
@@ -163,6 +158,85 @@ export function DayChip({
         </span>
       )}
     </span>
+  );
+}
+
+const LATE_WHY: Record<OrderLateReason, { why: Tri; short: Tri | null }> = {
+  prepare: { why: PREPARE_DAY_STRINGS.overduePrepare, short: null },
+  booked: { why: PREPARE_DAY_STRINGS.overdueBooked, short: PREPARE_DAY_STRINGS.lateBooked },
+  courier: { why: PREPARE_DAY_STRINGS.overdueCourier, short: PREPARE_DAY_STRINGS.lateCourier },
+};
+
+/**
+ * «متأخر», AND WHICH LATENESS IT IS — IN WORDS (the review of row 322). One
+ * word covers three causes that send an admin to three different places: a
+ * box still on our shelf, a shipment booked whose pick-up never moved its
+ * stage, a parcel the courier is late with. A `title` alone cannot be opened
+ * on a phone (the owner's iPhone), so the two that are not "go and pack it"
+ * say so on their face — «متأخر · مع المندوب», «متأخر · شحنته محجوزة» — and
+ * every reason's full sentence is the title for a mouse and the screen-reader
+ * text. Shared by the board's row and the order window.
+ */
+export function LateMark({ reason, loc }: { reason: OrderLateReason; loc: Loc }) {
+  const { why, short } = LATE_WHY[reason] ?? LATE_WHY.prepare;
+  const sentence = dayLine(loc, why);
+  return (
+    <span data-order-overdue={reason} className="text-[11px] leading-[1.4] font-bold text-danger" title={sentence}>
+      {dayLine(loc, PREPARE_DAY_STRINGS.late)}
+      {short ? `\u00a0· ${dayLine(loc, short)}` : null}
+      <span className="sr-only"> — {sentence}</span>
+    </span>
+  );
+}
+
+/**
+ * The row's lateness, as the server decided it (`overdue_reason`). An older
+ * server sends none: the stage alone then tells the courier's from the shelf's.
+ */
+export function lateReasonOfRow(order: Pick<AdminOrderRow, 'overdue_reason' | 'stage'>): OrderLateReason {
+  return order.overdue_reason ?? (order.stage === 'out_for_delivery' ? 'courier' : 'prepare');
+}
+
+/**
+ * THE ORDER WINDOW'S TWO DAYS (row 322): «التوصيل: … · التجهيز: …», both
+ * labelled by the server, and — when the board files the order on a day
+ * already past (`overdue_reason`, the review of row 322) — the same «متأخر» the
+ * board shows, so a late order never reads as an ordinary schedule.
+ *
+ * EACH PART IS ONE BLOCK THAT BREAKS AS A WHOLE (`inline-block`, the «·»
+ * riding at the end of the part before it): on a narrow phone the line breaks
+ * between the days, never between «ئامادەکردن:» and its day.
+ */
+export function OrderDaysLine({
+  deliveryLabel,
+  prepareLabel,
+  lateReason,
+  loc,
+}: {
+  deliveryLabel?: string;
+  prepareLabel?: string;
+  lateReason?: OrderLateReason | null;
+  loc: Loc;
+}) {
+  if (!deliveryLabel) return null;
+  const parts = [
+    <span key="delivery">{dayLine(loc, PREPARE_DAY_STRINGS.delivery, deliveryLabel)}</span>,
+    ...(prepareLabel ? [<span key="prepare">{dayLine(loc, PREPARE_DAY_STRINGS.prepare, prepareLabel)}</span>] : []),
+    ...(lateReason ? [<LateMark key="late" reason={lateReason} loc={loc} />] : []),
+  ];
+  return (
+    <p data-order-days className="text-[13px] font-bold text-text-secondary">
+      {parts.map((part, i) => (
+        <span key={i} className="inline-block">
+          {part}
+          {i < parts.length - 1 && (
+            <span className="mx-1.5 text-text-muted" aria-hidden>
+              ·
+            </span>
+          )}
+        </span>
+      ))}
+    </p>
   );
 }
 

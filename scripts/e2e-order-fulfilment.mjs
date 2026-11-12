@@ -518,9 +518,10 @@ async function main() {
       check(`${width}px — the PRO badge survives the compact row`, row.pro === 1, JSON.stringify(row));
       check(`${width}px — the day chip reads "today" from the server's bucket`, row.day === 'today', String(row.day));
       // Filed under today, it still names the CUSTOMER'S day, and says whose (row 322).
+      // `\s`, not a space: the label and its day are joined by a no-break space.
       check(
         `${width}px — and names the delivery day: «التوصيل: غدًا»`,
-        /(التوصيل|Delivery|گەیاندن): (غدًا|Tomorrow|بەیانی)/.test(row.dayText),
+        /(التوصيل|Delivery|گەیاندن):\s(غدًا|Tomorrow|بەیانی)/.test(row.dayText),
         JSON.stringify(row.dayText)
       );
       check(`${width}px — a day that MOVED is marked «مؤجل»`, row.postponed === 1, JSON.stringify(row));

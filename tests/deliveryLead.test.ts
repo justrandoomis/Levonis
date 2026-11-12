@@ -25,6 +25,7 @@ import {
   boardDaySql,
   checkLeadTable,
   leadBounds,
+  lateReasonOf,
   leadDaysFor,
   leadDaysSql,
   type DeliveryLeadTable,
@@ -87,7 +88,11 @@ test('the SQL is pinned for the owner’s table, and stable for any other', () =
     "(CASE WHEN o.stage IN ('out_for_delivery','delivered','cancelled') OR o.status IN ('delivered','cancelled') THEN 0" +
       " WHEN o.delivery_method_id IN ('personal','pickup') THEN 0 ELSE 1 END)"
   );
-  assert.equal(boardDaySql(), `date(o.delivery_due_day, '-' || ${leadDaysSql()} || ' days')`);
+  // A stored day SQLite cannot read back as itself gets no lead: its own text (the review, 2026-11-12).
+  assert.equal(
+    boardDaySql(),
+    `(CASE WHEN date(o.delivery_due_day) = o.delivery_due_day THEN date(o.delivery_due_day, '-' || ${leadDaysSql()} || ' days') ELSE o.delivery_due_day END)`
+  );
   // One WHEN per lead, ids sorted, whatever order the table lists them in.
   assert.equal(
     leadDaysSql({ default_days: 1, method_days: { c: 2, a: 0, b: 2 } }, 'x'),
@@ -124,7 +129,33 @@ test('the board day: the delivery day less the lead, across month, year and leap
   assert.equal(boardDayOf('2026-12-01', 1), '2026-11-30');
   assert.equal(boardDayOf('2027-01-01', 1), '2026-12-31');
   assert.equal(boardDayOf('2028-03-01', 1), '2028-02-29');
-  for (const none of [null, undefined, '', '13-11-2026', '2026-02-31']) assert.equal(boardDayOf(none, 1), '', String(none));
+  for (const none of [null, undefined, '', '13-11-2026']) assert.equal(boardDayOf(none, 1), '', String(none));
+  // The right shape but no calendar day (0094's CHECK is a shape check; only a
+  // hand-written fix writes one): no lead, the stored text — never '' (no
+  // board day, so no count and no `due` held it), never a normalised day.
+  for (const odd of ['2026-02-31', '2026-11-31', '2026-13-01', '0000-00-00', '2026-02-29']) assert.equal(boardDayOf(odd, 1), odd, odd);
+});
+
+test('which lateness «متأخر» is: the courier’s, a booked shipment’s, or the shelf’s — and a finished order is never late', () => {
+  const shelf = { stage: 'preparing', status: 'processing', delivery_method_id: 'standard' };
+  assert.equal(lateReasonOf(shelf), 'prepare', 'still on our shelf, nothing booked');
+  assert.equal(lateReasonOf({ ...shelf, delivery_remote_id: 'AW-1' }), 'booked', 'booked, but no pick-up moved the stage');
+  assert.equal(lateReasonOf({ ...shelf, delivery_remote_id: '' }), 'prepare', 'the column’s empty default is not a booking');
+  assert.equal(lateReasonOf({ ...shelf, delivery_remote_id: '   ' }), 'prepare');
+  assert.equal(lateReasonOf({ ...shelf, delivery_remote_id: null }), 'prepare');
+  assert.equal(lateReasonOf({ stage: 'out_for_delivery', status: 'shipped', delivery_remote_id: 'AW-1' }), 'courier', 'picked up: the courier is late');
+  assert.equal(lateReasonOf({ stage: 'out_for_delivery', status: 'shipped' }), 'courier', 'moved by hand, no shipment id');
+  assert.equal(lateReasonOf({ stage: 'confirmed', status: 'confirmed', delivery_method_id: 'personal' }), 'prepare', 'our own driver');
+  for (const status of FINISHED_STATUSES) {
+    for (const stage of ['preparing', 'out_for_delivery', status]) {
+      assert.equal(lateReasonOf({ stage, status, delivery_remote_id: 'AW-1' }), null, `${stage}/${status}`);
+    }
+  }
+  // Every stage before the courier reads the same: the shelf's, or the booking's.
+  for (const stage of ALL_STAGES.filter((s) => !(HANDED_OVER_STAGES as readonly string[]).includes(s))) {
+    assert.equal(lateReasonOf({ stage, status: 'processing' }), 'prepare', stage);
+    assert.equal(lateReasonOf({ stage, status: 'processing', delivery_remote_id: 'AW-9' }), 'booked', stage);
+  }
 });
 
 /**
@@ -138,7 +169,13 @@ function twinRows(table: DeliveryLeadTable): number {
   const stages: Array<string | null> = [...ALL_STAGES, '', null, 'bogus'];
   const statuses: Array<string | null> = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', '', null];
   const methods: Array<string | null> = ['standard', 'personal', 'pickup', 'merchant', 'home', 'slow', '', null, 'constructor', 'PERSONAL'];
-  const days: Array<string | null> = ['2026-11-13', '2026-12-01', '2027-01-01', '2028-03-01', null];
+  // …and days of the right shape that are no calendar day, which SQLite would
+  // otherwise normalise ('2026-11-31' → 30-11) or refuse ('2026-13-01' → NULL).
+  // (Years 0000–0099 stay out: Date.UTC reads them as 19xx.)
+  const days: Array<string | null> = [
+    '2026-11-13', '2026-12-01', '2027-01-01', '2028-03-01', null,
+    '2026-02-29', '2026-11-31', '2026-13-01', '2026-00-10', '2026-04-31',
+  ];
   const ins = db.prepare('INSERT INTO t VALUES (?,?,?,?)');
   for (const s of stages) for (const st of statuses) for (const m of methods) for (const d of days) ins.run(s, st, m, d);
   const rows = db
@@ -155,7 +192,7 @@ function twinRows(table: DeliveryLeadTable): number {
 }
 
 test('the TypeScript reading equals the SQL, row for row', () => {
-  assert.equal(twinRows(DELIVERY_LEAD), 19 * 8 * 10 * 5);
+  assert.equal(twinRows(DELIVERY_LEAD), 19 * 8 * 10 * 10);
   // And for a table that is not the owner's: two days on the road, a slow method at three.
-  assert.equal(twinRows({ default_days: 2, method_days: { personal: 0, pickup: 0, slow: 3 } }), 19 * 8 * 10 * 5);
+  assert.equal(twinRows({ default_days: 2, method_days: { personal: 0, pickup: 0, slow: 3 } }), 19 * 8 * 10 * 10);
 });

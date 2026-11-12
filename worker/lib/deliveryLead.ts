@@ -112,9 +112,53 @@ export function leadBounds(table: DeliveryLeadTable = DELIVERY_LEAD): { min: num
   return { min: Math.min(...all), max: Math.max(...all) };
 }
 
-/** The day to prepare: the delivery day less the lead, or '' when there is no day. */
+/**
+ * The day to prepare: the delivery day less the lead, or '' when there is no day.
+ *
+ * A DAY OF THE RIGHT SHAPE THAT IS NO CALENDAR DAY ('2026-13-01', '2026-11-31'
+ * — 0094's CHECK holds the shape, not the date, and only a hand-written SQL fix
+ * writes one) gets NO lead: its board day is the stored text itself, the day
+ * the board filed it by before row 322. Without a board day it was counted in
+ * no bucket and returned by no `due`, while its row showed under «بلا موعد»
+ * (the review, 2026-11-12). `boardDaySql` reads it the same way.
+ */
 export function boardDayOf(day: unknown, lead: number): string {
-  return isDay(day) ? addDays(day, -lead) : '';
+  if (!isDay(day)) return '';
+  return addDays(day, -lead) || day;
+}
+
+/**
+ * WHICH LATENESS «متأخر» IS — the board files a row on a day before today, and
+ * the admin does a different thing about each (the review of row 322):
+ *
+ *   'courier'  it left our shelf (`out_for_delivery`) and its delivery day has
+ *              passed: the courier is late;
+ *   'booked'   a shipment is booked with the delivery company, but nothing
+ *              moved the stage. Booking is not the courier taking the parcel
+ *              (admin.ts: «The stage is NOT advanced here»): only the courier's
+ *              status — once the owner has mapped it in «إدارة التوصيل» — or a
+ *              hand moves it, so the box may well have gone at 7 pm. The row
+ *              says what is known instead of «its day to pack passed»;
+ *   'prepare'  still on our shelf with nothing booked: its day to pack and hand
+ *              over has passed.
+ *
+ * Null for a finished order (delivered or cancelled), which is never late. The
+ * caller decides WHETHER the row is late (its board day before today); this
+ * says only which kind.
+ */
+export type LateReason = 'prepare' | 'booked' | 'courier';
+
+/** What the reason reads off an order row, on top of the lead's own fields. */
+export interface LateInput extends LeadInput {
+  /** The courier's id for the shipment, '' until one is booked (orders.delivery_remote_id, 0028). */
+  delivery_remote_id?: unknown;
+}
+
+export function lateReasonOf(order: LateInput): LateReason | null {
+  if (has(FINISHED_STATUSES, order.status)) return null;
+  if (has(HANDED_OVER_STAGES, order.stage)) return 'courier';
+  if (typeof order.delivery_remote_id === 'string' && order.delivery_remote_id.trim() !== '') return 'booked';
+  return 'prepare';
 }
 
 const quoted = (xs: readonly string[]) => xs.map((x) => `'${x}'`).join(',');
@@ -146,7 +190,15 @@ export function leadDaysSql(table: DeliveryLeadTable = DELIVERY_LEAD, alias = 'o
 /**
  * The board day in SQL: `date(day, '-N days')`. NULL when the order has no
  * day, and the stored string itself when the lead is 0.
+ *
+ * GUARDED BY `date(day) = day`, the SQL twin of `dayParts`' round trip: a
+ * stored day SQLite cannot read back as itself — '2026-13-01' (date() is NULL)
+ * or '2026-11-31' (date() says 01-12) — is no calendar day, gets no lead and
+ * keeps its own text, exactly as `boardDayOf` does. So every row with a day
+ * has a board day, and lands in exactly one count and one `due`.
  */
 export function boardDaySql(table: DeliveryLeadTable = DELIVERY_LEAD, alias = 'o'): string {
-  return `date(${alias}.delivery_due_day, '-' || ${leadDaysSql(table, alias)} || ' days')`;
+  const lead = leadDaysSql(table, alias); // checks the table and the alias first
+  const day = `${alias}.delivery_due_day`;
+  return `(CASE WHEN date(${day}) = ${day} THEN date(${day}, '-' || ${lead} || ' days') ELSE ${day} END)`;
 }
