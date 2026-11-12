@@ -116,6 +116,8 @@ export default function ExpenseLedger({
   const amountField = useRef<HTMLInputElement>(null);
   const dayField = useRef<HTMLInputElement>(null);
   const repeatField = useRef<HTMLInputElement>(null);
+  /** The entry being saved and its one operation (see submit). */
+  const operation = useRef<{ key: string; id: string } | null>(null);
   // A write whose answer never came reads the ledger again; what the form says about it stays through that read (which
   // otherwise clears the last read's error).
   const keepError = useRef(false);
@@ -208,15 +210,22 @@ export default function ExpenseLedger({
     setBusy(true);
     setError(null);
     setNotice(null);
+    const entry = {
+      category_id: draft.category_id,
+      amount_iqd: Number(draft.amount),
+      expense_day: draft.expense_day,
+      title: draft.title,
+      note: draft.note,
+      repeat_months: draft.repeat_months,
+    };
+    // ONE ENTRY, HOWEVER MANY PRESSES (the owner's brief, 2026-11-12): the entry keeps its operation while it is unchanged —
+    // across a press whose answer never came, and the same amount typed again after the form cleared it — so the server
+    // records it once and answers a second press with the first one's rows. A saved entry, or a changed one, starts afresh.
+    const key = JSON.stringify(entry);
+    if (operation.current?.key !== key) operation.current = { key, id: crypto.randomUUID() };
     try {
-      const res = await createExpense({
-        category_id: draft.category_id,
-        amount_iqd: Number(draft.amount),
-        expense_day: draft.expense_day,
-        title: draft.title,
-        note: draft.note,
-        repeat_months: draft.repeat_months,
-      });
+      const res = await createExpense({ ...entry, operation_id: operation.current.id });
+      operation.current = null;
       const months = res.ids?.length ?? 1;
       setNotice(months > 1 ? s.savedMany(countText(months, latin)) : s.savedOne);
       // The amount is cleared and the category, the day and the repeat are

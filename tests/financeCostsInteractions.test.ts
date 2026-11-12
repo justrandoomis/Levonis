@@ -278,7 +278,7 @@ test('an entry\'s editor kept open across a re-read sends only the field the own
   await page.unmount();
 });
 
-test('an expense whose answer is lost on the way back is not said to have failed: the page says it may be recorded, reads itself again and lists it, and clears the amount — a second press records nothing', async () => {
+test('an expense whose answer is lost on the way back is not said to have failed: the page says it may be recorded, reads itself again and lists it, and clears the amount — a second press records nothing, and the same entry typed again is recorded once (its operation, the owner’s brief 2026-11-12)', async () => {
   for (const [i, lang] of LANGS.entries()) {
     const io = serve(w, { lose: (method, path) => method === 'POST' && path === '/api/admin/finance/expenses' });
     const page = await mount(h(Workspace), lang);
@@ -306,6 +306,16 @@ test('an expense whose answer is lost on the way back is not said to have failed
     await io.settle();
     assert.deepEqual(io.writes().map((r) => [r.method, r.path]), [['POST', '/api/admin/finance/expenses']], `${lang}: one write`);
     assert.equal(rowsTitled(title).length, 1, `${lang}: one rent of 600,000, not two`);
+    // Typed again — the same entry — and pressed: the server is asked once more, with the same operation, and its answer
+    // (lost again) is the first one's rows: nothing new is recorded.
+    await act(async () => { type(fieldOf(page.container, local.fieldAmount), '600000'); });
+    await act(async () => { click(named(form(page.container), 'button', local.save)); });
+    await io.settle();
+    const posts = io.writes().filter((r) => r.method === 'POST' && r.path === '/api/admin/finance/expenses');
+    assert.equal(posts.length, 2, `${lang}: asked again`);
+    const ops = posts.map((r) => (r.body as { operation_id?: string }).operation_id);
+    assert.ok(ops[0] && ops[0] === ops[1], `${lang}: with the same operation (${ops.join(' / ')})`);
+    assert.equal(rowsTitled(title).length, 1, `${lang}: still one rent of 600,000`);
     await page.unmount();
   }
 });

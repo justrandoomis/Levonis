@@ -349,6 +349,7 @@
     "tests/estimateStrings.test.ts": 0.1,
     "tests/eventSchemas.test.ts": 0.5,
     "tests/exchangeRateDecision.test.ts": 0.6,
+    "tests/expenseOperation.test.ts": 20.0,
     "tests/explorerGradedSummary.test.ts": 10.9,
     "tests/extendedWarranty.test.ts": 34.2,
     "tests/externalModelCover.test.ts": 0.3,

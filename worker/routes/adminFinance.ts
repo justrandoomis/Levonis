@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from '../lib/types';
-import { requireAdmin, badRequest, notFound, str, int } from '../lib/http';
+import { requireAdmin, badRequest, conflict, notFound, str, int } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { requireCostRead } from '../lib/costAccess';
@@ -340,6 +340,35 @@ adminFinanceRoutes.get('/expenses', async (c) => {
 });
 
 /**
+ * ONE ENTRY, HOWEVER MANY PRESSES (the owner's brief, 2026-11-12: «prevent duplicate transactions»). The form sends an
+ * `operation_id` it keeps while the entry is unchanged — across a press whose answer never came — and the rows' ids are
+ * derived from it (`exp_op_<operation>_<month index>`). A second request for the same entry finds the rows the first
+ * one wrote and answers with them (`already: true`), before any other check, so a month closed in between does not turn
+ * a saved entry into a refusal; two racing requests meet on the primary key, and the loser answers the same way. The
+ * same operation for a DIFFERENT entry — another amount, day, category, text or number of months — is refused (409
+ * EXPENSE_OPERATION_REUSED), never applied and never answered with someone else's rows. Without an `operation_id` (an
+ * older screen) nothing changes.
+ */
+const EXPENSE_OPERATION = /^[A-Za-z0-9_-]{8,64}$/;
+const expenseOperationIds = (operation: string, n: number) => Array.from({ length: n }, (_, i) => `exp_op_${operation}_${i}`);
+interface ExpenseEntry { categoryId: string; amount: number; days: string[]; title: string; note: string }
+async function expenseAlreadyRecorded(db: D1Database, operation: string, want: ExpenseEntry) {
+  const rows = (await db
+    .prepare('SELECT id, category_id, amount_iqd, expense_day, title, note, series_id FROM operating_expenses WHERE id IN (SELECT value FROM json_each(?))')
+    .bind(JSON.stringify(expenseOperationIds(operation, MAX_EXPENSE_REPEAT)))
+    .all<{ id: string; category_id: string; amount_iqd: number; expense_day: string; title: string; note: string; series_id: string | null }>()).results ?? [];
+  if (!rows.length) return null;
+  const byIndex = new Map(rows.map((r) => [Number(r.id.slice(r.id.lastIndexOf('_') + 1)), r]));
+  const same = rows.length === want.days.length && want.days.every((d, i) => {
+    const r = byIndex.get(i);
+    return !!r && r.expense_day === d && r.category_id === want.categoryId && Number(r.amount_iqd) === want.amount && r.title === want.title && r.note === want.note;
+  });
+  if (!same) throw conflict('رقم العملية مستخدم لمصروف مختلف / This operation was already used for a different expense', 'EXPENSE_OPERATION_REUSED');
+  const ordered = want.days.map((_, i) => byIndex.get(i)!);
+  return { ids: ordered.map((r) => r.id), series_id: ordered[0].series_id ?? null, days: ordered.map((r) => r.expense_day) };
+}
+
+/**
  * Record an expense, optionally repeating it monthly.
  *
  * `repeat_months` WRITES REAL ROWS, NOW. It is not a recurrence rule and
@@ -367,9 +396,16 @@ adminFinanceRoutes.post('/expenses', async (c) => {
   const title = body.title === undefined ? '' : str(body.title, 'title', { min: 0, max: 120 });
   const note = body.note === undefined ? '' : str(body.note, 'note', { min: 0, max: 1000 });
   const repeat = body.repeat_months === undefined ? 1 : int(body.repeat_months, 'repeat_months', { min: 1, max: MAX_EXPENSE_REPEAT });
+  const operation = body.operation_id === undefined ? null : str(body.operation_id, 'operation_id', { min: 8, max: 64 });
+  if (operation !== null && !EXPENSE_OPERATION.test(operation)) throw badRequest('operation_id: 8–64 letters, digits, - or _', 'OPERATION_ID_INVALID');
 
   const days = expenseSeriesDays(day, repeat);
   if (days.length === 0) throw badRequest('expense_day could not be read as a calendar day', 'EXPENSE_DAY_INVALID');
+  const entry: ExpenseEntry = { categoryId, amount, days, title, note };
+  if (operation) {
+    const prior = await expenseAlreadyRecorded(c.env.DB, operation, entry);
+    if (prior) return c.json({ success: true, ...prior, already: true });
+  }
   // A closed accounting month refuses the row (migration 0162's trigger): say so with its code, before the write, not as a 500
   // (the independent review of step 5 — Costs → General expenses adds and edits through these routes).
   for (const m of new Set(days.map((d) => d.slice(0, 7)))) await periodOpen(c.env.DB, `${m}-01`);
@@ -377,7 +413,7 @@ adminFinanceRoutes.post('/expenses', async (c) => {
   // make the panel offer to "show the other months" of a group of one.
   const seriesId = days.length > 1 ? newId('exs') : null;
   const ts = nowIso();
-  const ids = days.map(() => newId('exp'));
+  const ids = operation ? expenseOperationIds(operation, days.length) : days.map(() => newId('exp'));
 
   /**
    * ONE STATEMENT PER ROW, ALL IN ONE BATCH — never one multi-row VALUES.
@@ -396,7 +432,14 @@ adminFinanceRoutes.post('/expenses', async (c) => {
     );
   const journals:D1PreparedStatement[]=[];
   for(let i=0;i<ids.length;i++)journals.push(...await planExpenseAccounting(c.env.DB,{id:ids[i],actor:admin.id,title,day:days[i],amount,fresh:true}));
-  await c.env.DB.batch([...inserts,...journals]);
+  try {
+    await c.env.DB.batch([...inserts,...journals]);
+  } catch (e) {
+    // The same entry, pressed twice at once: the other request wrote it first. Answer with its rows.
+    const prior = operation && /UNIQUE constraint failed/i.test(String(e)) ? await expenseAlreadyRecorded(c.env.DB, operation, entry) : null;
+    if (prior) return c.json({ success: true, ...prior, already: true });
+    throw e;
+  }
   await audit(c.env.DB, admin.id, 'finance.expense.create', ids[0], {
     category_id: categoryId,
     amount_iqd: amount,
@@ -404,6 +447,7 @@ adminFinanceRoutes.post('/expenses', async (c) => {
     months: days.length,
     series_id: seriesId,
     ids,
+    ...(operation ? { operation_id: operation } : {}),
   });
   return c.json({ success: true, ids, series_id: seriesId, days });
 });

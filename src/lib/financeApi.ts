@@ -124,10 +124,12 @@ export function createExpense(
     title?: string;
     note?: string;
     repeat_months?: number;
+    /** The entry's one operation (worker/routes/adminFinance.ts): a second request for the same entry is answered with its rows. */
+    operation_id?: string;
   },
   opts?: RequestOptions
-): Promise<{ ids: string[]; series_id: string | null; days: string[] }> {
-  return api.post<{ ids: string[]; series_id: string | null; days: string[]; success: boolean }>(
+): Promise<{ ids: string[]; series_id: string | null; days: string[]; already?: boolean }> {
+  return api.post<{ ids: string[]; series_id: string | null; days: string[]; success: boolean; already?: boolean }>(
     '/api/admin/finance/expenses',
     body,
     opts
