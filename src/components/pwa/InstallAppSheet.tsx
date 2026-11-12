@@ -3,12 +3,23 @@
  * teaches the customer the five taps their browser requires instead.
  *
  * IT IS THE APP'S OWN SHEET, not a new panel. `Sheet` (src/components/ui/
- * Overlay.tsx) already owns the material, the spring, the grabber, the
- * drag-to-dismiss and the Escape key; the header comment on that file exists
- * because twenty-four screens once hand-rolled `fixed inset-0 bg-black/80`
- * and every one of them appeared from nowhere and vanished to nowhere.
- * Inventing a panel here would be re-creating the exact defect the primitive
- * was written to delete.
+ * Sheet.tsx, over the Overlay primitive in ui/Overlay.tsx) already owns the
+ * material, the spring, the grabber, the drag-to-dismiss and the Escape key;
+ * the header comment on Overlay.tsx exists because twenty-four screens once
+ * hand-rolled `fixed inset-0 bg-black/80` and every one of them appeared from
+ * nowhere and vanished to nowhere. Inventing a panel here would be
+ * re-creating the exact defect the primitive was written to delete.
+ *
+ * THE v2 SHEET (`dragHandle`): DRAGGED BY ITS GRABBER, ITS BODY SCROLLS.
+ * iOS Safari's steps outgrow a small iPhone: in English they fill an SE's
+ * 553px, and in every language they are taller than an SE with Display Zoom
+ * (320×460 visible). The whole-panel sheet cannot scroll under a finger (its
+ * drag takes every vertical swipe) and the primitive caps a window at the
+ * screen, so the two answers under the steps were cut off below the bottom
+ * edge, the scrim was covered, and under Reduce Motion, which takes the drag
+ * away, nothing on the screen closed the sheet. Now the body scrolls both
+ * answers within a finger's reach, and the 92dvh cap leaves a strip of scrim
+ * above the sheet to tap. tests/overlayViewportFit.test.ts.
  *
  * ON A MERCHANT SUBDOMAIN IT NAMES THE MERCHANT. ali3d.levonis-iq.com runs
  * this same bundle (§10) and presents itself as that shop; a sheet offering
@@ -28,7 +39,7 @@ import { Check, Download, Globe, Menu, MoreVertical, Plus, Share } from 'lucide-
 import { useLanguage } from '../../LanguageContext';
 import { useStore } from '../../StoreContext';
 import { PLATFORM_APP_ICON } from '../../lib/siteLogo';
-import { Sheet } from '../ui/Overlay';
+import { Sheet } from '../ui/Sheet';
 import { useInstallApp } from '../../hooks/useInstallApp';
 import type { StepGlyph } from '../../lib/pwa';
 
@@ -95,8 +106,8 @@ export default function InstallAppSheet({ open, onClose }: InstallAppSheetProps)
   // hiding a setting from the person who came to change it is not restraint,
   // it is a missing control.
   //
-  // The X and the drag-away call `onClose` alone: those mean "not this
-  // window", not "stop asking".
+  // The scrim, Escape and the drag-away call `onClose` alone: those mean "not
+  // this window", not "stop asking".
   const later = () => {
     dismiss();
     onClose();
@@ -144,9 +155,12 @@ export default function InstallAppSheet({ open, onClose }: InstallAppSheetProps)
       label={t('pwaInstallClose')}
       labelledBy="install-app-title"
       testId="install-app-sheet"
+      // Dragged by its grabber, its body scrolls (see the header).
+      dragHandle
       // Geometry only. The glass, the border and the rounding are the
-      // primitive's, and they must stay that way.
-      panelClassName="w-full sm:max-w-md"
+      // primitive's, and they must stay that way. The height cap is in dvh,
+      // the screen as it is, never vh.
+      panelClassName="w-full sm:max-w-md max-h-[92dvh]"
     >
       <div className="p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:pb-5">
         <div className="flex items-center gap-3">

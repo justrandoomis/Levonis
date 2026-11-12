@@ -454,7 +454,12 @@ export default function AdminUsers() {
           // the primitive. `pointer-events-none` on the way out: while the panel
           // is playing its exit it is a picture of itself, and a click landing on
           // a role button then would re-open the window the admin just closed.
-          panelClassName={`w-full max-w-md${editingUser ? '' : ' pointer-events-none'}`}
+          // It scrolls itself: with no X and no scrim exit, Cancel and Save are
+          // its only way out, and on an iPhone SE with Display Zoom (320×460)
+          // the owner's editor is taller than the screen, more so with a failed
+          // save's error line, so they ended up below the bottom edge where
+          // nothing scrolls to (measured; tests/overlayViewportFit.test.ts).
+          panelClassName={`w-full max-w-md max-h-[90dvh] overflow-y-auto${editingUser ? '' : ' pointer-events-none'}`}
         >
           {/* The old inner padding lives on a plain div inside, where it belongs. */}
           <div className="p-6">

@@ -12,6 +12,7 @@ import { api, failureText, newIdempotencyKey } from '../../lib/api';
 // taller than an iPhone's screen, and the whole-panel sheet in Overlay.tsx
 // cannot scroll — its drag takes every vertical swipe — so «منح الهدية» and the
 // unsaved-changes question were below the bottom edge with no way down.
+// From sm up it draws no grabber, so the form pads its own top there.
 // tests/overlayViewportFit.test.ts.
 import { Sheet } from '../ui/Sheet';
 import { Banner, Field, Select, TextArea } from '../adminProducts/form/formUi';
@@ -131,7 +132,7 @@ export default function GrantSheet({
   return (
     <Sheet open={open} onClose={() => !busy && onClose()} labelledBy={titleId} dragHandle panelClassName="w-full sm:max-w-xl max-h-[92dvh]" dirty={!!user && !busy}>
       <form
-        className={`${T.AP} px-5 pb-5 pt-2 space-y-4`}
+        className={`${T.AP} px-5 pb-5 pt-2 sm:pt-5 space-y-4`}
         style={GIFTS_ACCENT}
         data-gift-grant-sheet
         onSubmit={(e) => {

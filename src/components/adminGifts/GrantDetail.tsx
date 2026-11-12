@@ -11,6 +11,7 @@ import { api, failureText } from '../../lib/api';
 // The v2 sheet (`dragHandle`): its body scrolls under a finger. A grant's
 // facts, note and actions are taller than an iPhone's screen, and the
 // whole-panel sheet cannot scroll — its drag takes every vertical swipe.
+// From sm up it draws no grabber, so the content pads its own top there.
 // tests/overlayViewportFit.test.ts.
 import { Sheet } from '../ui/Sheet';
 import { formatDateTime, statusLabel } from '../orders/format';
@@ -101,7 +102,7 @@ export default function GrantDetail({
 
   return (
     <Sheet open={!!giftId} onClose={() => !busy && onClose()} labelledBy={titleId} dragHandle panelClassName="w-full sm:max-w-xl max-h-[92dvh]">
-      <div className={`${T.AP} px-5 pb-5 pt-2 space-y-4`} style={GIFTS_ACCENT} data-gift-detail={giftId ?? ''}>
+      <div className={`${T.AP} px-5 pb-5 pt-2 sm:pt-5 space-y-4`} style={GIFTS_ACCENT} data-gift-detail={giftId ?? ''}>
         <h2 id={titleId} className="text-[15px] font-bold text-[var(--ap-text-1)]">
           {t('detail')}
         </h2>

@@ -729,10 +729,11 @@ function BindSheet({ agent, printers, onClose, onDone }: { agent: Agent; printer
   };
   return (
     // `dragHandle`: the body scrolls under a finger. A farm's printers list
-    // outgrows an iPhone's screen, and a whole-panel sheet cannot scroll
+    // outgrows an iPhone's screen, and a whole-panel sheet cannot scroll.
+    // From sm up it draws no grabber, so the content pads its own top there
     // (tests/overlayViewportFit.test.ts).
     <Sheet open onClose={onClose} labelledBy={titleId} dragHandle panelClassName="ap w-full sm:max-w-md max-h-[92dvh]">
-      <div className="space-y-3 px-5 pb-5 pt-2">
+      <div className="space-y-3 px-5 pb-5 pt-2 sm:pt-5">
         <h2 id={titleId} className={`text-[16px] font-bold ${T.text1}`}>
           {t(S.bindPrinters)} — {agent.name}
         </h2>

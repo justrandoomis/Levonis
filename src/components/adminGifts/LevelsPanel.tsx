@@ -13,7 +13,8 @@ import { api, ApiError, failureText } from '../../lib/api';
 // fields grow with its product (sale type, route, one row per option group,
 // colour, quantity) past an iPhone's screen, and the whole-panel sheet
 // cannot scroll — its drag takes every vertical swipe — so Save could end
-// up below the bottom edge. tests/overlayViewportFit.test.ts.
+// up below the bottom edge. From sm up it draws no grabber, so the content
+// pads its own top there. tests/overlayViewportFit.test.ts.
 import { Sheet } from '../ui/Sheet';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { Banner, Field, Grid, TextArea, TextInput, Toggle } from '../adminProducts/form/formUi';
@@ -85,7 +86,7 @@ function ItemSheet({
 
   return (
     <Sheet open={open} onClose={() => !busy && onClose()} labelledBy={titleId} dragHandle panelClassName="w-full sm:max-w-lg max-h-[92dvh]">
-      <div className={`${T.AP} px-5 pb-5 pt-2 space-y-3`} style={GIFTS_ACCENT} data-gift-item-sheet>
+      <div className={`${T.AP} px-5 pb-5 pt-2 sm:pt-5 space-y-3`} style={GIFTS_ACCENT} data-gift-item-sheet>
         <h2 id={titleId} className="text-[15px] font-bold text-[var(--ap-text-1)]">
           {item ? t('editItem') : t('addItem')} · {adminText(lang, 'levelN', { n: level })}
         </h2>
