@@ -24,7 +24,11 @@
  * when each order was delivered or cancelled — «الأحدث أولًا», or «الأقدم
  * أولًا» on its own switch — each row saying «سُلّم …» / «أُلغي …», and a
  * header line of the half shown and its total. A finished order has no day
- * left to be late on.
+ * left to be late on. AN ORDER- OR PHONE-NUMBER LOOKUP IS ONE LIST TOO, from
+ * either half — «نتائج البحث N», no day groups and no «متأخر» count — because
+ * it may find a customer's delivered and cancelled orders beside a live one
+ * (the review of row 323). What an answer draws is OrdersBoardList.tsx's, from
+ * the answer alone; this file keeps the state, the requests and the controls.
  *
  * WHAT REPLACED WHAT. Seven status chips bound to one `statusFilter`, plus a
  * per-row status dropdown, plus a phone card and an 820px table that both
@@ -92,7 +96,7 @@
  *  * NO `new Date(day)`. `new Date('2026-09-23')` is UTC midnight, which a
  *    browser west of Baghdad renders as the 22nd. The server sends the label.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Archive, RefreshCw, Tag } from 'lucide-react';
 import { loc as locOutside, useLanguage } from '../../LanguageContext';
 import {
@@ -100,23 +104,14 @@ import {
   ApiError,
   type AdminOrderRow,
   type AdminOrdersResponse,
-  type OrderDueBucket,
   type OrderStatus,
 } from '../../lib/api';
 import OrderDetailModal from './OrderDetailModal';
 import OrderBoardRow from './OrderBoardRow';
 import OrderSearchField from './OrderSearchField';
 import { countText } from './OrderBoardBadges';
-import { PREPARE_DAY_STRINGS, dayLine } from './prepareDayStrings';
-import {
-  ARCHIVE_SORTS,
-  ARCHIVE_STRINGS,
-  archiveRowsOf,
-  readArchiveSort,
-  saveArchiveSort,
-  say,
-  type ArchiveSort,
-} from './archiveSort';
+import { ARCHIVE_SCOPES, readArchiveSort, saveArchiveSort, type ArchiveScope, type ArchiveSort } from './archiveSort';
+import { ArchiveSortSwitch, BoardHeaderLine, BoardNote, BoardTrays } from './OrdersBoardList';
 import { apiRefusal, refusalText } from '../../lib/refusalStrings';
 import { estimateRefusalText } from '../../../packages/contracts/src/priceEstimates';
 import { gateRefusalOf } from './serials/SerialGateRefusal';
@@ -155,47 +150,12 @@ const OPEN_STATUSES: Array<{ id: OrderStatus; ar: string; en: string; ckb: strin
   { id: 'shipped', ar: 'تم الشحن', en: 'Shipped', ckb: 'نێردرا' },
 ];
 
-type ArchiveScope = 'delivered' | 'cancelled';
-const ARCHIVE_SCOPES: Array<{ id: ArchiveScope; ar: string; en: string; ckb: string }> = [
-  { id: 'delivered', ar: 'تم التسليم', en: 'Delivered', ckb: 'گەیەنراو' },
-  { id: 'cancelled', ar: 'ملغاة', en: 'Cancelled', ckb: 'هەڵوەشاوە' },
-];
-
-/**
- * The day headers, in the order the server already returns rows in (day
- * ascending, NULLs last), so grouping never reorders anything.
- *
- * THE DAY IS THE DAY TO PREPARE (DECISIONS row 322). «اليوم» is what needs us
- * today: packed and handed to the courier at 7 pm, a day before the customer's
- * day — or arriving today, for our own same-day delivery and for a parcel
- * already with the courier. The words did not change; the row says whose day
- * it names («التوصيل: غدًا»), and the note under the header says the rule.
- *
- * OVERDUE IS NOT A GROUP OF ITS OWN. The server takes the same view for its
- * `due=today` filter: «a box that should have gone out on Tuesday is not a
- * separate kind of work on Wednesday — it is today's work, and it is the most
- * urgent of it». It sorts first inside «اليوم» because its day is earlier, and
- * the row itself is marked «متأخر».
+/*
+ * The day groups («اليوم / غدًا / هذا الأسبوع / لاحقًا / بلا موعد»), the header
+ * line, the note and the archive's switch are drawn from the answer in
+ * OrdersBoardList.tsx; the archive's two halves (ARCHIVE_SCOPES) are
+ * archiveSort.ts's.
  */
-type GroupKey = 'today' | 'tomorrow' | 'week' | 'later' | 'unscheduled';
-const GROUPS: Array<{ id: GroupKey; ar: string; en: string; ckb: string }> = [
-  { id: 'today', ar: 'اليوم', en: 'Today', ckb: 'ئەمڕۆ' },
-  { id: 'tomorrow', ar: 'غدًا', en: 'Tomorrow', ckb: 'بەیانی' },
-  { id: 'week', ar: 'هذا الأسبوع', en: 'This week', ckb: 'ئەم هەفتەیە' },
-  { id: 'later', ar: 'لاحقًا', en: 'Later', ckb: 'دواتر' },
-  { id: 'unscheduled', ar: 'بلا موعد', en: 'No day', ckb: 'بێ ڕۆژ' },
-];
-
-const groupOf = (bucket?: OrderDueBucket): GroupKey => {
-  // A missing bucket is «بلا موعد», never today: an order with no day named is
-  // not work for this morning, and `null` must never COALESCE to a day.
-  if (!bucket) return 'unscheduled';
-  return bucket === 'overdue' ? 'today' : bucket;
-};
-
-const EMPTY_COUNTS: AdminOrdersResponse['counts'] = {
-  total: 0, overdue: 0, today: 0, tomorrow: 0, week: 0, later: 0, unscheduled: 0,
-};
 
 /**
  * The board's answer since migration 0218 (worker/routes/admin.ts): the
@@ -361,47 +321,8 @@ export default function OrdersBoard() {
   }, []);
 
   const orders = data?.orders ?? [];
-  const counts = data?.counts ?? EMPTY_COUNTS;
   const total = data?.total ?? 0;
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-
-  /** The board-wide count behind each header. Overdue folds into today. */
-  const groupCount = (id: GroupKey): number =>
-    id === 'today' ? counts.today + counts.overdue : counts[id];
-
-  /**
-   * THE ARCHIVE IS ONE LIST, IN THE SERVER'S ORDER (row 323): by when each
-   * order was delivered or cancelled, newest or oldest first. Filed under day
-   * headers it would put this morning's delivery under the day it was due and
-   * scramble that order — so the day groups below are the live board's only.
-   * Null on the live board's answer.
-   */
-  const archiveRows = useMemo(() => archiveRowsOf(data), [data]);
-
-  // The rows come back in day order already (day ascending, NULLs last), so
-  // bucketing them preserves the server's ordering inside every group —
-  // including the PRO pin, which is a tie-break WITHIN a day.
-  const groups = useMemo(() => {
-    if (archiveRowsOf(data)) return [];
-    const rows = data?.orders ?? [];
-    return GROUPS.map((g) => ({ ...g, rows: rows.filter((o) => groupOf(o.due_bucket) === g.id) })).filter(
-      (g) => g.rows.length > 0
-    );
-  }, [data]);
-
-  /** The archive's header: which half and how many — or, for an order- or
-   *  phone-number lookup, which ignores the half chosen, the results. */
-  const archiveTitle = data?.search?.pierced
-    ? ARCHIVE_STRINGS.results
-    : (ARCHIVE_SCOPES.find((s) => s.id === data?.scope) ?? ARCHIVE_SCOPES[0]);
-
-  /**
-   * The PRO segment counts the rows ON THIS PAGE, because the server's counts
-   * block carries no PRO column — it counts days. On page one that is the top
-   * of the board and matches what the eye sees; as soon as there is a second
-   * page it could be read as a board total, so it says which it is.
-   */
-  const proHere = orders.filter((o) => o.priority === 1).length;
 
   /**
    * «مباشر ٦» — the option and what tapping it would return.
@@ -483,8 +404,8 @@ export default function OrdersBoard() {
     }
   };
 
-  /** One row, the same in the day groups and in the archive's one list. */
-  const rowOf = (o: AdminOrderRow) => (
+  /** One row, the same in the day groups and in the one list of the archive or a lookup (`flat`). */
+  const rowOf = (o: AdminOrderRow, flat: boolean) => (
     <OrderBoardRow
       key={o.id}
       order={o}
@@ -495,6 +416,7 @@ export default function OrdersBoard() {
       advancing={advancing === o.id}
       deleting={deletingId === o.id}
       latin={latin}
+      flat={flat}
     />
   );
 
@@ -506,56 +428,11 @@ export default function OrdersBoard() {
           <h2 className="text-lg leading-tight font-black text-text-primary">
             {loc('الطلبات', 'Orders', 'داواکارییەکان')}
           </h2>
-          {/* TEXT, NOT CHIPS. Four numbers an owner reads in one glance on a
-              busy morning; the only coloured one is the one that means "late".
-              The archive has no day to be late on (row 323): its line is the
-              half shown and its total. */}
-          <p data-order-buckets className="mt-1 text-[13px] leading-[1.6] text-text-secondary">
-            {archiveRows ? (
-              <span data-order-archive-total className="tabular-nums">
-                {say(loc, archiveTitle)} {countText(total, latin)}
-              </span>
-            ) : (
-              <>
-                <span className="tabular-nums">
-                  {loc('اليوم', 'Today', 'ئەمڕۆ')} {countText(counts.today + counts.overdue, latin)}
-                </span>
-                <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
-                <span className="tabular-nums">
-                  {loc('غدًا', 'Tomorrow', 'بەیانی')} {countText(counts.tomorrow, latin)}
-                </span>
-                {counts.overdue > 0 && (
-                  <>
-                    <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
-                    <span data-order-overdue-count className="tabular-nums font-bold text-danger">
-                      {loc('متأخر', 'Overdue', 'دواکەوتوو')} {countText(counts.overdue, latin)}
-                    </span>
-                  </>
-                )}
-                {proHere > 0 && (
-                  <>
-                    <span className="mx-1.5 text-text-muted" aria-hidden>·</span>
-                    <span className="tabular-nums">
-                      PRO {countText(proHere, latin)}
-                      {pages > 1 && (
-                        <span className="ms-1 text-text-muted">
-                          {loc('(هذه الصفحة)', '(this page)', '(ئەم پەڕەیە)')}
-                        </span>
-                      )}
-                    </span>
-                  </>
-                )}
-              </>
-            )}
-          </p>
-          {/* WHY AN ORDER FOR TOMORROW IS UNDER «اليوم» (row 322), once, in
-              muted words — the live board only: the archive is one list by
-              when each order was delivered or cancelled (row 323). */}
-          {!archive && (
-            <p data-order-board-note className="mt-0.5 text-[12px] leading-[1.5] text-text-muted">
-              {dayLine(loc, PREPARE_DAY_STRINGS.boardNote)}
-            </p>
-          )}
+          {/* «اليوم ٦ · غدًا ٣ · متأخر ١» over the day groups; the half and its
+              total in the archive; «نتائج البحث N» for a lookup — and the note
+              over the day groups only. Drawn from the answer alone. */}
+          <BoardHeaderLine data={data} loc={loc} latin={latin} pages={pages} />
+          <BoardNote data={data} loc={loc} />
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -680,35 +557,21 @@ export default function OrdersBoard() {
         </button>
       </div>
 
-      {/* «الأحدث أولًا / الأقدم أولًا» (owner, row 323) — the archive only, by
-          when each order was delivered or cancelled. Its own row under the
-          three controls, never a fourth inside theirs (the e2e pins that row
-          at three), in the slot the live board's price filters use. A choice
-          starts again from the first page, like every control here. */}
-      {archive && (
-        <div
-          data-order-archive-sort
-          role="group"
-          aria-label={say(loc, ARCHIVE_STRINGS.sortGroup)}
-          className="flex flex-wrap gap-2 min-w-0"
-        >
-          {ARCHIVE_SORTS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              data-order-sort={s}
-              aria-pressed={archiveSort === s}
-              onClick={() => {
-                chooseArchiveSort(s);
-                setPage(0);
-              }}
-              className="lv-choice press-scale inline-flex min-h-[44px] items-center px-3 text-[13px] leading-[1.4] font-bold"
-            >
-              {say(loc, ARCHIVE_STRINGS[s])}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* «الأحدث أولًا / الأقدم أولًا» (owner, row 323) — the archive only, and
+          not during an order- or phone-number lookup, whose results keep the
+          work list's order. Its own row under the three controls, never a
+          fourth inside theirs (the e2e pins that row at three). A choice starts
+          again from the first page, like every control here. */}
+      <ArchiveSortSwitch
+        archive={archive}
+        data={data}
+        value={archiveSort}
+        onChoose={(s) => {
+          chooseArchiveSort(s);
+          setPage(0);
+        }}
+        loc={loc}
+      />
 
       {/* THE TWO PRICE HOLDS, side by side — each shown only while some order
           is held that way (or its filter is on), with the board-wide count:
@@ -763,39 +626,10 @@ export default function OrdersBoard() {
         <p className="lv-alert lv-alert-warning text-[13px] leading-[1.6] text-text-primary">{notice}</p>
       )}
 
-      {/* ------------------------------------------------- 4. THE DAY LIST.
-          ONE TRAY OF FLAT ROWS PER DAY, AT EVERY WIDTH (clay: a long list
-          is one resting tray with dividers, never a stack of cards), not a
-          table that becomes one. Sticky
-          headers inside an `overflow-x-auto` table do not stick — the overflow
-          box becomes the scrollport — and that failure appears only at the
-          desktop breakpoint, which is the one nobody re-checks after testing
-          the phone.
-
-          THE ARCHIVE IS ONE TRAY (row 323), its rows exactly in the server's
-          order — when each was delivered or cancelled, newest or oldest first
-          — with no day headers: each row says its own day, «سُلّم …». `groups`
-          is empty for its answer, so only one of the two lists ever draws. */}
-      {archiveRows && archiveRows.length > 0 && (
-        <section data-order-group="archive" data-order-sorted={data?.sort ?? ''} className="min-w-0">
-          <div className="lv-surface divide-y divide-border-subtle overflow-hidden">{archiveRows.map(rowOf)}</div>
-        </section>
-      )}
-      {groups.map((g) => (
-        <section key={g.id} data-order-group={g.id} className="min-w-0">
-          {/* On the canvas now (the admin's same-colour panel is gone), so
-              the header is the flat canvas: it rests mid-page and sticks over
-              plain canvas once the page's light has scrolled away — the
-              wash (lv-canvas) would restart the light at its own top. */}
-          <h3
-            className="sticky top-0 z-10 mb-2 flex items-baseline gap-1.5 bg-canvas px-2 py-2 text-[13px] leading-[1.5] font-black text-text-secondary"
-          >
-            {loc(g.ar, g.en, g.ckb)}
-            <span className="tabular-nums text-text-muted">({countText(groupCount(g.id), latin)})</span>
-          </h3>
-          <div className="lv-surface divide-y divide-border-subtle overflow-hidden">{g.rows.map(rowOf)}</div>
-        </section>
-      ))}
+      {/* ------------------------------------------------- 4. THE LIST — one
+          tray per day on the live board; one tray in the server's order for
+          the archive and for a lookup (OrdersBoardList.tsx). */}
+      <BoardTrays data={data} loc={loc} latin={latin} rowOf={rowOf} />
 
       {orders.length === 0 && (
         <p className="py-12 text-center text-[14px] leading-[1.6] font-medium text-text-muted">

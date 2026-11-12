@@ -25,6 +25,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { ROOT } from './fixtures/d1';
 import { DayChip, LateMark, OrderDaysLine, lateReasonOfRow } from '../src/components/adminOrders/OrderBoardBadges';
 import OrderBoardRow from '../src/components/adminOrders/OrderBoardRow';
+import { BoardNote } from '../src/components/adminOrders/OrdersBoardList';
 import { PREPARE_DAY_STRINGS, dayLine } from '../src/components/adminOrders/prepareDayStrings';
 import type { AdminOrderRow, OrderDueBucket, OrderLateReason } from '../src/lib/api';
 import { HANDOVER_HOUR } from '../worker/lib/deliveryLead';
@@ -242,12 +243,24 @@ test('the window asks in the reader’s language and draws the server’s line; 
     modal,
     /<OrderDaysLine\s+deliveryLabel=\{detail\.delivery_day_label\}\s+prepareLabel=\{detail\.prepare_label\}\s+lateReason=\{detail\.overdue_reason\}\s+loc=\{loc\}\s+\/>/
   );
-  const board = read('src/components/adminOrders/OrdersBoard.tsx');
-  assert.match(
-    board,
-    /\{!archive && \(\s*<p data-order-board-note className="[^"]*text-text-muted[^"]*">\s*\{dayLine\(loc, PREPARE_DAY_STRINGS\.boardNote\)\}/,
-    'one muted line, never in the archive'
-  );
-  // The header words did not change: «اليوم / غدًا / هذا الأسبوع / لاحقًا / بلا موعد».
-  for (const word of ["ar: 'اليوم'", "ar: 'غدًا'", "ar: 'هذا الأسبوع'", "ar: 'لاحقًا'", "ar: 'بلا موعد'"]) assert.ok(board.includes(word), word);
+  // The note: one muted line over the live board's day groups — never over the
+  // archive or a lookup's results, which have no day headers to explain.
+  type NoteData = Parameters<typeof BoardNote>[0]['data'];
+  const note = (data: NoteData, lang: Lang = 'ar') => renderToStaticMarkup(createElement(BoardNote, { data, loc: locIn(lang) }));
+  const live: NonNullable<NoteData> = {
+    scope: 'open',
+    orders: [],
+    total: 0,
+    counts: { total: 0, overdue: 0, today: 0, tomorrow: 0, week: 0, later: 0, unscheduled: 0 },
+    search: null,
+    sort: null,
+  };
+  const html = note(live);
+  assert.match(html, /^<p data-order-board-note="[^"]*" class="mt-0\.5 text-\[12px\] leading-\[1\.5\] text-text-muted">/);
+  assert.equal(text(html), text(PREPARE_DAY_STRINGS.boardNote.ar));
+  assert.equal(text(note(live, 'ckb')), text(PREPARE_DAY_STRINGS.boardNote.ckb));
+  assert.equal(note(null).length > 0, true, 'the live board before its first answer');
+  assert.equal(note({ ...live, scope: 'delivered' }), '');
+  assert.equal(note({ ...live, search: { raw: '07809998877', pierced: true } }), '');
+  assert.match(read('src/components/adminOrders/OrdersBoard.tsx'), /<BoardNote data=\{data\} loc=\{loc\} \/>/);
 });

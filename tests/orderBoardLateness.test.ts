@@ -12,6 +12,11 @@
  *                 over passed». A parcel with the courier past its day is
  *                 'courier', a box still on the shelf 'prepare', a finished
  *                 order never late. The order window says the same as the row.
+ *   THE SCREEN    a phone lookup's real answer — a customer's delivered and
+ *                 cancelled orders beside a live one, the COUNT still calling
+ *                 two of them overdue — drawn by the board's own components
+ *                 (OrdersBoardList.tsx): one list «نتائج البحث ٣», no «اليوم»
+ *                 group, nothing red (the review of row 323).
  *   THE BAD DAY   0094's CHECK holds the shape of `delivery_due_day`, not the
  *                 date: a hand-written '2026-13-01' or '0000-00-00' had no board
  *                 day, so no count and no `due` held it while the row showed
@@ -23,9 +28,14 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { freshDb, asD1, stubApp, get, json } from './fixtures/app';
 import { adminRoutes } from '../worker/routes/admin';
 import { STAGE_LEGACY_STATUS, type OrderStage } from '../worker/lib/orderStages';
+import { BoardHeaderLine, BoardNote, BoardTrays } from '../src/components/adminOrders/OrdersBoardList';
+import OrderBoardRow from '../src/components/adminOrders/OrderBoardRow';
+import type { AdminOrderRow, AdminOrdersResponse } from '../src/lib/api';
 
 // 09:00 in Baghdad on Friday 13 November — the morning of the owner's 13-11.
 const MORNING = '2026-11-13T06:00:00.000Z';
@@ -181,6 +191,28 @@ test('a finished order is never late — on the row an order- or phone-number lo
     assert.equal((await at(NOON, () => windowOf(app, id))).overdue_reason, null, `window ${id}`);
   }
   assert.deepEqual([rows.get('ORD-11FE00013')!.due_bucket, rows.get('ORD-11FE00013')!.overdue_reason], ['today', null]);
+  // The route's counts still say «متأخر ٢» for those two past days (the live
+  // COUNT is unchanged) — so the SCREEN must not draw them as a day board. The
+  // answer as the route sent it, through the board's own components: one list
+  // «نتائج البحث ٣», no «اليوم» group, nothing red (the review of row 323).
+  assert.equal(b.counts.overdue, 2);
+  const loc = (ar: string) => ar;
+  const data = b as unknown as AdminOrdersResponse;
+  const header = renderToStaticMarkup(createElement(BoardHeaderLine, { data, loc, latin: false, pages: 1 }));
+  const trays = renderToStaticMarkup(
+    createElement(BoardTrays, {
+      data,
+      loc,
+      latin: false,
+      rowOf: (order: AdminOrderRow, flat: boolean) =>
+        createElement(OrderBoardRow, { key: order.id, order, loc, onOpen() {}, onDelete() {}, onAdvance() {}, advancing: false, deleting: false, flat }),
+    })
+  );
+  assert.equal(header.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim(), 'نتائج البحث ٣');
+  assert.doesNotMatch(header, /data-order-overdue-count|متأخر/);
+  assert.deepEqual([...trays.matchAll(/data-order-group="([a-z]+)"/g)].map((m) => m[1]), ['results']);
+  assert.doesNotMatch(trays, /data-order-overdue|text-danger|متأخر/);
+  assert.equal(renderToStaticMarkup(createElement(BoardNote, { data, loc })), '');
 });
 
 // =========================================================================
