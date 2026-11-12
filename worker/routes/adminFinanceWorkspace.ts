@@ -1019,12 +1019,9 @@ adminFinanceWorkspaceRoutes.get('/statements/withdrawals/:id/print',(c)=>withdra
 async function courierReady(c:Context<AppContext>){
   if(!await courierInstalled(c.env.DB))throw unavailable('تحديث أموال شركة التوصيل لم يطبق على قاعدة البيانات بعد','COURIER_NOT_CONFIGURED');
 }
-adminFinanceWorkspaceRoutes.get('/courier',async(c)=>{
-  await courierReady(c);
-  return c.json({success:true,...(await courierOverview(c.env.DB))});
-});
+// The reads answer before migration 0232 too (tests/fxDeployAhead.test.ts): no transfer yet, or none by that id.
+adminFinanceWorkspaceRoutes.get('/courier',async(c)=>c.json({success:true,...(await courierOverview(c.env.DB))}));
 adminFinanceWorkspaceRoutes.get('/courier/remittances/:id',async(c)=>{
-  await courierReady(c);
   return c.json({success:true,...(await courierRemittance(c.env.DB,(c.req.param('id')??'').slice(0,80)))});
 });
 adminFinanceWorkspaceRoutes.post('/courier/remittances',async(c)=>{

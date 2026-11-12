@@ -513,6 +513,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'finance_wage_changes.preview_json': 'server wage impact, amounts and source identifiers',
   'finance_wage_targets.line_ids_json': 'server-calculated order-item ids covered by the current wage target; no media fields',
   'finance_wage_changes.request_json': 'effective wage rule, scope ids, date and reason',
+  // 0232 — a courier transfer as it was recorded (DECISIONS row 332); the form uploads nothing.
+  'courier_remittances.request_json': 'a courier transfer as recorded: parcel ids, cash, fees, day, statement number and note',
   'finance_wage_preview_jobs.input_json': 'wage preview parameters',
   'finance_wage_preview_jobs.preview_token': 'optimistic preview fingerprint',
   'finance_wage_preview_jobs.result_json': 'wage impact amounts and source identifiers',

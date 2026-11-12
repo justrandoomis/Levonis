@@ -15,7 +15,9 @@ import { crs } from './courierStrings';
  * Three figures: the cash still with Al-Zaeem, the same after the estimated fees, and what arrived but is not checked yet.
  * The parcels still with Al-Zaeem, oldest first: ticking them builds a transfer — each with its cash and its fee (the
  * estimate until the owner types the invoice's), the amount that arrived (their cash less their fees until typed), the
- * day, the statement number, the fee category (the last one used) and a note, which a difference needs. Until the first
+ * day, the statement number, the fee category (the last one used) and a note. The owner's rule (2026-11-13): what a
+ * delivery company pays is never less than the site's figure — a shortfall holds «سجّل التحويل» until a parcel is
+ * corrected; more is fine, and is recorded as lower courier fees. Until the first
  * transfer, the ticked parcels can be recorded instead as the opening balance, forty at a time. The transfers, newest first: each
  * opens its parcels, and «تمت المطابقة» checks it against Al-Zaeem's statement, once. Every write carries an operation id
  * kept for the same request, so a retry is never a second transfer.
@@ -125,7 +127,7 @@ export default function CourierMoney({ onOpenOrder, onChanged }: { onOpenOrder: 
   const p = data.pending;
   const tooMany = lines.length > MAX_PARCELS;
   const needsCategory = fees > 0 && !form.category;
-  const canTransfer = lines.length > 0 && !tooMany && !needsCategory && (difference === 0 || form.note.trim() !== '') && !saving;
+  const canTransfer = lines.length > 0 && !tooMany && !needsCategory && difference >= 0 && !saving;
 
   return <Surface title={crs(loc, 'title')} subtitle={crs(loc, 'sub')} action={<Button variant="ghost" onClick={read} busy={busy}>↻</Button>}>
     <div data-courier-money aria-busy={busy}>
@@ -174,7 +176,8 @@ export default function CourierMoney({ onOpenOrder, onChanged }: { onOpenOrder: 
             {categories.map((c) => <option key={c.id} value={c.id}>{categoryName(lang, c)}</option>)}
           </select></Field>
         </div>
-        {difference !== 0 && <p className="fw-courier-diff" data-courier-difference><Status tone="warning">{crs(loc, 'difference')}</Status> <Money value={difference} /> — {crs(loc, 'differenceHint')}</p>}
+        {difference !== 0 && <p className="fw-courier-diff" data-courier-difference={difference < 0 ? 'short' : 'surplus'} role={difference < 0 ? 'alert' : undefined}>
+          <Status tone={difference < 0 ? 'danger' : 'positive'}>{crs(loc, 'difference')}</Status> <Money value={difference} /> — {crs(loc, difference < 0 ? 'short' : 'surplus')}</p>}
         <Field label={crs(loc, 'note')}><input className="fw-input" data-courier-note value={form.note} maxLength={500} onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))} /></Field>
         <div className="fw-courier-actions">
           <Button variant="primary" disabled={!canTransfer} busy={saving === 'transfer'} onClick={recordTransfer} data-courier-record>{crs(loc, 'record')}</Button>

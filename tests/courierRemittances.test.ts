@@ -8,8 +8,8 @@
  * paid — oldest first, each with the fee estimated as the standard fee quoted (even when delivery was free). Recording a
  * transfer writes, per parcel, an ordinary collection (payer courier) with its fee expense, its journal entry (cash and fee
  * against the sale's receivable) and its audit row, then the transfer, its parcels and its own audit row, in one batch: a
- * retry is `already`, the same operation for other content is refused, a difference needs a note and is booked against
- * the courier-fee account, a partly paid parcel stays with what is left. An opening's amount is the parcels' cash less
+ * retry is `already`, the same operation for other content is refused, less than the site shows is refused (the owner's
+ * rule) and more is booked as lower courier fees, a partly paid parcel stays with what is left. An opening's amount is the parcels' cash less
  * their fees. Checking a transfer against the courier's statement reconciles it once and for good; the database refuses
  * any change or deletion of a recorded transfer. An assistant is refused at the door.
  *
@@ -114,19 +114,30 @@ test('a retry is already recorded; the same operation for other content is refus
   assert.equal((await json(other)).code, 'COURIER_OPERATION_REUSED');
 });
 
-test('a difference needs a note, is kept on the transfer and booked against the courier fee', async () => {
+test('the owner’s rule: never less than the site shows — a shortfall is refused, note or not; more is kept and booked as lower courier fees', async () => {
   const w = await parcels();
-  const short = { amount_iqd: 49000, category_id: 'rent', parcels: [{ order_id: 'a', fee_iqd: 5000 }] };
-  const refused = await transfer(w, short);
-  assert.equal(refused.status, 400);
-  assert.equal((await json(refused)).code, 'COURIER_DIFFERENCE_NOTE');
+  const base = { category_id: 'rent', parcels: [{ order_id: 'a', fee_iqd: 5000 }] };
+  for (const note of ['', 'خصم الزعيم أجرة طرد مدفوع مسبقًا']) {
+    const refused = await transfer(w, { ...base, amount_iqd: 49000, note });
+    assert.equal(refused.status, 400);
+    assert.equal((await json(refused)).code, 'COURIER_SHORT', 'a note does not make a shortfall acceptable');
+  }
   assert.equal(rows(w, 'SELECT id FROM finance_collections').length, 0, 'nothing written');
-  assert.equal((await transfer(w, { ...short, note: 'خصم الزعيم أجرة طرد مدفوع مسبقًا' })).status, 200);
-  assert.deepEqual(rows(w, 'SELECT amount_iqd,difference_iqd,note FROM courier_remittances'), [{ amount_iqd: 49000, difference_iqd: -1000, note: 'خصم الزعيم أجرة طرد مدفوع مسبقًا' }]);
+  assert.equal((await transfer(w, { ...base, amount_iqd: 52000 })).status, 200, 'more than the site shows needs no note');
+  assert.deepEqual(rows(w, 'SELECT amount_iqd,difference_iqd,note FROM courier_remittances'), [{ amount_iqd: 52000, difference_iqd: 2000, note: '' }]);
   assert.deepEqual(rows(w, `SELECT l.account_code AS account,l.debit_iqd AS debit,l.credit_iqd AS credit FROM accounting_lines l JOIN accounting_entries e ON e.id=l.entry_id
-      WHERE e.event_key='courier-difference:op-transfer-1' ORDER BY l.account_code`), [{ account: '1000', debit: 0, credit: 1000 }, { account: '5200', debit: 1000, credit: 0 }]);
+      WHERE e.event_key='courier-difference:op-transfer-1' ORDER BY l.account_code`), [{ account: '1000', debit: 2000, credit: 0 }, { account: '5200', debit: 0, credit: 2000 }]);
   const cash = rows(w, "SELECT COALESCE(SUM(debit_iqd-credit_iqd),0) AS n FROM accounting_lines WHERE account_code='1000'")[0].n;
-  assert.equal(cash, 49000, 'the books’ cash is what arrived');
+  assert.equal(cash, 52000, 'the books’ cash is what arrived');
+});
+
+test('before migration 0232 the page still reads: the parcels, no transfer yet; an id is simply not found', async () => {
+  const w = await parcels();
+  w.raw.exec('DROP TABLE courier_remittance_orders; DROP TABLE courier_remittances;');
+  const o = await overview(w);
+  assert.deepEqual([o.pending.count, o.remittances.length, o.unreconciled.count, o.first_time], [3, 0, 0, true]);
+  assert.equal((await get(w.app, '/f/courier/remittances/anything')).status, 404);
+  assert.equal((await transfer(w, { amount_iqd: 50000, category_id: 'rent', parcels: [{ order_id: 'a', fee_iqd: 5000 }] })).status, 503, 'recording waits for the migration');
 });
 
 test('what a transfer cannot hold: not a courier parcel, nothing due, too much, a fee over the cash, a parcel twice, too many', async () => {

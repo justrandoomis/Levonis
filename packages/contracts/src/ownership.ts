@@ -254,6 +254,8 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'finance_mutation_clock', 'finance_withdrawal_payment_lines', 'finance_wage_preview_jobs', 'finance_wage_pending_targets',
     // Agreed wage settlements and the rows they closed (DECISIONS row 306).
     'finance_staff_settlements', 'finance_staff_settled_costs',
+    // Money with the courier: Al-Zaeem's transfers and the parcels each paid (0232; DECISIONS row 332).
+    'courier_remittances', 'courier_remittance_orders',
     // Investor defaults are separate from immutable funded-purchase agreements.
     'investment_profiles', 'investment_profile_history', 'investment_legacy_links',
     'purchase_investor_agreements', 'purchase_investor_allocations', 'purchase_investor_receipts', 'purchase_investor_lot_capital',

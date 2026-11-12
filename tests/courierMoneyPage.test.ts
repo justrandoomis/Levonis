@@ -6,7 +6,7 @@
  *   answer as it is (a compile-time check over courierOverview).
  * - Mounted in the small browser over a fixed answer: the three figures, the first-time note, the parcels oldest first.
  *   Ticking parcels opens the transfer: their cash less their fees, the amount that arrived prefilled with it; a different
- *   amount shows the difference and holds «سجّل التحويل» until a note says why; pressing it sends each parcel's cash and
+ *   amount less than that is refused in red whatever the note (the owner's rule), more is fine; pressing it sends each parcel's cash and
  *   fee, the amount, the day, the statement number and the fee category, then reads again. A retry after a lost answer
  *   sends the same operation id. The first time, the ticked parcels can go as the opening balance instead. A received
  *   transfer is checked with «تمت المطابقة» → «تأكيد المطابقة»; a checked one says who checked it.
@@ -113,7 +113,7 @@ test('the three figures, the first-time note and the parcels, oldest first; an o
   await page.unmount();
 });
 
-test('a transfer: ticked parcels, their cash less fees, a difference that needs its note, then what is sent', async () => {
+test('a transfer: ticked parcels, their cash less fees, a shortfall held whatever the note, more accepted, then what is sent', async () => {
   const sent = serve(OVERVIEW);
   const changed: string[] = [];
   const page = await mount('ar', [], changed);
@@ -129,13 +129,17 @@ test('a transfer: ticked parcels, their cash less fees, a difference that needs 
   await act(async () => { type(q(page.container, 'tr[data-courier-parcel="ORD-0D00000002"] input[data-courier-fee]'), '6000'); });
   await act(async () => { type(amount, '73,000'); });
   await page.settle();
-  assert.match(words(q(page.container, '[data-courier-difference]')), /-1,000|−1,000/);
+  assert.match(words(q(page.container, '[data-courier-difference="short"]')), /-1,000|−1,000/);
   const record = named(page.container, 'button', 'سجّل التحويل');
-  assert.equal(record.disabled, true, 'a difference needs its note');
+  assert.equal(record.disabled, true, 'less than the site shows is never recorded');
   await act(async () => { type(q(page.container, 'input[data-courier-note]'), 'خصم أجرة طرد مدفوع مسبقًا'); });
   await act(async () => { type(q(page.container, 'input[data-courier-reference]'), 'Z-1003'); });
   await page.settle();
-  assert.equal(record.disabled, false);
+  assert.equal(record.disabled, true, 'a note does not change that');
+  await act(async () => { type(amount, '76000'); });
+  await page.settle();
+  assert.match(words(q(page.container, '[data-courier-difference="surplus"]')), /2,000/);
+  assert.equal(record.disabled, false, 'more than the site shows is fine');
   await act(async () => { click(record); });
   await page.settle();
   const post = sent.find((s) => s.method === 'POST')!;
@@ -143,7 +147,7 @@ test('a transfer: ticked parcels, their cash less fees, a difference that needs 
   const { operation_id, received_day, ...rest } = post.body!;
   assert.match(String(operation_id), /^[0-9a-f-]{36}$/);
   assert.match(String(received_day), /^\d{4}-\d{2}-\d{2}$/);
-  assert.deepEqual(rest, { kind: 'transfer', reference: 'Z-1003', amount_iqd: 73000, note: 'خصم أجرة طرد مدفوع مسبقًا', category_id: 'fees',
+  assert.deepEqual(rest, { kind: 'transfer', reference: 'Z-1003', amount_iqd: 76000, note: 'خصم أجرة طرد مدفوع مسبقًا', category_id: 'fees',
     parcels: [{ order_id: 'ORD-0D00000001', collected_iqd: 55000, fee_iqd: 5000 }, { order_id: 'ORD-0D00000002', collected_iqd: 30000, fee_iqd: 6000 }] });
   assert.match(words(q(page.container, '[data-courier-message]')), /سُجّل: 2 طرد/);
   assert.equal(sent.filter((s) => s.method === 'GET' && /\/courier$/.test(s.url)).length, 2, 'read again');

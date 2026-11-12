@@ -13,8 +13,10 @@
  *   RECEIVED     a transfer recorded: the parcels it paid, each with its cash and the fee kept, and what arrived;
  *   RECONCILED   the owner checked the transfer against Al-Zaeem's own statement.
  * The fee for a parcel not paid out yet is an estimate — the standard fee quoted for it, even when the customer got free
- * delivery (question 6's default) — and the transfer records the real one. A transfer whose amount is not the parcels'
- * cash less their fees keeps the difference, with a note, and books it against the courier-fee account.
+ * delivery (question 6's default) — and the transfer records the real one. THE OWNER'S RULE (2026-11-13): «Al-Zaeem or
+ * any delivery money received must be equal or higher than on web» — what arrives is never less than the parcels' cash
+ * less their fees, so a smaller amount is refused until a parcel's cash or fee is corrected from the courier's statement;
+ * a larger one (the courier kept less than the estimate) is kept on the transfer and booked against the courier fees.
  * Recording collections makes the orders' investor shares stale (their fingerprint reads collections); the minute
  * recovery recomputes them, two orders a run, so a transfer never replays every order inside its own request.
  */
@@ -187,6 +189,8 @@ export async function courierRemittances(db: D1Database, limit = 60): Promise<Co
 }
 
 export async function courierRemittance(db: D1Database, id: string) {
+  // Before migration 0232 there is no transfer to find: the same answer as an unknown id.
+  if (!await courierInstalled(db)) throw notFound('Transfer not found');
   const remittance = await db.prepare(`SELECT ${REMITTANCE_COLUMNS} FROM courier_remittances r LEFT JOIN users cu ON cu.id=r.created_by LEFT JOIN users ru ON ru.id=r.reconciled_by
       WHERE r.id=?`).bind(id).first<CourierRemittance>();
   if (!remittance) throw notFound('Transfer not found');
@@ -198,10 +202,12 @@ export async function courierRemittance(db: D1Database, id: string) {
 
 /** The page's figures: what is still at the courier, what arrived and is not yet checked, and whether this is the first time. */
 export async function courierOverview(db: D1Database) {
+  // The parcels read only older tables; before migration 0232 there is simply no transfer yet (a deploy can run ahead).
+  const installed = await courierInstalled(db);
   const [parcels, remittances, counts, category] = await Promise.all([
     pendingParcels(db),
-    courierRemittances(db),
-    db.prepare(`SELECT COALESCE(SUM(CASE WHEN kind='transfer' THEN 1 ELSE 0 END),0) AS transfers,COALESCE(SUM(CASE WHEN state='received' THEN 1 ELSE 0 END),0) AS unreconciled,
+    installed ? courierRemittances(db) : Promise.resolve([] as CourierRemittance[]),
+    !installed ? Promise.resolve(null) : db.prepare(`SELECT COALESCE(SUM(CASE WHEN kind='transfer' THEN 1 ELSE 0 END),0) AS transfers,COALESCE(SUM(CASE WHEN state='received' THEN 1 ELSE 0 END),0) AS unreconciled,
         COALESCE(SUM(CASE WHEN state='received' THEN amount_iqd ELSE 0 END),0) AS unreconciled_iqd FROM courier_remittances`)
       .first<{ transfers: number; unreconciled: number; unreconciled_iqd: number }>(),
     lastFeeCategory(db),
@@ -280,7 +286,7 @@ export async function recordRemittance(db: D1Database, actor: string, input: Rem
   const amount = input.kind === 'opening' ? collectedTotal - feeTotal : input.amount;
   if (amount === null || !Number.isSafeInteger(amount) || amount < 0) throw badRequest('اكتب المبلغ الذي وصل', 'COURIER_AMOUNT');
   const difference = amount - (collectedTotal - feeTotal);
-  if (difference !== 0 && !input.note.trim()) throw badRequest('المبلغ الواصل يختلف عن نقد الطرود بعد الأجور: اكتب السبب في الملاحظة', 'COURIER_DIFFERENCE_NOTE');
+  if (difference < 0) throw badRequest('وصل أقل مما يُظهره الموقع لهذه الطرود بعد أجورها، ويجب أن يساوي ما وصل من شركة التوصيل ما في الموقع أو يزيد عليه: صحّح نقد الطرد أو أجرته من كشف الشركة', 'COURIER_SHORT');
   const reference = input.reference || (input.kind === 'opening' ? 'رصيد افتتاحي' : '');
   const statements: D1PreparedStatement[] = [];
   // Every parcel's collection first: the transfer's own rows reference them.
