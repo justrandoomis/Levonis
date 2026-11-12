@@ -163,19 +163,19 @@ export function DayChip({
 
 const LATE_WHY: Record<OrderLateReason, { why: Tri; short: Tri | null }> = {
   prepare: { why: PREPARE_DAY_STRINGS.overduePrepare, short: null },
-  booked: { why: PREPARE_DAY_STRINGS.overdueBooked, short: PREPARE_DAY_STRINGS.lateBooked },
   courier: { why: PREPARE_DAY_STRINGS.overdueCourier, short: PREPARE_DAY_STRINGS.lateCourier },
 };
 
 /**
  * «متأخر», AND WHICH LATENESS IT IS — IN WORDS (the review of row 322). One
- * word covers three causes that send an admin to three different places: a
- * box still on our shelf, a shipment booked whose pick-up never moved its
- * stage, a parcel the courier is late with. A `title` alone cannot be opened
- * on a phone (the owner's iPhone), so the two that are not "go and pack it"
- * say so on their face — «متأخر · مع المندوب», «متأخر · شحنته محجوزة» — and
- * every reason's full sentence is the title for a mouse and the screen-reader
- * text. Shared by the board's row and the order window.
+ * word covers two causes that send an admin to two different places: a box
+ * still on our shelf, and a parcel the courier is late with — with the courier
+ * or booked with the delivery company, which the owner counts as handed over
+ * (2026-11-12). A `title` alone cannot be opened on a phone (the owner's
+ * iPhone), so the one that is not "go and pack it" says so on its face —
+ * «متأخر · مع المندوب» — and every reason's full sentence is the title for a
+ * mouse and the screen-reader text. Shared by the board's row and the order
+ * window.
  */
 export function LateMark({ reason, loc }: { reason: OrderLateReason; loc: Loc }) {
   const { why, short } = LATE_WHY[reason] ?? LATE_WHY.prepare;

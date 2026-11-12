@@ -9,7 +9,8 @@
  * over real SQLite, the TypeScript twin is pinned against the SQL, the count
  * beside the option equals the board total, the plan still reads through the
  * board's partial index, and pressing «تم تأكيد الطلب» on a received direct
- * order moves it in.
+ * order moves it in. A parcel booked with the delivery company is not on the
+ * list (the owner, 2026-11-12: «Count as handed over»; DECISIONS row 322 (٧)).
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -18,7 +19,7 @@ import { freshDb, asD1, stubApp, get, json, send, pending } from './fixtures/app
 import { adminRoutes, BOARD_ORDER_SQL, needsPreparation, PREPARE_WHERE_SQL } from '../worker/routes/admin';
 import { DIRECT_STAGES, PREORDER_STAGES, STAGE_LEGACY_STATUS, type OrderStage } from '../worker/lib/orderStages';
 
-interface Seed { id: string; type: string; stage: string; status: string }
+interface Seed { id: string; type: string; stage: string; status: string; remote?: string }
 
 function seed(orders: Seed[]) {
   const raw = freshDb();
@@ -27,10 +28,10 @@ function seed(orders: Seed[]) {
   const ins = raw.prepare(
     `INSERT INTO orders
        (id,user_id,status,stage,address_snapshot,delivery_method_id,delivery_method_snapshot,payment_method_id,
-        subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,priority,shipping_type,seller_type)
-     VALUES (?,?,?,?,'{"name":"x"}','standard','{}','cash',1000,1500,1000,1000,'2026-09-15T08:00:00.000Z',0,?,'levonis')`
+        subtotal_iqd,exchange_rate,total_iqd,due_on_delivery_iqd,created_at,priority,shipping_type,seller_type,delivery_remote_id)
+     VALUES (?,?,?,?,'{"name":"x"}','standard','{}','cash',1000,1500,1000,1000,'2026-09-15T08:00:00.000Z',0,?,'levonis',?)`
   );
-  for (const o of orders) ins.run(o.id, 'u1', o.status, o.stage, o.type);
+  for (const o of orders) ins.run(o.id, 'u1', o.status, o.stage, o.type, o.remote ?? '');
   const app = stubApp(
     asD1(raw),
     { id: 'boss', role: 'admin', email: 'boss@x.co', admin_scope: null },
@@ -62,6 +63,9 @@ function everyStage(): Seed[] {
   // STAGE decides, as it does for the row's quick button.
   out.push({ id: 'ORD-mixed-direct-received-processing', type: 'direct', stage: 'received', status: 'processing' });
   out.push({ id: 'ORD-mixed-sea-at-levo', type: 'preorder_sea', stage: 'at_levo_warehouse', status: 'processing' });
+  // Booked with the delivery company, stage never moved: handed over, so nothing to pack.
+  out.push({ id: 'ORD-booked-direct-preparing', type: 'direct', stage: 'preparing', status: 'processing', remote: 'AZ-1' });
+  out.push({ id: 'ORD-booked-sea-local_delivery_prep', type: 'preorder_sea', stage: 'local_delivery_prep', status: 'processing', remote: 'AZ-2' });
   return out;
 }
 
@@ -73,7 +77,7 @@ const EXPECTED = [
   'ORD-preorder_sea-local_delivery_prep',
 ].sort();
 
-test('membership for EVERY stage: direct confirmed/preparing + pre-orders in local delivery prep, nothing else', async () => {
+test('membership for EVERY stage: direct confirmed/preparing + pre-orders in local delivery prep, nothing booked, nothing else', async () => {
   const orders = everyStage();
   const { app } = seed(orders);
   const res = await board(app, 'scope=prepare');
@@ -81,7 +85,7 @@ test('membership for EVERY stage: direct confirmed/preparing + pre-orders in loc
   assert.equal(res.total, EXPECTED.length);
   // The TypeScript twin agrees with the SQL, row by row.
   assert.deepEqual(
-    orders.filter((o) => needsPreparation(o.type, o.stage, o.status)).map((o) => o.id).sort(),
+    orders.filter((o) => needsPreparation(o.type, o.stage, o.status, o.remote)).map((o) => o.id).sort(),
     EXPECTED
   );
 });

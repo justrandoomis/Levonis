@@ -14,9 +14,11 @@
  *            (`personal`) and «استلام من المخزن» (`pickup`) — which have no
  *            road day: the box is made up on the day itself;
  *   0 days   an order no longer on our shelf: with the courier
- *            (`out_for_delivery`), delivered or cancelled. It is filed by the
- *            day it reaches the customer, so a parcel handed over last night is
- *            not «late» this morning, and a courier who IS late still shows so.
+ *            (`out_for_delivery`), booked with the delivery company (a
+ *            `delivery_remote_id`; the owner, 2026-11-12: a booking is the
+ *            hand-over), delivered or cancelled. It is filed by the day it
+ *            reaches the customer, so a parcel handed over last night is not
+ *            «late» this morning, and a courier who IS late still shows so.
  *
  * WHY THE METHOD IDS AND NOT A FLAG. `home_delivery` (settings.ts) separates
  * the pickup from the two home deliveries, but `standard` and `personal` both
@@ -93,13 +95,28 @@ export interface LeadInput {
   stage?: unknown;
   status?: unknown;
   delivery_method_id?: unknown;
+  /** The courier's id for the shipment, '' until one is booked (orders.delivery_remote_id, 0028). */
+  delivery_remote_id?: unknown;
+}
+
+/**
+ * BOOKED WITH THE DELIVERY COMPANY IS HANDED OVER (the owner, 2026-11-12:
+ * «Count as handed over»). A shipment id is written when the parcel is booked,
+ * and the owner books a parcel once it is packed and given to the courier —
+ * so it is no longer ours to pack, even while no courier status has moved its
+ * stage. Blank text (the column's '' default, or spaces) is no booking. Spaces
+ * only, as SQLite's TRIM reads it, so `leadDaysSql` agrees row for row.
+ */
+export function isBooked(order: Pick<LeadInput, 'delivery_remote_id'>): boolean {
+  const v = order.delivery_remote_id;
+  return (typeof v === 'string' || typeof v === 'number') && String(v).replace(/^ +| +$/g, '') !== '';
 }
 
 const has = (list: readonly string[], v: unknown): boolean => typeof v === 'string' && list.includes(v);
 
 /** The order's lead in whole days — the TypeScript reading of `leadDaysSql`. */
 export function leadDaysFor(order: LeadInput, table: DeliveryLeadTable = DELIVERY_LEAD): number {
-  if (has(HANDED_OVER_STAGES, order.stage) || has(FINISHED_STATUSES, order.status)) return 0;
+  if (has(HANDED_OVER_STAGES, order.stage) || has(FINISHED_STATUSES, order.status) || isBooked(order)) return 0;
   const method = typeof order.delivery_method_id === 'string' ? order.delivery_method_id : '';
   if (method && Object.hasOwn(table.method_days, method)) return table.method_days[method];
   return table.default_days;
@@ -131,33 +148,30 @@ export function boardDayOf(day: unknown, lead: number): string {
  * WHICH LATENESS «متأخر» IS — the board files a row on a day before today, and
  * the admin does a different thing about each (the review of row 322):
  *
- *   'courier'  it left our shelf (`out_for_delivery`) and its delivery day has
- *              passed: the courier is late;
- *   'booked'   a shipment is booked with the delivery company, but nothing
- *              moved the stage. Booking is not the courier taking the parcel
- *              (admin.ts: «The stage is NOT advanced here»): only the courier's
- *              status — once the owner has mapped it in «إدارة التوصيل» — or a
- *              hand moves it, so the box may well have gone at 7 pm. The row
- *              says what is known instead of «its day to pack passed»;
+ *   'courier'  it left our shelf — with the courier (`out_for_delivery`) or
+ *              booked with the delivery company (`isBooked`) — and its
+ *              delivery day has passed: the courier is late;
  *   'prepare'  still on our shelf with nothing booked: its day to pack and hand
  *              over has passed.
+ *
+ * A booking had a reason of its own until the owner ruled it the hand-over
+ * (2026-11-12, «Count as handed over»): «متأخر · شحنته محجوزة» on the morning
+ * of its delivery day, because no courier status had moved its stage. Now a
+ * booked parcel has no day on the road (`leadDaysFor`), so its delivery
+ * morning is not late at all, and once that day passes it is the courier's.
  *
  * Null for a finished order (delivered or cancelled), which is never late. The
  * caller decides WHETHER the row is late (its board day before today); this
  * says only which kind.
  */
-export type LateReason = 'prepare' | 'booked' | 'courier';
+export type LateReason = 'prepare' | 'courier';
 
-/** What the reason reads off an order row, on top of the lead's own fields. */
-export interface LateInput extends LeadInput {
-  /** The courier's id for the shipment, '' until one is booked (orders.delivery_remote_id, 0028). */
-  delivery_remote_id?: unknown;
-}
+/** What the reason reads off an order row: the lead's own fields. */
+export type LateInput = LeadInput;
 
 export function lateReasonOf(order: LateInput): LateReason | null {
   if (has(FINISHED_STATUSES, order.status)) return null;
-  if (has(HANDED_OVER_STAGES, order.stage)) return 'courier';
-  if (typeof order.delivery_remote_id === 'string' && order.delivery_remote_id.trim() !== '') return 'booked';
+  if (has(HANDED_OVER_STAGES, order.stage) || isBooked(order)) return 'courier';
   return 'prepare';
 }
 
@@ -182,7 +196,8 @@ export function leadDaysSql(table: DeliveryLeadTable = DELIVERY_LEAD, alias = 'o
     .map((days) => ` WHEN ${alias}.delivery_method_id IN (${quoted(byDays.get(days)!)}) THEN ${days}`)
     .join('');
   return (
-    `(CASE WHEN ${alias}.stage IN (${quoted(HANDED_OVER_STAGES)}) OR ${alias}.status IN (${quoted(FINISHED_STATUSES)}) THEN 0` +
+    `(CASE WHEN ${alias}.stage IN (${quoted(HANDED_OVER_STAGES)}) OR ${alias}.status IN (${quoted(FINISHED_STATUSES)})` +
+    ` OR TRIM(COALESCE(${alias}.delivery_remote_id, '')) <> '' THEN 0` +
     `${methods} ELSE ${t.default_days} END)`
   );
 }

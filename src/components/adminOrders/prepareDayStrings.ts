@@ -9,9 +9,10 @@
  * it, where the two differ.
  *
  * «متأخر» SAYS WHICH LATENESS IT IS, IN WORDS (the review, 2026-11-12): a
- * tooltip cannot be opened on a phone, so the parcel with the courier and the
- * booked shipment carry a short visible reason («متأخر · مع المندوب»), and
- * every reason's full sentence is the mark's title and its screen-reader text.
+ * tooltip cannot be opened on a phone, so a parcel with the courier — or booked
+ * with the delivery company, which the owner counts as handed over — carries a
+ * short visible reason («متأخر · مع المندوب»), and every reason's full
+ * sentence is the mark's title and its screen-reader text.
  *
  * NO-BREAK SPACES, ON PURPOSE (`\u00a0`): between a label and its day
  * («التوصيل: غدًا» never splits into «التوصيل:» over «غدًا» inside its pill on
@@ -52,29 +53,17 @@ export const PREPARE_DAY_STRINGS = {
     en: 'Its day to pack and hand to the courier has passed',
     ckb: 'ڕۆژی ئامادەکردن و ڕادەستکردنی بە گەیەنەر تێپەڕیوە',
   },
-  /** «متأخر» on a parcel already with the courier: its delivery day has passed. */
+  /** «متأخر» on a parcel with the courier, or booked with it (the owner: a booking is the hand-over): its delivery day has passed. */
   overdueCourier: {
     ar: 'تجاوز يوم توصيله وهو مع المندوب',
     en: 'Past its delivery day and still with the courier',
     ckb: 'ڕۆژی گەیاندنی تێپەڕیوە و هێشتا لای گەیەنەرە',
   },
   /**
-   * «متأخر» on a shipment booked with the delivery company whose stage nothing
-   * moved: booking is not the courier taking it, so the screen says what is
-   * known and what to do — sync the courier's status, or move it by hand.
-   */
-  overdueBooked: {
-    ar: 'حُجزت شحنته لدى شركة التوصيل ولم تصل حالة استلامها — حدّث حالة الوسيط أو انقله يدويًا',
-    en: 'Its courier shipment is booked, but no pick-up status has arrived — sync the courier status or move it by hand',
-    ckb: 'بارنامەی گەیاندنی دروستکراوە بەڵام دۆخی وەرگرتنی نەگەیشتووە — دۆخی گەیەنەر نوێ بکەرەوە یان بە دەست بیگوازەرەوە',
-  },
-  /**
    * The visible reason after «متأخر ·» for a parcel with the courier — one
    * unbreakable phrase, so a narrow row breaks after the «·», never inside it.
    */
   lateCourier: { ar: 'مع\u00a0المندوب', en: 'with\u00a0the\u00a0courier', ckb: 'لای\u00a0گەیەنەر' },
-  /** The visible reason after «متأخر ·» for a booked shipment nothing moved — one phrase too. */
-  lateBooked: { ar: 'شحنته\u00a0محجوزة', en: 'shipment\u00a0booked', ckb: 'بارنامە\u00a0دروستکراوە' },
 } satisfies Record<string, Tri>;
 
 /** The reader's sentence through the screen's own `loc`, with the server's day label in it. */

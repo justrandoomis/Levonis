@@ -4,14 +4,14 @@
  * real SQLite with every migration applied and the clock pinned, as
  * tests/adminOrderPrepareDay.test.ts does.
  *
- *   THE REASON    the board files an order on the day to pack and hand it over,
- *                 so on its own delivery morning a parcel whose shipment is
- *                 BOOKED with the courier but whose stage nobody moved is late
- *                 by that rule — and the row now says so truthfully
- *                 (`overdue_reason: 'booked'`), never «its day to pack and hand
- *                 over passed». A parcel with the courier past its day is
- *                 'courier', a box still on the shelf 'prepare', a finished
- *                 order never late. The order window says the same as the row.
+ *   THE REASON    the board files an order on the day to pack and hand it over.
+ *                 A parcel whose shipment is BOOKED with the delivery company is
+ *                 handed over (the owner, 2026-11-12: «Count as handed over»),
+ *                 even while no courier status moved its stage: it shows on its
+ *                 own delivery day, is not late that morning, and once that day
+ *                 passes it is 'courier', like a parcel with the courier. A box
+ *                 still on the shelf is 'prepare', a finished order never late.
+ *                 The order window says the same as the row.
  *   THE SCREEN    a phone lookup's real answer — a customer's delivered and
  *                 cancelled orders beside a live one, the COUNT still calling
  *                 two of them overdue — drawn by the board's own components
@@ -127,17 +127,19 @@ async function windowOf(app: ReturnType<typeof seed>['app'], id: string): Promis
 // THE REASON
 // =========================================================================
 
-test('the delivery morning: a booked parcel nobody moved is late as «booked», never «its packing day passed»', async () => {
+test('the delivery morning: a booked parcel is with the courier — on its day, not late; the courier’s once the day passes', async () => {
   const { app } = seed([
-    // Booked with Al-Waseet on the 12th; the courier's pick-up status never moved the stage.
+    // Booked with the delivery company on the 12th; no courier status moved the stage. Handed over: due today.
     { id: 'ORD-B00CED013', day: '2026-11-13', stage: 'preparing', remote: 'AW-777' },
+    // Booked, due yesterday, still not delivered: the courier is late.
+    { id: 'ORD-B00CED012', day: '2026-11-12', stage: 'preparing', remote: 'AW-776' },
     // Picked up: with the courier, arriving today — not late.
     { id: 'ORD-0F0D00013', day: '2026-11-13', stage: 'out_for_delivery' },
     // Never booked, never handed over: the box is late.
     { id: 'ORD-5E1F00013', day: '2026-11-13', stage: 'preparing' },
     // With the courier since the 11th and due yesterday: the courier is late.
     { id: 'ORD-C0C1E0012', day: '2026-11-12', stage: 'out_for_delivery' },
-    // Booked for tomorrow: today's hand-over, not late.
+    // Booked for tomorrow: already handed over, so it shows on its own day.
     { id: 'ORD-B00CED014', day: '2026-11-14', stage: 'preparing', remote: 'AW-778' },
     // Our own same-day driver, due yesterday and still «مؤكد»: the box is late.
     { id: 'ORD-9E5000012', day: '2026-11-12', stage: 'confirmed', method: 'personal' },
@@ -150,20 +152,23 @@ test('the delivery morning: a booked parcel nobody moved is late as «booked», 
     const r = rows.get(id)!;
     return [r.due_bucket, r.overdue_reason];
   };
-  assert.deepEqual(seen('ORD-B00CED013'), ['overdue', 'booked'], 'booked, stage never moved: late on the board day, and the row says why');
+  assert.deepEqual(seen('ORD-B00CED013'), ['today', null], 'booked: with the courier, arriving today — not late');
+  assert.deepEqual(seen('ORD-B00CED012'), ['overdue', 'courier'], 'booked and past its day: the courier is late');
+  assert.equal(rows.get('ORD-B00CED013')!.lead_days, 0, 'a booking has no day on the road');
   assert.deepEqual(seen('ORD-0F0D00013'), ['today', null], 'with the courier: arriving today');
   assert.deepEqual(seen('ORD-5E1F00013'), ['overdue', 'prepare']);
   assert.deepEqual(seen('ORD-C0C1E0012'), ['overdue', 'courier']);
-  assert.deepEqual(seen('ORD-B00CED014'), ['today', null]);
+  assert.deepEqual(seen('ORD-B00CED014'), ['tomorrow', null], 'booked for tomorrow: on its own day');
   assert.deepEqual(seen('ORD-9E5000012'), ['overdue', 'prepare']);
   assert.deepEqual(seen('ORD-A5A900000'), ['unscheduled', null]);
   // Every late row carries a reason, and no other row does.
   for (const r of b.orders) assert.equal(r.overdue_reason !== null, r.due_bucket === 'overdue', r.id);
-  assert.deepEqual([b.counts.overdue, b.counts.today, b.counts.unscheduled], [4, 2, 1]);
+  assert.deepEqual([b.counts.overdue, b.counts.today, b.counts.tomorrow, b.counts.unscheduled], [4, 2, 1, 1]);
 
   // The order window says what the row says.
   for (const [id, want] of [
-    ['ORD-B00CED013', 'booked'],
+    ['ORD-B00CED013', null],
+    ['ORD-B00CED012', 'courier'],
     ['ORD-0F0D00013', null],
     ['ORD-5E1F00013', 'prepare'],
     ['ORD-C0C1E0012', 'courier'],

@@ -204,7 +204,8 @@ test('with the courier: filed by its own day — not late the morning after the 
     { id: 'ORD-OUTFD0012', stage: 'out_for_delivery', day: TODAY },
     { id: 'ORD-OUTFD0011', stage: 'out_for_delivery', day: '2026-11-11' },
     { id: 'ORD-OUTFD0013', stage: 'out_for_delivery', day: TOMORROW },
-    // A shipment booked with the courier but still on our shelf: still today's packing.
+    // A shipment booked with the delivery company, its stage never moved: handed over (the owner,
+    // 2026-11-12, «Count as handed over»), so filed by its own day like a parcel with the courier.
     { id: 'ORD-BOOKD0013', stage: 'preparing', remote: 'AW-123', day: TOMORROW },
     // Confirmed for today and never handed over: packing is late.
     { id: 'ORD-CONFR0012', stage: 'confirmed', day: TODAY },
@@ -213,7 +214,7 @@ test('with the courier: filed by its own day — not late the morning after the 
   assert.deepEqual([rows.get('ORD-OUTFD0012')!.due_bucket, rows.get('ORD-OUTFD0012')!.lead_days], ['today', 0]);
   assert.deepEqual([rows.get('ORD-OUTFD0011')!.due_bucket, rows.get('ORD-OUTFD0011')!.stage], ['overdue', 'out_for_delivery'], 'the courier is late');
   assert.equal(rows.get('ORD-OUTFD0013')!.due_bucket, 'tomorrow');
-  assert.deepEqual([rows.get('ORD-BOOKD0013')!.due_bucket, rows.get('ORD-BOOKD0013')!.lead_days], ['today', 1]);
+  assert.deepEqual([rows.get('ORD-BOOKD0013')!.due_bucket, rows.get('ORD-BOOKD0013')!.lead_days], ['tomorrow', 0]);
   assert.deepEqual([rows.get('ORD-CONFR0012')!.due_bucket, rows.get('ORD-CONFR0012')!.stage], ['overdue', 'confirmed'], 'the packing is late');
 });
 

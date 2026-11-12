@@ -73,7 +73,7 @@ import { applyRelations, loadRelationsViews, type ProductRelationsView } from '.
 import { langOf, mysteryViewFor, orderPublic, shippingConfigFrom, ORDER_ITEMS_SELECT } from './orders';
 import { addDays, baghdadDay, isDay } from '../lib/baghdadTime';
 import { dayLabel } from '../lib/deliveryDay';
-import { boardDayOf, boardDaySql, lateReasonOf, leadBounds, leadDaysFor, leadDaysSql } from '../lib/deliveryLead';
+import { boardDayOf, boardDaySql, isBooked, lateReasonOf, leadBounds, leadDaysFor, leadDaysSql } from '../lib/deliveryLead';
 import { ARCHIVE_SORTS, DEFAULT_ARCHIVE_SORT, archiveOrderSql, doneLabelOf, isArchiveScope } from '../lib/orderArchive';
 import { classifyOrderSearch } from '../lib/orderSearch';
 import { arabicFoldSql, phoneDigitsSql } from '../lib/sqlFold';
@@ -1673,6 +1673,12 @@ const BOARD_SCOPES = ['open', 'preorder', 'all', 'prepare', 'delivered', 'cancel
  *              mile. Earlier pre-order stages are the supplier's or the
  *              carrier's work, not a box on this shelf.
  *
+ * NOTHING BOOKED WITH THE DELIVERY COMPANY (the owner, 2026-11-12: «Count as
+ * handed over»; DECISIONS row 322 (٧)): a shipment id (`delivery_remote_id`)
+ * means the parcel was packed and given to the courier, even while no courier
+ * status has moved its stage — so it is not a box to pack, here or on the day
+ * board (deliveryLead.ts `isBooked`, the same blank-is-no-booking reading).
+ *
  * It is a SUBSET of the live set, so the route pushes the partial index's own
  * WHERE verbatim first; every term here carries a leading `+` for the reason
  * the `+o.shipping_type` note below gives — `idx_orders_stage` and
@@ -1685,14 +1691,16 @@ const BOARD_SCOPES = ['open', 'preorder', 'all', 'prepare', 'delivered', 'cancel
 export const PREPARE_DIRECT_STAGES = ['confirmed', 'preparing'] as const;
 export const PREPARE_PREORDER_STAGE = 'local_delivery_prep';
 const prepareSql = (p: string) =>
-  `(${p}o.shipping_type = 'direct' AND ${p}o.stage IN ('confirmed','preparing'))` +
-  ` OR (${p}o.shipping_type <> 'direct' AND ${p}o.stage = 'local_delivery_prep')`;
+  `((${p}o.shipping_type = 'direct' AND ${p}o.stage IN ('confirmed','preparing'))` +
+  ` OR (${p}o.shipping_type <> 'direct' AND ${p}o.stage = 'local_delivery_prep'))` +
+  ` AND TRIM(COALESCE(o.delivery_remote_id, '')) = ''`;
 export const PREPARE_WHERE_SQL = prepareSql('+');
 const PREPARE_FACET_SQL = prepareSql('');
 
 /** Whether an order belongs under «يجب تجهيزها» — the SQL above, in TypeScript. */
-export function needsPreparation(shippingType: string, stage: string, status: string): boolean {
+export function needsPreparation(shippingType: string, stage: string, status: string, deliveryRemoteId: unknown = ''): boolean {
   if (status === 'delivered' || status === 'cancelled') return false;
+  if (isBooked({ delivery_remote_id: deliveryRemoteId })) return false;
   if (shippingType === 'direct') return (PREPARE_DIRECT_STAGES as readonly string[]).includes(stage);
   return stage === PREPARE_PREORDER_STAGE;
 }
@@ -2424,21 +2432,22 @@ adminRoutes.get('/orders', async (c) => {
       /**
        * THE DAY TO PREPARE (row 322): the delivery day less `lead_days` — 1 for
        * the courier, 0 for the store's same-day methods and for an order
-       * already with the courier or finished. The bucket is filed by it; the
+       * already with the courier, booked with it (the owner: a booking is the
+       * hand-over) or finished. The bucket is filed by it; the
        * label still names the CUSTOMER'S day, and `prepare_label` names this
        * one only when the two differ.
        */
       board_day: boardDay || null,
       // The lead APPLIED: 0 where the board day is the stored day itself — the
-      // same-day methods, an order with the courier or finished, and a stored
+      // same-day methods, an order with the courier, booked or finished, and a stored
       // day that is no calendar day (deliveryLead.ts `boardDayOf`).
       lead_days: day ? (boardDay === day ? 0 : Number(o.board_lead_days) || 0) : null,
       due_bucket: bucket,
       /**
        * WHICH LATENESS «متأخر» IS (the review of row 322): 'courier' (with the
-       * courier past its day), 'booked' (a shipment booked, but no pick-up
-       * moved the stage) or 'prepare' (still on our shelf) — null unless the
-       * row is late, and for a finished order. The row says it in words.
+       * courier, or booked with it, past its day) or 'prepare' (still on our
+       * shelf) — null unless the row is late, and for a finished order. The
+       * row says it in words.
        */
       overdue_reason: bucket === 'overdue' ? lateReasonOf(o) : null,
       due_label: day ? dayLabel(day, today, lang).label : '',

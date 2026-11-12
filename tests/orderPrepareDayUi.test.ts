@@ -46,7 +46,7 @@ const seen = (html: string) => text(html.replace(/<span class="sr-only">[\s\S]*?
 
 test('every sentence has ar, en and its own Sorani — never the Arabic or the English, a Sorani letter, no Arabic-only one', () => {
   const entries = Object.entries(PREPARE_DAY_STRINGS);
-  assert.equal(entries.length, 9);
+  assert.equal(entries.length, 7);
   for (const [key, { ar, en, ckb }] of entries) {
     for (const [lang, s] of Object.entries({ ar, en, ckb })) assert.ok(s.trim().length > 0 && s === s.trim(), `${key}.${lang}`);
     assert.notEqual(ckb, ar, `${key}: the Sorani slot carries the Arabic (row 183)`);
@@ -131,7 +131,7 @@ test('away from «اليوم» the chip adds the day to prepare — and in a lis
   assert.doesNotMatch(chip('ar', { label: 'غدًا', bucket: 'today', prepareLabel: '', flat: true }), /data-order-prepare-day/);
 });
 
-test('«متأخر» says in words which lateness it is: the shelf, a booked shipment, or the courier — title and screen reader too', () => {
+test('«متأخر» says in words which lateness it is: the shelf, or the courier (a booked shipment is the courier’s) — title and screen reader too', () => {
   const shelf = chip('ar', { label: 'اليوم', bucket: 'overdue', prepareLabel: 'أمس' });
   assert.match(shelf, /data-order-overdue="prepare"/, 'the default: still on our shelf');
   assert.equal(seen(shelf), 'التوصيل: اليوم متأخر', 'the common case stays one word');
@@ -139,9 +139,6 @@ test('«متأخر» says in words which lateness it is: the shelf, a booked shi
     ['ar', 'courier', 'متأخر · مع المندوب', 'overdueCourier'],
     ['en', 'courier', 'Overdue · with the courier', 'overdueCourier'],
     ['ckb', 'courier', 'دواکەوتوو · لای گەیەنەر', 'overdueCourier'],
-    ['ar', 'booked', 'متأخر · شحنته محجوزة', 'overdueBooked'],
-    ['en', 'booked', 'Overdue · shipment booked', 'overdueBooked'],
-    ['ckb', 'booked', 'دواکەوتوو · بارنامە دروستکراوە', 'overdueBooked'],
     ['ar', 'prepare', 'متأخر', 'overduePrepare'],
     ['en', 'prepare', 'Overdue', 'overduePrepare'],
     ['ckb', 'prepare', 'دواکەوتوو', 'overduePrepare'],
@@ -156,9 +153,9 @@ test('«متأخر» says in words which lateness it is: the shelf, a booked shi
     assert.match(html, /class="text-\[11px\] leading-\[1\.4\] font-bold text-danger"/, 'the one red thing');
   }
   // The «·» never starts a line (a no-break space before it), and the reason is one unbreakable
-  // phrase: a narrow row breaks after the «·», never inside «مع المندوب» / "shipment booked".
+  // phrase: a narrow row breaks after the «·», never inside «مع المندوب».
   assert.ok(renderToStaticMarkup(createElement(LateMark, { reason: 'courier', loc: locIn('ar') })).includes(`متأخر${NBSP}· مع${NBSP}المندوب`));
-  for (const key of ['lateCourier', 'lateBooked'] as const) {
+  for (const key of ['lateCourier'] as const) {
     for (const [lang, s] of Object.entries(PREPARE_DAY_STRINGS[key])) assert.ok(!s.includes(' ') && s.includes(NBSP), `${key}.${lang}: ${JSON.stringify(s)}`);
   }
   assert.doesNotMatch(chip('ar', { label: 'غدًا', bucket: 'today' }), /data-order-overdue/);
@@ -193,17 +190,18 @@ function row(over: Partial<AdminOrderRow>, flat = false): string {
 test('the row hands the chip the server’s second day and the server’s reason for «متأخر»', () => {
   const tomorrowWork = row({ due_bucket: 'tomorrow', due_label: 'السبت ١٤ تشرين الثاني', prepare_label: 'غدًا' });
   assert.match(text(tomorrowWork), /التوصيل: السبت ١٤ تشرين الثاني التجهيز: غدًا/);
-  // The server decides the reason — a booked shipment still at «قيد التجهيز» is not «go and pack it».
-  assert.match(row({ due_bucket: 'overdue', due_label: 'اليوم', stage: 'preparing', overdue_reason: 'booked' }), /data-order-overdue="booked"/);
-  assert.match(seen(row({ due_bucket: 'overdue', due_label: 'اليوم', stage: 'preparing', overdue_reason: 'booked' })), /متأخر · شحنته محجوزة/);
+  // The server decides the reason — a booked shipment still at «قيد التجهيز» is with the courier (the owner,
+  // 2026-11-12: a booking is the hand-over), so a passed day is the courier's, not «go and pack it».
+  assert.match(row({ due_bucket: 'overdue', due_label: 'أمس', stage: 'preparing', overdue_reason: 'courier' }), /data-order-overdue="courier"/);
+  assert.match(seen(row({ due_bucket: 'overdue', due_label: 'أمس', stage: 'preparing', overdue_reason: 'courier' })), /متأخر · مع المندوب/);
   assert.match(row({ due_bucket: 'overdue', due_label: 'اليوم', stage: 'preparing', overdue_reason: 'prepare' }), /data-order-overdue="prepare"/);
   assert.match(row({ due_bucket: 'overdue', due_label: 'أمس', stage: 'out_for_delivery', status: 'shipped', overdue_reason: 'courier' }), /data-order-overdue="courier"/);
   // An older server sends no reason: the stage alone tells the courier's from the shelf's.
   assert.match(row({ due_bucket: 'overdue', due_label: 'اليوم', stage: 'preparing' }), /data-order-overdue="prepare"/);
   assert.match(row({ due_bucket: 'overdue', due_label: 'أمس', stage: 'out_for_delivery', status: 'shipped' }), /data-order-overdue="courier"/);
   assert.deepEqual(
-    [lateReasonOfRow({ stage: 'preparing' }), lateReasonOfRow({ stage: 'out_for_delivery' }), lateReasonOfRow({ stage: 'preparing', overdue_reason: 'booked' })],
-    ['prepare', 'courier', 'booked']
+    [lateReasonOfRow({ stage: 'preparing' }), lateReasonOfRow({ stage: 'out_for_delivery' }), lateReasonOfRow({ stage: 'preparing', overdue_reason: 'courier' })],
+    ['prepare', 'courier', 'courier']
   );
   // In a lookup's flat list the row names the day to pack it even under «اليوم».
   assert.match(text(row({ due_bucket: 'today', due_label: 'غدًا', prepare_label: 'اليوم' }, true)), /التوصيل: غدًا التجهيز: اليوم/);
@@ -233,7 +231,7 @@ test('the order window: both days from the server, each a block that breaks whol
   assert.match(late, /data-order-overdue="prepare"/);
   assert.equal(late.match(/<span class="inline-block">/g)?.length, 3);
   assert.equal(seen(days('en', { deliveryLabel: 'Yesterday', lateReason: 'courier' })), 'Delivery: Yesterday · Overdue · with the courier');
-  assert.equal(seen(days('ckb', { deliveryLabel: 'ئەمڕۆ', prepareLabel: 'دوێنێ', lateReason: 'booked' })), 'گەیاندن: ئەمڕۆ · ڕۆژی ئامادەکردن: دوێنێ · دواکەوتوو · بارنامە دروستکراوە');
+  assert.equal(seen(days('ckb', { deliveryLabel: 'دوێنێ', lateReason: 'courier' })), 'گەیاندن: دوێنێ · دواکەوتوو · لای گەیەنەر');
   // No day («في أقرب وقت»): no line at all.
   assert.equal(days('ar', { deliveryLabel: '', prepareLabel: '', lateReason: null }), '');
   assert.equal(days('ar', {}), '');

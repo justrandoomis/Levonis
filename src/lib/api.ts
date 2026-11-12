@@ -1543,12 +1543,12 @@ export type OrderDueBucket = 'overdue' | 'today' | 'tomorrow' | 'week' | 'later'
 
 /**
  * Which lateness an `overdue` row is (the review of DECISIONS row 322),
- * decided by the server: `courier` — with the courier past its delivery day;
- * `booked` — a shipment booked with the delivery company, but no pick-up moved
- * its stage; `prepare` — still on our shelf, its day to pack and hand over
- * passed.
+ * decided by the server: `courier` — with the courier, or booked with the
+ * delivery company (the owner counts a booking as the hand-over, 2026-11-12),
+ * past its delivery day; `prepare` — still on our shelf, its day to pack and
+ * hand over passed.
  */
-export type OrderLateReason = 'prepare' | 'booked' | 'courier';
+export type OrderLateReason = 'prepare' | 'courier';
 
 /**
  * `scope` IS THE BOARD, `type`/`status` narrow it. Pre-orders are a SCOPE and

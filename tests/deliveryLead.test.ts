@@ -2,8 +2,9 @@
  * THE DAY TO PREPARE — the lead table and its two readings (DECISIONS row 322).
  *
  * The owner: an order for the 13th is prepared on the 12th, «1 day everywhere»;
- * the store's own same-day methods and an order already with the courier or
- * finished have no day on the road. worker/lib/deliveryLead.ts holds that table
+ * the store's own same-day methods and an order already with the courier,
+ * booked with the delivery company (the owner, 2026-11-12: «Count as handed
+ * over») or finished have no day on the road. worker/lib/deliveryLead.ts holds that table
  * once and reads it twice — as SQL text the board files, counts and sorts by,
  * and as TypeScript for the order window — so this pins the table, its
  * precedence, the SQL it writes, the refusal of a table that is not plain days
@@ -24,6 +25,7 @@ import {
   boardDayOf,
   boardDaySql,
   checkLeadTable,
+  isBooked,
   leadBounds,
   lateReasonOf,
   leadDaysFor,
@@ -71,8 +73,20 @@ test('precedence: with the courier or finished beats the method, and the method 
     assert.equal(leadDaysFor({ stage, status: 'processing', delivery_method_id: 'standard' }), 1, stage);
     assert.equal(leadDaysFor({ stage, status: 'processing', delivery_method_id: 'personal' }), 0, stage);
   }
-  // A booked shipment still on the shelf is still ours to pack.
-  assert.equal(leadDaysFor({ stage: 'preparing', status: 'processing', delivery_method_id: 'standard' }), 1);
+  // A shipment booked with the delivery company is handed over (the owner, 2026-11-12, «Count as handed
+  // over»): no day on the road, whatever the stage before the courier and the method.
+  for (const stage of ALL_STAGES) {
+    for (const m of ['standard', 'personal', 'pickup', 'express']) {
+      assert.equal(leadDaysFor({ stage, status: 'processing', delivery_method_id: m, delivery_remote_id: 'AZ-1' }), 0, `booked ${stage}/${m}`);
+    }
+  }
+  // The column's '' default, spaces or no column at all is no booking: still ours to pack.
+  for (const blank of ['', '   ', null, undefined]) {
+    assert.equal(leadDaysFor({ stage: 'preparing', status: 'processing', delivery_method_id: 'standard', delivery_remote_id: blank }), 1, `no booking: ${JSON.stringify(blank)}`);
+  }
+  assert.equal(leadDaysFor({ stage: 'preparing', status: 'processing', delivery_method_id: 'standard', delivery_remote_id: 1234 }), 0, 'a numeric id is a booking');
+  assert.equal(isBooked({ delivery_remote_id: ' AZ-1 ' }), true);
+  assert.equal(isBooked({}), false);
 });
 
 test('the bounds the board’s index range is built from', () => {
@@ -85,7 +99,8 @@ test('the bounds the board’s index range is built from', () => {
 test('the SQL is pinned for the owner’s table, and stable for any other', () => {
   assert.equal(
     leadDaysSql(),
-    "(CASE WHEN o.stage IN ('out_for_delivery','delivered','cancelled') OR o.status IN ('delivered','cancelled') THEN 0" +
+    "(CASE WHEN o.stage IN ('out_for_delivery','delivered','cancelled') OR o.status IN ('delivered','cancelled')" +
+      " OR TRIM(COALESCE(o.delivery_remote_id, '')) <> '' THEN 0" +
       " WHEN o.delivery_method_id IN ('personal','pickup') THEN 0 ELSE 1 END)"
   );
   // A stored day SQLite cannot read back as itself gets no lead: its own text (the review, 2026-11-12).
@@ -96,7 +111,8 @@ test('the SQL is pinned for the owner’s table, and stable for any other', () =
   // One WHEN per lead, ids sorted, whatever order the table lists them in.
   assert.equal(
     leadDaysSql({ default_days: 1, method_days: { c: 2, a: 0, b: 2 } }, 'x'),
-    "(CASE WHEN x.stage IN ('out_for_delivery','delivered','cancelled') OR x.status IN ('delivered','cancelled') THEN 0" +
+    "(CASE WHEN x.stage IN ('out_for_delivery','delivered','cancelled') OR x.status IN ('delivered','cancelled')" +
+      " OR TRIM(COALESCE(x.delivery_remote_id, '')) <> '' THEN 0" +
       " WHEN x.delivery_method_id IN ('a') THEN 0 WHEN x.delivery_method_id IN ('b','c') THEN 2 ELSE 1 END)"
   );
   assert.equal(leadDaysSql({ default_days: 1, method_days: {} }).includes('delivery_method_id'), false, 'no methods, no WHEN');
@@ -136,10 +152,10 @@ test('the board day: the delivery day less the lead, across month, year and leap
   for (const odd of ['2026-02-31', '2026-11-31', '2026-13-01', '0000-00-00', '2026-02-29']) assert.equal(boardDayOf(odd, 1), odd, odd);
 });
 
-test('which lateness «متأخر» is: the courier’s, a booked shipment’s, or the shelf’s — and a finished order is never late', () => {
+test('which lateness «متأخر» is: the courier’s (a booked shipment is the courier’s) or the shelf’s — and a finished order is never late', () => {
   const shelf = { stage: 'preparing', status: 'processing', delivery_method_id: 'standard' };
   assert.equal(lateReasonOf(shelf), 'prepare', 'still on our shelf, nothing booked');
-  assert.equal(lateReasonOf({ ...shelf, delivery_remote_id: 'AW-1' }), 'booked', 'booked, but no pick-up moved the stage');
+  assert.equal(lateReasonOf({ ...shelf, delivery_remote_id: 'AW-1' }), 'courier', 'booked: handed over, so a passed day is the courier’s');
   assert.equal(lateReasonOf({ ...shelf, delivery_remote_id: '' }), 'prepare', 'the column’s empty default is not a booking');
   assert.equal(lateReasonOf({ ...shelf, delivery_remote_id: '   ' }), 'prepare');
   assert.equal(lateReasonOf({ ...shelf, delivery_remote_id: null }), 'prepare');
@@ -151,21 +167,22 @@ test('which lateness «متأخر» is: the courier’s, a booked shipment’s, 
       assert.equal(lateReasonOf({ stage, status, delivery_remote_id: 'AW-1' }), null, `${stage}/${status}`);
     }
   }
-  // Every stage before the courier reads the same: the shelf's, or the booking's.
+  // Every stage before the courier reads the same: the shelf's, or — booked — the courier's.
   for (const stage of ALL_STAGES.filter((s) => !(HANDED_OVER_STAGES as readonly string[]).includes(s))) {
     assert.equal(lateReasonOf({ stage, status: 'processing' }), 'prepare', stage);
-    assert.equal(lateReasonOf({ stage, status: 'processing', delivery_remote_id: 'AW-9' }), 'booked', stage);
+    assert.equal(lateReasonOf({ stage, status: 'processing', delivery_remote_id: 'AW-9' }), 'courier', stage);
   }
 });
 
 /**
  * THE TWO READINGS AGREE — every stage of both paths (and none, and nonsense)
  * × every status × the shipped methods and odd ids × days across a month and a
- * year end and none, through SQLite's own `date()`.
+ * year end and none × a booked shipment, a blank id and none, through SQLite's
+ * own `date()` and `TRIM()`.
  */
 function twinRows(table: DeliveryLeadTable): number {
   const db = new DatabaseSync(':memory:');
-  db.exec('CREATE TABLE t (stage TEXT, status TEXT, delivery_method_id TEXT, delivery_due_day TEXT)');
+  db.exec('CREATE TABLE t (stage TEXT, status TEXT, delivery_method_id TEXT, delivery_due_day TEXT, delivery_remote_id TEXT)');
   const stages: Array<string | null> = [...ALL_STAGES, '', null, 'bogus'];
   const statuses: Array<string | null> = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled', '', null];
   const methods: Array<string | null> = ['standard', 'personal', 'pickup', 'merchant', 'home', 'slow', '', null, 'constructor', 'PERSONAL'];
@@ -176,11 +193,12 @@ function twinRows(table: DeliveryLeadTable): number {
     '2026-11-13', '2026-12-01', '2027-01-01', '2028-03-01', null,
     '2026-02-29', '2026-11-31', '2026-13-01', '2026-00-10', '2026-04-31',
   ];
-  const ins = db.prepare('INSERT INTO t VALUES (?,?,?,?)');
-  for (const s of stages) for (const st of statuses) for (const m of methods) for (const d of days) ins.run(s, st, m, d);
+  const remotes: Array<string | null> = ['AZ-1', '', '   ', null];
+  const ins = db.prepare('INSERT INTO t VALUES (?,?,?,?,?)');
+  for (const s of stages) for (const st of statuses) for (const m of methods) for (const d of days) for (const r of remotes) ins.run(s, st, m, d, r);
   const rows = db
-    .prepare(`SELECT stage, status, delivery_method_id, delivery_due_day, ${leadDaysSql(table)} AS lead, ${boardDaySql(table)} AS board FROM t o`)
-    .all() as Array<{ stage: string | null; status: string | null; delivery_method_id: string | null; delivery_due_day: string | null; lead: number; board: string | null }>;
+    .prepare(`SELECT stage, status, delivery_method_id, delivery_due_day, delivery_remote_id, ${leadDaysSql(table)} AS lead, ${boardDaySql(table)} AS board FROM t o`)
+    .all() as Array<{ stage: string | null; status: string | null; delivery_method_id: string | null; delivery_due_day: string | null; delivery_remote_id: string | null; lead: number; board: string | null }>;
   for (const r of rows) {
     const lead = leadDaysFor(r, table);
     const where = JSON.stringify(r);
@@ -192,7 +210,7 @@ function twinRows(table: DeliveryLeadTable): number {
 }
 
 test('the TypeScript reading equals the SQL, row for row', () => {
-  assert.equal(twinRows(DELIVERY_LEAD), 19 * 8 * 10 * 10);
+  assert.equal(twinRows(DELIVERY_LEAD), 19 * 8 * 10 * 10 * 4);
   // And for a table that is not the owner's: two days on the road, a slow method at three.
-  assert.equal(twinRows({ default_days: 2, method_days: { personal: 0, pickup: 0, slow: 3 } }), 19 * 8 * 10 * 10);
+  assert.equal(twinRows({ default_days: 2, method_days: { personal: 0, pickup: 0, slow: 3 } }), 19 * 8 * 10 * 10 * 4);
 });
