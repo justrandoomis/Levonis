@@ -15,6 +15,8 @@ export const FW = {
   costs: ['التكاليف', 'Costs', 'تێچووەکان'],
   people: ['الأشخاص والدفعات', 'People & payouts', 'کەسەکان و پارەدانەکان'],
   accounting: ['المحاسبة', 'Accounting', 'ژمێریاری'],
+  books: ['الدفاتر', 'Books', 'دەفتەرەکان'],
+  courier: ['أموال لدى شركة التوصيل', 'Money with the courier', 'پارە لای کۆمپانیای گەیاندن'],
   orders: ['الطلبات', 'Orders', 'داواکارییەکان'],
   products: ['المنتجات', 'Products', 'بەرهەمەکان'],
   // Redesign step 4 (DECISIONS row 316): two more report pages.

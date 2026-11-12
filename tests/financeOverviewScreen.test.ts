@@ -224,14 +224,17 @@ test('five sections instead of eight tabs, and every earlier `finance=` link sti
   for (const word of ['نظرة عامة', 'التقارير', 'التكاليف', 'الأشخاص والدفعات', 'المحاسبة']) assert.ok(html.includes(`>${word}`), word);
   const links: Array<[string, string, string | undefined]> = [['overview', 'overview', undefined], ['orders', 'reports', 'orders'], ['products', 'reports', 'products'], ['monthly', 'costs', 'monthly'],
     ['monthlycosts', 'costs', 'monthly'], ['staff', 'people', 'staff'], ['people', 'people', 'staff'], ['investors', 'people', 'investors'], ['settlements', 'people', 'settlements'],
-    ['withdrawals', 'people', 'settlements'], ['accounting', 'accounting', undefined], ['missing', 'costs', 'missing'], ['expenses', 'costs', 'expenses'], ['nonsense', 'overview', undefined],
+    ['withdrawals', 'people', 'settlements'], ['accounting', 'accounting', 'accounting'], ['missing', 'costs', 'missing'], ['expenses', 'costs', 'expenses'], ['nonsense', 'overview', undefined],
     // Redesign step 4 (DECISIONS row 316): the reports' four pages; «reports» still opens the orders, «categories» the sections.
-    ['sections', 'reports', 'sections'], ['days', 'reports', 'days'], ['categories', 'reports', 'sections'], ['reports', 'reports', 'orders']];
+    ['sections', 'reports', 'sections'], ['days', 'reports', 'days'], ['categories', 'reports', 'sections'], ['reports', 'reports', 'orders'],
+    // The courier's money (DECISIONS row 332): a second page under «المحاسبة», whose first is now «الدفاتر».
+    ['courier', 'accounting', 'courier']];
   for (const [link, section, sub] of links) {
     const shown = open(`?finance=${link}`);
     assert.equal(current(shown), section, `?finance=${link} opens «${section}»`);
     assert.equal(page(shown), sub, `?finance=${link} opens the page «${sub}»`);
   }
+  assert.ok(open('?finance=accounting').includes('>الدفاتر<') && open('?finance=courier').includes('>أموال لدى شركة التوصيل<'));
   // The people pages keep the words their refusals name them by (the wage settlement's «السحب والتسويات»).
   assert.ok(open('?finance=settlements').includes('>السحب والتسويات<'));
   assert.ok(open('?finance=settlements', 'ckb').includes('>ڕاکێشان و یەکلاکردنەوەکان<'));

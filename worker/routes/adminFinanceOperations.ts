@@ -21,6 +21,7 @@ import { settleAdvance } from '../lib/payrollAdvance';
 import { validateRuleScope, readRuleScope } from '../lib/financeRuleScopes';
 import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, participantAdvanceState, participantSources, participantSummary, staffAdvanceSql, staffPaymentBudget, staffReconciliationBlockedSql } from '../lib/financeParticipants';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
+import { planCollection } from '../lib/courierCollections';
 import { orderGoods, postStoredRefund, runOrderFinancialEffects, type CostRule } from '../lib/orderFinance';
 import { operationsReport } from '../lib/operationsReport';
 import { wageVersionStatement } from '../lib/financeWageTimeline';
@@ -584,101 +585,23 @@ adminFinanceOperationsRoutes.post('/collections', async (c) => {
     amount = whole(b.amount_iqd, 'المبلغ الإجمالي', 1),
     fee = whole(b.fee_iqd ?? 0, 'أجرة الشركة'),
     day = dateValue(b.collection_day, baghdadDay());
-  if (fee > amount) throw badRequest('أجرة الشركة تتجاوز المبلغ الإجمالي');
-  const existing = await db
-    .prepare('SELECT order_id,amount_iqd,fee_iqd FROM finance_collections WHERE id=?')
-    .bind(id)
-    .first<{ order_id: string; amount_iqd: number; fee_iqd: number }>();
-  if (existing) {
-    if (existing.order_id !== orderId || existing.amount_iqd !== amount || existing.fee_iqd !== fee)
-      throw conflict('عملية التحصيل مستخدمة لمحتوى مختلف');
+  // The checks and the writes live in planCollection (courierCollections.ts), which a courier transfer uses too.
+  const plan = await planCollection(db, {
+    id,
+    orderId,
+    payer: b.payer === 'bank' ? 'bank' : b.payer === 'courier' ? 'courier' : 'customer',
+    amount,
+    fee,
+    day,
+    reference: text(b.reference),
+    categoryId: fee ? text(b.category_id, 60) : '',
+    actor: user.id,
+  });
+  if (plan.already) {
     await reconcileFinanceOrder(db,orderId,{actor:user.id});
     return c.json({ success: true, already: true });
   }
-  const order = await db
-    .prepare('SELECT status,due_on_delivery_iqd,gini_paid_iqd,seller_type FROM orders WHERE id=?')
-    .bind(orderId)
-    .first<{ status: string; due_on_delivery_iqd: number; gini_paid_iqd: number; seller_type: string }>();
-  if (!order || order.seller_type !== 'levonis') throw notFound('Platform order not found');
-  if (order.status === 'cancelled') throw badRequest('الطلب ملغى');
-  const salePosted = !!(await db
-    .prepare("SELECT id FROM accounting_entries WHERE event_key=? AND state='posted'")
-    .bind(`sale:${orderId}`)
-    .first());
-  const payer = b.payer === 'bank' ? 'bank' : b.payer === 'courier' ? 'courier' : 'customer';
-  const giniRefunds = (await db
-    .prepare("SELECT COALESCE(SUM(refund_iqd),0) AS n FROM finance_refund_facts WHERE order_id=? AND channel='gini'")
-    .bind(orderId)
-    .first<{ n: number }>())?.n ?? 0;
-  const collected =
-    (
-      await db
-        .prepare(
-          "SELECT COALESCE(SUM(amount_iqd),0) AS n FROM finance_collections WHERE order_id=? AND (payer='bank')=?",
-        )
-        .bind(orderId, payer === 'bank' ? 1 : 0)
-        .first<{ n: number }>()
-    )?.n ?? 0;
-  if (collected + amount > (payer === 'bank' ? order.gini_paid_iqd - giniRefunds : order.due_on_delivery_iqd))
-    throw badRequest('التحصيل يتجاوز المبلغ المتبقي للطلب');
-  await periodOpen(db, day);
-  const expense = fee ? newId('opex') : null,
-    statements = [
-      ...fence(
-        db,
-        "(SELECT COALESCE(SUM(amount_iqd),0) FROM finance_collections WHERE order_id=? AND (payer='bank')=?)=? AND EXISTS(SELECT 1 FROM accounting_entries WHERE event_key=? AND state='posted')=? AND EXISTS(SELECT 1 FROM orders WHERE id=? AND status<>'cancelled') AND (SELECT COALESCE(SUM(refund_iqd),0) FROM finance_refund_facts WHERE order_id=? AND channel='gini')=?",
-        [orderId, payer === 'bank' ? 1 : 0, collected, `sale:${orderId}`, salePosted ? 1 : 0, orderId, orderId, giniRefunds],
-      ),
-    ];
-  if (expense) {
-    const category = text(b.category_id, 60);
-    if (!category) throw badRequest('اختر تصنيف مصروف أجرة التوصيل');
-    statements.push(
-      db
-        .prepare(
-          'INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,note,created_by) VALUES (?,?,?,?,?,?,?)',
-        )
-        .bind(expense, category, fee, day, 'أجرة شركة التوصيل', orderId, user.id),
-    );
-  }
-  statements.push(
-    db
-      .prepare(
-        'INSERT INTO finance_collections(id,order_id,payer,amount_iqd,fee_iqd,collection_day,reference,actor_id,created_at,expense_id) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      )
-      .bind(
-        id,
-        orderId,
-        payer,
-        amount,
-        fee,
-        day,
-        text(b.reference),
-        user.id,
-        new Date().toISOString(),
-        expense,
-      ),
-    ...journalPlan(
-      db,
-      {
-        key: `collection:${id}`,
-        day,
-        title: 'تحصيل طلب',
-        source: 'collection',
-        sourceId: id,
-        actor: user.id,
-      },
-      [
-        { account: '1000', debit: amount - fee },
-        { account: '5200', debit: fee },
-        { account: salePosted ? '1100' : '2300', credit: amount },
-      ],
-    ).statements,
-    ...(await auditStatements(db, user.id, 'finance.collection_recorded', id, {
-      order_id: orderId, payer, amount_iqd: amount, fee_iqd: fee, net_iqd: amount - fee, collection_day: day, reference: text(b.reference),
-    })).statements,
-  );
-  await db.batch(statements);
+  await db.batch(plan.statements);
   await reconcileFinanceOrder(db,orderId,{actor:user.id,day});
   return c.json({ success: true });
 });

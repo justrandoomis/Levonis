@@ -26,6 +26,7 @@ import { xlsxResponse, xlsxWorkbook } from '../lib/xlsx';
 import { ordersReportHtml, ordersReportSheet, productsOf, type ReportLang } from '../lib/financeOrdersReport';
 import { staffPaymentStatement, staffStatementSheet, statementHtml, statementsHtml, withdrawalSheets, withdrawalStatement } from '../lib/financeStatements';
 import { asDocument } from '../lib/securityPolicy';
+import { courierInstalled, courierOverview, courierRemittance, MAX_REMITTANCE_PARCELS, reconcileRemittance, recordRemittance } from '../lib/courierCollections';
 import { CLOSED_MONTHS_SQL, EXPENSE_ROW_LIMIT, EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_LIMIT, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
 
 type Row=Record<string,unknown>;
@@ -1009,6 +1010,53 @@ async function withdrawalStatementFile(c:Context<AppContext>,kind:'xlsx'|'print'
 }
 adminFinanceWorkspaceRoutes.get('/statements/withdrawals/:id/export.xlsx',(c)=>withdrawalStatementFile(c,'xlsx'));
 adminFinanceWorkspaceRoutes.get('/statements/withdrawals/:id/print',(c)=>withdrawalStatementFile(c,'print'));
+
+/**
+ * MONEY WITH THE COURIER (the owner's brief, 2026-11-12, part 3; DECISIONS row 332; worker/lib/courierCollections.ts):
+ * what Al-Zaeem still holds, the transfers it made and their check. Reading is the owner's (this router's door);
+ * recording a transfer or checking one is a payment act — the `pay` capability, as the collection form.
+ */
+async function courierReady(c:Context<AppContext>){
+  if(!await courierInstalled(c.env.DB))throw unavailable('تحديث أموال شركة التوصيل لم يطبق على قاعدة البيانات بعد','COURIER_NOT_CONFIGURED');
+}
+adminFinanceWorkspaceRoutes.get('/courier',async(c)=>{
+  await courierReady(c);
+  return c.json({success:true,...(await courierOverview(c.env.DB))});
+});
+adminFinanceWorkspaceRoutes.get('/courier/remittances/:id',async(c)=>{
+  await courierReady(c);
+  return c.json({success:true,...(await courierRemittance(c.env.DB,(c.req.param('id')??'').slice(0,80)))});
+});
+adminFinanceWorkspaceRoutes.post('/courier/remittances',async(c)=>{
+  const user=c.get('user')!;
+  await requireCapability(c.env,user,'pay');
+  await courierReady(c);
+  const b=await c.req.json<Record<string,unknown>>();
+  const kind=b.kind==='opening'?'opening':'transfer';
+  // One past the limit is enough for recordRemittance to refuse a list that is too long.
+  const parcels=(Array.isArray(b.parcels)?b.parcels:[]).slice(0,MAX_REMITTANCE_PARCELS+1).map((p)=>{
+    const x=(p&&typeof p==='object'?p:{}) as Record<string,unknown>;
+    return {orderId:text(x.order_id,60),collected:x.collected_iqd==null||x.collected_iqd===''?null:whole(x.collected_iqd,'نقد الطرد',1),fee:whole(x.fee_iqd??0,'أجرة الطرد')};
+  });
+  const result=await recordRemittance(c.env.DB,user.id,{
+    id:str(b.operation_id,'operation_id',{min:8,max:40}),
+    kind,
+    day:dateValue(b.received_day,baghdadDay()),
+    reference:text(b.reference,120),
+    amount:kind==='opening'?null:whole(b.amount_iqd,'المبلغ الواصل'),
+    note:text(b.note,500),
+    categoryId:text(b.category_id,60),
+    parcels,
+  });
+  return c.json({success:true,...result});
+});
+adminFinanceWorkspaceRoutes.post('/courier/remittances/:id/reconcile',async(c)=>{
+  const user=c.get('user')!;
+  await requireCapability(c.env,user,'pay');
+  await courierReady(c);
+  const b=await c.req.json<Record<string,unknown>>().catch(()=>({} as Record<string,unknown>));
+  return c.json({success:true,...(await reconcileRemittance(c.env.DB,user.id,(c.req.param('id')??'').slice(0,80),text(b.note,500)))});
+});
 adminFinanceWorkspaceRoutes.get('/print',(c)=>ordersReportFile(c,'print'));
 adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   const view=c.req.query('view')||'lines',level=c.req.query('level')||'main';

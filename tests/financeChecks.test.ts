@@ -43,7 +43,9 @@ async function sale(raw: Raw, orderId: string, day: string, amount: number) {
     [{ account: '1100', debit: amount }, { account: '4000', credit: amount }]).statements);
   return (raw.prepare('SELECT id FROM accounting_entries WHERE event_key = ?').get(`sale:${orderId}`) as { id: string }).id;
 }
-const byKey = async (raw: Raw) => new Map((await runFinanceChecks(asD1(raw))).checks.map((c) => [c.key, c]));
+/** The run's moment: the courier checks measure two weeks and a week from it, whatever today is. */
+const NOW = new Date('2026-11-12T09:00:00.000Z');
+const byKey = async (raw: Raw) => new Map((await runFinanceChecks(asD1(raw), NOW)).checks.map((c) => [c.key, c]));
 
 test('a clean database finds nothing, and is ok', async () => {
   const report = await runFinanceChecks(asD1(base()));
@@ -59,7 +61,7 @@ async function seeded(): Promise<Raw> {
   // The journal's first sale (1 Nov) and an order delivered before it with no sale: not news.
   order(raw, 'ORD-0A0000000A', { status: 'delivered', delivered: '2026-11-01T09:00:00.000Z' });
   await sale(raw, 'ORD-0A0000000A', '2026-11-01', 30000);
-  order(raw, 'ORD-0A00000001', { status: 'delivered', delivered: '2026-10-20T09:00:00.000Z' });
+  order(raw, 'ORD-0A00000001', { status: 'delivered', delivered: '2026-10-30T09:00:00.000Z' });
   // delivered_without_sale
   order(raw, 'ORD-0A00000002', { status: 'delivered', delivered: '2026-11-04T09:00:00.000Z', total: 41000 });
   // journal_unbalanced: a posted entry whose lines disagree (only a hand-written fix can make one).
@@ -95,6 +97,11 @@ async function seeded(): Promise<Raw> {
   // cash_on_cancelled
   order(raw, 'ORD-0A00000009', { status: 'cancelled', delivered: null, total: 9000 });
   raw.exec("INSERT INTO finance_collections(id,order_id,payer,amount_iqd,fee_iqd,collection_day,actor_id,created_at) VALUES ('col-2','ORD-0A00000009','customer',9000,0,'2026-11-02','boss','2026-11-02T08:00:00.000Z')");
+  // courier_money_overdue: a parcel delivered 18 days before the run (before the journal's first sale, so no other check's).
+  order(raw, 'ORD-0A0000000B', { status: 'delivered', delivered: '2026-10-25T09:00:00.000Z', total: 22000 });
+  // courier_transfers_unchecked: a transfer recorded 10 days before the run and never checked.
+  raw.exec(`INSERT INTO courier_remittances(id,reference,received_day,amount_iqd,collected_iqd,fee_iqd,difference_iqd,parcels,created_by,created_at)
+    VALUES ('rem-1','Z-1','2026-11-02',4000,5000,1000,0,1,'boss','2026-11-02T08:00:00.000Z')`);
   // pending_cost_months
   raw.exec(`INSERT INTO finance_order_costs(id,order_id,rule_id,rule_version,rule_name,group_key,staff_id,category_id,milestone,qty,amount_iqd,cost_day,state,snapshot)
     VALUES ('cost-2','ORD-0A00000002','rule-1',1,'تجهيز','prep','staff_sajjad','cat-x','delivered',1,NULL,'2026-10-15','pending_cost','{}')`);
@@ -118,6 +125,8 @@ test('each check finds exactly the one thing seeded for it — its count, its mo
     cash_on_cancelled: [1, 9000, ['ORD-0A00000009']],
     pending_cost_months: [1, null, ['2026-10']],
     expenses_counting_nowhere: [1, 7000, ['exp-x']],
+    courier_money_overdue: [1, 22000, ['ORD-0A0000000B']],
+    courier_transfers_unchecked: [1, 4000, ['rem-1']],
   };
   for (const [key, [count, amount, sample]] of Object.entries(want) as Array<[FinanceCheckKey, [number, number | null, string[]]]>) {
     const c = found.get(key)!;
@@ -175,10 +184,10 @@ test('the daily word: not before nine, once a day; a fault every day, a warning 
 
 test('the message names what and how many, never an amount; and links the owner’s page', async () => {
   const raw = await seeded();
-  const report = await runFinanceChecks(asD1(raw));
+  const report = await runFinanceChecks(asD1(raw), NOW);
   const text = foundMessage(report, env(raw));
   for (const c of report.checks) assert.ok(text.includes(`${CHECK_WORDS[c.key]}: ${c.count}`), c.key);
-  for (const amount of [41000, 27000, 18000, 12000, 9000, 7000, 1500, 1000, 500]) {
+  for (const amount of [41000, 27000, 22000, 18000, 12000, 9000, 7000, 4000, 1500, 1000, 500]) {
     assert.ok(!text.includes(String(amount)) && !text.includes(amount.toLocaleString('en-US')), `no amount (${amount}) in the group`);
   }
   assert.ok(text.startsWith('⛔'), 'a fault leads');

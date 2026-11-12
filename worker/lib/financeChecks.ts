@@ -11,12 +11,16 @@
  *   'warning'  something the books do not settle on their own and the owner should look at — a delivered order whose sale
  *              never reached the journal, an order cancelled after delivery whose sale is still in it (DECISIONS row 318
  *              reverses those), an order walked back after delivery, cash recorded on an order since cancelled, a month
- *              that cannot close while costs wait, an expense linked to an order that will never count it.
+ *              that cannot close while costs wait, an expense linked to an order that will never count it, cash the courier has held
+ *              for over two weeks, a courier transfer not checked against the courier's statement for a week (DECISIONS row 332).
  *
  * ONE ROUND TRIP. Every check is wrapped the same way (count, total, the first five ids) and the whole set is one D1 batch
  * of reads, so the page and the daily alert (financeChecksAlert.ts) cost the same few hundred milliseconds whatever they
- * find. A check reads only tables migration 0162 or earlier created, so it runs on every database this code runs on.
+ * find. A check reads only tables migration 0162 or earlier created, so it runs on every database this code runs on —
+ * except one that names the newer table it `needs`: it runs once that table exists (one more read to look).
  */
+
+import { COURIER_OVERDUE_DAYS, COURIER_UNCHECKED_DAYS, courierDueSql, courierParcelSql } from './courierCollections';
 
 export type FinanceCheckKey =
   | 'journal_unbalanced'
@@ -29,7 +33,9 @@ export type FinanceCheckKey =
   | 'walk_backs'
   | 'cash_on_cancelled'
   | 'pending_cost_months'
-  | 'expenses_counting_nowhere';
+  | 'expenses_counting_nowhere'
+  | 'courier_money_overdue'
+  | 'courier_transfers_unchecked';
 
 export type FinanceCheckSeverity = 'error' | 'warning';
 
@@ -40,7 +46,11 @@ interface FinanceCheckSpec {
   /** Whether `amount` is dinars (a total worth showing) or a plain count. */
   money: boolean;
   sql: string;
+  /** A table a newer migration created: the check runs only once it exists. */
+  needs?: string;
 }
+/** In a check's SQL, the moment the run is for (an ISO instant): the page, the morning word and a test agree on what is old. */
+const NOW_TOKEN = '{now}';
 
 /** The order of the list on the page: the faults first, then what to look at. */
 export const FINANCE_CHECKS: readonly FinanceCheckSpec[] = [
@@ -136,6 +146,25 @@ export const FINANCE_CHECKS: readonly FinanceCheckSpec[] = [
       WHERE e.voided_at IS NULL AND (o.status = 'cancelled' OR o.seller_type <> 'levonis'
         OR (o.status = 'delivered' AND date(o.delivered_at, '+3 hours') IS NULL))`,
   },
+  {
+    // Cash the courier collected at the door over two weeks ago that no transfer has paid yet (DECISIONS row 332): a
+    // transfer not recorded, or money Al-Zaeem still owes. Before the one-time opening, every older parcel is here.
+    key: 'courier_money_overdue',
+    severity: 'warning',
+    money: true,
+    sql: `SELECT o.id AS id, ${courierDueSql('o')} AS amount FROM orders o
+      WHERE ${courierParcelSql('o')} AND ${courierDueSql('o')} > 0
+        AND julianday('{now}') - julianday(o.delivered_at) > ${COURIER_OVERDUE_DAYS}`,
+  },
+  {
+    // A transfer recorded over a week ago and never checked against Al-Zaeem's own statement.
+    key: 'courier_transfers_unchecked',
+    severity: 'warning',
+    money: true,
+    needs: 'courier_remittances',
+    sql: `SELECT r.id AS id, r.amount_iqd AS amount FROM courier_remittances r
+      WHERE r.state = 'received' AND julianday('{now}') - julianday(r.created_at) > ${COURIER_UNCHECKED_DAYS}`,
+  },
 ];
 
 export interface FinanceCheckResult {
@@ -163,8 +192,14 @@ const wrapped = (sql: string) => `WITH q AS (${sql})
 
 /** Every check, one batch of reads. */
 export async function runFinanceChecks(db: D1Database, now = new Date()): Promise<FinanceChecksReport> {
-  const answers = await db.batch(FINANCE_CHECKS.map((c) => db.prepare(wrapped(c.sql))));
-  const checks = FINANCE_CHECKS.map((c, i): FinanceCheckResult => {
+  const needed = [...new Set(FINANCE_CHECKS.flatMap((c) => (c.needs ? [c.needs] : [])))];
+  const present = new Set(needed.length
+    ? ((await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN (SELECT value FROM json_each(?))")
+      .bind(JSON.stringify(needed)).all<{ name: string }>()).results ?? []).map((r) => r.name)
+    : []);
+  const live = FINANCE_CHECKS.filter((c) => !c.needs || present.has(c.needs));
+  const answers = await db.batch(live.map((c) => db.prepare(wrapped(c.sql.replaceAll(NOW_TOKEN, now.toISOString())))));
+  const checks = live.map((c, i): FinanceCheckResult => {
     const r = (answers[i]?.results?.[0] ?? {}) as { n?: number; total?: number | null; sample?: string };
     let sample: string[] = [];
     try { sample = (JSON.parse(r.sample ?? '[]') as unknown[]).map(String); } catch { sample = []; }

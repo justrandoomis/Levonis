@@ -58,6 +58,8 @@ const TRAIL: Record<string, string[] | { none: string }> = {
   '/api/admin/finance-workspace POST /missing-costs/lines': ['finance.order_adjusted'],
   '/api/admin/finance-workspace POST /orders/:id/adjustments': ['finance.order_adjusted'],
   '/api/admin/finance-workspace POST /promotions': ['finance.monthly_promotion'],
+  '/api/admin/finance-workspace POST /courier/remittances': ['finance.courier_remittance_recorded', 'finance.collection_recorded'],
+  '/api/admin/finance-workspace POST /courier/remittances/:id/reconcile': ['finance.courier_remittance_reconciled'],
   '/api/admin/finance-workspace PATCH /promotions/:id': ['finance.monthly_promotion'],
   '/api/admin/finance-workspace DELETE /promotions/:id': ['finance.monthly_promotion'],
   '/api/admin/finance-people POST /rules/:id/preview': { none: 'a preview: it works out what a wage change would do and moves no money' },

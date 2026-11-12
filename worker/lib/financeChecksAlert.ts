@@ -55,6 +55,8 @@ export const CHECK_WORDS: Record<FinanceCheckKey, string> = {
   cash_on_cancelled: 'طلبات ملغاة عليها تحصيل مسجَّل',
   pending_cost_months: 'أشهر لا تُغلق لأن تكاليف فيها معلّقة',
   expenses_counting_nowhere: 'مصاريف مربوطة بطلبات لا يُحتسب فيها شيء',
+  courier_money_overdue: 'طرود نقدها لدى شركة التوصيل منذ أكثر من 14 يومًا',
+  courier_transfers_unchecked: 'تحويلات من شركة التوصيل لم تُطابَق منذ أكثر من أسبوع',
 };
 
 const baghdadHour = (now: Date) => new Date(now.getTime() + 3 * 3600_000).getUTCHours();

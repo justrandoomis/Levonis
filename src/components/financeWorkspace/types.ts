@@ -1,5 +1,5 @@
 /** Every page of «المال والأرباح»; each belongs to one of the five sections (redesign step 2: overview, reports, costs, people, accounting; step 4 adds sections and days). */
-export type FinanceSection = 'overview' | 'orders' | 'products' | 'sections' | 'days' | 'missing' | 'monthly' | 'expenses' | 'staff' | 'investors' | 'settlements' | 'accounting';
+export type FinanceSection = 'overview' | 'orders' | 'products' | 'sections' | 'days' | 'missing' | 'monthly' | 'expenses' | 'staff' | 'investors' | 'settlements' | 'accounting' | 'courier';
 /** Where an order, a product or a section stands (the server's orderState / groupState, DECISIONS row 316). */
 export type FinanceState = 'confirmed' | 'estimated' | 'waiting';
 /** An order's cash: nothing due on delivery, all of it recorded as received, part of it, or none yet. */
@@ -343,7 +343,7 @@ export const WORKSPACE_API = '/api/admin/finance-workspace';
 export type FinanceCheckKey =
   | 'journal_unbalanced' | 'posting_errors' | 'collections_over_due' | 'undated_delivered' | 'staff_payment_overallocated'
   | 'delivered_without_sale' | 'cancelled_after_delivery_in_journal' | 'walk_backs' | 'cash_on_cancelled'
-  | 'pending_cost_months' | 'expenses_counting_nowhere';
+  | 'pending_cost_months' | 'expenses_counting_nowhere' | 'courier_money_overdue' | 'courier_transfers_unchecked';
 export interface FinanceCheck { key: FinanceCheckKey; severity: 'error' | 'warning'; count: number; amount_iqd: number | null; sample: string[] }
 export interface FinanceChecksAnswer { checked_at: string; ok: boolean; checks: FinanceCheck[] }
 export const currentMonth = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 7);
@@ -387,4 +387,26 @@ export function statusName(status: string, loc: (ar: string, en: string) => stri
     completed: ['مكتمل', 'Completed'], paid: ['مدفوع', 'Paid'],
   };
   return names[status] ? loc(...names[status]) : status;
+}
+
+/** «أموال لدى شركة التوصيل» (DECISIONS row 332; worker/lib/courierCollections.ts, GET /courier). */
+export interface CourierParcel {
+  order_id: string; customer_name: string | null; governorate: string | null; tracking_no: string;
+  delivered_day: string | null; days: number; due_iqd: number; fee_estimate_iqd: number;
+}
+export interface CourierRemittanceRow {
+  id: string; kind: 'transfer' | 'opening'; reference: string; received_day: string; amount_iqd: number; collected_iqd: number;
+  fee_iqd: number; difference_iqd: number; parcels: number; state: 'received' | 'reconciled'; note: string;
+  created_by_name: string | null; created_at: string; reconciled_by_name: string | null; reconciled_at: string | null; reconcile_note: string;
+}
+export interface CourierOverview {
+  pending: { parcels: CourierParcel[]; count: number; due_iqd: number; fee_estimate_iqd: number; net_estimate_iqd: number; oldest_days: number };
+  remittances: CourierRemittanceRow[];
+  unreconciled: { count: number; amount_iqd: number };
+  first_time: boolean;
+  fee_category: { id: string } | null;
+}
+export interface CourierRemittanceDetail {
+  remittance: CourierRemittanceRow;
+  parcels: Array<CourierParcel & { collected_iqd: number; fee_iqd: number; net_iqd: number }>;
 }

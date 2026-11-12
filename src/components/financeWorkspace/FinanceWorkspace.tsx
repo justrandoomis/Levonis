@@ -11,6 +11,7 @@ import PromotionPage from './PromotionPage';
 import GeneralExpenses from './GeneralExpenses';
 import AccountingChecks from './AccountingChecks';
 import AccountingActivity from './AccountingActivity';
+import CourierMoney from './CourierMoney';
 import './finance-workspace.css';
 import { CurrencyToggle, DisplayCurrencyContext, type DisplayCurrency } from './displayCurrency';
 import Overview from './Overview';
@@ -55,14 +56,16 @@ const ParticipantCharts = lazy(() => import('./ParticipantCharts'));
  */
 type Main = 'overview' | 'reports' | 'costs' | 'people' | 'accounting';
 const MAIN_OF: Record<FinanceSection, Main> = { overview: 'overview', orders: 'reports', products: 'reports', sections: 'reports', days: 'reports', missing: 'costs', monthly: 'costs', expenses: 'costs',
-  staff: 'people', investors: 'people', settlements: 'people', accounting: 'accounting' };
+  staff: 'people', investors: 'people', settlements: 'people', accounting: 'accounting', courier: 'accounting' };
 const PAGES: Record<Main, FinanceSection[]> = { overview: ['overview'], reports: ['orders', 'products', 'sections', 'days'], costs: ['missing', 'monthly', 'expenses'],
-  people: ['staff', 'investors', 'settlements'], accounting: ['accounting'] };
+  people: ['staff', 'investors', 'settlements'], accounting: ['accounting', 'courier'] };
 const LABEL: Record<FinanceSection | Main, FwKey> = { overview: 'overview', reports: 'reports', costs: 'costs', people: 'people', accounting: 'accounting',
-  orders: 'orders', products: 'products', sections: 'sectionsPage', days: 'daysPage', missing: 'missing', monthly: 'promotion', expenses: 'expenses', staff: 'staff', investors: 'investors', settlements: 'withdrawals' };
+  orders: 'orders', products: 'products', sections: 'sectionsPage', days: 'daysPage', missing: 'missing', monthly: 'promotion', expenses: 'expenses', staff: 'staff', investors: 'investors', settlements: 'withdrawals', courier: 'courier' };
+/** A page's own name among its tab's pages, where it differs from the tab's: the books under «المحاسبة». */
+const PILL: Partial<Record<FinanceSection, FwKey>> = { accounting: 'books' };
 const SECTIONS = Object.keys(MAIN_OF) as FinanceSection[];
 // Accounting is not kept: its journal tools and the old report open on demand and pause the summary's refresh.
-const KEPT: FinanceSection[] = SECTIONS.filter((s) => s !== 'accounting');
+const KEPT: FinanceSection[] = SECTIONS.filter((s) => s !== 'accounting' && s !== 'courier');
 const keepable = (page: FinanceSection) => KEPT.includes(page);
 // The pages drawn in the display currency; every other page is in dinars whatever the toggle says.
 const CURRENCY_PAGES: FinanceSection[] = ['overview', 'orders', 'products', 'sections', 'days'];
@@ -230,7 +233,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
         onClick={() => { if (main !== m) setSection(PAGES[m][0]); }}>{fw(loc, LABEL[m])}{m === 'costs' && missingLines > 0 && <span className="fw-missing">{missingLines}</span>}</button>)}
     </nav>
     {PAGES[main].length > 1 && <div className="fw-filter-pills" role="group" aria-label={fw(loc, LABEL[main])}>
-      {PAGES[main].map((p) => <button key={p} type="button" className="fw-pill" aria-pressed={section === p} data-finance-subpage={p} onClick={() => setSection(p)}>{fw(loc, LABEL[p])}{p === 'missing' && missingLines > 0 ? ` · ${missingLines}` : ''}</button>)}
+      {PAGES[main].map((p) => <button key={p} type="button" className="fw-pill" aria-pressed={section === p} data-finance-subpage={p} onClick={() => setSection(p)}>{fw(loc, PILL[p] ?? LABEL[p])}{p === 'missing' && missingLines > 0 ? ` · ${missingLines}` : ''}</button>)}
     </div>}
     {section !== 'monthly' && <form className="fw-bar" onSubmit={apply} data-finance-period>
       <label className="fw-chip"><CalendarDays size={16} aria-hidden /><select className="fw-select" value={preset} aria-label={fw(loc, 'period')} onChange={(event) => {
@@ -280,6 +283,7 @@ export default function FinanceWorkspace({ legacy }: { legacy?: ReactNode }) {
         {advanced && <FinanceOperationsPanel from={range.from} to={range.to} initialTab="accounting" onChanged={refresh} />}
         {legacy && <details className="fw-advanced" onToggle={(e) => setLegacyOpen(e.currentTarget.open)}><summary>{loc('التقرير المحاسبي قبل توزيع الأرباح', 'Accounting report before profit distribution', 'ڕاپۆرتی ژمێریاری پێش دابەشکردنی قازانج')}</summary>{legacyOpen && <><p className="fw-note">{loc('هذا التقرير يراجع النشاط المحاسبي قبل حصص المستثمرين والتصحيحات الخاصة بالطلبات. استخدم «صافي حصتك» في النظرة العامة لمعرفة حصتك بعد التوزيع وتكاليف الشهر.', 'This report reviews accounting activity before investor distributions and order-specific corrections. Use “Your net share” in Overview for your share after distributions and monthly costs.', 'ئەم ڕاپۆرتە چالاکیی ژمێریاری پێش بەشی وەبەرهێنەران و ڕاستکردنەوەکانی داواکاری پێداچوونەوە دەکات. «سافی بەشی تۆ» لە تێڕوانینی گشتی بەکاربهێنە بۆ زانینی بەشەکەت دوای دابەشکردن و تێچووی مانگ.')}</p>{legacy}</>}</details>}
       </Suspense>}
+      {section === 'courier' && <Suspense fallback={loading}><CourierMoney onOpenOrder={(id) => openOrderAt(id)} onChanged={refresh} /></Suspense>}
     </div>
     {orderId && <OrderProfitSheet key={`${orderId}:${orderFocus.step ?? ''}:${orderFocus.line ?? ''}`} orderId={orderId} focus={orderFocus.step} focusLine={orderFocus.line}
       onClose={() => { setOrderId(null); setOrderFocus({}); if (orderChanged.current) { orderChanged.current = false; setPeopleRevision((v) => v + 1); } }}
