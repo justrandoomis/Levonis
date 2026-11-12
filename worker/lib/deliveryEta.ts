@@ -30,7 +30,7 @@
  * `now` is always an argument; nothing here reads a clock.
  */
 
-import { addDays, BAGHDAD_OFFSET_MS, baghdadDay, dayOfWeek } from './baghdadTime';
+import { addDays, BAGHDAD_OFFSET_MS, baghdadDay, dayOfWeek, dayParts } from './baghdadTime';
 import { dayLabel, WEEKDAYS } from './deliveryDay';
 import { IRAQ_GOVERNORATES, governorateName, normalizeGovernorate } from '../../packages/shipping/src/iraqGovernorates';
 
@@ -43,7 +43,7 @@ export type EtaLang = 'ar' | 'en' | 'ckb';
 export interface DeliveryHandoverPolicy {
   /** The owner's off switch: false draws no note anywhere. */
   enabled: boolean;
-  /** The daily handover, as a Baghdad hour 0..23 — 19 is «الساعة ٧ مساءً». */
+  /** The daily handover, as a Baghdad hour within `HANDOVER_HOURS` (12..23) — 19 is «الساعة ٧ مساءً». */
   hour: number;
   /** Governorates moved off `DEFAULT_ETA_TIERS`, by id. Only real differences are kept. */
   tiers: Partial<Record<string, EtaTier>>;
@@ -52,6 +52,32 @@ export interface DeliveryHandoverPolicy {
 }
 
 export const DEFAULT_HANDOVER_HOUR = 19;
+
+/**
+ * THE HOURS A HANDOVER MAY BE SET TO: noon to 11 pm (the independent review,
+ * 2026-11-12). The arrival windows below are the owner's words for an EVENING
+ * handover — next day 10–15, next day 18–20, the day after next at night — and
+ * they are constants: a midnight handover read «فات تسليم اليوم (الساعة ١٢
+ * ليلًا)» all day and put Baghdad two days out, and a morning one promised
+ * «the next day» to a parcel that leaves at breakfast. The admin's select
+ * offers these hours only, the PUT refuses any other, and a stored hour outside
+ * them reads as the owner's 7 pm.
+ */
+export const HANDOVER_HOURS = { min: 12, max: 23 } as const;
+
+/**
+ * THE BOARD'S PREPARATION DAY (owner, 2026-11-11: «1 day everywhere»): a
+ * courier order with a chosen delivery day is prepared and handed to the
+ * courier the day BEFORE that day — the Kurdistan Region too — and the orders
+ * board (another lane) files it there. The note names the same handover for a
+ * picked day, so the customer and the warehouse are told one day. Under the
+ * owner's own windows a Kurdistan parcel handed over the day before arrives a
+ * day after the picked day, and the note says so rather than promising the
+ * picked day (DECISIONS row 324, the review; the owner's call whether Kurdistan
+ * should be prepared two days ahead instead — this number and the board's
+ * change together).
+ */
+export const PREP_LEAD_DAYS = 1;
 
 /**
  * SHIPPED ON, like `DEFAULT_DELIVERY_DAY_POLICY` and for the same reason: the
@@ -117,8 +143,10 @@ const isPlainObject = (v: unknown): v is Record<string, unknown> => !!v && typeo
 /**
  * Any stored value → a whole, usable policy. The admin PUT refuses junk on the
  * way in (`validateDeliveryHandover`); this is the read side's clamp, so a row
- * written any other way still runs as something sane: the hour rounded into
- * 0..23 (unreadable → 19), tiers only for real governorates and the three
+ * written any other way still runs as something sane: the hour rounded, and
+ * the owner's 19 for anything unreadable or outside `HANDOVER_HOURS` (not the
+ * nearest end: a stored 31 or −3 was 23 or midnight, both of which make the
+ * fixed windows false), tiers only for real governorates and the three
  * tiers (a name is read as its id; an entry equal to the table is dropped),
  * weekdays only 0..6, unique, sorted, at most six — so a handover day always
  * remains and `nextHandover` always ends.
@@ -131,7 +159,10 @@ export function resolveDeliveryHandover(stored: unknown): DeliveryHandoverPolicy
   if (enabled !== null) out.enabled = enabled;
 
   const hour = num(stored.hour);
-  if (hour !== null) out.hour = Math.min(23, Math.max(0, Math.round(hour)));
+  if (hour !== null) {
+    const h = Math.round(hour);
+    out.hour = h >= HANDOVER_HOURS.min && h <= HANDOVER_HOURS.max ? h : DEFAULT_HANDOVER_HOUR;
+  }
 
   if (isPlainObject(stored.tiers)) {
     for (const [key, tier] of Object.entries(stored.tiers)) {
@@ -169,7 +200,10 @@ export function validateDeliveryHandover(
   });
   if (!isPlainObject(value)) return refuse('value');
   if (value.enabled !== undefined && typeof value.enabled !== 'boolean') return refuse('enabled');
-  if (value.hour !== undefined && !(typeof value.hour === 'number' && Number.isInteger(value.hour) && value.hour >= 0 && value.hour <= 23)) {
+  if (
+    value.hour !== undefined &&
+    !(typeof value.hour === 'number' && Number.isInteger(value.hour) && value.hour >= HANDOVER_HOURS.min && value.hour <= HANDOVER_HOURS.max)
+  ) {
     return refuse('hour');
   }
   if (value.tiers !== undefined) {
@@ -192,7 +226,9 @@ export interface Handover {
   /** The day the parcel goes to the courier. */
   day: string;
   is_today: boolean;
-  /** Today's hour has already passed. */
+  /** Today is one of the closed weekdays: there is no handover today at all, before or after the hour. */
+  today_closed: boolean;
+  /** Today was a handover day and its hour has already passed (never on a closed day). */
   cutoff_passed: boolean;
   /** The handover instant, epoch ms (19:00 Baghdad = 16:00Z). */
   at_ms: number;
@@ -205,16 +241,29 @@ const DAY_MS = 86_400_000;
  * 18:59 is still today, 19:00 is not. Then forward past any closed weekday.
  * Baghdad's hour is read from epoch ms plus Iraq's fixed +3 (no DST since
  * 2007), so 20:59Z is 23:59 on one Baghdad day and 21:00Z is 00:00 on the next.
+ *
+ * A CLOSED DAY HAS NO HOUR TO PASS (the review): on a closed Friday the line is
+ * «لا تسليم لشركة التوصيل اليوم» at 11:00 and at 20:00 alike — it read «فات
+ * تسليم اليوم» after 19:00, a handover that never was, and flipped at an hour
+ * the page's timer (armed for midnight on a closed day) never woke for.
  */
 export function nextHandover(nowMs: number, policy: DeliveryHandoverPolicy): Handover | null {
   const today = baghdadDay(nowMs);
   if (!today) return null;
   const minute = Math.floor(((((nowMs + BAGHDAD_OFFSET_MS) % DAY_MS) + DAY_MS) % DAY_MS) / 60_000);
-  const cutoff_passed = minute >= policy.hour * 60;
+  const today_closed = policy.closed_weekdays.includes(dayOfWeek(today));
+  const cutoff_passed = !today_closed && minute >= policy.hour * 60;
   let day = cutoff_passed ? addDays(today, 1) : today;
   // At most six closed weekdays (the resolver's clamp), so this ends.
   for (let i = 0; i < 7 && policy.closed_weekdays.includes(dayOfWeek(day)); i++) day = addDays(day, 1);
-  return { today, day, is_today: day === today, cutoff_passed, at_ms: Date.parse(`${day}T00:00:00.000Z`) + policy.hour * 3_600_000 - BAGHDAD_OFFSET_MS };
+  return {
+    today,
+    day,
+    is_today: day === today,
+    today_closed,
+    cutoff_passed,
+    at_ms: Date.parse(`${day}T00:00:00.000Z`) + policy.hour * 3_600_000 - BAGHDAD_OFFSET_MS,
+  };
 }
 
 /** The governorate's tier: the owner's override, else the table. null = no governorate on the address. */
@@ -226,34 +275,74 @@ export function tierOf(governorate: unknown, policy: DeliveryHandoverPolicy): Et
 
 export interface DeliveryEta {
   hour: number;
+  /** The next handover from now — the one an order placed now as soon as possible goes with. */
   handover: Handover;
+  /** The delivery day the customer picked in the picker under the note; '' = «في أقرب وقت». */
+  requested_day: string;
+  /**
+   * The handover THIS order goes with: the next one, or — for a picked day
+   * later than that — the evening before the picked day (`PREP_LEAD_DAYS`, the
+   * board's rule), past any closed weekday.
+   */
+  send_day: string;
   /** The governorate id, '' when the address has none. */
   governorate: string;
   /** null → the generic sentence. */
   tier: EtaTier | null;
-  /** '' when the tier is unknown. */
+  /** From `send_day`; '' when the tier is unknown. */
   arrival_day: string;
+  /** A picked day the estimate lands after (a «today» picked at 8 pm; any Kurdistan pick). */
+  after_requested: boolean;
   /** The next instant the sentences change: the handover, or Baghdad's midnight once it has passed. */
   next_change_ms: number;
 }
 
-/** null when the owner switched the note off. */
-export function deliveryEta(input: { nowMs: number; governorate: unknown; policy: DeliveryHandoverPolicy }): DeliveryEta | null {
+/**
+ * null when the owner switched the note off. `day` is the picker's choice, as
+ * the checkout holds it (null or '' = as soon as possible): the note is worded
+ * for the order being placed (the review: with «الأحد ١٥» picked it still said
+ * «يُسلَّم … اليوم» and «الوصول المتوقع: غدًا»). The picker and the server's
+ * checks are untouched — the owner's «only add the note»; this only words it.
+ */
+export function deliveryEta(input: { nowMs: number; governorate: unknown; policy: DeliveryHandoverPolicy; day?: unknown }): DeliveryEta | null {
   const { policy } = input;
   if (!policy.enabled) return null;
   const handover = nextHandover(input.nowMs, policy);
   if (!handover) return null;
   const governorate = normalizeGovernorate(input.governorate);
   const tier = tierOf(governorate, policy);
+  // A real calendar day, not just its shape ('2026-13-40' is no day: as soon as possible).
+  const requested_day = typeof input.day === 'string' && dayParts(input.day) ? input.day : '';
+  const send_day = requested_day ? sendDayFor(requested_day, handover.day, policy) : handover.day;
+  const arrival_day = tier ? addDays(send_day, ETA_WINDOWS[tier].days) : '';
   const midnight = Date.parse(`${addDays(handover.today, 1)}T00:00:00.000Z`) - BAGHDAD_OFFSET_MS;
   return {
     hour: policy.hour,
     handover,
+    requested_day,
+    send_day,
     governorate,
     tier,
-    arrival_day: tier ? addDays(handover.day, ETA_WINDOWS[tier].days) : '',
+    arrival_day,
+    after_requested: requested_day !== '' && arrival_day !== '' && arrival_day > requested_day,
+    // A picked day's words move at the same two instants: its handover is
+    // reckoned from the next one, and «غدًا» / «اليوم» from Baghdad's day.
     next_change_ms: Math.min(handover.at_ms, midnight),
   };
+}
+
+/**
+ * A PICKED DAY'S HANDOVER: the evening before it (the board's day,
+ * `PREP_LEAD_DAYS`), unless that evening is no later than the next handover —
+ * a «tomorrow» picked before 7 pm goes tonight as any order would, and a
+ * «today» picked at 8 pm cannot go before tomorrow's. A closed weekday moves
+ * it on to the next open day, as `nextHandover` does.
+ */
+function sendDayFor(requested: string, next: string, policy: DeliveryHandoverPolicy): string {
+  let day = addDays(requested, -PREP_LEAD_DAYS);
+  if (day <= next) return next;
+  for (let i = 0; i < 7 && policy.closed_weekdays.includes(dayOfWeek(day)); i++) day = addDays(day, 1);
+  return day;
 }
 
 /**
@@ -290,8 +379,17 @@ export interface EtaWords {
   handoverPassed: string;
   /** Today is a closed weekday: {hour} {day}. */
   handoverClosed: string;
+  /**
+   * Paid through Gini: the order waits for the receipt barcode (up to the Gini
+   * hold), so «today before 7 pm» is no promise — the next handover after it: {hour}.
+   */
+  handoverGini: string;
+  /** A picked day later than the next handover: the evening before it, {day} {hour}. */
+  handoverForDay: string;
   /** The chosen address's governorate: {gov} {day} {window}. */
   arrival: string;
+  /** The same, when the estimate lands after the day the customer picked: {gov} {day} {window}. */
+  arrivalLate: string;
   /** Kurdistan's window — no hours, «may be later». */
   night: string;
   /** The address has no governorate. */
@@ -306,7 +404,10 @@ export interface EtaWords {
   rule: string;
   ruleClosed: string;
   cutoff: string;
+  /** Each group: {list} {window}; near also {about}. */
   groups: Record<EtaTier, string>;
+  /** The owner's «+17 hrs» — true of the 7 pm handover only, so said only then (the review). */
+  nearAbout: string;
   example: string;
   estimates: string;
   /** The delivery row's «!» once it also answers «when». */
@@ -322,7 +423,10 @@ export const ETA_TEXT: Record<EtaLang, EtaWords> = {
     handoverToday: 'أتمم طلبك قبل الساعة {hour} ليُسلَّم لمندوب شركة التوصيل اليوم.',
     handoverPassed: 'فات تسليم اليوم (الساعة {hour})، فيُسلَّم طلبك لمندوب شركة التوصيل {day} الساعة {hour}.',
     handoverClosed: 'لا تسليم لشركة التوصيل اليوم، فيُسلَّم طلبك لمندوبها {day} الساعة {hour}.',
+    handoverGini: 'بعد تأكيد شرائه من تطبيق جني ومسح باركود الاستلام، يُسلَّم طلبك لمندوب شركة التوصيل في أقرب تسليم الساعة {hour}.',
+    handoverForDay: 'نجهّز طلبك لليوم الذي اخترته، ونسلّمه لمندوب شركة التوصيل {day} الساعة {hour}.',
     arrival: 'الوصول المتوقع إلى {gov}: {day} {window} (تقديري).',
+    arrivalLate: 'الوصول المتوقع إلى {gov}: {day} {window} (تقديري) — بعد اليوم الذي اخترته.',
     night: 'ليلًا، وقد تؤخّره نقاط التفتيش أكثر',
     generic:
       'يصل غالبًا في اليوم التالي للتسليم إلى المحافظات القريبة من مخزننا في الحلة، ومساء اليوم التالي إلى المحافظات البعيدة، وبعد يومين من التسليم ليلًا أو أكثر إلى إقليم كردستان (تقديري).',
@@ -334,10 +438,11 @@ export const ETA_TEXT: Record<EtaLang, EtaWords> = {
     ruleClosed: 'نجهّز كل الطلبات ونسلّمها لمندوب شركة التوصيل الساعة {hour} من كل يوم عدا {days}.',
     cutoff: 'اطلب قبل الساعة {hour} ليُسلَّم طلبك في اليوم نفسه. الطلب بعد الساعة {hour} يُسلَّم في اليوم التالي، فيتأخر وصوله يومًا كاملًا (٢٤ ساعة).',
     groups: {
-      near: 'المحافظات القريبة من مخزننا في الحلة (بابل): {list} — في اليوم التالي للتسليم {window}، أي بعد نحو ١٧ ساعة من التسليم.',
+      near: 'المحافظات القريبة من مخزننا في الحلة (بابل): {list} — في اليوم التالي للتسليم {window}{about}.',
       far: 'المحافظات البعيدة: {list} — في اليوم التالي للتسليم {window}.',
       kurdistan: 'إقليم كردستان: {list} — بعد يومين من التسليم ليلًا، وقد يتأخر أكثر من ٤٨ ساعة لأن نقاط التفتيش صعبة جدًا.',
     },
+    nearAbout: '، أي بعد نحو ١٧ ساعة من التسليم',
     example: 'مثال من بغداد: الطلب الساعة {early} يصل في اليوم التالي قرابة ١١ صباحًا ({window})، والطلب الساعة {late} يتأخر وصوله يومًا كاملًا.',
     estimates: 'كل هذه الأوقات تقديرية، وليست موعدًا ملزمًا.',
     question: 'كيف حُسبت تكلفة التوصيل، ومتى يصل طلبك؟',
@@ -346,7 +451,11 @@ export const ETA_TEXT: Record<EtaLang, EtaWords> = {
     handoverToday: "Place your order before {hour} and it goes to the delivery company's courier today.",
     handoverPassed: "Today's {hour} handover has passed, so your order goes to the delivery company's courier {day} at {hour}.",
     handoverClosed: "There is no courier handover today, so your order goes to the delivery company's courier {day} at {hour}.",
+    handoverGini:
+      "Once the purchase is confirmed in the Gini app and the receipt barcode is scanned, your order goes to the delivery company's courier at the next {hour} handover.",
+    handoverForDay: "We prepare your order for the day you chose. Handover to the delivery company's courier: {day}, {hour}.",
     arrival: 'Expected in {gov}: {day}, {window} (estimate).',
+    arrivalLate: 'Expected in {gov}: {day}, {window} (estimate) — later than the day you chose.',
     night: 'at night — checkpoints can delay it further',
     generic:
       'It usually arrives the day after handover in the governorates near our warehouse in Hillah, the evening of the day after handover in the far ones, and two or more days after handover, at night, in the Kurdistan Region (estimate).',
@@ -358,10 +467,11 @@ export const ETA_TEXT: Record<EtaLang, EtaWords> = {
     ruleClosed: "We prepare every order and hand it to the delivery company's courier at {hour} every day except {days}.",
     cutoff: 'Order before {hour} and your order is handed over the same day. An order placed after {hour} is handed over the next day, so it arrives a full day (24 hours) later.',
     groups: {
-      near: 'Governorates near our warehouse in Hillah (Babil): {list} — the day after handover, {window}, about 17 hours after it.',
+      near: 'Governorates near our warehouse in Hillah (Babil): {list} — the day after handover, {window}{about}.',
       far: 'Far governorates: {list} — the day after handover, {window}.',
       kurdistan: 'Kurdistan Region: {list} — two days after handover, at night; it can take more than 48 hours because the checkpoints are very slow.',
     },
+    nearAbout: ', about 17 hours after it',
     example: 'Example from Baghdad: an order placed at {early} arrives the next day around 11 am ({window}); one placed at {late} arrives a full day later.',
     estimates: 'All of these times are estimates, not a guaranteed delivery time.',
     question: 'How is the delivery cost calculated, and when will your order arrive?',
@@ -370,7 +480,11 @@ export const ETA_TEXT: Record<EtaLang, EtaWords> = {
     handoverToday: 'پێش کاتژمێر {hour} داواکارییەکەت تەواو بکە، بۆ ئەوەی ئەمڕۆ ڕادەستی گەیێنەری کۆمپانیای گەیاندن بکرێت.',
     handoverPassed: 'کاتی ڕادەستکردنی ئەمڕۆ (کاتژمێر {hour}) تێپەڕیوە، بۆیە داواکارییەکەت {day} کاتژمێر {hour} ڕادەستی گەیێنەری کۆمپانیای گەیاندن دەکرێت.',
     handoverClosed: 'ئەمڕۆ ڕادەستی کۆمپانیای گەیاندن ناکەین، بۆیە داواکارییەکەت {day} کاتژمێر {hour} ڕادەستی گەیێنەرەکەیان دەکرێت.',
+    handoverGini:
+      'دوای پشتڕاستکردنەوەی کڕینەکەی لە ئەپی جینی و سکانکردنی باڕکۆدی وەرگرتن، داواکارییەکەت لە نزیکترین ڕادەستکردندا کاتژمێر {hour} ڕادەستی گەیێنەری کۆمپانیای گەیاندن دەکرێت.',
+    handoverForDay: 'داواکارییەکەت بۆ ئەو ڕۆژەی هەڵتبژاردووە ئامادە دەکەین، و {day} کاتژمێر {hour} ڕادەستی گەیێنەری کۆمپانیای گەیاندنی دەکەین.',
     arrival: 'گەیشتنی چاوەڕوانکراو بۆ {gov}: {day} {window} (خەمڵێنراو).',
+    arrivalLate: 'گەیشتنی چاوەڕوانکراو بۆ {gov}: {day} {window} (خەمڵێنراو) — دوای ئەو ڕۆژەی هەڵتبژاردووە.',
     night: 'بە شەو، و لەوانەیە خاڵەکانی پشکنین زیاتر دوای بخەن',
     generic:
       'زۆربەی جار ڕۆژی دوای ڕادەستکردن دەگاتە ئەو پارێزگایانەی نزیکی کۆگاکەمانن لە حیللە، ئێوارەی ڕۆژی دوای ڕادەستکردن دەگاتە پارێزگا دوورەکان، و دوو ڕۆژ یان زیاتر دوای ڕادەستکردن، بە شەو، دەگاتە هەرێمی کوردستان (خەمڵێنراو).',
@@ -382,10 +496,11 @@ export const ETA_TEXT: Record<EtaLang, EtaWords> = {
     ruleClosed: 'هەموو داواکارییەکان ئامادە دەکەین و هەموو ڕۆژێک جگە لە {days}، کاتژمێر {hour} ڕادەستی گەیێنەری کۆمپانیای گەیاندنیان دەکەین.',
     cutoff: 'پێش کاتژمێر {hour} داوا بکە بۆ ئەوەی داواکارییەکەت هەمان ڕۆژ ڕادەست بکرێت. داواکاریی دوای کاتژمێر {hour} ڕۆژی دواتر ڕادەست دەکرێت، بۆیە گەیشتنی ڕۆژێکی تەواو (٢٤ کاتژمێر) دوادەکەوێت.',
     groups: {
-      near: 'پارێزگا نزیکەکانی کۆگاکەمان لە حیللە (بابل): {list} — ڕۆژی دوای ڕادەستکردن {window}، واتە نزیکەی ١٧ کاتژمێر دوای ڕادەستکردن.',
+      near: 'پارێزگا نزیکەکانی کۆگاکەمان لە حیللە (بابل): {list} — ڕۆژی دوای ڕادەستکردن {window}{about}.',
       far: 'پارێزگا دوورەکان: {list} — ڕۆژی دوای ڕادەستکردن {window}.',
       kurdistan: 'هەرێمی کوردستان: {list} — دوو ڕۆژ دوای ڕادەستکردن بە شەو، و لەوانەیە زیاتر لە ٤٨ کاتژمێر بخایەنێت چونکە خاڵەکانی پشکنین زۆر قورسن.',
     },
+    nearAbout: '، واتە نزیکەی ١٧ کاتژمێر دوای ڕادەستکردن',
     example: 'نموونە لە بەغداوە: داواکارییەک کە کاتژمێر {early} دەکرێت ڕۆژی دواتر نزیکەی کاتژمێر ١١ی پێش نیوەڕۆ دەگات ({window})؛ داواکارییەک کە کاتژمێر {late} دەکرێت ڕۆژێکی تەواو دواتر دەگات.',
     estimates: 'هەموو ئەم کاتانە خەمڵێنراون، نەک کاتێکی بەڵێندراو.',
     question: 'تێچووی گەیاندن چۆن هەژمار کرا، و داواکارییەکەت کەی دەگات؟',
@@ -401,6 +516,10 @@ export interface HandoverAdminWords {
   tier: string;
   /** Each option, the window in words: near/far {window}. */
   tiers: Record<EtaTier, string>;
+  /** Beside a governorate moved off the owner's table, so a move is visible on the row. */
+  moved: string;
+  /** After a Save that sent the handover (the fees' own sentence speaks of fees). */
+  saved: string;
 }
 
 /** «إدارة التوصيل»: the handover hour and each governorate's time group. */
@@ -413,6 +532,8 @@ export const HANDOVER_ADMIN_TEXT: Record<EtaLang, HandoverAdminWords> = {
     hour: 'ساعة التسليم اليومية للمندوب (بتوقيت بغداد)',
     tier: 'وقت الوصول — {gov}',
     tiers: { near: 'قريبة: اليوم التالي، {window}', far: 'بعيدة: اليوم التالي، {window}', kurdistan: 'كردستان: بعد يومين ليلًا، وقد يتأخر' },
+    moved: 'معدّلة عن الجدول الافتراضي',
+    saved: 'تم حفظ وقت التسليم — تتبعه ملاحظة صفحة الدفع من الآن.',
   },
   en: {
     title: 'Courier handover and expected arrival',
@@ -422,6 +543,8 @@ export const HANDOVER_ADMIN_TEXT: Record<EtaLang, HandoverAdminWords> = {
     hour: 'Daily courier handover (Baghdad time)',
     tier: 'Arrival time — {gov}',
     tiers: { near: 'Near: next day, {window}', far: 'Far: next day, {window}', kurdistan: 'Kurdistan: two days later at night, maybe later' },
+    moved: 'changed from the default table',
+    saved: 'Handover saved — the checkout note follows it from now on.',
   },
   ckb: {
     title: 'کاتی ڕادەستکردن بە کۆمپانیای گەیاندن و گەیشتنی چاوەڕوانکراو',
@@ -431,6 +554,8 @@ export const HANDOVER_ADMIN_TEXT: Record<EtaLang, HandoverAdminWords> = {
     hour: 'کاتژمێری ڕادەستکردنی ڕۆژانە بە گەیێنەر (بە کاتی بەغدا)',
     tier: 'کاتی گەیشتن — {gov}',
     tiers: { near: 'نزیک: ڕۆژی دواتر، {window}', far: 'دوور: ڕۆژی دواتر، {window}', kurdistan: 'کوردستان: دوو ڕۆژ دواتر بە شەو، لەوانەیە دواتر' },
+    moved: 'جیاوازە لە خشتەی بنەڕەت',
+    saved: 'کاتی ڕادەستکردن پاشەکەوت کرا — تێبینیی پەڕەی پارەدان لە ئێستاوە پەیڕەوی دەکات.',
   },
 };
 
@@ -439,21 +564,21 @@ export const HANDOVER_REFUSALS: Record<EtaLang, Record<HandoverField, string>> =
   ar: {
     value: 'قيمة وقت التسليم غير صالحة.',
     enabled: 'مفتاح إظهار الملاحظة قيمته true أو false فقط.',
-    hour: 'ساعة التسليم عدد صحيح من 0 إلى 23.',
+    hour: 'ساعة التسليم عدد صحيح من 12 إلى 23 (بعد الظهر أو المساء).',
     tiers: 'كل محافظة تأخذ near أو far أو kurdistan، بمعرّف إحدى المحافظات الثماني عشرة.',
     closed_weekdays: 'أيام العطلة أرقام من 0 (الأحد) إلى 6 (السبت)، ويبقى يوم تسليم واحد على الأقل في الأسبوع.',
   },
   en: {
     value: 'The handover setting is not valid.',
     enabled: 'The note switch takes true or false only.',
-    hour: 'The handover hour is a whole number from 0 to 23.',
+    hour: 'The handover hour is a whole number from 12 to 23 (afternoon or evening).',
     tiers: 'Each governorate takes near, far or kurdistan, by one of the eighteen governorate ids.',
     closed_weekdays: 'Closed days are numbers from 0 (Sunday) to 6 (Saturday), and at least one handover day must remain each week.',
   },
   ckb: {
     value: 'ڕێکخستنی کاتی ڕادەستکردن دروست نییە.',
     enabled: 'کلیلی پیشاندانی تێبینی تەنها true یان false وەردەگرێت.',
-    hour: 'کاتژمێری ڕادەستکردن ژمارەیەکی تەواوە لە 0 تا 23.',
+    hour: 'کاتژمێری ڕادەستکردن ژمارەیەکی تەواوە لە 12 تا 23 (دوای نیوەڕۆ یان ئێوارە).',
     tiers: 'هەر پارێزگایەک near یان far یان kurdistan وەردەگرێت، بە ناسنامەی یەکێک لە هەژدە پارێزگاکە.',
     closed_weekdays: 'ڕۆژە داخراوەکان ژمارەن لە 0 (یەکشەممە) تا 6 (شەممە)، و دەبێت لانیکەم ڕۆژێکی ڕادەستکردن لە هەفتەدا بمێنێتەوە.',
   },
@@ -497,22 +622,41 @@ function dayWords(day: string, today: string, L: EtaLang): string {
   return L === 'en' && (d.is_today || d.is_tomorrow) ? d.label.toLowerCase() : d.label;
 }
 
-/** The first line under the card: before the hour, after it, or a closed day. */
-export function etaHandoverLine(eta: DeliveryEta, lang: string): string {
+/**
+ * Which first line the note draws (and the checkout's `data-courier-handover`):
+ * a picked day later than the next handover → 'day'; paid through Gini → 'gini'
+ * (the order waits for its receipt barcode, so no «before 7 pm today»); else
+ * before the hour → 'today', after it → 'passed', a closed weekday → 'closed'.
+ */
+export type HandoverKind = 'day' | 'gini' | 'today' | 'passed' | 'closed';
+export function etaHandoverKind(eta: DeliveryEta, opts: { gini?: boolean } = {}): HandoverKind {
+  if (eta.send_day !== eta.handover.day) return 'day';
+  if (opts.gini) return 'gini';
+  if (eta.handover.is_today) return 'today';
+  return eta.handover.today_closed ? 'closed' : 'passed';
+}
+
+/** The first line under the card: when this order goes to the courier. */
+export function etaHandoverLine(eta: DeliveryEta, lang: string, opts: { gini?: boolean } = {}): string {
   const L = etaLang(lang);
   const T = ETA_TEXT[L];
   const hour = hourWords(eta.hour, L);
-  if (eta.handover.is_today) return fill(T.handoverToday, { hour });
-  const day = dayWords(eta.handover.day, eta.handover.today, L);
-  return fill(eta.handover.cutoff_passed ? T.handoverPassed : T.handoverClosed, { hour, day });
+  const kind = etaHandoverKind(eta, opts);
+  if (kind === 'today') return fill(T.handoverToday, { hour });
+  if (kind === 'gini') return fill(T.handoverGini, { hour });
+  const day = dayWords(kind === 'day' ? eta.send_day : eta.handover.day, eta.handover.today, L);
+  return fill(kind === 'day' ? T.handoverForDay : kind === 'passed' ? T.handoverPassed : T.handoverClosed, { hour, day });
 }
 
-/** The second line: the expected arrival in the address's governorate, named — or the generic sentence. */
+/**
+ * The second line: the expected arrival in the address's governorate, named —
+ * said to be after the picked day when it is — or the generic sentence.
+ */
 export function etaArrivalLine(eta: DeliveryEta, lang: string): string {
   const L = etaLang(lang);
   const T = ETA_TEXT[L];
   if (!eta.tier || !eta.arrival_day) return T.generic;
-  return fill(T.arrival, {
+  return fill(eta.after_requested ? T.arrivalLate : T.arrival, {
     gov: governorateName(eta.governorate, L),
     day: dayWords(eta.arrival_day, eta.handover.today, L),
     window: windowWords(eta.tier, L),
@@ -535,9 +679,11 @@ export function etaDetails(policy: DeliveryHandoverPolicy, lang: string): { titl
       : fill(T.rule, { hour }),
     fill(T.cutoff, { hour }),
   ];
+  // The owner's «+17 hrs» is 7 pm to about noon the next day: said at the owner's hour only.
+  const about = policy.hour === DEFAULT_HANDOVER_HOUR ? T.nearAbout : '';
   for (const tier of ETA_TIERS) {
     const names = IRAQ_GOVERNORATES.filter((g) => tierOf(g.id, policy) === tier).map((g) => governorateName(g.id, L));
-    if (names.length) lines.push(fill(T.groups[tier], { list: list(names, L), window: windowWords(tier, L) }));
+    if (names.length) lines.push(fill(T.groups[tier], { list: list(names, L), window: windowWords(tier, L), about }));
   }
   if (policy.hour > 13 && tierOf('baghdad', policy) === 'near') {
     lines.push(fill(T.example, { early: hourWords(13, L), late: clockWords(policy.hour, 30, L), window: windowWords('near', L) }));
@@ -555,8 +701,11 @@ export function tierOptionWords(tier: EtaTier, lang: string): string {
 export interface HandoverAdminView {
   /** The owner's table, so the page knows which governorate is moved off it. */
   table: Readonly<Record<string, EtaTier>>;
-  /** The page's words with the windows and the 24 hour labels written out; `tier` keeps its {gov}. */
-  words: Record<EtaLang, Omit<HandoverAdminWords, 'tiers'> & { tiers: Record<EtaTier, string>; hours: string[] }>;
+  /**
+   * The page's words with the windows written out, and the select's hours —
+   * `HANDOVER_HOURS` only, each with its label; `tier` keeps its {gov}.
+   */
+  words: Record<EtaLang, Omit<HandoverAdminWords, 'tiers'> & { tiers: Record<EtaTier, string>; hours: Array<{ hour: number; label: string }> }>;
 }
 
 /**
@@ -576,7 +725,10 @@ export function handoverAdminView(): HandoverAdminView {
     words[L] = {
       ...W,
       tiers: { near: tierOptionWords('near', L), far: tierOptionWords('far', L), kurdistan: tierOptionWords('kurdistan', L) },
-      hours: Array.from({ length: 24 }, (_, h) => hourWords(h, L)),
+      hours: Array.from({ length: HANDOVER_HOURS.max - HANDOVER_HOURS.min + 1 }, (_, i) => {
+        const hour = HANDOVER_HOURS.min + i;
+        return { hour, label: hourWords(hour, L) };
+      }),
     };
   }
   return { table: DEFAULT_ETA_TIERS, words };

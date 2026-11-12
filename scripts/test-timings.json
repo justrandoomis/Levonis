@@ -286,6 +286,7 @@
     "tests/couponLimits.test.ts": 0.3,
     "tests/couponResolver.test.ts": 0.3,
     "tests/courierDeliveredUnits.test.ts": 38,
+    "tests/courierNoteClock.test.ts": 0.3,
     "tests/courierSummary.test.ts": 6,
     "tests/courierTaxSetting.test.ts": 21.8,
     "tests/cspConsole.test.ts": 0.2,

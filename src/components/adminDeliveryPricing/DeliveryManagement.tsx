@@ -68,7 +68,12 @@ interface HandoverWords {
   /** The select's accessible name: {gov}. */
   tier: string;
   tiers: Record<EtaTier, string>;
-  hours: string[];
+  /** Beside a governorate moved off the owner's table. */
+  moved: string;
+  /** After a Save that sent the handover. */
+  saved: string;
+  /** The hours the handover may be set to (the server's `HANDOVER_HOURS`), each with its label. */
+  hours: Array<{ hour: number; label: string }>;
 }
 interface HandoverView {
   table: Record<string, EtaTier>;
@@ -123,6 +128,8 @@ export default function DeliveryManagement() {
   const [handoverView, setHandoverView] = useState<HandoverView | null>(null);
   const [policyDirty, setPolicyDirty] = useState(false);
   const [handoverDirty, setHandoverDirty] = useState(false);
+  // What the last Save sent, so its sentence names it: the fees' «applies to new orders», the handover's own.
+  const [savedWhat, setSavedWhat] = useState({ policy: false, handover: false });
 
   useEffect(() => {
     let live = true;
@@ -192,6 +199,8 @@ export default function DeliveryManagement() {
   };
   /** The time group a governorate is in now: the owner's move, else the table. */
   const tierOfRow = (id: string): EtaTier => handover?.tiers[id] ?? handoverView?.table[id] ?? 'far';
+  /** Moved off the owner's table — marked on its row, so a move does not look like the table. */
+  const movedOff = (id: string): boolean => !!handoverView && tierOfRow(id) !== handoverView.table[id];
   /** A governorate back on the owner's table drops its override; only real moves are stored. */
   const setTier = (id: string, tier: EtaTier) => {
     if (!handover || !handoverView) return;
@@ -234,17 +243,21 @@ export default function DeliveryManagement() {
   const save = async () => {
     setState('saving');
     setError('');
+    const sent = { policy: false, handover: false };
     try {
       // The handover only when it changed; the fees whenever they changed, or
       // when nothing did (the button's behaviour before the handover existed).
       if (handoverDirty && handover) {
         await api.put('/api/admin/settings/deliveryHandover', { value: handover });
         setHandoverDirty(false);
+        sent.handover = true;
       }
       if (policyDirty || !handoverDirty) {
         await api.put('/api/admin/settings/deliveryPolicy', { value: policy });
         setPolicyDirty(false);
+        sent.policy = true;
       }
+      setSavedWhat(sent);
       const fresh = await api.get<PolicyAnswer>('/api/admin/delivery-policy');
       setPolicy(fresh.policy);
       setProducts((prev) => ({ ...prev, ...fresh.products }));
@@ -449,13 +462,13 @@ export default function DeliveryManagement() {
             <label className="block">
               <span className="block text-[12px] text-text-secondary mb-1">{handoverWords.hour}</span>
               <select
-                className="lv-input w-auto"
+                className="lv-input w-auto max-w-full"
                 value={handover.hour}
                 onChange={(e) => updateHandover({ ...handover, hour: Number(e.target.value) })}
                 data-delivery-handover-hour
               >
-                {handoverWords.hours.map((label, h) => (
-                  <option key={h} value={h}>
+                {handoverWords.hours.map(({ hour, label }) => (
+                  <option key={hour} value={hour}>
                     {label}
                   </option>
                 ))}
@@ -499,9 +512,12 @@ export default function DeliveryManagement() {
                     onChange={(e) => setRule({ fee_iqd: Math.max(0, Math.trunc(Number(e.target.value) || 0)) })}
                   />
                 )}
+                {/* As wide as its longest window in words — 491 px in Sorani — the
+                    select spilled out of a phone's card (the review): its own line
+                    and the row's width there, and never wider than the row. */}
                 {handover && handoverWords && (
                   <select
-                    className="lv-input w-auto"
+                    className="lv-input w-full sm:w-auto max-w-full min-w-0"
                     value={tierOfRow(gov.id)}
                     onChange={(e) => setTier(gov.id, e.target.value as EtaTier)}
                     aria-label={handoverWords.tier.replace('{gov}', lang === 'en' ? gov.en : lang === 'ckb' ? gov.ckb : gov.ar)}
@@ -513,6 +529,11 @@ export default function DeliveryManagement() {
                       </option>
                     ))}
                   </select>
+                )}
+                {handover && handoverWords && movedOff(gov.id) && (
+                  <span className="text-[11px] text-text-muted" data-delivery-tier-moved={gov.id}>
+                    {handoverWords.moved}
+                  </span>
                 )}
               </div>
             );
@@ -543,9 +564,14 @@ export default function DeliveryManagement() {
         <button type="button" className="lv-button lv-button-primary w-full" onClick={save} disabled={state === 'saving'} data-delivery-save>
           <Save className="w-4 h-4" aria-hidden /> {state === 'saving' ? loc('جارٍ الحفظ…', 'Saving…', 'پاشەکەوت دەکرێت…') : loc('حفظ إدارة التوصيل', 'Save delivery management', 'پاشەکەوتکردنی بەڕێوەبردنی گەیاندن')}
         </button>
-        {state === 'saved' && (
+        {state === 'saved' && savedWhat.policy && (
           <p className="text-xs font-semibold text-text-muted flex items-center gap-1">
             <Check className="w-3 h-3 text-success" aria-hidden /> {loc('تم الحفظ — يسري على الطلبات الجديدة؛ الطلبات المؤكدة تحتفظ برسومها.', 'Saved — applies to new orders; placed orders keep their fee.', 'پاشەکەوت کرا — بۆ داواکارییە نوێیەکان؛ داواکارییە تۆمارکراوەکان کرێی خۆیان دەپارێزن.')}
+          </p>
+        )}
+        {state === 'saved' && savedWhat.handover && handoverWords && (
+          <p className="text-xs font-semibold text-text-muted flex items-center gap-1" data-delivery-saved-handover>
+            <Check className="w-3 h-3 text-success" aria-hidden /> {handoverWords.saved}
           </p>
         )}
         <p className="text-[11px] text-text-muted" data-delivery-updated>

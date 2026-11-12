@@ -31,7 +31,8 @@ function world() {
 
 test('junk is refused in three languages and never stored', async () => {
   const w = world();
-  for (const value of [null, 'tonight', { hour: 24 }, { hour: '19' }, { enabled: 'yes' }, { tiers: { atlantis: 'near' } }, { tiers: { baghdad: 'mars' } }, { closed_weekdays: [0, 1, 2, 3, 4, 5, 6] }]) {
+  // A midnight or morning hour too (the review): the arrival windows are the owner's words for an evening handover.
+  for (const value of [null, 'tonight', { hour: 24 }, { hour: 0 }, { hour: 9 }, { hour: '19' }, { enabled: 'yes' }, { tiers: { atlantis: 'near' } }, { tiers: { baghdad: 'mars' } }, { closed_weekdays: [0, 1, 2, 3, 4, 5, 6] }]) {
     const res = await put(w.admin, '/api/admin/settings/deliveryHandover', { value });
     assert.equal(res.status, 400, JSON.stringify(value));
     const body = await json(res);
@@ -50,7 +51,7 @@ test('a good save is stored canonical and audited; the page and the public setti
   assert.deepEqual(before.handover, DEFAULT_DELIVERY_HANDOVER);
   // The page's table and words come with it (the checkout is the module's only browser importer).
   assert.deepEqual(before.handover_view, JSON.parse(JSON.stringify(handoverAdminView())));
-  assert.equal(before.handover_view.words.ckb.hours[19], '٧ی ئێوارە');
+  assert.equal(before.handover_view.words.ckb.hours.find((x: { hour: number }) => x.hour === 19)?.label, '٧ی ئێوارە');
   const shipped = await json(await get(w.visitor, '/api/settings/public'));
   assert.deepEqual(shipped.settings.deliveryHandover, DEFAULT_DELIVERY_HANDOVER, 'public, before any order exists');
 
@@ -74,7 +75,8 @@ test('a row written any other way is clamped on the way out', async () => {
     .prepare("INSERT INTO admin_settings (key, value) VALUES ('deliveryHandover', ?)")
     .run(JSON.stringify({ enabled: 'maybe', hour: 31, tiers: { erbil: 'far', atlantis: 'near', basra: 'moon' }, closed_weekdays: [9, 5, 5] }));
   const out = (await json(await get(w.visitor, '/api/settings/public'))).settings.deliveryHandover;
-  assert.deepEqual(out, { enabled: true, hour: 23, tiers: { erbil: 'far' }, closed_weekdays: [5] });
+  // Hour 31 reads as the owner's 7 pm, not the nearest end (23 before the review).
+  assert.deepEqual(out, { enabled: true, hour: 19, tiers: { erbil: 'far' }, closed_weekdays: [5] });
   w.raw.close();
 });
 

@@ -108,7 +108,9 @@ test('a shop saved before the Sorani field reads the shipped Sorani — only whe
   const delivery = await getSetting(db, 'checkoutDeliveryMethods');
   const byId = new Map(delivery.map((m) => [m.id, m]));
   assert.equal(byId.get('standard')?.titleCkb, 'گەیاندنی ئاسایی');
-  assert.equal(byId.get('standard')?.descCkb, '2-3 ڕۆژی کار');
+  // Our old «2-3 أيام عمل» / '2-3 business days', untouched by the owner, reads as what we ship now
+  // (DECISIONS row 324, the review) — in Sorani too, rather than the old Sorani.
+  assert.equal(byId.get('standard')?.descCkb, 'لە ڕێگەی کۆمپانیای گەیاندنەوە — کاتەکەی بەپێی پارێزگاکەتە');
   assert.equal(byId.get('personal')?.titleCkb, undefined, 'a renamed method borrows no translation of the old name');
   assert.equal(byId.get('personal')?.descCkb, 'هەمان ڕۆژ', 'its description still says what we shipped');
   assert.equal(byId.get('pickup')?.titleCkb, 'وەرگرتنی خۆت', 'the owner’s Sorani wins');
@@ -124,7 +126,48 @@ test('a shop saved before the Sorani field reads the shipped Sorani — only whe
   assert.equal(methodTitle(byId.get('standard')!, 'ckb'), 'گەیاندنی ئاسایی');
   assert.equal(methodTitle(byId.get('personal')!, 'ckb'), 'مندوب خاص');
   assert.equal(methodTitle(byId.get('personal')!, 'en'), 'Courier');
-  assert.equal(methodDesc(byId.get('standard')!, 'ar'), '2-3 أيام عمل');
+  assert.equal(methodDesc(byId.get('standard')!, 'ar'), 'عبر شركة التوصيل — الموعد حسب محافظتك');
+});
+
+/**
+ * THE CARD ABOVE THE COURIER NOTE (DECISIONS row 324, the independent review). A shop that saved its
+ * method list — a price, another method's title — stored our «2-3 أيام عمل» with it, and the card
+ * printed it straight above «الوصول المتوقع إلى بغداد: غدًا». Our earlier words, in every language
+ * the row has, read as the words we ship now; one language the owner wrote keeps the row theirs.
+ */
+test('our earlier «2-3 أيام عمل» in a stored row reads as the current description; the owner’s own words are never replaced', async () => {
+  const now = SETTING_DEFAULTS.checkoutDeliveryMethods.find((m) => m.id === 'standard')!;
+  const standard = (desc: Record<string, string>) => ({ id: 'standard', titleAr: 'توصيل عادي', titleEn: 'Standard Delivery', titleCkb: 'گەیاندنی ئاسایی', price_iqd: 4000, icon: 'Truck', home_delivery: true, ...desc });
+  const readStandard = async (desc: Record<string, string>) => {
+    const methods = await getSetting(settingsDb({ checkoutDeliveryMethods: [standard(desc)] }), 'checkoutDeliveryMethods');
+    return methods.find((m) => m.id === 'standard')!;
+  };
+  // Ours in all three languages, ours with the Sorani never written, ours with stray spaces: the current words.
+  const ours: Array<Record<string, string>> = [
+    { descAr: '2-3 أيام عمل', descEn: '2-3 business days', descCkb: '2-3 ڕۆژی کار' },
+    { descAr: '2-3 أيام عمل', descEn: '2-3 business days' },
+    { descAr: ' 2-3 أيام عمل ', descEn: '', descCkb: '' },
+  ];
+  for (const desc of ours) {
+    const m = await readStandard(desc);
+    assert.deepEqual({ descAr: m.descAr, descEn: m.descEn, descCkb: m.descCkb }, { descAr: now.descAr, descEn: now.descEn, descCkb: now.descCkb }, JSON.stringify(desc));
+    assert.equal(m.price_iqd, 4000, 'only the description moves: the owner’s price stays');
+    for (const lang of ['ar', 'en', 'ckb']) assert.doesNotMatch(methodDesc(m, lang), /2-3/, `${lang}: ${JSON.stringify(desc)}`);
+  }
+  // The owner wrote one language: the row is theirs, as stored — and its Sorani reader keeps the Sorani we shipped with that Arabic.
+  const english = await readStandard({ descAr: '2-3 أيام عمل', descEn: 'Two to three working days' });
+  assert.equal(english.descAr, '2-3 أيام عمل');
+  assert.equal(english.descEn, 'Two to three working days');
+  assert.equal(english.descCkb, '2-3 ڕۆژی کار');
+  const sorani = await readStandard({ descAr: '2-3 أيام عمل', descEn: '2-3 business days', descCkb: 'دوو بۆ سێ ڕۆژ' });
+  assert.equal(sorani.descCkb, 'دوو بۆ سێ ڕۆژ', 'the owner’s Sorani is never replaced');
+  assert.equal(sorani.descAr, '2-3 أيام عمل');
+  // The owner's own Arabic is never touched.
+  const own = await readStandard({ descAr: 'يومان', descEn: '2-3 business days' });
+  assert.equal(own.descAr, 'يومان');
+  // Only the standard row's own old words: the same text on another method is that method's.
+  const other = await getSetting(settingsDb({ checkoutDeliveryMethods: [{ id: 'express', titleAr: 'سريع', titleEn: 'Express', descAr: '2-3 أيام عمل', descEn: '2-3 business days', price_iqd: 8000, icon: 'Truck' }] }), 'checkoutDeliveryMethods');
+  assert.equal(other.find((m) => m.id === 'express')?.descAr, '2-3 أيام عمل');
 });
 
 test('the admin can write the Sorani of every method, so a lent Sorani is visible before it is saved', () => {

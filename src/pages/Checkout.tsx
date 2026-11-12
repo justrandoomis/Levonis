@@ -56,12 +56,14 @@ import {
   deliveryEta,
   etaArrivalLine,
   etaDetails,
+  etaHandoverKind,
   etaHandoverLine,
   etaLang,
   ETA_TEXT,
   leavesWithCourier,
   resolveDeliveryHandover,
 } from '../../worker/lib/deliveryEta';
+import { useRerenderAt } from '../lib/useRerenderAt';
 import { useFreshOnReturn, changedPrices } from '../lib/useFreshOnReturn';
 import PromoCodeField, { readStoredPromo, storePromo } from '../components/PromoCodeField';
 import { CheckoutCouponsRow } from '../components/rewards/CartCoupons';
@@ -1515,31 +1517,40 @@ export default function Checkout() {
    *     10 am – 3 pm» under it would contradict it; the strip is that order's
    *     promise, so the note steps aside (by default PRO covers only
    *     «توصيل شخصي», which has no note anyway).
+   *   * NOT FOR A CARD THE SERVER CALLS UNAVAILABLE (a stopped governorate):
+   *     no timing, short or long, for a delivery that will not happen (the
+   *     review: the long version and its widened «!» question stayed).
    *
    * THE PICKER IS UNTOUCHED — the owner's «only add the note»: the offered
-   * days above and the server's checks are exactly what they were.
+   * days above and the server's checks are exactly what they were. The note
+   * is WORDED FOR THE DAY PICKED in it (the independent review): a later day
+   * goes to the courier the evening before it, as the board prepares it, and
+   * an estimate that lands after the picked day says so. Paid through Gini,
+   * the order waits for its receipt barcode, so the first line says the next
+   * handover after that instead of «before 7 pm, today».
    *
-   * ONE TIMEOUT keeps it true on a page left open: at the handover hour the
-   * line turns from «before 7 pm» to «tomorrow», and at Baghdad's midnight
-   * «tomorrow» becomes «today». The device clock is the only input, as for the
-   * picker; the note is an estimate and decides nothing.
+   * THE CLOCK IS READ AT EVERY RENDER, as the picker's «today» is, and
+   * `useRerenderAt` renders again once the next change has passed — at the
+   * handover hour «before 7 pm» turns into «tomorrow», at Baghdad's midnight
+   * «tomorrow» into «today» — by its timer, or the moment the page comes back
+   * from a sleeping phone, a frozen tab or the bfcache, whose timers ran on a
+   * stopped clock. A clock kept in state (until the review) kept tonight's
+   * handover on a page woken at 20:15. The device clock is the only input; the
+   * note is an estimate and decides nothing.
    */
   const handoverPolicy = useMemo(() => resolveDeliveryHandover(settings?.deliveryHandover), [settings?.deliveryHandover]);
-  const [etaNow, setEtaNow] = useState(() => Date.now());
   const etaGovernorate = addresses.find((a) => a.id === selectedAddressId)?.governorate ?? '';
+  const selectedDeliveryFee = quotedDeliveryFees?.find((f) => f.id === selectedDelivery?.id);
   const courierEta =
     settings !== null &&
     leavesWithCourier(selectedDelivery) &&
+    selectedDeliveryFee?.available !== false &&
     (quote ? quote.shipping_type === 'direct' : cartLooksDirect) &&
     quote?.priority_delivery?.eligible !== true
-      ? deliveryEta({ nowMs: etaNow, governorate: etaGovernorate, policy: handoverPolicy })
+      ? deliveryEta({ nowMs: Date.now(), governorate: etaGovernorate, policy: handoverPolicy, day: requestedDay })
       : null;
-  const etaChangesAt = courierEta?.next_change_ms ?? null;
-  useEffect(() => {
-    if (etaChangesAt === null) return;
-    const timer = window.setTimeout(() => setEtaNow(Date.now()), Math.max(1_000, etaChangesAt - Date.now() + 1_000));
-    return () => window.clearTimeout(timer);
-  }, [etaChangesAt]);
+  useRerenderAt(courierEta?.next_change_ms ?? null);
+  const etaGini = paymentMethod === 'gini';
   const etaWords = ETA_TEXT[etaLang(lang)];
 
   const deliveryPrice = selectedDelivery?.price_iqd || 0;
@@ -2790,10 +2801,14 @@ export default function Checkout() {
                     icon={<CalendarClock className="w-4 h-4" strokeWidth={1.5} />}
                     testId="checkout-courier-note"
                   >
-                    <span className="block font-light" data-courier-handover={courierEta.handover.is_today ? 'today' : courierEta.handover.cutoff_passed ? 'passed' : 'closed'}>
-                      {etaHandoverLine(courierEta, lang)}
+                    <span className="block font-light" data-courier-handover={etaHandoverKind(courierEta, { gini: etaGini })}>
+                      {etaHandoverLine(courierEta, lang, { gini: etaGini })}
                     </span>
-                    <span className="mt-1 block font-light" data-courier-arrival={courierEta.tier ?? 'generic'}>
+                    <span
+                      className="mt-1 block font-light"
+                      data-courier-arrival={courierEta.tier ?? 'generic'}
+                      data-courier-after-picked-day={courierEta.after_requested ? '' : undefined}
+                    >
                       {etaArrivalLine(courierEta, lang)}
                     </span>
                   </Note>

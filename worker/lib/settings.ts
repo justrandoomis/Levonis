@@ -922,7 +922,7 @@ export function normalizeSerialPrepGate(value: unknown): SerialPrepGate {
 function withShippedSorani(
   value: unknown,
   defaults: ReadonlyArray<Record<string, unknown>>,
-  earlier: ReadonlyArray<{ id: string; descAr: string; descCkb: string }> = []
+  earlier: ReadonlyArray<EarlierShippedDescription> = []
 ): unknown {
   if (!Array.isArray(value)) return value;
   const byId = new Map(defaults.map((d) => [d.id, d]));
@@ -930,9 +930,24 @@ function withShippedSorani(
   const blank = (v: unknown) => typeof v !== 'string' || v.trim() === '';
   return value.map((row) => {
     if (typeof row !== 'object' || row === null || Array.isArray(row)) return row;
-    const r = row as Record<string, unknown>;
+    let r = row as Record<string, unknown>;
     const d = byId.get(r.id);
     if (!d) return row;
+    // OUR EARLIER WORDS IN EVERY LANGUAGE (EARLIER_SHIPPED below) read as what
+    // we ship now: the Arabic word for word, and the English and the Sorani
+    // either ours too or left empty. One word the owner wrote keeps the row theirs.
+    const old = earlier.find((e) => e.id === r.id);
+    if (
+      old &&
+      same(r.descAr, old.descAr) &&
+      (blank(r.descEn) || same(r.descEn, old.descEn)) &&
+      (blank(r.descCkb) || same(r.descCkb, old.descCkb)) &&
+      typeof d.descAr === 'string' &&
+      typeof d.descEn === 'string' &&
+      typeof d.descCkb === 'string'
+    ) {
+      r = { ...r, descAr: d.descAr, descEn: d.descEn, descCkb: d.descCkb };
+    }
     let out = r;
     if (blank(r.titleCkb) && typeof d.titleCkb === 'string' && same(r.titleAr, d.titleAr)) out = { ...out, titleCkb: d.titleCkb };
     if (blank(r.descCkb) && typeof d.descCkb === 'string' && same(r.descAr, d.descAr)) out = { ...out, descCkb: d.descCkb };
@@ -947,13 +962,25 @@ function withShippedSorani(
 /**
  * WORDS WE SHIPPED BEFORE, still sitting in stored rows. A shop that saved its
  * methods while the standard card said «2-3 أيام عمل» still carries OUR words
- * there, not the owner's, so a Sorani reader keeps the Sorani they were
- * shipped with — the default moving on (DECISIONS row 324) must not hand that
- * reader the Arabic. The owner's own text is never replaced: changing the
- * stored description itself is the owner's, in Store settings.
+ * there, not the owner's — saving a price or another method's title writes the
+ * whole list, our description with it — and the card printed «2-3 أيام عمل»
+ * straight above the courier note's «الوصول المتوقع إلى بغداد: غدًا» (DECISIONS
+ * row 324, the independent review). So a row whose description is still
+ * exactly ours, in every language it has (the Arabic and English since the
+ * first commit, the Sorani since 2026-10-14), reads as the description we ship
+ * now. A row the owner wrote in, even one language of it, keeps their words,
+ * and a Sorani reader of such a row still gets the Sorani we shipped with the
+ * old Arabic rather than the Arabic. Read time only, as the Sorani above: the
+ * admin form shows the current words, so saving keeps them.
  */
-const EARLIER_SHIPPED_DELIVERY_DESCRIPTIONS: ReadonlyArray<{ id: string; descAr: string; descCkb: string }> = [
-  { id: 'standard', descAr: '2-3 أيام عمل', descCkb: '2-3 ڕۆژی کار' },
+interface EarlierShippedDescription {
+  id: string;
+  descAr: string;
+  descEn: string;
+  descCkb: string;
+}
+const EARLIER_SHIPPED_DELIVERY_DESCRIPTIONS: ReadonlyArray<EarlierShippedDescription> = [
+  { id: 'standard', descAr: '2-3 أيام عمل', descEn: '2-3 business days', descCkb: '2-3 ڕۆژی کار' },
 ];
 
 function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeof SETTING_DEFAULTS)[K] {

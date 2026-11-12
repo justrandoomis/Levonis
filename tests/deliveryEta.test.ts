@@ -25,9 +25,12 @@ import {
   ETA_WINDOWS,
   HANDOVER_ADMIN_TEXT,
   HANDOVER_REFUSALS,
+  HANDOVER_HOURS,
+  PREP_LEAD_DAYS,
   deliveryEta,
   etaArrivalLine,
   etaDetails,
+  etaHandoverKind,
   etaHandoverLine,
   handoverAdminView,
   hourWords,
@@ -47,8 +50,8 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), 'utf8');
 const P: DeliveryHandoverPolicy = resolveDeliveryHandover(undefined);
 /** Baghdad wall-clock → epoch ms. Iraq is UTC+3 all year. */
 const baghdad = (day: string, hhmm: string) => Date.parse(`${day}T${hhmm}:00.000+03:00`);
-const eta = (nowMs: number, governorate: unknown, policy = P) => {
-  const e = deliveryEta({ nowMs, governorate, policy });
+const eta = (nowMs: number, governorate: unknown, policy = P, day?: string | null) => {
+  const e = deliveryEta({ nowMs, governorate, policy, day });
   assert.ok(e, 'the note is on');
   return e;
 };
@@ -188,6 +191,24 @@ test('a closed weekday (supported, empty by default): Thursday 20:30 and Friday 
   assert.equal(etaDetails(fridays, 'en').lines[0], "We prepare every order and hand it to the delivery company's courier at 7 pm every day except Friday.");
 });
 
+test('a closed weekday has no hour to pass: Friday 20:00 still says «no handover today», and its next change is midnight (the review)', () => {
+  const fridays = resolveDeliveryHandover({ closed_weekdays: [5] });
+  for (const hhmm of ['00:30', '11:00', '18:59', '19:00', '20:00', '23:59']) {
+    const fri = eta(baghdad('2026-11-13', hhmm), 'baghdad', fridays);
+    assert.equal(fri.handover.today_closed, true, hhmm);
+    assert.equal(fri.handover.cutoff_passed, false, `${hhmm}: there was no handover today to pass`);
+    assert.equal(fri.handover.day, '2026-11-14', hhmm);
+    assert.equal(etaHandoverKind(fri), 'closed', hhmm);
+    assert.equal(etaHandoverLine(fri, 'ar'), 'لا تسليم لشركة التوصيل اليوم، فيُسلَّم طلبك لمندوبها غدًا الساعة ٧ مساءً.', hhmm);
+    // The page's timer wakes at midnight on a closed day; nothing is due to change at 19:00 any more.
+    assert.equal(new Date(fri.next_change_ms).toISOString(), '2026-11-13T21:00:00.000Z', hhmm);
+  }
+  // The day before a closed day, after the hour, its own handover did pass: «فات» is true there.
+  const thu = eta(baghdad('2026-11-12', '20:00'), 'baghdad', fridays);
+  assert.equal(etaHandoverKind(thu), 'passed');
+  assert.equal(thu.handover.today_closed, false);
+});
+
 test('the long version: the rule, the cutoff, the three groups as the table stands, the Baghdad example, the estimate', () => {
   const ar = etaDetails(P, 'ar');
   assert.equal(ar.title, 'متى يصل طلبك؟');
@@ -209,6 +230,114 @@ test('the long version: the rule, the cutoff, the three groups as the table stan
   // A group the owner emptied is left out rather than printed with no names.
   const noKurdistan = resolveDeliveryHandover({ tiers: { erbil: 'far', sulaymaniyah: 'far', duhok: 'far' } });
   assert.equal(etaDetails(noKurdistan, 'en').lines.some((l) => l.startsWith('Kurdistan Region')), false);
+  // «+17 hrs» is the owner's figure for 7 pm (to about noon the next day): at any other hour it is not said.
+  for (const hour of [12, 18, 20, 23]) {
+    const near = etaDetails(resolveDeliveryHandover({ hour }), 'en').lines.find((l) => l.startsWith('Governorates near'))!;
+    assert.match(near, /— the day after handover, between 10 am and 3 pm\.$/, `hour ${hour}`);
+    assert.doesNotMatch(near, /17 hours/, `hour ${hour}`);
+    for (const lang of ['ar', 'ckb'] as const) assert.doesNotMatch(etaDetails(resolveDeliveryHandover({ hour }), lang).lines.join(' '), /١٧/, `${lang} hour ${hour}`);
+  }
+  assert.match(etaDetails(P, 'en').lines.join(' '), /about 17 hours after it\./);
+});
+
+// =========================================================================
+// THE PICKED DAY: the note words the order being placed (the review)
+// =========================================================================
+
+test('a later day picked: the evening before it is the handover (the board’s day), and the picked day is the arrival', () => {
+  assert.equal(PREP_LEAD_DAYS, 1, 'the owner’s «1 day everywhere»');
+  // Wed 11-11 13:00, Baghdad, «الأحد ١٥ تشرين الثاني» picked under the note.
+  const e = eta(baghdad('2026-11-11', '13:00'), 'baghdad', P, '2026-11-15');
+  assert.equal(e.requested_day, '2026-11-15');
+  assert.equal(e.send_day, '2026-11-14', 'prepared and handed over the day before, as the board files it');
+  assert.equal(e.arrival_day, '2026-11-15');
+  assert.equal(e.after_requested, false);
+  assert.equal(etaHandoverKind(e), 'day');
+  assert.equal(etaHandoverLine(e, 'ar'), 'نجهّز طلبك لليوم الذي اخترته، ونسلّمه لمندوب شركة التوصيل السبت ١٤ تشرين الثاني الساعة ٧ مساءً.');
+  assert.equal(etaHandoverLine(e, 'en'), "We prepare your order for the day you chose. Handover to the delivery company's courier: Saturday 14 November, 7 pm.");
+  assert.equal(etaHandoverLine(e, 'ckb'), 'داواکارییەکەت بۆ ئەو ڕۆژەی هەڵتبژاردووە ئامادە دەکەین، و شەممە ١٤ تشرینی دووەم کاتژمێر ٧ی ئێوارە ڕادەستی گەیێنەری کۆمپانیای گەیاندنی دەکەین.');
+  assert.equal(etaArrivalLine(e, 'ar'), 'الوصول المتوقع إلى بغداد: الأحد ١٥ تشرين الثاني بين ١٠ صباحًا و٣ عصرًا (تقديري).');
+  assert.equal(etaArrivalLine(e, 'en'), 'Expected in Baghdad: Sunday 15 November, between 10 am and 3 pm (estimate).');
+  // Not «اليوم» and not «غدًا»: the two sentences the review found under a picked Sunday.
+  assert.doesNotMatch(etaHandoverLine(e, 'ar'), /اليوم\./);
+  assert.doesNotMatch(etaArrivalLine(e, 'ar'), /غدًا/);
+  // Two days ahead: the handover is tomorrow, said as such.
+  assert.equal(etaHandoverLine(eta(baghdad('2026-11-11', '13:00'), 'basra', P, '2026-11-13'), 'en'), "We prepare your order for the day you chose. Handover to the delivery company's courier: tomorrow, 7 pm.");
+});
+
+test('a picked day no later than the next handover allows goes with it; one the estimate cannot meet is said to be later', () => {
+  // Before 7 pm, «غدًا» picked: tonight's handover, arriving the picked day — the same words as «في أقرب وقت».
+  const tomorrow = eta(baghdad('2026-11-11', '13:00'), 'baghdad', P, '2026-11-12');
+  const asap = eta(baghdad('2026-11-11', '13:00'), 'baghdad');
+  assert.equal(tomorrow.send_day, '2026-11-11');
+  assert.equal(etaHandoverKind(tomorrow), 'today');
+  assert.equal(etaHandoverLine(tomorrow, 'ar'), etaHandoverLine(asap, 'ar'));
+  assert.equal(etaArrivalLine(tomorrow, 'ar'), etaArrivalLine(asap, 'ar'));
+  // 8 pm, «اليوم» or «غدًا» picked (the picker still offers both — the owner's «only add the note»):
+  // tomorrow's handover, Friday's arrival, and the note says that is after the picked day.
+  for (const picked of ['2026-11-11', '2026-11-12']) {
+    const late = eta(baghdad('2026-11-11', '20:00'), 'baghdad', P, picked);
+    assert.equal(late.send_day, '2026-11-12', picked);
+    assert.equal(late.arrival_day, '2026-11-13', picked);
+    assert.equal(late.after_requested, true, picked);
+    assert.equal(etaHandoverKind(late), 'passed', picked);
+    assert.equal(etaArrivalLine(late, 'ar'), 'الوصول المتوقع إلى بغداد: الجمعة ١٣ تشرين الثاني بين ١٠ صباحًا و٣ عصرًا (تقديري) — بعد اليوم الذي اخترته.', picked);
+    assert.equal(etaArrivalLine(late, 'en'), 'Expected in Baghdad: Friday 13 November, between 10 am and 3 pm (estimate) — later than the day you chose.', picked);
+    assert.equal(etaArrivalLine(late, 'ckb'), 'گەیشتنی چاوەڕوانکراو بۆ بەغدا: هەینی ١٣ تشرینی دووەم لە نێوان کاتژمێر ١٠ی پێش نیوەڕۆ و ٣ی دوای نیوەڕۆ (خەمڵێنراو) — دوای ئەو ڕۆژەی هەڵتبژاردووە.', picked);
+  }
+  // Nothing picked, or something that is not a day: as soon as possible, exactly as before.
+  for (const none of [null, '', 'soon', '2026-13-40']) {
+    const e = deliveryEta({ nowMs: baghdad('2026-11-11', '13:00'), governorate: 'baghdad', policy: P, day: none })!;
+    assert.equal(e.requested_day, '', String(none));
+    assert.equal(e.send_day, e.handover.day, String(none));
+    assert.equal(e.after_requested, false, String(none));
+  }
+  // The picked day's words change at the same instants as the rest of the note.
+  assert.equal(eta(baghdad('2026-11-11', '13:00'), 'baghdad', P, '2026-11-15').next_change_ms, asap.next_change_ms);
+});
+
+test('Kurdistan with a day picked: handed over the evening before, so by the owner’s two-day road it lands after the picked day — said, not hidden', () => {
+  const e = eta(baghdad('2026-11-11', '13:00'), 'erbil', P, '2026-11-15');
+  assert.equal(e.send_day, '2026-11-14');
+  assert.equal(e.arrival_day, '2026-11-16');
+  assert.equal(e.after_requested, true);
+  assert.equal(etaArrivalLine(e, 'ar'), 'الوصول المتوقع إلى أربيل: الاثنين ١٦ تشرين الثاني ليلًا، وقد تؤخّره نقاط التفتيش أكثر (تقديري) — بعد اليوم الذي اخترته.');
+  // A governorate the owner moved to far keeps the picked day.
+  const moved = eta(baghdad('2026-11-11', '13:00'), 'erbil', resolveDeliveryHandover({ tiers: { erbil: 'far' } }), '2026-11-15');
+  assert.equal(moved.arrival_day, '2026-11-15');
+  assert.equal(moved.after_requested, false);
+  // An address with no governorate: the picked day's handover, then the generic sentence.
+  const none = eta(baghdad('2026-11-11', '13:00'), '', P, '2026-11-15');
+  assert.equal(etaHandoverKind(none), 'day');
+  assert.equal(etaArrivalLine(none, 'en'), ETA_TEXT.en.generic);
+});
+
+test('a closed weekday the evening before the picked day moves the handover on, and the note says the estimate is later', () => {
+  const fridays = resolveDeliveryHandover({ closed_weekdays: [5] });
+  // Wed 11-11, Saturday 14 picked: Friday's evening is closed, so Saturday's handover, Sunday's arrival.
+  const e = eta(baghdad('2026-11-11', '13:00'), 'baghdad', fridays, '2026-11-14');
+  assert.equal(e.send_day, '2026-11-14');
+  assert.equal(e.arrival_day, '2026-11-15');
+  assert.equal(e.after_requested, true);
+});
+
+test('paid through Gini: no «before 7 pm, today» — the order waits for its receipt barcode, then the next handover', () => {
+  const e = eta(baghdad('2026-11-11', '15:00'), 'baghdad');
+  assert.equal(etaHandoverKind(e, { gini: true }), 'gini');
+  assert.equal(etaHandoverLine(e, 'ar', { gini: true }), 'بعد تأكيد شرائه من تطبيق جني ومسح باركود الاستلام، يُسلَّم طلبك لمندوب شركة التوصيل في أقرب تسليم الساعة ٧ مساءً.');
+  assert.equal(
+    etaHandoverLine(e, 'en', { gini: true }),
+    "Once the purchase is confirmed in the Gini app and the receipt barcode is scanned, your order goes to the delivery company's courier at the next 7 pm handover."
+  );
+  assert.equal(
+    etaHandoverLine(e, 'ckb', { gini: true }),
+    'دوای پشتڕاستکردنەوەی کڕینەکەی لە ئەپی جینی و سکانکردنی باڕکۆدی وەرگرتن، داواکارییەکەت لە نزیکترین ڕادەستکردندا کاتژمێر ٧ی ئێوارە ڕادەستی گەیێنەری کۆمپانیای گەیاندن دەکرێت.'
+  );
+  // The arrival stays, marked as the estimate it is.
+  assert.match(etaArrivalLine(e, 'ar'), /\(تقديري\)\.$/);
+  // Any other payment, the hour's own line; a later picked day, the picked day's line (confirmed or cancelled by then).
+  assert.equal(etaHandoverKind(e), 'today');
+  assert.equal(etaHandoverKind(eta(baghdad('2026-11-11', '15:00'), 'baghdad', P, '2026-11-15'), { gini: true }), 'day');
 });
 
 // =========================================================================
@@ -218,12 +347,17 @@ test('the long version: the rule, the cutoff, the three groups as the table stan
 test('the resolver clamps whatever a row holds into a usable policy', () => {
   for (const junk of [undefined, null, 'x', 7, [], [1, 2]]) assert.deepEqual(resolveDeliveryHandover(junk), DEFAULT_DELIVERY_HANDOVER, String(junk));
   const hour = (v: unknown) => resolveDeliveryHandover({ hour: v }).hour;
-  assert.equal(hour(25), 23);
-  assert.equal(hour(-3), 0);
+  assert.deepEqual(HANDOVER_HOURS, { min: 12, max: 23 }, 'noon to 11 pm: the hours the evening windows hold for');
+  // Outside the hours the fixed windows were written for: the owner's 7 pm, not the nearest end (the review).
+  for (const outside of [25, 24, -3, 0, 5, 11, 11.4]) assert.equal(hour(outside), 19, String(outside));
+  assert.equal(hour(12), 12);
+  assert.equal(hour(23), 23);
   assert.equal(hour('18'), 18, 'a settings row is text');
   assert.equal(hour(18.6), 19);
   assert.equal(hour('abc'), 19, 'unreadable keeps the owner’s 7 pm');
   assert.equal(hour(''), 19);
+  // Hour 0 used to run as «فات تسليم اليوم (الساعة ١٢ ليلًا)» all day long; read as 7 pm it is the owner's line at 13:00.
+  assert.equal(etaHandoverKind(eta(baghdad('2026-11-11', '13:00'), 'baghdad', resolveDeliveryHandover({ hour: 0 }))), 'today');
   assert.equal(resolveDeliveryHandover({ enabled: false }).enabled, false);
   assert.equal(resolveDeliveryHandover({ enabled: 'yes' }).enabled, true, 'junk keeps the default');
   assert.deepEqual(
@@ -252,8 +386,12 @@ test('the admin PUT refuses junk in three languages and stores only the canonica
   refused({ enabled: 'yes' }, 'enabled');
   refused({ hour: 24 }, 'hour');
   refused({ hour: -1 }, 'hour');
+  refused({ hour: 0 }, 'hour');
+  refused({ hour: 11 }, 'hour');
   refused({ hour: 7.5 }, 'hour');
   refused({ hour: '19' }, 'hour');
+  for (const hour of [12, 23]) assert.equal(validateDeliveryHandover({ hour }).ok, true, `hour ${hour}`);
+  assert.match(HANDOVER_REFUSALS.en.hour, /from 12 to 23/);
   refused({ tiers: [] }, 'tiers');
   refused({ tiers: { atlantis: 'near' } }, 'tiers');
   refused({ tiers: { Erbil: 'far' } }, 'tiers');
@@ -384,18 +522,25 @@ test('at 20:00 the picker still offers today and the seven days after it — the
 
 test('checkout draws the note under the chosen courier card, above the picker, and the long version inside «تفاصيل التوصيل»', () => {
   const checkout = read('src/pages/Checkout.tsx');
-  // Gated as the picker is (a direct cart), on a courier method, never beside the PRO 12-hour strip.
+  // Gated as the picker is (a direct cart), on a courier method the server has not called unavailable,
+  // never beside the PRO 12-hour strip; the clock read at render and the picked day passed (the review).
   assert.match(
     checkout,
-    /const courierEta =\s*settings !== null &&\s*leavesWithCourier\(selectedDelivery\) &&\s*\(quote \? quote\.shipping_type === 'direct' : cartLooksDirect\) &&\s*quote\?\.priority_delivery\?\.eligible !== true\s*\? deliveryEta\(\{ nowMs: etaNow, governorate: etaGovernorate, policy: handoverPolicy \}\)\s*: null;/
+    /const selectedDeliveryFee = quotedDeliveryFees\?\.find\(\(f\) => f\.id === selectedDelivery\?\.id\);\s*const courierEta =\s*settings !== null &&\s*leavesWithCourier\(selectedDelivery\) &&\s*selectedDeliveryFee\?\.available !== false &&\s*\(quote \? quote\.shipping_type === 'direct' : cartLooksDirect\) &&\s*quote\?\.priority_delivery\?\.eligible !== true\s*\? deliveryEta\(\{ nowMs: Date\.now\(\), governorate: etaGovernorate, policy: handoverPolicy, day: requestedDay \}\)\s*: null;\s*useRerenderAt\(courierEta\?\.next_change_ms \?\? null\);/
   );
-  // One timeout, re-armed at each change.
-  assert.match(checkout, /window\.setTimeout\(\(\) => setEtaNow\(Date\.now\(\)\), Math\.max\(1_000, etaChangesAt - Date\.now\(\) \+ 1_000\)\)/);
+  // No clock kept in state: the frozen `etaNow` was the review's finding (tests/courierNoteClock.test.ts renders the hook).
+  assert.doesNotMatch(checkout, /etaNow|setEtaNow/);
+  // Gini words its own first line; the data attribute names which line is drawn.
+  assert.match(checkout, /const etaGini = paymentMethod === 'gini';/);
+  assert.match(checkout, /data-courier-handover=\{etaHandoverKind\(courierEta, \{ gini: etaGini \}\)\}>\s*\{etaHandoverLine\(courierEta, lang, \{ gini: etaGini \}\)\}/);
   const note = checkout.indexOf('testId="checkout-courier-note"');
   const picker = checkout.indexOf('<DeliveryDayPicker');
   const card = checkout.indexOf('data-delivery-fee={method.id}');
   assert.ok(card > 0 && note > card && picker > note, 'card, then the note, then the picker');
   assert.match(checkout, /\{selected && courierEta && !unavailable \? \(\s*<Note\s+tone="zinc"\s+compact\s+animate=\{false\}/);
+  // The long version and the widened question hang on the same `courierEta`, so an unavailable card has neither.
+  assert.match(checkout, /question=\{courierEta \? etaWords\.question :/);
+  assert.match(checkout, /\{courierEta && \(\s*<div className="space-y-1 border-t border-white\/5 pt-2" data-courier-details>/);
   // The long version sits in the delivery row's «!», after the fee's own reasons.
   const details = checkout.indexOf('data-courier-details');
   const summaryOpen = checkout.indexOf('testId="delivery"');
@@ -411,6 +556,15 @@ test('«إدارة التوصيل» edits the hour, the switch and each governor
   assert.match(page, /api\.put\('\/api\/admin\/settings\/deliveryHandover', \{ value: handover \}\)/);
   // Only real moves are stored: back on the table, the override is dropped.
   assert.match(page, /if \(tier === handoverView\.table\[id\]\) delete tiers\[id\];/);
+  // The review: the select fits a phone's row (its own line there, never wider than the row) …
+  assert.match(page, /<select\s+className="lv-input w-full sm:w-auto max-w-full min-w-0"\s+value=\{tierOfRow\(gov\.id\)\}/);
+  assert.doesNotMatch(page, /className="lv-input w-auto"\s+value=\{tierOfRow/);
+  // … a moved governorate is marked on its row, and a Save that sent the handover says so in its own words.
+  assert.match(page, /movedOff\(gov\.id\) && \(\s*<span className="text-\[11px\] text-text-muted" data-delivery-tier-moved=\{gov\.id\}>\s*\{handoverWords\.moved\}/);
+  assert.match(page, /\{state === 'saved' && savedWhat\.handover && handoverWords && \(/);
+  assert.match(page, /\{state === 'saved' && savedWhat\.policy && \(/);
+  // The hour select offers the server's hours, not 0..23.
+  assert.match(page, /handoverWords\.hours\.map\(\(\{ hour, label \}\) => \(/);
 });
 
 test('the admin page reads the table and its words from the server, so it never shares the module with the checkout', () => {
@@ -418,14 +572,17 @@ test('the admin page reads the table and its words from the server, so it never 
   assert.deepEqual(view.table, DEFAULT_ETA_TIERS);
   for (const lang of ['ar', 'en', 'ckb'] as const) {
     const w = view.words[lang];
-    assert.equal(w.hours.length, 24);
-    assert.equal(w.hours[19], hourWords(19, lang));
+    // Noon to 11 pm only (the review): the windows are the owner's words for an evening handover.
+    assert.deepEqual(w.hours.map((x) => x.hour), [12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]);
+    assert.equal(w.hours.find((x) => x.hour === 19)?.label, hourWords(19, lang));
     assert.equal(w.tiers.far, tierOptionWords('far', lang));
     assert.equal(w.title, HANDOVER_ADMIN_TEXT[lang].title);
+    assert.equal(w.moved, HANDOVER_ADMIN_TEXT[lang].moved);
+    assert.equal(w.saved, HANDOVER_ADMIN_TEXT[lang].saved);
     assert.match(w.tier, /\{gov\}/, 'the page fills the governorate');
   }
   assert.equal(view.words.ar.tiers.near, 'قريبة: اليوم التالي، بين ١٠ صباحًا و٣ عصرًا');
-  assert.equal(view.words.en.hours[0], '12 am');
+  assert.deepEqual(view.words.en.hours[0], { hour: 12, label: '12 pm' });
   // THE CHECKOUT IS THE ONLY BROWSER IMPORTER. A second one makes the module a
   // chunk of its own, named in the entry's preload map on every first visit —
   // 12 B over the storefront payload's cap when it was tried (DECISIONS row 324).
