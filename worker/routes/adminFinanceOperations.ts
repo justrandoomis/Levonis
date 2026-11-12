@@ -5,7 +5,7 @@ import { isOwner } from '../lib/adminScope';
 import { requireCostRead } from '../lib/costAccess';
 import { limitByMethod } from '../lib/ratelimit';
 import { newId } from '../lib/crypto';
-import { audit } from '../lib/audit';
+import { audit, auditStatements } from '../lib/audit';
 import {
   baghdadDay,
   dateValue,
@@ -74,15 +74,16 @@ for (const [path, table] of [
     const user = c.get('user')!;
     await requireCapability(c.env, user, 'rules');
     const b = await c.req.json<Record<string, unknown>>(),
-      id = newId(path === 'staff' ? 'staff' : 'cc');
-    if (path === 'staff')
-      await c.env.DB.prepare('INSERT INTO finance_staff(id,name,role) VALUES (?,?,?)')
-        .bind(id, str(b.name, 'الاسم', { min: 1, max: 120 }), text(b.role, 120))
-        .run();
-    else
-      await c.env.DB.prepare(`INSERT INTO ${table}(id,name) VALUES (?,?)`)
-        .bind(id, str(b.name, 'الاسم', { min: 1, max: 120 }))
-        .run();
+      id = newId(path === 'staff' ? 'staff' : 'cc'),
+      name = str(b.name, 'الاسم', { min: 1, max: 120 }),
+      role = path === 'staff' ? text(b.role, 120) : '';
+    // Every change to the people and centres money is paid to or carried by leaves its row (the owner's brief, 2026-11-12).
+    await c.env.DB.batch([
+      path === 'staff'
+        ? c.env.DB.prepare('INSERT INTO finance_staff(id,name,role) VALUES (?,?,?)').bind(id, name, role)
+        : c.env.DB.prepare(`INSERT INTO ${table}(id,name) VALUES (?,?)`).bind(id, name),
+      ...(await auditStatements(c.env.DB, user.id, path === 'staff' ? 'finance.staff_created' : 'finance.center_created', id, path === 'staff' ? { name, role } : { name })).statements,
+    ]);
     return c.json({ success: true, id });
   });
   adminFinanceOperationsRoutes.patch(`/${path}/:id`, async (c) => {
@@ -91,9 +92,14 @@ for (const [path, table] of [
     const b = await c.req.json<Record<string, unknown>>();
     if(path==='staff'&&!isOwner(c.env,user))throw forbidden('تعديل بدء العمل للأدمن الرئيسي فقط');
     if(path==='staff')return c.json({success:true,id:c.req.param('id'),...await updateStaffEmployment(c.env.DB,c.req.param('id'),b,user.id)});
-    await c.env.DB.prepare(`UPDATE ${table} SET name=?,active=? WHERE id=?`)
-      .bind(str(b.name, 'الاسم', { min: 1, max: 120 }), b.active === false ? 0 : 1, c.req.param('id'))
-      .run();
+    const id = c.req.param('id'),
+      before = await c.env.DB.prepare(`SELECT name,active FROM ${table} WHERE id=?`).bind(id).first<{ name: string; active: number }>();
+    if (!before) throw notFound('Cost centre not found');
+    const after = { name: str(b.name, 'الاسم', { min: 1, max: 120 }), active: b.active === false ? 0 : 1 };
+    await c.env.DB.batch([
+      c.env.DB.prepare(`UPDATE ${table} SET name=?,active=? WHERE id=?`).bind(after.name, after.active, id),
+      ...(await auditStatements(c.env.DB, user.id, 'finance.center_updated', id, { before, after })).statements,
+    ]);
     return c.json({ success: true });
   });
 }
@@ -247,6 +253,7 @@ adminFinanceOperationsRoutes.post('/orders/:id/reconcile', async (c) => {
   )
     await runOrderFinancialEffects(c.env, id, 'prepared');
   if (order.status === 'delivered') await runOrderFinancialEffects(c.env, id, 'delivered');
+  await audit(c.env.DB, user.id, 'finance.order_recomputed', id, { status: order.status, stage: order.stage });
   return c.json({ success: true });
 });
 adminFinanceOperationsRoutes.post('/orders/:id/assignment', async (c) => {
@@ -274,6 +281,7 @@ adminFinanceOperationsRoutes.post('/orders/:id/assignment', async (c) => {
       c.env.DB.prepare(
         'INSERT INTO finance_task_assignments(order_id,group_key,staff_id,completed_at,actor_id) VALUES (?,?,?,?,?) ON CONFLICT(order_id,group_key) DO UPDATE SET staff_id=excluded.staff_id,completed_at=excluded.completed_at,actor_id=excluded.actor_id',
       ).bind(id, group, staff, b.completed ? new Date().toISOString() : null, user.id),
+      ...(await auditStatements(c.env.DB, user.id, 'finance.order_assigned', id, { group_key: group, staff_id: staff, completed: !!b.completed })).statements,
     ]);
   } catch (e) {
     if (/CHECK constraint failed/i.test(e instanceof Error ? e.message : String(e)))
@@ -286,9 +294,12 @@ adminFinanceOperationsRoutes.post('/orders/:id/assignment', async (c) => {
 adminFinanceOperationsRoutes.post('/costs/:id/approve', async (c) => {
   const user = c.get('user')!;
   await requireCapability(c.env, user, 'pay');
-  await c.env.DB.prepare("UPDATE finance_order_costs SET state='approved' WHERE id=? AND state='due'")
-    .bind(c.req.param('id'))
-    .run();
+  const id = c.req.param('id'),
+    cost = await c.env.DB.prepare("SELECT order_id,staff_id,amount_iqd FROM finance_order_costs WHERE id=? AND state='due'").bind(id)
+      .first<{ order_id: string; staff_id: string; amount_iqd: number }>();
+  // Only a cost that moved from «due» gets a row: a second press finds it approved and changes nothing.
+  const done = await c.env.DB.prepare("UPDATE finance_order_costs SET state='approved' WHERE id=? AND state='due'").bind(id).run();
+  if (cost && done.meta?.changes) await audit(c.env.DB, user.id, 'finance.cost_approved', id, cost);
   return c.json({ success: true });
 });
 adminFinanceOperationsRoutes.post('/costs/:id/reverse', async (c) => {
@@ -556,6 +567,7 @@ adminFinanceOperationsRoutes.post('/expense-links', async (c) => {
   const changes=oldLink?fence(db,'EXISTS(SELECT 1 FROM finance_expense_links WHERE expense_id=? AND center_id IS ? AND order_id IS ? AND allocation_basis=? AND target_type=? AND target_id=?)',[expense,oldLink.center_id,oldLink.order_id,oldLink.allocation_basis,oldLink.target_type,oldLink.target_id]):fence(db,'NOT EXISTS(SELECT 1 FROM finance_expense_links WHERE expense_id=?)',[expense]);
   changes.push(db.prepare('INSERT INTO finance_expense_links(expense_id,center_id,order_id,allocation_basis,target_type,target_id) VALUES (?,?,?,?,?,?) ON CONFLICT(expense_id) DO UPDATE SET center_id=excluded.center_id,order_id=excluded.order_id,allocation_basis=excluded.allocation_basis,target_type=excluded.target_type,target_id=excluded.target_id')
     .bind(expense,text(b.center_id,60)||null,orderId,basis,target,targetId));
+  changes.push(...(await auditStatements(db,user.id,'finance.expense_linked',expense,{before:oldLink??null,after:{center_id:text(b.center_id,60)||null,order_id:orderId,allocation_basis:basis,target_type:target,target_id:targetId}})).statements);
   await commitParticipantStatements(db,changes);
   for(const affected of new Set([oldLink?.order_id,orderId].filter((id):id is string=>!!id)))
     await reconcileFinanceOrder(db,affected,{actor:user.id});
@@ -661,6 +673,9 @@ adminFinanceOperationsRoutes.post('/collections', async (c) => {
         { account: salePosted ? '1100' : '2300', credit: amount },
       ],
     ).statements,
+    ...(await auditStatements(db, user.id, 'finance.collection_recorded', id, {
+      order_id: orderId, payer, amount_iqd: amount, fee_iqd: fee, net_iqd: amount - fee, collection_day: day, reference: text(b.reference),
+    })).statements,
   );
   await db.batch(statements);
   await reconcileFinanceOrder(db,orderId,{actor:user.id,day});
@@ -744,20 +759,24 @@ adminFinanceOperationsRoutes.post('/journal', async (c) => {
       credit: whole(r.credit ?? 0, 'الدائن'),
     };
   });
-  await c.env.DB.batch(
-    journalPlan(
+  const title = str(b.title, 'العنوان', { min: 3, max: 200 });
+  await c.env.DB.batch([
+    ...journalPlan(
       c.env.DB,
       {
         key: `manual:${id}`,
         day,
-        title: str(b.title, 'العنوان', { min: 3, max: 200 }),
+        title,
         source: 'manual',
         sourceId: id,
         actor: user.id,
       },
       lines,
     ).statements,
-  );
+    ...(await auditStatements(c.env.DB, user.id, 'accounting.journal_posted', `manual:${id}`, {
+      day, title, lines: lines.map((l) => [l.account, l.debit ?? 0, l.credit ?? 0]), debit_iqd: lines.reduce((n, l) => n + (l.debit ?? 0), 0),
+    })).statements,
+  ]);
   return c.json({ success: true });
 });
 adminFinanceOperationsRoutes.post('/journal/:id/reverse', async (c) => {
@@ -783,13 +802,14 @@ adminFinanceOperationsRoutes.post('/journal/:id/reverse', async (c) => {
         .bind(id)
         .all<{ account_code: string; debit_iqd: number; credit_iqd: number }>()
     ).results ?? [];
-  await db.batch(
-    journalPlan(
+  const reason = str(b.reason, 'السبب', { min: 3, max: 200 });
+  await db.batch([
+    ...journalPlan(
       db,
       {
         key: `reverse:${id}`,
         day,
-        title: str(b.reason, 'السبب', { min: 3, max: 200 }),
+        title: reason,
         source: 'manual_reversal',
         sourceId: id,
         actor: user.id,
@@ -797,7 +817,10 @@ adminFinanceOperationsRoutes.post('/journal/:id/reverse', async (c) => {
       },
       lines.map((l) => ({ account: l.account_code, debit: l.credit_iqd, credit: l.debit_iqd })),
     ).statements,
-  );
+    ...(await auditStatements(db, user.id, 'accounting.journal_reversed', id, {
+      day, reason, debit_iqd: lines.reduce((n, l) => n + l.debit_iqd, 0),
+    })).statements,
+  ]);
   return c.json({ success: true });
 });
 adminFinanceOperationsRoutes.post('/periods/close', async (c) => {

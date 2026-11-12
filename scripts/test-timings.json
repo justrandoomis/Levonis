@@ -364,6 +364,7 @@
     "tests/fetchGuard.test.ts": 0.3,
     "tests/fileRangeDelivery.test.ts": 48.1,
     "tests/fillButton.test.ts": 0.5,
+    "tests/financeAuditTrail.test.ts": 10.9,
     "tests/financeCostsInteractions.test.ts": 4.7,
     "tests/financeCostsPages.test.ts": 19.8,
     "tests/financeCostsServer.test.ts": 40.5,

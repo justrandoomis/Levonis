@@ -2,6 +2,7 @@ import { badRequest, conflict } from './http';
 import { fence, journalPlan, periodOpen } from './operations';
 import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, staffReconciliationBlockedSql } from './financeParticipants';
 import { settlementInstalled } from './staffSettledSql';
+import { auditStatements } from './audit';
 
 /** Apply an existing cash advance to approved earnings; no new cash or expense. */
 export async function settleAdvance(
@@ -110,6 +111,10 @@ export async function settleAdvance(
         { account: '1400', credit: input.amount },
       ],
     ).statements,
+    // In the same batch as the money (the owner's brief, 2026-11-12: every change to money leaves its row).
+    ...(await auditStatements(db, input.actor, 'finance.advance_settled', input.staffId, {
+      operation_id: input.id, amount_iqd: input.amount, settlement_day: input.day, note: input.note,
+    })).statements,
   );
   await commitParticipantStatements(db,statements);
 }

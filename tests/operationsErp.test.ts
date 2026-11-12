@@ -494,6 +494,14 @@ test('advance settlement consumes approved wages and advance once without cash o
     ).status,
     400,
   );
+  // The audit trail (the owner's brief, 2026-11-12): the settlement once — not its replay, not the refused one — and the
+  // approval once, with the cost's money.
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action='finance.advance_settled'"), 1);
+  const settled = JSON.parse(row<{ detail: string }>(raw, "SELECT detail FROM audit_log WHERE action='finance.advance_settled'")!.detail);
+  assert.deepEqual([settled.operation_id, settled.amount_iqd], [settlement.operation_id, 4000]);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action='finance.cost_approved'"), 1);
+  assert.equal((await post(app, `/f/costs/${cost.id}/approve`, {})).status, 200);
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action='finance.cost_approved'"), 1, 'a second press changes nothing and writes nothing');
 });
 
 test('rule cap is shared across all eligible lines in one order and replay does not use it twice', async () => {
@@ -732,6 +740,11 @@ test('Gini bank receivable and courier fee have separate collection limits and r
     (await post(app, '/f/collections', { ...bank, operation_id: crypto.randomUUID(), amount_iqd: 1 })).status,
     400,
   );
+  // The audit trail (the owner's brief, 2026-11-12): two collections, two rows — the replay and the refused one none —
+  // each with its money and what reached the cash.
+  assert.equal(count(raw, "SELECT COUNT(*) n FROM audit_log WHERE action='finance.collection_recorded'"), 2);
+  const courier = JSON.parse(row<{ detail: string }>(raw, "SELECT detail FROM audit_log WHERE action='finance.collection_recorded' AND detail LIKE '%\"payer\":\"courier\"%'")!.detail);
+  assert.deepEqual([courier.order_id, courier.amount_iqd, courier.fee_iqd, courier.net_iqd], ['order', 5000, 1000, 4000]);
 });
 
 test('estimated purchase can be finalized after supplier advance while preserving the payment and receipt value', async () => {
@@ -791,6 +804,9 @@ test('scoped overhead is allocated only to orders containing the selected depart
   const report = await operationsReport(db, baghdadDay(), baghdadDay());
   assert.equal(report.orders.find((o) => o.id === 'one')!.allocated_overhead_iqd, 1001);
   assert.equal(report.orders.find((o) => o.id === 'two')!.allocated_overhead_iqd, 0);
+  // The audit trail (the owner's brief, 2026-11-12): the link, with what it was and what it became.
+  const link = JSON.parse(row<{ detail: string }>(raw, "SELECT detail FROM audit_log WHERE action='finance.expense_linked' AND target='department-rent'")!.detail);
+  assert.deepEqual([link.before, link.after.target_type, link.after.target_id, link.after.allocation_basis], [null, 'catalog', 'main', 'orders']);
 });
 
 test('missing FIFO cost stays pending and posts once when the allocations become complete after revenue posting', async () => {

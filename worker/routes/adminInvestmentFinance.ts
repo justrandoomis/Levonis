@@ -3,7 +3,7 @@ import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, forbidden, notFound, str } from '../lib/http';
 import { canViewCost, isOwner, projectForAdmin } from '../lib/adminScope';
 import { newId } from '../lib/crypto';
-import { audit } from '../lib/audit';
+import { audit, auditStatements } from '../lib/audit';
 import { baghdadDay, dateValue, fence, journalPlan, periodOpen, requireCapability, whole } from '../lib/operations';
 import { investmentContractSummary, investorOrderSplit, refreshInvestorContract, type InvestmentContract } from '../lib/investorFinance';
 import { adminInvestmentProfilesRoutes } from './adminInvestmentProfiles';
@@ -69,7 +69,8 @@ adminInvestmentFinanceRoutes.post('/contracts/:id/funding',async c=>{
   await periodOpen(db,input.payment_day);
   await commit(db,[...fence(db,"(SELECT COALESCE(SUM(amount_iqd),0) FROM investor_finance_events WHERE contract_id=? AND kind='funding')+?<=?",[id,input.amount_iqd,contract.principal_iqd]),
     db.prepare('INSERT INTO investor_finance_events(id,event_key,contract_id,kind,amount_iqd,event_day,actor_id,snapshot,created_at) VALUES (?,?,?,\'funding\',?,?,?,?,?)').bind(newId('ive'),key,id,input.amount_iqd,input.payment_day,user.id,request,new Date().toISOString()),
-    ...journalPlan(db,{key,day:input.payment_day,title:'تمويل رأس مال دفعة',source:'investor',sourceId:id,actor:user.id},[{account:'1000',debit:input.amount_iqd},{account:'3100',credit:input.amount_iqd}]).statements]);
+    ...journalPlan(db,{key,day:input.payment_day,title:'تمويل رأس مال دفعة',source:'investor',sourceId:id,actor:user.id},[{account:'1000',debit:input.amount_iqd},{account:'3100',credit:input.amount_iqd}]).statements,
+    ...(await auditStatements(db,user.id,'investment.contract_funded',id,input)).statements]);
   await refreshInvestorContract(db,id,input.payment_day);return c.json({success:true});
 });
 adminInvestmentFinanceRoutes.post('/contracts/:id/void',async c=>{
