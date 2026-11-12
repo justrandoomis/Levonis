@@ -168,3 +168,153 @@ export function statementHtml(sheet: XlsxSheet, lang: ReportLang): string {
 <tbody>${body}</tbody><tfoot><tr>${totals}</tr></tfoot></table>
 <script>${AUTO_PRINT_SCRIPT}</script></body></html>`;
 }
+
+// ─────────────────────────────────────────────────────────────── an investor's withdrawal
+
+/**
+ * AN INVESTOR'S WITHDRAWAL STATEMENT (the owner's brief, 2026-11-12, part 2: «Investors: Investment amount, product name,
+ * unit cost, selling price, all expenses and discounts, final net profit, profit-sharing percentage, and the investor's
+ * actual earnings»; DECISIONS row 331).
+ *
+ * A withdrawal draws on earnings rows (finance_withdrawal_allocations): one profit row and one capital row per agreement
+ * (`invprofit:<agreement>`, `invcapital:<agreement>`), a purchase's capital surplus (`invsurplus:<purchase>`), or — for a
+ * staff member's request — wage rows. The statement has two tables:
+ *   THE SUMMARY   one line per agreement: what was invested, the profit share, the profit earned and the capital returned
+ *                 to date (the ledger's own accrued figures, never recomputed), what earlier withdrawals paid of them, what
+ *                 this withdrawal takes, and what remains; a surplus or a wage as its own line;
+ *   THE UNITS     every sold unit behind those agreements (investor_allocation_results, one per inventory allocation): its
+ *                 order, day and product, the pieces, the sale, the goods cost, the expenses, the profit, the share, the
+ *                 investor's profit, the capital it returned and any loss — as the ledger recorded them, a unit still
+ *                 waiting named so.
+ */
+export const WITHDRAWAL_WORDS = {
+  title: ['كشف سحب مستثمر', 'Investor withdrawal statement', 'کەشفی ڕاکێشانی وەبەرهێنەر'],
+  investor: ['المستثمر: {name}', 'Investor: {name}', 'وەبەرهێنەر: {name}'],
+  request: ['السحب: {amount} د.ع، طُلب يوم {day}، دُفع منه {paid} د.ع', 'Withdrawal: {amount} IQD, requested {day}, {paid} IQD of it paid', 'ڕاکێشان: {amount} د.ع، لە {day} داواکرا، {paid} د.ع ی لێ دراوە'],
+  summary: ['الملخص', 'Summary', 'کورتە'],
+  units: ['الوحدات المبيعة', 'Units sold', 'یەکە فرۆشراوەکان'],
+  surplus: ['فائض رأس مال: {title}', 'Capital surplus: {title}', 'زیادەی سەرمایە: {title}'],
+  wage: ['أجر: {task}', 'Wage: {task}', 'کرێ: {task}'],
+  counted: ['محتسب', 'Counted', 'ژمێردراو'],
+  waiting: ['ينتظر', 'Waiting', 'چاوەڕێ'],
+  note: ['الأرباح ورأس المال المسترد كما سجّلها الدفتر حتى اليوم؛ الباقي = المكتسب − ما دفعته سحوبات سابقة − هذا السحب.', 'Profit and capital returned as the ledger recorded them to date; remaining = earned − paid by earlier withdrawals − this withdrawal.', 'قازانج و سەرمایەی گەڕاوە وەک دەفتەر تا ئەمڕۆ تۆماری کردوون؛ ماوە = بەدەستهاتوو − ئەوەی ڕاکێشانی پێشوو داویانە − ئەم ڕاکێشانە.'],
+} as const satisfies Record<string, Tri>;
+const WW = WITHDRAWAL_WORDS;
+
+type StatementColumn = { key: string; kind: XlsxColumn['kind']; header: Tri };
+export const WITHDRAWAL_SUMMARY_COLUMNS: StatementColumn[] = [
+  { key: 'name', kind: 'text', header: ['الاتفاق', 'Agreement', 'ڕێککەوتن'] },
+  { key: 'invested', kind: 'money', header: ['المبلغ المستثمر', 'Invested', 'بڕی وەبەرهێنراو'] },
+  { key: 'share', kind: 'text', header: ['حصة الربح', 'Profit share', 'بەشی قازانج'] },
+  { key: 'profit', kind: 'money', header: ['الربح المكتسب', 'Profit earned', 'قازانجی بەدەستهاتوو'] },
+  { key: 'capital', kind: 'money', header: ['رأس المال المسترد', 'Capital returned', 'سەرمایەی گەڕاوە'] },
+  { key: 'paid_before', kind: 'money', header: ['دفعته سحوبات سابقة', 'Paid by earlier withdrawals', 'ڕاکێشانی پێشوو دایانە'] },
+  { key: 'this', kind: 'money', header: ['هذا السحب', 'This withdrawal', 'ئەم ڕاکێشانە'] },
+  { key: 'remaining', kind: 'money', header: ['الباقي', 'Remaining', 'ماوە'] },
+];
+export const WITHDRAWAL_UNIT_COLUMNS: StatementColumn[] = [
+  { key: 'agreement', kind: 'text', header: ['الاتفاق', 'Agreement', 'ڕێککەوتن'] },
+  { key: 'order_id', kind: 'text', header: ['الطلب', 'Order', 'داواکاری'] },
+  { key: 'day', kind: 'date', header: ['يوم التسليم', 'Delivered', 'ڕۆژی گەیاندن'] },
+  { key: 'product', kind: 'text', header: ['المنتج', 'Product', 'بەرهەم'] },
+  { key: 'qty', kind: 'int', header: ['القطع', 'Pieces', 'پارچە'] },
+  { key: 'revenue', kind: 'money', header: ['سعر البيع', 'Sale', 'نرخی فرۆشتن'] },
+  { key: 'cost', kind: 'money', header: ['تكلفة البضاعة', 'Goods cost', 'تێچووی کاڵا'] },
+  { key: 'expenses', kind: 'money', header: ['المصاريف', 'Expenses', 'خەرجییەکان'] },
+  { key: 'net', kind: 'money', header: ['صافي الربح', 'Net profit', 'قازانجی پوخت'] },
+  { key: 'share', kind: 'text', header: ['حصة الربح', 'Profit share', 'بەشی قازانج'] },
+  { key: 'earning', kind: 'money', header: ['ربح المستثمر', 'Investor’s profit', 'قازانجی وەبەرهێنەر'] },
+  { key: 'capital', kind: 'money', header: ['رأس المال المسترد', 'Capital returned', 'سەرمایەی گەڕاوە'] },
+  { key: 'loss', kind: 'money', header: ['الخسارة', 'Loss', 'زیان'] },
+  { key: 'state', kind: 'text', header: ['الحالة', 'State', 'دۆخ'] },
+];
+
+export interface WithdrawalStatement {
+  withdrawal: { id: string; user_name: string; amount_iqd: number; paid_iqd: number; state: string; created_at: string };
+  summary: Row[];
+  units: Row[];
+}
+
+const pct = (bps: unknown) => (isNum(bps) ? `${(bps / 100).toLocaleString('en-US', { maximumFractionDigits: 2 })}%` : '');
+const snap = (v: unknown, key: string): number | null => {
+  try { const x = (JSON.parse(String(v ?? '{}')) as Record<string, unknown>)[key]; return isNum(x) ? x : null; } catch { return null; }
+};
+
+/** The statement of one withdrawal, from the rows it reserved and the ledger's own figures. */
+export async function withdrawalStatement(db: D1Database, withdrawalId: string, lang: ReportLang): Promise<WithdrawalStatement> {
+  const w = await db.prepare(`SELECT w.id,COALESCE(u.name,u.email,w.user_id) AS user_name,w.amount_iqd,w.paid_iqd,w.state,w.created_at
+      FROM finance_withdrawals w LEFT JOIN users u ON u.id=w.user_id WHERE w.id=?`).bind(withdrawalId).first<WithdrawalStatement['withdrawal']>();
+  if (!w) throw notFound('Withdrawal not found');
+  const allocs = (await db.prepare(`SELECT a.source_kind,a.source_id,a.amount_iqd,
+      (SELECT COALESCE(SUM(o.paid_iqd),0) FROM finance_withdrawal_allocations o WHERE o.source_kind=a.source_kind AND o.source_id=a.source_id AND o.withdrawal_id<>a.withdrawal_id) AS paid_before
+    FROM finance_withdrawal_allocations a WHERE a.withdrawal_id=? ORDER BY a.source_kind,a.source_id`).bind(withdrawalId)
+    .all<{ source_kind: string; source_id: string; amount_iqd: number; paid_before: number }>()).results ?? [];
+  const contractOf = (id: string) => (/^inv(?:profit|capital):/.test(id) ? id.slice(id.indexOf(':') + 1) : null);
+  const contractIds = [...new Set(allocs.map((a) => contractOf(a.source_id)).filter((x): x is string => !!x))];
+  const contracts = contractIds.length ? (await db.prepare(`SELECT c.id,c.name,c.principal_iqd,c.profit_share_bps,
+      (SELECT accrued_iqd FROM finance_investor_earnings WHERE id='invprofit:'||c.id) AS profit,
+      (SELECT accrued_iqd FROM finance_investor_earnings WHERE id='invcapital:'||c.id) AS capital
+    FROM investment_contracts c WHERE c.id IN (SELECT value FROM json_each(?)) ORDER BY c.created_at,c.id`).bind(JSON.stringify(contractIds)).all<Row>()).results ?? [] : [];
+  const summary: Row[] = contracts.map((c) => {
+    const mine = allocs.filter((a) => contractOf(a.source_id) === c.id);
+    const paidBefore = mine.reduce((n, a) => n + Number(a.paid_before), 0), here = mine.reduce((n, a) => n + Number(a.amount_iqd), 0);
+    const earned = Number(c.profit ?? 0) + Number(c.capital ?? 0);
+    return { name: c.name, invested: c.principal_iqd, share: pct(c.profit_share_bps), profit: c.profit ?? 0, capital: c.capital ?? 0,
+      paid_before: paidBefore, this: here, remaining: Math.max(0, earned - paidBefore - here) };
+  });
+  for (const a of allocs.filter((x) => !contractOf(x.source_id))) {
+    if (a.source_kind === 'staff') {
+      const cost = await db.prepare(`SELECT c.rule_name,c.order_id,${effectiveStaffCostSql('c')} AS earned FROM finance_order_costs c WHERE c.id=?`).bind(a.source_id).first<Row>();
+      summary.push({ name: fill(pick(lang, WW.wage), { task: `${String(cost?.rule_name ?? a.source_id)} — ${String(cost?.order_id ?? '')}` }), invested: null, share: '',
+        profit: cost?.earned ?? null, capital: null, paid_before: a.paid_before, this: a.amount_iqd, remaining: null });
+    } else {
+      summary.push({ name: fill(pick(lang, WW.surplus), { title: a.source_id.replace(/^invsurplus:/, '') }), invested: null, share: '', profit: null,
+        capital: a.amount_iqd + Number(a.paid_before), paid_before: a.paid_before, this: a.amount_iqd, remaining: null });
+    }
+  }
+  const units = contractIds.length ? (await db.prepare(`SELECT r.contract_id,c.name AS agreement,c.profit_share_bps,a.order_id,date(o.delivered_at,'+3 hours') AS day,
+      i.name_snapshot AS product,r.snapshot,r.profit_iqd,r.capital_iqd,r.loss_iqd,r.eligible,r.pending
+    FROM investor_allocation_results r JOIN investment_contracts c ON c.id=r.contract_id
+      JOIN order_item_inventory_allocations a ON a.id=r.allocation_id JOIN order_items i ON i.id=a.order_item_id JOIN orders o ON o.id=a.order_id
+    WHERE r.contract_id IN (SELECT value FROM json_each(?)) ORDER BY o.delivered_at,a.order_id,r.allocation_id`).bind(JSON.stringify(contractIds)).all<Row>()).results ?? [] : [];
+  return {
+    withdrawal: w,
+    summary,
+    units: units.map((u) => ({
+      agreement: u.agreement, order_id: u.order_id, day: u.day, product: u.product, qty: snap(u.snapshot, 'qty'),
+      revenue: snap(u.snapshot, 'revenue'), cost: snap(u.snapshot, 'cost'), expenses: snap(u.snapshot, 'expenses'), net: snap(u.snapshot, 'profit'),
+      share: pct(u.profit_share_bps), earning: u.profit_iqd, capital: u.capital_iqd, loss: u.loss_iqd,
+      state: pick(lang, Number(u.eligible) === 1 && !Number(u.pending) ? WW.counted : WW.waiting),
+    })),
+  };
+}
+
+/** The withdrawal statement as a workbook: the summary sheet, then the units sheet. */
+export function withdrawalSheets(st: WithdrawalStatement, lang: ReportLang, at: Date): XlsxSheet[] {
+  const w = st.withdrawal;
+  const heading = [
+    pick(lang, WW.title),
+    fill(pick(lang, WW.investor), { name: w.user_name }),
+    fill(pick(lang, WW.request), { amount: money(w.amount_iqd), day: String(w.created_at).slice(0, 10), paid: money(w.paid_iqd) }),
+    pick(lang, WW.note),
+    fill(pick(lang, W.made), { at: baghdadClock(at) }),
+  ];
+  const cols = (list: StatementColumn[]) => list.map((c) => ({ key: c.key, kind: c.kind, header: pick(lang, c.header), ...(c.key === 'invested' ? { total: false } : {}) }));
+  return [
+    { name: pick(lang, WW.summary), rtl: lang !== 'en', heading, totalLabel: pick(lang, W.total), columns: cols(WITHDRAWAL_SUMMARY_COLUMNS), rows: st.summary },
+    { name: pick(lang, WW.units), rtl: lang !== 'en', heading: [pick(lang, WW.units), fill(pick(lang, WW.investor), { name: w.user_name })], totalLabel: pick(lang, W.total),
+      columns: cols(WITHDRAWAL_UNIT_COLUMNS), rows: st.units },
+  ];
+}
+
+/** Several statement sheets as one stand-alone print document: each sheet's heading, table and totals, a page apart. */
+export function statementsHtml(sheets: XlsxSheet[], lang: ReportLang): string {
+  if (sheets.length === 1) return statementHtml(sheets[0], lang);
+  const first = statementHtml(sheets[0], lang);
+  const bodies = sheets.map((s, i) => {
+    const html = statementHtml(s, lang);
+    const body = html.slice(html.indexOf('<body>') + 6, html.lastIndexOf('<script>'));
+    return i === 0 ? body : `<div class="page-break"></div>${body}`;
+  }).join('');
+  return `${first.slice(0, first.indexOf('</style>'))}  .page-break { break-before: page; }\n${first.slice(first.indexOf('</style>'), first.indexOf('<body>') + 6)}${bodies}<script>${AUTO_PRINT_SCRIPT}</script></body></html>`;
+}

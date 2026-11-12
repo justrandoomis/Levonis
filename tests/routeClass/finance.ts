@@ -98,6 +98,8 @@ export default {
         'GET /print': 'cost_read',
         'GET /statements/staff-payments/:id/export.xlsx': 'cost_read',
         'GET /statements/staff-payments/:id/print': 'cost_read',
+        'GET /statements/withdrawals/:id/export.xlsx': 'cost_read',
+        'GET /statements/withdrawals/:id/print': 'cost_read',
         'GET /orders': 'cost_read',
         'GET /orders/:id': 'cost_read',
         'POST /orders/:id/adjustments': 'cost_write',

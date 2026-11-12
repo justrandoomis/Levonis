@@ -219,3 +219,14 @@ test('a staff payment’s row opens its statement, as Excel and as a page to pri
   assert.ok(words(rows[0]).includes('6,500 د.ع'), 'the payment’s amount, now on its row');
   await page.unmount();
 });
+
+test('a paid withdrawal’s row opens the investor’s statement (DECISIONS row 331)', async () => {
+  serve([{ rows: [ROW(9, 'finance.withdrawal_paid', 'wd1', { amount_iqd: 28000, reference: 'zain cash' }, 'boss', '2026-11-12T07:00:00.000Z')], next: null }]);
+  const page = await mount();
+  const links = rowsOf(page.container)[0].querySelectorAll('a') as unknown as FakeElement[];
+  assert.deepEqual(links.map((a) => a.getAttribute('href')), [
+    '/api/admin/finance-workspace/statements/withdrawals/wd1/export.xlsx?lang=ar',
+    '/api/admin/finance-workspace/statements/withdrawals/wd1/print?lang=ar',
+  ]);
+  await page.unmount();
+});

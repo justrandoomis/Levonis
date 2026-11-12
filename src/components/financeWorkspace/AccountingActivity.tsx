@@ -15,8 +15,9 @@ import { aas, actionWords } from './activityStrings';
  * nothing. A table on a wide screen; on a phone each act is one item of the attention list, its money at the end, so nothing
  * hides behind a sideways scroll.
  *
- * A PAYMENT'S STATEMENT (the owner's brief, 2026-11-12, part 2; DECISIONS row 330). A staff payment's row carries its
- * statement — every wage it paid, traced — as Excel and as a page to print or save as PDF, in the reader's language.
+ * A PAYMENT'S STATEMENT (the owner's brief, 2026-11-12, part 2; DECISIONS rows 330–331). A staff payment's row carries its
+ * statement — every wage it paid, traced — and a paid withdrawal's row the investor's — the summary per agreement and every
+ * sold unit behind it — as Excel and as a page to print or save as PDF, in the reader's language.
  *
  * ON WHAT. The order the act concerns when there is one — its own target, or the order its detail names (a collection, an
  * approved wage) — as a button that opens its sheet; otherwise the row's own id.
@@ -95,8 +96,9 @@ export default function AccountingActivity({ from, to, onOpenOrder }: { from: st
   };
   const who = (r: ActivityRow) => r.actor_name || r.actor_id || aas(loc, 'system');
   const statement = (r: ActivityRow): ReactNode => {
-    if (r.action !== 'finance.staff_paid' || !r.target) return null;
-    const base = `${WORKSPACE_API}/statements/staff-payments/${encodeURIComponent(r.target)}`;
+    const kind = r.action === 'finance.staff_paid' ? 'staff-payments' : r.action === 'finance.withdrawal_paid' ? 'withdrawals' : null;
+    if (!kind || !r.target) return null;
+    const base = `${WORKSPACE_API}/statements/${kind}/${encodeURIComponent(r.target)}`;
     return <small data-finance-activity-statement>{aas(loc, 'statement')}: <a className="fw-link" href={`${base}/export.xlsx?lang=${lang}`}>Excel</a>
       {' · '}<a className="fw-link" href={`${base}/print?lang=${lang}`} target="_blank" rel="noopener">PDF</a></small>;
   };

@@ -24,7 +24,7 @@ import { loadLotUsdRates } from '../lib/batchSnapshot';
 import { runFinanceChecks } from '../lib/financeChecks';
 import { xlsxResponse, xlsxWorkbook } from '../lib/xlsx';
 import { ordersReportHtml, ordersReportSheet, productsOf, type ReportLang } from '../lib/financeOrdersReport';
-import { staffPaymentStatement, staffStatementSheet, statementHtml } from '../lib/financeStatements';
+import { staffPaymentStatement, staffStatementSheet, statementHtml, statementsHtml, withdrawalSheets, withdrawalStatement } from '../lib/financeStatements';
 import { asDocument } from '../lib/securityPolicy';
 import { CLOSED_MONTHS_SQL, EXPENSE_ROW_LIMIT, EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_LIMIT, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
 
@@ -994,6 +994,21 @@ async function staffStatementFile(c:Context<AppContext>,kind:'xlsx'|'print'){
 }
 adminFinanceWorkspaceRoutes.get('/statements/staff-payments/:id/export.xlsx',(c)=>staffStatementFile(c,'xlsx'));
 adminFinanceWorkspaceRoutes.get('/statements/staff-payments/:id/print',(c)=>staffStatementFile(c,'print'));
+/**
+ * AN INVESTOR'S WITHDRAWAL STATEMENT (the owner's brief, 2026-11-12, part 2; DECISIONS row 331; financeStatements.ts): the
+ * summary per agreement — invested, share, profit earned, capital returned, paid before, this withdrawal, remaining — and
+ * every sold unit behind it, as a workbook of two sheets or one page to print.
+ */
+async function withdrawalStatementFile(c:Context<AppContext>,kind:'xlsx'|'print'){
+  const lang:ReportLang=c.req.query('lang')==='en'?'en':c.req.query('lang')==='ckb'?'ckb':'ar';
+  const id=(c.req.param('id')??'').slice(0,80);
+  const sheets=withdrawalSheets(await withdrawalStatement(c.env.DB,id,lang),lang,new Date());
+  if(kind==='xlsx')return xlsxResponse(xlsxWorkbook(sheets),`withdrawal-${id}`);
+  asDocument(c);
+  return c.html(statementsHtml(sheets,lang));
+}
+adminFinanceWorkspaceRoutes.get('/statements/withdrawals/:id/export.xlsx',(c)=>withdrawalStatementFile(c,'xlsx'));
+adminFinanceWorkspaceRoutes.get('/statements/withdrawals/:id/print',(c)=>withdrawalStatementFile(c,'print'));
 adminFinanceWorkspaceRoutes.get('/print',(c)=>ordersReportFile(c,'print'));
 adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   const view=c.req.query('view')||'lines',level=c.req.query('level')||'main';

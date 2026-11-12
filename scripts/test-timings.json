@@ -1310,6 +1310,7 @@
     "tests/webManifest.test.ts": 47.1,
     "tests/webpMetadataStrip.test.ts": 2.7,
     "tests/whatsappOptIn.test.ts": 21.1,
+    "tests/withdrawalStatement.test.ts": 9.0,
     "tests/workflowNaming.test.ts": 0.4,
     "tests/workflowSecrets.test.ts": 0.3,
     "tests/workshopFactsSeams.test.ts": 8.6,
