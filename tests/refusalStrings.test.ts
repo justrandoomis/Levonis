@@ -275,6 +275,8 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/routes/kyc.ts',
     // …and its reviewer side (push 1.2, row 257): scope, revision, reason, the owner's grants.
     'worker/routes/adminMerchantApplications.ts',
+    // «أُرجع، لا يُلغى» and «أُلغي، لا يُرجع» (row 319): every cancel door and the returns desk answer through it.
+    'worker/lib/orderCancelOps.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

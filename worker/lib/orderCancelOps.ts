@@ -25,6 +25,7 @@
  *    (a concurrent cancel, an admin transition) writes nothing at all.
  */
 import type { Env } from './types';
+import { HttpError } from './http';
 import { releaseOrderRedemptionsStatement } from './offers';
 import { walletLedgerDinarsReady } from './walletOps';
 import { refundCentsAcrossRebase } from './fx/officialRate';
@@ -35,6 +36,61 @@ export type CancellableOrderMoney = Record<string, unknown>;
 
 /** `?2` is the order id in every statement below. */
 const ORDER_IS_CANCELLED = `EXISTS (SELECT 1 FROM orders o WHERE o.id = ?2 AND o.status = 'cancelled')`;
+
+/**
+ * «أُرجع، لا يُلغى» — AN ORDER ONE OF WHOSE RETURNS GAVE MONEY OR STOCK BACK IS NOT CANCELLED
+ * (owner 2026-11-11, Q7; DECISIONS row 319).
+ *
+ * A delivered order can be walked back and cancelled through four doors: the status dropdown, the
+ * stage panel, a courier status mapped to «cancelled», and the customer's own cancel after a
+ * walk-back to pending. The cancel gives back the WHOLE order — the wallet advance
+ * (`wtx_refund_<order>_usd`, below) and every unit it took (`planOrderReturn`) — and never asked
+ * whether a return had already given part of it back. Measured through the real return route: a
+ * 20,000 wallet order whose 15,000 line was refunded (`wtx_ret_<case>`) got 20,000 more, its unit
+ * went back on the shelf a second time (the counter read 4 over a batch of 3), and the journal
+ * reversed its sale twice.
+ *
+ * WHICH RETURNS: a case resolved as `refund` — returns.ts's one transition that credits the wallet
+ * and restores the stock in the same batch, and only after it records `finance_refund_facts` — or a
+ * case whose `wtx_ret_<case>` credit stands whatever its state. An open case, a rejected one and one
+ * resolved as repair, replacement or declined moved nothing and do not block. Both tables predate
+ * every cancel door's schema (0003, 0001), so the predicate reads on any database those doors run on.
+ * `order` is the SQL naming the order's id (`?1`, `o.id`…).
+ */
+export const returnMovedSql = (order: string): string => `EXISTS (SELECT 1 FROM return_cases rc WHERE rc.order_id = ${order}
+    AND ((rc.state = 'resolved' AND rc.resolution = 'refund')
+      OR EXISTS (SELECT 1 FROM wallet_transactions w WHERE w.id = 'wtx_ret_' || rc.id AND w.status = 'approved')))`;
+
+/** The one read every cancel door asks before it cancels, and again after a batch the fence below aborted. */
+export async function orderReturnMoved(db: D1Database, orderId: string): Promise<boolean> {
+  return !!(await db.prepare(`SELECT 1 AS x WHERE ${returnMovedSql('?1')}`).bind(orderId).first());
+}
+
+export const ORDER_CANCEL_RETURNED = 'ORDER_CANCEL_RETURNED';
+
+/** 409 for every door that would cancel such an order; the screens word the code (src/lib/refusalStrings.ts). */
+export function returnedOrderCancelRefusal(): HttpError {
+  return new HttpError(409,
+    'أُرجع، لا يُلغى: رُدّ مبلغ مرتجعٍ من هذا الطلب من قبل، فلا يُلغى ولا يُردّ شيء منه مرتين. / Returned, not cancelled: a return on this order was already refunded, so it is not cancelled and nothing is refunded twice.',
+    ORDER_CANCEL_RETURNED);
+}
+
+/**
+ * «أُلغي، لا يُرجع» — THE SAME HOLE FROM THE OTHER SIDE (DECISIONS row 319). A return still open
+ * when its order is cancelled does not block the cancel (it moved nothing), but the cancel then
+ * gives everything back; refunding that return afterwards paid it a second time and put its unit
+ * on the shelf twice. The returns desk refuses a refund on a cancelled order: decline the case.
+ */
+export const RETURN_ORDER_CANCELLED = 'RETURN_ORDER_CANCELLED';
+export const orderCancelledSql = (order: string): string => `EXISTS (SELECT 1 FROM orders oc WHERE oc.id = ${order} AND oc.status = 'cancelled')`;
+export async function orderCancelled(db: D1Database, orderId: string): Promise<boolean> {
+  return !!(await db.prepare(`SELECT 1 AS x WHERE ${orderCancelledSql('?1')}`).bind(orderId).first());
+}
+export function cancelledOrderReturnRefusal(): HttpError {
+  return new HttpError(409,
+    'أُلغي، لا يُرجع: أُلغي هذا الطلب ورُدّ ماله وقطعه عند الإلغاء، فلا يُردّ مرتجعه مرة ثانية. ارفض المرتجع مع ذكر السبب. / Cancelled, not returned: this order was cancelled and its money and units were given back then, so its return is not refunded again. Decline the return with a reason.',
+    RETURN_ORDER_CANCELLED);
+}
 
 /**
  * ASYNC SINCE MIGRATION 0108, AND THIS IS WHY.
@@ -64,9 +120,15 @@ export async function cancelledOrderRefundStatements(
   // A customer can approve a lower price after the cancel route reads the
   // order. That already returned part of the advance without changing stage
   // or status. Abort the entire cancellation if its money snapshot is stale.
+  // The batch that cancels the order (it was not cancelled when the door read it)
+  // also aborts when a return gave money or stock back meanwhile (Q7, row 319:
+  // the doors ask `orderReturnMoved` first; this closes the race). A replay on an
+  // order already cancelled is not fenced, and an order with no such return
+  // reads exactly as before: the clause is true, the CASE unchanged.
+  const cancelling = String(order.status ?? '') !== 'cancelled';
   out.push(env.DB.prepare(`UPDATE orders SET status=CASE WHEN status='cancelled'
     AND user_id=?2 AND wallet_applied_usd_cents=?3 AND points_discount_iqd=?4
-    AND wallet_applied_iqd IS ?5 AND exchange_rate IS ?6
+    AND wallet_applied_iqd IS ?5 AND exchange_rate IS ?6${cancelling ? ` AND NOT ${returnMovedSql('?1')}` : ''}
     THEN status ELSE NULL END WHERE id=?1`)
     .bind(id, userId, walletCents, points, order.wallet_applied_iqd ?? null, order.exchange_rate ?? null));
 

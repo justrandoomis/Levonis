@@ -715,6 +715,7 @@
     "tests/orderBoardRowItems.test.ts": 6.3,
     "tests/orderCancelAtomic.test.ts": 29.9,
     "tests/orderCancelRefundRepair.test.ts": 47.6,
+    "tests/orderCancelReturned.test.ts": 30.3,
     "tests/orderCelebration.test.ts": 0.4,
     "tests/orderCostForecastSafety.test.ts": 20.4,
     "tests/orderCostGroups.test.ts": 0.3,

@@ -46,7 +46,7 @@ import { scheduleVariantWarm } from '../lib/imageVariants';
 import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { sniff } from './uploads';
 import { deductOrderStock, planOrderReopen, planOrderReturn, stockReturnNote, type ReopenRefusal } from '../lib/orderInventory';
-import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
+import { cancelledOrderRefundStatements, orderReturnMoved, returnedOrderCancelRefusal } from '../lib/orderCancelOps';
 import { voidReviewGiftsOfOrder } from '../lib/gifts/reviewCode';
 import { cancelStoreOrder, notifyMerchantOfStoreOrder, storeCancelMovesMoney } from '../lib/storeOrderOps';
 import { assertFinancialScope } from '../lib/walletAdjust';
@@ -3847,6 +3847,8 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     if (res.reason === 'ORDER_REOPEN_STOCK_RETURNED' || res.reason === 'ORDER_REOPEN_STOCK_UNAVAILABLE') throw reopenStockRefusal(res.reason);
     if (res.reason === 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED') throw tradeInNotReceivedReopenRefusal();
     if (res.reason === 'TRADE_IN_ORDER_DELIVERED') throw tradeInDeliveredRefusal();
+    // «أُرجع، لا يُلغى» (Q7, DECISIONS row 319): a return already gave part of it back.
+    if (res.reason === 'ORDER_CANCEL_RETURNED') throw returnedOrderCancelRefusal();
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
     if (res.reason === 'PRICE_APPROVAL_PENDING') throw priceHeldRefusal(id);
     // «بانتظار تأكيد السعر النهائي» (0218): settle the estimated lines first.
@@ -3980,6 +3982,8 @@ adminRoutes.patch('/orders/:id', async (c) => {
     // statements the customer's cancel runs). This route used to flip first,
     // post only the two refund rows from a later batch, and never touch the
     // reservation or the accrual. A lost flip aborts the whole batch.
+    // «أُرجع، لا يُلغى» (Q7, DECISIONS row 319): not when a return already gave part of it back.
+    if (await orderReturnMoved(c.env.DB, id)) throw returnedOrderCancelRefusal();
     const stock = await planOrderReturn(c.env.DB, id, adminUser.id);
     try {
       const res = await c.env.DB.batch([
@@ -3993,6 +3997,8 @@ adminRoutes.patch('/orders/:id', async (c) => {
       if (again && again.status !== from) throw badRequest('The order changed while you were editing — reload and retry');
       // 0192 (S-P2): a delivered order that completed a trade-in is returned, never cancelled.
       if (/TRADE_IN_ORDER_DELIVERED/.test(e instanceof Error ? e.message : String(e))) throw tradeInDeliveredRefusal();
+      // A return refunded between the read above and the batch: the refund's fence aborted it.
+      if (await orderReturnMoved(c.env.DB, id)) throw returnedOrderCancelRefusal();
       throw e;
     }
     stockNote = stockReturnNote(stock.kind, stock.plan?.applied ?? 0);

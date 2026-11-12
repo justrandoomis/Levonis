@@ -50,7 +50,7 @@ import {
   stagesFor,
 } from './orderStages';
 import { deductOrderStock, planOrderReopen, planOrderReturn, stockReturnNote, type ReopenRefusal } from './orderInventory';
-import { cancelledOrderRefundStatements } from './orderCancelOps';
+import { cancelledOrderRefundStatements, orderReturnMoved } from './orderCancelOps';
 import { emitEvent, eventsEnabled } from './eventBus';
 import { OrderStatusChangedV1 } from '@levonis/contracts/events/v1/OrderStatusChanged';
 import { OrderDeliveredV1 } from '@levonis/contracts/events/v1/OrderDelivered';
@@ -125,6 +125,8 @@ export interface MoveResult {
     | 'SERIALS_REQUIRED'
     | 'ORDER_REOPEN_COUPON_SPENT'
     | 'TRADE_IN_ORDER_DELIVERED'
+    /** «أُرجع، لا يُلغى»: a return of this order already gave money or stock back (Q7, DECISIONS row 319). */
+    | 'ORDER_CANCEL_RETURNED'
     | 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED'
     /** An estimated line waits for its final price: the order stays at «تم الاستلام» (0218, T8). */
     | 'PRICE_ESTIMATE_UNCONFIRMED'
@@ -400,6 +402,12 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   if (String(row.seller_type ?? '') === 'merchant' && legacyFrom !== legacyTo && (legacyTo === 'cancelled' || legacyFrom === 'cancelled')) {
     return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'ILLEGAL_MOVE' };
   }
+  // «أُرجع، لا يُلغى» (Q7, DECISIONS row 319): a return already gave part of this order back, so a
+  // cancel — the stage panel's, or a courier status forced in — would give it back twice. Not even
+  // forced; the walk-back that came before stays.
+  if (legacyTo === 'cancelled' && legacyFrom !== 'cancelled' && await orderReturnMoved(env.DB, order.id)) {
+    return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_CANCEL_RETURNED' };
+  }
 
   const durations = resolveDurations(await getSetting(env.DB, 'orderStageDurations'));
   const schedule = scheduleFrom(opts.to, order.shipping_type, durations, nowIso, spreadFor(order.id));
@@ -536,6 +544,10 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
       if (!current || current.stage !== storedStage || current.status !== legacyFrom
         || ['wallet_applied_iqd','wallet_applied_usd_cents','points_discount_iqd','exchange_rate'].some(key => current[key] !== row[key])) {
         return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'RACED' };
+      }
+      // A return was refunded between the read above and this batch: the refund's fence aborted it (row 319).
+      if (legacyFrom !== 'cancelled' && await orderReturnMoved(env.DB, order.id)) {
+        return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_CANCEL_RETURNED' };
       }
     }
     const msg = e instanceof Error ? e.message : String(e);

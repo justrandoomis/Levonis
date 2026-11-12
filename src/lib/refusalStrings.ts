@@ -1984,6 +1984,19 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This order cannot be re-opened: its units are no longer free to hold again, so it stays cancelled.',
     ckb: 'ناتوانرێت ئەم داواکارییە دووبارە بکرێتەوە: پارچەکانی ئیتر بەردەست نین بۆ دووبارە گلدانەوە، بۆیە هەڵوەشاوە دەمێنێتەوە.',
   },
+  // Row 319 (Q7): an order a refunded return already gave part of back is not cancelled — the status
+  // door, the stage panel, the courier sync (its sync error) and the customer's cancel — and a
+  // cancelled order's return is not refunded on top of the cancel (the returns desk).
+  ORDER_CANCEL_RETURNED: {
+    ar: 'أُرجع، لا يُلغى: رُدّ مبلغ مرتجعٍ من هذا الطلب من قبل، فلا يُلغى ولا يُردّ شيء منه مرتين. ما بقي منه يُرجَع بطلب إرجاع، أو تواصل مع الدعم.',
+    en: 'Returned, not cancelled: a return on this order was already refunded, so it is not cancelled and nothing is refunded twice. Send back what is left through a return, or contact support.',
+    ckb: 'گەڕێندرایەوە، هەڵناوەشێندرێتەوە: پێشتر پارەی گەڕاندنەوەیەکی ئەم داواکارییە دراوەتەوە، بۆیە هەڵناوەشێندرێتەوە و هیچ پارەیەک دوو جار نادرێتەوە. ئەوەی ماوەتەوە بە داواکاریی گەڕاندنەوە بگەڕێنەرەوە، یان پەیوەندی بە پشتگیری بکە.',
+  },
+  RETURN_ORDER_CANCELLED: {
+    ar: 'أُلغي، لا يُرجع: أُلغي هذا الطلب ورُدّ ماله وقطعه عند الإلغاء، فلا يُردّ مرتجعه مرة ثانية. ارفض المرتجع مع ذكر السبب.',
+    en: 'Cancelled, not returned: this order was cancelled and its money and units were given back then, so its return is not refunded again. Decline the return with a reason.',
+    ckb: 'هەڵوەشێندرایەوە، ناگەڕێندرێتەوە: ئەم داواکارییە هەڵوەشێندرایەوە و پارە و پارچەکانی لە کاتی هەڵوەشاندنەوەدا گەڕێندرانەوە، بۆیە پارەی گەڕاندنەوەکەی جارێکی تر نادرێتەوە. گەڕاندنەوەکە بە هۆکارێکەوە ڕەت بکەرەوە.',
+  },
   // W-3 (row 237): one open warranty case per device. The customer cannot close a
   // claim, so this sentence never asks them to; the desk has its own (AdminSerials).
   CLAIM_ALREADY_OPEN: {

@@ -18,7 +18,7 @@ import { useState } from 'react';
 import { Check, Circle, Clock, Loader2, Truck, User } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
-import { apiRefusal } from '../../lib/refusalStrings';
+import { apiRefusal, refusalLang, refusalText } from '../../lib/refusalStrings';
 import { estimateRefusalText } from '../../../packages/contracts/src/priceEstimates';
 import SerialGateRefusal, { gateRefusalOf, type GateRefusal } from './serials/SerialGateRefusal';
 import type { GateMissing } from './serials/types';
@@ -237,8 +237,10 @@ export default function OrderStagePanel({
           {d.synced_at && <p className="text-text-muted">{loc('آخر مزامنة', 'Last sync', 'دوایین هاوکاتکردن')}: {when(d.synced_at, lang)}</p>}
           {/* A sync failure is SHOWN, not swallowed: the order did not move
               because we could not reach them, and an admin needs to know
-              that rather than assume nothing happened. */}
-          {d.error && <p className="text-danger">{loc('خطأ المزامنة', 'Sync error', 'هەڵەی هاوکاتکردن')}: {d.error}</p>}
+              that rather than assume nothing happened. A refusal stored as
+              its code (ORDER_CANCEL_RETURNED, DECISIONS row 319) reads in the
+              admin's language; a courier's own text as it came. */}
+          {d.error && <p className="text-danger">{loc('خطأ المزامنة', 'Sync error', 'هەڵەی هاوکاتکردن')}: {refusalText(d.error, refusalLang(lang), d.error)}</p>}
         </div>
       )}
 

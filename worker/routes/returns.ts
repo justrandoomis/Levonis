@@ -65,6 +65,7 @@ import { planLotRestore } from '../lib/inventoryLots';
 import { resolveReturnedOriginIds, planUnsellableOriginReturn, type ReturnedOriginSelection, unitOriginsInstalled } from '../lib/inventoryUnitOrigins';
 import { operationsInstalled, baghdadDay } from '../lib/operations';
 import { recordReturnFinancials, recordFinancialFailure } from '../lib/orderFinance';
+import { cancelledOrderReturnRefusal, orderCancelled, orderCancelledSql } from '../lib/orderCancelOps';
 import { calculateGoods, spread, type GoodsLine } from '../lib/orderProfit';
 import { estimateFactsOf, estimateLineAdjustments, estimatesUnreadable, paidNetUnit } from '../lib/paidNet';
 import { validateInvestorReturnEvidence } from '../lib/investorFinance';
@@ -832,6 +833,8 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
   // Conditional flip: concurrent transitions cannot both pass (same pattern
   // as the order-cancel flow).
   if (to === 'resolved' && resolution === 'refund') {
+    // «أُلغي، لا يُرجع» (DECISIONS row 319): the cancel already gave the order's money and units back.
+    if (await orderCancelled(c.env.DB, kase.order_id)) throw cancelledOrderReturnRefusal();
     await validateInvestorReturnEvidence(c.env.DB, id);
     await refuseProtectedReturn(c.env.DB, kase.order_item_id);
     // ONE MONEY PROCESS PER UNIT (plan §1.3): no refund for a device that is
@@ -1097,15 +1100,18 @@ returnRoutes.post('/admin/:id/transition', requireAdmin, async (c) => {
         refund: { amount_iqd: refundIqd, credited: credit !== null, channel: settledByGini ? 'gini' : 'wallet' },
         ...(givesCreditBack ? { trade_in_credit_back: { request_id: tradeInCredit!.requestId, amount_iqd: tradeInCredit!.amount } } : {}),
       });
+      // The order cancelled between the read above and this batch (row 319): its CHECK (qty > 0) aborts it all.
+      const cancelFence = c.env.DB.prepare(`UPDATE return_cases SET qty = -1 WHERE id = ?1 AND ${orderCancelledSql('?2')}`).bind(id, kase.order_id);
       try {
         await c.env.DB.batch([
-          refundFence, flipStatement, ...(credit ? [credit] : []),
+          refundFence, cancelFence, flipStatement, ...(credit ? [credit] : []),
           // S-P2 §6.9: the same coupon comes back for 30 days on any direct-sale device (completed requests only).
           ...(givesCreditBack ? returnReissueStatements(c.env.DB, tradeInCredit!, { orderId: kase.order_id, returnCaseId: id, userId: kase.user_id, now: nowIso, endsAt: reissueEnds! }) : []),
           ...(restorePlan?.statements??[]), ...originStatements, ...evidence.statements,
         ]);
       } catch (e) {
         if (/CHECK constraint failed:\s*qty\s*>\s*0/.test(String(e))) {
+          if (await orderCancelled(c.env.DB, kase.order_id)) throw cancelledOrderReturnRefusal();
           throw badRequest(serverMessage('RETURN_RESOLUTION_RETRY'), 'RETURN_RESOLUTION_RETRY');
         }
         throw e;

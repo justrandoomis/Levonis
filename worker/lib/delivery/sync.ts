@@ -13,7 +13,9 @@
  *                see it, and the next sweep tries again. The stage does not
  *                move. This is the case that makes a naive implementation
  *                dangerous: a 500 from a courier is not "not delivered yet",
- *                it is "we do not know", and those are different.
+ *                it is "we do not know", and those are different. Also a
+ *                cancel the order refuses because a return of it was already
+ *                refunded (ORDER_CANCEL_RETURNED, DECISIONS row 319).
  *   unmapped   — the courier answered with a status nobody has mapped. The
  *                status is recorded so the admin can map it, and the stage
  *                does not move. Never guessed from the status text.
@@ -122,6 +124,13 @@ export async function syncOrderDelivery(
     force: true,
     now,
   });
+  // «أُرجع، لا يُلغى» (Q7, DECISIONS row 319): the courier says cancelled, but a return of this order
+  // already gave part of it back, so it is not cancelled. Not silent: the code is stored where a
+  // courier error is (the order's stage panel words it), and the sweep counts it as an error.
+  if (!move.moved && move.reason === 'ORDER_CANCEL_RETURNED') {
+    await env.DB.prepare('UPDATE orders SET delivery_error = ? WHERE id = ?').bind(move.reason, orderId).run();
+    return { orderId, outcome: 'error', remoteStatusId: remote.statusId, remoteStatusText: remote.statusText, stage: mapped, error: move.reason };
+  }
   return {
     orderId,
     outcome: move.moved ? 'moved' : 'unchanged',

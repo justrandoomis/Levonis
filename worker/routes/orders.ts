@@ -156,7 +156,7 @@ import { CheckoutStartedV1 } from '@levonis/contracts/events/v1/CheckoutStarted'
 import { OrderCreatedV1 } from '@levonis/contracts/events/v1/OrderCreated';
 import { planOrderReturn } from '../lib/orderInventory';
 import { planOrderFinanceSnapshot } from '../lib/orderFinance';
-import { cancelledOrderRefundStatements } from '../lib/orderCancelOps';
+import { cancelledOrderRefundStatements, orderReturnMoved, returnedOrderCancelRefusal } from '../lib/orderCancelOps';
 import { voidPendingPriceAdjustmentStatement } from '../lib/orderPriceAdjust';
 import {
   cancelStoreOrder,
@@ -6352,6 +6352,9 @@ orderRoutes.post('/:id/cancel', async (c) => {
     });
   }
 
+  // «أُرجع، لا يُلغى» (Q7, DECISIONS row 319): a pending order may be one the team walked back
+  // from delivered; when a return of it was already refunded, cancelling it would refund it twice.
+  if (await orderReturnMoved(c.env.DB, id)) throw returnedOrderCancelRefusal();
   const now = new Date().toISOString();
   const walletCents = Number(data.order.wallet_applied_usd_cents) || 0;
   const points = Number(data.order.points_discount_iqd) || 0;
@@ -6389,6 +6392,8 @@ orderRoutes.post('/:id/cancel', async (c) => {
     // and the order is untouched: surface it and let the retry work.
     const again = await c.env.DB.prepare('SELECT status FROM orders WHERE id = ?').bind(id).first<{ status: string }>();
     if (again && again.status !== 'pending') throw badRequest('This order was already cancelled or has progressed');
+    // A return refunded between the read above and the batch: the refund's fence aborted it.
+    if (await orderReturnMoved(c.env.DB, id)) throw returnedOrderCancelRefusal();
     throw e;
   }
   await audit(c.env.DB, user.id, 'order.cancel', id, {
