@@ -201,9 +201,9 @@ export async function courierOverview(db: D1Database) {
   const [parcels, remittances, counts, category] = await Promise.all([
     pendingParcels(db),
     courierRemittances(db),
-    db.prepare(`SELECT COUNT(*) AS remittances,COALESCE(SUM(CASE WHEN state='received' THEN 1 ELSE 0 END),0) AS unreconciled,
+    db.prepare(`SELECT COALESCE(SUM(CASE WHEN kind='transfer' THEN 1 ELSE 0 END),0) AS transfers,COALESCE(SUM(CASE WHEN state='received' THEN 1 ELSE 0 END),0) AS unreconciled,
         COALESCE(SUM(CASE WHEN state='received' THEN amount_iqd ELSE 0 END),0) AS unreconciled_iqd FROM courier_remittances`)
-      .first<{ remittances: number; unreconciled: number; unreconciled_iqd: number }>(),
+      .first<{ transfers: number; unreconciled: number; unreconciled_iqd: number }>(),
     lastFeeCategory(db),
   ]);
   const sum = (f: (p: CourierParcel) => number) => parcels.reduce((n, p) => n + f(p), 0);
@@ -218,8 +218,9 @@ export async function courierOverview(db: D1Database) {
     },
     remittances,
     unreconciled: { count: counts?.unreconciled ?? 0, amount_iqd: counts?.unreconciled_iqd ?? 0 },
-    /** No transfer recorded yet: the page offers the one-time opening (question 8). */
-    first_time: (counts?.remittances ?? 0) === 0,
+    /** No transfer recorded yet: the page offers the opening (question 8). An opening entry is not a transfer, so an opening
+     *  cut short (forty parcels a time) can be finished the same way. */
+    first_time: (counts?.transfers ?? 0) === 0,
     fee_category: category,
   };
 }

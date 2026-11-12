@@ -15,8 +15,8 @@ import { crs } from './courierStrings';
  * Three figures: the cash still with Al-Zaeem, the same after the estimated fees, and what arrived but is not checked yet.
  * The parcels still with Al-Zaeem, oldest first: ticking them builds a transfer — each with its cash and its fee (the
  * estimate until the owner types the invoice's), the amount that arrived (their cash less their fees until typed), the
- * day, the statement number, the fee category (the last one used) and a note, which a difference needs. The first time,
- * the ticked parcels can be recorded instead as the opening balance, forty at a time. The transfers, newest first: each
+ * day, the statement number, the fee category (the last one used) and a note, which a difference needs. Until the first
+ * transfer, the ticked parcels can be recorded instead as the opening balance, forty at a time. The transfers, newest first: each
  * opens its parcels, and «تمت المطابقة» checks it against Al-Zaeem's statement, once. Every write carries an operation id
  * kept for the same request, so a retry is never a second transfer.
  */

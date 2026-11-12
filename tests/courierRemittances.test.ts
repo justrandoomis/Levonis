@@ -166,6 +166,7 @@ test('the opening: the parcels’ cash less their fees, under «رصيد افت�
   assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
   assert.deepEqual(rows(w, 'SELECT kind,reference,amount_iqd,collected_iqd,fee_iqd,difference_iqd FROM courier_remittances'),
     [{ kind: 'opening', reference: 'رصيد افتتاحي', amount_iqd: 70000, collected_iqd: 80000, fee_iqd: 10000, difference_iqd: 0 }], 'the amount sent is ignored');
+  assert.equal((await overview(w)).first_time, true, 'an opening is not a transfer: one cut short is finished the same way');
 });
 
 test('checking a transfer reconciles it once and for good; the database keeps a recorded transfer as it is', async () => {

@@ -103,7 +103,7 @@ test('the three figures, the first-time note and the parcels, oldest first; an o
   assert.match(words(q(page.container, '[data-courier-due]')), /88,000/);
   assert.match(words(q(page.container, '[data-courier-due]')), /3 طرد · أقدمها منذ 23 يومًا/);
   assert.match(words(q(page.container, '[data-courier-net]')), /75,000/);
-  assert.match(words(q(page.container, '[data-courier-howto]')), /أول مرة هنا/);
+  assert.match(words(q(page.container, '[data-courier-howto]')), /قبل أول تحويل/);
   assert.deepEqual(qa(page.container, 'tr[data-courier-parcel]').map((r) => r.getAttribute('data-courier-parcel')), ['ORD-0D00000001', 'ORD-0D00000002', 'ORD-0D00000003']);
   assert.match(words(q(page.container, 'tr[data-courier-parcel="ORD-0D00000003"]')), /3,000.*3,000.*0/, 'a fee never above the cash');
   await act(async () => { click(named(page.container, 'button', 'ORD-0D00000002')); });
