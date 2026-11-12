@@ -335,6 +335,17 @@ export interface OrderProfit {
 }
 
 export const WORKSPACE_API = '/api/admin/finance-workspace';
+
+/**
+ * THE BOOKS' OWN CHECKS, as GET /accounting-checks answers them (worker/lib/financeChecks.ts; the owner's brief,
+ * 2026-11-12). tests/accountingChecksPage.test.ts holds this shape to the server's.
+ */
+export type FinanceCheckKey =
+  | 'journal_unbalanced' | 'posting_errors' | 'collections_over_due' | 'undated_delivered' | 'staff_payment_overallocated'
+  | 'delivered_without_sale' | 'cancelled_after_delivery_in_journal' | 'walk_backs' | 'cash_on_cancelled'
+  | 'pending_cost_months' | 'expenses_counting_nowhere';
+export interface FinanceCheck { key: FinanceCheckKey; severity: 'error' | 'warning'; count: number; amount_iqd: number | null; sample: string[] }
+export interface FinanceChecksAnswer { checked_at: string; ok: boolean; checks: FinanceCheck[] }
 export const currentMonth = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 7);
 export const financeToday = () => new Date(Date.now() + 3 * 3600000).toISOString().slice(0, 10);
 export function validFinanceRange(range: FinanceRange): boolean {

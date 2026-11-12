@@ -42,6 +42,7 @@ import { runGuardedMediaCleanup } from './mediaRefs';
 import { queueUnattachedAssistMedia } from './assist/attachments';
 import { convertLegacyProducts } from './catalog/legacy';
 import { checkSchemaDrift, type DriftAlarmReport } from './schemaDriftAlarm';
+import { dailyFinanceChecks, type FinanceChecksAlarmReport } from './financeChecksAlert';
 import {
   backfillSearchIndex,
   SEARCH_BACKFILL_BUDGETED_LIMIT,
@@ -216,6 +217,11 @@ export interface DurableJobsReport {
    * the watchdog is a report that cannot tell "no drift" from "never ran".
    */
   schema_drift: DriftAlarmReport | null;
+  /**
+   * The books' own checks, once a Baghdad day (financeChecksAlert.ts; the owner's brief, 2026-11-12). `null` only if
+   * the step threw, as above.
+   */
+  finance_checks: FinanceChecksAlarmReport | null;
   errors: string[];
 }
 
@@ -326,6 +332,7 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
     assist_retention: { queued: 0, skipped: false },
     media_cleanup: { attempted: 0, deleted: 0, still_referenced: 0, dead_lettered: 0, retrying: 0, refusals: [] },
     schema_drift: null,
+    finance_checks: null,
     errors: [],
   };
 
@@ -766,6 +773,15 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
    */
   await step('schema_drift', async () => {
     report.schema_drift = await checkSchemaDrift(env);
+  });
+
+  /*
+   * THE BOOKS' OWN CHECKS, after the watchdog and for the same reason: last, so they never spend a customer's budget,
+   * and in their own step, so a check that throws takes nothing else with it. Once a Baghdad day; every other tick is
+   * one read of their state.
+   */
+  await step('finance_checks', async () => {
+    report.finance_checks = await dailyFinanceChecks(env);
   });
 
   return report;

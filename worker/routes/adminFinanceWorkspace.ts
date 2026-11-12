@@ -20,6 +20,7 @@ import { reportAdjustments, type ReportAdjustments } from '../lib/financeReportO
 import { loadUsdRateSteps, usdRateAt, type UsdRateSteps } from '../lib/fx/historyRate';
 import { ADDITIVE_IQD_FIELDS, baghdadDayStart, batchCogsCents, centsOf, chartCents, expenseCompositionCents, iqdToCents, instantOf, rederive, sumCents, type Cents } from '../lib/financeUsdDisplay';
 import { loadLotUsdRates } from '../lib/batchSnapshot';
+import { runFinanceChecks } from '../lib/financeChecks';
 import { CLOSED_MONTHS_SQL, EXPENSE_ROW_LIMIT, EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_LIMIT, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
 
 type Row=Record<string,unknown>;
@@ -913,6 +914,12 @@ function dayBuckets(daily:Row[],by:'week'|'month'):Row[]{
       estimated_orders:n(row.estimated_orders)+n(d.estimated_orders),unknown_refund_orders:n(row.unknown_refund_orders)+n(d.unknown_refund_orders)});}
   return [...out.values()];
 }
+/**
+ * THE BOOKS' OWN CHECKS (the owner's brief, 2026-11-12, part 4; worker/lib/financeChecks.ts): each finds what should not
+ * be, with its count, its money where it is money, and its first ids. Read on demand by the accounting page; the daily
+ * alert runs the same set.
+ */
+adminFinanceWorkspaceRoutes.get('/accounting-checks',async(c)=>c.json({success:true,...await runFinanceChecks(c.env.DB)}));
 adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   const view=c.req.query('view')||'lines',level=c.req.query('level')||'main';
   if(!(EXPORT_VIEWS as readonly string[]).includes(view))throw badRequest('عرض التصدير غير معروف / Unknown export view','EXPORT_VIEW_INVALID');
