@@ -52,6 +52,8 @@ function month() {
   order(w.raw, { id: 'b', qty: 3 });
   const cost = (id: string, orderId: string, name: string, basis: string, amount: number, base: number | null, qty: number, value: number) =>
     `('${id}','${orderId}','r-${id}',1,'${name}','g-${id}','staff_sajjad','rent','delivered',${base ?? 'NULL'},${qty},${value},'${day}','approved','${JSON.stringify({ rule: { basis, amount } })}')`;
+  // An invented name: the seeded staff row (migration 0162) carries a real first name.
+  w.raw.exec("UPDATE finance_staff SET name='موظف تجريبي' WHERE id='staff_sajjad'");
   w.raw.exec(`INSERT INTO finance_order_costs(id,order_id,rule_id,rule_version,rule_name,group_key,staff_id,category_id,milestone,base_iqd,qty,amount_iqd,cost_day,state,snapshot) VALUES
       ${cost('c1', 'a', 'تغليف', 'order', 2500, null, 1, 2500)},
       ${cost('c2', 'b', 'حصة من الربح', 'profit_percent', 500, 40000, 3, 2000)},
@@ -84,7 +86,7 @@ test('the payment’s statement: exactly the rows it paid, each traced, with the
   assert.match(sheet, /rightToLeft="1"/);
   const g = grid(sheet);
   const text = [...g.values()].flatMap((r) => [...r.values()]).join(' | ');
-  for (const part of ['كشف دفعة لموظف', 'الموظف: سجاد', `الدفعة: 6,500 د.ع يوم ${day}`, 'ملاحظة: أجور الأسبوع', 'المستحق للدفع اليوم:', 'سلف لم تُسوَّ بعد: 4,000 د.ع']) {
+  for (const part of ['كشف دفعة لموظف', 'الموظف: موظف تجريبي', `الدفعة: 6,500 د.ع يوم ${day}`, 'ملاحظة: أجور الأسبوع', 'المستحق للدفع اليوم:', 'سلف لم تُسوَّ بعد: 4,000 د.ع']) {
     assert.ok(text.includes(part), `«${part}»`);
   }
   const headerRow = [...g.entries()].find(([, r]) => r.get('A') === 'يوم الأجر')![0];
