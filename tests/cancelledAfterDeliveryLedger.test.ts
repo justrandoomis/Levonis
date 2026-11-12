@@ -27,6 +27,7 @@ import { adminInvestmentFinanceRoutes } from '../worker/routes/adminInvestmentFi
 import { drainOrderFinanceRecovery } from '../worker/lib/financeOrderRecovery';
 import { reconcileFinanceOrder } from '../worker/lib/financeReconcile';
 import { reverseCancelledSale, runOrderFinancialEffects } from '../worker/lib/orderFinance';
+import { runFinanceChecks } from '../worker/lib/financeChecks';
 import { continueStaffReconciliation } from '../worker/lib/financeStaffAccrual';
 import { participantOverview } from '../worker/lib/financeParticipants';
 import { setStatusMapping, upsertRemoteStatuses } from '../worker/lib/delivery/statusMap';
@@ -518,4 +519,17 @@ test('the D1 budget: a reversal is one read and one batch; the delivery path kee
   context.diagnostic(`a reversal of a sale and its cost: ${seen.length} prepared statements in ${batches} batch`);
   assert.deepEqual([seen.length, batches], [12, 1]);
   assert.equal(seen.filter((s) => s.includes('periodOpen') || s.startsWith('SELECT month FROM accounting_periods')).length, 0, 'no period read of its own');
+});
+
+test('the books check (DECISIONS row 327) names an order cancelled after delivery while its sale is still in the journal, and nothing once the scan reversed it', async () => {
+  const w = world();
+  const found = async () => (await runFinanceChecks(w.db)).checks.find((c) => c.key === 'cancelled_after_delivery_in_journal')!;
+  const id = await w.delivered('cart_books');
+  assert.equal((await found()).count, 0, 'delivered: nothing to look at');
+  await w.move(id, 'shipped');
+  await w.move(id, 'cancelled');
+  const before = await found();
+  assert.deepEqual([before.count, before.sample], [1, [id]], 'cancelled after delivery, its sale still in the journal');
+  await w.drainAll();
+  assert.equal((await found()).count, 0, 'reversed like a return: off the list');
 });
