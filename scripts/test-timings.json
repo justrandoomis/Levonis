@@ -383,6 +383,7 @@
     "tests/financeLegacyAndPrices.test.ts": 9.5,
     "tests/financeOrderRecovery.test.ts": 56.7,
     "tests/financeOrderRecoverySchedule.test.ts": 4.5,
+    "tests/financeOrdersReport.test.ts": 9.0,
     "tests/financeOverlayNoSettlement.test.ts": 11.3,
     "tests/financeOverviewFigures.test.ts": 1.3,
     "tests/financeOverviewScreen.test.ts": 1.4,
@@ -1312,6 +1313,7 @@
     "tests/workflowSecrets.test.ts": 0.3,
     "tests/workshopFactsSeams.test.ts": 8.6,
     "tests/workshopProfileUi.test.ts": 1.9,
-    "tests/workspaceUi.test.ts": 9.6
+    "tests/workspaceUi.test.ts": 9.6,
+    "tests/xlsxWriter.test.ts": 0.4
   }
 }

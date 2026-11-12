@@ -1,6 +1,7 @@
 import { participantReport } from '../lib/financeParticipantReports';
 import { hasUnknownRefund, isConfirmedOrderCost } from '../lib/financeLedger';
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { badRequest, conflict, notFound, requireAdmin, str, unavailable } from '../lib/http';
 import { canViewCost, isOwner } from '../lib/adminScope';
@@ -21,6 +22,9 @@ import { loadUsdRateSteps, usdRateAt, type UsdRateSteps } from '../lib/fx/histor
 import { ADDITIVE_IQD_FIELDS, baghdadDayStart, batchCogsCents, centsOf, chartCents, expenseCompositionCents, iqdToCents, instantOf, rederive, sumCents, type Cents } from '../lib/financeUsdDisplay';
 import { loadLotUsdRates } from '../lib/batchSnapshot';
 import { runFinanceChecks } from '../lib/financeChecks';
+import { xlsxResponse, xlsxWorkbook } from '../lib/xlsx';
+import { ordersReportHtml, ordersReportSheet, productsOf, type ReportLang } from '../lib/financeOrdersReport';
+import { asDocument } from '../lib/securityPolicy';
 import { CLOSED_MONTHS_SQL, EXPENSE_ROW_LIMIT, EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_LIMIT, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
 
 type Row=Record<string,unknown>;
@@ -954,6 +958,26 @@ adminFinanceWorkspaceRoutes.get('/activity',async(c)=>{
     return {id:n(row.id),actor_id:row.actor_id??null,actor_name:row.actor_name??null,action:s(row.action),target:s(row.target),detail,at:s(row.created_at)};});
   return c.json({success:true,range:r,rows:page,next:rows.length>ACTIVITY_PAGE?page[page.length-1].id:null});
 });
+/**
+ * REPORTS → ORDERS AS A WORKBOOK AND AS A PRINTED PAGE (the owner's brief, 2026-11-12, part 1; DECISIONS row 329;
+ * worker/lib/financeOrdersReport.ts): the CSV's rows (exportOrderRows) under the page's own filters, the columns the brief names
+ * with a totals row; the whole period also carries its general expenses and a promotion with no sales as a last row, so the
+ * totals are the statement's. `lang` (ar, en, ckb) names the columns and sets the sheet's direction. The print document opens
+ * the browser's print dialog, where «Save as PDF» makes the PDF with the Arabic shaped by the browser.
+ */
+async function ordersReportFile(c:Context<AppContext>,kind:'xlsx'|'print'){
+  if((c.req.query('view')||'orders')!=='orders')throw badRequest('عرض التصدير غير معروف / Unknown export view','EXPORT_VIEW_INVALID');
+  const lang:ReportLang=c.req.query('lang')==='en'?'en':c.req.query('lang')==='ckb'?'ckb':'ar';
+  const r=range(c.req.query('from'),c.req.query('to')),f=exportFilter((key)=>c.req.query(key),'orders');
+  const filtered=!!(f.q||f.state||f.kind||f.scope||f.cash);
+  const {orders,bases}=await exportOrderRows(c.env.DB,r,f.part||filtered?f:{...f,part:'period'});
+  const input={from:r.from,to:r.to,lang,at:new Date(),orders,products:productsOf(bases,lang)};
+  if(kind==='xlsx')return xlsxResponse(xlsxWorkbook([ordersReportSheet(input)]),`finance-orders-${r.from}-${r.to}`);
+  asDocument(c);
+  return c.html(ordersReportHtml(input));
+}
+adminFinanceWorkspaceRoutes.get('/export.xlsx',(c)=>ordersReportFile(c,'xlsx'));
+adminFinanceWorkspaceRoutes.get('/print',(c)=>ordersReportFile(c,'print'));
 adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   const view=c.req.query('view')||'lines',level=c.req.query('level')||'main';
   if(!(EXPORT_VIEWS as readonly string[]).includes(view))throw badRequest('عرض التصدير غير معروف / Unknown export view','EXPORT_VIEW_INVALID');
@@ -979,30 +1003,18 @@ async function exportExpenses(db:D1Database,r:{from:string;to:string}){
   if(rows.length>20000)throw badRequest('اختر فترة أضيق لتصدير جميع المصاريف');
   return csvFile(rows.map((e)=>({...e,kind:s(e.expense_kind),counts_as_general:isGeneralKind(s(e.expense_kind))?1:0,amount_iqd:n(e.amount_iqd),expense_id:s(e.id)})),EXPENSE_COLUMNS,`finance-expenses-${r.from}-${r.to}.csv`);
 }
-async function exportView(db:D1Database,r:{from:string;to:string},view:'orders'|'products'|'sections'|'days',level:'main'|'sub',f:ExportFilter){
+/**
+ * REPORTS → ORDERS AS THE FILES CARRY IT (redesign step 4, DECISIONS row 316; shared since the owner's brief of 2026-11-12):
+ * the CSV (exportView), the workbook and the print (exportOrdersReport) read the same rows — the period's orders the page
+ * shows (its filters), each with its delivery day, its wages and materials empty while a cost waits, its estimate named beside
+ * a known cost; and, with `part`, that column's share of the period's overheads as a last row (`row_kind` 'overhead').
+ */
+async function exportOrderRows(db:D1Database,r:{from:string;to:string},f:ExportFilter){
   const {answer,bases,truncated}=await periodFigures(db,r);if(truncated)throw badRequest('اختر فترة أضيق لتصدير جميع البنود');
   const filtered=!!(f.q||f.state||f.kind||f.scope||f.cash);
-  const file=(rows:Row[],fields:readonly string[])=>csvFile(rows,fields,`finance-${view}${view==='sections'?`-${level}`:''}${f.part?`-${f.part}`:''}${f.by&&f.by!=='day'?`-${f.by}`:''}${filtered?'-filtered':''}-${r.from}-${r.to}.csv`);
   // A cost that waits for the goods cost (a profit-based wage) is in no sum yet, so a row with one has no known wages or
   // materials — the statement's rule (statement.ts) and the tables' — never the part that happens to be approved.
   const settled=(row:Row):Row=>(n(row.pending_costs)>0?{...row,wages_iqd:null,materials_iqd:null}:row);
-  // A row's estimates are named beside its known cost, as the page names them: beside an empty cost the count is empty too (the
-  // third review of step 4), so the column adds up to the costs total's «تقديري n» — and, over the rows with a net, to the net's.
-  const besideCost=(rows:Row[])=>rows.map((row)=>(row.cost_iqd===null?{...row,estimated_orders:null}:row));
-  if(view==='days'){const daily=answer.chart_data.daily as Row[];return f.by==='week'||f.by==='month'?file(besideCost(dayBuckets(daily,f.by)),BUCKET_COLUMNS):file(besideCost(daily),DAY_COLUMNS);}
-  // Products and sections: the rows whose name holds the search (any language the server has), then — on the whole table only,
-  // as the screen draws it — the order-level row, so the file adds up to the orders.
-  const needle=f.q.toLocaleLowerCase(),named=(x:Row)=>!needle||[x.name,x.name_ar,x.name_en,x.name_ckb].some((v)=>typeof v==='string'&&v.toLocaleLowerCase().includes(needle));
-  const level0=needle?null:answer.order_level;
-  const orderLevelRow=(names:Row):Row=>({...Object.fromEntries(GROUP_COLUMNS.map((k)=>[k,0])),...names,coupon_iqd:level0!.coupon_iqd,price_protection_iqd:level0!.price_protection_iqd,
-    trade_in_credit_returned_iqd:level0!.trade_in_credit_returned_iqd,net_after_report_adjustments_iqd:level0!.net_after_report_adjustments_iqd,finance_state:'',wait_reason:'',orders_count:level0!.orders_count,row_kind:'order_level'});
-  if(view==='products'){const rows=(answer.products as Row[]).filter(named).map((p)=>settled({...p,product_id:p.id,row_kind:'product'}));
-    if(level0)rows.push(orderLevelRow({product_id:'order_level',name:ORDER_LEVEL_NAMES[0],main_id:'',main_name:''}));
-    return file(rows,['product_id','name','main_id','main_name',...GROUP_COLUMNS]);}
-  if(view==='sections'){const [ar,en,ckb]=UNCLASSIFIED[level];
-    const rows=(answer.categories as Row[]).filter((x)=>x.level===level&&named(x)).map((x)=>settled({...x,section_id:x.id,row_kind:'section',...(x.id==='unclassified'?{name_ar:ar,name_en:en,name_ckb:ckb}:{})}));
-    if(level0){const [lar,len,lckb]=ORDER_LEVEL_NAMES;rows.push(orderLevelRow({section_id:'order_level',name_ar:lar,name_en:len,name_ckb:lckb}));}
-    return file(rows,['section_id','name_ar','name_en','name_ckb',...GROUP_COLUMNS]);}
   const days=new Map(bases.map((b)=>[b.order_id,deliveredDay(b)]));
   const scope=scopeOrders(f.scope,{products:answer.products as Row[],categories:answer.categories as Row[],order_level:answer.order_level},days),q=f.q.toLocaleLowerCase();
   const orders=(answer.orders as Row[]).filter((o)=>{
@@ -1028,5 +1040,32 @@ async function exportView(db:D1Database,r:{from:string;to:string},view:'orders'|
   const net=f.part==='calculated'||(f.part==='period'&&orders.every((o)=>o.net_after_report_adjustments_iqd!=null))?-general-unallocated:null;
   if(share&&(general||unallocated))orders.push({...Object.fromEntries(ORDER_COLUMNS.map((k)=>[k,0])),order_id:'',delivered_day:'',customer_name:'',order_kind:'',finance_state:'',wait_reason:'',cash_state:'',
     promotion_iqd:unallocated,general_expenses_iqd:general,owner_net_iqd:net,net_after_report_adjustments_iqd:net,row_kind:'overhead'});
-  return file(orders,ORDER_COLUMNS);
+  return {orders,bases,filtered};
+}
+async function exportView(db:D1Database,r:{from:string;to:string},view:'orders'|'products'|'sections'|'days',level:'main'|'sub',f:ExportFilter){
+  if(view==='orders'){const {orders,filtered}=await exportOrderRows(db,r,f);return csvFile(orders,ORDER_COLUMNS,`finance-orders${f.part?`-${f.part}`:''}${filtered?'-filtered':''}-${r.from}-${r.to}.csv`);}
+  const {answer,truncated}=await periodFigures(db,r);if(truncated)throw badRequest('اختر فترة أضيق لتصدير جميع البنود');
+  const filtered=!!(f.q||f.state||f.kind||f.scope||f.cash);
+  const file=(rows:Row[],fields:readonly string[])=>csvFile(rows,fields,`finance-${view}${view==='sections'?`-${level}`:''}${f.part?`-${f.part}`:''}${f.by&&f.by!=='day'?`-${f.by}`:''}${filtered?'-filtered':''}-${r.from}-${r.to}.csv`);
+  // A cost that waits for the goods cost (a profit-based wage) is in no sum yet, so a row with one has no known wages or
+  // materials — the statement's rule (statement.ts) and the tables' — never the part that happens to be approved.
+  const settled=(row:Row):Row=>(n(row.pending_costs)>0?{...row,wages_iqd:null,materials_iqd:null}:row);
+  // A row's estimates are named beside its known cost, as the page names them: beside an empty cost the count is empty too (the
+  // third review of step 4), so the column adds up to the costs total's «تقديري n» — and, over the rows with a net, to the net's.
+  const besideCost=(rows:Row[])=>rows.map((row)=>(row.cost_iqd===null?{...row,estimated_orders:null}:row));
+  if(view==='days'){const daily=answer.chart_data.daily as Row[];return f.by==='week'||f.by==='month'?file(besideCost(dayBuckets(daily,f.by)),BUCKET_COLUMNS):file(besideCost(daily),DAY_COLUMNS);}
+  // Products and sections: the rows whose name holds the search (any language the server has), then — on the whole table only,
+  // as the screen draws it — the order-level row, so the file adds up to the orders.
+  const needle=f.q.toLocaleLowerCase(),named=(x:Row)=>!needle||[x.name,x.name_ar,x.name_en,x.name_ckb].some((v)=>typeof v==='string'&&v.toLocaleLowerCase().includes(needle));
+  const level0=needle?null:answer.order_level;
+  const orderLevelRow=(names:Row):Row=>({...Object.fromEntries(GROUP_COLUMNS.map((k)=>[k,0])),...names,coupon_iqd:level0!.coupon_iqd,price_protection_iqd:level0!.price_protection_iqd,
+    trade_in_credit_returned_iqd:level0!.trade_in_credit_returned_iqd,net_after_report_adjustments_iqd:level0!.net_after_report_adjustments_iqd,finance_state:'',wait_reason:'',orders_count:level0!.orders_count,row_kind:'order_level'});
+  if(view==='products'){const rows=(answer.products as Row[]).filter(named).map((p)=>settled({...p,product_id:p.id,row_kind:'product'}));
+    if(level0)rows.push(orderLevelRow({product_id:'order_level',name:ORDER_LEVEL_NAMES[0],main_id:'',main_name:''}));
+    return file(rows,['product_id','name','main_id','main_name',...GROUP_COLUMNS]);}
+  if(view==='sections'){const [ar,en,ckb]=UNCLASSIFIED[level];
+    const rows=(answer.categories as Row[]).filter((x)=>x.level===level&&named(x)).map((x)=>settled({...x,section_id:x.id,row_kind:'section',...(x.id==='unclassified'?{name_ar:ar,name_en:en,name_ckb:ckb}:{})}));
+    if(level0){const [lar,len,lckb]=ORDER_LEVEL_NAMES;rows.push(orderLevelRow({section_id:'order_level',name_ar:lar,name_en:len,name_ckb:lckb}));}
+    return file(rows,['section_id','name_ar','name_en','name_ckb',...GROUP_COLUMNS]);}
+  throw badRequest('عرض التصدير غير معروف / Unknown export view','EXPORT_VIEW_INVALID');
 }

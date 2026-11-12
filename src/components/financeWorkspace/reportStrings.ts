@@ -24,6 +24,9 @@ export const RS = {
   amountsUsd: ['المبالغ بالدولار', 'Amounts in USD', 'بڕەکان بە دۆلار'],
   // The independent review of step 4: the export is the page as shown; its file is in dinars whatever the toggle says.
   exportIqd: ['تصدير CSV بالدينار', 'Export CSV in IQD', 'هەناردەکردنی CSV بە دینار'],
+  // The owner's brief of 2026-11-12, part 1 (DECISIONS row 329): the orders as a workbook with totals, and as a page to print or save as PDF.
+  exportXlsx: ['تنزيل Excel بالمجاميع', 'Download Excel with totals', 'داگرتنی Excel لەگەڵ کۆکان'],
+  exportPrint: ['طباعة أو حفظ PDF', 'Print or save as PDF', 'چاپ یان پاشەکەوتکردن وەک PDF'],
   kindFilter: ['النوع: {name}', 'Type: {name}', 'جۆر: {name}'],
   // The columns.
   colOrder: ['الطلب', 'Order', 'داواکاری'],

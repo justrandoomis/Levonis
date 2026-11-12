@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { ArrowDownToLine, Search, X } from 'lucide-react';
+import { ArrowDownToLine, Printer, Search, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { Status, Surface, useNarrow } from './ui';
 import { DisplayMoney, MissingValue, UsdBasisNote, centsAt, useDisplayCurrency } from './displayCurrency';
@@ -148,6 +148,22 @@ function ExportLink({ data, query }: { data: FinanceSummary; query: string }) {
   return <a className="fw-button fw-button--ghost" href={`${WORKSPACE_API}/export.csv?from=${data.range.from}&to=${data.range.to}${query}`} aria-label={usd ? rs(loc, 'exportIqd') : fw(loc, 'exportCsv')} data-finance-export>
     <ArrowDownToLine size={16} aria-hidden /><span>{usd ? rs(loc, 'exportIqd') : fw(loc, 'exportCsv')}</span></a>;
 }
+/**
+ * Reports → Orders as a workbook and as a page to print (the owner's brief, 2026-11-12, part 1; DECISIONS row 329): the same
+ * table and filters as the CSV, in the reader's language, the amounts in dinars; the printed page opens in its own tab with the
+ * browser's print dialog, where «Save as PDF» makes the PDF.
+ */
+function OrdersFileLinks({ data, query }: { data: FinanceSummary; query: string }) {
+  const { loc, lang } = useLanguage();
+  if (!data.range) return null;
+  const base = `from=${data.range.from}&to=${data.range.to}${query}&lang=${lang}`;
+  return <>
+    <a className="fw-button fw-button--ghost" href={`${WORKSPACE_API}/export.xlsx?${base}`} aria-label={rs(loc, 'exportXlsx')} title={rs(loc, 'exportXlsx')} data-finance-export-xlsx>
+      <ArrowDownToLine size={16} aria-hidden /><span>Excel</span></a>
+    <a className="fw-button fw-button--ghost" href={`${WORKSPACE_API}/print?${base}`} target="_blank" rel="noopener" aria-label={rs(loc, 'exportPrint')} title={rs(loc, 'exportPrint')} data-finance-export-print>
+      <Printer size={16} aria-hidden /><span>PDF</span></a>
+  </>;
+}
 function ScopeChip({ label, onClear, attr = 'data-finance-scope' }: { label: string | null; onClear: () => void; attr?: string }) {
   const { loc } = useLanguage();
   return label && <span className="fw-scope" {...{ [attr]: '' }}><bdi>{label}</bdi><button type="button" className="fw-icon-button fw-scope-x" onClick={onClear} aria-label={rs(loc, 'clearFilter')}><X size={14} aria-hidden /></button></span>;
@@ -278,6 +294,7 @@ export function OrdersReport({ data, scope: ref, onClearScope, openOrder, onMiss
         <ScopeChip label={scope?.label ?? null} onClear={onClearScope} />
         {narrow && <ScopeChip label={kind ? rs(loc, 'kindFilter', { name: kindName }) : null} onClear={() => setKind('')} attr="data-finance-kind-chip" />}
         <ExportLink data={data} query={exportQuery({ view: 'orders', q, state, kind, scope: ref })} />
+        <OrdersFileLinks data={data} query={exportQuery({ view: 'orders', q, state, kind, scope: ref })} />
       </div>
       {strip}
       <UsdNote data={data} />

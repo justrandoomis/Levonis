@@ -422,6 +422,12 @@ test('each page exports itself as shown — its filters, its row or days, its gr
   const base = '/api/admin/finance-workspace/export.csv?from=2026-11-01&to=2026-11-11';
   const magnets = render(createElement(OrdersReport, { data: s, scope: { kind: 'product', id: 'prd_magnets', name: 'm' }, onClearScope: noop, openOrder: noop, onMissing: noop, onCollections: noop }), 'en');
   assert.equal(href(magnets), `${base}&view=orders&scope=product%3Aprd_magnets`, 'the magnets\' orders, not every order of the period');
+  // The same table as a workbook and as a printed page (the owner's brief, 2026-11-12; DECISIONS row 329): the same filters, the reader's language.
+  const fileHref = (html: string, attr: string) => new RegExp(`href="([^"]+)"[^>]*${attr}`).exec(html)?.[1].replace(/&amp;/g, '&');
+  assert.equal(fileHref(magnets, 'data-finance-export-xlsx'), '/api/admin/finance-workspace/export.xlsx?from=2026-11-01&to=2026-11-11&view=orders&scope=product%3Aprd_magnets&lang=en');
+  assert.equal(fileHref(magnets, 'data-finance-export-print'), '/api/admin/finance-workspace/print?from=2026-11-01&to=2026-11-11&view=orders&scope=product%3Aprd_magnets&lang=en');
+  assert.match(magnets, /target="_blank" rel="noopener"[^>]*data-finance-export-print/, 'the printed page opens in its own tab');
+  assert.doesNotMatch(render(createElement(GroupsReport, { data: s, level: 'product', onOpenOrders: noop, onMissing: noop }), 'en'), /data-finance-export-xlsx|data-finance-export-print/, 'the orders page only');
   assert.equal(href(render(createElement(GroupsReport, { data: s, level: 'product', onOpenOrders: noop, onMissing: noop }), 'en')), `${base}&view=products`);
   assert.equal(href(render(createElement(GroupsReport, { data: s, level: 'main', onLevel: noop, onOpenOrders: noop, onMissing: noop }), 'en')), `${base}&view=sections&level=main`);
   assert.equal(href(render(createElement(DaysReport, { data: s, onOpenOrders: noop }), 'en')), `${base}&view=days`);
