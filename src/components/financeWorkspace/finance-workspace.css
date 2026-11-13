@@ -99,3 +99,6 @@ dialog.fw-sheet--side{margin:0;margin-inline-start:auto;width:min(440px,100vw);h
 .fw-table tfoot th,.fw-table tfoot td{font-weight:700;border-top:1px solid color-mix(in oklab,var(--fw-text) 30%,transparent)}
 .fw-courier-table tbody tr[aria-selected=true]>td{background:color-mix(in oklab,var(--fw-accent) 9%,var(--fw-surface))}
 .fw-table .fw-status.fw-chip-button{white-space:nowrap}
+/* Prepaid parcels' fees and undone transfers (DECISIONS row 338). */
+.fw-courier-prepaid{margin-top:16px}.fw-courier-prepaid .fw-courier-h .fw-link{font:inherit}
+.fw-courier-undone td{color:var(--fw-muted)}.fw-courier-check>.fw-note{flex-basis:100%;margin:0}

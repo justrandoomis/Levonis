@@ -99,9 +99,11 @@ async function seeded(): Promise<Raw> {
   raw.exec("INSERT INTO finance_collections(id,order_id,payer,amount_iqd,fee_iqd,collection_day,actor_id,created_at) VALUES ('col-2','ORD-0A00000009','customer',9000,0,'2026-11-02','boss','2026-11-02T08:00:00.000Z')");
   // courier_money_overdue: a parcel delivered 18 days before the run (before the journal's first sale, so no other check's).
   order(raw, 'ORD-0A0000000B', { status: 'delivered', delivered: '2026-10-25T09:00:00.000Z', total: 22000 });
-  // courier_transfers_unchecked: a transfer recorded 10 days before the run and never checked.
+  // courier_transfers_unchecked: a transfer recorded 10 days before the run and never checked; another as old, undone
+  // (DECISIONS row 338), waits for no check.
   raw.exec(`INSERT INTO courier_remittances(id,reference,received_day,amount_iqd,collected_iqd,fee_iqd,difference_iqd,parcels,created_by,created_at)
-    VALUES ('rem-1','Z-1','2026-11-02',4000,5000,1000,0,1,'boss','2026-11-02T08:00:00.000Z')`);
+    VALUES ('rem-1','Z-1','2026-11-02',4000,5000,1000,0,1,'boss','2026-11-02T08:00:00.000Z'),('rem-2','Z-2','2026-11-02',8000,9000,1000,0,1,'boss','2026-11-02T08:00:00.000Z');
+    INSERT INTO courier_remittance_voids(remittance_id,reason,actor_id,created_at) VALUES ('rem-2','recorded twice','boss','2026-11-02T09:00:00.000Z');`);
   // pending_cost_months
   raw.exec(`INSERT INTO finance_order_costs(id,order_id,rule_id,rule_version,rule_name,group_key,staff_id,category_id,milestone,qty,amount_iqd,cost_day,state,snapshot)
     VALUES ('cost-2','ORD-0A00000002','rule-1',1,'تجهيز','prep','staff_sajjad','cat-x','delivered',1,NULL,'2026-10-15','pending_cost','{}')`);

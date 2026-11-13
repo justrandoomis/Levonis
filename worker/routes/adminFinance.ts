@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str, int } from '../lib/http';
+import { COURIER_HELD_EXPENSE, courierHeldExpense } from '../lib/courierCollections';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { requireCostRead } from '../lib/costAccess';
@@ -470,6 +471,7 @@ adminFinanceRoutes.patch('/expenses/:id', async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const row = await c.env.DB.prepare('SELECT * FROM operating_expenses WHERE id = ?').bind(id).first<ExpenseRow>();
   if (!row) throw notFound('Expense not found');
+  if (await courierHeldExpense(c.env.DB, id)) throw conflict(COURIER_HELD_EXPENSE, 'COURIER_FEE_EXPENSE');
   if (row.voided_at) throw badRequest('This expense is voided — restore it before editing', 'EXPENSE_VOIDED');
   const body = await c.req.json().catch(() => ({}));
 
@@ -523,6 +525,7 @@ adminFinanceRoutes.delete('/expenses/:id', async (c) => {
   const id = str(c.req.param('id'), 'id', { min: 1, max: 60 });
   const row = await c.env.DB.prepare('SELECT * FROM operating_expenses WHERE id = ?').bind(id).first<ExpenseRow>();
   if (!row) throw notFound('Expense not found');
+  if (await courierHeldExpense(c.env.DB, id)) throw conflict(COURIER_HELD_EXPENSE, 'COURIER_FEE_EXPENSE');
   const reason = str(c.req.query('reason') ?? '', 'reason', { min: 0, max: 300 });
   const ts = nowIso();
   if(row.voided_at)return c.json({success:true,voided:false});
@@ -565,6 +568,8 @@ adminFinanceRoutes.post('/expenses/:id/restore', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM operating_expenses WHERE id = ?').bind(id).first<ExpenseRow>();
   if (!row) throw notFound('Expense not found');
   if(!row.voided_at)return c.json({success:true,restored:false});
+  // An undone courier transfer's fee stays voided: restored, it would count again once the parcels are recorded anew.
+  if (await courierHeldExpense(c.env.DB, id)) throw conflict(COURIER_HELD_EXPENSE, 'COURIER_FEE_EXPENSE');
   await periodOpen(c.env.DB, row.expense_day);
   const change=c.env.DB.prepare(
     `UPDATE operating_expenses SET voided_at = NULL, voided_by = NULL, void_reason = '', updated_at = ?

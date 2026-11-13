@@ -406,15 +406,22 @@ export interface CourierRemittanceRow {
   id: string; kind: 'transfer' | 'opening'; reference: string; received_day: string; amount_iqd: number; collected_iqd: number;
   fee_iqd: number; difference_iqd: number; parcels: number; state: 'received' | 'reconciled'; note: string;
   created_by_name: string | null; created_at: string; reconciled_by_name: string | null; reconciled_at: string | null; reconcile_note: string;
+  /** Set once the transfer is undone (DECISIONS row 338): when, by whom and why. */
+  undone_at: string | null; undone_by_name: string | null; undo_reason: string;
 }
 export interface CourierOverview {
   pending: { parcels: CourierParcel[]; count: number; due_iqd: number; fee_estimate_iqd: number; net_estimate_iqd: number; oldest_days: number };
+  /** Prepaid parcels whose fee no transfer took yet, oldest first (DECISIONS row 338); `more` when the list stops short. */
+  prepaid: { parcels: CourierParcel[]; count: number; more: boolean };
   remittances: CourierRemittanceRow[];
   unreconciled: { count: number; amount_iqd: number };
   first_time: boolean;
   fee_category: { id: string } | null;
+  /** Prepaid parcels' fees and undo can be recorded (migration 0233 is on the database). */
+  undo: boolean;
 }
 export interface CourierRemittanceDetail {
   remittance: CourierRemittanceRow;
-  parcels: Array<CourierParcel & { collected_iqd: number; fee_iqd: number; net_iqd: number }>;
+  /** A parcel with cash, or a prepaid one whose fee alone the courier took (`kind` 'fee': no cash, net = −fee). */
+  parcels: Array<CourierParcel & { kind: 'cash' | 'fee'; collected_iqd: number; fee_iqd: number; net_iqd: number }>;
 }

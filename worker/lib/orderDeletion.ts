@@ -106,7 +106,9 @@ async function columnsOf(db: OrderDeletionDb, table: string): Promise<Set<string
 type Protection = { code: string; message: string; query: string };
 type DeletionSchema = { columns: Map<string, Set<string>>; protections: Protection[] };
 const financialTables = ['finance_order_costs','finance_order_adjustments','finance_workspace_postings','finance_order_calculations',
-  'finance_collections','finance_refund_facts','investor_finance_events','finance_investor_earnings','finance_expense_links'] as const;
+  'finance_collections','finance_refund_facts','investor_finance_events','finance_investor_earnings','finance_expense_links',
+  // A prepaid parcel's fee on a courier transfer, and the parcels of an undone one (0233; DECISIONS row 338).
+  'courier_remittance_fees','courier_remittance_undone'] as const;
 const itemEvidenceTables = ['stock_serial_links','stock_return_inspections','trade_in_claims'] as const;
 const allocationEvidenceTables = ['investor_finance_events','investor_allocation_results','lot_cost_adjustment_shares','stock_return_lot_evidence','stock_return_unit_evidence','stock_return_order_unit_evidence'] as const;
 

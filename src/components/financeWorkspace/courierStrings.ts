@@ -78,6 +78,23 @@ export const CS = {
   panelTitle: ['التحويل', 'The transfer', 'گواستنەوەکە'],
   noneSelected: ['حدّد من القائمة الطرود التي دفعها التحويل، أو اختر أيامها من «من يوم» و«إلى يوم».', 'Tick the parcels the transfer paid, or pick their days with «From» and «To».', 'ئەو پاکەتانە دیاری بکە کە گواستنەوەکە پارەکەیانی داوە، یان ڕۆژەکانیان بە «لە ڕۆژی» و «تا ڕۆژی» هەڵبژێرە.'],
   noMatch: ['لا طرد يطابق البحث.', 'No parcel matches.', 'هیچ پاکەتێک ناگونجێت.'],
+  // Prepaid parcels' fees and undo (DECISIONS row 338).
+  prepaidTitle: ['طرود مدفوعة مسبقًا تنتظر أجرتها ({n})', 'Prepaid parcels awaiting their fee ({n})', 'پاکەتی پێشوەختە پارەدراو کە چاوەڕێی کرێکەیانن ({n})'],
+  prepaidPicked: ['المحدَّد: {n}', 'Selected: {n}', 'دیاریکراو: {n}'],
+  prepaidHint: ['دُفع ثمن هذه الطرود قبل التسليم فلا نقد لها عند الباب، لكن الزعيم يخصم أجرتها من تحويل. حدّد ما خصم هذا التحويل أجرته وصحّح الأجرة من كشفه؛ وأجرة 0 تعني أن الطرد سُوّي بلا أجرة.', 'These parcels were paid before delivery, so there is no cash at the door, but Al-Zaeem takes their fee from a transfer. Tick those whose fee this transfer took and correct the fee from its statement; a fee of 0 settles a parcel with no fee.', 'پارەی ئەم پاکەتانە پێش گەیاندن دراوە، بۆیە لە دەرگا پارەیان نییە، بەڵام زەعیم کرێکەیان لە گواستنەوەیەک دەبڕێت. ئەوانە دیاری بکە کە ئەم گواستنەوەیە کرێیانی بڕیوە و کرێکە لە کەشفەکەی ڕاست بکەرەوە؛ کرێی 0 واتە پاکەتەکە بێ کرێ یەکلاکرایەوە.'],
+  selectAllPrepaid: ['تحديد كل المدفوعة مسبقًا', 'Select all prepaid', 'هەموو پێشوەختەکان دیاری بکە'],
+  selectedPrepaid: ['ومدفوع مسبقًا: {n}، أجوره', 'prepaid: {n}, their fees', 'پێشوەختە: {n}، کرێکانیان'],
+  needsCash: ['يحتاج التحويل طردًا واحدًا على الأقل له نقد؛ أجور الطرود المدفوعة مسبقًا تُسجَّل معه.', 'A transfer needs at least one parcel with cash; prepaid parcels’ fees are recorded with it.', 'گواستنەوە لانیکەم پاکەتێکی بە پارەی پێویستە؛ کرێی پاکەتە پێشوەختەکان لەگەڵیدا تۆمار دەکرێن.'],
+  feesExceed: ['أجور المحدَّد أكبر من نقده: لا يبقى ما يحوّله الزعيم. أزل طردًا مدفوعًا مسبقًا أو صحّح أجرته.', 'The selected fees are more than the selected cash: nothing would be left for Al-Zaeem to transfer. Untick a prepaid parcel or correct its fee.', 'کرێی دیاریکراو لە پارەی دیاریکراو زیاترە: هیچ نامێنێت بۆ ئەوەی زەعیم بیگوازێتەوە. پاکەتێکی پێشوەختە لابە یان کرێکەی ڕاست بکەرەوە.'],
+  firstTimePrepaid: ['وإن كان الزعيم قد خصم من قبل أجور طرود مدفوعة مسبقًا، فحدّدها كذلك من «طرود مدفوعة مسبقًا» مع الرصيد الافتتاحي، بأجرة 0 إن لم تعرفها.', 'If Al-Zaeem already took the fees of prepaid parcels before, tick them too under «Prepaid parcels» with the opening balance, with a fee of 0 if you do not know it.', 'ئەگەر زەعیم پێشتر کرێی پاکەتە پێشوەختەکانی بڕیبێت، ئەوانیش لە «پاکەتی پێشوەختە پارەدراو» لەگەڵ باڵانسی سەرەتایی دیاری بکە، بە کرێی 0 ئەگەر نایزانیت.'],
+  prepaidLine: ['مدفوع مسبقًا، أجرة فقط', 'Prepaid, fee only', 'پێشوەختە، تەنها کرێ'],
+  undo: ['تراجع', 'Undo', 'هەڵوەشاندنەوە'],
+  undoWarn: ['يُلغى التحويل كأنه لم يُسجَّل: تعود طروده إلى القائمة، وتُعكس قيوده في يومه، وتُلغى مصاريف أجوره، وتعود حصص المستثمرين التي أطلقها إلى الانتظار. يبقى في القائمة مع سببك، ولا رجعة في التراجع. التحويل المُطابَق لا يُتراجع عنه.', 'The transfer is taken back as if never recorded: its parcels return to the list, its journal entries are reversed on its day, its fee expenses are voided, and investor shares it released wait again. It stays in the list with your reason, and the undo is final. A checked transfer cannot be undone.', 'گواستنەوەکە وەک ئەوەی تۆمار نەکرابێت هەڵدەوەشێتەوە: پاکەتەکانی دەگەڕێنەوە بۆ لیستەکە، تۆمارەکانی لە ڕۆژی خۆیدا پێچەوانە دەکرێنەوە، خەرجی کرێکانی هەڵدەوەشێنەوە، و بەشی وەبەرهێنەران کە ئازادی کردبوو دووبارە چاوەڕێ دەکەن. لەگەڵ هۆکارەکەت لە لیستەکەدا دەمێنێتەوە و هەڵوەشاندنەوەکە کۆتاییە. گواستنەوەی بەراوردکراو هەڵناوەشێتەوە.'],
+  undoReason: ['سبب التراجع (مطلوب)', 'Reason for the undo (required)', 'هۆکاری هەڵوەشاندنەوە (پێویستە)'],
+  undoConfirm: ['تراجع عن هذا التحويل', 'Undo this transfer', 'ئەم گواستنەوەیە هەڵبوەشێنەرەوە'],
+  stateUndone: ['تم التراجع', 'Undone', 'هەڵوەشێنرایەوە'],
+  undoneBy: ['تراجع عنه {name} يوم {day}', 'Undone by {name} on {day}', '{name} لە {day} هەڵیوەشاندەوە'],
+  undoneMsg: ['تم التراجع عن التحويل وعادت طروده إلى القائمة. تُحدَّث أرباح الطلبات وحصص المستثمرين خلال دقائق.', 'The transfer was undone and its parcels are back in the list. Order profits and investor shares update within minutes.', 'گواستنەوەکە هەڵوەشێنرایەوە و پاکەتەکانی گەڕانەوە بۆ لیستەکە. قازانجی داواکارییەکان و بەشی وەبەرهێنەران لە ماوەی چەند خولەکێکدا نوێ دەبنەوە.'],
 } as const satisfies Record<string, Tri>;
 
 export type CsKey = keyof typeof CS;

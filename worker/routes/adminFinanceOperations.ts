@@ -21,7 +21,7 @@ import { settleAdvance } from '../lib/payrollAdvance';
 import { validateRuleScope, readRuleScope } from '../lib/financeRuleScopes';
 import { commitParticipantStatements, effectiveStaffCostSql, heldSourceSql, participantAdvanceState, participantSources, participantSummary, staffAdvanceSql, staffPaymentBudget, staffReconciliationBlockedSql } from '../lib/financeParticipants';
 import { reconcileFinanceOrder } from '../lib/financeReconcile';
-import { planCollection } from '../lib/courierCollections';
+import { COURIER_HELD_EXPENSE, courierHeldExpense, planCollection } from '../lib/courierCollections';
 import { orderGoods, postStoredRefund, runOrderFinancialEffects, type CostRule } from '../lib/orderFinance';
 import { operationsReport } from '../lib/operationsReport';
 import { wageVersionStatement } from '../lib/financeWageTimeline';
@@ -529,6 +529,8 @@ adminFinanceOperationsRoutes.post('/expense-links', async (c) => {
     expense = text(b.expense_id, 60),
     target = text(b.target_type, 20) || 'all',
     targetId = target === 'all' ? '' : text(b.target_id, 60);
+  // A prepaid parcel's fee stays on its order (DECISIONS row 338).
+  if (expense && await courierHeldExpense(db, expense)) throw conflict(COURIER_HELD_EXPENSE, 'COURIER_FEE_EXPENSE');
   if (
     !['none', 'revenue', 'units', 'orders'].includes(basis) ||
     !['all', 'catalog', 'product'].includes(target)

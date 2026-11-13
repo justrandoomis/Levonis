@@ -157,13 +157,15 @@ export const FINANCE_CHECKS: readonly FinanceCheckSpec[] = [
         AND julianday('{now}') - julianday(o.delivered_at) > ${COURIER_OVERDUE_DAYS}`,
   },
   {
-    // A transfer recorded over a week ago and never checked against Al-Zaeem's own statement.
+    // A transfer recorded over a week ago and never checked against Al-Zaeem's own statement; an undone one waits for
+    // nothing (DECISIONS row 338: its table comes with migration 0233, which needs 0232's).
     key: 'courier_transfers_unchecked',
     severity: 'warning',
     money: true,
-    needs: 'courier_remittances',
+    needs: 'courier_remittance_voids',
     sql: `SELECT r.id AS id, r.amount_iqd AS amount FROM courier_remittances r
-      WHERE r.state = 'received' AND julianday('{now}') - julianday(r.created_at) > ${COURIER_UNCHECKED_DAYS}`,
+      WHERE r.state = 'received' AND julianday('{now}') - julianday(r.created_at) > ${COURIER_UNCHECKED_DAYS}
+        AND NOT EXISTS (SELECT 1 FROM courier_remittance_voids v WHERE v.remittance_id = r.id)`,
   },
 ];
 

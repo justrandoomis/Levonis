@@ -105,6 +105,7 @@ export default {
         'GET /courier/remittances/:id': 'cost_read',
         'POST /courier/remittances': 'cost_write',
         'POST /courier/remittances/:id/reconcile': 'cost_write',
+        'POST /courier/remittances/:id/undo': 'cost_write',
         'GET /orders': 'cost_read',
         'GET /orders/:id': 'cost_read',
         'POST /orders/:id/adjustments': 'cost_write',

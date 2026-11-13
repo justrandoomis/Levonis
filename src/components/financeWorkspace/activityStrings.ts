@@ -43,6 +43,7 @@ export const ACTION_WORDS: Record<string, Tri> = {
   'finance.collection_recorded': ['سجّل تحصيلًا', 'Recorded a collection', 'وەرگرتنێکی پارەی تۆمارکرد'],
   'finance.courier_remittance_recorded': ['سجّل تحويلًا من شركة التوصيل', 'Recorded a transfer from the courier', 'گواستنەوەیەکی کۆمپانیای گەیاندنی تۆمارکرد'],
   'finance.courier_remittance_reconciled': ['طابق تحويلًا من شركة التوصيل مع كشفها', 'Checked a courier transfer against its statement', 'گواستنەوەیەکی کۆمپانیای گەیاندنی لەگەڵ کەشفەکەی بەراورد کرد'],
+  'finance.courier_remittance_undone': ['تراجع عن تحويل من شركة التوصيل', 'Undid a transfer from the courier', 'گواستنەوەیەکی کۆمپانیای گەیاندنی هەڵوەشاندەوە'],
   'finance.cost_approved': ['اعتمد أجرًا', 'Approved a wage', 'کرێیەکی پەسەندکرد'],
   'finance.cost_reversed': ['عكس أجرًا', 'Reversed a wage', 'کرێیەکی پێچەوانەکردەوە'],
   'finance.rule_created': ['أضاف قاعدة أجر', 'Added a wage rule', 'یاسایەکی کرێی زیادکرد'],

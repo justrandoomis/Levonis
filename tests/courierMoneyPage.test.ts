@@ -10,6 +10,10 @@
  *   fee, the amount, the day, the statement number and the fee category, then reads again. A retry after a lost answer
  *   sends the same operation id. The first time, the ticked parcels can go as the opening balance instead. A received
  *   transfer is checked with «تمت المطابقة» → «تأكيد المطابقة»; a checked one says who checked it.
+ * - The second round (DECISIONS row 338): prepaid parcels wait in their own list, ticked by hand with their fee (the day
+ *   range leaves them alone); they go with a transfer as `fees` and lower what should arrive, and alone they cannot make a
+ *   transfer. A received transfer can be undone with a reason, then reads «Undone by …» with no button; a transfer's
+ *   prepaid line reads «Prepaid, fee only».
  *
  * Every figure is invented. Run: node --import tsx --test tests/courierMoneyPage.test.ts
  */
@@ -56,14 +60,16 @@ const OVERVIEW: CourierOverview = {
   unreconciled: { count: 0, amount_iqd: 0 },
   first_time: true,
   fee_category: { id: 'fees' },
+  prepaid: { parcels: [], count: 0, more: false },
+  undo: true,
 };
 const TRANSFERS: CourierOverview['remittances'] = [
-  { id: 'rem-2', kind: 'transfer', reference: 'Z-1002', received_day: '2026-11-10', amount_iqd: 49000, collected_iqd: 55000, fee_iqd: 5000, difference_iqd: -1000, parcels: 1, state: 'received', note: 'نقص', created_by_name: 'Owner', created_at: '2026-11-10T09:00:00.000Z', reconciled_by_name: null, reconciled_at: null, reconcile_note: '' },
-  { id: 'rem-1', kind: 'opening', reference: 'رصيد افتتاحي', received_day: '2026-11-01', amount_iqd: 25000, collected_iqd: 30000, fee_iqd: 5000, difference_iqd: 0, parcels: 1, state: 'reconciled', note: '', created_by_name: 'Owner', created_at: '2026-11-01T09:00:00.000Z', reconciled_by_name: 'Owner', reconciled_at: '2026-11-02T09:00:00.000Z', reconcile_note: '' },
+  { id: 'rem-2', kind: 'transfer', reference: 'Z-1002', received_day: '2026-11-10', amount_iqd: 49000, collected_iqd: 55000, fee_iqd: 5000, difference_iqd: -1000, parcels: 1, state: 'received', note: 'نقص', created_by_name: 'Owner', created_at: '2026-11-10T09:00:00.000Z', reconciled_by_name: null, reconciled_at: null, reconcile_note: '', undone_at: null, undone_by_name: null, undo_reason: '' },
+  { id: 'rem-1', kind: 'opening', reference: 'رصيد افتتاحي', received_day: '2026-11-01', amount_iqd: 25000, collected_iqd: 30000, fee_iqd: 5000, difference_iqd: 0, parcels: 1, state: 'reconciled', note: '', created_by_name: 'Owner', created_at: '2026-11-01T09:00:00.000Z', reconciled_by_name: 'Owner', reconciled_at: '2026-11-02T09:00:00.000Z', reconcile_note: '', undone_at: null, undone_by_name: null, undo_reason: '' },
 ];
 
 interface Sent { method: string; url: string; body: Record<string, unknown> | null }
-function serve(overview: CourierOverview, opts: { failPosts?: number } = {}) {
+function serve(overview: CourierOverview, opts: { failPosts?: number; detail?: unknown } = {}) {
   const sent: Sent[] = [];
   let failures = opts.failPosts ?? 0;
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -75,7 +81,7 @@ function serve(overview: CourierOverview, opts: { failPosts?: number } = {}) {
       if (failures > 0) { failures--; throw new TypeError('Failed to fetch'); }
       return ok(url.endsWith('/reconcile') ? { already: false } : { already: false, id: (JSON.parse(String(init!.body)) as { operation_id: string }).operation_id, parcels: 1 });
     }
-    if (/\/courier\/remittances\//.test(url)) return ok({ remittance: TRANSFERS[0], parcels: [{ ...parcel('ORD-0D00000009', 55000, 5000, '2026-11-01', 12), collected_iqd: 55000, fee_iqd: 5000, net_iqd: 50000 }] });
+    if (/\/courier\/remittances\//.test(url)) return ok(opts.detail ?? { remittance: TRANSFERS[0], parcels: [{ ...parcel('ORD-0D00000009', 55000, 5000, '2026-11-01', 12), collected_iqd: 55000, fee_iqd: 5000, net_iqd: 50000 }] });
     return ok(overview);
   }) as typeof fetch;
   return sent;
@@ -232,5 +238,126 @@ test('the list: days as groups with their box, a search, and «From / To» that 
   await act(async () => { type(q(page.container, 'input[data-courier-search]'), 'nothing-like-this'); });
   await page.settle();
   assert.ok(q(page.container, '[data-courier-no-match]'));
+  await page.unmount();
+});
+
+// ─────────────────────────────────────────── the second round (DECISIONS row 338): prepaid parcels' fees and undo
+
+const WITH_PREPAID: CourierOverview = {
+  ...OVERVIEW,
+  prepaid: { parcels: [parcel('ORD-0D00000007', 0, 5000, '2026-11-04', 8), parcel('ORD-0D00000008', 0, 4000, '2026-11-05', 7)], count: 2, more: false },
+};
+const tickPrepaid = async (page: Awaited<ReturnType<typeof mount>>, id: string) => {
+  await act(async () => { click(q(page.container, `tr[data-courier-parcel="${id}"] input[data-courier-prepaid-pick]`)); });
+  await page.settle();
+};
+
+test('prepaid parcels wait in their own list; ticked with their fee they go with the transfer and lower what should arrive', async () => {
+  const sent = serve(WITH_PREPAID);
+  const page = await mount('en');
+  const toggle = q(page.container, 'button[data-courier-prepaid-toggle]');
+  assert.match(words(toggle), /Prepaid parcels awaiting their fee \(2\)/);
+  assert.equal(q(page.container, '[data-courier-prepaid-parcels]'), null, 'folded until opened');
+  assert.match(words(q(page.container, '[data-courier-first-prepaid]')), /with the opening balance/, 'the first time says the old ones go with the opening');
+  await act(async () => { click(toggle); });
+  await page.settle();
+  assert.deepEqual(qa(page.container, 'tr[data-courier-prepaid-parcel]').map((r) => r.getAttribute('data-courier-parcel')), ['ORD-0D00000007', 'ORD-0D00000008']);
+  // The day range ticks parcels with cash only.
+  await act(async () => { type(q(page.container, 'input[data-courier-from]'), '2026-11-01'); });
+  await page.settle();
+  await act(async () => { click(q(page.container, 'button[data-courier-pick-range]')); });
+  await page.settle();
+  assert.equal(qa(page.container, 'tr[data-courier-prepaid-parcel][aria-selected="true"]').length, 0, 'the range leaves prepaid parcels alone');
+  await act(async () => { click(q(page.container, 'button[data-courier-clear]')); });
+  await page.settle();
+  // A prepaid parcel alone cannot make a transfer.
+  await tickPrepaid(page, 'ORD-0D00000007');
+  assert.ok(q(page.container, '[data-courier-needs-cash]'), 'it needs a parcel with cash');
+  assert.equal(named(page.container, 'button', 'Record the transfer').disabled, true);
+  await tick(page, 'ORD-0D00000002');
+  // 30,000 less its 5,000, less the prepaid parcel's fee, corrected from the statement to 6,000: 19,000.
+  await act(async () => { type(q(page.container, 'tr[data-courier-parcel="ORD-0D00000007"] input[data-courier-prepaid-fee]'), '6000'); });
+  await page.settle();
+  const form = q(page.container, '[data-courier-form]');
+  assert.match(words(form), /Parcels selected: 1/);
+  assert.match(words(q(page.container, '[data-courier-prepaid-sum]')), /prepaid: 1, their fees.*6,000/);
+  assert.equal(q(page.container, 'input[data-courier-amount]').value, '19000', 'what should arrive is that much less');
+  assert.match(words(q(page.container, 'button[data-courier-prepaid-toggle]').parentNode as unknown as FakeElement), /Selected: 1/);
+  await act(async () => { click(named(page.container, 'button', 'Record the transfer')); });
+  await page.settle();
+  const post = sent.find((s) => s.method === 'POST')!;
+  assert.deepEqual([post.body!.amount_iqd, post.body!.parcels, post.body!.fees], [19000,
+    [{ order_id: 'ORD-0D00000002', collected_iqd: 30000, fee_iqd: 5000 }], [{ order_id: 'ORD-0D00000007', fee_iqd: 6000 }]]);
+  assert.match(words(q(page.container, '[data-courier-message]')), /Parcels recorded: 2/);
+  await page.unmount();
+});
+
+test('fees above the cash are refused on the page; the opening takes the prepaid parcels with its first part', async () => {
+  const sent = serve(WITH_PREPAID);
+  const page = await mount('ar');
+  await act(async () => { click(q(page.container, 'button[data-courier-prepaid-toggle]')); });
+  await page.settle();
+  await tick(page, 'ORD-0D00000003');
+  await act(async () => { click(q(page.container, 'input[data-courier-prepaid-pick-all]')); });
+  await page.settle();
+  // 3,000 at the door less its 3,000 fee, less 9,000 of prepaid fees: nothing would be left to transfer.
+  assert.ok(q(page.container, '[data-courier-fees-exceed]'));
+  assert.equal(named(page.container, 'button', 'سجّل التحويل').disabled, true);
+  assert.equal(q(page.container, '[data-courier-opening]').disabled, true);
+  await tick(page, 'ORD-0D00000001');
+  assert.equal(q(page.container, '[data-courier-fees-exceed]'), null);
+  await act(async () => { choose(q(page.container, 'select[data-courier-category]'), 'rent'); });
+  await act(async () => { click(named(page.container, 'button', 'سجّل كرصيد افتتاحي')); });
+  await page.settle();
+  const post = sent.find((s) => s.method === 'POST')!;
+  assert.equal(post.body!.kind, 'opening');
+  assert.deepEqual((post.body!.parcels as Array<{ order_id: string }>).map((p) => p.order_id), ['ORD-0D00000001', 'ORD-0D00000003']);
+  assert.deepEqual(post.body!.fees, [{ order_id: 'ORD-0D00000007', fee_iqd: 5000 }, { order_id: 'ORD-0D00000008', fee_iqd: 4000 }]);
+  await page.unmount();
+});
+
+test('a received transfer can be undone with a reason; an undone one says who undid it, with no button; a prepaid line reads as a fee', async () => {
+  const UNDONE = { ...TRANSFERS[0], id: 'rem-3', reference: 'Z-1003', undone_at: '2026-11-12T10:00:00.000Z', undone_by_name: 'Owner', undo_reason: 'wrong parcel' };
+  const detail = { remittance: TRANSFERS[0], parcels: [
+    { ...parcel('ORD-0D00000009', 0, 0, '2026-11-01', 12), kind: 'cash', collected_iqd: 55000, fee_iqd: 5000, net_iqd: 50000 },
+    { ...parcel('ORD-0D00000007', 0, 0, '2026-11-04', 8), kind: 'fee', collected_iqd: 0, fee_iqd: 5000, net_iqd: -5000 },
+  ] };
+  const sent = serve({ ...OVERVIEW, first_time: false, remittances: [UNDONE, ...TRANSFERS], unreconciled: { count: 1, amount_iqd: 49000 } }, { detail });
+  const changed: string[] = [];
+  const page = await mount('en', [], changed);
+  const undone = q(page.container, 'tr[data-courier-transfer="rem-3"]');
+  assert.equal(undone.getAttribute('data-courier-state'), 'undone');
+  assert.match(words(undone), /Undone by Owner on 2026-11-12/);
+  assert.equal(q(page.container, 'tr[data-courier-transfer="rem-3"] button[data-courier-undo]'), null, 'an undone transfer has no button');
+  assert.equal(q(page.container, 'tr[data-courier-transfer="rem-3"] button[data-courier-reconcile]'), null);
+  assert.equal(q(page.container, 'tr[data-courier-transfer="rem-1"] button[data-courier-undo]'), null, 'a checked one cannot be undone');
+  await act(async () => { click(q(page.container, 'tr[data-courier-transfer="rem-2"] button[data-courier-undo]')); });
+  await page.settle();
+  assert.match(words(q(page.container, '[data-courier-undo-form]')), /as if never recorded/);
+  const confirm = named(page.container, 'button', 'Undo this transfer');
+  assert.equal(confirm.disabled, true, 'a reason first');
+  await act(async () => { type(q(page.container, 'input[data-courier-undo-reason]'), 'ticked a parcel by mistake'); });
+  await page.settle();
+  assert.equal(confirm.disabled, false);
+  await act(async () => { click(confirm); });
+  await page.settle();
+  const post = sent.find((s) => s.method === 'POST')!;
+  assert.match(post.url, /\/courier\/remittances\/rem-2\/undo$/);
+  assert.deepEqual(post.body, { reason: 'ticked a parcel by mistake' });
+  assert.match(words(q(page.container, '[data-courier-message]')), /The transfer was undone/);
+  assert.deepEqual(changed, ['changed']);
+  await act(async () => { click(named(page.container, 'button', /1 · Parcels/)); });
+  await page.settle();
+  assert.match(words(q(page.container, '[data-courier-transfer-parcels]')), /ORD-0D00000007.*-5,000|ORD-0D00000007.*−5,000/);
+  assert.match(words(q(page.container, '[data-courier-transfer-parcels]')), /Prepaid, fee only/);
+  await page.unmount();
+});
+
+test('before migration 0233 there is no undo button and no prepaid list', async () => {
+  serve({ ...OVERVIEW, first_time: false, remittances: TRANSFERS, undo: false });
+  const page = await mount('ckb');
+  assert.equal(q(page.container, 'button[data-courier-undo]'), null);
+  assert.ok(q(page.container, 'tr[data-courier-transfer="rem-2"] button[data-courier-reconcile]'), 'checking still works');
+  assert.equal(q(page.container, '[data-courier-prepaid]'), null);
   await page.unmount();
 });
