@@ -13,6 +13,7 @@
 import type { RouteClassFile } from './_types';
 import { NB } from './_types';
 import { adminMembershipBenefitRoutes } from '../../worker/routes/adminMembershipBenefits';
+import { adminOrderServiceTaskRoutes, adminPrinterServiceRoutes } from '../../worker/routes/adminPrinterServices';
 import { adminTaxonomyRoutes } from '../../worker/routes/adminTaxonomy';
 import { mediaRoutes } from '../../worker/routes/media';
 import { adminPriceReportRoutes } from '../../worker/routes/priceReports';
@@ -116,6 +117,31 @@ export default {
         'GET /consolidation': 'op',
         'POST /consolidation': 'money',
         'POST /simulate': 'op',
+      },
+    },
+    {
+      // «خدمات الطابعة» (0234, DECISIONS row 339): the printer-services price list.
+      prefix: '/api/admin/printer-services',
+      name: 'adminPrinterServiceRoutes',
+      router: adminPrinterServiceRoutes,
+      writes: 'the printer-services price list setting (customer prices per family); no cost column is read',
+      routes: {
+        'GET /': 'op',
+        // Customer prices: only the owner saves the draft (owner ruling; OWNER_ONLY_ACTS
+        // printer_services), publishes it or switches it off; staff may view it (GET).
+        'PUT /draft': 'owner',
+        'POST /publish': 'owner',
+        'POST /unpublish': 'owner',
+      },
+    },
+    {
+      // The warehouse's tasks for a printer line (0234): any admin closes one.
+      prefix: '/api/admin/order-service-tasks',
+      name: 'adminOrderServiceTaskRoutes',
+      router: adminOrderServiceTaskRoutes,
+      writes: 'a task status and a staff note on order_service_tasks; no money, no cost',
+      routes: {
+        'POST /:id/done': { cls: 'op', noBody: 'needs a real task id; the empty body is refused 404 for an unknown one' },
       },
     },
     {

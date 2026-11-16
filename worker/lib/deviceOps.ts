@@ -253,6 +253,7 @@ export async function createUnitsOnDelivery(
   // batch and the activation batch, even when activation fails and waits for
   // the sweep. The activation writes the same values again (carriedWindow).
   const carried = await carriedPriors(env.DB, orderId);
+  const servicesByItem = await servicesSnapshots(env.DB, { orderId });
 
   // Which lines are printers, by the owner's catalog flag, and which sit in a
   // section whose serial policy says 'required' (0178) — two batched reads for
@@ -272,7 +273,7 @@ export async function createUnitsOnDelivery(
     const policy = lineDevicePolicy(it.ops_policy, it.product_id, policyCtx);
     if (!policy.serialized) continue;
     serializedItems++;
-    const { cov, policyVersion } = ownUnitWindow(policy.warranty_base_months, it.warranty_snapshot, deliveredAtIso);
+    const { cov, policyVersion } = ownUnitWindow(policy.warranty_base_months, it.warranty_snapshot, deliveredAtIso, servicesByItem.get(String(it.item_id)) ?? null);
     const qty = Math.min(Math.max(Number(it.qty) || 0, 0), 500);
     for (let i = 1; i <= qty; i++) {
       planned++;
@@ -334,8 +335,33 @@ export async function createUnitsOnDelivery(
 export function ownUnitWindow(
   baseMonths: number | null,
   warrantySnapshot: unknown,
-  deliveredAtIso: string
+  deliveredAtIso: string,
+  /**
+   * The line's frozen printer services (0234). When present it is the WHOLE
+   * promise: the warranty bought is a TOTAL (0, 12 or 24 months) from
+   * delivery, with no base under it and nothing stacked on it (owner ruling
+   * 2026-11-17, DECISIONS row 339). Stored as base = total, ext = 0, so every
+   * later recompute from the unit's own columns lands on the same end.
+   */
+  servicesSnapshot?: string | null
 ): { cov: CoverageCalc; policyVersion: string } {
+  const services = safeParse<{ warranty_months?: unknown; revision?: unknown; selection?: { warranty?: unknown } } | null>(servicesSnapshot ?? null, null);
+  const bought = services && typeof services.warranty_months === 'number' && [0, 12, 24].includes(services.warranty_months)
+    ? services.warranty_months
+    : null;
+  if (bought !== null) {
+    return {
+      cov: { base_months: bought, ext_months: 0, total_months: bought, end_at: addMonths(deliveredAtIso, bought) },
+      policyVersion: JSON.stringify({
+        v: 2,
+        base: bought,
+        ext: 0,
+        total: bought,
+        services_revision: typeof services!.revision === 'number' ? services!.revision : null,
+        warranty_choice: typeof services!.selection?.warranty === 'string' ? services!.selection.warranty : null,
+      }),
+    };
+  }
   const snap = safeParse<WarrantySnapshotLite | null>(warrantySnapshot, null);
   const cov = computeCoverage(baseMonths, snap, deliveredAtIso);
   const policyVersion = JSON.stringify({
@@ -396,7 +422,8 @@ export async function headStartUndoStatements(
   if (identity.resale_of !== binding.prior_unit_id && identity.resale_of !== source?.id) return [];
   const policyCtx = await serializationContext(db, unit.product_id ? [unit.product_id] : []);
   const policy = lineDevicePolicy(unit.ops_policy, unit.product_id, policyCtx);
-  const own = ownUnitWindow(policy.warranty_base_months, unit.warranty_snapshot, unit.delivered_at);
+  const own = ownUnitWindow(policy.warranty_base_months, unit.warranty_snapshot, unit.delivered_at,
+    (await servicesSnapshots(db, { itemId: binding.order_item_id })).get(binding.order_item_id) ?? null);
   return [
     db
       .prepare(
@@ -577,6 +604,12 @@ export function recomputeUnitWindow(unit: UnitRow, newDeliveredAtIso: string): {
       ...(moved ? { policy_version: moved } : {}),
     };
   }
+  // A printer sold with the services and NO warranty (0234: total 0 months)
+  // recorded an end at its delivery; the corrected date moves it, never erases
+  // it (a null end would read as «no window recorded»).
+  if (safeParse<{ total?: unknown }>(unit.policy_version, {}).total === 0) {
+    return { start_at: newDeliveredAtIso, end_at: addMonths(newDeliveredAtIso, 0) };
+  }
   const total = unitTotalMonths(unit);
   return { start_at: newDeliveredAtIso, end_at: total !== null ? addMonths(newDeliveredAtIso, total) : null };
 }
@@ -725,4 +758,23 @@ export function stageToLegacyStatus(stage: ClaimStage): 'submitted' | 'in_review
     default:
       return 'approved'; // approved/repairing/replaced/resolved
   }
+}
+
+/**
+ * The frozen printer-services snapshots (0234) of an order's lines, or of one
+ * line. Empty — every unit priced as before — on a database one migration
+ * behind (CLAUDE.md rule 2), where no line can carry services.
+ */
+export async function servicesSnapshots(db: D1Database, by: { orderId: string } | { itemId: string }): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  try {
+    const { results } = await db
+      .prepare(`SELECT id, services_snapshot FROM order_items WHERE ${'orderId' in by ? 'order_id' : 'id'} = ? AND services_snapshot IS NOT NULL`)
+      .bind('orderId' in by ? by.orderId : by.itemId)
+      .all<{ id: string; services_snapshot: string }>();
+    for (const r of results ?? []) out.set(r.id, r.services_snapshot);
+  } catch (e) {
+    if (!/no such column/i.test(String((e as Error)?.message ?? e))) throw e;
+  }
+  return out;
 }

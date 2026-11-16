@@ -30,6 +30,7 @@ import { serialsApi } from './serials/serialsApi';
 import type { GateMissing, OrderSerials } from './serials/types';
 import VariantImg from '../ui/VariantImg';
 import { couponPoolLabel } from '../../../packages/contracts/src/couponPool';
+import ServiceTasksSection, { type ServiceTask } from './ServiceTasksSection';
 
 // The §16 serial / warranty page, opened from a linked slot's serial.
 const SerialDetail = React.lazy(() => import('../adminWarranty/serial/SerialDetail'));
@@ -729,6 +730,12 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               onOpenSerial={openSerialPage}
               focusRequest={focusRequest}
               onFocusHandled={clearFocusRequest}
+            />
+
+            {/* «مهام الخدمات» (0234): packing, inspection (blocks the hand-over), Academy. */}
+            <ServiceTasksSection
+              tasks={((detail as { service_tasks?: ServiceTask[] }).service_tasks) ?? []}
+              onChanged={(tasks) => setDetail((d) => (d ? ({ ...d, service_tasks: tasks } as typeof d) : d))}
             />
 
             {detail.admin_note && (

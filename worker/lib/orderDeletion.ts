@@ -64,6 +64,10 @@ export const ORDER_OWNED_TABLES: Owned[] = [
   // 0218: an estimated line's record and settlement (a cancelled order's lines are void). Deleted
   // explicitly, before its order line, because D1's FK cascades are not guaranteed.
   { table: 'order_price_estimates' },
+  // 0234 «خصص طابعتك»: the warehouse tasks of a serviced printer line (packing, inspection, Academy) name the
+  // order LINE (order_item_id REFERENCES order_items), so they go before it — else every cancelled printer
+  // order with services fails the purge on its foreign key and the sweep stalls on it.
+  { table: 'order_service_tasks' },
   { table: 'order_items' },
 ];
 

@@ -83,6 +83,7 @@ import { templateRoutes } from './routes/template';
 import { mediaRoutes } from './routes/media';
 import { adminTaxonomyRoutes } from './routes/adminTaxonomy';
 import { adminMembershipBenefitRoutes } from './routes/adminMembershipBenefits';
+import { adminOrderServiceTaskRoutes, adminPrinterServiceRoutes } from './routes/adminPrinterServices';
 import { warrantyAdminRoutes, warrantyPublicRoutes } from './routes/warranty';
 import { adminImportRoutes } from './routes/adminImport';
 import { adminProductRelationsRoutes } from './routes/adminProductRelations';
@@ -596,6 +597,8 @@ app.route('/api/admin/investment-finance', adminInvestmentFinanceRoutes);
 app.route('/api/finance-earnings', financeEarningsRoutes);
 // Every commercial value PRO and PREMIUM shopping benefits are made of (§6).
 app.route('/api/admin/membership-benefits', adminMembershipBenefitRoutes);
+app.route('/api/admin/printer-services', adminPrinterServiceRoutes);
+app.route('/api/admin/order-service-tasks', adminOrderServiceTaskRoutes);
 // Admin → Rewards (0220): the programme's terms, the reward coupons issued and the competitions.
 app.route('/api/admin/rewards', adminRewardsRoutes);
 // The issued warranty document: public verification by receipt number or by

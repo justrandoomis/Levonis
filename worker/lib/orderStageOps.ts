@@ -40,6 +40,7 @@ import {
   type OrderStage,
   type StageSource,
   STAGE_LEGACY_STATUS,
+  INSPECTION_GATED_STAGES,
   STAGE_SOURCE,
   canMoveStage,
   nextStageOf,
@@ -62,6 +63,7 @@ import { runOrderDeliveredEffects } from './orderDeliveredEffects';
 import { isPriceHeld, isPriceHoldAbort } from './priceHold';
 import { hasOpenEstimates, isEstimateGateAbort, isEstimateReopenAbort } from './priceEstimateGate';
 import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance';
+import { isInspectionGateAbort, openInspectionBlocksDispatch } from './printerServices';
 
 /** Mirrors STOCK_DEDUCTED_STATES in the admin route — the same four statuses. */
 const STOCK_DEDUCTED_STATES = new Set(['confirmed', 'processing', 'shipped', 'delivered']);
@@ -127,6 +129,8 @@ export interface MoveResult {
     | 'TRADE_IN_ORDER_DELIVERED'
     /** «أُرجع، لا يُلغى»: a return of this order already gave money or stock back (Q7, DECISIONS row 319). */
     | 'ORDER_CANCEL_RETURNED'
+    /** A pre-dispatch inspection bought on this order is not done yet (0234, DECISIONS row 339). */
+    | 'INSPECTION_NOT_DONE'
     | 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED'
     /** An estimated line waits for its final price: the order stays at «تم الاستلام» (0218, T8). */
     | 'PRICE_ESTIMATE_UNCONFIRMED'
@@ -375,6 +379,14 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   if (isPriceHeld(row)) {
     return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'PRICE_APPROVAL_PENDING' };
   }
+  // «الفحص قبل الشحن» (0234; owner ruling 2026-11-17): a printer whose inspection
+  // was bought does not leave the warehouse until a staff member completes it —
+  // whoever moves it (a person, the sweep, the courier sync), forced or not, and
+  // whether it goes to «في الطريق إليك» or skips straight to «تم التوصيل». The
+  // trigger trg_orders_inspection_gate enforces the same rule inside the flip.
+  if (INSPECTION_GATED_STAGES.has(opts.to) && opts.to !== storedStage && (await openInspectionBlocksDispatch(env.DB, order.id))) {
+    return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'INSPECTION_NOT_DONE' };
+  }
   // «بانتظار تأكيد السعر النهائي» (0218): while an estimated line is open,
   // proposed or rejected the order stays at «تم الاستلام» — not even forced,
   // not by the sweep, not by the courier sync. One indexed read, asked only of
@@ -563,6 +575,14 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
       return {
         moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
         next_stage: null, next_stage_at: null, notes: [], reason: 'SERIALS_REQUIRED',
+      };
+    }
+    // «الفحص قبل الشحن» (0234, trg_orders_inspection_gate): an inspection opened or
+    // was still open when the flip ran.
+    if (isInspectionGateAbort(e)) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'INSPECTION_NOT_DONE',
       };
     }
     if (isPriceHoldAbort(e)) {

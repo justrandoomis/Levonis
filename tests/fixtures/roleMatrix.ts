@@ -79,6 +79,7 @@ import { adminSerialRulesRoutes } from '../../worker/routes/adminSerialRules';
 import { adminSecurityRoutes } from '../../worker/routes/adminSecurity';
 import { adminCreativeStudioRoutes } from '../../worker/routes/adminCreativeStudio';
 import { adminMembershipBenefitRoutes } from '../../worker/routes/adminMembershipBenefits';
+import { adminOrderServiceTaskRoutes, adminPrinterServiceRoutes } from '../../worker/routes/adminPrinterServices';
 import { adminFinanceOperationsRoutes } from '../../worker/routes/adminFinanceOperations';
 import { adminFinanceWorkspaceRoutes } from '../../worker/routes/adminFinanceWorkspace';
 import { adminFinancePeopleRoutes } from '../../worker/routes/adminFinancePeople';
@@ -252,6 +253,8 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/admin/investment-finance', adminInvestmentFinanceRoutes as Router],
   ['/api/finance-earnings', financeEarningsRoutes as Router],
   ['/api/admin/membership-benefits', adminMembershipBenefitRoutes as Router],
+  ['/api/admin/printer-services', adminPrinterServiceRoutes as Router],
+  ['/api/admin/order-service-tasks', adminOrderServiceTaskRoutes as Router],
   ['/api/admin/rewards', adminRewardsRoutes as Router],
   ['/api/warranty', warrantyPublicRoutes as Router],
   ['/api/admin/warranties', warrantyAdminRoutes as Router],

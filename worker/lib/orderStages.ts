@@ -81,6 +81,14 @@ export const PREORDER_STAGES: OrderStage[] = [
   'delivered',
 ];
 
+/**
+ * «الفحص قبل الشحن» (0234; owner ruling 2026-11-17): the stages an order may not
+ * enter while a pre-dispatch inspection bought on it is still open — the
+ * hand-over to the courier and everything after it, on either path. The same
+ * set is in trg_orders_inspection_gate (migrations/0234_printer_services.sql).
+ */
+export const INSPECTION_GATED_STAGES: ReadonlySet<string> = new Set<OrderStage>(['out_for_delivery', 'delivered']);
+
 export function stagesFor(shippingType: ShippingType): OrderStage[] {
   return shippingType === 'direct' ? DIRECT_STAGES : PREORDER_STAGES;
 }

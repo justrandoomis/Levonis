@@ -293,7 +293,8 @@ test('«عدة ألوان»: the notice and «تواصل معنا» follow the p
 
 test('⚡ Quick Buy is not offered for an estimated selection', () => {
   const page = read('src/pages/Product.tsx');
-  assert.match(page, /const showQuickBuyToggle = isAuthenticated && source === 'catalog' && !selectionEstimate;/);
+  // A printer enrolled in «خصص طابعتك» (DECISIONS row 339) is never quick-bought either: its packages need the cart.
+  assert.match(page, /const showQuickBuyToggle = isAuthenticated && source === 'catalog' && !selectionEstimate && !psEnrolled;/);
   assert.match(page, /const quickBuyOn = !!product && quickBuyFor === product\.id && !selectionEstimate;/);
   assert.match(page, /quickBuyOn=\{quickBuyFor === product\.id && !selectionEstimate\}/);
   // The buy row falls back to the one cart button whenever the toggle is not shown.

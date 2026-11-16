@@ -41,7 +41,7 @@ import { safeParse, localeToApi } from '../lib/types';
 import { dailyUserHash, emitBestEffort, eventsEnabled, waitUntilFrom } from '../lib/eventBus';
 import { ProductViewedV1 } from '@levonis/contracts/events/v1/ProductViewed';
 import { isOfferOccasionKey, OFFER_OCCASION_KEYS, type OccasionName } from '@levonis/contracts/offerOccasions';
-import { HttpError, notFound, int, str } from '../lib/http';
+import { HttpError, badRequest, notFound, int, str } from '../lib/http';
 import { getSetting, getSettings, PUBLIC_SETTING_KEYS, projectPublicSettings, publicPrintServiceRates } from '../lib/settings';
 import { getPublicDisplayRate } from '../lib/fx/displayRate';
 import { normalizeHomeBanners, normalizeSectionItems } from '../lib/homeContent';
@@ -153,6 +153,8 @@ import { normalizeHomeBento } from '../lib/homeBento';
 import { conditionSaving, parseConditionDoc } from '../lib/condition';
 import { salesBadgeFor } from '../lib/salesBadge';
 import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
+import { enrolledClasses, productEnrolled, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
+import { parseSelection, servicesOffer, SERVICES_WITH_LEGACY_WARRANTY } from '@levonis/pricing/printerServices';
 import {
   canonicalOptionValueIds as canonicalSelectionOptionValueIds,
   optionValueIdsInRelationOrder,
@@ -5272,6 +5274,9 @@ export async function catalogProductDetail(
   // product page, for reads that depend on nothing this wave returns.
   const productId = String(row.id);
   const printerPromise = isPrinterProduct(db, productId);
+  // «خصص طابعتك» (DECISIONS row 339): answered as one flag from the shared pricing inputs (one
+  // settings statement the page already spends; fresh within PRICING_INPUTS_TTL_MS). The quote reads it fresh.
+  const servicesPromise = pricingInputsFor(db).then((i) => publishedFromSetting(i.settings.printerServices)).catch(() => null);
   // S-P2 (review F-33): the taxonomy says whether a trade-in credit can buy this device — memoised
   // per isolate, read beside the rest of the wave.
   const taxonomyPromise = catalogIndexFor(db).catch(() => null);
@@ -5481,7 +5486,10 @@ export async function catalogProductDetail(
   // the total months each yields — so "+12 months → 24 total · +67,425"
   // is the server's sentence, never the browser's arithmetic. Empty for a
   // non-printer: the cart would refuse the plan (WARRANTY_NOT_PRINTER).
-  out.warranty_plans = pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter);
+  // A product enrolled in the published printer services (some selection of it
+  // resolves) sells those instead: never the legacy plans (DECISIONS row 339).
+  const servicesEnrolled = productEnrolled(await servicesPromise, { id: productId, condition: parsed.condition });
+  out.warranty_plans = servicesEnrolled ? [] : pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter);
   // The imported prose in Arabic and Sorani (0196): `out` is re-shaped from the row, so the overlay is applied here.
   overlayImportedText(out, translations, parsed.translation_meta);
 
@@ -5522,6 +5530,10 @@ export async function catalogProductDetail(
      */
     sales_badge: salesBadge,
     rating: ratingSummary,
+    // True when this printer sells the printer services (new, and SOME selection
+    // of it resolves a family and a class): the page then asks one quote
+    // straight away, which carries the offer. Only when true.
+    ...(servicesEnrolled ? { printer_services_enrolled: true as const } : {}),
     /**
      * The new product's CURRENT price, for the struck-through comparison on
      * a graded listing. Resolved server-side so the page never has to fetch
@@ -5897,7 +5909,7 @@ productRoutes.post('/:slug/quote', async (c) => {
   // as the detail endpoint reads them. Quoting from the bare row made every
   // option saved through the current admin form (whose structure lives ONLY
   // in the tables) answer OPTION_NOT_FOUND, and per-colour stock invisible.
-  const [relations, ctx, isPrinter, offer] = await Promise.all([
+  const [relations, ctx, isPrinter, offer, servicesConfig] = await Promise.all([
     loadRelationsView(c.env.DB, String(row.id), row.inventory_mode),
     pricingCtx(c), // tier ONLY from the session, never the body
     isPrinterProduct(c.env.DB, String(row.id)),
@@ -5906,6 +5918,8 @@ productRoutes.post('/:slug/quote', async (c) => {
     degradeIfSchemaMissing('offers (migration 0060)', () => loadOffers(c.env.DB, [subjectOf(String(row.id))]), EMPTY_OFFERS()).then(
       (m) => m.get(offerKey(subjectOf(String(row.id))))
     ),
+    // «خصص طابعتك» (DECISIONS row 339): null until the owner publishes.
+    publishedPrinterServices(c.env.DB),
   ]);
   const doc = applyRelations(parseProductRow(row), relations);
   const now = Date.now();
@@ -5982,6 +5996,16 @@ productRoutes.post('/:slug/quote', async (c) => {
   const standIn = optionValueIds.length === 0 && !colorId ? unchosenStandIn(doc, ctx, offer, now) : null;
   const priceValueIds = standIn ? [standIn.optionId] : optionValueIds;
   const priceOptionId = standIn ? standIn.optionId : optionId;
+  // PRINTER SERVICES: an enrolled printer (published list, mapped, new) is
+  // quoted with the services the page sends, as a PREVIEW (the confirmation
+  // and the no-warranty acknowledgment are the cart's to require). Resolved
+  // for the SAME selection the price is (the stand-in when nothing is chosen),
+  // so a version-only mapping answers the services there too.
+  const servicesProduct = { id: String(row.id), condition: doc.condition };
+  const servicesEnrolled = productEnrolled(servicesConfig, servicesProduct);
+  const servicesClasses = enrolledClasses(servicesConfig, servicesProduct, priceValueIds);
+  const servicesSelection = servicesClasses && body.services != null ? parseSelection(body.services) : null;
+  if (servicesClasses && body.services != null && !servicesSelection) throw badRequest('services is malformed', 'SERVICES_INVALID');
   const resolved = resolveUnitPrice({
     product: doc,
     optionId: priceOptionId,
@@ -5990,7 +6014,11 @@ productRoutes.post('/:slug/quote', async (c) => {
     colorId,
     transportMethod,
     fulfillmentType,
-    warrantyPlanId,
+    // An enrolled printer never prices a legacy plan (refused just below).
+    warrantyPlanId: servicesEnrolled ? null : warrantyPlanId,
+    printerServices: servicesClasses && servicesConfig && servicesSelection
+      ? { config: servicesConfig, classes: servicesClasses, selection: servicesSelection, preview: true }
+      : null,
     tier: ctx.tier,
     tierActive: ctx.tierActive,
     proPolicy: ctx.proPolicy,
@@ -6001,8 +6029,12 @@ productRoutes.post('/:slug/quote', async (c) => {
   // The same printers-only rule the cart enforces, reported the way the page
   // reports every other selection error — so the button disables here rather
   // than the add failing a moment later.
-  if (warrantyPlanId && !isPrinter && !resolved.errors.includes(WARRANTY_NOT_PRINTER)) {
+  if (warrantyPlanId && !isPrinter && !servicesEnrolled && !resolved.errors.includes(WARRANTY_NOT_PRINTER)) {
     resolved.errors.push(WARRANTY_NOT_PRINTER);
+  }
+  // A legacy plan on an enrolled printer is refused, services sent or not (never both, never instead).
+  if (warrantyPlanId && servicesEnrolled && !resolved.errors.includes(SERVICES_WITH_LEGACY_WARRANTY)) {
+    resolved.errors.push(SERVICES_WITH_LEGACY_WARRANTY);
   }
   // C2: priced under the live offer exactly as the cart line will be, so the
   // figure that lands here is never higher than the one the cart charges.
@@ -6036,7 +6068,21 @@ productRoutes.post('/:slug/quote', async (c) => {
     // Every extended-warranty option priced for THIS selection's regular price
     // (an option surcharge moves a percent fee), so the chooser can show the
     // exact dinar of each plan before one is picked.
-    warranty_plans: pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter),
+    // An enrolled printer sells the printer services instead (never both).
+    warranty_plans: servicesEnrolled || servicesClasses ? [] : pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter),
+    // Only on an enrolled printer: every other quote is byte-identical. The
+    // offer is per unit; `selection` is the sent choice priced (preview).
+    ...(servicesClasses && servicesConfig
+      ? {
+          printer_services: {
+            offer: servicesOffer(servicesConfig, servicesClasses),
+            selection: priced.services
+              ? { fee_iqd: priced.services.fee_iqd, lines: priced.services.lines, warranty_months: priced.services.warranty_months,
+                  delivery_fee_iqd: priced.services.delivery_fee_iqd, blockers: priced.services.blockers }
+              : null,
+          },
+        }
+      : {}),
     // Availability for THIS selection — changing option/color re-checks it,
     // against the REAL inventory snapshot and colour links, and asking for a
     // transport is asking for the pre-order journey (same rule as the cart).

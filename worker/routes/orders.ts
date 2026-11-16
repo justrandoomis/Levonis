@@ -224,7 +224,7 @@ import {
 import type { PointsRule, OrderPointsSnapshot } from '../lib/pointsOps';
 import { audit, auditStatements } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
-import { quoteShipping } from '../lib/shipping';
+import { couponDeliveryBase, quoteShipping } from '../lib/shipping';
 import { deliveryCharge, type DeliveryPolicy } from '../lib/storeDelivery';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
 import { productCatalogPlacements } from '../lib/printerIdentity';
@@ -244,6 +244,8 @@ import { createInvoiceForOrder } from '../lib/invoices';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
 import { orderConfirmKeyboard } from '../lib/orderTelegramConfirm';
 import { notifyOrderPlaced } from '../lib/orderNotify';
+import { SERVICES_CODES } from '@levonis/pricing/printerServices';
+import { orderServicesView, serviceTaskStatements, servicesForMethod, SERVICES_DELIVERY_METHOD_MESSAGE, SERVICES_DELIVERY_METHOD_TEXT, withServicesSnapshot } from '../lib/printerServices';
 
 /**
  * 409 PRODUCT_CURRENTLY_UNAVAILABLE naming the products (the clean start, spec addendum A.5): a line
@@ -941,6 +943,12 @@ export function orderPublic(
               warranty: customerWarranty(safeParse<Record<string, unknown> | null>(it.warranty_snapshot, null)),
               transport: customerOrderTransport(safeParse(it.transport_snapshot, null)),
             }),
+        // The printer services bought with this line (0234) — the same view
+        // for the customer and the admin: choices, fees, months. Absent on
+        // every other line.
+        ...(typeof it.services_snapshot === 'string' && it.services_snapshot
+          ? { services: orderServicesView(it.services_snapshot) }
+          : {}),
         /**
          * The exact selection that was bought, in the shape POST /api/cart/items
          * accepts — so "buy again" repeats THIS line instead of the product's
@@ -1838,6 +1846,8 @@ export interface ComputedLine {
   stock_targets: StockTarget[];
   pricing_snapshot: string;
   warranty_snapshot: string | null;
+  /** The printer services priced and frozen for this line (0234), absent/null on every other line. */
+  services_snapshot?: string | null;
   transport_snapshot: string | null;
   breakdown: ReturnType<typeof publicBreakdown>;
   /** catalogs.is_printer_catalog — drives the home-delivery NOTE, never a fee. */
@@ -2232,6 +2242,9 @@ export async function computeCheckout(
     'checkoutPaymentMethods',
     'proPricingPolicy',
     'preorderTransportDefaults',
+    // The published printer-services list (DECISIONS row 339): omitted, an
+    // enrolled printer would be priced WITHOUT its services at checkout.
+    'printerServices',
     'printerGiftConfig',
     'preorderGiftConfig',
     'shippingPolicy',
@@ -2827,6 +2840,11 @@ export async function computeCheckout(
       // predicate: an ordinary line is sold only from a V2 document's own SKU row — never from a legacy
       // ladder number, even if some surface forgot the predicate.
       if (doc.sku_strict !== true || resolvedLive.price_source !== 'sku') throw productsUnavailable([String(row.id)]);
+      // PRINTER SERVICES (DECISIONS row 339): its own code, so the cart can open the chooser for this line.
+      const servicesRefusal = resolved.errors.find((e) => SERVICES_CODES.has(e));
+      if (servicesRefusal) {
+        throw badRequest(`"${displayName}": choose and confirm how you want this printer`, servicesRefusal, { cart_item_id: String(row.cart_item_id ?? '') });
+      }
       if (resolved.errors.length > 0) {
         throw badRequest(`"${displayName}": ${resolved.errors.join(', ')}`, 'VALIDATION');
       }
@@ -3001,7 +3019,39 @@ export async function computeCheckout(
       merchandise += resolved.applied_iqd * qty;
       productIds.push(String(row.id));
       const facts = shippingFactsFrom(row.ops_policy, row);
-      shippingItems.push({ product_id: String(row.id), qty, is_printer: isPrinter, ...facts });
+      /**
+       * THE PRINTER'S DELIVERY FOLLOWS THE CHECKOUT METHOD (owner ruling
+       * 2026-11-17). Its Economy / Personal choice is a STANDARD delivery
+       * component. Store pickup has no last mile: the choice is dropped, no fee
+       * is charged for it and the frozen snapshot says «pickup» — so what the
+       * order records and what it charged always agree. Any other method would
+       * price the printer by a tariff the customer never chose: refused, so they
+       * use the standard delivery step.
+       */
+      const servicesFrozen = resolved.services ? servicesForMethod(resolved.services, delivery.id) : null;
+      if (resolved.services && !servicesFrozen) {
+        throw badRequest(
+          `"${displayName}": ${SERVICES_DELIVERY_METHOD_MESSAGE}`,
+          'SERVICES_DELIVERY_METHOD',
+          { cart_item_id: String(row.cart_item_id ?? ''), delivery_method_id: delivery.id, message: SERVICES_DELIVERY_METHOD_TEXT }
+        );
+      }
+      shippingItems.push({
+        product_id: String(row.id), qty, is_printer: isPrinter, ...facts,
+        // An enrolled printer is delivered by its own class and the customer's choice (DECISIONS row 339).
+        // Charged only by the standard quote (store pickup quotes nothing); kept on
+        // the item so the other methods' preview fees price it the same way.
+        ...(resolved.services
+          ? {
+              printer_service: {
+                delivery: resolved.services.selection.delivery,
+                delivery_class: resolved.services.classes.delivery_class,
+                economy_iqd: resolved.services.delivery_options.economy_iqd,
+                personal_iqd: resolved.services.delivery_options.personal_iqd,
+              },
+            }
+          : {}),
+      });
       // Persisted resolver snapshot: cost fields must NEVER be stored on the
       // order (it is served back to the buyer). It carries `direct.waived`,
       // `transport.waived_by` and `pricing_basis`, so an invoice, a refund or
@@ -3083,6 +3133,7 @@ export async function computeCheckout(
         tracked: stockRes.tracked,
         pricing_snapshot: JSON.stringify(offerSnapshot ? { ...pricingSnapshot, offer: offerSnapshot } : pricingSnapshot),
         warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
+        services_snapshot: servicesFrozen ? JSON.stringify(servicesFrozen) : null,
         transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
         breakdown: publicBreakdown(resolved),
         is_printer: isPrinter,
@@ -3573,6 +3624,8 @@ export async function computeCheckout(
       benefitAncestry,
       shippingType === 'direct' ? 'direct_sale' : 'pre_order'
     );
+    // A printer's Personal delivery is never discounted (couponDeliveryBase): the
+    // callers pass the coupon's delivery base, not the whole fee.
     const couponCtx = (deliveryIqd: number): CouponContext => ({
       delivery_method: couponDeliveryMethod(delivery.id),
       delivery_iqd: isPickup ? 0 : deliveryIqd,
@@ -3581,7 +3634,7 @@ export async function computeCheckout(
       const couponBasis = Math.max(0, subtotal - lineDiscount) + shipping.total_iqd;
       const check = await validateCoupon(c.env, user.id, input.couponCode, couponBasis, {
         lines: couponLines,
-        ctx: couponCtx(shipping.total_iqd),
+        ctx: couponCtx(couponDeliveryBase(shipping)),
       });
       if (!check.ok || !check.coupon_id) {
         const reason = check.reason ?? 'COUPON_INVALID';
@@ -3676,7 +3729,7 @@ export async function computeCheckout(
     // that has nothing left to take (delivery came out free) is refused and its
     // use is not spent (plan §1.1 ⑫).
     if (couponRule && couponNamesDelivery(couponRule)) {
-      couponDelivery = allocateCoupon(couponRule, couponLines, couponCtx(shipping.total_iqd)).delivery_iqd;
+      couponDelivery = allocateCoupon(couponRule, couponLines, couponCtx(couponDeliveryBase(shipping))).delivery_iqd;
       couponDiscount = couponMerchandise + couponDelivery;
       if (couponDiscount <= 0) throw badRequest('Coupon could not be applied (NO_DISCOUNT)', 'NO_DISCOUNT');
     }
@@ -3684,7 +3737,7 @@ export async function computeCheckout(
       // The same on the pool, and which coupons it spends is decided here: a fee
       // the coupons themselves moved may leave one of them with nothing to take,
       // and that one stays with the customer.
-      const onFinalFee = allocateCouponPool(couponPool, couponLines, couponCtx(shipping.total_iqd));
+      const onFinalFee = allocateCouponPool(couponPool, couponLines, couponCtx(couponDeliveryBase(shipping)));
       couponDelivery = onFinalFee.delivery_iqd;
       couponDiscount = couponMerchandise + couponDelivery;
       couponPoolUsed = onFinalFee.used;
@@ -4598,6 +4651,9 @@ function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
             : null,
       },
       shipping: comp.shipping,
+      /** The part of the delivery fee a delivery code may take: all of it but a printer's
+       *  Personal delivery (never discounted, DECISIONS row 339) — what the code preview is checked on. */
+      coupon_delivery_iqd: couponDeliveryBase(comp.shipping),
       /** Every method's real fee for this cart — so the screen prints a true
        *  figure on every card before the customer has chosen anything. */
       delivery_method_fees: comp.deliveryMethodFees,
@@ -4805,6 +4861,14 @@ export async function placeOrder(
   const comp = await computeCheckout(c, user, input, { allocate: true, source: quickBuy?.source });
   quickBuy?.guard?.(comp);
 
+  // A printer whose delivery (Economy / Personal) was never chosen is refused
+  // with its own code — never defaulted to either (DECISIONS row 339).
+  const undecided = comp.shipping.needs_config.find((n) => n.endsWith(':printer_delivery_required'));
+  if (undecided) {
+    throw badRequest('Choose Economy or Personal delivery for the printer', 'SERVICES_DELIVERY_REQUIRED', {
+      product_id: undecided.split(':')[1] ?? null,
+    });
+  }
   // Honest blocker (§6.3): an unpriced fee component (printer size mapping /
   // carton fee not configured by the owner yet) can NEVER be silently waived
   // or invented — the order cannot complete until the owner configures it.
@@ -5263,8 +5327,10 @@ export async function placeOrder(
         coupon_discount_iqd: comp.couponLineDiscounts.get(it.id) ?? 0,
       // The two 0175 columns, on a gift line only — and the six 0181 columns on an
       // engine-priced line only; every other line's INSERT is the statement it always was.
-      }, it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq, ...(estimate ?? {}) } : basis || estimate ? { ...(basis ?? {}), ...(estimate ?? {}) } : undefined)
+      }, withServicesSnapshot(it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq, ...(estimate ?? {}) } : basis || estimate ? { ...(basis ?? {}), ...(estimate ?? {}) } : undefined, it.services_snapshot ?? null))
     );
+    // The warehouse's work for an enrolled printer, in the order's own batch (0234).
+    stmts.push(...serviceTaskStatements(c.env.DB, orderId, it.id, it.services_snapshot ?? null, now, it.qty));
     /**
      * THE GIFT IS CONSUMED HERE, IN THE ORDER'S OWN BATCH (0175, D4).
      *

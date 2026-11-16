@@ -249,7 +249,7 @@ test('the page: a combination it does not sell is not offered — no quote, no f
   // No quote is asked for it (the quote answered it with another SKU's figures), and nothing on screen can be bought:
   // the price card, the «من …» pill, the route rows and the status lines (with their codes) step aside.
   assert.match(page, /if \(catalogOnly \|\| knownUnpriced \|\| selectionUnoffered\) \{\s*setQuoteLoading\(false\);\s*return;/);
-  assert.match(page, /warrantyPlanId, quoteToken, catalogOnly, knownUnpriced, selectionUnoffered\]\);/);
+  assert.match(page, /warrantyPlanId, quoteToken, catalogOnly, knownUnpriced, selectionUnoffered(, psEnrolled, svc)?\]\);/);
   assert.match(page, /const noPrice = catalogOnly \|\| selectionUnpriced \|\| selectionUnoffered;/);
   assert.match(page, /const priceBlock = noPrice \? null : \(/);
   assert.match(page, /const showTransports = effectivePreorder && !noPrice && /);

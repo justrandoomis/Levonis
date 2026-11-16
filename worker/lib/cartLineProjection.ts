@@ -42,6 +42,7 @@ export const CART_LINE_COLUMNS: ReadonlyArray<{ name: string; sqlDefault: string
   { name: 'transport_method', sqlDefault: "''" }, // 0002
   { name: 'fulfillment_type', sqlDefault: "''" }, // 0073
   { name: 'warranty_plan_id', sqlDefault: "''" }, // 0002
+  { name: 'services', sqlDefault: "''" }, // 0234: the printer services chosen for the line
   { name: 'draw_salt', sqlDefault: "''" }, // 0058
   // 0175: the gift a line was added from. NULL — an ordinary line — on a
   // database behind the migration, so no gift branch is ever entered there.

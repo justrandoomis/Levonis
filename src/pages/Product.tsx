@@ -116,6 +116,7 @@ import { CommunityStoreLink } from './community/access';
 import CompareBadge from '../components/compare/CompareBadge';
 import PrinterFitsLine, { type FitPrinterRef } from '../components/product/PrinterFitsLine';
 import { QuickBuyBar } from '../components/quickBuy/QuickBuyBar';
+import type { QuotedServices, ServiceSelection } from '../components/product/printerServicesModel';
 import { quickBuyChrome } from '../components/quickBuy/chromeStrings';
 import type { QuickBuySheetMode } from '../components/quickBuy/quickBuyActions';
 import type { QuickBuyPrinterAcceptance, QuickBuyPrinterPolicy } from '../lib/quickBuy';
@@ -228,6 +229,8 @@ const ColourQuantityPanel = React.lazy(loadColourQuantityPanel);
 const loadQuickBuyActions = () => import('../components/quickBuy/quickBuyActions');
 const loadQuickBuySheet = () => import('../components/quickBuy/QuickBuyActivationSheet');
 const QuickBuyActivationSheet = React.lazy(loadQuickBuySheet);
+/** «خصص طابعتك» (DECISIONS row 339): the card loads with an enrolled printer's offer, the sheet on open — neither is in any other product's opening. */
+const PrinterPackages = React.lazy(() => import('../components/product/PrinterPackages'));
 
 /** Reviews and eligibility are below the purchase panel; start them near the scroll viewport. */
 function ProductReviews({ productId }: { productId: string }) {
@@ -958,6 +961,8 @@ interface DetailResponse {
    */
   sales_badge?: number | null;
   rating?: { average: number; count: number } | null;
+  /** «خصص طابعتك»: this printer sells the printer services (present only when true). */
+  printer_services_enrolled?: true;
   /** The linked new product's CURRENT price, when this is a graded listing. */
   condition_reference?: { reference_iqd: number; saving_iqd: number } | null;
   /** 0148 — the published printers this part fits, in the admin's order. */
@@ -980,6 +985,8 @@ interface QuoteResponse {
   /** The ways to buy THIS selection, priced by the server. */
   pricing_modes?: PricingModes;
   viewer_tier?: ViewerTier;
+  /** An enrolled printer's offer and the sent choice priced (DECISIONS row 339). */
+  printer_services?: QuotedServices;
 }
 
 // ------------------------------------------------------------------ helpers
@@ -1382,6 +1389,18 @@ export default function Product() {
   /** The extended-warranty disclosure. Closed by default because "no
    *  extension" is already the correct answer for most buyers. */
   const [warrantyOpen, setWarrantyOpen] = useState(false);
+  /**
+   * «خصص طابعتك» (DECISIONS row 339). `psEnrolled` comes with the page body;
+   * the offer comes with the quote it makes the page ask for. `svc` is the
+   * customer's choice — null until they tap: Smart Choice is only DRAWN as the
+   * recommendation, and the add is refused until a choice is confirmed.
+   */
+  const [psEnrolled, setPsEnrolled] = useState(false);
+  const [psQuoted, setPsQuoted] = useState<QuotedServices | null>(null);
+  const [svc, setSvc] = useState<ServiceSelection | null>(null);
+  /** The card's verdict (printerServicesModel.verdictOf): complete, and priced by the server without a blocker. */
+  const [svcReady, setSvcReady] = useState(false);
+  const [psAttention, setPsAttention] = useState(false);
   const [quoteError, setQuoteError] = useState<unknown>(null);
   const [quoteToken, setQuoteToken] = useState(0);
   // Only the freshly returned detail's exact opening selection may skip a
@@ -1516,6 +1535,11 @@ export default function Product() {
         setPriceLevels(data.price_levels ?? null);
         setSalesBadge(data.sales_badge ?? null);
         setRating(data.rating ?? null);
+        setPsEnrolled(data.printer_services_enrolled === true);
+        setPsQuoted(null);
+        setSvc(null);
+        setSvcReady(false);
+        setPsAttention(false);
         setConditionRef(data.condition_reference ?? null);
         setFitsPrinters(data.fits_printers ?? []);
         setMaintenance(data.maintenance_parts ?? null);
@@ -1670,7 +1694,7 @@ export default function Product() {
    */
   const effectiveTransport = resolveTransport(transportMethod, requestedOrderType, availability?.preorder);
 
-  const priceKey = `${optionValueIds.join(',')}|${colorId}|${requestedOrderType}|${effectiveTransport}|${warrantyPlanId}`;
+  const priceKey = `${optionValueIds.join(',')}|${colorId}|${requestedOrderType}|${effectiveTransport}|${warrantyPlanId}${psEnrolled ? '|' + JSON.stringify(svc) : ''}`;
   const productSlug = product?.slug ?? '';
   /** Shown, not sold (rows 239-240): the quote door answers 409 for it, so the page never asks. */
   const catalogOnly = priceStatus === 'unpriced';
@@ -1727,6 +1751,8 @@ export default function Product() {
             transportMethod: effectiveTransport || undefined,
             fulfillmentType: requestedOrderType || undefined,
             warrantyPlanId: warrantyPlanId || undefined,
+            // A PREVIEW of the draft choice; the cart re-prices and requires the confirmation.
+            services: psEnrolled && svc ? svc : undefined,
           },
           // A superseded or abandoned quote is dropped at the socket instead of
           // being left to hold a connection open behind the next one, and the
@@ -1751,6 +1777,7 @@ export default function Product() {
         setQuotedFor(priceKey);
         setLiveAvailability(res.availability);
         if (Array.isArray(res.warranty_plans)) setQuotedPlans(res.warranty_plans);
+        setPsQuoted(res.printer_services ?? null);
         if (res.pricing_modes) setQuotedModes(res.pricing_modes);
         // Assigned unconditionally: `null` for a tier is an ANSWER ("nothing
         // to promise for this selection"), not a missing field, and keeping
@@ -1775,7 +1802,7 @@ export default function Product() {
       clearTimeout(timer);
       ac.abort();
     };
-  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, quoteToken, catalogOnly, knownUnpriced, selectionUnoffered]);
+  }, [productSlug, source, priceKey, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, quoteToken, catalogOnly, knownUnpriced, selectionUnoffered, psEnrolled, svc]);
 
   /**
    * «يجب التاكد من ان السعر يتحدث» — ON THE SCREEN WHERE THE PRICE IS READ.
@@ -2239,6 +2266,14 @@ export default function Product() {
       // refuses a cart that holds something else, and a lost answer is re-read
       // below before the button is offered again.
       if (addInFlight.current) return;
+      // «خصص طابعتك»: nothing is added until a package (and the delivery, when
+      // offered) is chosen, «بدون ضمان» acknowledged, and the server priced that
+      // choice without a blocker. A pending or failed quote waits too; only a
+      // fresh quote with no offer (this version is not enrolled) adds without.
+      if (psEnrolled && !svcReady && !(quotedFor === priceKey && !psQuoted)) {
+        setPsAttention(true);
+        return;
+      }
       if (!isAuthenticated) {
         navigate(authPathWithSupportRef(`/product/${product.slug}`));
         return;
@@ -2301,6 +2336,7 @@ export default function Product() {
         // customer chose rather than what a transport implies.
         if (requestedOrderType) body.fulfillmentType = requestedOrderType;
         if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
+        if (psQuoted && svc) body.services = svc;
         if (replaceCart) body.replaceCart = true;
         // What the page believes this exact line holds — only when it really read the cart.
         if (cartLinesLoaded) body.inCart = before;
@@ -2397,6 +2433,7 @@ export default function Product() {
             estimateSaid = estimateRefusalText(code, lang);
           } catch { /* The server's own sentence stays below. */ }
         }
+        // «خصص طابعتك»: a services refusal is in the refusal dictionary below (printerServicesStrings.ts).
         // An offline refusal dictionary must not hide the original server
         // message or strand the add-to-cart button in its busy state.
         let counted = '';
@@ -2421,7 +2458,7 @@ export default function Product() {
         setAddingToCart(false);
       }
     },
-    [product, relations, inCartQty, cartLinesLoaded, availability, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, isAuthenticated, navigate, s, lang, refreshQuote]
+    [product, relations, inCartQty, cartLinesLoaded, availability, qty, optionId, optionValueIds, colorId, requestedOrderType, effectiveTransport, warrantyPlanId, psEnrolled, psQuoted, svc, svcReady, quotedFor, priceKey, isAuthenticated, navigate, s, lang, refreshQuote]
   );
 
   const handleAddToCart = useCallback(() => postAddToCart(false), [postAddToCart]);
@@ -4820,7 +4857,29 @@ export default function Product() {
           server) and the total months it yields; this block only lays those
           facts out. A plan can be chosen here or later in the cart, and only
           before the order is placed — the policy link says the rest. */}
-      {warrantyPlans.length > 0 && !noPrice ? (
+      {psEnrolled && !noPrice ? (
+        <React.Suspense fallback={null}>
+          <PrinterPackages
+            ps={psQuoted}
+            selection={svc}
+            onChange={(next) => { setSvc(next); setPsAttention(false); }}
+            fresh={quotedFor === priceKey}
+            failed={!!quoteError && !quoteLoading}
+            onReady={setSvcReady}
+            quoteFor={[productSlug ?? '', optionId, optionValueIds, colorId, effectiveTransport, requestedOrderType]}
+            product={product}
+            attention={psAttention}
+            onAdd={handleAddToCart}
+            addable={source === 'catalog' && !noPrice && mode !== 'unavailable'}
+            adding={addingToCart}
+            pro={proInvite?.unit_iqd}
+            upgrade={isPrime}
+          />
+        </React.Suspense>
+      ) : null}
+      {/* An enrolled printer never shows the legacy plans — not even while its first quote is on its way;
+          only a fresh quote with no services offer (this version is not enrolled) brings them back. */}
+      {(!psEnrolled || (quotedFor === priceKey && !psQuoted)) && warrantyPlans.length > 0 && !noPrice ? (
         /*
           AN OPTIONAL UPSELL, SIZED LIKE ONE.
 
@@ -5173,7 +5232,8 @@ export default function Product() {
   // goes through the cart, where the notice is read and acknowledged (the server refuses PRICE_ESTIMATE_QUICK_BUY too).
   const quickBuyOn = !!product && quickBuyFor === product.id && !selectionEstimate;
   const quickBuyWords = quickBuyChrome(lang);
-  const showQuickBuyToggle = isAuthenticated && source === 'catalog' && !selectionEstimate;
+  // Quick buy does not sell a printer with services this round (migration 0234): the cart does.
+  const showQuickBuyToggle = isAuthenticated && source === 'catalog' && !selectionEstimate && !psEnrolled;
   const cartIcon = justAdded ? <Check aria-hidden="true" className="w-5 h-5" /> : <ShoppingCart aria-hidden="true" className="w-5 h-5" />;
   const buyButton =
     showQuickBuyToggle && product ? (

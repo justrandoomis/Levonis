@@ -80,6 +80,18 @@ export interface ShippingItem {
    * which then fall to the default.
    */
   category_path?: string[];
+  /**
+   * An ENROLLED printer's own delivery (printer services, DECISIONS row 339):
+   * the customer's choice on the line and its class's two per-unit prices.
+   * Such a line leaves the delivery-policy groups and is charged its own
+   * component; absent on every other line, which prices exactly as before.
+   */
+  printer_service?: {
+    delivery: 'economy' | 'personal' | null;
+    delivery_class: string;
+    economy_iqd: number | null;
+    personal_iqd: number | null;
+  };
 }
 
 export type ProductDeliveryMethod = 'standard' | 'personal';
@@ -100,7 +112,11 @@ export interface ProductDeliveryOptions {
 export interface ShippingComponent {
   /** 'rule' is a delivery-policy group (storeDelivery.ts). 'product' and
    *  'category' are retired and stay only so old order snapshots still type. */
-  kind: 'ordinary' | 'rule' | 'product' | 'category' | 'protected' | 'printer_small' | 'printer_large' | 'carton';
+  kind: 'ordinary' | 'rule' | 'product' | 'category' | 'protected' | 'printer_small' | 'printer_large' | 'carton' | 'printer_service';
+  /** A printer_service component: the printer's delivery class (printerServices.ts). */
+  delivery_class?: string;
+  /** A printer_service component: the customer's choice. */
+  printer_delivery?: 'economy' | 'personal';
   fee_iqd: number;
   waived: boolean;
   units: number;
@@ -193,6 +209,22 @@ export interface MembershipShippingDecision {
   basis_iqd: number;
   max_subsidy_iqd: number | null;
   reason: 'applied' | 'no_rule' | 'below_threshold' | 'method_not_covered';
+}
+
+/**
+ * The part of a quote's charged delivery a DELIVERY coupon may take
+ * (applies_to 'delivery' / 'both'): everything charged except a printer's
+ * Personal delivery. Personal is a premium the customer chose and no free-
+ * delivery rule takes it off — a coupon is no different (owner ruling
+ * 2026-11-17, DECISIONS row 339). Personal is never waived, so its whole fee is
+ * inside `total_iqd`.
+ */
+export function couponDeliveryBase(quote: Pick<ShippingQuote, 'total_iqd' | 'components'>): number {
+  const personal = quote.components.reduce(
+    (n, comp) => n + (comp.kind === 'printer_service' && comp.printer_delivery === 'personal' && !comp.waived ? comp.fee_iqd : 0),
+    0
+  );
+  return Math.max(0, quote.total_iqd - personal);
 }
 
 export function quoteShipping(input: {
@@ -354,8 +386,10 @@ export function quoteShipping(input: {
   let deliveryUnavailable: ShippingQuote['delivery_unavailable'];
   if (standardShipment) {
     const policy = input.deliveryPolicy ?? DELIVERY_POLICY_FALLBACK;
+    // Enrolled printers are charged by their own class below, never by a group.
+    const serviced = input.items.filter((it) => it.printer_service);
     const charge = deliveryCharge({
-      parts: input.items.map((it) => ({
+      parts: input.items.filter((it) => !it.printer_service).map((it) => ({
         product_id: it.product_id,
         qty: it.qty,
         category_path: it.category_path,
@@ -389,6 +423,41 @@ export function quoteShipping(input: {
         method: 'standard',
         product_ids: part.product_ids,
         advance_required: part.contains_printer && config.printer_advance_required,
+      });
+    }
+    /**
+     * PRINTER SERVICES DELIVERY: per unit, by the printer's class and the
+     * customer's choice. Economy is waived exactly when a group's standard
+     * fee would be (a printer in a group was covered the same way before);
+     * Personal is a premium the customer chose and no membership or wallet
+     * rule takes it off (brief: free normal delivery must not turn a premium
+     * choice into Economy or wipe its surcharge).
+     */
+    for (const it of serviced) {
+      const ps = it.printer_service!;
+      const units = Math.max(0, Math.trunc(it.qty));
+      if (units === 0) continue;
+      if (ps.delivery === null) {
+        needs.push(`product:${it.product_id}:printer_delivery_required`);
+        reasons.push('Choose Economy or Personal delivery for the printer.');
+        continue;
+      }
+      const per = ps.delivery === 'economy' ? ps.economy_iqd : ps.personal_iqd;
+      if (per === null) {
+        needs.push(`product:${it.product_id}:printer_delivery_unpriced`);
+        reasons.push('This delivery option is not priced for the printer.');
+        continue;
+      }
+      components.push({
+        kind: 'printer_service',
+        fee_iqd: per * units,
+        waived: ps.delivery === 'economy' ? ruleFeeWaived : false,
+        units,
+        method: 'standard',
+        product_id: it.product_id,
+        delivery_class: ps.delivery_class,
+        printer_delivery: ps.delivery,
+        advance_required: config.printer_advance_required,
       });
     }
   }
@@ -479,7 +548,9 @@ export function quoteShipping(input: {
    * binding ceiling the membership keeps every component it already waived.
    */
   const wallet = input.walletFreeDelivery === true && input.deliveryMethod !== undefined;
-  const walletTakes = (comp: ShippingComponent) => wallet && comp.kind !== 'protected';
+  // A printer's Personal delivery is a premium the customer chose: no free-delivery rule takes it (DECISIONS row 339).
+  const walletTakes = (comp: ShippingComponent) =>
+    wallet && comp.kind !== 'protected' && !(comp.kind === 'printer_service' && comp.printer_delivery === 'personal');
   const waivedSum = components.reduce((n, comp) => n + (comp.waived ? comp.fee_iqd : 0), 0);
   const ceiling = (proEligible || primeEligible) && rule ? rule.max_subsidy_iqd : null;
   const cap = ceiling === null ? null : Math.max(0, Math.trunc(ceiling));

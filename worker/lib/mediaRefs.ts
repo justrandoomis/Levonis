@@ -671,6 +671,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'bundle_components.option_value_ids': 'option ids',
   'cart_bundle_choices.option_value_ids': 'option ids',
   'cart_items.option_value_ids': 'option ids',
+  // 0234 — the printer services chosen for a cart line (choice codes only).
+  'cart_items.services': 'the printer services choice (codes); no media',
   'mystery_allocations.option_value_ids': 'option ids',
   'mystery_pool_entries.option_value_ids': 'option ids',
   'order_items.option_value_ids': 'option ids',
@@ -921,6 +923,13 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'order_items.option_snapshot': 'the human-readable variant text',
   'order_items.pricing_snapshot': 'the price ladder as sold',
   'order_items.warranty_snapshot': 'the warranty as sold',
+  'order_items.services_snapshot': 'the printer services as sold (choices, fees, months); no media',
+  // 0234 — the warehouse's work for a printer line: codes and staff notes.
+  'order_service_tasks.kind': 'a task kind code; no media',
+  'order_service_tasks.choice': 'a service choice code; no media',
+  'order_service_tasks.note': 'the packing / inspection / Academy instruction text; no media',
+  'order_service_tasks.status': 'open / done / cancelled; no media',
+  'order_service_tasks.result_note': "a staff member's note on finishing the task; no media",
   'order_items.transport_snapshot': 'the transport choice as sold',
   'mystery_allocations.name_snapshot': 'the item name as drawn',
   'mystery_allocations.variant_snapshot': 'the variant text as drawn',

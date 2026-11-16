@@ -46,6 +46,9 @@ import { groupCartLines, groupPictures } from '../lib/cartGroups';
 import { colourLang, colourStrings, groupSummaryText, isolate } from '../lib/colourQuantities';
 import { ColourSwatch, ColourTag } from '../components/product/ColourTag';
 import VariantChoices from '../components/cart/VariantChoices';
+import { PS_STRINGS, servicesErrorText } from '../components/product/printerServicesStrings';
+/** «تخصيص بنفسي» from the cart (DECISIONS row 339): loaded only when opened. */
+const CustomizeSheet = React.lazy(() => import('../components/product/CustomizeSheet'));
 import { ESTIMATE_TEXT } from '../lib/priceStatus';
 
 /**
@@ -549,6 +552,12 @@ export default function Cart() {
   // out of the narrow product-detail column prevents RTL text or a long price
   // from widening the cart beyond the viewport.
   const [warrantyPickerId, setWarrantyPickerId] = useState<string | null>(null);
+  /** The printer line whose package the sheet is changing (0234). */
+  const [servicesLineId, setServicesLineId] = useState<string | null>(null);
+  const [servicesError, setServicesError] = useState<Record<string, string>>({});
+  /** The printer line whose choice is being saved: «تطبيق» is busy, a second press sends nothing. */
+  const [servicesSavingId, setServicesSavingId] = useState<string | null>(null);
+  const servicesSavingRef = useRef(false);
   const [warrantySavingId, setWarrantySavingId] = useState<string | null>(null);
   const [warrantyPendingPlan, setWarrantyPendingPlan] = useState<string>('');
   const [warrantyErrors, setWarrantyErrors] = useState<Record<string, string>>({});
@@ -715,6 +724,9 @@ export default function Cart() {
         ? estimateWordsRef.current?.estimateRefusalText(code, lang as 'ar' | 'en' | 'ckb') ?? null
         : null;
       if (estimateSaid) return estimateSaid;
+      // «خصص طابعتك»: a services refusal names its fix in the reader’s language (never the server’s English).
+      const servicesSaid = servicesErrorText(code, lang);
+      if (servicesSaid) return servicesSaid;
       const said = apiRefusal(err, lang as 'ar' | 'en' | 'ckb', fallback);
       const counter = counterNamed(code);
       return counter ? `${said} ${counter}` : said;
@@ -1140,6 +1152,34 @@ export default function Cart() {
   // and locks the cart on (§1). The legacy `shipping_method_id` is no longer
   // priced and used to mislabel every pre-order line as "direct".
   const shippingLabel = (item: CartItem) => shippingTypeLabel(typeForTransport(item.transport_method), lang);
+
+  // ------------------------------------------------- printer services (0234)
+  // One save at a time (a ref, so two taps in one tick cannot both PATCH). A
+  // refusal is said INSIDE the open sheet, which stays open to fix the choice.
+  const chooseServices = async (item: CartItem, services: unknown) => {
+    if (servicesSavingRef.current) return;
+    servicesSavingRef.current = true;
+    setServicesSavingId(item.id);
+    setServicesError((prev) => { const next = { ...prev }; delete next[item.id]; return next; });
+    actionBusyRef.current += 1;
+    try {
+      const data = await api.patch<CartWriteResponse>(`/api/cart/items/${item.id}`, { services });
+      applyCartWrite(data);
+      setServicesLineId(null);
+    } catch (err) {
+      const said = cartRefusal(err, loc('تعذّر حفظ اختيار الخدمات', 'Could not save the services choice', 'هەڵبژاردنی خزمەتگوزارییەکان پاشەکەوت نەکرا'));
+      setServicesError((prev) => ({ ...prev, [item.id]: said }));
+    } finally {
+      actionBusyRef.current -= 1;
+      servicesSavingRef.current = false;
+      setServicesSavingId(null);
+    }
+  };
+  const closeServices = (id: string) => {
+    if (servicesSavingRef.current) return;
+    setServicesLineId(null);
+    setServicesError((prev) => { const next = { ...prev }; delete next[id]; return next; });
+  };
 
   // ------------------------------------------------- extended warranty
   //
@@ -1952,6 +1992,66 @@ export default function Cart() {
               </span>
             </p>
           )}
+
+          {item.printer_services && (() => {
+            const ps = item.printer_services;
+            const w = PS_STRINGS[(lang === 'en' || lang === 'ckb' ? lang : 'ar')];
+            const pkg = ps.selection?.package;
+            const name = pkg === 'just' ? w.just : pkg === 'smart' ? w.smart : pkg === 'complete' ? w.complete : pkg === 'custom' ? w.custom : null;
+            // The server’s verdict on the saved choice (e.g. an option no longer offered): said on the line.
+            const blocker = ps.priced?.blockers.find((b) => b !== 'SERVICES_NOT_CONFIRMED') ?? null;
+            const blockerSaid = blocker ? servicesErrorText(blocker, lang) || w.unavailable : '';
+            return (
+              <div className="mb-2" data-cart-printer-services={item.id}>
+                <button
+                  type="button"
+                  aria-haspopup="dialog"
+                  onClick={() => setServicesLineId(item.id)}
+                  className="lv-choice w-full min-h-[40px] px-2.5 py-1.5 flex items-center gap-2 text-start"
+                  data-selected={!ps.needs_choice}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-bold text-text-primary leading-tight">{w.cardTitle}</span>
+                    <span className="block text-[11px] leading-tight truncate tabular-nums text-text-secondary">
+                      {ps.needs_choice || !name
+                        ? w.chooseFirst
+                        : `${name}${ps.priced && ps.priced.fee_iqd > 0 ? ` · +${money(ps.priced.fee_iqd)}` : ''}${ps.selection?.delivery ? ` · ${ps.selection.delivery === 'economy' ? w.deliveryEconomy : w.deliveryPersonal}` : ''}`}
+                    </span>
+                  </span>
+                  <ChevronRight className={`w-3.5 h-3.5 text-text-muted shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
+                {blockerSaid ? <p role="alert" className="mt-1 text-[11px] text-text-primary" data-cart-services-blocked>{blockerSaid}</p> : null}
+                {servicesLineId === item.id ? (
+                  <React.Suspense fallback={null}>
+                    <CustomizeSheet
+                      open
+                      onClose={() => closeServices(item.id)}
+                      onApply={(next) => void chooseServices(item, next)}
+                      offer={ps.offer}
+                      current={ps.selection}
+                      printer={{ name: item.name, image: item.image ?? null, versionLabel: item.options_label ?? item.variantLabel ?? '' }}
+                      lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'}
+                      money={(v) => money(v)}
+                      // The draft is priced by the server for THIS line (its version, colour, transport, quantity).
+                      quote={(sel, signal) => import('../components/product/printerServicesModel').then((m) => m.quoteDraft({
+                        slug: item.slug,
+                        body: {
+                          qty: item.qty,
+                          optionId: item.option_id || undefined,
+                          optionValueIds: item.option_value_ids?.length ? item.option_value_ids : undefined,
+                          colorId: item.color_id || undefined,
+                          transportMethod: item.transport_method || undefined,
+                        },
+                      }, sel, signal))}
+                      busy={servicesSavingId === item.id}
+                      error={servicesError[item.id] ?? null}
+                    />
+                  </React.Suspense>
+                ) : null}
+              </div>
+            );
+          })()}
 
           {(item.warranty_plans ?? []).length > 0 && (() => {
             const current = (item.warranty_plans ?? []).find((w) => w.id === (item.warranty_plan_id ?? '')) ?? null;

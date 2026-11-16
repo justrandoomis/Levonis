@@ -396,7 +396,9 @@ const pricingInputsMemo = new WeakMap<object, { at: number; inputs: Promise<Pric
 
 async function readPricingInputs(db: D1Database): Promise<PricingInputs> {
   const [settings, benefitRules, ancestry, proPause] = await Promise.all([
-    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']).catch(() => ({}) as Record<string, unknown>),
+    // `printerServices` rides along (DECISIONS row 339): the product page's «خصص طابعتك» flag reads it
+    // from here, so the page spends no statement of its own. Quotes, the cart and checkout read it fresh.
+    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults', 'printerServices']).catch(() => ({}) as Record<string, unknown>),
     activeBenefitRules(db),
     catalogAncestry(db),
     getProPause(db),

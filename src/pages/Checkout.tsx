@@ -372,6 +372,8 @@ interface CheckoutQuoteDto {
   delivery_method_fees?: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: 'needs_configuration' | 'governorate_stopped' }>;
   shipping: ShippingQuoteDto;
   is_pickup: boolean;
+  /** The delivery a delivery code may take (a printer's Personal delivery excluded). Absent from an older server. */
+  coupon_delivery_iqd?: number;
   /** The protected-delivery add-on: offered only when the owner priced it. */
   protected_delivery?: {
     available: boolean;
@@ -3730,7 +3732,7 @@ export default function Checkout() {
                 enabled={!couponCode && !quoteLoading}
                 itemIds={items.map((i) => i.id)}
                 signature={[itemIdsKey, selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, protectedDelivery, supportRef].join('~')}
-                deliveryIqd={shippingIqd}
+                deliveryIqd={quote?.coupon_delivery_iqd ?? shippingIqd}
                 plainTotalIqd={quote.total_iqd}
                 quoteWith={quoteWithCoupon}
                 onApply={(code) => {

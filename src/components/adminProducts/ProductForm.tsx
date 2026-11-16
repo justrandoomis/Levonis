@@ -127,6 +127,7 @@ import { MainImagesPair } from './form/MainImagesPair';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
 import { setLeaveGuard } from '../../lib/leaveGuard';
 import { subSectionOptions } from './subSectionOptions';
+const AdminPrinterServices = React.lazy(() => import('../adminPrinterServices/AdminPrinterServices'));
 
 interface TemplateField {
   id: string;
@@ -222,6 +223,8 @@ export default function ProductForm({
   const [doc, setDoc] = useState<EditorDoc>(() => blankDoc());
   const [rel, setRel] = useState<RelationsState>(() => emptyRelations());
   const [baseline, setBaseline] = useState('');
+  /** «خدمات الطابعة» holds unsaved price-list edits (its own save, not the product's). */
+  const [printerServicesDirty, setPrinterServicesDirty] = useState(false);
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState('');
   /** The status the server holds (not the editor's): a content save keeps an active product active (`isContentOnlySave`). */
   const [storedStatus, setStoredStatus] = useState('');
@@ -726,7 +729,8 @@ export default function ProductForm({
   // THE TYPED PRICES NEVER LEAVE SILENTLY (owner report 2026-10-10, row 214 F3): dollars typed and not
   // saved — or a review sheet waiting — live only in this page, so leaving it asks first. Every way out
   // asks — «رجوع», the browser, and the dashboard's sidebar, drawer and menus (lib/leaveGuard.ts).
-  const leaveWarning = v2.touched || !!v2.review ? v2s.leaveUnsaved : null;
+  // «خدمات الطابعة»: its unsaved price-list edits are guarded the same way (AdminPrinterServices reports them).
+  const leaveWarning = v2.touched || !!v2.review || printerServicesDirty ? v2s.leaveUnsaved : null;
   const leave = () => {
     if (leaveWarning && !window.confirm(leaveWarning)) return;
     onBack();
@@ -1744,6 +1748,15 @@ export default function ProductForm({
           sectionSerial={sectionSerial}
           onBaseMonthsChange={(v) => setDoc((d) => ({ ...d, warranty_base_months: v }))}
         />
+
+        {/* «خدمات الطابعة» (owner, 2026-11-17: on the printer's own edit page; DECISIONS row 339):
+            this printer's warranty family and delivery class, and the shared price list. A saved
+            printer only — the mapping is keyed by its id. Loaded with the section. */}
+        {isPrinterCatalog && (doc.id || productId) ? (
+          <React.Suspense fallback={null}>
+            <AdminPrinterServices productId={String(doc.id || productId)} onDirtyChange={setPrinterServicesDirty} />
+          </React.Suspense>
+        ) : null}
 
         {/* Open box / used / refurbished. Beside the warranty because a graded
             listing's coverage IS one of its condition facts — the server

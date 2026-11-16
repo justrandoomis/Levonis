@@ -41,6 +41,7 @@ import { listing, refuseIfOnlyCatalog } from './listing';
 import { loadRelationsViews, snapshotFrom, capacityFrom, EMPTY_RELATIONS, type ProductRelationsView } from './productOverlay';
 import { isPrinterProduct } from './printerIdentity';
 import { refuseNonPrinterWarranty } from './warrantyPlans';
+import { encodeSelection, parseSelection, SERVICES_CODES } from '@levonis/pricing/printerServices';
 import { degradeIfSchemaMissing } from './membershipBenefits';
 import { loadOffers, offerEligible, offerKey, offerPriceRefusal, subjectOf, type OfferView } from './offers';
 import { activePoolProductIds } from './mysteryDraw';
@@ -62,12 +63,28 @@ import {
 } from '../routes/cart';
 import { lineOrderType, saleAvailability, unusableOrderType, type SaleAvailability } from '../routes/products';
 
-/** What every line of one add shares: the route, the order type and the warranty plan. */
+/** What every line of one add shares: the route, the order type, the warranty plan and the printer services. */
 export interface AddShared {
   transportMethod: string;
   fulfillmentType: string;
   warrantyPlanId: string;
+  /** Canonical services JSON (`servicesFromBody`), '' = none. */
+  services: string;
 }
+
+/**
+ * The posted printer-services choice in its canonical stored form: '' when
+ * absent, 400 SERVICES_INVALID when malformed. Whether THIS product may (or
+ * must) carry one is the line resolver's question (resolveCartLine).
+ */
+export function servicesFromBody(raw: unknown): string {
+  if (raw === undefined || raw === null || raw === '') return '';
+  const sel = parseSelection(raw);
+  if (!sel) throw badRequest('The printer services choice is malformed', 'SERVICES_INVALID');
+  return encodeSelection(sel);
+}
+
+export { SERVICES_CODES } from '@levonis/pricing/printerServices';
 
 /** One line of an add: its own selection and quantity. */
 export interface AddLine {
@@ -268,11 +285,11 @@ export async function loadAddContext(
 export function judgeLevonisLineOrThrow(actx: AddContext, line: AddLine, shared: AddShared): JudgedLine {
   const { product, ctx, view } = actx;
   const { optionValueIds, colorId, qty } = line;
-  const { transportMethod, fulfillmentType, warrantyPlanId } = shared;
+  const { transportMethod, fulfillmentType, warrantyPlanId, services } = shared;
   const optionId = optionValueIds[0] ?? '';
   const { doc, resolved, selectionErrors } = resolveCartLine(
     product,
-    { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId },
+    { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId, services },
     actx.tier,
     actx.tierActive,
     ctx,
@@ -302,6 +319,12 @@ export function judgeLevonisLineOrThrow(actx: AddContext, line: AddLine, shared:
   if (resolved.errors.includes(SKU_STRICT_ERROR)) {
     refuseIncompleteSelection(saleAvailability(doc, { optionValueIds, colorId: colorId || null, qty: 1 }));
     throw badRequest('That option is not available right now', SKU_STRICT_ERROR);
+  }
+  // PRINTER SERVICES (DECISIONS row 339): refused with their own code, so the
+  // page reopens the package chooser instead of showing «invalid selection».
+  const servicesRefusal = resolved.errors.find((e) => SERVICES_CODES.has(e));
+  if (servicesRefusal) {
+    throw badRequest('Choose and confirm how you want this printer before adding it', servicesRefusal);
   }
   if (resolved.errors.length > 0) {
     throw badRequest(`Invalid selection: ${resolved.errors.join(', ')}`, 'VALIDATION');

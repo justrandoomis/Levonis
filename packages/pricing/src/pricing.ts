@@ -60,6 +60,7 @@ import { safeParse } from './json';
 import { effectiveAvailability } from './availability';
 import { unitDiscountIqd, type BenefitRule } from './membershipBenefits';
 import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlanMath';
+import { priceServices, SERVICES_NOT_CONFIRMED, SERVICES_NO_WARRANTY_ACK, SERVICES_WITH_LEGACY_WARRANTY, type PricedServices, type PrinterClasses, type PrinterServicesConfig, type ServiceSelection } from './printerServices';
 import type { PhysicalDimensionOverrides } from './physicalDimensions';
 import { skuComboKey, type SkuChannel } from './skuChannel';
 
@@ -555,6 +556,8 @@ export interface ResolvedPrice {
     transport_fee_iqd: number;
     direct_fee_iqd: number;
     warranty_fee_iqd: number;
+    /** The printer services' fee per unit (printerServices.ts), 0 when none. */
+    services_fee_iqd?: number;
   };
   /**
    * The pre-order journey this line is on (null on a direct line). The
@@ -577,7 +580,13 @@ export interface ResolvedPrice {
    *  pre-order line paid cash on delivery). */
   pricing_basis: 'direct' | 'preorder';
   warranty: ResolvedWarranty | null;
-  unit_subtotal_iqd: number; // applied + effective commission + effective direct surcharge + warranty fee
+  /**
+   * The printer services priced for this line (owner brief 2026-11-17), or
+   * absent for every line that is not an enrolled printer. Its `fee_iqd` is
+   * in `unit_subtotal_iqd`; its delivery fee is NOT (that goes to shipping).
+   */
+  services?: PricedServices | null;
+  unit_subtotal_iqd: number; // applied + effective commission + effective direct surcharge + warranty fee + services fee
   errors: string[]; // non-empty = selection invalid, reject server-side
   /**
    * The SKU rung that priced this line; null/absent when the ladder did (docs/ux/PRODUCT-DISCOUNT.md
@@ -999,6 +1008,14 @@ export function resolveUnitPrice(input: {
    */
   fulfillmentType?: 'direct_sale' | 'pre_order' | null;
   warrantyPlanId?: string | null;
+  /**
+   * An ENROLLED printer's services: the published price list, the printer's
+   * classes for this selection, and the customer's choice. `preview` = the
+   * product page asking before the customer confirmed: the missing
+   * confirmation and acknowledgment are not errors there; the cart and the
+   * order send preview false and refuse on them.
+   */
+  printerServices?: { config: PrinterServicesConfig; classes: PrinterClasses; selection: ServiceSelection; preview?: boolean } | null;
   tier: Tier;
   tierActive: boolean;
   proPolicy?: ProPricingPolicy;
@@ -1432,7 +1449,9 @@ export function resolveUnitPrice(input: {
   // same dinar for the same extension; the rounding happens once, here, and
   // the product page, the cart and the checkout all read this number.
   let warranty: ResolvedPrice['warranty'] = null;
-  if (input.warrantyPlanId) {
+  // An enrolled printer (printerServices given) never prices a legacy plan: a
+  // plan sent with it is refused below (SERVICES_WITH_LEGACY_WARRANTY).
+  if (input.warrantyPlanId && !input.printerServices) {
     const plan = product.warranty_plans.find((w) => w.id === input.warrantyPlanId && w.active !== false);
     if (!plan) {
       errors.push('WARRANTY_PLAN_NOT_FOUND');
@@ -1463,8 +1482,21 @@ export function resolveUnitPrice(input: {
 
   const commissionEffective = transport && !transport.waived ? transport.commission_iqd : 0;
   const warrantyFee = warranty ? warranty.fee_iqd : 0;
+  // PRINTER SERVICES (owner brief 2026-11-17): an enrolled printer sells the
+  // new services INSTEAD of the legacy base + extension plans, never both.
+  let services: PricedServices | null = null;
+  if (input.printerServices) {
+    const ps = input.printerServices;
+    if (input.warrantyPlanId) errors.push(SERVICES_WITH_LEGACY_WARRANTY);
+    services = priceServices(ps.config, ps.classes, ps.selection);
+    for (const b of services.blockers) {
+      if (ps.preview && (b === SERVICES_NOT_CONFIRMED || b === SERVICES_NO_WARRANTY_ACK)) continue;
+      if (!errors.includes(b)) errors.push(b);
+    }
+  }
+  const servicesFee = services ? services.fee_iqd : 0;
   const directFee = direct && !direct.waived ? direct.surcharge_iqd : 0;
-  const unitSubtotal = appliedIqd + commissionEffective + directFee + warrantyFee;
+  const unitSubtotal = appliedIqd + commissionEffective + directFee + warrantyFee + servicesFee;
   // THE DOLLAR BASE (DECISIONS row 248): the V2 row that answered, else the unanimous rows at this
   // dinar price; absent (the figure is converted) when neither speaks.
   const regularUsdCents =
@@ -1506,6 +1538,7 @@ export function resolveUnitPrice(input: {
     direct,
     pricing_basis: pricingBasis,
     warranty,
+    ...(services ? { services } : {}),
     unit_subtotal_iqd: unitSubtotal,
     ...usdTwins(regularUsdCents, { regular_iqd: regularIqd, applied_iqd: appliedIqd, unit_subtotal_iqd: unitSubtotal }),
     // The SKU rung's identity, when it answered (docs/ux/PRODUCT-DISCOUNT.md §4.1).
@@ -1523,6 +1556,7 @@ export function resolveUnitPrice(input: {
       transport_fee_iqd: commissionEffective,
       direct_fee_iqd: directFee,
       warranty_fee_iqd: warrantyFee,
+      ...(services ? { services_fee_iqd: servicesFee } : {}),
     },
     errors,
   };

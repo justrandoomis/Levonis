@@ -630,6 +630,10 @@ export const SETTING_DEFAULTS = {
    * re-issue validity is 30 days, literal in migration 0192's trigger.
    */
   tradeInPolicy: { ...TRADE_IN_POLICY_DEFAULTS } as TradeInPolicy,
+  // «خصص طابعتك» (DECISIONS row 339): { draft, published, … }. Written ONLY by
+  // /api/admin/printer-services (worker/lib/printerServices.ts); published = null
+  // until the owner publishes, which keeps every printer on the legacy flow.
+  printerServices: { draft: null, published: null, published_at: null, published_by: null } as unknown,
   /**
    * The local courier's wire format — endpoint paths and the map from our
    * field names to theirs. NOT credentials: those are Worker secrets

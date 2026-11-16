@@ -69,6 +69,7 @@ import {
   lineStockTargets,
   loadAddContext,
   loadAddProduct,
+  servicesFromBody,
   type AddLine,
   type AddShared,
   type JudgedLine,
@@ -179,6 +180,40 @@ import {
 import { giftSelectionOf, selectionFromColumns, type GiftSelection } from '../lib/gifts/selection';
 import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 import { auditStatements } from '../lib/audit';
+import { enrolledClasses, publishedFromSetting } from '../lib/printerServices';
+import { parseSelection, servicesOffer, SERVICES_CODES, SERVICES_NOT_OFFERED, SERVICES_REQUIRED, type PrinterClasses, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
+
+/** The cart line's printer-services block (absent for every other line). */
+function cartServicesView(
+  config: PrinterServicesConfig | null,
+  /** From resolveCartLine — the same relation-ordered value ids pricing used. */
+  classes: PrinterClasses | null,
+  sel: CartSelection,
+  resolved: ResolvedPrice
+): Record<string, unknown> {
+  if (!config || !classes) return {};
+  const p = resolved.services;
+  return {
+    printer_services: {
+      offer: servicesOffer(config, classes),
+      selection: sel.services ? parseSelection(sel.services) : null,
+      priced: p
+        ? { fee_iqd: p.fee_iqd, lines: p.lines, warranty_months: p.warranty_months, delivery_fee_iqd: p.delivery_fee_iqd, blockers: p.blockers }
+        : null,
+      needs_choice: !p,
+    },
+  };
+}
+
+/** A second add of a printer whose line already holds a different services choice. */
+export const CART_SERVICES_CONFLICT = 'CART_SERVICES_CONFLICT';
+
+/** True when a stored, non-empty services choice differs from the posted one (delivery preference included). */
+export function servicesClash(posted: string, stored: string | null | undefined): boolean {
+  const held = String(stored ?? '');
+  return held !== '' && held !== posted;
+}
+
 
 export const cartRoutes = new Hono<AppContext>();
 cartRoutes.use('*', requireAuth);
@@ -251,6 +286,13 @@ export interface PricingContext {
   /** Frozen per request so three passes over the same cart cannot disagree
    *  about whether a dated rule was live. */
   nowIso: string;
+  /**
+   * The PUBLISHED printer-services price list (DECISIONS row 339), or null =
+   * the feature is off and every printer prices as before. Read with the
+   * other settings, so the add, the cart read and the checkout price an
+   * enrolled printer against the same list.
+   */
+  printerServices?: PrinterServicesConfig | null;
 }
 
 /**
@@ -315,13 +357,14 @@ export function pricingContextFrom(
     benefitStatus: benefits?.status ?? null,
     catalogAncestry: benefits?.ancestry ?? null,
     nowIso: benefits?.nowIso ?? new Date().toISOString(),
+    printerServices: publishedFromSetting(settings.printerServices),
   };
 }
 
 export async function loadPricingContext(db: D1Database, status?: TierStatus | null): Promise<PricingContext> {
   const member = !!status && status.active;
   const [settings, rules, ancestry] = await Promise.all([
-    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']),
+    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults', 'printerServices']),
     // A guest earns no benefit, so their request does not pay for either query.
     member ? activeBenefitRules(db) : Promise.resolve([] as BenefitRule[]),
     member ? catalogAncestry(db) : Promise.resolve(null),
@@ -340,7 +383,7 @@ export async function loadPricingContext(db: D1Database, status?: TierStatus | n
  */
 async function loadPricingParts(db: D1Database) {
   const [settings, rules, ancestry] = await Promise.all([
-    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults']),
+    getSettings(db, ['proPricingPolicy', 'preorderTransportDefaults', 'printerServices']),
     activeBenefitRules(db),
     catalogAncestry(db),
   ]);
@@ -383,6 +426,20 @@ export interface CartSelection {
    */
   fulfillmentType: string;
   warrantyPlanId: string;
+  /**
+   * The printer services chosen for this line (canonical JSON,
+   * packages/pricing/src/printerServices.ts), '' = none. Only an ENROLLED
+   * printer may carry one, and an enrolled printer must (DECISIONS row 339).
+   */
+  services?: string;
+  /**
+   * True when `services` is the line's STORED choice (the cart row), not one
+   * posted now. A stored choice the published list no longer offers
+   * (unpublished, unmapped, the listing became used) is ignored — the line
+   * falls back to the legacy flow and the next write clears it — instead of
+   * blocking the cart; a POSTED one is refused (SERVICES_NOT_OFFERED).
+   */
+  servicesStored?: boolean;
   /** §7 multi-group selection. `optionId` stays as the authored first-group
    *  value so every pre-0018 reader keeps seeing the price-bearing model. */
   optionValueIds?: string[];
@@ -429,6 +486,14 @@ export function resolveCartLine(
   colorTag: ColorTag | null;
   /** `variantLabel` without the colour part. */
   optionsLabel: string;
+  /**
+   * The printer's services classes under the published list, judged on the
+   * relation-ordered value ids pricing used (a legacy optionId included); null
+   * when the services do not apply to this line.
+   */
+  servicesClasses: PrinterClasses | null;
+  /** The line's stored services choice is no longer offered: ignored, cleared on the next write. */
+  servicesStale: boolean;
 } {
   // Options and colours come from the relational tables when the product has
   // them (migration 0022 gave every existing product its rows), so the cart
@@ -440,6 +505,8 @@ export function resolveCartLine(
   const storedIds = canonicalOptionValueIds(sel.optionValueIds ?? []);
   const identityIds = storedIds.length ? storedIds : canonicalOptionValueIds([], sel.optionId);
   const valueIds = optionValueIdsInRelationOrder(identityIds, view);
+  const servicesClasses = enrolledClasses(ctx.printerServices ?? null, { id: String(row.id), condition: doc.condition }, valueIds);
+  const servicesSelection = servicesClasses && sel.services ? parseSelection(sel.services) : null;
 
   // The resolver prices ONE option; with several groups the first selected
   // value carries the price override, and per-field inheritance fills the
@@ -454,6 +521,9 @@ export function resolveCartLine(
     fulfillmentType:
       sel.fulfillmentType === 'direct_sale' || sel.fulfillmentType === 'pre_order' ? sel.fulfillmentType : null,
     warrantyPlanId: sel.warrantyPlanId || null,
+    printerServices: servicesClasses && servicesSelection && ctx.printerServices
+      ? { config: ctx.printerServices, classes: servicesClasses, selection: servicesSelection }
+      : null,
     tier,
     tierActive,
     proPolicy: ctx.proPolicy,
@@ -462,6 +532,14 @@ export function resolveCartLine(
     preorderPricing,
     isPrinter,
   });
+  // An enrolled printer is bought WITH a confirmed choice (Just Printer is a
+  // choice too). A choice POSTED for a product the list does not offer is
+  // refused; a STORED one the list no longer offers (unpublished, unmapped, the
+  // listing became used) is stale: the line prices and sells as before, nothing
+  // of the services is charged or frozen, and the next write clears it.
+  const servicesStale = !servicesClasses && !!sel.services && sel.servicesStored === true;
+  if (servicesClasses && !servicesSelection) resolved.errors.push(SERVICES_REQUIRED);
+  if (!servicesClasses && sel.services && !servicesStale) resolved.errors.push(SERVICES_NOT_OFFERED);
 
   // With relational links present, the real AND/OR algebra decides whether the
   // colour may be bought with these options — the resolver's single-option
@@ -521,6 +599,8 @@ export function resolveCartLine(
     offerId: withOffer.source === 'offer' ? withOffer.offer_id : null,
     colorTag,
     optionsLabel: optionLabels.join(' / '),
+    servicesClasses,
+    servicesStale,
   };
 }
 
@@ -657,6 +737,9 @@ export function selectionFromCartRow(row: Record<string, unknown>): CartSelectio
     transportMethod,
     fulfillmentType,
     warrantyPlanId: String(row.warranty_plan_id ?? ''),
+    // 0234: '' on every row before it and on every unenrolled line.
+    services: String(row.services ?? ''),
+    servicesStored: true,
   };
 }
 
@@ -1159,7 +1242,7 @@ async function loadCart(c: Context<AppContext>) {
     const offerView = lineOffers.get(offerKey(subjectOf(String(row.id)))) ?? null;
     const offerCheck = offerEligible(status, offerView, nowMs);
     const offerInput = { view: offerView, eligible: offerCheck.ok, nowMs };
-    const { doc, resolved, variantLabel, selectionErrors, offerId, colorTag, optionsLabel } = resolveCartLine(
+    const { doc, resolved, variantLabel, selectionErrors, offerId, colorTag, optionsLabel, servicesClasses } = resolveCartLine(
       row,
       sel,
       tier,
@@ -1283,6 +1366,9 @@ async function loadCart(c: Context<AppContext>) {
       support_gift_eligible: eligibleIds.has(String(row.id ?? '')),
       /** From catalogs.is_printer_catalog — the printer home-delivery note keys off this. */
       is_printer: isPrinter,
+      // «خصص طابعتك» (0234): an enrolled printer's offer, its chosen package and
+      // what that adds — or `needs_choice` when the line has none yet.
+      ...cartServicesView(ctx.printerServices ?? null, servicesClasses, sel, resolved),
       /** Cash on delivery would change this pre-order line's price (it carries
        *  a direct premium this customer pays). False on a direct line and on a
        *  pre-order line with no premium — the cart says nothing there. */
@@ -2607,20 +2693,38 @@ export function upsertStatement(
   productId: string,
   judged: JudgedLine,
   line: AddLine,
-  shared: AddShared
+  shared: AddShared,
+  /**
+   * The line this add merges into holds a stored services choice although this
+   * add carries none: the product is no longer enrolled (an enrolled printer
+   * cannot be added without one), so the stale choice is cleared (0234).
+   */
+  opts: { clearServices?: boolean } = {}
 ): D1PreparedStatement {
+  // The services column (0234) is named only when the line carries a choice (or
+  // clears a stale one), so every other add still works on a database one
+  // migration behind (CLAUDE.md rule 2).
+  const withServices = shared.services !== '' || opts.clearServices === true;
+  // ONE SERVICES CHOICE PER LINE, decided INSIDE the write: a merge into a line
+  // that holds a different choice updates nothing (changes = 0), so two
+  // concurrent adds with different packages cannot both land — the loser is
+  // answered CART_SERVICES_CONFLICT by its door. Clearing a stale choice
+  // (excluded.services = '') always applies.
   return db
     .prepare(
       `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id,
-                               shipping_method_id, transport_method, fulfillment_type, warranty_plan_id, qty)
-       VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
+                               shipping_method_id, transport_method, fulfillment_type, warranty_plan_id${withServices ? ', services' : ''}, qty)
+       VALUES (?, ?, ?, ?, ?, ?, '', ?, ?, ?${withServices ? ', ?' : ''}, ?)
        ON CONFLICT DO UPDATE SET qty = MIN(?, qty + excluded.qty),
                      option_value_ids = excluded.option_value_ids,
                      transport_method = excluded.transport_method,
                      fulfillment_type = excluded.fulfillment_type,
                      warranty_plan_id = CASE WHEN excluded.warranty_plan_id = ''
                                              THEN cart_items.warranty_plan_id
-                                             ELSE excluded.warranty_plan_id END`
+                                             ELSE excluded.warranty_plan_id END${withServices
+         ? `, services = excluded.services
+       WHERE excluded.services = '' OR cart_items.services = '' OR cart_items.services = excluded.services`
+         : ''}`
     )
     .bind(
       newId('ci'),
@@ -2632,6 +2736,7 @@ export function upsertStatement(
       shared.transportMethod,
       shared.fulfillmentType,
       shared.warrantyPlanId,
+      ...(withServices ? [shared.services] : []),
       line.qty,
       judged.ceiling
     );
@@ -2655,7 +2760,7 @@ cartRoutes.post('/items', async (c) => {
   // optional: an older client sends none and keeps the old behaviour exactly.
   const inCart =
     body.inCart === undefined || body.inCart === null ? null : int(body.inCart, 'inCart', { min: 0, max: LINE_QTY_MAX });
-  const shared: AddShared = { transportMethod, fulfillmentType, warrantyPlanId };
+  const shared: AddShared = { transportMethod, fulfillmentType, warrantyPlanId, services: servicesFromBody(body.services) };
   const line: AddLine = { optionValueIds, colorId, qty };
 
   // THE RULES ARE worker/lib/cartAdd.ts, shared with the batch door below
@@ -2702,11 +2807,11 @@ cartRoutes.post('/items', async (c) => {
       : ((
           await c.env.DB
             .prepare(
-              `SELECT id, option_id, option_value_ids, color_id, qty, warranty_plan_id FROM cart_items
+              `SELECT * FROM cart_items
                 WHERE user_id = ? AND product_id = ? AND color_id = ? AND shipping_method_id = ''`
             )
             .bind(user.id, productId, colorId)
-            .all<{ id: string; option_id: string | null; option_value_ids: string | null; color_id: string | null; qty: number; warranty_plan_id: string | null }>()
+            .all<{ id: string; option_id: string | null; option_value_ids: string | null; color_id: string | null; qty: number; warranty_plan_id: string | null; services?: string | null }>()
         ).results ?? []);
   const lineNow = colourRows.find((row) => String(row.option_id ?? '') === primaryOption && String(row.option_value_ids ?? '[]') === canonicalJson) ?? null;
   // A PRESS WHOSE ANSWER WAS LOST IS SAFE TO PRESS AGAIN. The upsert ADDS the
@@ -2726,14 +2831,25 @@ cartRoutes.post('/items', async (c) => {
       CART_WARRANTY_CONFLICT
     );
   }
+  // ONE SERVICES CHOICE PER LINE, the warranty plan's rule: a line already
+  // holding a choice is never rewritten by another add (DECISIONS row 339).
+  if (existingLine && shared.services && servicesClash(shared.services, existingLine.services)) {
+    throw conflict('This printer is already in your cart with a different package — change it from the cart.', CART_SERVICES_CONFLICT);
+  }
 
   try {
-    await c.env.DB.batch([
+    const written = await c.env.DB.batch([
       // The confirmed "empty the cart first", in the same transaction as the
       // line that replaces it (B15).
       ...replacing,
-      upsertStatement(c.env.DB, user.id, productId, judged, line, shared),
+      upsertStatement(c.env.DB, user.id, productId, judged, line, shared, {
+        clearServices: !!existingLine && !shared.services && String(existingLine.services ?? '') !== '',
+      }),
     ]);
+    // A concurrent add stored a different package on this line between the read above and this write.
+    if (shared.services && (written[written.length - 1]?.meta?.changes ?? 1) === 0) {
+      throw conflict('This printer is already in your cart with a different package — change it from the cart.', CART_SERVICES_CONFLICT);
+    }
   } catch (e) {
     // A store line landed between this door's read and its write; the 0114
     // trigger refused the mix inside the statement.
@@ -2915,7 +3031,7 @@ cartRoutes.post('/items/batch', async (c) => {
   const fulfillmentType = parseFulfillmentType(body.fulfillmentType);
   const warrantyPlanId = str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false });
   const lines = parseBatchLines(body.lines);
-  const shared: AddShared = { transportMethod, fulfillmentType, warrantyPlanId };
+  const shared: AddShared = { transportMethod, fulfillmentType, warrantyPlanId, services: servicesFromBody(body.services) };
   await rateLimit(c, 'cart_batch', 20, 60);
 
   // 2. The product-level refusals, once, with the single door's codes.
@@ -2972,11 +3088,11 @@ cartRoutes.post('/items/batch', async (c) => {
     (
       await c.env.DB
         .prepare(
-          `SELECT id, option_id, option_value_ids, color_id, qty, warranty_plan_id FROM cart_items
+          `SELECT * FROM cart_items
             WHERE user_id = ? AND product_id = ? AND shipping_method_id = ''`
         )
         .bind(user.id, productId)
-        .all<{ id: string; option_id: string; option_value_ids: string; color_id: string; qty: number; warranty_plan_id: string | null }>()
+        .all<{ id: string; option_id: string; option_value_ids: string; color_id: string; qty: number; warranty_plan_id: string | null; services?: string | null }>()
     ).results ?? []
   );
   const heldFor = (j: JudgedLine, l: AddLine) =>
@@ -3058,10 +3174,40 @@ cartRoutes.post('/items/batch', async (c) => {
       );
     }
   }
+  if (shared.services) {
+    const clashes = judged.flatMap((j, i) => {
+      const row = existingFor(j, lines[i]);
+      return row && servicesClash(shared.services, row.services)
+        ? [{ index: i, color_id: lines[i].colorId, option_value_ids: lines[i].optionValueIds, code: CART_SERVICES_CONFLICT }]
+        : [];
+    });
+    if (clashes.length > 0) {
+      throw new HttpError(409, 'This printer is already in your cart with a different package — change it from the cart.', CART_SERVICES_CONFLICT, { lines: clashes });
+    }
+  }
 
   // 7. Every write in ONE batch: the confirmed emptying and every line, or none.
   try {
-    await c.env.DB.batch([...replacing, ...judged.map((j, i) => upsertStatement(c.env.DB, user.id, productId, j, lines[i], shared))]);
+    const written = await c.env.DB.batch([
+      ...replacing,
+      ...judged.map((j, i) => {
+        const row = existingFor(j, lines[i]);
+        return upsertStatement(c.env.DB, user.id, productId, j, lines[i], shared, {
+          clearServices: !!row && !shared.services && String(row.services ?? '') !== '',
+        });
+      }),
+    ]);
+    // The upsert's own fence (a concurrent add stored a different package on a line): refused, named per line.
+    if (shared.services) {
+      const lost = judged.flatMap((_, i) =>
+        (written[replacing.length + i]?.meta?.changes ?? 1) === 0
+          ? [{ index: i, color_id: lines[i].colorId, option_value_ids: lines[i].optionValueIds, code: CART_SERVICES_CONFLICT }]
+          : []
+      );
+      if (lost.length > 0) {
+        throw new HttpError(409, 'This printer is already in your cart with a different package — change it from the cart.', CART_SERVICES_CONFLICT, { lines: lost });
+      }
+    }
   } catch (e) {
     if (isCartSellerAbort(e)) throw await sellerConflictRefusal(c, PLATFORM_SCOPE, 'LEVONIS');
     throw e;
@@ -3307,6 +3453,9 @@ cartRoutes.patch('/items/:id', async (c) => {
     body.warrantyPlanId !== undefined
       ? str(body.warrantyPlanId, 'warrantyPlanId', { max: 60, required: false })
       : String(existing.warranty_plan_id ?? '');
+  // The cart's «change package» sends a new choice; otherwise the line keeps its own.
+  const servicesPosted = body.services !== undefined;
+  let services = servicesPosted ? servicesFromBody(body.services) : String(existing.services ?? '');
 
   // The one-type rule has a second door. POST /items guards the ADD, but
   // editing an existing line's transport changes its type in place — and in a
@@ -3349,9 +3498,9 @@ cartRoutes.patch('/items/:id', async (c) => {
   ]);
   refuseNonPrinterWarranty(isPrinter, warrantyPlanId);
   const view = views.get(String(existing.product_id));
-  const { doc, resolved, selectionErrors } = resolveCartLine(
+  const { doc, resolved, selectionErrors, servicesStale } = resolveCartLine(
     product,
-    { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId },
+    { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId, services, servicesStored: !servicesPosted },
     tier,
     tierActive,
     ctx,
@@ -3359,9 +3508,13 @@ cartRoutes.patch('/items/:id', async (c) => {
     'prepaid',
     isPrinter
   );
+  // A stored choice the list no longer offers is cleared by this write (the line is a legacy line now).
+  if (servicesStale) services = '';
   if (offerPriceRefusal(resolved.errors)) {
     throw badRequest('This offer is not available right now', 'OFFER_INACTIVE');
   }
+  const servicesRefusal = resolved.errors.find((e) => SERVICES_CODES.has(e));
+  if (servicesRefusal) throw badRequest('Choose and confirm how you want this printer', servicesRefusal);
   if (resolved.errors.includes(SKU_STRICT_ERROR)) {
     refuseIncompleteSelection(saleAvailability(doc, { optionValueIds, colorId: colorId || null, qty: 1 }));
     throw badRequest('That option is not available right now', SKU_STRICT_ERROR);
@@ -3453,12 +3606,12 @@ cartRoutes.patch('/items/:id', async (c) => {
   }
   await c.env.DB.prepare(
     `UPDATE cart_items SET qty = ?, option_id = ?, option_value_ids = ?, color_id = ?,
-            transport_method = ?, fulfillment_type = ?, warranty_plan_id = ?
+            transport_method = ?, fulfillment_type = ?, warranty_plan_id = ?${'services' in existing ? ', services = ?' : ''}
       WHERE id = ? AND user_id = ?`
   )
     .bind(
       qty, primaryOption, canonicalJson, colorId,
-      transportMethod, fulfillmentType, warrantyPlanId, id, user.id
+      transportMethod, fulfillmentType, warrantyPlanId, ...('services' in existing ? [services] : []), id, user.id
     )
     .run();
 

@@ -668,6 +668,23 @@ export interface CartItem {
   transport_method?: string;
   /** From catalogs.is_printer_catalog — shows the home-delivery note. */
   is_printer?: boolean;
+  /**
+   * «خصص طابعتك» (DECISIONS row 339): an enrolled printer's offer, its chosen
+   * package and what it adds — `needs_choice` when the line has none yet.
+   */
+  printer_services?: {
+    offer: import('../../packages/pricing/src/printerServices').ServicesOffer;
+    selection: import('../../packages/pricing/src/printerServices').ServiceSelection | null;
+    priced: {
+      fee_iqd: number;
+      warranty_months: number;
+      delivery_fee_iqd: number | null;
+      blockers: string[];
+      /** Each priced service as the server priced it — the cart lists these, it never sums them. */
+      lines?: Array<{ service: string; choice: string; fee_iqd: number }>;
+    } | null;
+    needs_choice: boolean;
+  };
   /** Cash on delivery would change THIS pre-order line's price (it carries a
    *  direct premium this customer pays). The cart explains the rule only then. */
   cod_reprices?: boolean;

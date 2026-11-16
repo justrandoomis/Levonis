@@ -82,6 +82,7 @@ import { getOrderPointsSnapshots } from '../lib/pointsOps';
 import { telegramConfigured, telegramGetMe } from '../lib/telegram';
 import { checkMetaCapi, META_DATASET_ID, metaCapiConfigured, readMetaLastSend, type MetaError } from '../lib/metaCapi';
 import {
+  INSPECTION_GATED_STAGES,
   STAGE_LEGACY_STATUS,
   STAGE_SOURCE,
   canMoveStage,
@@ -149,6 +150,7 @@ import { runGuardedMediaCleanupJobs } from '../lib/mediaRefs';
 import { supportInboxCounts } from './adminChats';
 import { canHandleDisputes, canReviewKyc } from '../lib/staffCapabilities';
 import { searchIndexStatus } from '../lib/search/store';
+import { INSPECTION_NOT_DONE_MESSAGE, isInspectionGateAbort, openInspectionBlocksDispatch, orderServiceTasks } from '../lib/printerServices';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -2680,6 +2682,9 @@ adminRoutes.get('/orders/:id', async (c) => {
       /** «بانتظار تأكيد السعر النهائي» (0218): an estimated line still waits — the modal opens the estimate panel. */
       price_estimate_open: itemsHoldOrder(items),
       admin_note: o.admin_note ?? '',
+      // The warehouse's work for the printer services (0234): packing
+      // instruction, inspection (blocks dispatch until done), Academy request.
+      service_tasks: await orderServiceTasks(c.env.DB, id),
       customer: {
         id: o.user_id,
         name: o.user_name ?? null,
@@ -2968,6 +2973,11 @@ function estimateReopenRefusal(): HttpError {
 }
 
 /** The estimate gate's own aborts, as the admin doors answer them (a lost race or an older pre-check). */
+/** 409 INSPECTION_NOT_DONE: a pre-dispatch inspection bought on the order is still open (0234). */
+function inspectionNotDoneRefusal(): HttpError {
+  return new HttpError(409, INSPECTION_NOT_DONE_MESSAGE, 'INSPECTION_NOT_DONE');
+}
+
 function estimateAbortRefusal(e: unknown, orderId: string): HttpError | null {
   if (isEstimateGateAbort(e)) return estimateUnconfirmedRefusal(orderId);
   if (isEstimateReopenAbort(e)) return estimateReopenRefusal();
@@ -3509,6 +3519,10 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
     throw estimatesReadFailed();
   }
   if (estimateHeld) throw estimateUnconfirmedRefusal(id);
+  // «الفحص قبل الشحن» (0234; owner ruling): a courier booking IS the hand-over,
+  // so an open inspection refuses it BEFORE the courier is called
+  // (trg_orders_inspection_gate is the backstop on the store below).
+  if (await openInspectionBlocksDispatch(c.env.DB, id)) throw inspectionNotDoneRefusal();
   if (order.delivery_remote_id) {
     throw badRequest('This order already has a delivery shipment.', 'SHIPMENT_EXISTS', {
       remote_id: order.delivery_remote_id,
@@ -3611,9 +3625,9 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
   } catch (e) {
     // T8 refused to record the shipment (0218): unreachable after the pre-check
     // above (a settled line never re-opens), answered as the gate all the same.
-    const refusal = estimateAbortRefusal(e, id);
+    const refusal = isInspectionGateAbort(e) ? inspectionNotDoneRefusal() : estimateAbortRefusal(e, id);
     if (refusal) {
-      console.error('courier shipment created but refused by the estimate gate', id, res.value.remoteId);
+      console.error('courier shipment created but refused by the estimate / inspection gate', id, res.value.remoteId);
       throw refusal;
     }
     throw e;
@@ -3849,6 +3863,8 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     if (res.reason === 'TRADE_IN_ORDER_DELIVERED') throw tradeInDeliveredRefusal();
     // «أُرجع، لا يُلغى» (Q7, DECISIONS row 319): a return already gave part of it back.
     if (res.reason === 'ORDER_CANCEL_RETURNED') throw returnedOrderCancelRefusal();
+    // «الفحص قبل الشحن» (0234): finish the inspection first.
+    if (res.reason === 'INSPECTION_NOT_DONE') throw inspectionNotDoneRefusal();
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
     if (res.reason === 'PRICE_APPROVAL_PENDING') throw priceHeldRefusal(id);
     // «بانتظار تأكيد السعر النهائي» (0218): settle the estimated lines first.
@@ -3912,6 +3928,16 @@ adminRoutes.patch('/orders/:id', async (c) => {
   const from = String(order.status);
   if (!ORDER_TRANSITIONS[from]?.includes(next)) {
     throw badRequest(`Cannot move an order from "${from}" to "${next}"`);
+  }
+  // «الفحص قبل الشحن» (0234; owner ruling): this dropdown may not hand a printer
+  // to the courier (a direct order's «shipped») or mark it delivered while its
+  // inspection is open — refused BEFORE orders.status is written, like the stage
+  // door. trg_orders_inspection_gate refuses the same write inside the flip.
+  {
+    const target = stageForLegacyStatus(next, asShippingType(order.shipping_type));
+    if (INSPECTION_GATED_STAGES.has(target) && target !== String(order.stage ?? '') && (await openInspectionBlocksDispatch(c.env.DB, id))) {
+      throw inspectionNotDoneRefusal();
+    }
   }
   // The same refusal the stage door applies, on the same condition — this
   // dropdown is still the fastest way to move an order and must not be the
@@ -4050,6 +4076,7 @@ adminRoutes.patch('/orders/:id', async (c) => {
       flipped = (await c.env.DB.batch([flipStmt, ...serialGate.statements]))[0]?.meta.changes ?? 0;
     } catch (e) {
       if (isLostRace(e)) throw serialsRequiredError(await serialGateState(c.env, id));
+      if (isInspectionGateAbort(e)) throw inspectionNotDoneRefusal();
       // This dropdown changes the STATUS first, so the estimate gate (0218, T8) refuses the flip itself.
       throw estimateAbortRefusal(e, id) ?? e;
     }
@@ -4057,6 +4084,8 @@ adminRoutes.patch('/orders/:id', async (c) => {
     try {
       flipped = (await flipStmt.run()).meta.changes;
     } catch (e) {
+      // «الفحص قبل الشحن» (0234): the inspection gate refused the flip itself.
+      if (isInspectionGateAbort(e)) throw inspectionNotDoneRefusal();
       // «بانتظار تأكيد السعر النهائي» (0218, T8): no confirm, preparation or shipping before settlement.
       throw estimateAbortRefusal(e, id) ?? e;
     }
@@ -4610,6 +4639,10 @@ adminRoutes.put('/settings/:key', async (c) => {
   // normalises it, refuses an unusable one, bumps its version and audits the
   // change per section. Storing it raw here would bypass all four.
   // Trade-in v2 policy (S-P2): the owner's, through its own door, which validates and audits it.
+  // Printer services (DECISIONS row 339): validated, revision-fenced and audited through its own door; publishing is the owner's.
+  if (key === 'printerServices') {
+    throw badRequest('خدمات الطابعات تُحرَّر من مسارها الخاص / Use /api/admin/printer-services for the printer services', 'PRINTER_SERVICES_ROUTE');
+  }
   if (key === 'tradeInPolicy') {
     throw badRequest('سياسة الاستبدال تُحرَّر من مسارها الخاص / Use PUT /api/admin/trade-in/policy for the trade-in policy', 'TRADE_IN_POLICY_ROUTE');
   }

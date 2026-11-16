@@ -40,6 +40,71 @@ export interface RefusalStrings {
 }
 
 export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
+  // «خصص طابعتك» (DECISIONS row 339): the printer-services refusals. The same words as
+  // SERVICES_ERRORS in src/components/product/printerServicesStrings.ts, copied rather than
+  // imported so this lazy dictionary pulls no printer chunk into the entry (bundle budget);
+  // tests/printerServices.test.ts keeps the two identical.
+
+  SERVICES_REQUIRED: {
+    ar: 'اختر باقة الطابعة وطريقة التوصيل قبل إضافتها إلى السلة.',
+    en: 'Choose the printer package and delivery before adding it to the cart.',
+    ckb: 'پێش خستنە ناو سەبەتە، پاکێجی پرینتەر و جۆری گەیاندن هەڵبژێرە.',
+  },
+  SERVICES_NOT_OFFERED: {
+    ar: 'خدمات هذه الطابعة تغيّرت أو لم تعد متاحة — اختر من جديد.',
+    en: 'The services for this printer have changed or are no longer offered — choose again.',
+    ckb: 'خزمەتگوزارییەکانی ئەم پرینتەرە گۆڕاون یان چیتر پێشکەش ناکرێن — دووبارە هەڵبژێرە.',
+  },
+  SERVICES_WITH_LEGACY_WARRANTY: {
+    ar: 'لا يُجمع بين باقة الطابعة والضمان الممدد القديم — اختر الباقة وحدها.',
+    en: 'A printer package cannot be combined with the old extended warranty — choose the package alone.',
+    ckb: 'پاکێجی پرینتەر لەگەڵ گەرەنتی درێژکراوەی کۆن کۆ ناکرێتەوە — تەنها پاکێجەکە هەڵبژێرە.',
+  },
+  SERVICES_NOT_CONFIRMED: {
+    ar: 'اضغط على باقة لتأكيد اختيارك.',
+    en: 'Tap a package to confirm your choice.',
+    ckb: 'کرتە لە پاکێجێک بکە بۆ دڵنیاکردنەوەی هەڵبژاردنەکەت.',
+  },
+  SERVICES_NO_WARRANTY_ACK: {
+    ar: 'أكّد أنك تشتري الطابعة بدون ضمان تجاري إضافي.',
+    en: 'Confirm that you are buying the printer without an additional commercial warranty.',
+    ckb: 'دڵنیای بکەرەوە کە پرینتەرەکە بەبێ گەرەنتی بازرگانی زیادە دەکڕیت.',
+  },
+  SERVICES_OPTION_UNAVAILABLE: {
+    ar: 'أحد الخيارات التي اخترتها غير متوفر لهذه النسخة — غيّره.',
+    en: 'One of the options you chose is not available for this version — change it.',
+    ckb: 'یەکێک لەو بژاردانەی هەڵتبژاردووە بۆ ئەم وەشانە بەردەست نییە — بیگۆڕە.',
+  },
+  SERVICES_PACKAGE_MISMATCH: {
+    ar: 'محتوى الباقة تغيّر — اختر الباقة من جديد.',
+    en: 'What the package includes has changed — choose the package again.',
+    ckb: 'ناوەڕۆکی پاکێجەکە گۆڕاوە — دووبارە پاکێجەکە هەڵبژێرە.',
+  },
+  SERVICES_PACKAGE_UNAVAILABLE: {
+    ar: 'هذه الباقة غير متوفرة حالياً — اختر غيرها.',
+    en: 'This package is not available right now — choose another.',
+    ckb: 'ئەم پاکێجە ئێستا بەردەست نییە — یەکێکی تر هەڵبژێرە.',
+  },
+  SERVICES_INVALID: {
+    ar: 'تعذّرت قراءة اختيار الخدمات — اختر من جديد.',
+    en: 'Your services choice could not be read — choose again.',
+    ckb: 'هەڵبژاردنی خزمەتگوزارییەکان نەخوێندرایەوە — دووبارە هەڵبژێرە.',
+  },
+  SERVICES_DELIVERY_REQUIRED: {
+    ar: 'اختر التوصيل الاقتصادي أو الشخصي لكل طابعة.',
+    en: 'Choose Economy or Personal delivery for each printer.',
+    ckb: 'بۆ هەر پرینتەرێک گەیاندنی ئابووری یان تایبەت هەڵبژێرە.',
+  },
+  SERVICES_DELIVERY_METHOD: {
+    ar: 'الطابعة مع خدماتها تُوصَّل بالتوصيل العادي (اقتصادي أو شخصي) أو تُستلم من المتجر — اختر أحدهما لإتمام الطلب.',
+    en: 'A printer with its services goes by standard delivery (Economy or Personal) or store pickup — choose one of them to place the order.',
+    ckb: 'پرینتەر لەگەڵ خزمەتگوزارییەکانی بە گەیاندنی ئاسایی (ئابووری یان تایبەت) دەنێردرێت یان لە فرۆشگا وەردەگیرێت — یەکێکیان هەڵبژێرە بۆ تەواوکردنی داواکاری.',
+  },
+  CART_SERVICES_CONFLICT: {
+    ar: 'هذه الطابعة في سلتك بباقة مختلفة — غيّر الباقة من السلة.',
+    en: 'This printer is already in your cart with a different package — change it from the cart.',
+    ckb: 'ئەم پرینتەرە پێشتر بە پاکێجێکی جیاواز لە سەبەتەکەتدایە — لە سەبەتەوە بیگۆڕە.',
+  },
   // ---- «اجمع النقاط»: the missions and their video ads (0227, DECISIONS row 300) ----
   REWARD_ALREADY_CLAIMED: {
     ar: 'أخذت نقاط هذه المهمة من قبل.',
@@ -2497,6 +2562,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'الرقم التسلسلي لا يطابق هذا المنتج.',
     en: 'This serial number does not match this product.',
     ckb: 'ژمارە زنجیرەییەکە لەگەڵ ئەم بەرهەمە ناگونجێت.',
+  },
+  // «الفحص قبل الشحن» (migration 0234): the order cannot go to the courier before the inspection task is done.
+  INSPECTION_NOT_DONE: {
+    ar: 'فحص الطابعة قبل الشحن لم يُكمَل بعد — أكمله من «مهام الخدمات» في تفاصيل الطلب ثم أعد المحاولة.',
+    en: 'The pre-dispatch inspection is not done yet — complete it under «Service tasks» in the order details, then try again.',
+    ckb: 'پشکنینی پرینتەر پێش ناردن هێشتا تەواو نەکراوە — لە «ئەرکەکانی خزمەتگوزاری» لە وردەکاریی داواکارییەکەدا تەواوی بکە و دووبارە هەوڵ بدەرەوە.',
   },
   SERIALS_REQUIRED: {
     ar: 'تبقى أرقام تسلسلية غير مرتبطة لهذا الطلب.',

@@ -279,6 +279,9 @@ test('every code the table translates is one the server can actually emit', () =
     'worker/routes/adminMerchantApplications.ts',
     // «أُرجع، لا يُلغى» and «أُلغي، لا يُرجع» (row 319): every cancel door and the returns desk answer through it.
     'worker/lib/orderCancelOps.ts',
+    // «خصص طابعتك» (DECISIONS row 339): the services codes are constants of the pricing package
+    // (the cart and checkout throw them by name).
+    'packages/pricing/src/printerServices.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');

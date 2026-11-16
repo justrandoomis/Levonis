@@ -64,7 +64,11 @@ export type MoneyAct =
   | 'coupon_issue'
   | 'gift_grant'
   | 'review_reward'
-  | 'member_price_rules';
+  | 'member_price_rules'
+  /** The printer services price list (owner brief 2026-11-17): saving the draft — the owner's (owner ruling). */
+  | 'printer_services'
+  /** Publishing it to customers, or switching it off: the owner's. */
+  | 'printer_services_publish';
 
 /** The acts only the owner performs, whatever the amount (decision 3). */
 export const OWNER_ONLY_ACTS: ReadonlySet<MoneyAct> = new Set<MoneyAct>([
@@ -78,6 +82,10 @@ export const OWNER_ONLY_ACTS: ReadonlySet<MoneyAct> = new Set<MoneyAct>([
   'warranty_replace',
   // A public promo code (the coupon editor makes no other kind): decision 3.
   'coupon_issue',
+  // Customer prices for every printer change at once (DECISIONS row 339);
+  // the owner also keeps the draft price list (owner ruling: staff only view it).
+  'printer_services',
+  'printer_services_publish',
 ]);
 
 /** The shortest reason the owner may record for going above a ceiling. */

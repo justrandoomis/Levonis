@@ -339,7 +339,8 @@ test('the checkout: one quiet row beside the code’s, only with no code on the 
   assert.ok(row > 0 && row < box);
   const block = page.slice(row, box);
   assert.match(block, /enabled=\{!couponCode && !quoteLoading\}/, 'a settled quote, to compare with');
-  assert.match(block, /deliveryIqd=\{shippingIqd\}/);
+  // A printer's Personal delivery is never discounted (DECISIONS row 339): the row is checked on the coupon's delivery base.
+  assert.match(block, /deliveryIqd=\{quote\?\.coupon_delivery_iqd \?\? shippingIqd\}/);
   assert.match(block, /signature=\{\[itemIdsKey, selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, protectedDelivery, supportRef\]\.join/, 'whatever prices the order');
   assert.match(block, /plainTotalIqd=\{quote\.total_iqd\}/);
   assert.match(block, /quoteWith=\{quoteWithCoupon\}/);

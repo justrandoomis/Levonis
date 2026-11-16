@@ -262,3 +262,17 @@ test('the sweep skips a cancelled estimate order that lost its race; uncontended
   for (const table of ['orders', 'order_items', 'order_price_estimates'])
     assert.equal(db.prepare(`SELECT COUNT(*) n FROM ${table}`).get()!.n, 0, table);
 });
+
+test('a cancelled printer order with its service tasks (0234) is deleted, tasks first, with foreign keys on', async () => {
+  const db = database();
+  addOrder(db, 'order-ps');
+  db.prepare(
+    `INSERT INTO order_service_tasks (id, order_id, order_item_id, kind, choice, qty, note, status, created_at)
+     VALUES ('ost-1', 'order-ps', 'order-ps-item', 'inspection', 'full', 1, 'فحص كامل', 'cancelled', '2026-01-01T00:00:00.000Z')`
+  ).run();
+  db.prepare("UPDATE orders SET status = 'cancelled', updated_at = '2026-01-02T00:00:00.000Z' WHERE id = 'order-ps'").run();
+  const result = await deleteCancelledOrder(adapter(db), 'order-ps');
+  assert.equal(result.deleted, true);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM order_service_tasks WHERE order_id = 'order-ps'").get()!.n, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM orders WHERE id = 'order-ps'").get()!.n, 0);
+});

@@ -52,7 +52,7 @@ const KB = 1024;
  * 60 KB, and the budget is re-cut to 120 KB: comfortable headroom for ordinary
  * work, tight enough that re-eagering a page is caught the same day.
  */
-const ENTRY_BUDGET = 69 * KB; // 72 → 68 (speed audit 2026-10-16: 62.8 KB measured); 68 → 69 (2026-10-27: Print Cloud, Creative Studio and the community routes brought it to 68.0 KB)
+const ENTRY_BUDGET = 70 * KB; // 72 → 68 (speed audit 2026-10-16: 62.8 KB measured); 68 → 69 (2026-10-27: Print Cloud, Creative Studio and the community routes brought it to 68.0 KB); 69 → 70 (owner, 2026-11-17, DECISIONS row 339: «خصص طابعتك» — the cart route now names the printer-services words chunk in the entry's preload list, 69.0 KB measured)
 /** §10: any single route chunk. */
 const CHUNK_BUDGET = 250 * KB;
 /**
@@ -512,8 +512,12 @@ function staticClosure(start: string): Set<string> {
  * work had grown the opening first (287.4 KB before the speed lanes); with
  * the four lanes together a clean build measures 274.7 KB, and the cap stays
  * ~3 % over that.
+ * RAISED TO 284 KB BY THE OWNER (2026-11-17, DECISIONS row 339): the community
+ * update had used the headroom (the live tip measured 282.8 KB) and «خصص طابعتك»
+ * adds ~0.4 KB of page wiring for the lazy printer card; every word, figure and
+ * control of the card itself stays in its lazy chunks.
  */
-const PRODUCT_OPENING_BUDGET = 283 * KB;
+const PRODUCT_OPENING_BUDGET = 284 * KB;
 
 test('opening a product excludes below-fold reviews, closed purchase dialogs, refusal translations, the price-request panel, the knowledge tabs, the several-colours panel and the estimate notice', () => {
   const files = readdirSync(ASSETS).filter((file) => file.endsWith('.js'));
