@@ -26,6 +26,7 @@ import type { AppContext } from './types';
 import { forbidden, HttpError, notFound, unauthorized } from './http';
 import { getTierStatus, benefits, type TierStatus } from './entitlements';
 import { approvedAtSql, merchantApproved, merchantNotApprovedRefusal, withApprovalSchema } from './merchantApproval';
+import { isDemoId } from '../../packages/contracts/src/demoData';
 
 export interface MerchantRow {
   id: string;
@@ -421,5 +422,8 @@ export function storeSanctioned(ctx: StoreContext): boolean {
  * its merchant PAUSED is not hidden: its page says it is closed (C10).
  */
 export function storeHiddenFromPublic(ctx: StoreContext): boolean {
-  return storeSanctioned(ctx) || !merchantApproved(ctx.merchant);
+  // A community DEMO store (worker/lib/communityDemo.ts) lives inside the
+  // closed community only: its subdomain, slug page, manifest, share card and
+  // public-API entry answer as for a hidden store.
+  return storeSanctioned(ctx) || !merchantApproved(ctx.merchant) || isDemoId(ctx.store.id);
 }

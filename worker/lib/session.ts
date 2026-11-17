@@ -8,6 +8,7 @@ import { loadPrivateGrants } from './costAccess';
 import { isCapabilityGrant } from './merchantApproval';
 import { HttpError } from './http';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
+import { isDemoId } from '../../packages/contracts/src/demoData';
 
 /** The session cookie's name. Exported because the caching rule of §14 has to
  *  ask "does this request carry a session?" BEFORE the session is resolved —
@@ -135,6 +136,10 @@ export interface SessionCondition {
  * written and the sign-in is refused (REAUTH_REQUIRED) instead.
  */
 export async function createSession(c: Context<AppContext>, userId: string, stillHolds?: SessionCondition): Promise<void> {
+  // A COMMUNITY DEMO ACCOUNT IS NEVER SIGNED IN TO (worker/lib/communityDemo.ts):
+  // it has no password, no Google subject and no phone, and should a way in
+  // ever be found, no session is opened for it.
+  if (isDemoId(userId)) throw new HttpError(403, 'هذا حساب تجريبي / This is a demo account and cannot be signed in to', 'DEMO_ACCOUNT');
   const token = randomToken(32);
   const id = await sha256Hex(token);
   const expires = new Date(Date.now() + SESSION_TTL_DAYS * 86_400_000);
@@ -185,6 +190,8 @@ export async function loadSessionUser(c: Context<AppContext>): Promise<void> {
     .bind(id)
     .first<Record<string, unknown>>();
   if (!row) return;
+  // …and a session row naming one is no session.
+  if (isDemoId(row.id)) return;
   if (new Date(String(row.session_expires)).getTime() < Date.now()) {
     await c.env.DB.prepare('DELETE FROM sessions WHERE id = ?').bind(id).run();
     return;

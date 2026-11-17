@@ -83,6 +83,15 @@ import {
 import { offerCoverageShape } from '../lib/offerCoverage';
 import { publicEstimate } from '../lib/requestRevisions';
 import { isMissingSchema } from '../lib/merchantApproval';
+import {
+  demoCounts,
+  demoPresent,
+  demoRemovalBlockers,
+  demoRemovalStatements,
+  demoSeedStatements,
+  demoTotal,
+  realRequestsWithDemoOffers,
+} from '../lib/communityDemo';
 
 export const adminCommunityRoutes = new Hono<AppContext>();
 adminCommunityRoutes.use('*', requireAdmin);
@@ -459,6 +468,14 @@ adminCommunityRoutes.put('/gate', async (c) => {
   }
 
   const before = await readCommunityGate(c.env.DB);
+  // DEMO DATA NEVER MEETS THE PUBLIC (worker/lib/communityDemo.ts): the
+  // community opens only once «حذف كل البيانات التجريبية» has run.
+  if (open && !before.open && (await demoPresent(c.env.DB))) {
+    throw conflict(
+      'احذف البيانات التجريبية قبل فتح المجتمع / Remove the community demo data before opening the community',
+      'COMMUNITY_DEMO_PRESENT'
+    );
+  }
   const nowIso = new Date().toISOString();
   // The same upsert `setSetting` uses; the key is not a typed SETTING_DEFAULTS
   // entry because the generic settings PUT must not be able to open the
@@ -480,6 +497,101 @@ adminCommunityRoutes.put('/gate', async (c) => {
   // P2a: the guests' cached /api/community/access answer follows the switch.
   await afterCommunityGateWrite(c);
   return c.json({ success: true, open, closed: !open, allowed_user_ids: ids, changed: before.open !== open });
+});
+
+// ------------------------------------------------------------ demo data
+
+/**
+ * «بيانات تجريبية» — the owner's demo content for testing the closed
+ * community, added and removed in one action each (worker/lib/communityDemo.ts
+ * says what is written, how a demo row is known and what never is).
+ *
+ * The owner or a full admin only (`requireFinancialScope`, the scope the
+ * money and settings writes of this router use): an assistant admin is
+ * refused all three, the counts included.
+ */
+adminCommunityRoutes.get('/demo', requireFinancialScope, async (c) => {
+  const [counts, gate] = await Promise.all([demoCounts(c.env.DB), readCommunityGate(c.env.DB)]);
+  const total = demoTotal(counts);
+  return c.json({ success: true, present: counts.users > 0, total, counts, community_open: gate.open });
+});
+
+/**
+ * Seed the set. Refused while the community is open to the public
+ * (COMMUNITY_OPEN): fake shops and requests must never reach a real
+ * customer. IDEMPOTENT BY REFUSING TO TOP UP: when a demo account already
+ * exists, nothing is written and the answer says `already_present` with the
+ * current counts — the set is fixed ids, so a press racing another lands on
+ * the primary keys and reports the same.
+ */
+adminCommunityRoutes.post('/demo/seed', requireFinancialScope, async (c) => {
+  const admin = c.get('user')!;
+  const gate = await readCommunityGate(c.env.DB);
+  if (gate.open) {
+    throw conflict(
+      'المجتمع مفتوح للجميع، لا تُضاف بيانات تجريبية / The community is open to the public; demo data is not added',
+      'COMMUNITY_OPEN'
+    );
+  }
+  if (await demoPresent(c.env.DB)) {
+    return c.json({ success: true, created: false, already_present: true, counts: await demoCounts(c.env.DB) });
+  }
+  try {
+    await c.env.DB.batch(demoSeedStatements(c.env.DB));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/UNIQUE|PRIMARY KEY|constraint/i.test(msg) && (await demoPresent(c.env.DB))) {
+      return c.json({ success: true, created: false, already_present: true, counts: await demoCounts(c.env.DB) });
+    }
+    if (/UNIQUE/i.test(msg)) {
+      // A real account or store already holds one of the demo usernames or slugs.
+      throw conflict('اسم مستخدم أو رابط متجر تجريبي محجوز / A demo username or store slug is already taken', 'DEMO_SEED_CONFLICT');
+    }
+    throw e;
+  }
+  const counts = await demoCounts(c.env.DB);
+  await audit(c.env.DB, admin.id, 'community.demo_seeded', 'community_demo', { counts });
+  return c.json({ success: true, created: true, already_present: false, counts }, 201);
+});
+
+/**
+ * Remove every demo row, and only demo rows and the interactions real
+ * accounts made with them — always allowed, open or closed. One batch, one
+ * transaction. A trade record naming a demo row (expected never) stops it
+ * with DEMO_REMOVE_BLOCKED and the tables that hold one.
+ */
+adminCommunityRoutes.post('/demo/remove', requireFinancialScope, async (c) => {
+  const admin = c.get('user')!;
+  const blockers = await demoRemovalBlockers(c.env.DB);
+  if (Object.keys(blockers).length) {
+    throw new HttpError(
+      409,
+      'سجلات بيع أو مال تشير إلى بيانات تجريبية / Trade or money records name demo rows; nothing was removed',
+      'DEMO_REMOVE_BLOCKED',
+      { blockers }
+    );
+  }
+  const recount = await realRequestsWithDemoOffers(c.env.DB);
+  const steps = demoRemovalStatements(c.env.DB, recount);
+  let results: D1Result[];
+  try {
+    results = await c.env.DB.batch(steps.map((s) => s.stmt));
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/FOREIGN KEY/i.test(msg)) {
+      throw new HttpError(409, 'سجل آخر يشير إلى بيانات تجريبية / Another record names a demo row; nothing was removed', 'DEMO_REMOVE_BLOCKED', { error: msg.slice(0, 200) });
+    }
+    throw e;
+  }
+  const removed: Record<string, number> = {};
+  steps.forEach((s, i) => {
+    if (s.label === 'recount') return;
+    const n = Number(results[i]?.meta?.changes ?? 0);
+    if (n > 0) removed[s.label] = (removed[s.label] ?? 0) + n;
+  });
+  const total = Object.values(removed).reduce((a, b) => a + b, 0);
+  await audit(c.env.DB, admin.id, 'community.demo_removed', 'community_demo', { removed, total, recounted: recount.length });
+  return c.json({ success: true, removed, total });
 });
 
 // --------------------------------------------------------------- merchants

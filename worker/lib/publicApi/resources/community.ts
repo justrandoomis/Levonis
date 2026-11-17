@@ -27,6 +27,7 @@
  *   - offset paging, so no cursor carries an internal id.
  */
 import { communityClosedRefusal, communityMayEnter, readCommunityGate } from '../../communityGate';
+import { notDemoSql } from '../../communityDemo';
 import { membershipBadges } from '../../entitlements';
 import { rootDomainFrom } from '../../hosts';
 import { likePattern } from '../../sqlLike';
@@ -194,7 +195,7 @@ async function communityStores(req: PublicRequest): Promise<PublicResult> {
   const q = likePattern(query.q);
   // The directory's own predicate (push 1.4); on a database without 0204 the second try lists nothing (C11).
   const [rows, total] = await withApprovalSchema((schema) => {
-    const where = `${communityDirectoryVisible('?1', schema)} AND s.id IS NOT NULL AND COALESCE(s.slug, '') <> ''`;
+    const where = `${communityDirectoryVisible('?1', schema)} AND s.id IS NOT NULL AND COALESCE(s.slug, '') <> '' AND ${notDemoSql('cm.id')}`;
     return Promise.all([
       db
         .prepare(
@@ -306,7 +307,8 @@ async function communityRequests(req: PublicRequest): Promise<PublicResult> {
   const offset = decodeCursor(query.cursor);
   const q = likePattern(query.q);
   const gov = query.governorate ? normalizeGovernorate(query.governorate) || '\u0000' : '';
-  const where = `${requestBoardVisible('?1', '?2')}
+  // Never a community demo request (worker/lib/communityDemo.ts).
+  const where = `${requestBoardVisible('?1', '?2')} AND ${notDemoSql('r.id')}
         AND (?3 = '' OR r.category = ?3)
         AND (?4 = '' OR r.governorate = ?4)`;
   const binds = [new Date().toISOString(), q, query.category ?? '', gov];
@@ -331,7 +333,7 @@ async function communityRequest(req: PublicRequest): Promise<PublicResult> {
   // The same board rule, for one reference: a draft, a private, a closed or an
   // expired request is not public, whoever asks.
   const r = await db
-    .prepare(`SELECT ${REQUEST_COLUMNS} FROM community_requests r WHERE r.id = ?3 AND ${requestBoardVisible('?1', '?2')}`)
+    .prepare(`SELECT ${REQUEST_COLUMNS} FROM community_requests r WHERE r.id = ?3 AND ${requestBoardVisible('?1', '?2')} AND ${notDemoSql('r.id')}`)
     .bind(new Date().toISOString(), '', req.path.reference)
     .first<Rec>();
   if (!r) throw notFound('Request not found');

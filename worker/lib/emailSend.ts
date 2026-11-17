@@ -35,6 +35,7 @@
 
 import { fetchWithBudget, PROVIDER_BUDGETS } from '@levonis/platform-kit/httpx';
 import type { Env } from './types';
+import { isDemoEmail } from '../../packages/contracts/src/demoData';
 
 export const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 
@@ -51,6 +52,8 @@ export function emailConfigured(env: Env): boolean {
  * lib/outbox.ts, which agreed on it.
  */
 export function emailAllowsRecipient(env: Env, to: string): boolean {
+  // A community demo account's reserved `.invalid` address is never mailed.
+  if (isDemoEmail(to)) return false;
   const allowed = (env.EMAIL_ALLOWED_RECIPIENTS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase())

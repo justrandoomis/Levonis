@@ -62,6 +62,8 @@ import {
 import { normalizeGovernorate } from '@levonis/shipping/iraqGovernorates';
 import { fanOutMerchantNotice, matchingRequestNotice, type MerchantNotice } from './merchantNotify';
 import { notifyStatement } from './notifications';
+import { notDemoSql } from './communityDemo';
+import { isDemoId } from '../../packages/contracts/src/demoData';
 
 /** The engine that writes a row: 2 = eligibility.ts (0132 `engine`). */
 export const MATCH_ENGINE = 2;
@@ -370,7 +372,9 @@ export async function loadCandidates(db: D1Database, merchantIds?: string[]): Pr
           .bind(JSON.stringify([...new Set(merchantIds)]))
           .all<Record<string, unknown>>()
       : db
-          .prepare(`SELECT ${columns} WHERE m.status = 'active' AND ${schema ? 'm.approved_at IS NOT NULL' : '0'}`)
+          // Never a community demo workshop (worker/lib/communityDemo.ts): a real
+          // request is not matched to, nor its customer shown, a fake shop.
+          .prepare(`SELECT ${columns} WHERE m.status = 'active' AND ${schema ? 'm.approved_at IS NOT NULL' : '0'} AND ${notDemoSql('m.id')}`)
           .all<Record<string, unknown>>();
   });
   const rows = merchants.results ?? [];
@@ -592,6 +596,8 @@ export async function matchRequest(
   requestId: string,
   opts: { notify: boolean; limit?: number; text?: NoticeText; now?: number } = { notify: true }
 ): Promise<RequestMatchOutcome> {
+  // A community demo request is matched to nobody: no real workshop is told of a fake job.
+  if (isDemoId(requestId)) return { considered: 0, eligible: 0, notified: 0 };
   const db = env.DB;
   const now = opts.now ?? Date.now();
   const ts = new Date(now).toISOString();
@@ -668,6 +674,7 @@ export async function matchMerchant(env: Env, merchantId: string, opts: { now?: 
       `SELECT r.id FROM community_requests r
         WHERE r.state IN ('open','receiving_offers') AND r.visibility = 'public'
           AND (r.expires_at IS NULL OR r.expires_at = '' OR r.expires_at > ?)
+          AND ${notDemoSql('r.id')}
         ORDER BY r.created_at DESC LIMIT ?`
     )
     .bind(ts, MERCHANT_REMATCH_REQUESTS)

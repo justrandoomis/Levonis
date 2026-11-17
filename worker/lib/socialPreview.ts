@@ -62,6 +62,7 @@ import { variantSourceMime } from './imageConvert';
 import { STORE_GALLERY_SIZES, STORE_HERO_SIZES, variantSrcSet } from '../../packages/contracts/src/imageSizing';
 import { mediaAspect, productGallerySizes } from '../../packages/contracts/src/imageSizes';
 import { merchantPublicSql, storePublicSql, withApprovalSchema } from './merchantApproval';
+import { notDemoSql } from './communityDemo';
 
 /** The four things a chat app reads off a link, already absolute and escaped. */
 export interface SocialPreview {
@@ -564,7 +565,7 @@ export async function resolveStorePreview(
            FROM merchant_stores s
            JOIN community_merchants m ON m.id = s.merchant_id
           WHERE (s.slug = ?1 OR (?2 = 1 AND (s.id = ?1 OR s.merchant_id = ?1)))
-            AND ${storePublicSql('s')} AND ${merchantPublicSql('m', schema)}
+            AND ${storePublicSql('s')} AND ${merchantPublicSql('m', schema)} AND ${notDemoSql('s.id')}
           LIMIT 1`
       )
       .bind(storeKey, scope.storeSlug ? 0 : 1)

@@ -137,6 +137,11 @@ const ADMIN_COMMUNITY_ROUTES: Record<string, MoneyClass> = {
   'GET /gate': 'none',
   'GET /gate/lookup': 'none',
   'PUT /gate': 'none',
+  // Community demo data (worker/lib/communityDemo.ts): moves no money, but it is the owner's or a full admin's
+  // tool only, so it wears the same guard (tests/communityDemo.test.ts).
+  'GET /demo': 'guard',
+  'POST /demo/seed': 'guard',
+  'POST /demo/remove': 'guard',
   'GET /merchants': 'none',
   'POST /merchants/:id/verify': 'none',
   'POST /merchants/:id/status': 'none',
