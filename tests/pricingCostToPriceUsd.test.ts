@@ -324,6 +324,8 @@ test('the storefront never recomputes: only the owner pricing router, the engine
   // customer path. It imports the V2 modules (and the engine's 400 builder) only, pinned here.
   const V2_PRODUCT_SAVE: Readonly<Record<string, readonly string[]>> = {
     'worker/routes/adminProducts.ts': [
+      // DECISIONS row 340: the owner's save removes «سعر تقديري» (`clearEstimateOnOwnerSave`) — a label write, no price computed.
+      '../lib/pricingEngine/estimate/confirm',
       '../lib/pricingEngine/v2/api',
       // Owner answer Q3 (DECISIONS row 222): an editor's publish below cost + minimum profit rings the owner.
       '../lib/pricingEngine/v2/bell',

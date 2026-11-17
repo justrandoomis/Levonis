@@ -577,3 +577,51 @@ export async function setEstimateProduct(db: D1Database, pid: string, raw: unkno
   }
   return { product_id: pid, ...next, version: version + 1 };
 }
+
+/* ------------------------------------------------- the owner's save removes the label -- */
+
+/**
+ * THE OWNER'S SAVE IS THE CONFIRMATION (owner, 2026-11-17: «make estimated price gone when i edit the product
+ * [saved it], not need to confirm button on edit page»; DECISIONS row 340). When the owner saves an estimated
+ * product from its edit page (POST /api/admin/products-v2, draft or publish), the label goes in one batch
+ * right after the save: the bookkeeping `confirmed` FIRST (trigger T2 reads it), then
+ * `products.price_estimate = 0`, the firm SKUs deleted, the audit. The prices the save left are the owner's
+ * firm prices; nothing else moves.
+ *
+ * This is the owner's own statement, so it takes no measure statement and no flag acceptance (it amends
+ * D2 / rows 279 (٤) and 292 for this door only): `measure_basis` becomes 'real' as the CHECK requires, and the
+ * default-measure codes leave the row's flags as a whole confirmation leaves them. A paused estimate is
+ * confirmed too (it still carries the label). The estimator never touches a confirmed product again; «إعادة
+ * إلى التقدير» stays the way back.
+ *
+ * Who: the caller passes only a viewer who writes cost (the owner); any other admin's save keeps the label.
+ * Never throws: a product with no label, a database without 0218, a lost race or an import's guard answers
+ * false and the save stands as written.
+ */
+export async function clearEstimateOnOwnerSave(db: D1Database, pid: string, actor: string, now: Date): Promise<boolean> {
+  try {
+    if (!PRODUCT_ID.test(pid)) return false;
+    const row = await db.prepare('SELECT price_estimate FROM products WHERE id = ?').bind(pid).first<Record<string, unknown>>();
+    if (!isEstimateRow(row)) return false;
+    const estimate = await estimateRow(db, pid);
+    if (!estimate || estimate.state === 'confirmed') return false;
+    const at = now.toISOString();
+    const audit = await auditStatements(db, actor, 'price_estimate.confirmed', pid, { product_id: pid, whole: true, on_save: true });
+    await db.batch([
+      ...fence(db, 'EXISTS (SELECT 1 FROM product_price_estimates WHERE product_id = ? AND version = ? AND state = ?)', [pid, estimate.version, estimate.state]),
+      db
+        .prepare(
+          `UPDATE product_price_estimates SET state = 'confirmed', measure_basis = 'real', flags_json = ?, confirmed_at = ?, confirmed_by = ?,
+                  version = version + 1, updated_by = ?, updated_at = ? WHERE product_id = ?`
+        )
+        .bind(flagsWithoutDefaults(estimate.flags_json), at, actor, actor, at, pid),
+      db.prepare('UPDATE products SET price_estimate = 0 WHERE id = ? AND price_estimate = 1').bind(pid),
+      db.prepare('DELETE FROM price_estimate_firm_skus WHERE product_id = ?').bind(pid),
+      ...audit.statements,
+    ]);
+    return true;
+  } catch (e) {
+    console.warn('[estimate] the label stays after the owner save', pid, e instanceof Error ? e.message : String(e));
+    return false;
+  }
+}

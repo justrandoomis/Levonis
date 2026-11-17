@@ -948,6 +948,7 @@ export default function ProductForm({
         warnings?: string[];
         already?: boolean;
         pricing_v2?: { priced: boolean };
+        price_estimate?: AdminProductEstimate | null;
       }>(
         '/api/admin/products-v2',
         body,
@@ -961,6 +962,8 @@ export default function ProductForm({
       // later save would only be noise, and the read-back below already carries
       // the text into the document.
       setOverrides({});
+      // The owner's save removed «سعر تقديري» (DECISIONS row 340): the banner says so at once.
+      if (res.price_estimate !== undefined) setPriceEstimate(res.price_estimate);
 
       // WHAT THE FORM SHOWS AFTER A SAVE IS A READ-BACK, NOT THE ECHO.
       // The save answers with the product document; the structure is read from

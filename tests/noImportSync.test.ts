@@ -116,7 +116,11 @@ test('the import\'s code is reachable only through the two route mounts: no othe
   // mounts: a route mount again, never a cron path.
   const workerFiles = walk(join(ROOT, 'worker')).map((f) => relative(ROOT, f).split(sep).join('/'));
   const estimatorDoors = workerFiles.filter((f) => !f.startsWith('worker/lib/pricingEngine/estimate/') && /from\s+'[^']*pricingEngine\/estimate\/[^']+'/.test(source(f)));
-  assert.deepEqual(estimatorDoors, ['worker/routes/adminPriceEstimates.ts'], 'the estimator has one door');
+  // DECISIONS row 340: the owner's product save is the second door — a route too, never a cron path — and it
+  // takes only the on-save clear, nothing of the estimator's compute.
+  assert.deepEqual(estimatorDoors, ['worker/routes/adminPriceEstimates.ts', 'worker/routes/adminProducts.ts'], 'the estimator has two route doors');
+  const saveTakes = [...source('worker/routes/adminProducts.ts').matchAll(/import\s*\{([^}]*)\}\s*from\s*'[^']*pricingEngine\/estimate\/([^']+)'/g)].map((m) => `${m[2]}:${m[1]!.trim()}`);
+  assert.deepEqual(saveTakes, ['confirm:clearEstimateOnOwnerSave'], 'the product save takes only the on-save clear');
   const routerMounts = workerFiles.filter((f) => /from\s+'[^']*\/adminPriceEstimates'/.test(source(f)));
   assert.deepEqual(routerMounts, ['worker/routes/adminPricing.ts'], 'the estimates router is mounted only inside the owner pricing router');
   const index = source('worker/index.ts');

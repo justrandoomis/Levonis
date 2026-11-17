@@ -112,7 +112,7 @@ export default function PricesSectionV2({
             onProductChanged={onProductChanged}
             onOpenDimensions={onOpenDimensions}
             onOpenCost={onOpenCost}
-            revision={v2.stored?.seq ? `${v2.stored.seq.inputs_seq}:${v2.stored.seq.write_seq}` : ''}
+            revision={`${v2.stored?.seq ? `${v2.stored.seq.inputs_seq}:${v2.stored.seq.write_seq}` : ''}${priceEstimate?.label === false ? ':firm' : ''}`}
           />
         </Suspense>
       ) : null}
