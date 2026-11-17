@@ -30,7 +30,7 @@
  * something working correctly.
  */
 
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Box, Loader2, PackageSearch } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
@@ -491,11 +491,16 @@ function AllRequests({
   const { state, process, governorate } = filters;
   const url = useCallback((after?: string) => boardUrl(q, { state, process, governorate }, after), [q, state, process, governorate]);
 
+  /** The board the rows on screen belong to: a «المزيد» page that answers after the search or the filters moved is dropped. */
+  const boardKey = useRef('');
+
   useEffect(() => {
     let alive = true;
+    boardKey.current = url();
     setRows(null);
     setLoadError(null);
     setMoreError(false);
+    setMore(false);
     api
       .get<{ requests: RequestRow[]; next_cursor: string | null }>(url())
       .then((d) => {
@@ -512,17 +517,19 @@ function AllRequests({
 
   async function loadMore() {
     if (!cursor || more) return;
+    const k = boardKey.current;
     setMore(true);
     setMoreError(false);
     try {
       const d = await api.get<{ requests: RequestRow[]; next_cursor: string | null }>(url(cursor));
+      if (boardKey.current !== k) return;
       setRows((r) => [...(r ?? []), ...d.requests.filter((x) => !(r ?? []).some((y) => y.id === x.id))]);
       setCursor(d.next_cursor ?? null);
     } catch {
       // The rest of the board is still there: keep the way to it.
-      setMoreError(true);
+      if (boardKey.current === k) setMoreError(true);
     } finally {
-      setMore(false);
+      if (boardKey.current === k) setMore(false);
     }
   }
 

@@ -89,6 +89,16 @@ test('the page: a search box that keeps the keyboard, «المزيد» that says
   assert.match(board, /ORDER BY r\.created_at DESC, r\.id DESC LIMIT \?7/);
 });
 
+test('«المزيد» answering after the search or the filters moved is dropped, never appended to the new board (review 2026-11-17)', () => {
+  const page = code('src/pages/Requests.tsx');
+  // The board's own address is the key: set when a board starts loading, captured when a page is asked for.
+  assert.match(page, /boardKey\.current = url\(\);\s*setRows\(null\);/);
+  assert.match(page, /setMoreError\(false\);\s*setMore\(false\);/, 'a new board does not inherit the «loading more» of the old one');
+  assert.match(page, /const k = boardKey\.current;[\s\S]*?url\(cursor\)\);\s*if \(boardKey\.current !== k\) return;\s*setRows/, 'an old page is dropped before it touches the rows or the cursor');
+  assert.match(page, /if \(boardKey\.current === k\) setMoreError\(true\);/);
+  assert.match(page, /finally \{\s*if \(boardKey\.current === k\) setMore\(false\);/);
+});
+
 test('every offer count on the request screens is a counted phrase — the workshop board in its own digits', async () => {
   const { offersLabel } = await import('../src/components/community/hub/copy');
   assert.deepEqual([0, 1, 2, 5, 12, 100].map((n) => offersLabel(n, 'ar')), ['لا عروض بعد', 'عرض واحد', 'عرضان', '5 عروض', '12 عرضًا', '100 عرض']);
