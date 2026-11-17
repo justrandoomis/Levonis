@@ -59,7 +59,7 @@ import {
   viewerGovernorate,
 } from '../lib/merchantDelivery';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
-import { anonymousCached } from '../lib/edgePolicy';
+import { anonymousCached, isAnonymousGet } from '../lib/edgePolicy';
 import { storefrontWorkshopFacts } from '../lib/printMatchingStore';
 import { openNow } from '../lib/storeHours';
 
@@ -339,6 +339,11 @@ async function hiddenFrom(c: Context<AppContext>, ctx: StoreContext): Promise<bo
   // the viewer is read here, for a demo store only. A request with a session
   // cookie is never stored by the edge (`anonymousCached`), and one without is
   // refused below — a refusal is never stored either.
+  // A request the edge would store as anonymous (worker/lib/edgePolicy.ts
+  // `isAnonymousGet`, its own strict cookie test) never reads a session here, so a
+  // cookie that only Hono's looser parser accepts can never put a demo store
+  // under the shared anonymous key.
+  if (isAnonymousGet(c)) return true;
   if (c.get('user') === undefined || c.get('user') === null) await loadSessionUser(c);
   if (!communityMayEnter(await readCommunityGate(c.env.DB), c.get('user'))) return true;
   // Shown to those who may enter — and never to an index.

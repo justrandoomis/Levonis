@@ -32,6 +32,7 @@ import { storeTakesOrders } from '../lib/storeOrderOps';
 import { merchantTakesNewWork } from '../lib/communityRequests';
 import { blockedEither } from './communityPosts';
 import { communityMayEnter, readCommunityGate } from '../lib/communityGate';
+import { isDemoId } from '../../packages/contracts/src/demoData';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { safeParse } from '../lib/types';
 
@@ -612,6 +613,9 @@ chatRoutes.post('/open', async (c) => {
     );
     if (!m) throw notFound('Store not found');
     if (m.user_id === user.id) throw badRequest('You cannot chat with yourself');
+    // A demo shop (worker/lib/communityDemo.ts) is only for those who may enter
+    // the closed community; anyone else gets the storefront's one refusal.
+    if (isDemoId(merchantId) && !communityMayEnter(await readCommunityGate(c.env.DB), user)) throw publicStoreUnavailable();
     /*
      * E12 (Community V3 push 1.4): A NEW conversation by merchant id only with
      * a merchant the public may see — not suspended, approved, its store not
