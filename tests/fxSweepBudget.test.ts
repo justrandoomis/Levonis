@@ -33,6 +33,8 @@
  * Run: node --import tsx --test tests/fxSweepBudget.test.ts
  */
 import { test } from 'node:test';
+import { FINANCE_CHECKS_STATE_KEY } from '../worker/lib/financeChecksAlert';
+import { baghdadDay } from '../worker/lib/baghdadTime';
 import assert from 'node:assert/strict';
 import { copyFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -131,6 +133,12 @@ const event = () => ({ cron: '*/15 * * * *', scheduledTime: Date.now(), noRetry(
 /** One quarter-hour tick of the real handler; every promise it hands to waitUntil settled. */
 async function tick(raw: DatabaseSync) {
   resetEventBus();
+  // The once-a-day finance checks alert (from 09:00 Baghdad) is not one of the bounded jobs measured here: it is
+  // marked as sent today, so the count is the same at any hour of the run — before this, every run after 06:00 UTC
+  // failed on its Telegram notice to an unconfigured admin bot.
+  raw
+    .prepare('INSERT OR REPLACE INTO admin_settings (key, value) VALUES (?, ?)')
+    .run(FINANCE_CHECKS_STATE_KEY, JSON.stringify({ day: baghdadDay(Date.now()), signature: '', errors: false }));
   const d1 = new CountD1(raw);
   const env = { DB: d1 as unknown as D1Database, INITIAL_ADMIN_EMAIL: 'boss@x.co', STORE_ROOT_DOMAIN: 'levonis-iq.com' } as unknown as Env;
   const waited: Promise<unknown>[] = [];
