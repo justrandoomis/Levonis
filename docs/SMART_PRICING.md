@@ -1027,6 +1027,8 @@ For each product, in order:
      - The same UPDATE drops the default-measure entries (`EST_DEFAULT_WEIGHT`, `EST_DEFAULT_BOX`) from the row's `flags_json`. Step 1 has just proved that none is left. Before this a product confirmed on the owner's typed measures kept those entries and showed «وزن افتراضي»; `shownFlags` now never shows a confirmed row's default-measure entries, so a product confirmed before this change shows none either (its other entries are shown as stored).
    - **Some SKUs:** INSERT those SKUs into `price_estimate_firm_skus` (T4 passes) and write the audit. The label stays for the others.
 
+**The owner's save removes the label (DECISIONS row 340, 2026-11-17).** Any save of an existing product from its edit page (`POST /api/admin/products-v2`) by a viewer who writes cost confirms the whole product right after the save batch (`clearEstimateOnOwnerSave`): the same write as a whole confirmation above, with no measure statement and no flag acceptance asked, and no price moved. The form's banner has no «تأكيد» button; the workspace's sheet is unchanged.
+
 Other actions:
 - **"Return to estimate"** is a re-apply (§4.8).
 - **Pause** (`PUT /estimates/products/:id {state:'paused'}`) stops refreshes and leaves the label alone.

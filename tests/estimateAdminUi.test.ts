@@ -195,7 +195,7 @@ test('the workspace is lazy and owner-mounted: a card in «التسعير وال
   // weight open in place) and read again when the stored pricing moves.
   assert.match(
     section,
-    /<Suspense fallback=\{null\}>\s*<EstimateBanner\s+productId=\{productId\}\s+owner=\{v2\.owner\}\s+state=\{priceEstimate\}\s+onProductChanged=\{onProductChanged\}\s+onOpenDimensions=\{onOpenDimensions\}\s+onOpenCost=\{onOpenCost\}\s+revision=\{v2\.stored\?\.seq \? `\$\{v2\.stored\.seq\.inputs_seq\}:\$\{v2\.stored\.seq\.write_seq\}` : ''\}\s*\/>/
+    /<Suspense fallback=\{null\}>\s*<EstimateBanner\s+productId=\{productId\}\s+owner=\{v2\.owner\}\s+state=\{priceEstimate\}\s+onProductChanged=\{onProductChanged\}\s+onOpenDimensions=\{onOpenDimensions\}\s+onOpenCost=\{onOpenCost\}\s+revision=\{`\$\{v2\.stored\?\.seq \? `\$\{v2\.stored\.seq\.inputs_seq\}:\$\{v2\.stored\.seq\.write_seq\}` : ''\}\$\{priceEstimate\?\.label === false \? ':firm' : ''\}`\}\s*\/>/
   );
 
   // Nobody else reaches into the workspace, statically or lazily.
@@ -1131,8 +1131,9 @@ test('the confirmation’s ways in: the product form reads the product again kee
   assert.match(prices, /onProductChanged,\s*onOpenDimensions,\s*onOpenCost,\s*\}: \{/);
   // The banner reads again when the stored pricing moves, and hands the ways to the sheet.
   const banner = codeOf(`${DIR}/EstimateBanner.tsx`);
-  assert.match(banner, /\}, \[productId, reload, revision\]\);/);
-  assert.match(banner, /onStale=\{stale\}\s*onProductChanged=\{onProductChanged\}\s*onOpenDimensions=\{onOpenDimensions\}\s*onOpenCost=\{onOpenCost\}/);
+  assert.match(banner, /\}, \[productId, revision\]\);/);
+  // No sheet on the edit page any more: the owner's save removes the label (DECISIONS row 340).
+  assert.doesNotMatch(banner, /ConfirmSheet/);
   // The workspace's sheet tells its list when the server moved.
   assert.match(codeOf(`${DIR}/EstimateLists.tsx`), /onStale=\{\(\) => setReload\(\(n\) => n \+ 1\)\}/);
   // «الأبعاد والوزن»: the product's own «صندوق الشحن» block carries the anchor; a model's or colour's never does.

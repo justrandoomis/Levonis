@@ -144,6 +144,7 @@ import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { loadPrinterFitIds, printerOptions } from '../lib/printerFits';
 import { loadImportStock } from '../lib/importStock';
 import { isMissingEstimateSchema } from '../lib/priceEstimateLabel';
+import { clearEstimateOnOwnerSave } from '../lib/pricingEngine/estimate/confirm';
 import { planProcurementImportStock, withPreparedProcurementStock } from '../lib/procurementImportStock';
 
 /** Kept under its old name: the diff is now the contract's (productPersistence). */
@@ -2067,6 +2068,9 @@ adminProductsRoutes.post('/', async (c) => {
     }
   }
 
+  // The owner's save removes the «سعر تقديري» label (owner, 2026-11-17; DECISIONS row 340): the prices this save
+  // left are the owner's firm prices, with no «تأكيد السعر» step. Another admin's save keeps the label.
+  const estimateCleared = prev !== null && canWriteCost(c.env, admin) && (await clearEstimateOnOwnerSave(c.env.DB, doc.id, admin.id, new Date()));
   const stored = await reloadForVerification(c.env.DB, doc.id);
   c.set('catalogueSlug', doc.slug); // the product page is purged with the listing
   // …and an opt-in slug change drops the address it left: its cached answer and share card still name the product.
@@ -2080,6 +2084,8 @@ adminProductsRoutes.post('/', async (c) => {
     ...(plan.relations ? { relations: plan.relations.summary } : {}),
     ...(plan.warnings.length ? { warnings: plan.warnings } : {}),
     ...(pinnedAfterPriceChange ? { pinned_prices: pinnedAfterPriceChange } : {}),
+    // The label this save removed (DECISIONS row 340): the form's banner drops it without a reload.
+    ...(estimateCleared ? { price_estimate: { label: false, state: 'confirmed' } } : {}),
     // Named honestly rather than hidden behind a green tick: these fields kept
     // their English text because the local engine could not translate them
     // safely (§3). The product is saved and live either way.

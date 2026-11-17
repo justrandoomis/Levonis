@@ -781,14 +781,20 @@ export const BANNER = {
   defaultBox: t('صندوق افتراضي', 'Default box', 'سندوقی بنەڕەتی'),
   review: t('مراجعة', 'Review', 'پێداچوونەوە'),
   confirm: t('تأكيد', 'Confirm', 'پشتڕاستکردنەوە'),
+  /** The product form's banner (DECISIONS row 340): the owner's save is the confirmation, no button. */
+  onSave: t(
+    'يُزال «سعر تقديري» عند حفظ المنتج، وتصبح أسعاره الحالية نهائية.',
+    'Saving this product removes “Estimated price”; its current prices become final.',
+    'بە پاشەکەوتکردنی ئەم بەرهەمە «نرخی خەمڵێنراو» لادەبرێت و نرخەکانی ئێستای دەبنە کۆتایی.'
+  ),
   links: t('روابط المورّد ({n})', 'Supplier links ({n})', 'بەستەرەکانی دابینکەر ({n})'),
   allLinks: t('كل روابط المنتج', 'Every link of the product', 'هەموو بەستەرەکانی بەرهەمەکە'),
   none: t('لا رابط عند المورّد بعد.', 'No supplier link yet.', 'هێشتا هیچ بەستەرێکی دابینکەر نییە.'),
   find: t('ابحث عند المورّد', 'Find it at the supplier', 'لای دابینکەر بیدۆزەرەوە'),
   staffLabel: t(
-    'يرى الزبون «سعر تقديري» على هذا المنتج حتى يؤكد المالك السعر مع المورّد.',
-    'Customers see “Estimated price” on this product until the owner confirms the price with the supplier.',
-    'کڕیار «نرخی خەمڵێنراو» لەسەر ئەم بەرهەمە دەبینێت تا خاوەن نرخەکە لەگەڵ دابینکەر پشتڕاست دەکاتەوە.'
+    'يرى الزبون «سعر تقديري» على هذا المنتج حتى يحفظه المالك أو يؤكد سعره.',
+    'Customers see “Estimated price” on this product until the owner saves it or confirms its price.',
+    'کڕیار «نرخی خەمڵێنراو» لەسەر ئەم بەرهەمە دەبینێت تا خاوەن پاشەکەوتی دەکات یان نرخەکەی پشتڕاست دەکاتەوە.'
   ),
   staffState: t('التسعير التقديري: {state} — يديره المالك.', 'Estimated pricing: {state} — managed by the owner.', 'نرخدانانی خەمڵێنراو: {state} — خاوەن بەڕێوەی دەبات.'),
   title: t('التسعير التقديري لهذا المنتج', 'This product’s estimated pricing', 'نرخدانانی خەمڵێنراوی ئەم بەرهەمە'),

@@ -9,22 +9,22 @@
  *     pricing/estimates/products/:id`) and its supplier links (`GET /api/admin/
  *     pricing/supplier-prices/links/:id`): the label and state, the sources and
  *     capture dates, the default measures, the links that open Tmall or the EU
- *     store on the exact option, «مراجعة» and «تأكيد» (the confirmation sheet,
- *     in place). A product with no link but an estimate row is offered the
- *     lookup instead. Any refusal or an older database shows nothing: the
+ *     store on the exact option, and «مراجعة». No «تأكيد» here: the owner's
+ *     save of this form removes the label (owner, 2026-11-17; DECISIONS row
+ *     340; worker/lib/pricingEngine/estimate/confirm.ts
+ *     `clearEstimateOnOwnerSave`), and the banner says so. A product with no
+ *     link but an estimate row is offered the lookup instead. Any refusal or an older database shows nothing: the
  *     banner is a courtesy;
  *   - EVERY OTHER ADMIN sees the state alone, from the product read's
  *     non-financial `price_estimate: {label, state}` (worker/routes/
  *     adminProducts.ts) — no request is made, no source, figure or flag shown.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Tag } from 'lucide-react';
-import { Button } from '../ui/Button';
 import { StatusChip } from '../ui/Badge';
 import type { AdminProductEstimate } from '../../lib/api';
 import { fetchEstimate, fetchProductLinks, workspaceHref, type ProductLinks, type RealMeasures, type StoredEstimate } from './api';
 import { Ltr, SupplierLinkRow, errorCode, skuName, useUiLang } from './parts';
-import ConfirmSheet from './ConfirmSheet';
 import { BANNER, ESTIMATE_STATE_LABELS, SOURCE_LABELS, say, type UiLang } from './strings';
 import { dayOf } from './format';
 
@@ -46,20 +46,10 @@ export interface EstimateBannerProps {
   revision?: string;
 }
 
-export default function EstimateBanner({ productId, owner, state = null, onProductChanged, onOpenDimensions, onOpenCost, revision = '' }: EstimateBannerProps) {
+export default function EstimateBanner({ productId, owner, state = null, revision = '' }: EstimateBannerProps) {
   const { lang, dir } = useUiLang();
   if (!owner) return <StaffEstimateState state={state} lang={lang} dir={dir} />;
-  return (
-    <OwnerEstimateBanner
-      productId={productId}
-      lang={lang}
-      dir={dir}
-      revision={revision}
-      onProductChanged={onProductChanged}
-      onOpenDimensions={onOpenDimensions}
-      onOpenCost={onOpenCost}
-    />
-  );
+  return <OwnerEstimateBanner productId={productId} lang={lang} dir={dir} revision={revision} />;
 }
 
 /** What every other admin may know: whether customers see the label, and where the owner holds the estimate. */
@@ -82,21 +72,11 @@ export function sourceDates(estimate: StoredEstimate | null, links: ProductLinks
   });
 }
 
-function OwnerEstimateBanner({
-  productId,
-  lang,
-  dir,
-  revision,
-  onProductChanged,
-  onOpenDimensions,
-  onOpenCost,
-}: { productId: string; lang: UiLang; dir: 'rtl' | 'ltr'; revision: string } & Pick<EstimateBannerProps, 'onProductChanged' | 'onOpenDimensions' | 'onOpenCost'>) {
+function OwnerEstimateBanner({ productId, lang, dir, revision }: { productId: string; lang: UiLang; dir: 'rtl' | 'ltr'; revision: string }) {
   const [estimate, setEstimate] = useState<StoredEstimate | null>(null);
   const [links, setLinks] = useState<ProductLinks | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [open, setOpen] = useState(false);
-  const [confirming, setConfirming] = useState(false);
-  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -118,14 +98,8 @@ function OwnerEstimateBanner({
       })
       .catch(() => undefined);
     return () => ac.abort();
-  }, [productId, reload, revision]);
+  }, [productId, revision]);
 
-  const done = useCallback(() => {
-    setConfirming(false);
-    setReload((n) => n + 1);
-  }, []);
-  // The sheet moved the server's state (a compute, a stale version): the banner's chips are read again too.
-  const stale = useCallback(() => setReload((n) => n + 1), []);
   const dates = useMemo(() => sourceDates(estimate, links), [estimate, links]);
   const factCount = useMemo(() => (links?.skus ?? []).reduce((n, s) => n + s.supplier_prices.length, 0), [links]);
 
@@ -162,10 +136,10 @@ function OwnerEstimateBanner({
         <a href={workspaceHref('review', productId)} className="lv-button lv-button-secondary lv-button-sm" data-estimate-banner-review>
           {say(BANNER.review, lang)}
         </a>
-        {estimate?.state === 'estimated' ? (
-          <Button size="sm" variant="primary" onClick={() => setConfirming(true)} data-estimate-banner-confirm>
-            {say(BANNER.confirm, lang)}
-          </Button>
+        {estimate?.label ? (
+          <span className="text-[12px] text-text-secondary" data-estimate-banner-on-save>
+            {say(BANNER.onSave, lang)}
+          </span>
         ) : null}
         {links && factCount > 0 ? (
           <button type="button" className="inline-flex min-h-11 items-center gap-1 px-1 text-[13px] font-bold text-text-primary underline underline-offset-2" aria-expanded={open} onClick={() => setOpen((o) => !o)} data-estimate-banner-links>
@@ -202,15 +176,6 @@ function OwnerEstimateBanner({
           </a>
         </div>
       ) : null}
-      <ConfirmSheet
-        estimate={confirming ? estimate : null}
-        onClose={() => setConfirming(false)}
-        onDone={done}
-        onStale={stale}
-        onProductChanged={onProductChanged}
-        onOpenDimensions={onOpenDimensions}
-        onOpenCost={onOpenCost}
-      />
     </section>
   );
 }
