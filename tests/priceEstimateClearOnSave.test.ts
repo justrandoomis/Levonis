@@ -54,7 +54,7 @@ const mount = (raw: DatabaseSync, user: StubUser = OWNER) =>
   );
 
 /** The product form's own «نشر» of the product as it stands (a content save: no price typed), as `app`'s user. */
-async function formSave(app: ReturnType<typeof mount>): Promise<{ status: number; body: Json }> {
+async function formSave(app: ReturnType<typeof mount>, extra: Record<string, unknown> = {}): Promise<{ status: number; body: Json }> {
   const p = (await json(await get(app, '/api/admin/products-v2/p_fil'))) as Json;
   const r = (await json(await get(app, '/api/admin/products/p_fil/relations'))) as Json;
   const doc: Record<string, unknown> = { ...(toEditorDoc(p.product) as unknown as Record<string, unknown>), status: 'active' };
@@ -66,6 +66,7 @@ async function formSave(app: ReturnType<typeof mount>): Promise<{ status: number
     ...docWithoutLegacyMoney(docFields),
     relations: withoutLegacyMoney(relationsToWire(hydrateRelations(r as unknown as RelationsResponse, p.product) as never)),
     expected_updated_at: p.product.updated_at,
+    ...extra,
   });
   return { status: res.status, body: (await json(res)) as Json };
 }
@@ -162,6 +163,29 @@ test('the edit page’s save: the owner’s removes the label and says so; a sta
   const again = await formSave(w.app);
   assert.equal(again.status, 200);
   assert.equal(again.body.price_estimate, undefined);
+});
+
+test('a save the server answers «already» (the same prices as a price set written before) removes the label too', async () => {
+  // The owner's usual case (live, 2026-11-17): a product priced earlier, opened and saved again unchanged —
+  // the price set's hash was written before, so the route answers `already` without a new write.
+  const w = world();
+  await estimate(w.app);
+  const before = prices(w.raw);
+  const hash = 'c'.repeat(64);
+  w.raw.exec(`INSERT INTO pricing_audit (id, entity, entity_key, action, created_at, idempotency_key)
+    VALUES ('pa_replay', 'product_write', 'p_fil', 'update', ${q(NOW)}, ${q(`v2price:p_fil:${hash}`)})`);
+
+  const staff = await formSave(mount(w.raw, STAFF), { pricing_v2: { preview_hash: hash } });
+  assert.equal(staff.status, 200, JSON.stringify(staff.body).slice(0, 300));
+  assert.equal(staff.body.already, true, 'the replay path');
+  assert.equal(label(w.raw), 1, 'another admin’s save keeps the label');
+
+  const owner = await formSave(w.app, { pricing_v2: { preview_hash: hash } });
+  assert.equal(owner.status, 200, JSON.stringify(owner.body).slice(0, 300));
+  assert.equal(owner.body.already, true, 'the replay path');
+  assert.deepEqual(owner.body.price_estimate, { label: false, state: 'confirmed' });
+  assert.equal(label(w.raw), 0, 'the owner’s unchanged save removed it');
+  assert.equal(prices(w.raw), before, 'no price moved');
 });
 
 test('the save route calls it for the owner after the save, and the edit page has no «تأكيد» button', () => {

@@ -2005,9 +2005,17 @@ adminProductsRoutes.post('/', async (c) => {
       status: doc.status,
     });
     if (v2Outcome.kind === 'already') {
+      // An unchanged save is still the owner's save (DECISIONS row 340): it removes the label too.
+      const cleared = prev !== null && canWriteCost(c.env, admin) && (await clearEstimateOnOwnerSave(c.env.DB, doc.id, admin.id, new Date()));
       const current = await reloadForVerification(c.env.DB, doc.id);
       c.set('catalogueSlug', doc.slug);
-      return c.json({ success: true, already: true, created: false, product: current ? projectForAdmin(c.env, admin, current.document) : null });
+      return c.json({
+        success: true,
+        already: true,
+        created: false,
+        product: current ? projectForAdmin(c.env, admin, current.document) : null,
+        ...(cleared ? { price_estimate: { label: false, state: 'confirmed' } } : {}),
+      });
     }
     plan.statements = v2Outcome.statements;
   }
@@ -2030,8 +2038,16 @@ adminProductsRoutes.post('/', async (c) => {
     if (v2Outcome) {
       const outcome = v2BatchOutcome(e);
       if (outcome === 'already') {
+        const cleared = prev !== null && canWriteCost(c.env, admin) && (await clearEstimateOnOwnerSave(c.env.DB, doc.id, admin.id, new Date()));
         const current = await reloadForVerification(c.env.DB, doc.id);
-        return c.json({ success: true, already: true, created: false, product: current ? projectForAdmin(c.env, admin, current.document) : null });
+        if (cleared) c.set('catalogueSlug', doc.slug);
+        return c.json({
+          success: true,
+          already: true,
+          created: false,
+          product: current ? projectForAdmin(c.env, admin, current.document) : null,
+          ...(cleared ? { price_estimate: { label: false, state: 'confirmed' } } : {}),
+        });
       }
       if (outcome) throw outcome;
       const refusal = engineDbRefusal(e);
