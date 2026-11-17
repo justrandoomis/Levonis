@@ -34,6 +34,7 @@
  * and is REPORTED as such — never answered with a success that did nothing.
  */
 
+import { isDemoId } from '../../packages/contracts/src/demoData';
 import type { Env } from './types';
 import { safeParse } from './types';
 import { newId } from './crypto';
@@ -149,6 +150,9 @@ export async function storeTakesOrders(
   // shopfront pays one tier read instead of two (P2a).
   ownerTier?: TierStatus
 ): Promise<StoreSellingVerdict> {
+  // A community DEMO shop (worker/lib/communityDemo.ts) sells nothing, ever:
+  // its products are for looking at; the cart and the checkout both ask here.
+  if (isDemoId(ctx.store.id) || isDemoId(ctx.merchant.id)) return { ok: false, reason: 'not_selling_products' };
   if (ctx.merchant.status !== 'active') {
     return { ok: false, reason: ctx.merchant.status === 'suspended' ? 'merchant_suspended' : 'merchant_restricted' };
   }

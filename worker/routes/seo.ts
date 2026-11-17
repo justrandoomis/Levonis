@@ -25,6 +25,7 @@
  * argument the manifest route makes about installability, with a sharper edge:
  * getting this wrong de-indexes the shop.
  */
+import { notDemoSql } from '../lib/communityDemo';
 import { listing } from '../lib/listing';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -296,6 +297,7 @@ export async function sitemapRoute(c: Context<AppContext>): Promise<Response> {
            JOIN community_merchants m ON m.id = s.merchant_id
           WHERE s.slug = ? AND p.lifecycle = 'active' AND p.status = 'active' AND p.slug <> ''
             AND ${storePublicSql('s')} AND ${merchantPublicSql('m')}
+            AND ${notDemoSql('s.id')} AND ${notDemoSql('p.id')}
           ORDER BY p.updated_at DESC
           LIMIT ${MAX_SITEMAP_URLS}`
       )

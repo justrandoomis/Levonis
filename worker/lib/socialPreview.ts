@@ -374,7 +374,7 @@ export async function resolveProductPreview(
              JOIN community_merchants m ON m.id = s.merchant_id
             WHERE p.slug = ?1 AND p.status = 'active' AND p.lifecycle = 'active'
               AND (s.slug = ?2 OR (?3 = 1 AND (s.id = ?2 OR s.merchant_id = ?2)))
-              AND ${storePublicSql('s')} AND ${merchantPublicSql('m', schema)}`
+              AND ${storePublicSql('s')} AND ${merchantPublicSql('m', schema)} AND ${notDemoSql('s.id')}`
         )
         .bind(slug, storeKey, scope.storeSlug ? 0 : 1)
         .first<PreviewRow>()
@@ -410,7 +410,7 @@ export async function resolveProductPreview(
              JOIN community_merchants m ON m.id = p.merchant_id
              JOIN merchant_stores s ON s.id = p.store_id
             WHERE p.slug = ? AND p.status = 'active' AND p.lifecycle = 'active'
-              AND ${merchantPublicSql('m', schema)} AND ${storePublicSql('s')}`
+              AND ${merchantPublicSql('m', schema)} AND ${storePublicSql('s')} AND ${notDemoSql('s.id')}`
         )
         .bind(slug)
         .first<PreviewRow>()

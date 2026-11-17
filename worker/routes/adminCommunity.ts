@@ -65,7 +65,7 @@ import { COMPLAINT_AWAITS_DESK_SQL } from './adminChats';
 import { requireFinancialScope } from '../lib/walletAdjust';
 import { canHandleDisputes, requireDisputeHandler } from '../lib/staffCapabilities';
 import { canMoveMoney } from '../lib/adminScope';
-import { rootDomainFrom } from '../lib/hosts';
+import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift } from '../lib/storeOrderOps';
 import { merchantUnsanctionedSql } from '../lib/merchantApproval';
 import { enqueueMatchStatement, rematchAfterResponse } from '../lib/printMatchingStore';
@@ -85,11 +85,12 @@ import { publicEstimate } from '../lib/requestRevisions';
 import { isMissingSchema } from '../lib/merchantApproval';
 import {
   DEMO_PRESENT_SQL,
-  communityStoreUrl,
   demoCounts,
   demoPresent,
   demoRemovalBlockers,
   demoRemovalStatements,
+  buildDemoPlan,
+  demoImagePool,
   demoSeedStatements,
   demoTotal,
   realRequestsWithDemoOffers,
@@ -549,7 +550,9 @@ adminCommunityRoutes.post('/demo/seed', requireFinancialScope, async (c) => {
     return c.json({ success: true, created: false, already_present: true, counts: await demoCounts(c.env.DB) });
   }
   try {
-    await c.env.DB.batch(demoSeedStatements(c.env.DB));
+    // The pictures are the catalogue's own published product photos, by reference (worker/lib/communityDemo.ts).
+    const plan = buildDemoPlan({ nowMs: Date.now(), images: await demoImagePool(c.env.DB), adminId: admin.id });
+    await c.env.DB.batch(demoSeedStatements(c.env.DB, plan));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     // The batch's own guard: the gate opened between the read above and the write.
@@ -635,7 +638,7 @@ adminCommunityRoutes.get('/merchants', async (c) => {
     success: true,
     merchants: results.map((m) => ({
       ...m,
-      store_url: m.store_slug ? communityStoreUrl(String(m.store_slug), root, String(m.store_id)) : null,
+      store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
     })),
   });
 });

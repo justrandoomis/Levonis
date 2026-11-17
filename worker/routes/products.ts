@@ -10,6 +10,7 @@
  * is always recomputed at checkout.
  */
 
+import { notDemoSql } from '../lib/communityDemo';
 import {
   listing as listingOf,
   optimisticSellable,
@@ -5727,7 +5728,8 @@ async function productDetail(c: Context<AppContext>): Promise<Response> {
          JOIN community_merchants cm ON cm.id = cp.merchant_id
          JOIN merchant_stores s ON s.id = cp.store_id
         WHERE cp.slug = ? AND cp.status = 'active' AND cp.lifecycle = 'active'
-          AND ${merchantPublicSql('cm', schema)} AND ${storePublicSql('s')}`
+          AND ${merchantPublicSql('cm', schema)} AND ${storePublicSql('s')}
+          AND ${notDemoSql('cp.id')} AND ${notDemoSql('s.id')}`
     )
       .bind(slug)
       .first<Record<string, unknown>>()

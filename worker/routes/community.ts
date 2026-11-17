@@ -1,12 +1,12 @@
 import { Hono } from 'hono';
-import { communityStoreUrl, demoIdSql } from '../lib/communityDemo';
+import { demoIdSql } from '../lib/communityDemo';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, notFound, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { membershipBadges } from '../lib/entitlements';
-import { rootDomainFrom } from '../lib/hosts';
+import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
 import { requestBoardFilterSql, requestBoardVisible } from '../lib/requestBoard';
 import { governorateParam, optionalOneOf } from '../lib/listParams';
@@ -135,7 +135,7 @@ export function communityFeedProduct(p: Record<string, unknown>, root: string | 
       slug: storeSlug,
       name: p.s_name ?? '',
       logoUrl: fileUrl(p.s_logo_key),
-      url: communityStoreUrl(storeSlug, root, storeId),
+      url: storeUrl(storeSlug, root, storeId),
       /** «مزوّد معتمد» (C4), read as `COMMUNITY_FEED_COLUMNS` selects it; a row read without it carries no mark. */
       approved_provider: Number(p.m_approved_provider ?? 0) === 1,
     },
@@ -340,7 +340,7 @@ export function directoryCard(m: Record<string, unknown>, badges: { pro: Set<str
     // itself says they are closed (C10).
     store_url:
       m.store_slug && storeIsPublic({ status: m.store_status }) && merchantIsPublic(m)
-        ? communityStoreUrl(String(m.store_slug), root, String(m.store_id))
+        ? storeUrl(String(m.store_slug), root, String(m.store_id))
         : null,
     store_name: hasStore ? String(m.store_name ?? '') : null,
     tagline: hasStore ? String(m.store_tagline ?? '') : '',
@@ -674,7 +674,7 @@ communityRoutes.get('/works', async (c) => {
         slug: w.store_slug,
         name: w.store_name,
         logoUrl: fileUrl(w.store_logo_key),
-        url: communityStoreUrl(String(w.store_slug), root, String(w.store_id)),
+        url: storeUrl(String(w.store_slug), root, String(w.store_id)),
       },
     })),
   });

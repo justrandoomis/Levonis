@@ -131,7 +131,7 @@ async function communityProducts(req: PublicRequest): Promise<PublicResult> {
   // The feed's own predicate (push 1.4: approved merchants' stores only); on a
   // database without 0204 the second try lists nothing (C11).
   const [rows, total] = await withApprovalSchema((schema) => {
-    const where = `${communityProductsVisible('?1', schema)} AND s.id IS NOT NULL`;
+    const where = `${communityProductsVisible('?1', schema)} AND s.id IS NOT NULL AND ${notDemoSql('s.id')}`;
     return Promise.all([
       db
         .prepare(

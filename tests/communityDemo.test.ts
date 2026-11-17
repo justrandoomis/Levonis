@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { DatabaseSync } from 'node:sqlite';
 import { Hono } from 'hono';
-import { APEX, approveMerchants, asD1, ctx, freshDb, get, json, post, put, stubApp, type StubUser } from './fixtures/app';
+import { APEX, approveMerchants, asD1, ctx, freshDb, get, json, memoryBucket, post, put, stubApp, type StubUser } from './fixtures/app';
 import { fetchPublished } from './fixtures/autoPublish';
 import { ROOT } from './fixtures/d1';
 import worker from '../worker/index';
@@ -32,7 +32,18 @@ import { communitySocialRoutes } from '../worker/routes/communitySocial';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { authRoutes } from '../worker/routes/auth';
 import { chatRoutes } from '../worker/routes/chats';
-import { DEMO_TABLES, demoId, demoSeedStatements, expectedDemoCounts } from '../worker/lib/communityDemo';
+import { storefrontRoutes } from '../worker/routes/storefront';
+import { cartRoutes } from '../worker/routes/cart';
+import { seedLiveCatalog } from './fixtures/liveCatalog';
+import { autoPublishV2 } from './fixtures/autoPublish';
+import { storeById } from '../worker/lib/merchantAuth';
+import { storeTakesOrders } from '../worker/lib/storeOrderOps';
+import { normalizeLayout } from '../packages/storeLayout/src/normalize';
+import { THEME_NAMES, TOKEN_VALUES } from '../packages/storeLayout/src/tokens';
+import { DEMO_TABLES, buildDemoPlan, demoId, demoSeedStatements, type DemoImage } from '../worker/lib/communityDemo';
+
+/** The set one press writes for the admin `boss`, with the pictures the catalogue offers. */
+const expectedDemoCounts = (images: DemoImage[] = []) => buildDemoPlan({ nowMs: Date.now(), images, adminId: 'boss' }).counts;
 import { createSession } from '../worker/lib/session';
 import { emailAllowsRecipient } from '../worker/lib/emailSend';
 import { loadCandidates, matchRequest } from '../worker/lib/printMatchingStore';
@@ -151,10 +162,16 @@ test('one press writes the whole fixed set, a second press writes nothing, and n
   assert.equal(body.created, true);
   assert.deepEqual(body.counts, expectedDemoCounts());
   const expected = expectedDemoCounts();
-  assert.equal(expected.users, 10);
-  assert.equal(expected.merchant_stores, 3);
-  assert.equal(expected.community_posts, 15);
-  assert.equal(expected.community_requests, 6);
+  assert.equal(expected.users, 40);
+  assert.equal(expected.merchant_stores, 15);
+  assert.equal(expected.community_posts, 120);
+  assert.equal(expected.community_requests, 30);
+  assert.ok(expected.community_offers >= 30 && expected.community_offers <= 120);
+  assert.equal(expected.store_layout_revisions, 15);
+  assert.equal(expected.community_products, 75);
+  assert.ok(expected.merchant_reviews >= 60);
+  assert.ok(expected.community_comments > 300, `${expected.community_comments} comments`);
+  assert.ok(expected.community_likes > 900, `${expected.community_likes} likes`);
   assert.ok(expected.community_offers >= 4 && expected.community_likes > 10 && expected.community_comments >= 10);
 
   // Every id-bearing row is demo-prefixed; every join row names a demo row.
@@ -163,7 +180,10 @@ test('one press writes the whole fixed set, a second press writes nothing, and n
   }
   assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_likes WHERE substr(user_id,1,5) = 'demo_' AND substr(post_id,1,5) <> 'demo_'"), 0, 'demo users like demo posts only');
   assert.equal(n(raw, "SELECT COUNT(*) AS n FROM user_follows WHERE substr(follower_id,1,5) = 'demo_' AND substr(user_id,1,5) <> 'demo_'"), 0);
-  assert.deepEqual(money(), quiet, 'no product, order, escrow, wallet, ledger, chat, notification, outbox or session');
+  const after = money();
+  assert.equal(after.products, quiet.products + expected.community_products, 'only the demo shelves');
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_products WHERE substr(id,1,5) <> 'demo_'"), quiet.products);
+  assert.deepEqual({ ...after, products: 0 }, { ...quiet, products: 0 }, 'no order, escrow, wallet, ledger, chat, notification, outbox or session');
   assert.deepEqual(realSnapshot(raw), before, 'the seed moves no real counter');
 
   // Offers: pending only, a fee on some and pickup on others; the board's count matches.
@@ -211,7 +231,7 @@ test('a demo account cannot be signed in to, by any door, and is never mailed', 
   const raw = seed();
   await seedDemo(raw);
   const users = raw.prepare("SELECT id, email, password_hash, google_sub, phone_e164, username FROM users WHERE substr(id,1,5) = 'demo_'").all() as Array<Record<string, string | null>>;
-  assert.equal(users.length, 10);
+  assert.equal(users.length, 40);
   for (const u of users) {
     assert.equal(u.password_hash, null);
     assert.equal(u.google_sub, null);
@@ -247,20 +267,20 @@ test('the demo set fills the closed community the admin walks through', async ()
   const admin = as(raw, OWNER);
   const posts = await json(await get(admin, '/api/community/posts?limit=48'));
   const ids = (posts.posts as Array<{ id: string }>).map((p) => p.id);
-  assert.equal(ids.filter(isDemoId).length, 15, JSON.stringify(posts).slice(0, 300));
-  assert.ok(ids.includes('rp1'));
+  assert.ok(ids.filter(isDemoId).length >= 45, JSON.stringify(posts).slice(0, 300));
+  assert.ok(Number(posts.total ?? 0) === 0 || Number(posts.total) >= 121, `total ${posts.total}`);
   const creator = await get(admin, '/api/community/creators/demo_noor_prints');
   assert.equal(creator.status, 200);
   const c = (await json(creator)).creator;
   assert.ok(c.store, 'the maker page shows the demo workshop');
   assert.ok(Number(c.stats.followers) > 0);
   const merchants = await json(await get(admin, '/api/community/merchants'));
-  assert.equal((merchants.merchants as Array<{ id: string }>).filter((m) => isDemoId(m.id)).length, 3);
+  assert.ok((merchants.merchants as Array<{ id: string }>).filter((m) => isDemoId(m.id)).length >= 15);
   const store = await get(admin, `/api/community/store/${demoId('mch', 1)}`);
   assert.equal(store.status, 200);
   assert.ok((await json(store)).workshop, 'the workshop facts read from the demo printers');
   const board = await json(await get(admin, '/api/marketplace/requests?limit=24'));
-  assert.equal((board.requests as Array<{ id: string }>).filter((r) => isDemoId(r.id)).length, 6);
+  assert.ok((board.requests as Array<{ id: string }>).filter((r) => isDemoId(r.id)).length >= 20);
   const adminReq = await json(await get(admin, `/api/admin/community/requests/${demoId('req', 1)}`));
   assert.equal((adminReq.offers as unknown[]).length, 2, 'the owner sees the demo offers as admin');
   // A guest outside the list still meets the wall.
@@ -297,8 +317,14 @@ test('removal deletes exactly the demo rows and the interactions with them, and 
   assert.equal(removed.users, expected.users);
   assert.equal(removed.community_posts, expected.community_posts);
   assert.equal(removed.community_requests, expected.community_requests);
-  assert.equal(removed.community_merchants, 3);
-  assert.equal(removed.merchant_stores, 3);
+  assert.equal(removed.community_merchants, 15);
+  assert.equal(removed.merchant_stores, 15);
+  assert.equal(removed.community_products, expected.community_products);
+  assert.equal(removed.merchant_reviews, expected.merchant_reviews);
+  assert.equal(removed.store_layout_revisions, 15);
+  assert.equal(removed.store_layout_drafts, 15);
+  assert.equal(removed.merchant_store_sections, expected.merchant_store_sections);
+  assert.equal(removed.merchant_services, expected.merchant_services);
   assert.equal(removed.community_likes, expected.community_likes + 1, 'the real tester\'s like went with the demo post');
   assert.equal(removed.community_comments, expected.community_comments + 1);
   assert.equal(removed.user_follows, expected.user_follows + 1);
@@ -333,7 +359,7 @@ test('a trade record naming a demo row stops the removal, which then deletes not
   const body = await json(res);
   assert.equal(body.code, 'DEMO_REMOVE_BLOCKED');
   assert.equal(body.details.blockers.wallet_transactions, 1);
-  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM users WHERE substr(id,1,5) = 'demo_'"), 10);
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM users WHERE substr(id,1,5) = 'demo_'"), 40);
 });
 
 test('a direct chat a real tester opened with a demo maker goes whole with the removal', async () => {
@@ -358,16 +384,20 @@ test('a direct chat a real tester opened with a demo maker goes whole with the r
   assert.deepEqual((await json(await get(tester, '/api/chats'))).chats, []);
 });
 
-test('inside the community a demo shop links to its in-site page, which answers by merchant id, store id and slug', async () => {
+test('a demo shop links to its own address like a real store, and the in-site page answers by merchant id, store id and slug', async () => {
   const raw = seed();
   await seedDemo(raw);
   const admin = stubApp(asD1(raw), OWNER, mount as never, { env: { STORE_ROOT_DOMAIN: APEX } });
   const merchants = (await json(await get(admin, '/api/community/merchants'))).merchants as Array<{ id: string; store_url: string | null }>;
   const shop = merchants.find((m) => m.id === demoId('mch', 1))!;
-  assert.equal(shop.store_url, `/community/store/${demoId('str', 1)}`, 'never the subdomain the storefront refuses');
+  assert.equal(shop.store_url, `https://demo-noor-prints.${APEX}`, 'its own address, as a real store');
   assert.match(String(merchants.find((m) => m.id === 'm1')?.store_url), /^https:\/\/realshop\./, 'a real shop keeps its own address');
   const posts = (await json(await get(admin, '/api/community/posts?limit=48'))).posts as Array<{ id: string; store: { url: string } | null }>;
-  assert.equal(posts.find((p) => p.id === demoId('prj', 1))?.store?.url, `/community/store/${demoId('str', 1)}`);
+  const tagged = posts.filter((p) => isDemoId(p.id) && p.store);
+  assert.ok(tagged.length > 10);
+  for (const p of tagged) assert.match(String(p.store!.url), new RegExp(`^https://demo-[a-z0-9-]+\\.${APEX.replace('.', '\\.')}$`));
+  // Different shops, different addresses: a click lands on that shop's own page.
+  assert.ok(new Set(tagged.map((p) => p.store!.url)).size >= 10);
   for (const ref of [demoId('mch', 1), demoId('str', 1), 'demo-noor-prints']) {
     const page = await get(admin, `/api/community/store/${ref}`);
     assert.equal(page.status, 200, ref);
@@ -381,7 +411,7 @@ test('the seed batch writes nothing if the gate opened after the route read it',
   const raw = seed();
   openGate(raw);
   const db = asD1(raw);
-  await assert.rejects(db.batch(demoSeedStatements(db)), /NOT NULL/);
+  await assert.rejects(db.batch(demoSeedStatements(db, buildDemoPlan({ nowMs: Date.now(), images: [], adminId: 'boss' }))), /NOT NULL/);
   assert.equal(n(raw, "SELECT COUNT(*) AS n FROM users WHERE substr(id,1,5) = 'demo_'"), 0);
   assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_posts WHERE substr(id,1,5) = 'demo_'"), 0);
 });
@@ -399,6 +429,221 @@ test('no money is recorded on a demo merchant or account, and the matcher never 
   assert.equal(n(raw, 'SELECT COUNT(*) AS n FROM merchant_payouts'), 0);
   assert.deepEqual(await loadCandidates(asD1(raw) as never, [demoId('mch', 1)]), []);
   assert.equal((await post(owner, '/api/admin/community/demo/remove', {})).status, 200, 'the removal is never blocked by a refused write');
+});
+
+
+// ------------------------------------------------------------------ round 2: pictures, stores, products, scale
+
+/** A catalogue whose published products carry their own photographs (`product_images`), in the public bucket. */
+async function withCatalogPictures(raw: DatabaseSync) {
+  seedLiveCatalog(raw);
+  await autoPublishV2(asD1(raw));
+  const products = raw.prepare("SELECT id FROM products WHERE status = 'active' ORDER BY id").all() as Array<{ id: string }>;
+  const bucket = memoryBucket();
+  const keys: string[] = [];
+  products.slice(0, 12).forEach((p, i) => {
+    for (let k = 0; k < 2; k += 1) {
+      const key = `products/${p.id}/gallery/${(i * 2 + k).toString(16).padStart(64, 'a')}.webp`;
+      keys.push(key);
+      raw.prepare('INSERT INTO product_images (id, product_id, url, sort_order, is_primary, width, height, content_type) VALUES (?, ?, ?, ?, ?, 1200, 1200, ?)')
+        .run(`pimg_${i}_${k}`, p.id, `/files/${key}`, k, k === 0 ? 1 : 0, 'image/webp');
+      void bucket.put(key, new Uint8Array([0x52, 0x49, 0x46, 0x46]), { httpMetadata: { contentType: 'image/webp' } });
+    }
+  });
+  return { keys, bucket };
+}
+
+const storefrontMount = (a: Hono<AppContext>) => {
+  mount(a);
+  a.route('/api/storefront', storefrontRoutes);
+  a.route('/api/cart', cartRoutes);
+};
+const allowList = (raw: DatabaseSync, ids: string[]) =>
+  raw.exec(`INSERT OR REPLACE INTO admin_settings (key,value) VALUES ('communityGate','${JSON.stringify({ open: false, allowed_user_ids: ids })}')`);
+
+test('pictures: every post, avatar, logo, banner, showcase piece and product reuses a published catalogue photo by reference, and the removal deletes no photo', async () => {
+  const raw = seed();
+  const { keys } = await withCatalogPictures(raw);
+  const res = await seedDemo(raw);
+  assert.equal(res.status, 201, JSON.stringify(await res.clone().json()));
+  const known = new Set(keys);
+  const posts = raw.prepare("SELECT id FROM community_posts WHERE substr(id,1,5) = 'demo_' ORDER BY id").all() as Array<{ id: string }>;
+  assert.equal(posts.length, 120);
+  let previous = '';
+  for (const p of posts) {
+    const media = raw.prepare('SELECT media_key FROM community_post_media WHERE post_id = ? ORDER BY sort_order').all(p.id) as Array<{ media_key: string }>;
+    assert.ok(media.length >= 1, `${p.id} has a cover`);
+    for (const m of media) assert.ok(known.has(m.media_key), `${m.media_key} is a catalogue photo`);
+    assert.notEqual(media[0].media_key, previous, 'neighbours never share a cover');
+    previous = media[0].media_key;
+  }
+  assert.ok(n(raw, "SELECT COUNT(*) AS n FROM community_post_media WHERE substr(post_id,1,5) = 'demo_'") > 180, 'galleries of several pictures');
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM users WHERE substr(id,1,5) = 'demo_' AND avatar_key IS NULL"), 0, 'every account has an avatar');
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM merchant_stores WHERE substr(id,1,5) = 'demo_' AND (logo_key IS NULL OR banner_key IS NULL)"), 0);
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM merchant_showcase WHERE substr(id,1,5) = 'demo_' AND image_key IS NULL"), 0);
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_products WHERE substr(id,1,5) = 'demo_' AND images = '[]'"), 0);
+  // The cards read them through the same /files/ address real posts use.
+  const feed = await json(await get(as(raw, OWNER), '/api/community/posts?limit=12'));
+  const covers = (feed.posts as Array<{ id: string; cover: { url: string } | null }>).filter((p) => isDemoId(p.id)).map((p) => p.cover?.url);
+  assert.ok(covers.length > 5 && covers.every((u) => typeof u === 'string' && u.startsWith('/files/products/')));
+  const page = await json(await get(as(raw, OWNER), `/api/community/posts/${demoId('prj', 5)}`));
+  assert.ok(JSON.stringify(page).includes('/files/products/'), 'the project page shows its gallery');
+
+  // The removal takes the pointers and nothing else.
+  const photos = n(raw, 'SELECT COUNT(*) AS n FROM product_images');
+  assert.equal((await post(as(raw, OWNER), '/api/admin/community/demo/remove', {})).status, 200);
+  assert.equal(n(raw, 'SELECT COUNT(*) AS n FROM product_images'), photos, 'every catalogue photo row stays');
+  assert.equal(n(raw, 'SELECT COUNT(*) AS n FROM media_cleanup_jobs'), 0, 'no object is queued for deletion');
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_post_media WHERE substr(post_id,1,5) = 'demo_'"), 0);
+});
+
+test('without catalogue photos the seed still writes the whole set, with no picture rows', async () => {
+  const raw = seed();
+  assert.equal((await seedDemo(raw)).status, 201);
+  assert.equal(n(raw, 'SELECT COUNT(*) AS n FROM community_post_media'), 0);
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_posts WHERE substr(id,1,5) = 'demo_'"), 120);
+});
+
+test('every workshop page is a store-builder layout that passes the builder\'s own validation, and together they use every theme and option', async () => {
+  const raw = seed();
+  assert.equal((await seedDemo(raw)).status, 201);
+  const rows = raw.prepare(
+    `SELECT s.id, s.user_id, s.published_revision_id, r.layout_json FROM merchant_stores s JOIN store_layout_revisions r ON r.id = s.published_revision_id
+      WHERE substr(s.id,1,5) = 'demo_'`
+  ).all() as Array<{ id: string; user_id: string; layout_json: string }>;
+  assert.equal(rows.length, 15, 'every demo store publishes its layout');
+  const seen: Record<string, Set<string>> = {};
+  const mark = (k: string, v: unknown) => (seen[k] ??= new Set()).add(String(v));
+  for (const r of rows) {
+    const checked = normalizeLayout(JSON.parse(r.layout_json), { ownerUserId: r.user_id });
+    assert.ok(checked.ok, `${r.id}: ${JSON.stringify(checked.issues)}`);
+    assert.deepEqual(checked.issues, [], r.id);
+    const l = checked.layout;
+    mark('theme', l.theme);
+    mark('header', l.header.variant);
+    mark('footer', l.footer.variant);
+    for (const [k, v] of Object.entries(l.tokens)) mark(k, v);
+    for (const b of l.blocks) mark(`block`, b.type);
+    mark('hero', l.blocks.find((b) => b.type === 'hero')?.variant);
+  }
+  assert.deepEqual([...seen.theme].sort(), [...THEME_NAMES].sort());
+  for (const [k, values] of Object.entries(TOKEN_VALUES)) assert.deepEqual([...seen[k]].sort(), values.map(String).sort(), `token ${k}`);
+  assert.equal(seen.header.size, 3);
+  assert.equal(seen.footer.size, 3);
+  assert.equal(seen.hero.size, 4);
+  for (const t of ['faq', 'text', 'cta', 'reviews', 'services', 'showcase', 'printers', 'stats', 'contact']) assert.ok(seen.block.has(t), `block ${t}`);
+  assert.equal(new Set(raw.prepare("SELECT accent FROM merchant_stores WHERE substr(id,1,5) = 'demo_'").all().map((x) => (x as { accent: string }).accent)).size, 7);
+});
+
+test('a demo storefront opens at its own address for the people who may enter the community, and for nobody else', async () => {
+  const raw = seed();
+  raw.exec("INSERT INTO users (id,name,email,password_hash,role) VALUES ('tester','Tester','tester@x.co','h','customer')");
+  assert.equal((await seedDemo(raw)).status, 201);
+  allowList(raw, ['tester']);
+  const TESTER: StubUser = { id: 'tester', role: 'customer', email: 'tester@x.co' };
+  const app = (user: StubUser | null, host?: string) => stubApp(asD1(raw), user, storefrontMount as never, { host, env: { STORE_ROOT_DOMAIN: APEX } });
+  for (const viewer of [OWNER, TESTER]) {
+    const bySlug = await get(app(viewer), '/api/storefront/demo-noor-prints');
+    assert.equal(bySlug.status, 200, `${viewer.id} by slug`);
+    assert.match(String(bySlug.headers.get('x-robots-tag')), /noindex/);
+    const store = (await json(bySlug)).store;
+    assert.equal(store.name, 'ورشة نور للطباعة');
+    assert.equal(store.url, `https://demo-noor-prints.${APEX}`);
+    assert.ok(store.logoUrl === null || String(store.logoUrl).startsWith('/files/'));
+    assert.equal((await get(app(viewer), `/api/storefront/by-id/${demoId('str', 2)}`)).status, 200, `${viewer.id} by id`);
+    const resolved = await get(app(viewer, `demo-karwan-3d.${APEX}`), '/api/storefront/resolve');
+    assert.equal(resolved.status, 200, `${viewer.id} on the subdomain`);
+    assert.equal((await json(resolved)).store.name, 'کارگەی کاروان');
+    const products = await json(await get(app(viewer), '/api/storefront/demo-noor-prints/products'));
+    assert.ok((products.products as unknown[]).length >= 5, 'its shelf');
+    const reviews = await json(await get(app(viewer), '/api/storefront/demo-noor-prints/reviews'));
+    assert.ok(Number(reviews.count ?? (reviews.reviews as unknown[]).length) >= 4, 'its reviews');
+  }
+  // Two shops, two different pages.
+  const a = (await json(await get(app(OWNER), '/api/storefront/demo-noor-prints'))).store;
+  const b = (await json(await get(app(OWNER), '/api/storefront/demo-karwan-3d'))).store;
+  assert.notEqual(a.name, b.name);
+  assert.notEqual(JSON.stringify(a.layout?.tokens ?? a.theme), JSON.stringify(b.layout?.tokens ?? b.theme));
+  // Everyone else meets the hidden store's one answer, on every door.
+  for (const viewer of [null, CUSTOMER]) {
+    for (const res of [
+      await get(app(viewer), '/api/storefront/demo-noor-prints'),
+      await get(app(viewer), `/api/storefront/by-id/${demoId('str', 1)}`),
+      await get(app(viewer, `demo-noor-prints.${APEX}`), '/api/storefront/resolve'),
+      await get(app(viewer), '/api/storefront/demo-noor-prints/products'),
+    ]) {
+      assert.equal(res.status, 404, `${viewer?.id ?? 'guest'}`);
+      assert.equal((await json(res)).code, 'STORE_UNAVAILABLE');
+    }
+  }
+});
+
+test('a demo product can be looked at but never bought, and never reaches the catalogue', async () => {
+  const raw = seed();
+  raw.exec("INSERT INTO users (id,name,email,password_hash,role) VALUES ('tester','Tester','tester@x.co','h','customer')");
+  assert.equal((await seedDemo(raw)).status, 201);
+  allowList(raw, ['tester']);
+  const TESTER: StubUser = { id: 'tester', role: 'customer', email: 'tester@x.co' };
+  const tester = stubApp(asD1(raw), TESTER, storefrontMount as never);
+  const added = await post(tester, '/api/cart/merchant-items', { productId: demoId('prd', 1), qty: 1 });
+  assert.ok(added.status >= 400, `add to cart: ${added.status}`);
+  assert.equal((await json(added)).code, 'STORE_CLOSED');
+  assert.equal(n(raw, 'SELECT COUNT(*) AS n FROM cart_items'), 0);
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_products WHERE substr(id,1,5) = 'demo_' AND (sku <> '' OR audience_user_id IS NOT NULL)"), 0);
+  // The store rule the cart and the checkout share says no, whatever the store row says.
+  const ctx = await storeById(asD1(raw) as never, demoId('str', 1));
+  assert.equal((await storeTakesOrders(asD1(raw) as never, ctx!)).ok, false);
+});
+
+test('the seed binds at most 100 parameters per statement, in one batch of a safe size', async () => {
+  const raw = seed();
+  const db = asD1(raw);
+  let statements = 0;
+  let widest = 0;
+  const watched = {
+    ...db,
+    prepare: (sql: string) => {
+      const stmt = db.prepare(sql);
+      return Object.assign(Object.create(Object.getPrototypeOf(stmt)), stmt, {
+        bind: (...args: unknown[]) => {
+          widest = Math.max(widest, args.length);
+          return stmt.bind(...args);
+        },
+      });
+    },
+  };
+  const all = demoSeedStatements(watched as never, buildDemoPlan({ nowMs: Date.now(), images: Array.from({ length: 40 }, (_, i) => ({ key: `products/p${i}/gallery/${String(i).padStart(64, 'b')}.webp`, width: 800, height: 800 })), adminId: 'boss' }));
+  statements = all.length;
+  assert.ok(widest <= 100, `widest statement binds ${widest}`);
+  assert.ok(statements < 400, `${statements} statements in the batch`);
+  await db.batch(all);
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_posts WHERE substr(id,1,5) = 'demo_'"), 120);
+});
+
+test('the removal also takes the first, smaller demo set that live still holds', async () => {
+  const raw = seed();
+  // The round-1 seed's shape: the same `demo_<tag>_` ids, a few of each.
+  raw.exec(`
+    INSERT INTO users (id,email,username,name,creator_public) VALUES
+      ('${demoId('usr', 1)}','demo+1@demo.levonis.invalid','demo_noor_prints','نور',1),
+      ('${demoId('usr', 7)}','demo+7@demo.levonis.invalid','demo_zainab_k','زينب',0);
+    INSERT INTO community_merchants (id,user_id,name,approved_at) VALUES ('${demoId('mch', 1)}','${demoId('usr', 1)}','ورشة نور','2026-11-01T00:00:00.000Z');
+    INSERT INTO merchant_stores (id,merchant_id,user_id,slug,name) VALUES ('${demoId('str', 1)}','${demoId('mch', 1)}','${demoId('usr', 1)}','demo-noor-prints','ورشة نور');
+    INSERT INTO merchant_printers (id,merchant_id,store_id,name) VALUES ('${demoId('prn', 1)}','${demoId('mch', 1)}','${demoId('str', 1)}','P1S');
+    INSERT INTO merchant_request_prefs (merchant_id) VALUES ('${demoId('mch', 1)}');
+    INSERT INTO community_posts (id,author_id,kind,title,state,visibility,published_at,store_id) VALUES ('${demoId('prj', 1)}','${demoId('usr', 1)}','project','x','published','public','2026-11-01T00:00:00.000Z','${demoId('str', 1)}');
+    INSERT INTO community_comments (id,post_id,author_id,body) VALUES ('${demoId('cmt', 1)}','${demoId('prj', 1)}','${demoId('usr', 7)}','hi');
+    INSERT INTO community_likes (user_id,post_id) VALUES ('${demoId('usr', 7)}','${demoId('prj', 1)}');
+    INSERT INTO user_follows (follower_id,user_id) VALUES ('${demoId('usr', 7)}','${demoId('usr', 1)}');
+    INSERT INTO follows (user_id,merchant_id) VALUES ('${demoId('usr', 7)}','${demoId('mch', 1)}');
+    INSERT INTO community_requests (id,customer_id,title,state,status,visibility) VALUES ('${demoId('req', 1)}','${demoId('usr', 7)}','r','receiving_offers','open','public');
+    INSERT INTO community_offers (id,request_id,merchant_id,store_id,price_iqd,state) VALUES ('${demoId('off', 1)}','${demoId('req', 1)}','${demoId('mch', 1)}','${demoId('str', 1)}',1000,'pending');
+  `);
+  const res = await post(as(raw, OWNER), '/api/admin/community/demo/remove', {});
+  assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
+  assert.equal((await json(await get(as(raw, OWNER), '/api/admin/community/demo'))).total, 0);
+  // …and the new set goes in after it.
+  assert.equal((await seedDemo(raw)).status, 201);
 });
 
 // ------------------------------------------------------------------ outside the wall

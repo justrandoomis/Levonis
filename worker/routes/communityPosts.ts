@@ -27,7 +27,6 @@
  * Everything sits inside Levo Community's maintenance wall (communityGate),
  * exactly like the feeds beside it.
  */
-import { communityStoreUrl } from '../lib/communityDemo';
 import { listing } from '../lib/listing';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
@@ -38,7 +37,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { notify } from '../lib/notifications';
-import { rootDomainFrom } from '../lib/hosts';
+import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { feedCursor } from '../lib/feedCursor';
 import { optionalOneOf } from '../lib/listParams';
 import {
@@ -117,7 +116,7 @@ export function postCard(p: Record<string, unknown>, root: string | null) {
     media_count: Number(p.media_count ?? 0),
     author: authorPublic(p),
     store: storeOk
-      ? { id: String(p.store_id), slug: String(p.s_slug ?? ''), name: String(p.s_name ?? ''), logoUrl: fileUrl(p.s_logo), url: communityStoreUrl(String(p.s_slug ?? ''), root, String(p.store_id)) }
+      ? { id: String(p.store_id), slug: String(p.s_slug ?? ''), name: String(p.s_name ?? ''), logoUrl: fileUrl(p.s_logo), url: storeUrl(String(p.s_slug ?? ''), root, String(p.store_id)) }
       : null,
     product: productOk
       ? {

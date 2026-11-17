@@ -36,7 +36,11 @@ import { safeParse } from '../lib/types';
 import { HttpError, notFound, int, str, oneOf } from '../lib/http';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
-import { storeBySlug, storeById, storeHiddenFromPublic, type StoreContext } from '../lib/merchantAuth';
+import { communityMayEnter, readCommunityGate } from '../lib/communityGate';
+import { loadSessionUser } from '../lib/session';
+import { isDemoId } from '../../packages/contracts/src/demoData';
+import { storeBySlug, storeById, storeHiddenFromPublic, storeSanctioned, type StoreContext } from '../lib/merchantAuth';
+import { merchantApproved } from '../lib/merchantApproval';
 import { publicStoreUnavailable } from '../lib/merchantApproval';
 import { approvedProvider } from '../lib/merchantOps';
 import { storeTakesOrders } from '../lib/storeOrderOps';
@@ -308,7 +312,33 @@ async function storeForRetiredSlug(db: D1Database, slug: string): Promise<StoreC
  * any cached call keep working), and never a sanctioned one.
  */
 async function servableStore(c: Context<AppContext>, rawSlug: string | undefined): Promise<StoreContext> {
-  return servableStoreBySlug(c.env.DB, str(rawSlug, 'slug', { min: 1, max: 64 }));
+  const ctx = await storeBySlugOrRetired(c.env.DB, str(rawSlug, 'slug', { min: 1, max: 64 }));
+  if (await hiddenFrom(c, ctx)) throw storeUnavailable();
+  return ctx;
+}
+
+/**
+ * THE COMMUNITY DEMO STORE'S ONE DOOR (worker/lib/communityDemo.ts). The public
+ * never sees a demo shop (`storeHiddenFromPublic`), but the people who may
+ * enter the closed community — the admins and the allow-listed testers — see
+ * it whole, through these same in-app storefront routes, so its page is its
+ * own page (logo, banner, accent, products, reviews), not a stand-in. A
+ * signed-in answer is never shared by the edge (`anonymousCached`), and a
+ * guest's is the refusal, which is never stored. The public API, the app
+ * manifest and the share card keep `storeHiddenFromPublic` as it is.
+ */
+async function hiddenFrom(c: Context<AppContext>, ctx: StoreContext): Promise<boolean> {
+  if (!storeHiddenFromPublic(ctx)) return false;
+  if (!isDemoId(ctx.store.id) || storeSanctioned(ctx) || !merchantApproved(ctx.merchant)) return true;
+  // This router answers session-free (worker/lib/session.ts `sessionFreePublicGet`):
+  // the viewer is read here, for a demo store only. A request with a session
+  // cookie is never stored by the edge (`anonymousCached`), and one without is
+  // refused below — a refusal is never stored either.
+  if (c.get('user') === undefined || c.get('user') === null) await loadSessionUser(c);
+  if (!communityMayEnter(await readCommunityGate(c.env.DB), c.get('user'))) return true;
+  // Shown to those who may enter — and never to an index.
+  c.header('X-Robots-Tag', 'noindex, nofollow');
+  return false;
 }
 
 /**
@@ -430,7 +460,7 @@ storefrontRoutes.get('/resolve', (c) => anonymousCached(c, {}, async () => {
     // which would make a typo silently look like the platform's own homepage.
     return c.json({ success: false, kind: 'merchant', system, store: null, error: 'No such store', root_domain }, 404);
   }
-  if (storeHiddenFromPublic(ctx)) return unavailable();
+  if (await hiddenFrom(c, ctx)) return unavailable();
   return c.json({
     success: true,
     kind: 'merchant',
@@ -863,6 +893,6 @@ storefrontRoutes.get('/by-id/:storeId', (c) => anonymousCached(c, {}, async () =
     if (row) ctx = await storeById(c.env.DB, row.id);
   }
   if (!ctx) throw notFound('Store not found');
-  if (storeHiddenFromPublic(ctx)) throw storeUnavailable();
+  if (await hiddenFrom(c, ctx)) throw storeUnavailable();
   return c.json({ success: true, store: await storefrontStore(c.env.DB, ctx, rootDomainFrom(c.env)) });
 }));
