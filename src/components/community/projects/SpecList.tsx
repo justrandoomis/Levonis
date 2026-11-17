@@ -19,7 +19,7 @@ export default function SpecList({ post: p }: { post: Post }) {
   if (printer) rows.push({ k: s.printer, v: p.printer.product ? <SpecLink to={p.printer.product.url}>{printer}</SpecLink> : printer });
   if (material) rows.push({ k: s.material, v: p.material.product ? <SpecLink to={p.material.product.url}>{material}</SpecLink> : material });
   if (p.color) rows.push({ k: s.color, v: p.color });
-  if (p.print_time_minutes) rows.push({ k: s.printTime, v: <span className="tabular-nums">{printTimeLabel(p.print_time_minutes, s)}</span> });
+  if (p.print_time_minutes) rows.push({ k: s.printTime, v: <span className="tabular-nums">{printTimeLabel(p.print_time_minutes, s, lang)}</span> });
   const size = dimensionsLabel(p.dimensions, s);
   if (size) rows.push({ k: s.size, v: <span dir="ltr" className="tabular-nums">{size}</span> });
   const st = p.print_settings;

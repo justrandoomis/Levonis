@@ -63,7 +63,7 @@ export default function ProjectGridCard({ post: p, eager = false, onPatch }: { p
         {p.print_time_minutes ? (
           <span className={`${BADGE} bottom-2 end-2 gap-1 px-2 py-0.5 text-[11px] font-medium tabular-nums`}>
             <Clock aria-hidden="true" className="h-3 w-3" />
-            {printTimeLabel(p.print_time_minutes, s)}
+            {printTimeLabel(p.print_time_minutes, s, lang)}
           </span>
         ) : null}
       </div>

@@ -25,7 +25,7 @@ export default function ProjectCard({
   variant?: 'rail' | 'grid';
   eager?: boolean;
 }) {
-  const { loc } = useLanguage();
+  const { loc, lang } = useLanguage();
   const s = useProjectStrings();
   const width = variant === 'rail' ? 'w-[148px] sm:w-[168px] shrink-0 snap-start' : 'min-w-0';
   const author = p.author.username ? creatorHref(p.author.username) : null;
@@ -51,7 +51,7 @@ export default function ProjectCard({
         {p.print_time_minutes ? (
           <span className="absolute bottom-2 end-2 inline-flex items-center gap-1 rounded-full bg-onyx/80 px-2 py-0.5 text-[11px] font-medium tabular-nums text-snow">
             <Clock aria-hidden="true" className="h-3 w-3" />
-            {printTimeLabel(p.print_time_minutes, s)}
+            {printTimeLabel(p.print_time_minutes, s, lang)}
           </span>
         ) : null}
       </div>

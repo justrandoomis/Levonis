@@ -23,6 +23,7 @@ import { TAB_IDS, TAB_PAGES, legacyTabTarget } from '../src/components/community
 import { HUB_STRINGS, colophon, projectsLabel, sectionNumber, workshopsLabel } from '../src/components/community/hub/strings';
 import {
   completedLabel,
+  durationLabel,
   followersLabel,
   offersLabel,
   productsLabel,
@@ -94,6 +95,28 @@ test('search is the server\'s: the term travels as `q`, and the page filters not
   const page = code('src/pages/Community.tsx');
   assert.doesNotMatch(page, /\.filter\([^)]*toLowerCase/, 'no client-side search over the loaded rows');
   assert.match(page, /params\.get\('q'\)/, 'the term lives in the URL');
+});
+
+test('a print time counts its Arabic nouns, never «6 ساعة»; English and Sorani keep the unit after the number', async () => {
+  const { printTimeLabel } = await import('../src/components/community/projects/strings');
+  const units = { hours: 'h', minutes: 'min' };
+  assert.equal(durationLabel(6 * 60, 'ar', units), '6 ساعات');
+  assert.equal(durationLabel(7 * 60, 'ar', units), '7 ساعات');
+  assert.equal(durationLabel(11 * 60, 'ar', units), '11 ساعة');
+  assert.equal(durationLabel(60, 'ar', units), 'ساعة');
+  assert.equal(durationLabel(120, 'ar', units), 'ساعتان');
+  assert.equal(durationLabel(6 * 60 + 20, 'ar', units), '6 ساعات و20 دقيقة');
+  assert.equal(durationLabel(8 * 60 + 5, 'ar', units), '8 ساعات و5 دقائق');
+  assert.equal(durationLabel(2, 'ar', units), 'دقيقتان');
+  assert.equal(durationLabel(6 * 60 + 20, 'en', units), '6 h 20 min');
+  assert.equal(durationLabel(40, 'en', units), '40 min');
+  const sorani = { hours: 'کاتژمێر', minutes: 'خولەک' };
+  assert.equal(durationLabel(6 * 60 + 20, 'ckb', sorani), '6 کاتژمێر 20 خولەک', 'a Sorani noun after a numeral stays singular');
+  // Every card and the spec list go through it with the reader's language.
+  assert.equal(printTimeLabel(7 * 60, { hours: 'ساعة', minutes: 'دقيقة' } as never, 'ar'), '7 ساعات');
+  for (const f of ['ProjectGridCard', 'ProjectCard', 'SpecList']) {
+    assert.match(read(`src/components/community/projects/${f}.tsx`), /printTimeLabel\(p\.print_time_minutes, s, lang\)/, f);
+  }
 });
 
 test('Arabic counts agree with their number; English and Sorani read naturally', () => {

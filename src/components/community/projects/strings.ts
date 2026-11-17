@@ -6,6 +6,7 @@
  * Arabic standing in. Counted nouns follow src/components/community/hub/copy.ts.
  */
 import { useLanguage } from '../../../LanguageContext';
+import { durationLabel, type HubLang } from '../hub/copy';
 import type { PostKind, PostState, PostVisibility } from './api';
 import type { FeedFrom, PostMaterialFamily, PostSort } from '../../../../packages/contracts/src/communityFilters';
 
@@ -481,13 +482,9 @@ export function useProjectStrings(): ProjectStrings {
   return (lang === 'en' ? STRINGS.en : lang === 'ckb' ? STRINGS.ckb : STRINGS.ar) as ProjectStrings;
 }
 
-/** «6 س 20 د» / «6h 20m» — a print time from minutes. */
-export function printTimeLabel(minutes: number, s: ProjectStrings): string {
-  const h = Math.floor(minutes / 60);
-  const m = minutes % 60;
-  if (h === 0) return `${m} ${s.minutes}`;
-  if (m === 0) return `${h} ${s.hours}`;
-  return `${h} ${s.hours} ${m} ${s.minutes}`;
+/** «6 ساعات و20 دقيقة» / «6 h 20 min» / «6 کاتژمێر 20 خولەک» — a print time from minutes, the Arabic nouns counted (hub/copy.ts). */
+export function printTimeLabel(minutes: number, s: ProjectStrings, lang: HubLang): string {
+  return durationLabel(minutes, lang, s);
 }
 
 /** «220 × 60 × 40 مم» from whichever axes were given. */

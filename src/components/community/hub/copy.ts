@@ -88,6 +88,45 @@ const STORES: Forms = {
   enN: 'stores',
 };
 
+const HOURS: Forms = {
+  one: 'ساعة',
+  two: 'ساعتان',
+  few: 'ساعات',
+  many: 'ساعة',
+  hundred: 'ساعة',
+  en1: 'h',
+  enN: 'h',
+};
+
+const MINUTES: Forms = {
+  one: 'دقيقة',
+  two: 'دقيقتان',
+  few: 'دقائق',
+  many: 'دقيقة',
+  hundred: 'دقيقة',
+  en1: 'min',
+  enN: 'min',
+};
+
+/**
+ * «6 ساعات و20 دقيقة», «ساعتان», «11 ساعة», «دقيقة»: a print time in Arabic
+ * counts its nouns like every other count here, never «6 ساعة». English and
+ * Sorani keep the plain unit after the number (`hours` / `minutes`): a Sorani
+ * noun after a numeral stays singular, «6 کاتژمێر 20 خولەک».
+ */
+export function durationLabel(minutes: number, lang: HubLang, units: { hours: string; minutes: string }): string {
+  const total = Math.max(0, Math.round(minutes));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (lang === 'ar') {
+    const parts = [h ? counted(h, HOURS, lang) : '', m || !h ? counted(m, MINUTES, lang) : ''].filter(Boolean);
+    return parts.join(' و');
+  }
+  if (h === 0) return `${m} ${units.minutes}`;
+  if (m === 0) return `${h} ${units.hours}`;
+  return `${h} ${units.hours} ${m} ${units.minutes}`;
+}
+
 export const resultsLabel = (n: number, lang: HubLang) => counted(n, RESULTS, lang);
 export const storesLabel = (n: number, lang: HubLang) => counted(n, STORES, lang);
 export const followersLabel = (n: number, lang: HubLang) => counted(n, FOLLOWERS, lang);
