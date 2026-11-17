@@ -1245,6 +1245,11 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Your cart holds items from more than one seller. Keep one seller’s items, then check out.',
     ckb: 'سەبەتەکەت بەرهەمی زیاتر لە فرۆشیارێکی تێدایە. تەنها بەرهەمەکانی یەک فرۆشیار بهێڵەرەوە و پاشان داواکارییەکە تەواو بکە.',
   },
+  DEMO_STORE_PURCHASE: {
+    ar: 'متجر تجريبي — لا يمكن الشراء منه.',
+    en: 'Demo store — purchases are disabled.',
+    ckb: 'فرۆشگای تاقیکاری — کڕین لێی ناکرێت.',
+  },
   STORE_CLOSED: {
     ar: 'هذا المتجر لا يستقبل طلبات حاليًا. جرّب لاحقًا.',
     en: 'This store is not taking orders right now. Try again later.',

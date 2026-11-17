@@ -191,10 +191,13 @@ export function ReviewsView({
                 {r.customer_name}
               </span>
               {/* Every review here came from a completed transaction — the
-                  database will not hold one that did not. */}
-              <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-                {loc('شراء موثّق', 'Verified', 'کڕینی پشتڕاستکراو')}
-              </span>
+                  database will not hold one that did not. The server says
+                  `verified: false` only for a community demo review. */}
+              {r.verified !== false && (
+                <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                  {loc('شراء موثّق', 'Verified', 'کڕینی پشتڕاستکراو')}
+                </span>
+              )}
             </div>
             <div className="flex gap-0.5 shrink-0" role="img" aria-label={`${r.rating}/5`}>
               {[1, 2, 3, 4, 5].map((n) => (
@@ -288,9 +291,11 @@ function ReviewCards({ reviews, photoAlt }: { reviews: ReviewsData['reviews']; p
             <span className="text-zinc-400 text-[12px] font-semibold truncate" dir="auto">
               {r.customer_name}
             </span>
-            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
-              {loc('شراء موثّق', 'Verified', 'کڕینی پشتڕاستکراو')}
-            </span>
+            {r.verified !== false && (
+              <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
+                {loc('شراء موثّق', 'Verified', 'کڕینی پشتڕاستکراو')}
+              </span>
+            )}
           </figcaption>
           {!!r.merchant_reply && (
             <div className="ps-3 border-s-2 border-gold/30">

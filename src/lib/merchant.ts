@@ -71,6 +71,8 @@ export interface MerchantStore {
   social_links: Record<string, string>;
   accepts_custom_requests: boolean;
   sells_direct_products: boolean;
+  /** A community DEMO shop (worker/lib/communityDemo.ts): shown to testers, never sold from. */
+  is_demo?: boolean;
   status: string;
   status_reason?: string;
   open?: boolean;

@@ -39,7 +39,8 @@ import { DEMO_EMAIL_DOMAIN, DEMO_ID_PREFIX, isDemoId } from '../../packages/cont
 import { HttpError } from './http';
 import { listing } from './listing';
 import { isAnonymousPublicMediaKey } from './mediaStorage';
-import { DEMO_COMMENTS, DEMO_IDEAS, DEMO_MAKER_COUNT, DEMO_PEOPLE, DEMO_PRINTERS, DEMO_PRODUCTS, DEMO_REPLIES, DEMO_REQUESTS, DEMO_SHOPS, type DemoLang } from './communityDemoData';
+import { DEMO_COMMENTS, DEMO_IDEAS, DEMO_MAKER_COUNT, DEMO_PEOPLE, DEMO_PRINTERS, DEMO_PRODUCTS, DEMO_REPLIES, DEMO_REQUESTS, DEMO_SHOPS, DEMO_SPECIALITY_WORDS, type DemoLang } from './communityDemoData';
+import { governorateName } from '@levonis/shipping/iraqGovernorates';
 import { makeBlock, normalizeLayout } from '@levonis/storeLayout/normalize';
 import { starterLayout } from '@levonis/storeLayout/starters';
 import { FOOTER_VARIANTS, HEADER_VARIANTS, SCHEMA_VERSION, defaultFooter, defaultHeader, type StoreBlock, type StoreLayout } from '@levonis/storeLayout/schema';
@@ -335,7 +336,11 @@ export function buildDemoPlan(opts: { nowMs: number; images: readonly DemoImage[
     ['id', 'merchant_id', 'user_id', 'slug', 'name', 'tagline', 'description', 'logo_key', 'banner_key', 'accent', 'categories', 'governorate', 'service_areas', 'accepts_custom_requests', 'sells_direct_products', 'status', 'profile_facts', 'created_at', 'updated_at'],
     DEMO_SHOPS.map((s, i) => [
       sid(i + 1), mid(i + 1), uid(s.owner), s.slug, s.name, s.tagline, s.description,
-      img(i * 7 + 1)?.key ?? null, img(i * 7 + 4)?.key ?? null, s.accent, JSON.stringify(s.categories), s.gov, JSON.stringify(s.areas),
+      img(i * 7 + 1)?.key ?? null, img(i * 7 + 4)?.key ?? null, s.accent,
+      // Display words in the shop's own language, as a merchant types them in settings — specialities and the
+      // governorates it covers by their names (merchant_request_prefs keeps the governorate ids for matching).
+      JSON.stringify(s.categories.map((c) => DEMO_SPECIALITY_WORDS[c]?.[people[s.owner - 1].locale] ?? c)), s.gov,
+      JSON.stringify(s.areas.map((g) => governorateName(g, people[s.owner - 1].locale === 'ku' ? 'ckb' : people[s.owner - 1].locale))),
       1, 0, 'active', JSON.stringify(s.facts.map((f) => ({ ...f, visible: true }))), at(24 * 58), now,
     ])
   );

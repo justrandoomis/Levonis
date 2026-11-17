@@ -422,6 +422,12 @@ export default function Storefront({
         <SavedIdsProvider value={savedIds}>
           {/* Keyed on what the address asks for, so following a link to a tab
               or a collection starts the page there. */}
+          {/* «متجر تجريبي»: a community demo shop, seen only by the closed community's testers. */}
+          {store.is_demo && (
+            <div role="note" data-demo-store className="lv-alert lv-alert-info mx-4 mt-2 text-[12.5px] font-semibold">
+              {loc('متجر تجريبي — للتجربة فقط، لا يمكن الشراء منه', 'Demo store — for testing only, purchases are disabled', 'فرۆشگای تاقیکاری — تەنها بۆ تاقیکردنەوە، کڕین لێی ناکرێت')}
+            </div>
+          )}
           <StoreRenderer key={`${initialTab ?? ''}|${section}`} store={store} className="min-h-screen pb-24" footer={footer} />
         </SavedIdsProvider>
       </StorefrontRuntimeProvider>

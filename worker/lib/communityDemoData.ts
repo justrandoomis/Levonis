@@ -288,3 +288,32 @@ export const DEMO_PRODUCTS: DemoProductIdea[] = [
   { en: 'Raised-letter sign', ar: 'لافتة بأحرف بارزة', descEn: 'Your shop name in raised letters, up to 60 cm.', descAr: 'اسم محلك بأحرف بارزة حتى 60 سم.', price: 75000, category: 'signage', material: 'PLA', tech: 'fdm', color: 'gold', finish: 'sanded' },
   { en: 'Puzzle box', ar: 'صندوق ألغاز', descEn: 'Opens in a secret order. Wood-fill filament.', descAr: 'يُفتح بترتيب سري. خيط بلون الخشب.', price: 19000, category: 'games', material: 'PLA Wood', tech: 'fdm', color: 'wood', finish: 'raw' },
 ];
+
+/**
+ * A workshop's specialities as the store page shows them. A real merchant
+ * types these words in store settings (worker/routes/merchant.ts stores the
+ * text as written) — there is no label map — so each demo shop stores them in
+ * its own language.
+ */
+export const DEMO_SPECIALITY_WORDS: Record<string, Tri> = {
+  architecture: t('مجسمات معمارية', 'Architectural models', 'مۆدێلی بیناسازی'),
+  business: t('للمحلات والمطاعم', 'For shops and restaurants', 'بۆ دوکان و چێشتخانە'),
+  car: t('إكسسوارات السيارات', 'Car accessories', 'پێداویستی ئۆتۆمبێل'),
+  cosplay: t('كوسبلاي', 'Cosplay', 'کۆسپلە'),
+  decor: t('ديكور', 'Home decor', 'ڕازاندنەوەی ماڵ'),
+  education: t('نماذج تعليمية', 'Teaching models', 'مۆدێلی فێرکاری'),
+  functional: t('قطع وظيفية', 'Functional parts', 'پارچەی بەکارهێنان'),
+  gifts: t('هدايا', 'Gifts', 'دیاری'),
+  heritage: t('مجسمات تراثية', 'Heritage pieces', 'پارچەی کەلەپووری'),
+  home: t('مستلزمات البيت', 'Home', 'پێداویستی ماڵ'),
+  industrial: t('قطع صناعية', 'Industrial parts', 'پارچەی پیشەسازی'),
+  jewellery: t('إكسسوارات وحلي', 'Jewellery', 'خشڵ'),
+  lighting: t('إضاءة', 'Lighting', 'ڕووناکی'),
+  miniatures: t('مجسمات مصغرة', 'Miniatures', 'پەیکەری بچووک'),
+  models: t('نماذج ومجسمات', 'Scale models', 'مۆدێل'),
+  props: t('إكسسوارات تصوير', 'Film props', 'کەرەستەی فیلم'),
+  replicas: t('نسخ طبق الأصل', 'Replicas', 'کۆپی'),
+  signage: t('لافتات', 'Signs', 'تابلۆ'),
+  spare_parts: t('قطع غيار', 'Spare parts', 'پارچەی یەدەگ'),
+  toys: t('ألعاب', 'Toys', 'یاری'),
+};

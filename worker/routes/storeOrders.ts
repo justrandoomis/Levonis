@@ -79,6 +79,7 @@ import {
   isOwnStore,
   notifyMerchantOfStoreOrder,
   storeOrderPublic,
+  refuseDemoStorePurchase,
   storeTakesOrders,
 } from '../lib/storeOrderOps';
 import {
@@ -303,6 +304,7 @@ async function priceMerchantCart(c: Context<AppContext>, couponCode: string, whe
   // taking orders" is true whether the merchant paused it, an admin
   // suspended it, or their subscription lapsed — a customer has no business
   // being told which, and a probe learns nothing about another account.
+  refuseDemoStorePurchase(ctx);
   const verdict = await storeTakesOrders(db, ctx);
   if (!verdict.ok) throw refuse('This store is not taking orders right now', 'STORE_CLOSED');
 

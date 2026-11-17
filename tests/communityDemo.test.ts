@@ -37,7 +37,7 @@ import { cartRoutes } from '../worker/routes/cart';
 import { seedLiveCatalog } from './fixtures/liveCatalog';
 import { autoPublishV2 } from './fixtures/autoPublish';
 import { storeById } from '../worker/lib/merchantAuth';
-import { storeTakesOrders } from '../worker/lib/storeOrderOps';
+import { refuseDemoStorePurchase, storeTakesOrders } from '../worker/lib/storeOrderOps';
 import { normalizeLayout } from '../packages/storeLayout/src/normalize';
 import { THEME_NAMES, TOKEN_VALUES } from '../packages/storeLayout/src/tokens';
 import { DEMO_TABLES, buildDemoPlan, demoId, demoSeedStatements, type DemoImage } from '../worker/lib/communityDemo';
@@ -586,13 +586,57 @@ test('a demo product can be looked at but never bought, and never reaches the ca
   const TESTER: StubUser = { id: 'tester', role: 'customer', email: 'tester@x.co' };
   const tester = stubApp(asD1(raw), TESTER, storefrontMount as never);
   const added = await post(tester, '/api/cart/merchant-items', { productId: demoId('prd', 1), qty: 1 });
-  assert.ok(added.status >= 400, `add to cart: ${added.status}`);
-  assert.equal((await json(added)).code, 'STORE_CLOSED');
+  assert.equal(added.status, 409, `add to cart: ${added.status}`);
+  assert.equal((await json(added)).code, 'DEMO_STORE_PURCHASE', 'told it is a demo, not that the shop is closed');
+  const { REFUSAL_STRINGS } = await import('../src/lib/refusalStrings');
+  assert.deepEqual(REFUSAL_STRINGS.DEMO_STORE_PURCHASE, {
+    ar: 'متجر تجريبي — لا يمكن الشراء منه.',
+    en: 'Demo store — purchases are disabled.',
+    ckb: 'فرۆشگای تاقیکاری — کڕین لێی ناکرێت.',
+  });
   assert.equal(n(raw, 'SELECT COUNT(*) AS n FROM cart_items'), 0);
   assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_products WHERE substr(id,1,5) = 'demo_' AND (sku <> '' OR audience_user_id IS NOT NULL)"), 0);
-  // The store rule the cart and the checkout share says no, whatever the store row says.
+  // The store rule the cart and the checkout share says no, whatever the store row says, and the
+  // checkout's own door refuses a demo store with the same plain words.
   const ctx = await storeById(asD1(raw) as never, demoId('str', 1));
   assert.equal((await storeTakesOrders(asD1(raw) as never, ctx!)).ok, false);
+  assert.throws(() => refuseDemoStorePurchase(ctx!), (e: unknown) => (e as { code?: string }).code === 'DEMO_STORE_PURCHASE');
+  const real = await storeById(asD1(raw) as never, 's1');
+  assert.doesNotThrow(() => refuseDemoStorePurchase(real!));
+  // …while the page shows the shelf as a real one: open, in stock, its own words, and the notice.
+  const page = await json(await get(tester, '/api/storefront/demo-noor-prints'));
+  assert.equal(page.store.open, true);
+  assert.equal(page.store.status, 'active');
+  assert.equal(page.store.is_demo, true);
+  assert.deepEqual(page.store.service_areas, ['بغداد', 'بابل'], 'governorates by name, in the shop\'s language');
+  assert.ok((page.store.categories as string[]).includes('هدايا'), 'specialities as words, not keys');
+  for (const areas of raw.prepare("SELECT service_areas, categories FROM merchant_stores WHERE substr(id,1,5) = 'demo_'").all() as Array<{ service_areas: string; categories: string }>) {
+    assert.doesNotMatch(areas.service_areas + areas.categories, /"[a-z_]+"/, 'no raw key reaches a store page');
+  }
+  const products = await json(await get(tester, '/api/storefront/demo-noor-prints/products'));
+  assert.ok((products.products as Array<{ in_stock: boolean }>).every((p) => p.in_stock !== false));
+  const realStore = await json(await get(stubApp(asD1(raw), OWNER, storefrontMount as never), '/api/storefront/realshop'));
+  assert.equal(realStore.store.is_demo, undefined, 'a real store carries no demo mark');
+  const sf = readFileSync(join(ROOT, 'src/pages/Storefront.tsx'), 'utf8');
+  assert.match(sf, /store\.is_demo && \([\s\S]*data-demo-store[\s\S]*'متجر تجريبي/);
+});
+
+test('a demo review is never shown as a verified purchase; a real one still is', async () => {
+  const raw = seed();
+  raw.exec("INSERT INTO merchant_reviews (id,merchant_id,store_id,customer_id,order_id,rating,body) VALUES ('rv_real','m1','s1','rcu','ord_real',5,'Great')");
+  assert.equal((await seedDemo(raw)).status, 201);
+  const app = stubApp(asD1(raw), OWNER, storefrontMount as never);
+  const demo = await json(await get(app, '/api/storefront/demo-noor-prints/reviews'));
+  assert.ok((demo.reviews as unknown[]).length >= 4);
+  for (const r of demo.reviews as Array<{ verified: boolean }>) assert.equal(r.verified, false);
+  const layout = JSON.stringify((await json(await get(app, '/api/storefront/demo-noor-prints'))).store);
+  assert.doesNotMatch(layout, /"verified":true,"customer_name"/, 'nor in the reviews block the layout carries');
+  const real = await json(await get(app, '/api/storefront/realshop/reviews'));
+  assert.deepEqual((real.reviews as Array<{ verified: boolean }>).map((r) => r.verified), [true]);
+  // The badge is drawn only when the server says so, in both review layouts.
+  const block = readFileSync(join(ROOT, 'src/components/storefront/blocks/Reviews.tsx'), 'utf8');
+  assert.equal((block.match(/r\.verified !== false && \(/g) ?? []).length, 2);
+  assert.equal((block.match(/شراء موثّق/g) ?? []).length, 2);
 });
 
 test('the seed binds at most 100 parameters per statement, in one batch of a safe size', async () => {

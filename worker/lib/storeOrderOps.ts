@@ -36,6 +36,7 @@
 
 import { isDemoId } from '../../packages/contracts/src/demoData';
 import type { Env } from './types';
+import { HttpError } from './http';
 import { safeParse } from './types';
 import { newId } from './crypto';
 import { audit, auditStatements } from './audit';
@@ -142,6 +143,18 @@ export type StoreSellingVerdict = { ok: true } | { ok: false; reason: StoreClose
  * with no CHECK, so anything other than exactly `active` is closed. A sanction
  * nobody has taught this function yet stops sales rather than slipping past.
  */
+/**
+ * THE DEMO SHOP'S OWN ANSWER at the cart and the checkout: a community demo
+ * store (worker/lib/communityDemo.ts) shows its shelf like a real shop, and a
+ * press of «أضف إلى السلة» is told plainly that it is a demo, not that the
+ * shop is closed (src/lib/refusalStrings.ts DEMO_STORE_PURCHASE).
+ */
+export function refuseDemoStorePurchase(ctx: StoreContext): void {
+  if (isDemoId(ctx.store.id) || isDemoId(ctx.merchant.id)) {
+    throw new HttpError(409, 'متجر تجريبي — لا يمكن الشراء منه / Demo store — purchases are disabled', 'DEMO_STORE_PURCHASE');
+  }
+}
+
 export async function storeTakesOrders(
   db: D1Database,
   ctx: StoreContext,

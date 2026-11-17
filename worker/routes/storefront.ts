@@ -108,6 +108,10 @@ export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain:
    * rule for both now: what this says is what the cart does.
    */
   const takingOrders = (await storeTakesOrders(db, ctx, tier)).ok;
+  // A community DEMO shop (worker/lib/communityDemo.ts) looks like the real
+  // thing — its shelf open, its products in stock — and says it is a demo; the
+  // cart and the checkout refuse it on the server (DEMO_STORE_PURCHASE).
+  const demo = isDemoId(s.id);
   return {
     id: s.id,
     slug: s.slug,
@@ -156,11 +160,12 @@ export async function publicStore(db: D1Database, ctx: StoreContext, rootDomain:
     // the largest bed, the usual turnaround, the intro) — never a printer's
     // economics. Guest-cacheable like the rest of this body: no viewer in it.
     workshop,
-    open: takingOrders,
+    open: takingOrders || demo,
+    ...(demo ? { is_demo: true } : {}),
     // The reason a shop is shut is between the merchant and Levonis. A
     // visitor is told it is closed, never whether the merchant paused it, an
     // admin restricted it, or their subscription lapsed.
-    status: takingOrders ? 'active' : 'closed',
+    status: takingOrders || demo ? 'active' : 'closed',
     merchant: {
       id: m.id,
       name: m.name,
@@ -860,7 +865,8 @@ storefrontRoutes.get('/:slug/reviews', (c) => anonymousCached(c, { params: STORE
       images: safeParse(r.images, []),
       // Every review here came from a completed transaction — the database
       // will not hold one that did not. Saying so is honest, not decoration.
-      verified: true,
+      // A community DEMO review names no real order: never «شراء موثّق».
+      verified: !isDemoId(r.id),
       // MASKED, exactly as a platform product review is (worker/routes/reviews.ts
       // `maskName`, pinned by tests/reviews.test.ts): «Ahmed K.», never the
       // buyer's full account name on a public page (audit 04 #15).

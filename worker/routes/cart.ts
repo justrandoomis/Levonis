@@ -16,7 +16,7 @@ import {
   type SellerScope,
 } from '../lib/cartSeller';
 import { storeById } from '../lib/merchantAuth';
-import { isOwnStore, merchantVariantLabel, storeTakesOrders } from '../lib/storeOrderOps';
+import { isOwnStore, merchantVariantLabel, refuseDemoStorePurchase, storeTakesOrders } from '../lib/storeOrderOps';
 import { isSchemaMissing } from '../lib/membershipBenefits';
 import { storeThreadOf } from '../lib/chatThread';
 import { buyablePrivateIds } from '../lib/privateProducts';
@@ -3542,6 +3542,7 @@ async function loadBuyableMerchantProduct(c: Context<AppContext>, productId: str
   if (isOwnStore(ctx, user.id)) {
     throw new HttpError(403, 'A store cannot buy from itself', 'OWN_STORE_PURCHASE');
   }
+  refuseDemoStorePurchase(ctx);
   if (!(await storeTakesOrders(c.env.DB, ctx)).ok) {
     throw badRequest('This store is not taking orders right now', 'STORE_CLOSED');
   }

@@ -27,6 +27,7 @@
  * «used in …» and the delete door can refuse (MEDIA_IN_USE) instead of
  * breaking a page.
  */
+import { isDemoId } from '../../packages/contracts/src/demoData';
 import { normalizeLayout, renderableBlocks, type LayoutIssue } from '@levonis/storeLayout/normalize';
 import { defaultLayoutFromStore } from '@levonis/storeLayout/defaults';
 import {
@@ -518,7 +519,8 @@ async function reviewsFor(db: D1Database, ctx: StoreContext, limit: number): Pro
       rating: Number(r.rating),
       body: String(r.body ?? ''),
       images: safeParse<unknown[]>(r.images as string, []).filter((x): x is string => typeof x === 'string'),
-      verified: true,
+      // A community DEMO review names no real order: never «شراء موثّق».
+      verified: !isDemoId(r.id),
       customer_name: maskName(r.customer_name as string | null, r.customer_username as string | null),
       merchant_reply: (r.merchant_reply as string) || null,
       merchant_replied_at: (r.merchant_replied_at as string | null) ?? null,

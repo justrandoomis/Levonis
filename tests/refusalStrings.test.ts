@@ -118,6 +118,8 @@ test('every code the table translates is one the server can actually emit', () =
   // weight that reads as coverage. Every key is grepped for in the worker.
   const sources = [
     'worker/routes/cart.ts',
+    // The cart and the checkout's shared «متجر تجريبي — لا يمكن الشراء منه» (community demo data).
+    'worker/lib/storeOrderOps.ts',
     'worker/routes/orders.ts',
     'worker/routes/returns.ts',
     // Who may move money in the services (owner decision 3, row 223): every
