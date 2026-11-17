@@ -90,6 +90,14 @@ export interface OwnerRequestCard extends PublicRequestCard {
   estimate_low_iqd?: number | null;
   estimate_high_iqd?: number | null;
   accepted_merchant?: string | null;
+  /**
+   * The chosen offer's total (price + delivery fee, what the escrow holds;
+   * offers V2 §4e) and its two parts for the breakdown; absent before a
+   * choice or on an older Worker.
+   */
+  accepted_total_iqd?: number | null;
+  accepted_price_iqd?: number | null;
+  accepted_fee_iqd?: number | null;
 }
 
 interface CommonProps {
@@ -432,6 +440,21 @@ export default function RequestListCard(props: RequestListCardProps) {
           <span className="flex items-center gap-2 text-[13px]">
             <span className="text-text-secondary">{w.acceptedBy}</span>
             <bdi className="ms-auto truncate font-semibold text-text-primary">{own.accepted_merchant}</bdi>
+          </span>
+        )}
+        {own.accepted_total_iqd !== null && own.accepted_total_iqd !== undefined && (
+          <span className="flex flex-col gap-0.5 text-[13px]" data-request-accepted-total>
+            <span className="flex items-center gap-2">
+              <span className="text-text-secondary">{w.acceptedTotal}</span>
+              <span className="ms-auto font-bold text-text-primary">
+                <Iqd value={own.accepted_total_iqd} lang={lang} />
+              </span>
+            </span>
+            {!!own.accepted_fee_iqd && own.accepted_price_iqd !== null && own.accepted_price_iqd !== undefined && (
+              <span className="text-end text-[12px] text-text-muted" data-request-accepted-breakdown>
+                <Iqd value={own.accepted_price_iqd} lang={lang} /> + <Iqd value={own.accepted_fee_iqd} lang={lang} /> {w.delivery}
+              </span>
+            )}
           </span>
         )}
         {needed}

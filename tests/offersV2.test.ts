@@ -256,6 +256,38 @@ test('the fee is in the escrow gross and in the snapshot; the customer confirms 
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_orders WHERE state <> 'cancelled'"), 1);
 });
 
+test('«طلباتي» says what the escrow holds: total = price + fee for a delivery offer, = price for a pickup, to the customer alone, in one read', async () => {
+  for (const [body, total, fee] of [
+    [{ price_iqd: 50_000, delivery_fee_iqd: 5_000, delivery_method: 'courier' }, 55_000, 5_000],
+    [{ price_iqd: 50_000, delivery_method: 'pickup', delivery_fee_iqd: 0 }, 50_000, 0],
+  ] as const) {
+    const raw = seed();
+    const made = await offerBy(raw, ALI, body);
+    assert.equal(made.status, 201, JSON.stringify(made.data));
+    fund(raw, 'buyer', 500_000);
+    const ok = await post(as(raw, BUYER), `/api/marketplace/offers/${made.offer.id}/accept`, { expected_total_iqd: total, offer_revision: 1 });
+    assert.equal(ok.status, 201, JSON.stringify(await ok.clone().json()));
+    await settle();
+    const esc = row<{ gross_iqd: number }>(raw, 'SELECT gross_iqd FROM community_escrows')!;
+    const { waves, db } = wavesD1(raw);
+    waves.reset();
+    const list = await json(await get(stubApp(db, BUYER, mount), '/api/marketplace/print/my-requests'));
+    assert.equal(waves.counts.waves, 1, `«طلباتي» is one read, ${waves.counts.waves} waves`);
+    const mine = list.requests.find((r: Record<string, unknown>) => r.id === 'r1');
+    assert.deepEqual(
+      [mine.accepted.price_iqd, mine.accepted.delivery_fee_iqd, mine.accepted.total_iqd],
+      [50_000, fee, total],
+      `${body.delivery_method}: the list's total`
+    );
+    assert.equal(mine.accepted.total_iqd, esc.gross_iqd, 'the figure is the escrow gross');
+    // Nobody else's «طلباتي» carries the request, its merchant or its total.
+    for (const who of [ALI, NOUR]) {
+      const other = await json(await get(as(raw, who), '/api/marketplace/print/my-requests'));
+      assert.equal(other.requests.some((r: Record<string, unknown>) => r.id === 'r1'), false, `${who.id} does not see r1`);
+    }
+  }
+});
+
 test('an offer without a fee still accepts an older client\'s expected_price_iqd, for one release', async () => {
   const raw = seed();
   const made = await offerBy(raw, ALI, { price_iqd: 30_000 });

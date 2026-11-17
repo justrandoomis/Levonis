@@ -258,6 +258,10 @@ export interface MyRequestRow {
     order_id: string | null;
     merchant_name: string;
     price_iqd: number | null;
+    /** Offers V2 (0159): the chosen offer's delivery fee, 0 for a pickup; absent on an older Worker. */
+    delivery_fee_iqd?: number;
+    /** What the escrow holds: price + delivery fee (the offers list's `total_iqd`); absent on an older Worker. */
+    total_iqd?: number | null;
     completion_days: number | null;
     /** P1-05 review 6: the order makes only some parts (absent for a whole order or an older Worker). */
     covers_all?: false;

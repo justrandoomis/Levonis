@@ -10,7 +10,7 @@
  *
  * Each row is the owner card of the shared request card (community UI plan
  * C3, `RequestListCard variant="owner"`): the first picture, the own
- * budget, the estimate, the chosen merchant and its price, and the marks a
+ * budget, the estimate, the chosen merchant and the total held (price + delivery fee), and the marks a
  * row must keep (the technical review, an estimate over some parts only,
  * models left out of it, the estimate confidence, a partial or substituted
  * order). Pages arrive as the list end comes into view (plan B3 `cursor`).
@@ -203,8 +203,13 @@ export default function MyRequestsList({ onOpen, filters = NO_FILTERS, q = '' }:
           estimated && p?.estimate_confidence ? s.confidence[p.estimate_confidence] : '',
           ...orderChips,
         ].filter(Boolean);
+        // The amount a row says is what the escrow holds: the price plus the
+        // delivery fee (offers V2 §4e), the server's `total_iqd`, on its own
+        // labelled line. An older Worker sends no total: the price beside
+        // the name, as before.
+        const total = accepted?.total_iqd ?? null;
         const chosen = accepted
-          ? accepted.price_iqd !== null
+          ? total === null && accepted.price_iqd !== null
             ? `${accepted.merchant_name} · ${iqdNumber(accepted.price_iqd, L)} ${iqdUnit(L)}`
             : accepted.merchant_name
           : null;
@@ -235,6 +240,9 @@ export default function MyRequestsList({ onOpen, filters = NO_FILTERS, q = '' }:
                 estimate_low_iqd: p?.estimate_low_iqd ?? null,
                 estimate_high_iqd: p?.estimate_high_iqd ?? null,
                 accepted_merchant: chosen,
+                accepted_total_iqd: total,
+                accepted_price_iqd: accepted?.price_iqd ?? null,
+                accepted_fee_iqd: accepted?.delivery_fee_iqd ?? 0,
               }}
               chips={chips}
               onRepeat={() => {

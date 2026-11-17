@@ -119,6 +119,7 @@ import { REQUEST_MODEL_LIMITS } from '@levonis/contracts/requestModel';
 import { isMissingSchema } from '../lib/merchantApproval';
 import { ENTRY_NOTE_PREFIX, budgetReaderOf, budgetSwitchOf, budgetVisibleOf, chatSwitchMark, stripSpecBudget } from '../lib/requestBudget';
 import { orderCoverageFacts } from '../lib/chatCards';
+import { offerFee, offerTotal } from '../lib/offerTotal';
 
 /**
  * THE PRINT REQUEST JOURNEY — upload, measure, estimate, publish, notify.
@@ -2826,7 +2827,7 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
             p.completeness, p.primary_file_id, p.source_kind, p.source_provider,
             f.preview_key AS preview_key, f.file_name AS primary_file_name,
             f.model_format AS primary_format,
-            o.price_iqd AS accepted_price_iqd, o.completion_days AS accepted_days,
+            o.price_iqd AS accepted_price_iqd, o.delivery_fee_iqd AS accepted_fee_iqd, o.completion_days AS accepted_days,
             m.name AS accepted_merchant_name,
             co.offer_snapshot AS accepted_offer_snapshot, co.request_snapshot AS accepted_request_snapshot,
             (SELECT COUNT(*) FROM community_request_files cf WHERE cf.request_id = r.id) AS file_count,
@@ -2921,6 +2922,10 @@ printRequestRoutes.get('/my-requests', requireAuth, async (c) => {
             order_id: r.community_order_id === null ? null : String(r.community_order_id),
             merchant_name: String(r.accepted_merchant_name ?? ''),
             price_iqd: r.accepted_price_iqd === null ? null : Number(r.accepted_price_iqd),
+            // What the escrow holds (offers V2 §4e): price + delivery fee, by
+            // the offers list's own rule; 0 and the price for a pickup.
+            delivery_fee_iqd: offerFee({ delivery_fee_iqd: r.accepted_fee_iqd }),
+            total_iqd: r.accepted_price_iqd === null ? null : offerTotal({ price_iqd: r.accepted_price_iqd, delivery_fee_iqd: r.accepted_fee_iqd }),
             completion_days: r.accepted_days === null ? null : Number(r.accepted_days),
             // Partial or substituted, from the order snapshots (P1-05 review 6), as
             // the order row and the chat card say it; nothing for a whole order.

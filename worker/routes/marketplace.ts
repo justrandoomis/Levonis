@@ -149,6 +149,7 @@ import {
   type OfferCoverageTerms,
   type RevisionModel,
 } from '../lib/offerCoverage';
+import { offerFee, offerTotal } from '../lib/offerTotal';
 // Phase 5b (docs/COMMUNITY_ECOSYSTEM.md §9.5): the discussion's server-written
 // rows on a close or a revision, and the timeline's «started» row.
 import { writeRequestSystemUpdate } from './requestDiscussion';
@@ -257,10 +258,6 @@ function parseIds(raw: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, OFFER_MAX_MATERIALS) : [];
 }
 
-/** The delivery fee an offer row carries (0159); a row from before it carries none. */
-const offerFee = (o: Record<string, unknown>): number => Math.max(0, Number(o.delivery_fee_iqd ?? 0) || 0);
-/** What the customer agrees to: price plus fee, computed HERE and never read from a client. */
-const offerTotal = (o: Record<string, unknown>): number => (Number(o.price_iqd ?? 0) || 0) + offerFee(o);
 
 export function offerShape(o: Record<string, unknown>, badges: { pro: Set<string>; premium: Set<string> } = { pro: new Set(), premium: new Set() }) {
   return {

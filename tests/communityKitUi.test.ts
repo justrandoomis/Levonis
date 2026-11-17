@@ -260,6 +260,23 @@ test('the owner card adds what only the owner reads, with its button beside a st
   assert.doesNotMatch(unknown, /data-request-budget-visible/);
 });
 
+test('the owner card says the total the escrow holds — price + delivery, the breakdown beside it — and a pickup\'s total is its price', () => {
+  const delivery = card({ variant: 'owner', request: { ...leaky, accepted_merchant: 'ورشة بغداد', accepted_total_iqd: 55000, accepted_price_iqd: 50000, accepted_fee_iqd: 5000 } });
+  assert.match(delivery, /data-request-accepted-total[^>]*>[\s\S]*الإجمالي المحجوز[\s\S]*55,000/, 'the total, labelled as held');
+  assert.match(delivery, /data-request-accepted-breakdown[^>]*>[\s\S]*50,000[\s\S]*\+[\s\S]*5,000[\s\S]*توصيل/, 'price + fee delivery');
+  const pickup = card({ variant: 'owner', request: { ...leaky, accepted_merchant: 'ورشة بغداد', accepted_total_iqd: 50000, accepted_price_iqd: 50000, accepted_fee_iqd: 0 } });
+  assert.match(pickup, /الإجمالي المحجوز[\s\S]*50,000/);
+  assert.doesNotMatch(pickup, /data-request-accepted-breakdown/, 'no fee, no breakdown');
+  // Before a choice, or from an older Worker, no total is claimed.
+  assert.doesNotMatch(card({ variant: 'owner', request: { ...leaky } }), /data-request-accepted-total/);
+  assert.match(card({ variant: 'owner', request: { ...leaky, accepted_total_iqd: 55000, accepted_price_iqd: 50000, accepted_fee_iqd: 5000 } }, 'en'), /Total held[\s\S]*55,000[\s\S]*delivery/);
+  // «طلباتي» hands the card the server's total, never the bare price beside the name when a total came.
+  const list = readFileSync(join(ROOT, 'src/components/print/MyRequestsList.tsx'), 'utf8');
+  assert.match(list, /const total = accepted\?\.total_iqd \?\? null;/);
+  assert.match(list, /accepted_total_iqd: total,/);
+  assert.match(list, /total === null && accepted\.price_iqd !== null/, 'the price beside the name only for an older Worker');
+});
+
 test('the card words: state words and counted nouns in three languages, Latin digits, the Sorani its own', () => {
   assert.equal(words.piecesWord(1, 'ar'), 'قطعة واحدة');
   assert.equal(words.piecesWord(2, 'ar'), 'قطعتان');

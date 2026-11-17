@@ -106,6 +106,10 @@ export interface CardWords {
   budgetShown: string;
   estimate: string;
   acceptedBy: string;
+  /** The chosen offer's total, what the escrow holds: the price plus its delivery fee (offers V2 §4e). */
+  acceptedTotal: string;
+  /** The fee's word in the breakdown «price + fee delivery». */
+  delivery: string;
   repeat: string;
   /** The sets of a job of parts, before «×n» (the words of the live hub card, hub/RequestCard.tsx). */
   sets: string;
@@ -127,6 +131,8 @@ export const CARD_WORDS: Readonly<Record<CardLang, CardWords>> = {
     // The brand stays Latin in every language (tests/brandName.test.ts), as the wizard and the print summary write it.
     estimate: 'تقدير Levonis',
     acceptedBy: 'التاجر المختار',
+    acceptedTotal: 'الإجمالي المحجوز',
+    delivery: 'توصيل',
     repeat: 'إعادة الطلب',
     sets: 'الأطقم',
     glyphFdm: 'طباعة بالخيوط',
@@ -143,6 +149,8 @@ export const CARD_WORDS: Readonly<Record<CardLang, CardWords>> = {
     budgetShown: 'Seen by the merchants who can make your request, never by the public',
     estimate: 'Levonis estimate',
     acceptedBy: 'Chosen merchant',
+    acceptedTotal: 'Total held',
+    delivery: 'delivery',
     repeat: 'Request again',
     sets: 'Sets',
     glyphFdm: 'Filament print',
@@ -159,6 +167,8 @@ export const CARD_WORDS: Readonly<Record<CardLang, CardWords>> = {
     budgetShown: 'ئەو بازرگانانە دەیبینن کە دەتوانن داواکارییەکەت دروست بکەن، بۆ خەڵکی گشتی دەرناکەوێت',
     estimate: 'خەمڵاندنی Levonis',
     acceptedBy: 'بازرگانی هەڵبژێردراو',
+    acceptedTotal: 'کۆی گشتیی ڕاگیراو',
+    delivery: 'گەیاندن',
     repeat: 'دووبارە داوای بکەرەوە',
     sets: 'سێت',
     glyphFdm: 'چاپی فیلامێنت',
