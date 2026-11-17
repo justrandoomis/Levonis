@@ -478,3 +478,90 @@ test('«طلبات تناسبك» asks the server for THIS workshop\'s board: `?
   assert.equal(asked.length, 1);
   assert.match(asked[0], /^\/api\/community\/requests\?for=me&limit=6$/);
 });
+
+// ------------------------------------------- the feed card's commerce row
+//
+// Card v2 brings back what the old card carried (owner, 2026-11-17): the
+// product for sale with its price and the store as chips, and for a printed
+// project «اطلب طباعة مثلها» (the live editor address) and «اشترِ الخامات»
+// when the material is a catalogue product. Each part only when the server
+// sent it with the card, each a pressable sibling of the stretched link.
+
+const { PostCommerce } = await import('../src/components/community/feed/PostCard');
+type FeedPost = Parameters<typeof PostCommerce>[0]['post'];
+const feedPost = (over: Partial<FeedPost> = {}): FeedPost => ({
+  id: 'post_1',
+  kind: 'project',
+  title: 'مشبك كابلات',
+  excerpt: 'طبعته بـ PLA.',
+  cover: null,
+  media_count: 0,
+  author: { id: 'u_ali', username: 'ali', name: 'Ali', avatarUrl: null },
+  store: null,
+  product: null,
+  printer: { name: 'Bambu A1', product: null },
+  material: { name: 'PLA', product: null },
+  color: '',
+  print_time_minutes: null,
+  dimensions: {},
+  tags: [],
+  counts: { likes: 0, comments: 0, saves: 0, views: 0 },
+  state: 'published',
+  visibility: 'public',
+  published_at: '2026-11-01T00:00:00.000Z',
+  created_at: '2026-11-01T00:00:00.000Z',
+  url: '/community/projects/post_1',
+  ...over,
+} as FeedPost);
+const card = (post: FeedPost) =>
+  renderToStaticMarkup(
+    createElement(AuthProvider, {
+      children: createElement(LanguageProvider, {
+        children: createElement(WalletProvider, {
+          children: createElement(CurrencyProvider, { children: createElement(MemoryRouter, null, createElement(PostCommerce, { post })) }),
+        }),
+      }),
+    })
+  );
+/** The opening tag of the element carrying `attr`. */
+const tagOf = (html: string, attr: string) => html.match(new RegExp(`<[a-z]+[^>]*${attr}[^>]*>`))?.[0] ?? '';
+
+test('feed card commerce: a project with a product, a store and a catalogue material draws all four, each pressable', () => {
+  const html = card(
+    feedPost({
+      product: { id: 'pr_1', slug: 'clip', name: 'Cable clip', name_ar: 'مشبك', price_iqd: 15000, url: '/store/eve/p/clip' },
+      store: { id: 'st_1', slug: 'eve', name: 'Eve Prints', logoUrl: null, url: '/store/eve' },
+      material: { name: 'PLA', product: { id: 'm_1', slug: 'pla', name: 'PLA Matte', url: '/products/pla' } as FeedPost['material']['product'] },
+    })
+  );
+  const print = tagOf(html, 'data-post-print');
+  assert.match(print, /href="\/requests\/new\?project=post_1"/, 'the live editor address, the project named');
+  for (const attr of ['data-post-print', 'data-post-materials', 'data-post-product', 'data-post-store']) {
+    const t = tagOf(html, attr);
+    assert.ok(t.startsWith('<a'), `${attr} is a link of its own`);
+    assert.match(t, /relative z-10/, `${attr} sits above the stretched link`);
+  }
+  assert.match(tagOf(html, 'data-post-materials'), /href="\/products\/pla"/);
+  assert.match(tagOf(html, 'data-post-product'), /href="\/store\/eve\/p\/clip"/);
+  assert.match(tagOf(html, 'data-post-store'), /href="\/store\/eve"/);
+  assert.match(html, /اطلب طباعة مثلها/);
+  assert.match(html, /اشترِ الخامات/);
+  assert.match(html, /<bdi[^>]*>مشبك<\/bdi>/, 'the product by its Arabic name');
+  assert.match(html, /15,000|15٬000|١٥/, 'and its price');
+  assert.match(html, /<bdi[^>]*>Eve Prints<\/bdi>/);
+});
+
+test('feed card commerce: only what the server sent, by the old card\'s rules', () => {
+  const bare = card(feedPost());
+  assert.match(bare, /data-post-print/, 'a project can always be printed');
+  for (const attr of ['data-post-materials', 'data-post-product', 'data-post-store', 'data-post-commerce']) assert.doesNotMatch(bare, new RegExp(attr), `${attr} without its data`);
+  const idea = card(
+    feedPost({ kind: 'question' as FeedPost['kind'], material: { name: 'PLA', product: { id: 'm_1', slug: 'pla', name: 'PLA', url: '/products/pla' } as FeedPost['material']['product'] } })
+  );
+  assert.doesNotMatch(idea, /data-post-print|data-post-materials/, 'the two verbs are a printed project\'s');
+  const src = code('src/components/community/feed/PostCard.tsx');
+  // In the card, after the chips and before the stretched link: siblings of it, never inside.
+  assert.match(src, /<PostCommerce post=\{p\} \/>\s*<div className="border-t border-border-subtle">\s*<Link\s+to=\{p\.url\}/);
+  assert.doesNotMatch(src, /useEffect|fetch\(|Api\./, 'no read per card');
+  assert.doesNotMatch(src, /\b(ml|mr|pl|pr|left|right)-\d/, 'logical sides only');
+});

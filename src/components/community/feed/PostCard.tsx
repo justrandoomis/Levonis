@@ -11,22 +11,28 @@
  *   the cover, inset, 16:9
  *   two chips: the first tag, and «material · printer» (a door to the
  *     catalogue when the material or the printer is a product there)
+ *   the commerce row, each part only when the server sent it with the card
+ *     (never a fetch per card): the product for sale with its price and the
+ *     store, as chips; then, for a printed project, «اطلب طباعة مثلها» (the
+ *     request editor with the project's files, `/requests/new?project=`,
+ *     ProtectedRoute carrying a guest through /auth) and, when the material
+ *     is a catalogue product, «اشترِ الخامات»
  *   a hairline, «عرض المشروع ‹» in gold: THE card's one stretched link, named
  *     with the title so every card's link has its own name
  *   a hairline, then the four labelled cells (ActionRow `labelled`)
  *
  * Every pressable thing beside the stretched link is a sibling with
- * `relative z-10`, never inside it, and a 44 px target. The commerce verbs
- * are the project page's (plan D-10), not the card's.
+ * `relative z-10`, never inside it, and a 44 px target, one Tab stop each.
  *
  * Memoised: the feed appends a page by re-rendering the list, and thirty
  * cards that did not change must not re-render with it.
  */
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Box, Play, Tag } from 'lucide-react';
+import { Box, Play, Printer, ShoppingBag, Store, Tag } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { useAuth } from '../../../AuthContext';
+import { useMoney } from '../../../CurrencyContext';
 import SafeImage from '../../ui/SafeImage';
 import ActionRow from '../social/ActionRow';
 import PostMenu from '../social/PostMenu';
@@ -35,7 +41,7 @@ import { creatorHref, type PostCard as PostCardData } from '../projects/api';
 import { KindIcon } from '../projects/kindIcons';
 import { useProjectStrings } from '../projects/strings';
 import { KitAvatar } from '../kit/display';
-import { OnwardChevron } from '../kit/buttons';
+import { KitButtonLink, OnwardChevron, kitButtonClass } from '../kit/buttons';
 import { HubLink } from '../hub/parts';
 import { timeAgo } from '../hub/copy';
 import { useHubStrings } from '../hub/strings';
@@ -163,6 +169,8 @@ function PostCard({ post: p, eager = false, onPatch }: { post: PostCardData; eag
         </div>
       )}
 
+      <PostCommerce post={p} />
+
       <div className="border-t border-border-subtle">
         <Link
           to={p.url}
@@ -180,5 +188,66 @@ function PostCard({ post: p, eager = false, onPatch }: { post: PostCardData; eag
         onViewer={(viewer) => onPatch?.(p.id, { viewer })}
       />
     </article>
+  );
+}
+
+/**
+ * THE CARD'S COMMERCE ROW: only what the server sent with the card. The
+ * product and the store as chips, then a printed project's two verbs (the
+ * old card's rules: «اطلب طباعة مثلها» on every project, «اشترِ الخامات»
+ * when its material is a catalogue product). Each a sibling of the card's
+ * stretched link, `relative z-10`, 44 px, one Tab stop.
+ */
+export function PostCommerce({ post: p }: { post: PostCardData }) {
+  const { lang } = useLanguage();
+  const { money } = useMoney();
+  const s = useHubStrings();
+  const ps = useProjectStrings();
+  const printable = p.kind === 'project';
+  const materialShop = printable ? p.material.product : null;
+  if (!p.product && !p.store && !printable) return null;
+  return (
+    <>
+      {(p.product || p.store) && (
+        <div className="flex flex-wrap items-center gap-2" data-post-commerce>
+          {p.product && (
+            <HubLink href={p.product.url} className={CHIP} data-post-product>
+              <ShoppingBag aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+              <bdi className="truncate">{lang === 'ar' ? p.product.name_ar || p.product.name : p.product.name}</bdi>
+              <span aria-hidden="true">·</span>
+              <span className="shrink-0 font-semibold text-text-primary">{money(p.product.price_iqd)}</span>
+            </HubLink>
+          )}
+          {p.store && (
+            <HubLink href={p.store.url} className={CHIP} data-post-store>
+              <Store aria-hidden="true" className="h-4 w-4 shrink-0" strokeWidth={1.75} />
+              <bdi className="truncate">{p.store.name}</bdi>
+            </HubLink>
+          )}
+        </div>
+      )}
+
+      {printable && (
+        <div className="flex flex-wrap items-center gap-2" data-post-verbs>
+          <KitButtonLink
+            to={`/requests/new?project=${encodeURIComponent(p.id)}`}
+            state={{ project: { id: p.id, title: p.title, material: p.material.name, color: p.color } }}
+            variant="outline"
+            size="sm"
+            icon={<Printer aria-hidden="true" className="h-4 w-4" />}
+            className="relative z-10"
+            data-post-print
+          >
+            {ps.printOneLikeIt}
+          </KitButtonLink>
+          {materialShop && (
+            <HubLink href={materialShop.url} className={`${kitButtonClass('secondary', 'sm')} relative z-10`} data-post-materials>
+              <ShoppingBag aria-hidden="true" className="h-4 w-4" />
+              {s.buyMaterials}
+            </HubLink>
+          )}
+        </div>
+      )}
+    </>
   );
 }

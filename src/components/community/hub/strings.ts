@@ -62,7 +62,7 @@ const STRINGS = {
     noResultsHint: 'جرّب كلمة أقصر، أو ابحث في قسم آخر.',
     resultsFor: '{n} لـ «{q}»',
     printIt: 'اطلب طباعته',
-    buyMaterials: 'اشترِ المواد',
+    buyMaterials: 'اشترِ الخامات',
     more: 'المزيد',
     video: 'فيديو',
     kinds: { project: 'مشروع مطبوع', post: 'صورة', tutorial: 'شرح', timelapse: 'طبعة زمنية', before_after: 'قبل وبعد' } as Record<PostKind, string>,
