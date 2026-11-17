@@ -487,7 +487,8 @@ test('the purchase wizard: a strip under each step-2 line head and on each saved
   assert.doesNotMatch(codeOf('src/components/adminOperations/purchaseBlockers.ts'), /supplier[_ -]?link|SupplierLinks/i);
   assert.doesNotMatch(panel, /id=["{`][^"}`]*supplier-link/i, 'no element id: the dock’s «اذهب» targets stay the wizard’s');
   // The gates are the old expressions (tests/purchaseBlockers.test.ts pins them whole).
-  assert.match(panel, /const nextBlocked = !nameValid \|\| !fundingValid\(funding\) \|\| \(step > 0 && \(!quantitiesValid \|\| !originsValid\)\) \|\| \(step === 2 && \(!costsValid \|\| !draftSerialsValid \|\| !rateReady \|\| pendingInlinePrices\)\);/);
+  // Typed prices no longer gate «التالي» (it saves them first, DECISIONS row 345); the rest of the gate is unchanged.
+  assert.match(panel, /const nextBlockedBase = !nameValid \|\| !fundingValid\(funding\) \|\| \(step > 0 && \(!quantitiesValid \|\| !originsValid\)\) \|\| \(step === 2 && \(!costsValid \|\| !draftSerialsValid \|\| !rateReady\)\);/);
 });
 
 test('the order view: a strip on each pre-order line for the owner — never a gift, a bundle or a gone product, never inside a price panel any admin reads', () => {

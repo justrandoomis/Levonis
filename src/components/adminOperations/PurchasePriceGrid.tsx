@@ -68,7 +68,7 @@ export default function PurchasePriceGrid({ rows, currency, decimals, onQty, onR
       </p>
       <ol className="grid gap-2">
         {rows.map((r, i) => (
-          <li key={`${r.key}:${i}`} className="grid gap-3 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-1)] p-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,0.7fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)] lg:items-start" data-purchase-grid-row={i}>
+          <li key={`${r.key}:${i}`} className="purchase-grid-row grid gap-3 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)] bg-[var(--ap-surface-1)] p-3" data-purchase-grid-row={i}>
             <div className="flex min-w-0 items-start gap-2.5">
               {r.image ? <VariantImg sizes="44px" src={r.image} alt="" className="h-11 w-11 shrink-0 rounded-[var(--ap-radius-sm)] object-cover" loading="lazy" /> : <span aria-hidden className="grid h-11 w-11 shrink-0 place-items-center rounded-[var(--ap-radius-sm)] bg-[var(--ap-surface-2)] text-[13px] font-semibold text-[var(--ap-text-3)]">{i + 1}</span>}
               <div className="min-w-0">
@@ -79,17 +79,17 @@ export default function PurchasePriceGrid({ rows, currency, decimals, onQty, onR
                 </button>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-2 lg:contents">
+            <div className="purchase-grid-pair grid grid-cols-2 gap-2">
               <Input id={`purchase-grid-${i}-qty`} label={loc('الكمية', 'Quantity', 'بڕ')} type="number" min={1} value={Number.isFinite(r.qty) ? r.qty : ''} onChange={(v) => onQty(i, v)} error={r.qtyError} />
               <Input id={`purchase-grid-${i}-raw`} label={`${r.rawMode === 'total' ? loc('إجمالي سعر المورد', 'Supplier total', 'کۆی نرخی دابینکەر') : loc('سعر المورد للقطعة', 'Supplier unit price', 'نرخی دابینکەر بۆ پارچە')} (${currency})`} type="number" min={0} decimals={decimals} value={r.raw} onChange={(v) => onRaw(i, v)} error={r.rawError} />
             </div>
             {r.packed ? (
               <Input id={`purchase-grid-${i}-packed`} label={r.packed.basis === 'volume' ? loc('حجم الكرتون للقطعة CBM', 'Packed CBM per unit', 'قەبارەی کارتۆن بۆ پارچە CBM') : loc('وزن الكرتون للقطعة كغ', 'Packed kg per unit', 'کێشی کارتۆن بۆ پارچە کگ')} type="number" min={0} decimals={r.packed.basis === 'volume' ? 9 : 3} value={r.packed.value} onChange={(v) => onPacked(i, v)} error={r.packedError} />
             ) : <span className="hidden lg:block" />}
-            <dl className="grid grid-cols-3 gap-2 text-[12px] lg:grid-cols-1 lg:gap-1">
+            <dl className="purchase-grid-figs grid grid-cols-3 gap-2 text-[12px]">
               <div><dt className={T.text3}>{loc('تكلفة القطعة الواصلة', 'Landed per unit', 'تێچووی گەیشتووی پارچە')}</dt><dd className={`text-[14px] font-semibold tabular-nums ${T.text1}`}><bdi dir="ltr">{fig(r.landedUnit)}</bdi></dd></div>
               <div><dt className={T.text3}>{loc('إجمالي البند', 'Line total', 'کۆی بەند')}</dt><dd className={`tabular-nums ${T.text2}`}><bdi dir="ltr">{fig(r.lineTotal)}</bdi></dd></div>
-              <div className="lg:mt-1 lg:rounded-[var(--ap-radius-sm)] lg:bg-[var(--ap-accent-soft)] lg:px-2 lg:py-1">
+              <div className="purchase-grid-price">
                 <dt className={T.text3}>{loc('سعر الزبون', 'Customer price', 'نرخی کڕیار')}</dt>
                 <dd className="text-[14px] font-semibold tabular-nums text-[var(--ap-accent-text)]"><bdi dir="ltr">{r.customerIqd == null ? '—' : money(r.customerIqd)}</bdi></dd>
                 {r.priceToSave && <dd className="text-[11px] font-semibold text-[var(--ap-warning)]">{loc('سعر جديد لم يُحفظ', 'New price not saved', 'نرخی نوێ پاشەکەوت نەکراوە')}</dd>}

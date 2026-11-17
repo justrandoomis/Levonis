@@ -433,7 +433,7 @@ export default function PurchaseInvoiceImport({ currency, onAdd }: { currency: s
                   {p.pdf ? (
                     <span className={`grid h-full place-items-center p-1 text-center text-[10px] ${T.text2}`}>PDF<br />{p.file.name.slice(0, 18)}</span>
                   ) : (
-                    <img src={p.url} alt={p.file.name} className="h-full w-full object-cover object-top" />
+                    <img src={p.url} alt={p.file.name} className="h-full w-full object-cover" />
                   )}
                   {!busy && (
                     <button

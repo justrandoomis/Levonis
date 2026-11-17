@@ -92,3 +92,11 @@
   .inventory-workspace .inventory-dock-actions { width: 100%; }
   .inventory-workspace .inventory-blockers li { align-items: start; }
 }
+/* The purchase price grid (PurchasePriceGrid.tsx): one row per item on a wide screen. Kept here, not as Tailwind
+   arbitrary values, so the admin-only layout stays out of the public stylesheet budget (tests/bundleBudget). */
+@media (min-width: 1024px) {
+  .inventory-workspace .purchase-grid-row { grid-template-columns: minmax(0, 1.6fr) minmax(0, .7fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.3fr); align-items: start; }
+  .inventory-workspace .purchase-grid-pair { display: contents; }
+  .inventory-workspace .purchase-grid-figs { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .inventory-workspace .purchase-grid-price { margin-top: 4px; padding: 4px 8px; border-radius: var(--ap-radius-sm); background: var(--ap-accent-soft); }
+}
