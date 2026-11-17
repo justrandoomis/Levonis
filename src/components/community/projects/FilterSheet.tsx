@@ -45,9 +45,12 @@ export default function FilterSheet({
 }) {
   const s = useProjectStrings();
   const [draft, setDraft] = useState(value);
+  // The draft starts from the address when the sheet opens, and only then: the page hands a new
+  // `value` object each render, and following it would undo the choices not yet applied.
   useEffect(() => {
     if (open) setDraft(value);
-  }, [open, value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   const set = <K extends keyof ProjectFilterValue>(k: K, v: ProjectFilterValue[K]) => setDraft((d) => ({ ...d, [k]: v }));
 
   const chips = <T extends string>(ids: readonly T[], current: T | '', pick: (v: T | '') => void, name: (v: T) => string, label: string) => (
