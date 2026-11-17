@@ -234,12 +234,29 @@ export default function OfferCompare({ requestId, offers, takingOffers, material
             parts={parts}
             canAct={!!detailsOf && canChoose(detailsOf.offer)}
             onClose={() => setDetailsOf(null)}
+            onChoose={(o) => {
+              setChosen(o.id);
+              setDetailsOf(null);
+            }}
             onChat={chat}
             onDecline={decline}
             onHistory={(o) => openDetails(o, true)}
           />
         )}
-        {asked.compare && <CompareSheet open={compareOpen} offers={offers} materials={materials} parts={parts} onClose={() => setCompareOpen(false)} />}
+        {asked.compare && (
+          <CompareSheet
+            open={compareOpen}
+            offers={offers}
+            materials={materials}
+            parts={parts}
+            onClose={() => setCompareOpen(false)}
+            canChoose={canChoose}
+            onChoose={(o) => {
+              setChosen(o.id);
+              setCompareOpen(false);
+            }}
+          />
+        )}
       </Suspense>
 
       <AcceptSheet

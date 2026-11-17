@@ -12,13 +12,15 @@
  * itself does not grow (plan R6).
  */
 import { useId, type ReactNode } from 'react';
-import { AlertTriangle, BadgeCheck, History, MessageCircle, Star } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, CircleCheck, History, MessageCircle, Star, X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { Sheet } from '../../ui/Sheet';
 import { Button } from '../../ui/Button';
 import { Money } from '../../ui/Money';
 import { StatusChip } from '../../ui/Badge';
 import { CommunityStoreLink } from '../../../pages/community/access';
+import { KitButton, KitIconButton } from '../kit/buttons';
+import { useKitStrings } from '../kit/strings';
 import type { CatalogMaterial, OfferHistoryEntryV2, OfferV2 } from './api';
 import { Breakdown, OfferFiles } from './OfferCompare';
 import { localMaterial } from './mirrors';
@@ -42,8 +44,13 @@ function Row({ k, children, dir = 'auto' }: { k: string; children: ReactNode; di
   );
 }
 
-/** The rows every offer answers, in the same order, so two offers read across. */
-export function OfferFacts({ o, s, lang, materials, parts }: { o: OfferV2; s: RequestStrings; lang: RequestLang; materials: CatalogMaterial[]; parts: PartRef[] }) {
+/**
+ * The rows every offer answers, in the same order, so two offers read across.
+ * `uniform` (the side-by-side columns of CompareSheet): every row is drawn, a
+ * fact the offer lacks as «—», so each label sits level with the same label
+ * of the column beside it; the details sheet leaves an empty optional row out.
+ */
+export function OfferFacts({ o, s, lang, materials, parts, uniform = false }: { o: OfferV2; s: RequestStrings; lang: RequestLang; materials: CatalogMaterial[]; parts: PartRef[]; uniform?: boolean }) {
   const partial = partialLabel(o, parts.length, s);
   const { covered, uncovered } = coverageOf(o, parts);
   const subs = substitutionPieces(o, parts, s, lang, materials);
@@ -54,8 +61,8 @@ export function OfferFacts({ o, s, lang, materials, parts }: { o: OfferV2; s: Re
     <dl className="divide-y divide-border-subtle/60" data-offer-facts={o.id}>
       <Row k={s.completion}>{o.completion_days ? daysLabel(o.completion_days, lang) : '—'}</Row>
       <Row k={s.handover}>{handoverLabel(o.delivery_method, s)}</Row>
-      {o.quantity != null && <Row k={s.quantity}>{`×${o.quantity}`}</Row>}
-      {o.color && <Row k={s.colour}>{o.color}</Row>}
+      {(uniform || o.quantity != null) && <Row k={s.quantity}>{o.quantity != null ? `×${o.quantity}` : '—'}</Row>}
+      {(uniform || !!o.color) && <Row k={s.colour}>{o.color || '—'}</Row>}
       <Row k={s.materials}>{o.material_ids?.length ? o.material_ids.map(matName).join(sep) : o.materials || '—'}</Row>
       {parts.length > 1 && (
         <Row k={s.partsLabel} dir={readerDir(lang)}>
@@ -67,18 +74,20 @@ export function OfferFacts({ o, s, lang, materials, parts }: { o: OfferV2; s: Re
           )}
         </Row>
       )}
-      {subs.length > 0 && (
+      {(uniform || subs.length > 0) && (
         <Row k={s.substitutesLabel} dir={readerDir(lang)}>
-          {subs.map((x) => (
-            <span key={x.line} className="block" data-offer-substitution>
-              <SubstitutionText x={x} s={s} dir={readerDir(lang)} />
-            </span>
-          ))}
+          {subs.length
+            ? subs.map((x) => (
+                <span key={x.line} className="block" data-offer-substitution>
+                  <SubstitutionText x={x} s={s} dir={readerDir(lang)} />
+                </span>
+              ))
+            : '—'}
         </Row>
       )}
       <Row k={s.included}>{o.included || '—'}</Row>
       <Row k={s.warranty}>{o.warranty_terms || '—'}</Row>
-      {o.terms && <Row k={s.terms}>{o.terms}</Row>}
+      {(uniform || !!o.terms) && <Row k={s.terms}>{o.terms || '—'}</Row>}
       <Row k={s.validUntil}>{until || s.openEnded}</Row>
     </dl>
   );
@@ -112,17 +121,20 @@ export interface OfferDetailsSheetProps {
   showHistory?: boolean;
   materials: CatalogMaterial[];
   parts: PartRef[];
-  /** The offer can still be declined (the request takes offers and it is live). */
+  /** The offer can still be chosen and declined (the request takes offers and it is live). */
   canAct: boolean;
   onClose: () => void;
+  /** «اختر هذا العرض»: chooses it as tapping its card does (only when `canAct`). */
+  onChoose?: (o: OfferV2) => void;
   onChat: (o: OfferV2) => void;
   onDecline: (o: OfferV2) => void;
   onHistory: (o: OfferV2) => void;
 }
 
-export default function OfferDetailsSheet({ offer, showHistory = false, materials, parts, canAct, onClose, onChat, onDecline, onHistory }: OfferDetailsSheetProps) {
+export default function OfferDetailsSheet({ offer, showHistory = false, materials, parts, canAct, onClose, onChoose, onChat, onDecline, onHistory }: OfferDetailsSheetProps) {
   const { lang } = useLanguage();
   const s = useRequestStrings();
+  const k = useKitStrings();
   const L = requestLang(lang);
   const titleId = useId();
   const o = offer;
@@ -141,16 +153,20 @@ export default function OfferDetailsSheet({ offer, showHistory = false, material
       panelClassName="w-full sm:max-w-md"
       testId="offer-details"
       header={
-        <div className="px-5 pb-1 pt-1">
-          <h2 id={titleId} className="flex items-center gap-1.5 text-[16px] font-bold text-text-primary">
-            <bdi className="truncate">{showHistory ? s.history : m?.name ?? s.theMerchant}</bdi>
-            {!showHistory && m?.verified && <BadgeCheck aria-label={s.verified} className="h-4 w-4 shrink-0 text-gold" />}
-          </h2>
-          {showHistory && m?.name && (
-            <p className="mt-0.5 text-[12px] text-text-muted">
-              <bdi>{m.name}</bdi>
-            </p>
-          )}
+        // The title clear of the window's top edge, and the close every window of the kit offers beside it.
+        <div className="flex items-center gap-2 pb-1 pe-3 ps-5 pt-2">
+          <div className="min-w-0 flex-1">
+            <h2 id={titleId} className="flex items-center gap-1.5 text-[16px] font-bold text-text-primary">
+              <bdi className="truncate">{showHistory ? s.history : m?.name ?? s.theMerchant}</bdi>
+              {!showHistory && m?.verified && <BadgeCheck aria-label={s.verified} className="h-4 w-4 shrink-0 text-gold" />}
+            </h2>
+            {showHistory && m?.name && (
+              <p className="mt-0.5 text-[12px] text-text-muted">
+                <bdi>{m.name}</bdi>
+              </p>
+            )}
+          </div>
+          <KitIconButton label={k.close} tone="ghost" icon={<X className="h-5 w-5" />} onClick={onClose} data-sheet-close />
         </div>
       }
     >
@@ -215,6 +231,12 @@ export default function OfferDetailsSheet({ offer, showHistory = false, material
               <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               {s.unableNote}
             </p>
+          )}
+          {canAct && onChoose && (
+            // The same choice as tapping the card: it arms «متابعة مع هذا العرض» under the list, nothing more.
+            <KitButton block className="mt-3" icon={<CircleCheck aria-hidden="true" className="h-4 w-4" />} onClick={() => onChoose(o)} data-offer-choose={o.id}>
+              {s.chooseThisOffer}
+            </KitButton>
           )}
           <div className="mt-3 flex flex-wrap gap-1">
             {(o.state === 'pending' || o.state === 'superseded') && (

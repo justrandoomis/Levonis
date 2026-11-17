@@ -11,7 +11,8 @@
  *          notes, each also the radio's description
  *   row 2  three cells: the expected time, the materials, the handover
  *          («يشمل التوصيل» when the fee is nothing and the workshop brings
- *          it, «+ fee توصيل» when there is a fee, «استلام من الورشة» with the
+ *          it, «+fee توصيل» when there is a fee, the sign in the amount's
+ *          island, «استلام من الورشة» with the
  *          governorate, never a district: plan R3; a delivery names no
  *          governorate, the workshop's not being the customer's)
  *   row 3  «التفاصيل» (every fact, in OfferDetailsSheet) and «مراسلة» (a live
@@ -21,13 +22,14 @@
  * «العروض» only when it can be chosen (the request still takes offers and
  * this offer is live); nothing is chosen until the customer chooses, and the
  * choice only arms the one gold button under the list, which opens the
- * accept sheet. The chosen card wears the gold edge and the check badge, and
- * says «محدد» in its name: never colour alone. The radio holds only words;
+ * accept sheet. Every card that can be chosen shows an empty radio ring at
+ * its start corner; the chosen one fills it, wears the gold edge, and says
+ * «محدد» in its name: never colour alone. The radio holds only words;
  * the two buttons sit beside it in the card, never inside it.
  */
 import { useId } from 'react';
 import type React from 'react';
-import { AlertTriangle, BadgeCheck, Check, Clock, FileText, Layers, MapPin, MessageCircle, Star, Store, Truck } from 'lucide-react';
+import { AlertTriangle, BadgeCheck, Clock, FileText, Layers, MapPin, MessageCircle, Star, Store, Truck } from 'lucide-react';
 import { GOVERNORATE_LABELS } from '../../../lib/governorates';
 import { iqdNumber, iqdUnit } from '../../../lib/money';
 import { Money } from '../../ui/Money';
@@ -93,13 +95,18 @@ export default function OfferCard({ o, s, lang, parts, materials, selectable, se
 
   const body = (
     <>
-      {selectable && (
-        // The badge the scope sheet shows on a chosen radio (`[aria-checked='true'] > .cm-check`), at the end corner.
-        <span aria-hidden="true" className="cm-check absolute size-6 items-center justify-center rounded-full" style={{ insetInlineStart: 'auto', insetInlineEnd: 0, insetBlockStart: 0 }}>
-          <Check className="h-4 w-4" strokeWidth={3} />
-        </span>
-      )}
       <div className="flex items-start gap-3">
+        {selectable && (
+          // The radio drawn at the start corner: an empty ring on every card that can be chosen, filled on the
+          // chosen one. Drawn only; the state is said by the radio (`aria-checked`, «محدد» in its name).
+          <span
+            aria-hidden="true"
+            className={`mt-3 flex size-6 shrink-0 items-center justify-center rounded-full border-2 ${selected ? 'border-gold' : 'border-text-muted'}`}
+            data-offer-ring={selected ? 'on' : 'off'}
+          >
+            {selected && <span className="size-3 rounded-full bg-gold" />}
+          </span>
+        )}
         <KitAvatar src={m?.logo_url ?? null} name={name} size={48} />
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 text-[17px] font-bold leading-snug text-text-primary">
@@ -122,7 +129,7 @@ export default function OfferCard({ o, s, lang, parts, materials, selectable, se
             {!!m?.completed_orders && <span>{jobsLabel(m.completed_orders, lang)}</span>}
           </p>
         </div>
-        <div className="shrink-0 pe-6 text-end">
+        <div className="shrink-0 text-end">
           <p className="text-[20px] font-bold leading-tight text-text-primary" data-offer-total={o.total_iqd ?? ''}>
             <Money iqd={o.total_iqd} />
           </p>
@@ -191,7 +198,11 @@ export default function OfferCard({ o, s, lang, parts, materials, selectable, se
           {pickup ? <Store aria-hidden="true" className={icon} /> : <Truck aria-hidden="true" className={icon} />}
           <span className="min-w-0">
             <span className="block text-[14px] font-semibold leading-snug text-text-primary">
-              {pickup ? s.handoverPickup : fee > 0 ? fillNodes(s.plusDelivery, { fee: <Money iqd={fee} /> }) : s.deliveryIncluded}
+              {pickup ? s.handoverPickup : fee > 0 ? (
+                // «+٢٬٠٠٠ د.ع توصيل»: the sign in the amount's own left-to-right island (Money `signed`), so it never
+                // drifts to the far end of an Arabic line or wraps away from the figure.
+                fillNodes(s.plusDelivery, { fee: <span className="whitespace-nowrap" data-offer-fee><Money iqd={fee} signed /></span> })
+              ) : s.deliveryIncluded}
             </span>
             <span className="block text-[12px] leading-snug text-text-muted">{/* The workshop's governorate is where a pickup happens; under a delivery it would read as the customer's own area. */}
               {pickup ? gov || s.handover : handoverLabel(o.delivery_method, s)}</span>

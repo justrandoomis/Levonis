@@ -93,6 +93,7 @@ const compare = await import('../src/components/community/requests/OfferCompare'
 const composer = await import('../src/components/community/requests/OfferComposer');
 const discussion = await import('../src/components/community/requests/Discussion');
 const await_compareSheet = await import('../src/components/community/requests/CompareSheet');
+const OfferCard = (await import('../src/components/community/requests/OfferCard')).default;
 const { REQUEST_STRINGS, requestStrings, daysLabel, jobsLabel, shortDay, offerStateWords, orderStateWord, escrowSentence, systemUpdateLabel, fillNodes, handoverLabel, composerHandover, fill } = strings;
 const { requestStepIndex, requestStateTone, requestTakesOffers, requestPath, requestRedirect, REQUEST_STEPS, REQUEST_SECTIONS, latestEvent } = states;
 const OfferCompare = compare.default;
@@ -743,4 +744,83 @@ test('the owner page: the tab count is the live offers, a tab is written into th
   assert.match(list, /if \(!d\.published\) toast\.info\(s\.repeatedDraft\);\s*onOpen\(d\.request_id\);/);
   assert.doesNotMatch(list, /setNotice/, 'no notice set on a list that is left at once');
   assert.doesNotMatch(read('src/components/print/MyRequestsList.tsx'), /PUBLISHES it/, 'the header no longer says a repeat publishes');
+});
+
+// ------------------------------------------------------------- C3 screenshot fixes
+
+test('«مقارنة العروض»: every column answers the same rows in the same order, «—» where an offer is silent; a close; «اختر هذا العرض» only where the card could be chosen', () => {
+  const CompareSheet = await_compareSheet.default;
+  const full = offer({ id: 'full', quantity: 2, color: 'أسود', terms: 'كما في الصورة' });
+  const bare = offer({ id: 'bare', merchant_id: 'm2', merchant: merchant('m2', 'B', 4), quantity: null, color: '', terms: '' });
+  const chosen: string[] = [];
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const s = requestStrings(lang);
+    const h = html(createElement(CompareSheet, { open: true, offers: [full, bare], materials, parts: [], onClose: noop, canChoose: () => true, onChoose: (o: OfferV2) => chosen.push(o.id) }), lang);
+    const column = (id: string) => new RegExp(`data-compare-column="${id}"[\\s\\S]*?</article>`).exec(h)?.[0] ?? '';
+    const labels = (c: string) => [...c.matchAll(/<dt[^>]*>([^<]*)<\/dt>/g)].map((m) => m[1]);
+    assert.ok(labels(column('full')).length >= 9, column('full'));
+    assert.deepEqual(labels(column('bare')), labels(column('full')), `${lang}: the same rows, in the same order`);
+    for (const k of [s.quantity, s.colour, s.terms, s.substitutesLabel]) assert.ok(labels(column('bare')).includes(k), `${lang}: «${k}» is drawn for the silent offer`);
+    assert.match(column('bare'), /<dd[^>]*>—<\/dd>/, 'a missing fact reads «—»');
+    assert.deepEqual(attrs(h, 'data-compare-choose').sort(), ['bare', 'full']);
+    assert.ok(text(h).includes(s.chooseThisOffer), lang);
+    const close = { ar: 'إغلاق', en: 'Close', ckb: 'داخستن' }[lang];
+    assert.match(h, new RegExp(`<button[^>]*data-sheet-close[^>]*aria-label="${close}"`), `${lang}: a visible close in the header`);
+  }
+  // The rule of the cards: a request that takes no offers (or an offer that is not live) offers no choice.
+  const none = html(createElement(CompareSheet, { open: true, offers: [full, bare], materials, parts: [], onClose: noop, canChoose: () => false, onChoose: noop }));
+  assert.deepEqual(attrs(none, 'data-compare-choose'), []);
+  // OfferCompare hands the sheet its own rule and its own choice.
+  const src = code('src/components/community/requests/OfferCompare.tsx');
+  assert.match(src, /<CompareSheet[\s\S]*?canChoose=\{canChoose\}[\s\S]*?onChoose=\{\(o\) => \{\s*setChosen\(o\.id\);\s*setCompareOpen\(false\);/);
+  assert.match(src, /<OfferDetailsSheet[\s\S]*?canAct=\{!!detailsOf && canChoose\(detailsOf\.offer\)\}[\s\S]*?onChoose=\{\(o\) => \{\s*setChosen\(o\.id\);\s*setDetailsOf\(null\);/);
+  // The details sheet keeps leaving a silent optional row out.
+  const details = code('src/components/community/requests/OfferDetailsSheet.tsx');
+  assert.match(details, /<OfferFacts o=\{o\} s=\{s\} lang=\{L\} materials=\{materials\} parts=\{parts\} \/>/);
+});
+
+test('the details sheet: a close in a header clear of the top edge, and «اختر هذا العرض» only when the offer can be chosen', async () => {
+  const Details = (await import('../src/components/community/requests/OfferDetailsSheet')).default;
+  const props = { offer: offer(), materials, parts: [], onClose: noop, onChat: noop, onDecline: noop, onHistory: noop };
+  const picked: string[] = [];
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const h = html(createElement(Details, { ...props, canAct: true, onChoose: (o: OfferV2) => picked.push(o.id) }), lang);
+    assert.deepEqual(attrs(h, 'data-offer-choose'), ['off_1'], lang);
+    assert.ok(text(h).includes(requestStrings(lang).chooseThisOffer), lang);
+    assert.equal(count(h, /data-sheet-close/g), 1, `${lang}: one close`);
+  }
+  const cannot = html(createElement(Details, { ...props, canAct: false, onChoose: noop }));
+  assert.deepEqual(attrs(cannot, 'data-offer-choose'), [], 'a stale, unable or closed offer cannot be chosen here either');
+  const src = code('src/components/community/requests/OfferDetailsSheet.tsx');
+  assert.match(src, /header=\{\s*<div className="flex items-center gap-2 pb-1 pe-3 ps-5 pt-2">/, 'the title is padded off the window top');
+  assert.match(code('src/components/community/requests/CompareSheet.tsx'), /header=\{\s*<div className="flex items-center gap-2 pb-1 pe-3 ps-5 pt-2">/, 'the two sheets share the header');
+});
+
+test('an offer card that can be chosen shows an empty radio ring at its start, filled once chosen; the ring is drawn only', () => {
+  const s = requestStrings('ar');
+  const props = { o: offer(), s, lang: 'ar' as const, parts: [], materials, onDetails: noop };
+  const card = (selectable: boolean, selected: boolean) => html(createElement(OfferCard, { ...props, selectable, selected }));
+  const ring = (h: string) => /<span[^>]*data-offer-ring="[^"]*"[^>]*>/.exec(h)?.[0] ?? '';
+  assert.match(ring(card(true, false)), /aria-hidden="true"/);
+  assert.match(ring(card(true, false)), /data-offer-ring="off"/);
+  assert.match(ring(card(true, false)), /border-text-muted/);
+  assert.match(ring(card(true, true)), /data-offer-ring="on"/);
+  assert.match(ring(card(true, true)), /border-gold/);
+  assert.match(card(true, true), /data-offer-ring="on"[^>]*><span class="size-3 rounded-full bg-gold">/, 'filled when chosen');
+  assert.equal(ring(card(false, false)), '', 'an offer that cannot be chosen is not drawn as a radio');
+  // The ring sits before the logo in the first row: the inline start corner, in either direction.
+  const h = card(true, false);
+  assert.ok(h.indexOf('data-offer-ring') < h.indexOf('data-offer-total'));
+  assert.match(h, /role="radio" aria-checked="false"/, 'the state stays on the radio');
+});
+
+test('«+٢٬٠٠٠ د.ع توصيل»: the sign rides in the amount\'s own isolate and never wraps away from it, in ar, en and ckb', () => {
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const s = requestStrings(lang);
+    assert.ok(s.plusDelivery.startsWith('{fee} '), `${lang}: «${s.plusDelivery}» leaves the sign to the amount`);
+    assert.ok(!s.plusDelivery.includes('+'), lang);
+    const h = html(createElement(OfferCard, { o: offer(), s, lang, parts: [], materials, selectable: true, selected: false, onDetails: noop }), lang);
+    const fee = /<span class="whitespace-nowrap" data-offer-fee="true">([\s\S]*?)<\/span>/.exec(h)?.[1] ?? '';
+    assert.match(fee, /<bdi data-money="true" class="whitespace-nowrap[^"]*"><bdi dir="ltr">\+/, `${lang}: «+» inside the left-to-right island: ${fee}`);
+  }
 });

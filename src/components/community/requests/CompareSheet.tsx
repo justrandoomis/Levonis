@@ -4,17 +4,21 @@
  * wins on each of the three things a customer weighs (the cheapest total, the
  * fastest, the best rated; from the complete offers when a partial one would
  * otherwise win, and said so), sorted as the customer asks; from a wide screen
- * the live offers also stand side by side, every one answering the same rows.
+ * the live offers also stand side by side, every one answering the same rows
+ * (a fact an offer lacks is «—», so each label is level across the columns),
+ * each with «اختر هذا العرض», the choice tapping its card makes.
  *
  * A lazy chunk, like the details sheet: the request page does not carry it.
  */
 import { useId, useMemo, useState, type ReactNode } from 'react';
-import { Star } from 'lucide-react';
+import { CircleCheck, Star, X } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
 import { Sheet } from '../../ui/Sheet';
 import { Money } from '../../ui/Money';
 import { StatusChip } from '../../ui/Badge';
+import { KitButton, KitIconButton } from '../kit/buttons';
 import { SegmentedTrack } from '../kit/controls';
+import { useKitStrings } from '../kit/strings';
 import type { CatalogMaterial, OfferV2 } from './api';
 import { OfferFacts } from './OfferDetailsSheet';
 import { bestOffers, offerIsLive, partialLabel, sortOffers, type OfferSort, type PartRef } from './offerParts';
@@ -44,11 +48,16 @@ export interface CompareSheetProps {
   materials: CatalogMaterial[];
   parts: PartRef[];
   onClose: () => void;
+  /** The rule of the cards: may this offer be chosen now (the request takes offers and the offer is live)? */
+  canChoose?: (o: OfferV2) => boolean;
+  /** «اختر هذا العرض»: the choice tapping the offer's card makes. */
+  onChoose?: (o: OfferV2) => void;
 }
 
-export default function CompareSheet({ open, offers, materials, parts, onClose }: CompareSheetProps) {
+export default function CompareSheet({ open, offers, materials, parts, onClose, canChoose, onChoose }: CompareSheetProps) {
   const { lang } = useLanguage();
   const s = useRequestStrings();
+  const k = useKitStrings();
   const L = requestLang(lang);
   const titleId = useId();
   const [sort, setSort] = useState<OfferSort>('price');
@@ -65,10 +74,11 @@ export default function CompareSheet({ open, offers, materials, parts, onClose }
       panelClassName="w-full sm:max-w-md lg:max-w-3xl"
       testId="offer-compare-sheet"
       header={
-        <div className="px-5 pb-1 pt-1">
-          <h2 id={titleId} className="text-[16px] font-bold text-text-primary">
+        <div className="flex items-center gap-2 pb-1 pe-3 ps-5 pt-2">
+          <h2 id={titleId} className="min-w-0 flex-1 text-[16px] font-bold text-text-primary">
             {s.compareOffers}
           </h2>
+          <KitIconButton label={k.close} tone="ghost" icon={<X className="h-5 w-5" />} onClick={onClose} data-sheet-close />
         </div>
       }
     >
@@ -115,14 +125,22 @@ export default function CompareSheet({ open, offers, materials, parts, onClose }
         {/* Wide screens: the offers side by side, every one answering the same rows, in the chosen order. */}
         <div className="grid gap-3 lg:grid-cols-2" data-offer-columns>
           {sorted.map((o) => (
-            <article key={o.id} className="lv-surface p-4" data-compare-column={o.id}>
+            <article key={o.id} className="lv-surface flex flex-col p-4" data-compare-column={o.id}>
               <p className="truncate text-[14px] font-semibold text-text-primary">
                 <bdi>{o.merchant?.name ?? s.theMerchant}</bdi>
               </p>
               <p className="mt-1 text-[18px] font-bold text-text-primary">
                 <Money iqd={o.total_iqd} />
               </p>
-              <OfferFacts o={o} s={s} lang={L} materials={materials} parts={parts} />
+              <OfferFacts o={o} s={s} lang={L} materials={materials} parts={parts} uniform />
+              {onChoose && canChoose?.(o) && (
+                // At the foot of every column alike, however long the column above it.
+                <div className="mt-auto pt-3">
+                  <KitButton block icon={<CircleCheck aria-hidden="true" className="h-4 w-4" />} onClick={() => onChoose(o)} data-compare-choose={o.id}>
+                    {s.chooseThisOffer}
+                  </KitButton>
+                </div>
+              )}
             </article>
           ))}
         </div>
