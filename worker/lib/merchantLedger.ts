@@ -44,6 +44,7 @@
  */
 import { newId } from './crypto';
 import { auditStatements } from './audit';
+import { refuseDemoMoney } from './communityDemo';
 
 export type LedgerBucket = 'pending' | 'available' | 'reserved' | 'paid';
 export type LedgerKind =
@@ -818,6 +819,7 @@ export async function recordAdminPayout(
   db: D1Database,
   p: { merchantId: string; amountIqd: number; reference: string; adminId: string; key: string; ts?: string }
 ): Promise<PayoutResult> {
+  refuseDemoMoney(p.merchantId);
   if (!(Number.isSafeInteger(p.amountIqd) && p.amountIqd > 0 && p.amountIqd <= 1_000_000_000)) {
     return { ok: false, reason: 'INVALID_AMOUNT' };
   }
@@ -894,6 +896,7 @@ export async function adjustMerchantBalance(
   db: D1Database,
   p: { merchantId: string; amountIqd: number; reason: string; adminId: string; key: string; ts?: string }
 ): Promise<AdjustResult> {
+  refuseDemoMoney(p.merchantId);
   if (!(Number.isSafeInteger(p.amountIqd) && p.amountIqd !== 0 && Math.abs(p.amountIqd) <= 1_000_000_000)) {
     return { ok: false, reason: 'INVALID_AMOUNT' };
   }

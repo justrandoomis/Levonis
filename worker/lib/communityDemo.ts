@@ -35,7 +35,33 @@
  * share cards leave demo rows out, the matcher never pairs a demo row with a
  * real one, and email to a demo address is never sent.
  */
-import { DEMO_EMAIL_DOMAIN, DEMO_ID_PREFIX } from '../../packages/contracts/src/demoData';
+import { DEMO_EMAIL_DOMAIN, DEMO_ID_PREFIX, isDemoId } from '../../packages/contracts/src/demoData';
+import { HttpError } from './http';
+import { storeUrl } from './hosts';
+
+/**
+ * A store's address as the community hands it out. A community DEMO store has
+ * no public storefront (`storeHiddenFromPublic`), so its links stay on the
+ * in-site page, which /api/community/store/:id serves by store id too.
+ * (worker/lib/hosts.ts stays a byte-identical copy of the edge package's, so
+ * the rule lives here, at the community's call sites.)
+ */
+export function communityStoreUrl(slug: string, rootDomain: string | null, storeId: string): string {
+  return isDemoId(storeId) ? `/community/store/${storeId}` : storeUrl(slug, rootDomain, storeId);
+}
+
+/**
+ * NO MONEY ON A DEMO ROW. A ledger line, a payout or a wallet line naming a
+ * demo merchant or account would block «حذف كل البيانات التجريبية» for good
+ * (DEMO_REMOVE_BLOCKED) and so keep the community shut; the admin money doors
+ * that take an id (merchant payout and adjustment, the wallet adjustment)
+ * refuse one first.
+ */
+export function refuseDemoMoney(id: unknown): void {
+  if (isDemoId(id)) {
+    throw new HttpError(409, 'هذا حساب تجريبي، لا تُسجَّل له أموال / This is community demo data; no money is recorded for it', 'DEMO_NO_MONEY');
+  }
+}
 
 /** A column holds a demo id. `substr`, not LIKE: `_` is a LIKE wildcard. */
 export const demoIdSql = (col: string) => `substr(${col}, 1, ${DEMO_ID_PREFIX.length}) = '${DEMO_ID_PREFIX}'`;
@@ -230,7 +256,7 @@ export function expectedDemoCounts(): DemoCounts {
   };
 }
 
-/** The demo rows each table holds now. One statement, nine sub-counts. */
+/** The demo rows each table holds now. One statement, one sub-count per table. */
 export async function demoCounts(db: D1Database): Promise<DemoCounts> {
   const row = await db
     .prepare(
@@ -257,11 +283,38 @@ export async function demoCounts(db: D1Database): Promise<DemoCounts> {
 
 export const demoTotal = (c: DemoCounts) => DEMO_TABLES.reduce((n, t) => n + c[t], 0);
 
-/** Is any demo account present? The one cheap probe the gate's PUT asks. */
+/** Is any demo row present — an account, a shop, a post, a request or an offer? */
+export const DEMO_PRESENT_SQL = `(EXISTS (SELECT 1 FROM users WHERE ${demoIdSql('id')})
+    OR EXISTS (SELECT 1 FROM community_merchants WHERE ${demoIdSql('id')})
+    OR EXISTS (SELECT 1 FROM merchant_stores WHERE ${demoIdSql('id')})
+    OR EXISTS (SELECT 1 FROM community_posts WHERE ${demoIdSql('id')})
+    OR EXISTS (SELECT 1 FROM community_requests WHERE ${demoIdSql('id')})
+    OR EXISTS (SELECT 1 FROM community_offers WHERE ${demoIdSql('id')}))`;
+
 export async function demoPresent(db: D1Database): Promise<boolean> {
-  const row = await db.prepare(`SELECT 1 AS x FROM users WHERE ${demoIdSql('id')} LIMIT 1`).first();
-  return !!row;
+  const row = await db.prepare(`SELECT ${DEMO_PRESENT_SQL} AS x`).first<{ x: number }>();
+  return Number(row?.x ?? 0) === 1;
 }
+
+/** The chats a demo shop, store or account is in. */
+export const demoChatsSql = () =>
+  `SELECT id FROM chats WHERE ${demoIdSql('merchant_id')} OR ${demoIdSql('store_id')}
+   UNION SELECT chat_id FROM chat_participants WHERE ${demoIdSql('user_id')}`;
+
+/**
+ * The gate is open to the public, as SQL: `{"open": true}` in the one row.
+ * Read the strict way the server reads it, but leaning closed-for-demo: any
+ * truthy `open` counts as open here, so the seed refuses rather than writes.
+ */
+export const GATE_OPEN_SQL = `EXISTS (SELECT 1 FROM admin_settings WHERE key = 'communityGate'
+    AND json_valid(value) AND json_extract(value, '$.open') = 1)`;
+
+/**
+ * The seed's first statement: a guard that fails the whole batch (users.email
+ * is NOT NULL) when the gate is open at the moment the batch runs, so a seed
+ * racing an «open» writes nothing.
+ */
+export const DEMO_SEED_GUARD_SQL = `INSERT INTO users (id, email, name) SELECT 'demo_gate_guard', NULL, '' WHERE ${GATE_OPEN_SQL}`;
 
 // ------------------------------------------------------------------ seeding
 
@@ -275,7 +328,7 @@ export function demoSeedStatements(db: D1Database, nowMs: number = Date.now()): 
   const at = (hoursAgo: number) => new Date(nowMs - hoursAgo * 3_600_000).toISOString();
   const ahead = (days: number) => new Date(nowMs + days * 86_400_000).toISOString();
   const now = at(0);
-  const out: D1PreparedStatement[] = [];
+  const out: D1PreparedStatement[] = [db.prepare(DEMO_SEED_GUARD_SQL)];
 
   for (const u of USERS) {
     const profile = u.maker ? { printers: u.printers ?? [], materials: u.materials ?? [] } : {};
@@ -437,7 +490,8 @@ export async function demoRemovalBlockers(db: D1Database): Promise<Record<string
         (SELECT COUNT(*) FROM community_complaints WHERE ${d('merchant_id')} OR ${d('store_id')} OR ${d('offer_id')} OR ${d('reporter_id')} OR ${d('reported_user_id')}) AS community_complaints,
         (SELECT COUNT(*) FROM merchant_ledger_entries WHERE ${d('merchant_id')} OR ${d('store_id')}) AS merchant_ledger_entries,
         (SELECT COUNT(*) FROM merchant_payouts WHERE ${d('merchant_id')}) AS merchant_payouts,
-        (SELECT COUNT(*) FROM orders WHERE ${d('user_id')} OR ${d('merchant_id')} OR ${d('store_id')}) AS orders,
+        (SELECT COUNT(*) FROM orders WHERE ${d('user_id')} OR ${d('merchant_id')} OR ${d('store_id')} OR origin_chat_id IN (${demoChatsSql()})) AS orders,
+        (SELECT COUNT(*) FROM community_orders WHERE chat_id IN (${demoChatsSql()})) AS community_orders_in_demo_chats,
         (SELECT COUNT(*) FROM wallet_transactions WHERE ${d('user_id')}) AS wallet_transactions`
     )
     .first<Record<string, number>>();
@@ -458,7 +512,7 @@ export async function demoRemovalBlockers(db: D1Database): Promise<Record<string
 export function demoRemovalStatements(db: D1Database, realRequestsToRecount: string[]): Array<{ label: string; stmt: D1PreparedStatement }> {
   const d = demoIdSql;
   const del = (label: string, sql: string) => ({ label, stmt: db.prepare(sql) });
-  const demoChats = `SELECT id FROM chats WHERE ${d('merchant_id')} OR ${d('store_id')}`;
+  const demoChats = demoChatsSql();
   const steps = [
     // A demo account's bell (user_notifications, the notifications service's
     // table) goes with the account: its user_id foreign key cascades.
@@ -491,7 +545,13 @@ export function demoRemovalStatements(db: D1Database, realRequestsToRecount: str
       'community_requests_to_demo_shops',
       `DELETE FROM community_requests WHERE NOT (${d('id')}) AND (${d('target_merchant_id')} OR origin_chat_id IN (${demoChats}))`
     ),
-    del('chats', `DELETE FROM chats WHERE ${d('merchant_id')} OR ${d('store_id')}`),
+    // Every conversation a demo shop or a demo account is in — a store thread,
+    // or a direct message a real tester opened with a demo maker — goes whole:
+    // its messages, its members, the chat.
+    // Messages first (counted), then the chats — while their members are still
+    // there to name them; the members go with each chat (ON DELETE CASCADE).
+    del('chat_messages', `DELETE FROM chat_messages WHERE chat_id IN (${demoChats})`),
+    del('chats', `DELETE FROM chats WHERE id IN (${demoChats})`),
     del('community_requests', `DELETE FROM community_requests WHERE ${d('id')} OR ${d('customer_id')}`),
     del('merchant_printers', `DELETE FROM merchant_printers WHERE ${d('id')} OR ${d('merchant_id')}`),
     del('merchant_request_prefs', `DELETE FROM merchant_request_prefs WHERE ${d('merchant_id')}`),

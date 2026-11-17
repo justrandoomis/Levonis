@@ -167,7 +167,9 @@ test('a suspended shop\'s community link says «غير متاح», as its own ad
   const page = code('src/pages/CommunityStorePage.tsx');
   assert.match(page, /const refused = \(e: unknown\) => e instanceof ApiError && e\.code === 'STORE_UNAVAILABLE';/);
   assert.match(page, /\.catch\(\(e: unknown\) => \{\s*if \(refused\(e\)\) throw e;\s*return storefrontApi\.storeById\(id\);\s*\}\)/, 'a refusal is not retried as another kind of id');
-  assert.match(page, /if \(alive && refused\(legacy\)\) setUnavailable\(true\);/, 'the profile-only door answers the same');
+  // A refused storefront still asks the in-community profile once (a community demo shop has no storefront);
+  // whatever that answers, a refused shop stays «غير متاح».
+  assert.match(page, /if \(alive && \(storefrontRefused \|\| refused\(legacy\)\)\) setUnavailable\(true\);/, 'the profile-only door answers the same');
   assert.match(page, /if \(unavailable\) return <StoreUnavailable \/>;/);
 });
 

@@ -31,7 +31,8 @@ import { communityPostRoutes } from '../worker/routes/communityPosts';
 import { communitySocialRoutes } from '../worker/routes/communitySocial';
 import { marketplaceRoutes } from '../worker/routes/marketplace';
 import { authRoutes } from '../worker/routes/auth';
-import { DEMO_TABLES, demoId, expectedDemoCounts } from '../worker/lib/communityDemo';
+import { chatRoutes } from '../worker/routes/chats';
+import { DEMO_TABLES, demoId, demoSeedStatements, expectedDemoCounts } from '../worker/lib/communityDemo';
 import { createSession } from '../worker/lib/session';
 import { emailAllowsRecipient } from '../worker/lib/emailSend';
 import { loadCandidates, matchRequest } from '../worker/lib/printMatchingStore';
@@ -77,6 +78,7 @@ const mount = (a: Hono<AppContext>) => {
   a.route('/api/community', communitySocialRoutes);
   a.route('/api/marketplace', marketplaceRoutes);
   a.route('/api/auth', authRoutes);
+  a.route('/api/chats', chatRoutes);
 };
 const as = (raw: DatabaseSync, user: StubUser | null) => stubApp(asD1(raw), user, mount as never);
 const n = (raw: DatabaseSync, sql: string, ...args: unknown[]) => Number((raw.prepare(sql).get(...(args as never[])) as { n: number }).n);
@@ -332,6 +334,71 @@ test('a trade record naming a demo row stops the removal, which then deletes not
   assert.equal(body.code, 'DEMO_REMOVE_BLOCKED');
   assert.equal(body.details.blockers.wallet_transactions, 1);
   assert.equal(n(raw, "SELECT COUNT(*) AS n FROM users WHERE substr(id,1,5) = 'demo_'"), 10);
+});
+
+test('a direct chat a real tester opened with a demo maker goes whole with the removal', async () => {
+  const raw = seed();
+  await seedDemo(raw);
+  const tester = as(raw, CUSTOMER);
+  const opened = await json(await post(tester, '/api/chats/open', { userId: demoId('usr', 1) }));
+  assert.ok(opened.chatId, JSON.stringify(opened));
+  const sent = await post(tester, `/api/chats/${opened.chatId}/messages`, { body: 'Hello maker', client_id: 'demo-chat-00001' });
+  assert.ok(sent.status < 300, `send: ${sent.status}`);
+  assert.equal(n(raw, 'SELECT COUNT(*) AS n FROM chat_messages WHERE chat_id = ?', opened.chatId), 1);
+  assert.equal(((await json(await get(tester, '/api/chats'))).chats as unknown[]).length, 1);
+
+  const res = await post(as(raw, OWNER), '/api/admin/community/demo/remove', {});
+  assert.equal(res.status, 200, JSON.stringify(await res.clone().json()));
+  const removed = (await json(res)).removed as Record<string, number>;
+  assert.equal(removed.chats, 1);
+  assert.equal(removed.chat_messages, 1);
+  for (const t of ['chats WHERE id = ?', 'chat_participants WHERE chat_id = ?', 'chat_messages WHERE chat_id = ?']) {
+    assert.equal(n(raw, `SELECT COUNT(*) AS n FROM ${t}`, opened.chatId), 0, t);
+  }
+  assert.deepEqual((await json(await get(tester, '/api/chats'))).chats, []);
+});
+
+test('inside the community a demo shop links to its in-site page, which answers by merchant id, store id and slug', async () => {
+  const raw = seed();
+  await seedDemo(raw);
+  const admin = stubApp(asD1(raw), OWNER, mount as never, { env: { STORE_ROOT_DOMAIN: APEX } });
+  const merchants = (await json(await get(admin, '/api/community/merchants'))).merchants as Array<{ id: string; store_url: string | null }>;
+  const shop = merchants.find((m) => m.id === demoId('mch', 1))!;
+  assert.equal(shop.store_url, `/community/store/${demoId('str', 1)}`, 'never the subdomain the storefront refuses');
+  assert.match(String(merchants.find((m) => m.id === 'm1')?.store_url), /^https:\/\/realshop\./, 'a real shop keeps its own address');
+  const posts = (await json(await get(admin, '/api/community/posts?limit=48'))).posts as Array<{ id: string; store: { url: string } | null }>;
+  assert.equal(posts.find((p) => p.id === demoId('prj', 1))?.store?.url, `/community/store/${demoId('str', 1)}`);
+  for (const ref of [demoId('mch', 1), demoId('str', 1), 'demo-noor-prints']) {
+    const page = await get(admin, `/api/community/store/${ref}`);
+    assert.equal(page.status, 200, ref);
+    assert.equal((await json(page)).merchant.id, demoId('mch', 1), ref);
+  }
+  // A real shop is still found by its merchant id only on this route, as before.
+  assert.equal((await get(admin, '/api/community/store/realshop')).status, 404);
+});
+
+test('the seed batch writes nothing if the gate opened after the route read it', async () => {
+  const raw = seed();
+  openGate(raw);
+  const db = asD1(raw);
+  await assert.rejects(db.batch(demoSeedStatements(db)), /NOT NULL/);
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM users WHERE substr(id,1,5) = 'demo_'"), 0);
+  assert.equal(n(raw, "SELECT COUNT(*) AS n FROM community_posts WHERE substr(id,1,5) = 'demo_'"), 0);
+});
+
+test('no money is recorded on a demo merchant or account, and the matcher never loads a demo workshop by id', async () => {
+  const raw = seed();
+  await seedDemo(raw);
+  const owner = as(raw, OWNER);
+  for (const path of [`/api/admin/community/merchants/${demoId('mch', 1)}/adjustment`, `/api/admin/community/merchants/${demoId('mch', 1)}/payout`]) {
+    const res = await post(owner, path, { amount_iqd: 1000, reason: 'a test', note: 'x', idempotencyKey: 'demo-key-0001' });
+    assert.equal(res.status, 409, path);
+    assert.equal((await json(res)).code, 'DEMO_NO_MONEY', path);
+  }
+  assert.equal(n(raw, 'SELECT COUNT(*) AS n FROM merchant_ledger_entries'), 0);
+  assert.equal(n(raw, 'SELECT COUNT(*) AS n FROM merchant_payouts'), 0);
+  assert.deepEqual(await loadCandidates(asD1(raw) as never, [demoId('mch', 1)]), []);
+  assert.equal((await post(owner, '/api/admin/community/demo/remove', {})).status, 200, 'the removal is never blocked by a refused write');
 });
 
 // ------------------------------------------------------------------ outside the wall

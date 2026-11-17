@@ -1,11 +1,12 @@
 import { Hono } from 'hono';
+import { communityStoreUrl, demoIdSql } from '../lib/communityDemo';
 import type { AppContext } from '../lib/types';
 import { safeParse } from '../lib/types';
 import { requireAuth, badRequest, notFound, str, int, HttpError } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { membershipBadges } from '../lib/entitlements';
-import { rootDomainFrom, storeUrl } from '../lib/hosts';
+import { rootDomainFrom } from '../lib/hosts';
 import { feedCursor, nextFeedCursor } from '../lib/feedCursor';
 import { requestBoardFilterSql, requestBoardVisible } from '../lib/requestBoard';
 import { governorateParam, optionalOneOf } from '../lib/listParams';
@@ -134,7 +135,7 @@ export function communityFeedProduct(p: Record<string, unknown>, root: string | 
       slug: storeSlug,
       name: p.s_name ?? '',
       logoUrl: fileUrl(p.s_logo_key),
-      url: storeUrl(storeSlug, root, storeId),
+      url: communityStoreUrl(storeSlug, root, storeId),
       /** «مزوّد معتمد» (C4), read as `COMMUNITY_FEED_COLUMNS` selects it; a row read without it carries no mark. */
       approved_provider: Number(p.m_approved_provider ?? 0) === 1,
     },
@@ -339,7 +340,7 @@ export function directoryCard(m: Record<string, unknown>, badges: { pro: Set<str
     // itself says they are closed (C10).
     store_url:
       m.store_slug && storeIsPublic({ status: m.store_status }) && merchantIsPublic(m)
-        ? storeUrl(String(m.store_slug), root, String(m.store_id))
+        ? communityStoreUrl(String(m.store_slug), root, String(m.store_id))
         : null,
     store_name: hasStore ? String(m.store_name ?? '') : null,
     tagline: hasStore ? String(m.store_tagline ?? '') : '',
@@ -673,7 +674,7 @@ communityRoutes.get('/works', async (c) => {
         slug: w.store_slug,
         name: w.store_name,
         logoUrl: fileUrl(w.store_logo_key),
-        url: storeUrl(String(w.store_slug), root, String(w.store_id)),
+        url: communityStoreUrl(String(w.store_slug), root, String(w.store_id)),
       },
     })),
   });
@@ -732,14 +733,20 @@ communityRoutes.post('/requests/:id/close', requireAuth, (c) =>
 // Merchant storefront ---------------------------------------------------------
 
 communityRoutes.get('/store/:id', async (c) => {
-  const id = c.req.param('id');
+  const ref = c.req.param('id');
+  // The merchant id, as the directory links. A community DEMO store
+  // (worker/lib/communityDemo.ts) has no storefront to resolve its store id or
+  // slug, so for one of those this page answers by either too.
   const merchant = await c.env.DB.prepare(
     `SELECT m.*, s.id AS store_id, s.status AS store_status
-       FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id WHERE m.id = ?`
+       FROM community_merchants m LEFT JOIN merchant_stores s ON s.merchant_id = m.id
+      WHERE m.id = ?1 OR (${demoIdSql('m.id')} AND (s.id = ?1 OR s.slug = ?1))
+      LIMIT 1`
   )
-    .bind(id)
+    .bind(ref)
     .first<Record<string, unknown>>();
   if (!merchant) throw notFound('Store not found');
+  const id = String(merchant.id);
   // The in-site profile of a shop the public may not see answers what its
   // storefront does: «المتجر غير متاح حاليًا», and nothing of the shop
   // (worker/routes/storefront.ts) — sanctioned, not approved, or with no store

@@ -368,7 +368,7 @@ export async function loadCandidates(db: D1Database, merchantIds?: string[]): Pr
              LEFT JOIN merchant_notification_preferences np ON np.merchant_id = m.id`;
     return merchantIds
       ? db
-          .prepare(`SELECT ${columns} WHERE m.id IN (SELECT value FROM json_each(?))`)
+          .prepare(`SELECT ${columns} WHERE m.id IN (SELECT value FROM json_each(?)) AND ${notDemoSql('m.id')}`)
           .bind(JSON.stringify([...new Set(merchantIds)]))
           .all<Record<string, unknown>>()
       : db

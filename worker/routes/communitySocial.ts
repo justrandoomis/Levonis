@@ -35,6 +35,7 @@
  *
  * Everything sits inside the community's maintenance wall (communityGate).
  */
+import { communityStoreUrl } from '../lib/communityDemo';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
@@ -43,7 +44,7 @@ import { newId } from '../lib/crypto';
 import { rateLimit } from '../lib/ratelimit';
 import { audit } from '../lib/audit';
 import { notifyGrouped, peopleAr, stampGroupedCkb } from '../lib/notifications';
-import { rootDomainFrom, storeUrl } from '../lib/hosts';
+import { rootDomainFrom } from '../lib/hosts';
 import { feedCursor } from '../lib/feedCursor';
 import { optionalOneOf } from '../lib/listParams';
 import { COMMENT_ORDERS, CREATOR_SORTS, DIRECTORY_WORKS_MAX, FEED_FROM } from '@levonis/contracts/communityFilters';
@@ -815,7 +816,7 @@ export function creatorCard(r: Record<string, unknown>, badges: { pro: Set<strin
     },
     stats: { projects: Number(r.projects ?? 0), followers: Number(r.follower_count ?? 0) },
     store: storeOk
-      ? { id: String(r.store_id), slug: String(r.store_slug ?? ''), name: String(r.store_name ?? ''), url: storeUrl(String(r.store_slug ?? ''), root, String(r.store_id)) }
+      ? { id: String(r.store_id), slug: String(r.store_slug ?? ''), name: String(r.store_name ?? ''), url: communityStoreUrl(String(r.store_slug ?? ''), root, String(r.store_id)) }
       : null,
     url: `/u/${encodeURIComponent(String(r.username))}`,
     viewer: { following: !!r.viewer_follows },

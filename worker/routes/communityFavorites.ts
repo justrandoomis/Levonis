@@ -11,6 +11,7 @@
  * carrying their session across.
  */
 
+import { communityStoreUrl } from '../lib/communityDemo';
 import { listing } from '../lib/listing';
 import { priceStatusOf, sellableNowOf } from '../lib/commercialState';
 import { estimateClause, isEstimateRow, runWithEstimateClause } from '../lib/priceEstimateLabel';
@@ -18,7 +19,7 @@ import { Hono } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAuth, notFound } from '../lib/http';
 import { rateLimit } from '../lib/ratelimit';
-import { rootDomainFrom, storeUrl } from '../lib/hosts';
+import { rootDomainFrom } from '../lib/hosts';
 import { loadAuthoritativeProductImages } from '../lib/productSelectionImage';
 import { approvedAtSql, merchantIsPublic, merchantPublicSql, storeIsPublic, storePublicSql, withApprovalSchema } from '../lib/merchantApproval';
 
@@ -154,7 +155,7 @@ communityFavoriteRoutes.get('/', requireAuth, async (c) => {
       saved_at: r.saved_at,
       store_slug: r.store_slug,
       store_name: r.store_name,
-      store_url: r.store_slug ? storeUrl(String(r.store_slug), root, String(r.store_id)) : null,
+      store_url: r.store_slug ? communityStoreUrl(String(r.store_slug), root, String(r.store_id)) : null,
     };
   });
 

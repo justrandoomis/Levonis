@@ -33,6 +33,7 @@ import {
   scanRoundingDrift,
 } from '../lib/walletAdjust';
 import { audit } from '../lib/audit';
+import { refuseDemoMoney } from '../lib/communityDemo';
 
 export const adminWalletAdjustRoutes = new Hono<AppContext>();
 
@@ -53,6 +54,7 @@ adminWalletAdjustRoutes.post('/users/:id', async (c) => {
   await rateLimit(c, 'admin-wallet-adjust', 30, 3600);
   const admin = c.get('user')!;
   const userId = c.req.param('id') ?? '';
+  refuseDemoMoney(userId);
   const body = await c.req.json().catch(() => ({}));
   const kind = oneOf(body.kind, 'kind', ['balance', 'points'] as const);
   const direction = oneOf(body.direction, 'direction', ['credit', 'debit'] as const);

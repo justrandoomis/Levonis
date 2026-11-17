@@ -65,7 +65,7 @@ import { COMPLAINT_AWAITS_DESK_SQL } from './adminChats';
 import { requireFinancialScope } from '../lib/walletAdjust';
 import { canHandleDisputes, requireDisputeHandler } from '../lib/staffCapabilities';
 import { canMoveMoney } from '../lib/adminScope';
-import { rootDomainFrom, storeUrl } from '../lib/hosts';
+import { rootDomainFrom } from '../lib/hosts';
 import { reconcileRefundUnrefunded, reconcileReverseCredit, storeOrderMoneyDrift } from '../lib/storeOrderOps';
 import { merchantUnsanctionedSql } from '../lib/merchantApproval';
 import { enqueueMatchStatement, rematchAfterResponse } from '../lib/printMatchingStore';
@@ -84,6 +84,8 @@ import { offerCoverageShape } from '../lib/offerCoverage';
 import { publicEstimate } from '../lib/requestRevisions';
 import { isMissingSchema } from '../lib/merchantApproval';
 import {
+  DEMO_PRESENT_SQL,
+  communityStoreUrl,
   demoCounts,
   demoPresent,
   demoRemovalBlockers,
@@ -480,14 +482,24 @@ adminCommunityRoutes.put('/gate', async (c) => {
   // The same upsert `setSetting` uses; the key is not a typed SETTING_DEFAULTS
   // entry because the generic settings PUT must not be able to open the
   // community without an audit row naming who opened it.
-  await c.env.DB.prepare(
-    'INSERT INTO admin_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value'
+  // …and in the write itself: an «open» that lands after a demo seed writes
+  // nothing (a seed racing this PUT is fenced the same way, in its own batch).
+  const wrote = await c.env.DB.prepare(
+    `INSERT INTO admin_settings (key, value) SELECT ?1, ?2 WHERE NOT (?3 = 1 AND ${DEMO_PRESENT_SQL})
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`
   )
     .bind(
       COMMUNITY_GATE_SETTING_KEY,
-      JSON.stringify({ open, allowed_user_ids: ids, updated_at: nowIso, by: admin.id })
+      JSON.stringify({ open, allowed_user_ids: ids, updated_at: nowIso, by: admin.id }),
+      open ? 1 : 0
     )
     .run();
+  if (Number(wrote.meta?.changes ?? 0) === 0) {
+    throw conflict(
+      'احذف البيانات التجريبية قبل فتح المجتمع / Remove the community demo data before opening the community',
+      'COMMUNITY_DEMO_PRESENT'
+    );
+  }
   await audit(c.env.DB, admin.id, 'community.gate_update', COMMUNITY_GATE_SETTING_KEY, {
     before_open: before.open,
     after_open: open,
@@ -540,6 +552,13 @@ adminCommunityRoutes.post('/demo/seed', requireFinancialScope, async (c) => {
     await c.env.DB.batch(demoSeedStatements(c.env.DB));
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
+    // The batch's own guard: the gate opened between the read above and the write.
+    if (/NOT NULL/i.test(msg) && (await readCommunityGate(c.env.DB)).open) {
+      throw conflict(
+        'المجتمع مفتوح للجميع، لا تُضاف بيانات تجريبية / The community is open to the public; demo data is not added',
+        'COMMUNITY_OPEN'
+      );
+    }
     if (/UNIQUE|PRIMARY KEY|constraint/i.test(msg) && (await demoPresent(c.env.DB))) {
       return c.json({ success: true, created: false, already_present: true, counts: await demoCounts(c.env.DB) });
     }
@@ -616,7 +635,7 @@ adminCommunityRoutes.get('/merchants', async (c) => {
     success: true,
     merchants: results.map((m) => ({
       ...m,
-      store_url: m.store_slug ? storeUrl(String(m.store_slug), root, String(m.store_id)) : null,
+      store_url: m.store_slug ? communityStoreUrl(String(m.store_slug), root, String(m.store_id)) : null,
     })),
   });
 });
