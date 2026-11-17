@@ -7,12 +7,22 @@ type Box = { x: number; y: number; width: number; height: number };
 type Picture = { rect: Box; plane: Box; url: string; width: number; height: number; background: string; radius: string };
 type Journey = { href: string; origin: string; productId: string; photo: Picture; returning: boolean; cancel: () => void };
 let journey: Journey | null = null;
+const USER_INPUT = ['pointerdown', 'wheel', 'keydown'] as const;
 /** The photo owns this navigation; a simultaneous page push would move it twice. */
 export function ownsProductNavigation(from: string, to: string): boolean {
   return !!journey && ((from === journey.origin && to === journey.href) || (from === journey.href && to === journey.origin));
 }
 const reduce = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const route = () => window.location.pathname + window.location.search;
+/**
+ * How long a flight may float over the page before it has docked into its destination. Going back, the card is
+ * either on screen after scroll restoration or not at all (below the fold, in a closed carousel), so the photo
+ * waits briefly. Opening, the product page's chunk and skeleton may still be loading. Past this the floating photo
+ * is removed: a photo frozen over the page reads as a broken screen (owner, 2026-11-17).
+ */
+export function undockedDeadlineMs(returning: boolean): number {
+  return returning ? 700 : 3000;
+}
 const visible = (rect: Box) => rect.width > 4 && rect.height > 4 && rect.y + rect.height > 0 && rect.y < innerHeight;
 
 /** The painted image, including cover crops, contain gutters and the card's top alignment. */
@@ -99,11 +109,19 @@ function travel(saved: Journey) {
     mq.removeEventListener('change', cleanup);
     window.removeEventListener('resize', settle);
     document.removeEventListener('scroll', settle, true);
+    clearTimeout(undocked);
+    USER_INPUT.forEach((type) => window.removeEventListener(type, abandonIfFloating, true));
     animations.forEach((animation) => animation.cancel());
     covered.forEach((visibility, photo) => { photo.style.visibility = visibility; });
     layer.remove();
   };
   saved.cancel = cleanup;
+  /** A photo that never reached its place leaves at once rather than staying frozen over the page. */
+  const abandonIfFloating = () => {
+    if (disposed || target) return;
+    cleanup();
+    if (journey === saved) journey = null;
+  };
   const settledImage = () => {
     const actual = target?.querySelector<HTMLImageElement>('img[data-main-image]');
     return actual?.closest('[data-image-state]')?.getAttribute('data-image-state') === 'error'
@@ -164,6 +182,9 @@ function travel(saved: Journey) {
     if (armed && !frame && !disposed) frame = requestAnimationFrame(update);
   }
   const timeout = window.setTimeout(cleanup, 10_000);
+  const undocked = window.setTimeout(abandonIfFloating, undockedDeadlineMs(saved.returning));
+  // The person acting on the page (a tap, a wheel, a key) while the photo still floats ends the flight.
+  USER_INPUT.forEach((type) => window.addEventListener(type, abandonIfFloating, true));
   observer.observe(document.getElementById('main-scroll-container') ?? document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-image-state'] });
   mq.addEventListener('change', cleanup);
   window.addEventListener('resize', settle);

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { imagePlane } from '../src/components/motion/ProductTransition';
+import { imagePlane, undockedDeadlineMs } from '../src/components/motion/ProductTransition';
+import { readFileSync } from 'node:fs';
 import { gallerySwipeStep } from '../src/components/motion/GallerySurface';
 
 test('a cover-cropped card and a padded hero describe the same undistorted image plane', () => {
@@ -35,4 +36,15 @@ test('production CSS seconds and source milliseconds produce the same visible du
   assert.equal(cssTimeMs('.15s', 1), 150);
   assert.equal(cssTimeMs('0ms', 250), 0);
   for (const value of ['', 'auto', 'NaN', '-10ms', '250']) assert.equal(cssTimeMs(value, 250), 250);
+});
+
+test('a product photo that cannot reach its place never stays frozen over the page (owner, 2026-11-17)', () => {
+  // Going back to a page whose card is off screen, the photo used to float for 10 s over the home page.
+  assert.ok(undockedDeadlineMs(true) <= 1000, 'back: gone within a second');
+  assert.ok(undockedDeadlineMs(false) <= 3000, 'open: gone once a slow page would show its own skeleton');
+  const src = readFileSync('src/components/motion/ProductTransition.tsx', 'utf8');
+  assert.match(src, /setTimeout\(abandonIfFloating, undockedDeadlineMs\(saved\.returning\)\)/);
+  assert.match(src, /USER_INPUT = \['pointerdown', 'wheel', 'keydown'\]/);
+  assert.match(src, /if \(disposed \|\| target\) return;/, 'a docked photo is left to finish its own flight');
+  assert.match(src, /clearTimeout\(undocked\);/);
 });
