@@ -56,8 +56,13 @@ const ICONS_BUDGET = 16 * KB;
  * 138 chunks under 1 KB before the icon chunk, 28 after (small app modules two lazy routes share).
  * The community section pages (community UI plan C1, C5) share two more: the home rails and the
  * search lines, each under 1 KB; the icons still group into one chunk.
+ * Community UI plan C2.1 adds one: packages/contracts/src/communityFilters.ts (pure data, 585 B),
+ * which the home, the Projects and Following pages, the projects filter sheet and the directories
+ * share. Every manual group those pages load is also on the product or store page, whose budgets
+ * (tests/bundleBudget.test.ts) have no room for it. (The feed card skeleton, the other new one, now
+ * shares src/components/community/directory/Skeletons.tsx.)
  */
-const TINY_CHUNKS_MAX = 47;
+const TINY_CHUNKS_MAX = 48;
 
 /** Identifiers that only the projection tree, the drag gesture and the pan session carry; they survive minification as property names. */
 const FEATURE_FINGERPRINTS = ['isProjectionDirty', 'resolveTargetDelta', 'scheduleUpdateProjection', 'panSession'];

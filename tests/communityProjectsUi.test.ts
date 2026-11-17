@@ -10,7 +10,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -27,4 +27,11 @@ test('the filter sheet resets its draft when it opens, not on every render of th
   assert.equal(effect[1].trim(), 'open', 'the effect follows the sheet opening only, never the new `value` object of each render');
   assert.match(sheet, /const \[draft, setDraft\] = useState\(value\);/);
   assert.match(sheet, /onApply\(draft\)/, '«عرض النتائج» applies the draft');
+});
+
+test('the feed card skeleton shares the community skeletons module: alone it was a chunk under 1 KB (tests/motionLazy.test.ts)', () => {
+  assert.match(code('src/components/community/directory/Skeletons.tsx'), /export function FeedCardSkeleton\(/);
+  assert.match(code('src/components/community/feed/FeedList.tsx'), /import \{ FeedCardSkeleton \} from '\.\.\/directory\/Skeletons';/);
+  assert.match(code('src/pages/community/Following.tsx'), /import \{ FeedCardSkeleton \} from '\.\.\/\.\.\/components\/community\/directory\/Skeletons';/);
+  assert.equal(existsSync(join(ROOT, 'src/components/community/feed/FeedCardSkeleton.tsx')), false);
 });

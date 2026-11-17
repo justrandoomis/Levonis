@@ -26,7 +26,7 @@ import { useCommunityFeed } from '../hub/useCommunityFeed';
 import { useSocial } from '../social/SocialContext';
 import ComposerDock from './ComposerDock';
 import PostCard, { type PostPatch } from './PostCard';
-import FeedCardSkeleton from './FeedCardSkeleton';
+import { FeedCardSkeleton } from '../directory/Skeletons';
 
 const AUTO_LOADS = 2;
 const NO_FILTERS: Record<string, string> = {};

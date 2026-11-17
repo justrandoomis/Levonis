@@ -19,7 +19,7 @@ import { useAuth } from '../../AuthContext';
 import CommunitySurface from '../../components/community/CommunitySurface';
 import SectionPageHeader, { SectionsButton } from '../../components/community/kit/SectionPageHeader';
 import { SegmentedTrack } from '../../components/community/kit/controls';
-import FeedCardSkeleton from '../../components/community/feed/FeedCardSkeleton';
+import { FeedCardSkeleton } from '../../components/community/directory/Skeletons';
 import { useHubStrings } from '../../components/community/hub/strings';
 import { useProjectStrings } from '../../components/community/projects/strings';
 import { FEED_FROM, type FeedFrom } from '../../../packages/contracts/src/communityFilters';
