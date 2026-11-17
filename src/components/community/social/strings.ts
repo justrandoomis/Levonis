@@ -64,6 +64,8 @@ const STRINGS = {
     copyLink: 'نسخ الرابط',
     linkCopied: 'نُسخ الرابط',
     share: 'مشاركة',
+    /** The four labelled cells under a feed card (ActionRow `labelled`, IMG_8486). */
+    cell: { like: 'إعجاب', comments: 'تعليقات', save: 'حفظ', share: 'مشاركة' },
     mutedToast: 'كُتم — لن تظهر منشوراته في «لك».',
     unmutedToast: 'أُلغي الكتم.',
     blockedToast: 'حُظر الحساب.',
@@ -145,6 +147,8 @@ const STRINGS = {
     copyLink: 'Copy link',
     linkCopied: 'Link copied',
     share: 'Share',
+    /** The four labelled cells under a feed card (ActionRow `labelled`, IMG_8486). */
+    cell: { like: 'Like', comments: 'Comments', save: 'Save', share: 'Share' },
     mutedToast: 'Muted — their posts leave your For You feed.',
     unmutedToast: 'Unmuted.',
     blockedToast: 'Account blocked.',
@@ -226,6 +230,8 @@ const STRINGS = {
     copyLink: 'کۆپیکردنی لینک',
     linkCopied: 'لینکەکە کۆپی کرا',
     share: 'هاوبەشکردن',
+    /** The four labelled cells under a feed card (ActionRow `labelled`, IMG_8486). */
+    cell: { like: 'حەزکردن', comments: 'لێدوانەکان', save: 'پاشەکەوت', share: 'هاوبەشکردن' },
     mutedToast: 'بێدەنگ کرا — پۆستەکانی لە «بۆ تۆ» دەرناکەون.',
     unmutedToast: 'بێدەنگی لابرا.',
     blockedToast: 'هەژمارەکە بلۆک کرا.',

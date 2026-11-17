@@ -51,6 +51,14 @@ export interface CountToggleProps {
   failText: string;
   /** The ink of the mark when on: `gold` (default) or `like` (the scoped scarlet, gold outside the scope). */
   tone?: 'gold' | 'like';
+  /**
+   * A visible word before the number and the mark (the labelled cells of a
+   * feed card, IMG_8486 «إعجاب 24 ♥»). It is also the name, so what is read
+   * is what is shown (WCAG 2.5.3); `aria-pressed` says the state.
+   */
+  text?: string;
+  /** Show the number at zero too (the grid card footer, IMG_8485). */
+  zero?: boolean;
   className?: string;
   'data-social'?: string;
 }
@@ -67,6 +75,8 @@ export default function CountToggle({
   onChange,
   failText,
   tone = 'gold',
+  text,
+  zero = false,
   className = '',
   'data-social': testAttr,
 }: CountToggleProps) {
@@ -109,12 +119,42 @@ export default function CountToggle({
 
   const iconSize = size === 'sm' ? 'h-4 w-4' : 'h-5 w-5';
   const like = tone === 'like';
+  const mark = (
+    <motion.span
+      aria-hidden="true"
+      className="inline-flex"
+      style={on && like ? { color: 'var(--cm-like, var(--color-gold))' } : undefined}
+      animate={{ scale: pop ? 1.15 : 1 }}
+      transition={m.spring('quick')}
+      onAnimationComplete={() => {
+        if (pop) setPop(false);
+      }}
+    >
+      {icon(on, `${iconSize} transition-colors ${on ? (like ? 'fill-current' : 'fill-gold') : ''}`)}
+    </motion.span>
+  );
+  const number = (count > 0 || zero) && (
+    <span aria-hidden="true" className="relative inline-flex min-w-5 justify-center overflow-hidden font-semibold tabular-nums">
+      <AnimatePresence mode="popLayout" initial={false}>
+        <motion.span
+          key={count}
+          initial={{ y: m.travel(6), opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: m.travel(-6), opacity: 0 }}
+          transition={m.spring('quick')}
+          className="inline-block"
+        >
+          {count}
+        </motion.span>
+      </AnimatePresence>
+    </span>
+  );
   return (
     <button
       type="button"
       onClick={press}
       aria-pressed={on}
-      aria-label={`${on ? labelOn : labelOff}${count > 0 ? ` — ${countLabel(count)}` : ''}`}
+      aria-label={`${text ?? (on ? labelOn : labelOff)}${count > 0 ? ` — ${countLabel(count)}` : ''}`}
       data-social={testAttr}
       data-on={on ? 'true' : 'false'}
       data-tone={tone}
@@ -122,33 +162,19 @@ export default function CountToggle({
         on ? (like ? 'text-text-primary' : 'text-gold') : 'text-text-secondary hover:text-text-primary'
       } ${size === 'sm' ? 'text-[12px]' : 'text-[13px]'} ${className}`}
     >
-      <motion.span
-        aria-hidden="true"
-        className="inline-flex"
-        style={on && like ? { color: 'var(--cm-like, var(--color-gold))' } : undefined}
-        animate={{ scale: pop ? 1.15 : 1 }}
-        transition={m.spring('quick')}
-        onAnimationComplete={() => {
-          if (pop) setPop(false);
-        }}
-      >
-        {icon(on, `${iconSize} transition-colors ${on ? (like ? 'fill-current' : 'fill-gold') : ''}`)}
-      </motion.span>
-      {count > 0 && (
-        <span aria-hidden="true" className="relative inline-flex min-w-5 justify-center overflow-hidden font-semibold tabular-nums">
-          <AnimatePresence mode="popLayout" initial={false}>
-            <motion.span
-              key={count}
-              initial={{ y: m.travel(6), opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: m.travel(-6), opacity: 0 }}
-              transition={m.spring('quick')}
-              className="inline-block"
-            >
-              {count}
-            </motion.span>
-          </AnimatePresence>
-        </span>
+      {text ? (
+        <>
+          <span>{text}</span>
+          <span className="inline-flex items-center gap-1">
+            {number}
+            {mark}
+          </span>
+        </>
+      ) : (
+        <>
+          {mark}
+          {number}
+        </>
       )}
     </button>
   );
