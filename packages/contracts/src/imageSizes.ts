@@ -33,8 +33,8 @@ export const IMAGE_SIZES = {
   logo72: '72px',
   /** A product card in a grid (phone 164 of 390 CSS px; at DPR 2.5+ the 480 copy, as home/ProductCard.tsx's grid). */
   card: '(min-width: 1280px) 230px, (min-width: 1024px) 20vw, (min-width: 640px) 30vw, (min-resolution: 2.5dppx) 41vw, 45vw',
-  /** The feed column's card: the phone's full width, 672 px on a desktop. Its cover is cropped to fill it — see `feedCoverSizes`. */
-  feedCover: '(min-width: 1024px) 672px, (min-width: 640px) calc(100vw - 32px), 100vw',
+  /** Card v2's 16:9 cover frame, inset 13 px each side (p-3 + the border) in the feed column: 646 px of the 672 px column on a desktop, the page width less 32 + 26 px on a phone. Its cover is cropped to fill it — see `feedCoverSizes`. */
+  feedCover: '(min-width: 1024px) 646px, calc(100vw - 58px)',
   /**
    * A category ROW BANNER's photograph (`CropPhoto`'s default): drawn
    * clamp(205, (100vw − 32) × 0.62, 223) CSS px on a phone, 302 at 640–1023,
@@ -166,17 +166,14 @@ export function coverSizes(boxes: readonly CoverBox[], imageAspect?: number | nu
     .join(', ');
 }
 
-/** A feed card's cover (community/feed/PostCard.tsx): 4:3, or 4:5 for a portrait picture, cropped to fill the feed column. */
+/** A feed card's cover (community/feed/PostCard.tsx, card v2 of community UI plan C2.1): a 16:9 frame inset in the card, the picture cropped to fill it. */
 export function feedCoverSizes(cover: { width?: number | null; height?: number | null } | null | undefined): string {
-  const aspect = mediaAspect(cover);
-  const box = aspect !== null && aspect < 1 ? 0.8 : 4 / 3;
   return coverSizes(
     [
-      { media: '(min-width: 1024px)', width: '672px', aspect: box },
-      { media: '(min-width: 640px)', width: 'calc(100vw - 32px)', aspect: box },
-      { width: '100vw', aspect: box },
+      { media: '(min-width: 1024px)', width: '646px', aspect: 16 / 9 },
+      { width: 'calc(100vw - 58px)', aspect: 16 / 9 },
     ],
-    aspect
+    mediaAspect(cover)
   );
 }
 
