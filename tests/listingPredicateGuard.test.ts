@@ -210,6 +210,9 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/lib/bundleRead.ts': { visible: 0, sellable: 1, states: 0 },
   'worker/lib/catalogMembership.ts': { visible: 1, sellable: 0, states: 0 },
   'worker/lib/catalogPresentation.ts': { visible: 0, sellable: 0, states: 0 },
+  // The community demo set's picture pool (worker/lib/communityDemo.ts `demoImagePool`): photographs of VISIBLE
+  // products only, reused by reference on demo posts and shops — never a price, never a purchase.
+  'worker/lib/communityDemo.ts': { visible: 1, sellable: 0, states: 0 },
   'worker/lib/gifts/selection.ts': { visible: 0, sellable: 4, states: 0 },
   'worker/lib/homeShelves.ts': { visible: 0, sellable: 8, states: 0 },
   'worker/lib/mysteryDraw.ts': { visible: 0, sellable: 3, states: 0 },
