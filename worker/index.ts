@@ -93,6 +93,7 @@ import { adminFinanceReportRoutes } from './routes/adminFinanceReport';
 import { adminInventoryRoutes } from './routes/adminInventory';
 import { adminProcurementRoutes } from './routes/adminProcurement';
 import { adminProcurementOriginSerialRoutes } from './routes/adminProcurementOriginSerials';
+import { adminProcurementImportRoutes } from './routes/adminProcurementImport';
 import { adminPricingRoutes } from './routes/adminPricing';
 import { adminStockOperationsRoutes } from './routes/adminStockOperations';
 import { adminFinanceOperationsRoutes } from './routes/adminFinanceOperations';
@@ -584,6 +585,8 @@ app.route('/api/admin/taxonomy', adminTaxonomyRoutes);
 app.route('/api/admin/inventory', adminInventoryRoutes);
 app.route('/api/admin/procurement', adminProcurementRoutes);
 app.route('/api/admin/procurement', adminProcurementOriginSerialRoutes);
+// «استيراد فاتورة الشراء من الصور»: owner only, reads supplier screenshots / PDFs through the Creative Studio's AI door.
+app.route('/api/admin/procurement', adminProcurementImportRoutes);
 // «التسعير والشحن» (pricing engine MVP, P1): the owner's read-only pricing
 // workspace — today's prices, the minimum profit and Direct Sale Extra the old
 // prices carry, and the what-if calculator. Owner only at its own door

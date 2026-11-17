@@ -9,7 +9,8 @@ import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { planAtomicAdjustment } from '../lib/inventoryAdjustment';
 import { requireSelection, selectionStock } from '../lib/inventorySelection';
-import { baghdadDay, fence, journalPlan, requireCapability, whole } from '../lib/operations';
+import { baghdadDay, fence, isFenceMiss, journalPlan, requireCapability, whole } from '../lib/operations';
+import { fundedWriteOffRows, planReconcile } from '../lib/stockReconcile';
 import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 import { normalizeSerial } from '../lib/deviceOps';
 import { counterTarget } from '../lib/inventoryReceiving';
@@ -365,31 +366,59 @@ adminStockOperationsRoutes.post('/counts/:id/cancel', async (c) => {
   if (result.meta.changes) await audit(c.env.DB, user.id, 'stock.count_cancelled', id, {});
   return c.json({ success: true });
 });
-adminStockOperationsRoutes.get('/health', async (c) => {
-  await requireCapability(c.env, c.get('user')!, 'count');
-  const q = text(c.req.query('q'), 120),
-    offset = whole(c.req.query('offset') ?? 0, 'offset', 0, 100000);
-  const cost=await effectiveLotCostSql(c.env.DB,'inventory_lots');
-  const { results } = await c.env.DB.prepare(
-    `WITH counters AS (
+// «دقة المخزون»: one row per tracked stock identity, its counter beside its
+// FIFO cost layers. `discrepancy` = counter − lot units: + means shelf units
+// with no cost layer, − means layers holding units the shelf no longer has.
+// `only_diff=1` keeps the rows that differ; `summary` covers every matching
+// row, not just this page of 200.
+const HEALTH_COUNTERS = `WITH counters AS (
     SELECT id AS product_id,'base' AS scope,'' AS scope_id,stock,stock_reserved AS reserved,low_stock_threshold FROM products WHERE inventory_mode='BASE' AND stock IS NOT NULL
     UNION ALL SELECT v.product_id,'option',v.id,v.stock,v.reserved,v.low_stock_threshold FROM product_option_values v JOIN products p ON p.id=v.product_id WHERE p.inventory_mode='OPTION' AND v.stock IS NOT NULL
     UNION ALL SELECT v.product_id,'color',v.id,v.stock,v.reserved,v.low_stock_threshold FROM product_colors v JOIN products p ON p.id=v.product_id WHERE p.inventory_mode='COLOR' AND v.stock IS NOT NULL
     UNION ALL SELECT v.product_id,'variant',v.id,v.stock,v.reserved,v.low_stock_threshold FROM product_variants v JOIN products p ON p.id=v.product_id WHERE p.inventory_mode='VARIANT_COMBINATION' AND v.stock IS NOT NULL
-    ), layers AS (SELECT product_id,scope,scope_id,SUM(qty_remaining) AS units,SUM(qty_remaining*${cost}) AS inventory_value_iqd,MIN(CASE WHEN qty_remaining>0 THEN received_at END) AS oldest FROM inventory_lots GROUP BY product_id,scope,scope_id), velocity AS (
+    )`;
+const HEALTH_FILTER = `(?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||c.scope_id),lower(?))>0)
+    AND (?=0 OR c.stock<>COALESCE(l.units,0))`;
+adminStockOperationsRoutes.get('/health', async (c) => {
+  await requireCapability(c.env, c.get('user')!, 'count');
+  const q = text(c.req.query('q'), 120),
+    offset = whole(c.req.query('offset') ?? 0, 'offset', 0, 100000),
+    onlyDiff = c.req.query('only_diff') === '1' ? 1 : 0;
+  const cost=await effectiveLotCostSql(c.env.DB,'inventory_lots');
+  const [{ results }, summary] = await Promise.all([c.env.DB.prepare(
+    `${HEALTH_COUNTERS}, layers AS (SELECT product_id,scope,scope_id,SUM(qty_remaining) AS units,SUM(qty_remaining*${cost}) AS inventory_value_iqd,MIN(CASE WHEN qty_remaining>0 THEN received_at END) AS oldest FROM inventory_lots GROUP BY product_id,scope,scope_id), velocity AS (
     SELECT product_id,scope,scope_id,SUM(qty) AS sold FROM inventory_ledger WHERE kind='deduct' AND created_at>=datetime('now','-30 days') GROUP BY product_id,scope,scope_id)
     SELECT c.*,p.name,p.name_ar,COALESCE(l.units,0) AS lot_units,c.stock-COALESCE(l.units,0) AS discrepancy,l.inventory_value_iqd,l.oldest,
       COALESCE(v.sold,0) AS sold_30d,COALESCE(r.lead_time_days,7) AS lead_time_days,COALESCE(r.reorder_point,c.low_stock_threshold,0) AS reorder_point,
       (SELECT COALESCE(SUM(i.qty_ordered-i.qty_received),0) FROM incoming_inventory i WHERE i.product_id=c.product_id AND i.scope=c.scope AND i.scope_id=c.scope_id AND i.status IN ('incoming','partial')) AS incoming
     FROM counters c JOIN products p ON p.id=c.product_id LEFT JOIN layers l ON l.product_id=c.product_id AND l.scope=c.scope AND l.scope_id=c.scope_id
     LEFT JOIN velocity v ON v.product_id=c.product_id AND v.scope=c.scope AND v.scope_id=c.scope_id LEFT JOIN inventory_reorder_settings r ON r.product_id=c.product_id AND r.scope=c.scope AND r.scope_id=c.scope_id
-    WHERE (?='' OR instr(lower(COALESCE(p.name,'')||' '||COALESCE(p.name_ar,'')||' '||COALESCE(p.sku,'')||' '||c.scope_id),lower(?))>0)
+    WHERE ${HEALTH_FILTER}
     ORDER BY ABS(c.stock-COALESCE(l.units,0)) DESC,c.stock-c.reserved ASC,c.product_id,c.scope_id LIMIT 200 OFFSET ?`,
   )
-    .bind(q, q, offset)
-    .all<Record<string, unknown>>();
+    .bind(q, q, onlyDiff, offset)
+    .all<Record<string, unknown>>(),
+  // Counts and units only — no cost — so every counter reads the same summary.
+  c.env.DB.prepare(
+    `${HEALTH_COUNTERS}, layers AS (SELECT product_id,scope,scope_id,SUM(qty_remaining) AS units FROM inventory_lots GROUP BY product_id,scope,scope_id)
+    SELECT COUNT(*) AS rows_total,
+      COALESCE(SUM(CASE WHEN c.stock<>COALESCE(l.units,0) THEN 1 ELSE 0 END),0) AS rows_differ,
+      COALESCE(SUM(CASE WHEN c.stock>COALESCE(l.units,0) THEN c.stock-COALESCE(l.units,0) ELSE 0 END),0) AS units_without_lots,
+      COALESCE(SUM(CASE WHEN c.stock<COALESCE(l.units,0) THEN COALESCE(l.units,0)-c.stock ELSE 0 END),0) AS lot_units_not_on_shelf
+    FROM counters c JOIN products p ON p.id=c.product_id LEFT JOIN layers l ON l.product_id=c.product_id AND l.scope=c.scope AND l.scope_id=c.scope_id
+    WHERE ${HEALTH_FILTER}`,
+  ).bind(q, q, onlyDiff).first<{ rows_total: number; rows_differ: number; units_without_lots: number; lot_units_not_on_shelf: number }>()]);
+  // A −n row whose FIFO write-off would reach an investor-funded lot is fixed by
+  // a lot count only (RECONCILE_INVESTOR_LOT); the screen marks it beforehand.
+  const lotCountOnly = await fundedWriteOffRows(
+    c.env.DB,
+    (results ?? [])
+      .filter((r) => Number(r.discrepancy) < 0)
+      .map((r) => ({ product_id: String(r.product_id), scope: String(r.scope), scope_id: String(r.scope_id ?? ''), need: -Number(r.discrepancy) })),
+  );
   const rows = (results ?? []).map((r) => ({
     ...r,
+    needs_lot_count: lotCountOnly.has(`${r.product_id}:${r.scope}:${r.scope_id ?? ''}`),
     available: Number(r.stock) - Number(r.reserved),
     recommended_purchase: Math.max(
       0,
@@ -405,7 +434,17 @@ adminStockOperationsRoutes.get('/health', async (c) => {
         ? Math.floor(((Number(r.stock) - Number(r.reserved)) * 30) / Number(r.sold_30d))
         : null,
   }));
-  return c.json(projectForAdmin(c.env, c.get('user'), { success: true, rows, limit: 200 }));
+  return c.json(projectForAdmin(c.env, c.get('user'), {
+    success: true,
+    rows,
+    limit: 200,
+    summary: {
+      rows_total: Number(summary?.rows_total ?? 0),
+      rows_differ: Number(summary?.rows_differ ?? 0),
+      units_without_lots: Number(summary?.units_without_lots ?? 0),
+      lot_units_not_on_shelf: Number(summary?.lot_units_not_on_shelf ?? 0),
+    },
+  }));
 });
 adminStockOperationsRoutes.post('/reorder', async (c) => {
   const user = c.get('user')!;
@@ -426,6 +465,63 @@ adminStockOperationsRoutes.post('/reorder', async (c) => {
     )
     .run();
   return c.json({ success: true });
+});
+// «تصحيح الفرق»: brings each identity's FIFO cost layers to its shelf counter
+// (worker/lib/stockReconcile.ts says why that direction). The body names the
+// counter and lot units the person confirmed; anything that moved since
+// refuses the whole batch (STOCK_CHANGED). One operation_id per batch, replay-safe.
+const RECONCILE_BATCH_MAX = 25;
+adminStockOperationsRoutes.post('/reconcile', async (c) => {
+  const user = c.get('user')!;
+  await requireCapability(c.env, user, 'count');
+  const b = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>),
+    db = c.env.DB,
+    operationId = str(b.operation_id, 'operation_id', { min: 8, max: 60 });
+  const raw = Array.isArray(b.rows) ? b.rows : [];
+  if (!raw.length || raw.length > RECONCILE_BATCH_MAX) throw badRequest(`أرسل من 1 إلى ${RECONCILE_BATCH_MAX} بندًا للتصحيح`, 'RECONCILE_ROWS');
+  const seen = new Set<string>();
+  const statements: D1PreparedStatement[] = [];
+  let fixed = 0,
+    already = 0,
+    unknown = 0;
+  for (const v of raw) {
+    const r = (v ?? {}) as Record<string, unknown>;
+    const scope = text(r.scope, 20) as StockScope;
+    if (!['base', 'option', 'color', 'variant'].includes(scope)) throw badRequest('Invalid physical stock scope', 'BAD_SCOPE');
+    const productId = str(r.product_id, 'product_id', { min: 1, max: 60 }),
+      scopeId = scope === 'base' ? '' : text(r.scope_id, 60);
+    const identity = `${productId}:${scope}:${scopeId}`;
+    if (seen.has(identity)) throw badRequest('بند مكرر في التصحيح', 'RECONCILE_DUPLICATE');
+    seen.add(identity);
+    const plan = await planReconcile(db, {
+      operationId,
+      productId,
+      scope,
+      scopeId,
+      expectedStock: whole(r.stock, 'stock', 0, 10_000_000),
+      expectedLotUnits: whole(r.lot_units, 'lot_units', 0, 10_000_000),
+      actorUserId: user.id,
+    });
+    if (plan.already) already++;
+    else if (plan.delta) {
+      fixed++;
+      if (plan.delta < 0 && plan.valueIqd === null) unknown++;
+    }
+    statements.push(...plan.statements);
+  }
+  if (statements.length) {
+    try {
+      await db.batch(statements);
+    } catch (e) {
+      if (isFenceMiss(e) || /UNIQUE|CHECK constraint/i.test(String(e)))
+        throw conflict('تغيّر المخزون أثناء التصحيح؛ حدّث الصفحة ثم أعد المحاولة', 'STOCK_CHANGED');
+      throw e;
+    }
+    await audit(db, user.id, 'stock.reconciled', operationId, { rows: fixed });
+  }
+  // Whether a written-off layer had a recorded cost is the owner's to know (DECISIONS row 219).
+  const answer = { success: true, fixed, already: already > 0 && fixed === 0 };
+  return c.json(canViewCost(c.env, user) ? { ...answer, unknown_cost_rows: unknown } : answer);
 });
 adminStockOperationsRoutes.get('/trace', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'receive');

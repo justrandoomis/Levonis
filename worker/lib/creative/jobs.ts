@@ -88,8 +88,8 @@ export type JobStart =
  * rebuilding the table (migrations here are additive), so a `chat` turn is stored as `ideas`: it is an
  * ideas conversation, and a design made from one of its suggestions links the job the same way.
  */
-export function storedTask(task: AiTask): Exclude<AiTask, 'chat'> {
-  return task === 'chat' ? 'ideas' : task;
+export function storedTask(task: AiTask): Exclude<AiTask, 'chat' | 'invoice'> {
+  return task === 'chat' ? 'ideas' : task === 'invoice' ? 'review' : task;
 }
 
 export async function openJob(

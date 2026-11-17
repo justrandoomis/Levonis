@@ -678,6 +678,41 @@ export const COST_REFUSALS = {
     en: 'This purchase already has a saved funding agreement; create a new purchase to change the funding.',
     ckb: 'ئەم کڕینە ڕێککەوتنی پارەدارکردنی پاشەکەوتکراوی هەیە؛ بۆ گۆڕینی پارەدارکردن کڕینێکی نوێ دروست بکە.',
   },
+  // ---- «حذف نهائي» of a purchase (owner request 2026-11-17) ----
+  // POST /api/admin/procurement/documents/:id/delete removes a cancelled
+  // purchase or an unconfirmed draft and its own rows, owner only. Anything
+  // real that hangs on it keeps it in the register: a receipt, money, investor
+  // funding, a registered serial. A stale screen hears INCOMING_CHANGED.
+  PURCHASE_DELETE_STATUS: {
+    ar: 'يُحذف نهائيًا الشراء الملغى أو المسودة غير المؤكدة فقط. إن لم يُستلم منه شيء فأغلق المتبقي أولًا.',
+    en: 'Only a cancelled purchase or an unconfirmed draft can be deleted permanently. If nothing of it was received, close the remainder first.',
+    ckb: 'تەنها کڕینێکی هەڵوەشاوە یان ڕەشنووسێکی پشتڕاستنەکراوە بە یەکجاری دەسڕدرێتەوە. ئەگەر هیچی لێ وەرنەگیراوە، سەرەتا ماوەکەی دابخە.',
+  },
+  PURCHASE_DELETE_RECEIVED: {
+    ar: 'استُلمت بضاعة من هذا الشراء أو سُجّل له استلام؛ يبقى في السجل ولا يُحذف.',
+    en: 'Goods from this purchase were received or a receipt was recorded for it; it stays in the register and cannot be deleted.',
+    ckb: 'بەرهەم لەم کڕینە وەرگیراوە یان وەرگرتنێکی بۆ تۆمار کراوە؛ لە تۆمارەکەدا دەمێنێتەوە و ناسڕدرێتەوە.',
+  },
+  PURCHASE_DELETE_PAID: {
+    ar: 'لهذا الشراء دفعة للمورد أو قيد محاسبي؛ يبقى في السجل ولا يُحذف.',
+    en: 'This purchase has a supplier payment or an accounting entry; it stays in the register and cannot be deleted.',
+    ckb: 'ئەم کڕینە پارەدانێکی دابینکەر یان تۆمارێکی ژمێریاری هەیە؛ لە تۆمارەکەدا دەمێنێتەوە و ناسڕدرێتەوە.',
+  },
+  PURCHASE_DELETE_FUNDED: {
+    ar: 'لهذا الشراء تمويل أو اتفاق مستثمر؛ يبقى في السجل ولا يُحذف.',
+    en: 'This purchase has investor funding or an investment agreement; it stays in the register and cannot be deleted.',
+    ckb: 'ئەم کڕینە پارەدارکردن یان ڕێککەوتنی وەبەرهێنەری هەیە؛ لە تۆمارەکەدا دەمێنێتەوە و ناسڕدرێتەوە.',
+  },
+  PURCHASE_DELETE_SERIALS: {
+    ar: 'سُجّلت أرقام تسلسلية لقطع هذا الشراء؛ يبقى في السجل ولا يُحذف.',
+    en: 'Serial numbers were registered for this purchase’s units; it stays in the register and cannot be deleted.',
+    ckb: 'ژمارەی زنجیرەیی بۆ پارچەکانی ئەم کڕینە تۆمار کراوە؛ لە تۆمارەکەدا دەمێنێتەوە و ناسڕدرێتەوە.',
+  },
+  PURCHASE_DELETE_LINKED: {
+    ar: 'ما زال سجل آخر مرتبطًا بهذا الشراء؛ لم يُحذف شيء.',
+    en: 'Another record is still linked to this purchase; nothing was deleted.',
+    ckb: 'هێشتا تۆمارێکی تر بەم کڕینەوە بەستراوە؛ هیچ شتێک نەسڕایەوە.',
+  },
   // A purchase cannot be received until its freight costs are stated (a
   // receipt freezes the lot's cost). WHICH cost is missing — or that it is a
   // cost at all — is the owner's to read (DECISIONS row 220: the receive
@@ -701,6 +736,14 @@ export const COST_REFUSALS = {
     ar: 'جرد دفعة يجد وحدات أكثر مما تسجّله الدفعة يثبّته الأدمن الرئيسي فقط؛ اطلب منه تثبيته.',
     en: 'A lot count that finds more units than the lot records is posted by the main admin only; ask them to post it.',
     ckb: 'ژماردنی وەجبەیەک کە یەکەی زیاتر لە تۆمارەکەی وەجبەکە دەدۆزێتەوە تەنها بەڕێوەبەری سەرەکی تۆماری دەکات؛ داوای لێبکە تۆماری بکات.',
+  },
+  // «تصحيح الفرق» (POST /api/admin/stock-operations/reconcile) never writes off
+  // units of an investor-funded batch: the investor's capital loss is posted
+  // only by the lot count on that batch, so the row is refused and sent there.
+  RECONCILE_INVESTOR_LOT: {
+    ar: 'التصحيح يُخرج وحدات من دفعة ممولة من مستثمر؛ صحّح هذا البند بـ«جرد الدفعة» على تلك الدفعة ليُسجَّل أثره على رأس مال المستثمر.',
+    en: 'This fix would write off units from an investor-funded batch; correct this row with a lot count on that batch so the investor’s capital loss is recorded.',
+    ckb: 'ئەم چاککردنە یەکە لە وەجبەیەک دەردەکات کە وەبەرهێنەر پارەی داوە؛ ئەم ڕیزە بە «ژماردنی وەجبە» لەسەر ئەو وەجبەیە چاک بکە تا کاریگەرییەکەی لەسەر سەرمایەی وەبەرهێنەر تۆمار بکرێت.',
   },
   // ---- Pricing V2 (docs/PRICING-V2.md; DECISIONS rows 221, 233; spec §2.8, §3.10) ----
   // Landed whole with migration 0189 so no later V2 stage ships a refusal in one

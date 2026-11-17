@@ -332,8 +332,12 @@ export interface ExportDto {
  * `chat`: the free conversation on Home. Its job and usage rows are STORED under `ideas` (the 0216 CHECK lists
  * the six tasks above it and is not widened in place — worker/lib/creative/jobs.ts `storedTask`), so a design
  * made from a chat idea links that job exactly like an ideas answer.
+ *
+ * `invoice`: «استيراد فاتورة شراء» (worker/routes/adminProcurementImport.ts) — reading a supplier's order
+ * screenshots / invoice PDF, and choosing catalogue selections for its lines. STORED under `review` (a reading
+ * of pictures) for the same reason `chat` is stored under `ideas`.
  */
-export type AiTask = 'test' | 'ideas' | 'compose' | 'edit' | 'review' | 'carousel' | 'chat';
+export type AiTask = 'test' | 'ideas' | 'compose' | 'edit' | 'review' | 'carousel' | 'chat' | 'invoice';
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface JobDto {

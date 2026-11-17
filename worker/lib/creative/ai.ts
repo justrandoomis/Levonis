@@ -21,7 +21,7 @@
  * No fake success: a failed call is a failed job, a usage row with its code,
  * and an error answer — never an empty "result".
  */
-import type { AiTask, AiUsageDto, ErrorCode } from '../../../packages/creativeDoc/src/api';
+import type { AiTask, AiUsageDto, Effort, ErrorCode } from '../../../packages/creativeDoc/src/api';
 import { newId } from '../crypto';
 import { HttpError } from '../http';
 import type { Env } from '../types';
@@ -111,6 +111,10 @@ export interface AiSpec<T> {
   content: ContentBlock[];
   schema: Record<string, unknown>;
   imageTokens?: number;
+  /** A task-specific system prompt (the purchase-invoice reader); the studio's own SYSTEM_PROMPT otherwise. */
+  system?: string;
+  /** A task-specific effort (still sent only when the model lists it); the owner's choice otherwise. */
+  effort?: Effort | null;
   /** Step 5: the app's own decision. A refusal fails the job with INVALID_OUTPUT and the reason. */
   validate: (raw: unknown) => { ok: true; result: T } | { ok: false; reason: string; detail?: unknown };
   /** Rows the accepted result adds in the same batch (the ideas). */
@@ -237,10 +241,13 @@ async function reserveCallRecord<T>(env: AiEnv, ready: Ready, spec: AiSpec<T>, t
   const db = env.DB;
   const { settings, model } = ready;
   await releaseStale(db);
-  const req: MessagesRequest = { task: spec.task, model, system: SYSTEM_PROMPT, content: spec.content, schema: spec.schema, effort: settings.effort, capabilities: settings.capabilities };
-  // A picture is billed by its pixels (`spec.imageTokens`), not by the length of its base64: the
-  // text estimate is taken with every image's data blanked, so the allowance alone counts it.
-  const sized: MessagesRequest = { ...req, content: req.content.map((b): ContentBlock => (b.type === 'image' ? { ...b, source: { ...b.source, data: '' } } : b)) };
+  const req: MessagesRequest = { task: spec.task, model, system: spec.system ?? SYSTEM_PROMPT, content: spec.content, schema: spec.schema, effort: spec.effort !== undefined ? spec.effort : settings.effort, capabilities: settings.capabilities };
+  // A picture (or a PDF's pages) is billed by its pixels (`spec.imageTokens`), not by the length of its
+  // base64: the text estimate is taken with every image's and document's data blanked, so the allowance alone counts it.
+  const sized: MessagesRequest = {
+    ...req,
+    content: req.content.map((b): ContentBlock => (b.type === 'image' ? { ...b, source: { ...b.source, data: '' } } : b.type === 'document' ? { ...b, source: { ...b.source, data: '' } } : b)),
+  };
   const inputEstimate = estimateInputTokens(JSON.stringify(messagesBody(sized)), spec.imageTokens ?? 0);
   const need = worstCase(inputEstimate, MAX_TOKENS[spec.task], settings.rates);
   const reserved = await reserve(db, settings.budget, settings.rates, need);

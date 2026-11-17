@@ -66,6 +66,7 @@ import { adminTaxonomyRoutes } from '../../worker/routes/adminTaxonomy';
 import { adminInventoryRoutes } from '../../worker/routes/adminInventory';
 import { adminProcurementRoutes } from '../../worker/routes/adminProcurement';
 import { adminProcurementOriginSerialRoutes } from '../../worker/routes/adminProcurementOriginSerials';
+import { adminProcurementImportRoutes } from '../../worker/routes/adminProcurementImport';
 import { adminPricingRoutes } from '../../worker/routes/adminPricing';
 import { adminStockOperationsRoutes } from '../../worker/routes/adminStockOperations';
 import { adminImportRoutes } from '../../worker/routes/adminImport';
@@ -245,6 +246,7 @@ export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/admin/inventory', adminInventoryRoutes as Router],
   ['/api/admin/procurement', adminProcurementRoutes as Router],
   ['/api/admin/procurement', adminProcurementOriginSerialRoutes as Router],
+  ['/api/admin/procurement', adminProcurementImportRoutes as Router],
   ['/api/admin/pricing', adminPricingRoutes as Router],
   ['/api/admin/stock-operations', adminStockOperationsRoutes as Router],
   ['/api/admin/finance-operations', adminFinanceOperationsRoutes as Router],

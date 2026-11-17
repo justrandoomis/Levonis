@@ -76,6 +76,8 @@ export default {
         },
         'POST /documents/:id/payments': { cls: 'cost_write', path: '/api/admin/procurement/documents/po1/payments' },
         'POST /documents/:id/close': { cls: 'cost_write', path: '/api/admin/procurement/documents/po1/close' },
+        // «حذف نهائي» (owner request 2026-11-17): a cancelled purchase or an unconfirmed draft, the owner alone.
+        'POST /documents/:id/delete': { cls: 'cost_write', path: '/api/admin/procurement/documents/po1/delete' },
         'POST /documents/:id/investor-receipts': {
           cls: 'owner',
           refusal: { status: 403, code: 'FORBIDDEN' },
@@ -118,6 +120,11 @@ export default {
         // The scan answers the whole lot row — stripped for a non-owner.
         'POST /scan': { cls: 'op', body: { code: 'lot1' } },
         'POST /lot-counts': { cls: 'op', body: { operation_id: 'rm-lot-count-1', lot_id: 'lot1', counted_qty: 1 } },
+        // «تصحيح الفرق»: the seeded counter 5 against lot1's 2 units; a non-owner hears no cost fact (tests/stockReconcile.test.ts).
+        'POST /reconcile': {
+          cls: 'op',
+          body: { operation_id: 'rm-reconcile-1', rows: [{ product_id: 'p_a1', scope: 'base', scope_id: '', stock: 5, lot_units: 2 }] },
+        },
       },
     },
   ],

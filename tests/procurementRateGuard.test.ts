@@ -257,8 +257,8 @@ test('F17: the owner finance screens give every loc() its own Sorani — never t
       assert.doesNotMatch(ckb, /[ةىيك]/, `${where}: an Arabic-only letter in the Sorani`);
     }
   }
-  // «إضافة مخزون موجود», the finding's example, reads in Sorani.
-  assert.match(src('src/components/adminOperations/ProcurementPanel.tsx'), /loc\('إضافة مخزون موجود', 'Add stock on hand', 'زیادکردنی کۆگای ئامادە'\)/);
+  // «أين البضاعة الآن؟» (the stock-on-hand / incoming choice that replaced «إضافة مخزون موجود», 2026-11-17) reads in Sorani.
+  assert.match(src('src/components/adminOperations/ProcurementPanel.tsx'), /loc\('أين البضاعة الآن؟', 'Where are the goods now\?', 'کاڵاکان ئێستا لە کوێن؟'\)/);
   assert.match(src('src/components/adminOperations/ProcurementPanel.tsx'), /loc\(p\.name_ar, p\.name_en, p\.name_ckb\)/);
   // The purchase review (Pricing V2 D1) that replaced SelectionPriceUpdate: every entry of its string
   // table carries its own Sorani.

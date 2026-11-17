@@ -158,10 +158,21 @@ const REQUIRED: Record<string, readonly string[]> = {
   'Deleted-product wage consistency (owner request 2026-10-11)': ['WAGE_SCOPE_REVIEW_REQUIRED'],
   // Owner request 2026-10-10: the investment remainder returns to the investor's «أرباحي».
   'Investment remainder (owner request 2026-10-10)': ['INVESTMENT_NEEDS_FINAL_COST', 'INVESTMENT_AGREEMENT_EXISTS'],
+  // Owner request 2026-11-17: a cancelled purchase (or an unconfirmed draft) is deleted permanently, unless something real hangs on it.
+  'Purchase permanent delete (owner request 2026-11-17)': [
+    'PURCHASE_DELETE_STATUS',
+    'PURCHASE_DELETE_RECEIVED',
+    'PURCHASE_DELETE_PAID',
+    'PURCHASE_DELETE_FUNDED',
+    'PURCHASE_DELETE_SERIALS',
+    'PURCHASE_DELETE_LINKED',
+  ],
   // The verification of the cost-leak audit (DECISIONS row 220): an upward lot
   // count is the owner's to post, and the receive door tells anyone else only
   // that a purchase waits for him — one answer each, whatever the cost data.
   'DECISIONS row 220 verification': ['LOT_COUNT_UP_OWNER_ONLY', 'RECEIVE_AWAITS_OWNER'],
+  // Stock accuracy «تصحيح الفرق» (2026-11-17): an investor-funded batch is corrected by its lot count only.
+  'Stock reconcile (2026-11-17)': ['RECONCILE_INVESTOR_LOT'],
   // Pricing V2 (DECISIONS rows 221, 233): migration 0189's three database
   // refusals and the V2-3 / V2-5 codes of the spec (§3.10), all landed with
   // 0189 so no later V2 stage ships one in a single language. §3.10's

@@ -33,6 +33,7 @@ import { approvedProcurementRates, requireApprovedDocumentRate } from '../lib/pr
 import { cleanStartInstalled, engineColumnInstalled } from '../lib/engineInstalled';
 import { batchSnapshotInstalled, purchaseLotSnapshot, type PurchaseFxSource } from '../lib/batchSnapshot';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
+import { costRefusal } from '../lib/costAccess';
 import { unitOriginsInstalled, normalizeUnitOrigins, planCreateUnitOrigins, planReceiveUnitOrigins, unitOriginsByIncoming } from '../lib/inventoryUnitOrigins';
 import { planDraftOriginSerials, originSerialConflict } from '../lib/procurementOriginSerials';
 
@@ -1189,6 +1190,127 @@ adminProcurementRoutes.post('/documents/:id/close', async (c) => {
   ]);
   await audit(c.env.DB, user.id, 'purchase.remainder_closed', id, { reason });
   return c.json({ success: true });
+});
+
+/**
+ * «حذف نهائي» — A CANCELLED PURCHASE, OR AN UNCONFIRMED DRAFT, IS DELETED
+ * PERMANENTLY (owner request 2026-11-17: «Purchase orders for orders has
+ * cancelled can not be remove permanently»). Owner only.
+ *
+ * Body: `{ version }` — the version the screen showed (409 INCOMING_CHANGED
+ * when it moved). Refused, with nothing written, while anything real hangs on
+ * the purchase:
+ *   - PURCHASE_DELETE_STATUS    not 'cancelled' or 'draft';
+ *   - PURCHASE_DELETE_RECEIVED  a received unit, a lot, a receipt or receiving
+ *                               note/event, a lot cost adjustment, a received
+ *                               or assigned piece;
+ *   - PURCHASE_DELETE_PAID      a supplier payment or any journal entry of it;
+ *   - PURCHASE_DELETE_FUNDED    an investor agreement, allocation, receipt or
+ *                               an investment contract on one of its lines
+ *                               (all immutable by the database);
+ *   - PURCHASE_DELETE_SERIALS   a registered serial on one of its pieces.
+ * Otherwise ONE batch, behind a fence that re-checks every one of those, takes
+ * away the purchase's own rows — unreceived piece origins, charges, lines,
+ * their incoming rows and the purchase itself — supersedes any pending price
+ * review of it (as a cancel does; decided reviews stay as history) and writes
+ * the `purchase.deleted` audit row with the request it was saved from.
+ */
+const DELETABLE_PURCHASE = ['cancelled', 'draft'];
+type DeleteBlocker = 'PURCHASE_DELETE_RECEIVED' | 'PURCHASE_DELETE_PAID' | 'PURCHASE_DELETE_FUNDED' | 'PURCHASE_DELETE_SERIALS';
+const PURCHASE_INCOMING = 'SELECT incoming_id FROM purchase_lines WHERE purchase_id=?';
+/** Each blocker: the table it needs, and one EXISTS over `?` = the purchase id. */
+const DELETE_BLOCKERS: ReadonlyArray<{ code: DeleteBlocker; table: string; sql: string }> = [
+  { code: 'PURCHASE_DELETE_RECEIVED', table: 'purchase_lines', sql: `EXISTS(SELECT 1 FROM purchase_lines l JOIN incoming_inventory i ON i.id=l.incoming_id WHERE l.purchase_id=? AND i.qty_received>0)` },
+  { code: 'PURCHASE_DELETE_RECEIVED', table: 'inventory_lots', sql: `EXISTS(SELECT 1 FROM inventory_lots WHERE incoming_id IN (${PURCHASE_INCOMING}))` },
+  { code: 'PURCHASE_DELETE_RECEIVED', table: 'incoming_inventory_receipts', sql: `EXISTS(SELECT 1 FROM incoming_inventory_receipts WHERE incoming_id IN (${PURCHASE_INCOMING}))` },
+  { code: 'PURCHASE_DELETE_RECEIVED', table: 'purchase_receiving_notes', sql: 'EXISTS(SELECT 1 FROM purchase_receiving_notes WHERE purchase_id=?)' },
+  { code: 'PURCHASE_DELETE_RECEIVED', table: 'purchase_receiving_events', sql: 'EXISTS(SELECT 1 FROM purchase_receiving_events WHERE purchase_id=?)' },
+  { code: 'PURCHASE_DELETE_RECEIVED', table: 'lot_cost_adjustments', sql: `EXISTS(SELECT 1 FROM lot_cost_adjustments WHERE incoming_id IN (${PURCHASE_INCOMING}))` },
+  { code: 'PURCHASE_DELETE_RECEIVED', table: 'inventory_unit_origins', sql: 'EXISTS(SELECT 1 FROM inventory_unit_origins WHERE purchase_id=? AND received_lot_id IS NOT NULL)' },
+  { code: 'PURCHASE_DELETE_RECEIVED', table: 'order_item_inventory_unit_assignments', sql: 'EXISTS(SELECT 1 FROM order_item_inventory_unit_assignments WHERE purchase_id=?)' },
+  { code: 'PURCHASE_DELETE_PAID', table: 'supplier_payments', sql: 'EXISTS(SELECT 1 FROM supplier_payments WHERE purchase_id=?)' },
+  { code: 'PURCHASE_DELETE_PAID', table: 'accounting_entries', sql: 'EXISTS(SELECT 1 FROM accounting_entries WHERE source_id=?)' },
+  { code: 'PURCHASE_DELETE_FUNDED', table: 'purchase_investor_agreements', sql: 'EXISTS(SELECT 1 FROM purchase_investor_agreements WHERE purchase_id=?)' },
+  { code: 'PURCHASE_DELETE_FUNDED', table: 'purchase_investor_allocations', sql: 'EXISTS(SELECT 1 FROM purchase_investor_allocations WHERE purchase_id=?)' },
+  { code: 'PURCHASE_DELETE_FUNDED', table: 'purchase_investor_receipts', sql: 'EXISTS(SELECT 1 FROM purchase_investor_receipts WHERE purchase_id=?)' },
+  { code: 'PURCHASE_DELETE_FUNDED', table: 'investment_contracts', sql: `EXISTS(SELECT 1 FROM investment_contracts WHERE incoming_id IN (${PURCHASE_INCOMING}))` },
+  { code: 'PURCHASE_DELETE_SERIALS', table: 'inventory_unit_origins', sql: 'EXISTS(SELECT 1 FROM inventory_unit_origins WHERE purchase_id=? AND serial_norm IS NOT NULL)' },
+];
+/** Funding and serials name what blocks most precisely; a receipt next; money last. */
+const DELETE_BLOCKER_ORDER: readonly DeleteBlocker[] = ['PURCHASE_DELETE_FUNDED', 'PURCHASE_DELETE_SERIALS', 'PURCHASE_DELETE_RECEIVED', 'PURCHASE_DELETE_PAID'];
+adminProcurementRoutes.post('/documents/:id/delete', async (c) => {
+  const user = c.get('user')!;
+  await requireCapability(c.env, user, 'purchase');
+  // `purchase` is cost write; a delegated grantee may edit purchases but never erase one.
+  if (!isOwner(c.env, user)) throw costRefusal(c.env, user);
+  const b = await bodyOf(c),
+    id = c.req.param('id'),
+    version = whole(b.version, 'version', 1);
+  const db = c.env.DB;
+  const p = await db
+    .prepare('SELECT id,status,version,invoice_no,supplier_id,currency,request_json FROM purchase_orders WHERE id=?')
+    .bind(id)
+    .first<{ id: string; status: string; version: number; invoice_no: string | null; supplier_id: string | null; currency: string; request_json: string }>();
+  if (!p) throw notFound('Purchase not found');
+  if (p.version !== version) throw conflict(serverMessage('INCOMING_CHANGED'), 'INCOMING_CHANGED');
+  if (!DELETABLE_PURCHASE.includes(p.status)) throw conflict(serverMessage('PURCHASE_DELETE_STATUS'), 'PURCHASE_DELETE_STATUS');
+  const present = new Set(
+    ((await db.prepare(`SELECT name FROM sqlite_master WHERE type='table' AND name IN (SELECT value FROM json_each(?))`)
+      .bind(JSON.stringify([...new Set(DELETE_BLOCKERS.map((x) => x.table))]))
+      .all<{ name: string }>()).results ?? []).map((r) => r.name),
+  );
+  const blockers = DELETE_BLOCKERS.filter((x) => present.has(x.table));
+  const hit = blockers.length
+    ? await db
+        .prepare(`SELECT ${blockers.map((x, i) => `${x.sql} AS b${i}`).join(',')}`)
+        .bind(...blockers.flatMap((x) => Array(x.sql.split('?').length - 1).fill(id)))
+        .first<Record<string, number>>()
+    : null;
+  const found = new Set(blockers.filter((_, i) => hit?.[`b${i}`]).map((x) => x.code));
+  const blocker = DELETE_BLOCKER_ORDER.find((code) => found.has(code));
+  if (blocker) throw conflict(serverMessage(blocker), blocker);
+
+  const incoming = ((await db.prepare(PURCHASE_INCOMING).bind(id).all<{ incoming_id: string }>()).results ?? []).map((r) => r.incoming_id);
+  const now = new Date().toISOString();
+  const statements: D1PreparedStatement[] = [
+    // The read above, held until the write: the same version and status, and still nothing real on it.
+    ...fence(
+      db,
+      [`EXISTS(SELECT 1 FROM purchase_orders WHERE id=? AND version=? AND status IN ('cancelled','draft'))`, ...blockers.map((x) => `NOT ${x.sql}`)].join(' AND '),
+      [id, version, ...blockers.flatMap((x) => Array(x.sql.split('?').length - 1).fill(id))],
+    ),
+    // A pending price review of this purchase goes as a cancel's does; a review it had replaced comes back.
+    ...((await cleanStartInstalled(db)) ? await cancelledPurchaseReviewStatements(db, id, user.id, now) : []),
+  ];
+  if (present.has('inventory_unit_origins')) statements.push(db.prepare('DELETE FROM inventory_unit_origins WHERE purchase_id=?').bind(id));
+  statements.push(
+    db.prepare('DELETE FROM purchase_charges WHERE purchase_id=?').bind(id),
+    db.prepare('DELETE FROM purchase_lines WHERE purchase_id=?').bind(id),
+  );
+  if (incoming.length)
+    statements.push(db.prepare('DELETE FROM incoming_inventory WHERE id IN (SELECT value FROM json_each(?))').bind(JSON.stringify(incoming)));
+  statements.push(
+    db.prepare('DELETE FROM purchase_orders WHERE id=? AND version=?').bind(id, version),
+    ...(await auditStatements(db, user.id, 'purchase.deleted', id, {
+      status: p.status,
+      version: p.version,
+      invoice_no: p.invoice_no ?? '',
+      supplier_id: p.supplier_id,
+      currency: p.currency,
+      lines: incoming.length,
+      request: json<unknown>(p.request_json),
+    })).statements,
+  );
+  try {
+    await db.batch(statements);
+  } catch (error) {
+    if (isFenceMiss(error)) throw conflict(serverMessage('INCOMING_CHANGED'), 'INCOMING_CHANGED');
+    // A row this route does not know (a later table's key, an immutability trigger): nothing was deleted.
+    if (/FOREIGN KEY constraint failed|immutable|PURCHASE_FROZEN|cannot be deleted/i.test(`${String(error)} ${String((error as { cause?: unknown })?.cause ?? '')}`))
+      throw conflict(serverMessage('PURCHASE_DELETE_LINKED'), 'PURCHASE_DELETE_LINKED');
+    throw error;
+  }
+  return c.json({ success: true, id });
 });
 
 adminProcurementRoutes.post('/documents/:id/investor-receipts',async c=>{

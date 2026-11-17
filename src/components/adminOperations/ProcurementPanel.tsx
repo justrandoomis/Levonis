@@ -10,7 +10,10 @@ import PurchaseLineCosts, { type ExtraChargeView } from './PurchaseLineCosts';
 import PurchaseUnitOrigins, { PurchaseUnitReceiveFields, SavedPurchaseUnitOrigins } from './PurchaseUnitOrigins';
 import type { PurchaseSerialResult } from './PurchaseUnitSerial';
 import { copyPurchaseUnits, purchaseReceiptDraft, purchaseReceiptValid, purchaseUnitRows, purchaseUnitsValid, purchaseUnitsWire, type PurchaseReceiptDraft } from './procurementUnitOrigins';
-import InlineProcurementPricing, { currentInlinePrice, inlinePriceKey, inlinePricingRequestKey, type InlinePriceDraft, type InlinePriceQuote } from './InlineProcurementPricing';
+import InlineProcurementPricing, { currentInlinePrice, inlinePriceKey, inlinePricingRequestKey, type InlinePriceDraft, type InlinePriceQuote, type InlinePriceSaver } from './InlineProcurementPricing';
+import PurchasePriceGrid, { type PriceGridRow } from './PurchasePriceGrid';
+import PurchaseDeleteButton from './PurchaseDeleteButton';
+import PurchaseInvoiceImport, { type InvoiceImportResult } from './PurchaseInvoiceImport';
 import BatchSnapshotCard from '../adminInventory/BatchSnapshotCard';
 import { extraOnStep, previewDraft, previewSaved, type PreviewChoices, type PricingPreview, type PricingSummary } from './procurementPricing';
 import { procurementPricingStrings } from './procurementPricingStrings';
@@ -166,6 +169,25 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
   const [renaming, setRenaming] = useState<string | null>(null);
   const [inlinePrices, setInlinePrices] = useState<Record<string, InlinePriceDraft>>({});
   const [priceQuotes, setPriceQuotes] = useState<Record<string, InlinePriceQuote>>({});
+  // «حفظ أسعار كل المنتجات» (owner request 2026-11-17): every product card registers its save here, so one
+  // press saves them all instead of one «حفظ التكلفة والربح والسعر» per product.
+  const savers = useRef(new Map<string, InlinePriceSaver>());
+  const [, setSaverTick] = useState(0);
+  const onRegisterSaver = useCallback((key: string, saver: InlinePriceSaver | null) => {
+    const old = savers.current.get(key);
+    if (!saver) { if (!old) return; savers.current.delete(key); }
+    else {
+      if (old && old.pending === saver.pending && old.typed === saver.typed && old.ready === saver.ready && old.needsConfirm === saver.needsConfirm) { savers.current.set(key, saver); return; }
+      savers.current.set(key, saver);
+    }
+    setSaverTick((t) => t + 1);
+  }, []);
+  const [savingAll, setSavingAll] = useState(false);
+  const [saveAllNote, setSaveAllNote] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
+  // While «حفظ الكل» runs, each saved card must not re-price the others mid-loop (a new revision empties
+  // their quotes, and an empty quote cannot be saved): one revision bump at the end instead.
+  const bulkSaving = useRef(false);
+  const bulkSavedAny = useRef(false);
   const onPriceQuote = useCallback((key: string, quote: InlinePriceQuote) => setPriceQuotes((current) =>
     current[key]?.requestKey === quote.requestKey && current[key]?.price === quote.price ? current : { ...current, [key]: quote }), []);
   const inlineKey = (l: Pick<Selection, 'product_id' | 'scope' | 'scope_id'>) => `${l.product_id}:${l.scope}:${l.scope_id}`;
@@ -543,11 +565,12 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     ...(!extrasValid ? [{ id: 'extras', step: 3 as const, text: loc('صحّح زيادة البيع المباشر المكتوبة: بالدينار وعلى مضاعفات 1,000.', 'Fix the typed direct-sale extra: whole dinars in steps of 1,000.', 'زیادەی فرۆشتنی ڕاستەوخۆی نووسراو چاک بکە: بە دینار و بە هەنگاوی 1,000.'), target: null }] : []),
   ];
   // The gates themselves, unchanged: «التالي» per step, and the confirm on the review.
-  const nextBlocked = !nameValid || !fundingValid(funding) || (step > 0 && (!quantitiesValid || !originsValid)) || (step === 2 && (!costsValid || !draftSerialsValid || !rateReady || pendingInlinePrices));
+  // Typed prices no longer stop «التالي» on the costs step: it saves them first (owner request 2026-11-17).
+  const nextBlockedBase = !nameValid || !fundingValid(funding) || (step > 0 && (!quantitiesValid || !originsValid)) || (step === 2 && (!costsValid || !draftSerialsValid || !rateReady));
   const confirmBlocked = draftBusy || pendingInlinePrices || !draftSerialsValid || !originsValid || !costsValid || !extrasValid || !nameValid || !fundingValid(funding) || fundingNeedsFinalCost || !rateReady || (quickReceive && header.cost_state !== 'final');
   const stepLocked = (i: number) => (i > 0 && !fundingValid(funding)) || (i > 1 && !quantitiesValid) || (i === 3 && (!costsValid || !rateReady));
   const shownBlockers = step < 3
-    ? (nextBlocked ? blockersUpTo(blockers, step) : [])
+    ? (nextBlockedBase ? blockersUpTo(blockers, step).filter((b) => step !== 2 || !b.id.endsWith(':price')) : [])
     : (confirmBlocked && !draftBusy ? [...blockersUpTo(blockers, 2), ...confirmOnly] : []);
   // Everything fixed: the footer and the fields go back to their quiet state until the next press.
   const blockerCount = shownBlockers.length;
@@ -569,8 +592,17 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     setAnnounce((prev) => (prev === text ? `${text}\u200b` : text));
   };
   const goNext = () => {
-    if (op.busy) return;
-    if (nextBlocked) {
+    if (op.busy || savingAll) return;
+    if (step === 2 && !nextBlockedBase && pendingInlinePrices) {
+      void op.run(async () => {
+        if (!(await saveAllPrices(true))) throw new Error(loc('لم تُحفظ كل الأسعار المكتوبة؛ راجع البطاقات المعلّمة ثم اضغط «التالي» مجددًا.', 'Not every typed price was saved; check the marked cards, then press Continue again.', 'هەموو نرخە نووسراوەکان پاشەکەوت نەکران؛ کارتە نیشانکراوەکان بپشکنە و دووبارە «بەردەوام بە» دابگرە.'));
+        setAttempted(false);
+        setStep(3);
+        setFocusTarget({ id: null, at: Date.now() });
+      });
+      return;
+    }
+    if (nextBlockedBase) {
       setAttempted(true);
       const list = blockersUpTo(blockers, step);
       say(list, bs.title);
@@ -692,7 +724,69 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
     }
   };
   const saveLocal = () => { privateDrafts.setItem('levonis-purchase-draft-v2', JSON.stringify({ header, lines, charges, funding, editId, editVersion, operationId, quickReceive, inlinePrices })); setDraftAvailable(true); };
-  const restoreLocal = () => { try { const d = JSON.parse(privateDrafts.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setInlinePrices(d.inlinePrices ?? {}); setCharges(Array.isArray(d.charges) ? d.charges.map(chargeDraft) : []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive); setEditing(true); setStep(0); } catch { privateDrafts.removeItem('levonis-purchase-draft-v2'); } };
+  const restoreLocal = () => { try { const d = JSON.parse(privateDrafts.getItem('levonis-purchase-draft-v2') || '{}'); if (!Array.isArray(d.lines)) return; setHeader({ ...newHeader(), ...restoreCostProfileSnapshot(d.header ?? {}, config.cost_profiles) }); setLines(d.lines); setInlinePrices(d.inlinePrices ?? {}); setCharges(Array.isArray(d.charges) ? d.charges.map(chargeDraft) : []); setFunding(d.funding ?? newFunding()); setEditId(d.editId); setEditVersion(d.editVersion); setOperationId(d.operationId); setQuickReceive(d.quickReceive === true); setEditing(true); setStep(0); } catch { privateDrafts.removeItem('levonis-purchase-draft-v2'); } };
+  /**
+   * «حفظ أسعار كل المنتجات»: every card with something to save, one after the other (the V2 writer takes one
+   * product at a time, with its own sequence and hash). `typedOnly`: only the prices the owner typed (what
+   * «التالي» needs); the button saves the shipment's new costs too. Answers whether all of them were saved.
+   */
+  const saveAllPrices = async (typedOnly = false): Promise<boolean> => {
+    const list = [...savers.current.values()].filter((x) => x.pending && (!typedOnly || x.typed));
+    let saved = 0, left = 0;
+    setSavingAll(true); setSaveAllNote(null);
+    bulkSaving.current = true; bulkSavedAny.current = false;
+    try {
+      for (const x of list) {
+        if (x.needsConfirm || !x.ready) { left++; continue; }
+        if (await x.save()) saved++; else left++;
+      }
+    } finally {
+      bulkSaving.current = false;
+      if (bulkSavedAny.current) { setPricingRevision((v) => v + 1); onChanged(); }
+      setSavingAll(false);
+    }
+    setSaveAllNote(left
+      ? { tone: 'error', text: loc(`حُفظت أسعار ${saved} منتج، وبقي ${left}: راجع البطاقات المعلّمة أدناه (تأكيد تغيير أكبر من 15% أو مبلغ ناقص).`, `Saved ${saved} product price(s); ${left} left: check the marked cards below (a change above 15% to confirm, or a missing amount).`, `نرخی ${saved} بەرهەم پاشەکەوت کرا، ${left} ماوە: کارتە نیشانکراوەکانی خوارەوە بپشکنە (گۆڕانی زیاتر لە 15% بۆ پشتڕاستکردنەوە، یان بڕێکی ناتەواو).`) }
+      : { tone: 'ok', text: loc(`حُفظت أسعار ${saved} منتج.`, `Saved ${saved} product price(s).`, `نرخی ${saved} بەرهەم پاشەکەوت کرا.`) });
+    return left === 0;
+  };
+  const setLineRaw = (i: number, v: string) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_conversion_inexact: false, ...(x.purchase_cost_mode === 'total' ? { source_total_amount: v === '' ? '' : Number(v), source_unit_amount: v === '' ? '' : Number(v) / x.qty_ordered } : { source_unit_amount: v === '' ? '' : Number(v), source_total_amount: v === '' ? '' : Number((Number(v) * x.qty_ordered).toFixed(6)) }) } : x));
+  const setLinePacked = (i: number, v: string) => setLines((a) => a.map((x, j) => j === i ? (shippingBasis === 'volume' ? { ...x, volume_mm3: packedMeasureInput(v, 'volume') } : { ...x, weight_g: packedMeasureInput(v, 'weight') }) : x));
+  const setLineQty = (i: number, v: string) => setLines((a) => a.map((x, j) => j === i ? changeLineQuantity(x, v === '' ? NaN : Number(v)) : x));
+  const [importNote, setImportNote] = useState<string>('');
+  /**
+   * «ارفع صور الفاتورة» (owner request 2026-11-17): the read and matched lines of the supplier's order become
+   * purchase lines — product, option/colour, quantity and the raw unit price. A purchase without a route takes the
+   * invoice's currency (its approved rate prefilled, earlier typed prices cleared as a manual change does); a
+   * route fixes its own currency, so a different invoice currency adds the lines without prices and says so.
+   */
+  const addImported = (r: InvoiceImportResult) => {
+    const docCurrency = r.document.currency;
+    const known = ['IQD', 'USD', 'CNY', 'EUR'].includes(docCurrency);
+    const switchCurrency = known && !header.cost_profile_id && docCurrency !== header.currency;
+    const pricesFit = known && (switchCurrency || docCurrency === header.currency);
+    const decimals = (switchCurrency ? docCurrency : header.currency) === 'IQD' ? 0 : 6;
+    if (switchCurrency) {
+      setHeader((h) => ({ ...h, currency: docCurrency, exchange_rate: prefillRate(config.approved_rates, docCurrency) }));
+    }
+    setHeader((h) => ({
+      ...h,
+      invoice_no: h.invoice_no.trim() || (r.document.order_no ?? '').slice(0, 80),
+      purchase_day: r.document.date && /^\d{4}-\d{2}-\d{2}$/.test(r.document.date) ? r.document.date : h.purchase_day,
+    }));
+    const added = r.lines.map((x) => {
+      const line = changeLineQuantity(selectionCostDraft(x.selection, header.cost_profile_id), x.qty);
+      if (!pricesFit || !Number.isFinite(x.unit_price)) return line;
+      const unit = Number(x.unit_price.toFixed(decimals));
+      return { ...line, purchase_cost_mode: 'unit' as const, unit_conversion_inexact: false, source_unit_amount: unit, source_total_amount: Number((unit * x.qty).toFixed(6)), cost_source: 'unknown' };
+    });
+    setLines((old) => [...(switchCurrency ? old.map((l) => ({ ...l, source_total_amount: '', source_unit_amount: '', discounted_unit_amount: '', cost_source: 'unknown' })) : old), ...added]);
+    const notes = [loc(`أُضيف ${added.length} منتج من الفاتورة.`, `${added.length} item(s) added from the invoice.`, `${added.length} بەرهەم لە پسوولەکەوە زیاد کرا.`)];
+    if (switchCurrency) notes.push(loc(`عملة الشراء صارت ${docCurrency} كما في الفاتورة؛ راجع سعر الصرف في «التكاليف والشحن».`, `The purchase currency is now ${docCurrency}, as on the invoice; check the exchange rate under Costs & freight.`, `دراوی کڕین بوو بە ${docCurrency} وەک پسوولەکە؛ نرخی ئاڵوگۆڕ لە «تێچوو و ناردن» بپشکنە.`));
+    if (!pricesFit) notes.push(loc(`الفاتورة بعملة ${docCurrency} ومسار الشحن بعملة ${header.currency}: أُضيفت المنتجات والكميات دون أسعار، أدخلها في «التكاليف والشحن».`, `The invoice is in ${docCurrency} and the route buys in ${header.currency}: items and quantities were added without prices; enter them under Costs & freight.`, `پسوولەکە بە ${docCurrency}یە و ڕێگاکە بە ${header.currency}: بەرهەم و بڕەکان بێ نرخ زیاد کران؛ لە «تێچوو و ناردن» بیاننووسە.`));
+    if ((r.document.shipping ?? 0) > 0 || (r.document.discount ?? 0) > 0) notes.push(loc('الشحن والخصم في الفاتورة لا يُضافان تلقائيًا: أضفهما كمصاريف في «التكاليف والشحن».', 'The invoice’s shipping and discount are not added automatically: enter them as charges under Costs & freight.', 'ناردن و داشکاندنی پسوولەکە خۆکار زیاد ناکرێن: وەک خەرجی لە «تێچوو و ناردن» بیاننووسە.'));
+    setImportNote(notes.join(' '));
+  };
   const addChoice = () => { if (!choice) return; setLines((old) => [...old, selectionCostDraft(choice, header.cost_profile_id)]); setRecent((old) => [choice, ...old.filter((r) => `${r.product_id}:${r.scope}:${r.scope_id}` !== `${choice.product_id}:${choice.scope}:${choice.scope_id}`)].slice(0, 6)); setChoice(null); };
   if (pricingProduct) return (
     <div className="inventory-workspace" data-procurement-price-editor>
@@ -718,10 +812,9 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
       <div className="mb-4 flex flex-wrap gap-2">
         {/* ONE PRIMARY PER TOOLBAR: «شراء قادم» is the screen's job; adding
             stock already on the shelf is the second way in. */}
-        <button type="button" className={T.btnSecondary} onClick={() => start(undefined, false, true)}>{loc('إضافة مخزون موجود', 'Add stock on hand', 'زیادکردنی کۆگای ئامادە')}</button>
         {draftAvailable && <><button type="button" className={T.btnSecondary} onClick={restoreLocal}>{loc('استكمال مسودة هذه الجلسة', 'Resume this session’s draft', 'بەردەوامبوون لە ڕەشنووسی ئەم دانیشتنە')}</button><button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => { setEditing(false); privateDrafts.removeItem('levonis-purchase-draft-v2'); setDraftAvailable(false); }}>{loc('حذف مسودة الجلسة', 'Discard session draft', 'سڕینەوەی ڕەشنووسی دانیشتن')}</button></>}
         <button type="button" className={T.btnPrimary} onClick={() => start()}>
-          {loc('شراء قادم', 'Incoming purchase', 'کڕینی چاوەڕوانکراو')}
+          {loc('شراء جديد', 'New purchase', 'کڕینی نوێ')}
         </button>
         <button type="button" className={T.btnSecondary} aria-pressed={receiveOnly} onClick={() => { setEditing(false); setSelected(null); setOffset(0); setReceiveOnly((v) => !v); }}>
           {loc('الشحنات بانتظار الاستلام', 'Awaiting receipt', 'بارەکانی چاوەڕێی وەرگرتن')}
@@ -731,7 +824,22 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
         </button>
       </div>
       {editing && (
-        <Card title={loc(editId ? 'تعديل أمر الشراء' : 'شراء جديد', editId ? 'Edit purchase' : 'New purchase', editId ? 'دەستکاریکردنی کڕین' : 'کڕینی نوێ')}>
+        <Card title={editId ? loc('تعديل أمر الشراء', 'Edit purchase', 'دەستکاریکردنی کڕین') : quickReceive ? loc('شراء جديد · وصل إلى المخزن', 'New purchase · already in stock', 'کڕینی نوێ · گەیشتووەتە کۆگا') : loc('شراء جديد · في الطريق', 'New purchase · on the way', 'کڕینی نوێ · لە ڕێگادایە')}>
+          {/* ONE DOOR, ONE QUESTION (owner report 2026-11-17: «إضافة مخزون موجود» and «شراء قادم» looked the same and
+              confused). Both are the same purchase; the only difference is whether the goods are already on the
+              shelf. So there is one «شراء جديد» and this choice, said in the owner's words, on every step. */}
+          <fieldset className="mb-4 grid gap-2 sm:grid-cols-2" data-purchase-mode>
+            <legend className={`mb-2 text-[14px] font-semibold ${T.text1}`}>{loc('أين البضاعة الآن؟', 'Where are the goods now?', 'کاڵاکان ئێستا لە کوێن؟')}</legend>
+            {([
+              [false, loc('في الطريق (شراء قادم)', 'On the way (incoming)', 'لە ڕێگادایە (کڕینی چاوەڕوانکراو)'), loc('يُسجَّل كشحنة قادمة، وتستلمها من «الشحنات بانتظار الاستلام» عند وصولها.', 'Saved as an incoming shipment; receive it from “Awaiting receipt” when it arrives.', 'وەک بارێکی چاوەڕوانکراو تۆمار دەکرێت؛ کاتێک گەیشت لە «بارەکانی چاوەڕێی وەرگرتن» وەریبگرە.')],
+              [true, loc('وصلت وهي في المخزن الآن', 'Already here, in stock now', 'گەیشتووە و ئێستا لە کۆگایە'), loc('تُضاف الكميات إلى المخزون فور التأكيد. تحتاج تكلفة نهائية.', 'Quantities are added to stock as soon as you confirm. Needs a final cost.', 'بڕەکان هەر کە پشتڕاستت کردەوە دەخرێنە سەر کۆگا. تێچووی کۆتایی دەوێت.')],
+            ] as const).map(([quick, title, hint]) => (
+              <label key={String(quick)} className={`flex cursor-pointer items-start gap-2.5 rounded-[var(--ap-radius-md)] border p-3 ${quickReceive === quick ? 'border-[var(--ap-accent)] bg-[var(--ap-accent-soft)]' : 'border-[var(--ap-border)] bg-[var(--ap-surface-1)]'}`}>
+                <input type="radio" name="purchase-mode" className="mt-1" checked={quickReceive === quick} onChange={() => setQuickReceive(quick)} />
+                <span className="grid gap-0.5"><strong className={`text-[14px] ${T.text1}`}>{title}</strong><small className={`text-[12px] ${T.text3}`}>{hint}</small></span>
+              </label>
+            ))}
+          </fieldset>
           {/* The purchase's name, above the four steps and on every one (owner request 2026-10-10: «لا يمكن تسمية المخزون»). */}
           <div className="mb-4 grid max-w-xl gap-1" data-purchase-name>
             <Input id="purchase-name" label={pn.label} value={header.invoice_no} onChange={(v) => update('invoice_no', v)} placeholder={pn.placeholder} hint={pn.hint} />
@@ -756,6 +864,10 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             <div className="inventory-fields">
               <Select label={loc('المورد', 'Supplier', 'دابینکەر')} value={header.supplier_id} onChange={(v) => update('supplier_id', v)} empty={loc('بدون مورد', 'No supplier', 'بێ دابینکەر')} options={config.suppliers.map((x) => ({ id: x.id, name: nameOf(x) }))} />
               <Input label={loc('تاريخ الشراء', 'Purchase date', 'ڕێکەوتی کڕین')} type="date" value={header.purchase_day} onChange={(v) => update('purchase_day', v)} />
+            </div>
+            <div className="my-5" data-purchase-invoice-import>
+              <PurchaseInvoiceImport currency={header.currency} onAdd={addImported} />
+              {importNote && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{importNote}</p>}
             </div>
             <div className="my-5 max-w-2xl" id="purchase-add-item">
               <StockSelection value={choice} onChange={setChoice} showPurchaseReference={false} />
@@ -796,13 +908,47 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               <p className={`mt-3 text-sm ${T.text3}`}>{header.cost_profile_id ? loc('نحسب الشحن من وزن الكرتون مع التغليف أو حجمه. عند تأكيد الشراء تُحفظ الأسعار الخام والقياسات لهذا الخيار، ويُحفظ سعر الصرف والشحن لهذا المسار لاستخدامها في المشتريات القادمة.', 'Freight uses the packed carton weight or volume. Confirming saves this selection’s raw price and packed measurements, and this route’s exchange and freight rates for future purchases.', 'کرێی ناردن لە کێش یان قەبارەی کارتۆنی پاکێجکراو هەژمار دەکرێت. لە کاتی پشتڕاستکردنەوەی کڕیندا نرخە خاوەکان و پێوانەکان بۆ ئەم هەڵبژاردەیە، و نرخی ئاڵوگۆڕ و ناردنی ئەم ڕێگایە بۆ کڕینەکانی داهاتوو پاشەکەوت دەکرێن.') : loc('الإدخال اليدوي يحافظ على تكاليف المستندات السابقة. راجع إن كانت القيمة المحفوظة تشمل الشحن قبل إضافة تكلفة جديدة. اختر مسارًا أعلاه لحفظ أسعار المورد وحساب الشحن تلقائيًا.', 'Manual entry preserves historical document costs. Check whether a saved amount already includes shipping before adding charges. Choose a route above to remember supplier prices and calculate freight automatically.', 'نووسینی دەستی تێچووی بەڵگەنامە پێشووەکان دەپارێزێت. پێش زیادکردنی تێچووی نوێ، بپشکنە ئایا بڕی پاشەکەوتکراو کرێی ناردنی تێدایە. ڕێگایەک لە سەرەوە هەڵبژێرە بۆ پاشەکەوتکردنی نرخەکانی دابینکەر و هەژمارکردنی خۆکاری ناردن.')}</p>
               {header.cost_profile_id && <div className="mt-3 flex flex-wrap gap-2"><button type="button" className={T.btnSecondary} disabled={op.busy || !Number.isFinite(header.exchange_rate) || header.exchange_rate <= 0 || header.shipping_rate_iqd === null || !Number.isFinite(header.shipping_rate_iqd) || header.shipping_rate_iqd < 0} onClick={() => op.run(saveProfileDefaults, loc('حُفظ سعر الصرف والشحن للمشتريات القادمة', 'Exchange and freight defaults saved', 'نرخی ئاڵوگۆڕ و ناردن بۆ کڕینەکانی داهاتوو پاشەکەوت کرا'))}>{loc('حفظ سعر الصرف والشحن الآن', 'Save exchange and freight defaults now', 'ئێستا نرخی ئاڵوگۆڕ و ناردن پاشەکەوت بکە')}</button><button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => op.run(reloadProfileRates, loc('حُمّل سعر الصرف والشحن المحفوظان؛ بقيت أسعار المنتجات كما أدخلتها', 'Saved exchange and freight rates loaded; entered product prices preserved', 'نرخی ئاڵوگۆڕ و ناردنی پاشەکەوتکراو هێنرانەوە؛ نرخی بەرهەمەکان وەک خۆت نووسیبووت مانەوە'))}>{loc('إعادة تحميل سعر الصرف والشحن', 'Reload saved exchange and freight rates', 'هێنانەوەی نرخی ئاڵوگۆڕ و ناردنی پاشەکەوتکراو')}</button></div>}
             </section>
-            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line" key={i}>
+            <PurchasePriceGrid
+              currency={header.currency}
+              decimals={header.currency === 'IQD' ? 0 : 6}
+              units={lines.reduce((n, l) => n + (Number.isSafeInteger(l.qty_ordered) ? l.qty_ordered : 0), 0)}
+              total={costsValid ? total : NaN}
+              rows={lines.map((l, i): PriceGridRow => ({
+                key: inlineKey(l),
+                label: l.label,
+                sku: l.sku,
+                image: l.image_url,
+                qty: l.qty_ordered,
+                raw: l.purchase_cost_mode === 'total' ? l.source_total_amount ?? '' : l.source_unit_amount,
+                rawMode: l.purchase_cost_mode === 'total' ? 'total' : 'unit',
+                packed: header.cost_profile_id && shippingBasis ? { basis: shippingBasis, value: shippingBasis === 'volume' ? (l.volume_mm3 > 0 ? l.volume_mm3 / 1_000_000_000 : '') : (l.weight_g > 0 ? l.weight_g / 1_000 : '') } : null,
+                landedUnit: estimates[i]?.unit_iqd ?? NaN,
+                lineTotal: estimates[i]?.total_iqd ?? NaN,
+                customerIqd: priceQuotes[inlineKey(l)]?.price ?? (Number.isFinite(l.selling_price_iqd) ? l.selling_price_iqd : null),
+                priceToSave: savers.current.get(inlineKey(l))?.pending === true,
+                qtyError: fieldError(!lineChecks[i]?.quantity, bs.quantity),
+                rawError: fieldError(!lineChecks[i]?.raw, bs.required),
+                packedError: fieldError(lineChecks[i]?.packed === false, bs.required),
+              }))}
+              onQty={setLineQty}
+              onRaw={setLineRaw}
+              onPacked={setLinePacked}
+              onDetails={(i) => setFocusTarget({ id: `purchase-line-${i}-card`, at: Date.now() })}
+              saveAll={{
+                count: [...savers.current.values()].filter((x) => x.pending).length,
+                needConfirm: [...savers.current.values()].filter((x) => x.pending && x.needsConfirm).length,
+                busy: savingAll || op.busy,
+                note: saveAllNote,
+                onSave: () => void saveAllPrices(),
+              }}
+            />
+            <div className="inventory-lines">{lines.map((l, i) => <article className="inventory-line scroll-mt-24" id={`purchase-line-${i}-card`} key={i}>
               <div className="inventory-line-head"><div><strong>{l.label}</strong><small>{loc('الكمية', 'Quantity', 'بڕ')}: {l.qty_ordered} · {ps.storePrice(Number.isFinite(l.selling_price_iqd) ? money(l.selling_price_iqd) : '—')}</small></div></div>
               {/* Where to buy it, beside the raw price he types: never a blocker, never inside the dock. */}
               {ownerCost && l.product_id && <div className="mb-3 min-w-0" data-purchase-supplier-links={i}><Suspense fallback={null}><SupplierLinksPanel productId={l.product_id} scope={{ scope: l.scope, scope_id: l.scope_id }} variant="strip" context="purchase" /></Suspense></div>}
               {header.cost_profile_id && l.procurement_shared_colors && <p className={`mb-3 text-sm ${T.text3}`}>{loc('ألوان هذا الخيار تشترك في مخزون واحد، لذلك يشملها السعر الخام المحفوظ. لفصل تكاليف الألوان، اختر مخزونًا منفصلًا لكل خيار ولون في إعدادات المنتج.', 'This option shares one stock pool across colours, so its saved raw price applies to those colours. For separate colour costs, use stock tracked by option and colour in the product settings.', 'ڕەنگەکانی ئەم هەڵبژاردەیە یەک کۆگایان هەیە، بۆیە نرخی خاوی پاشەکەوتکراو ئەوانیش دەگرێتەوە. بۆ جیاکردنەوەی تێچووی ڕەنگەکان، لە ڕێکخستنەکانی بەرهەمدا کۆگای جیا بۆ هەر هەڵبژاردە و ڕەنگێک هەڵبژێرە.')}</p>}
               <Select label={loc('طريقة إدخال الشراء الخام', 'Raw purchase input', 'شێوازی نووسینی کڕینی خاو')} value={l.purchase_cost_mode || 'unit'} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? changePurchaseCostMode(x, v as 'unit' | 'total', header.currency === 'IQD' ? 0 : 6) : x))} options={[{ id: 'total', name: loc('إجمالي سعر شراء البند الخام', 'Total raw line purchase price', 'کۆی نرخی کڕینی خاوی بەند') }, { id: 'unit', name: loc('سعر شراء القطعة الخام', 'Raw unit purchase price', 'نرخی کڕینی خاوی پارچە') }]} />
-              <div className="inventory-fields mt-3"><Input id={`purchase-line-${i}-raw`} error={fieldError(!lineChecks[i]?.raw, bs.required)} label={`${l.purchase_cost_mode === 'total' ? loc('إجمالي سعر الشراء الخام من المورد', 'Raw supplier purchase total', 'کۆی نرخی کڕینی خاو لە دابینکەر') : loc('سعر شراء القطعة الخام من المورد', 'Raw supplier unit price', 'نرخی کڕینی خاوی پارچە لە دابینکەر')} (${header.currency})`} type="number" min={0} decimals={header.currency === 'IQD' ? 0 : 6} value={l.purchase_cost_mode === 'total' ? l.source_total_amount ?? '' : l.source_unit_amount} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, unit_conversion_inexact: false, ...(x.purchase_cost_mode === 'total' ? { source_total_amount: v === '' ? '' : Number(v), source_unit_amount: v === '' ? '' : Number(v) / x.qty_ordered } : { source_unit_amount: v === '' ? '' : Number(v), source_total_amount: v === '' ? '' : Number((Number(v) * x.qty_ordered).toFixed(6)) }) } : x))} hint={l.cost_source === 'procurement_default' ? `${loc('آخر سعر خام محفوظ لهذا الخيار والمسار، دون شحن (متوسط القطعة عند إدخال إجمالي الفاتورة)', 'Saved raw supplier price, excluding freight (unit average when entered as an invoice total)', 'دوایین نرخی خاوی پاشەکەوتکراو بۆ ئەم هەڵبژاردە و ڕێگایە، بەبێ کرێی ناردن (تێکڕای پارچە کاتێک کۆی پسوولە دەنووسرێت)')} ${l.cost_date?.slice(0, 10) || ''}` : l.cost_source === 'confirmed_purchase' || l.cost_source === 'catalogue' ? loc('قيمة المستند المحفوظة؛ راجع فصل الشحن عنها قبل التعديل', 'Saved document amount; verify whether freight is included before changing it', 'بڕی بەڵگەنامەی پاشەکەوتکراو؛ پێش دەستکاری بپشکنە ئایا کرێی ناردن لێی جیاکراوەتەوە') : loc('أدخل سعر المورد فقط، دون الشحن', 'Enter only the supplier price, excluding freight', 'تەنها نرخی دابینکەر بنووسە، بەبێ کرێی ناردن')} />
+              <div className="inventory-fields mt-3"><Input id={`purchase-line-${i}-raw`} error={fieldError(!lineChecks[i]?.raw, bs.required)} label={`${l.purchase_cost_mode === 'total' ? loc('إجمالي سعر الشراء الخام من المورد', 'Raw supplier purchase total', 'کۆی نرخی کڕینی خاو لە دابینکەر') : loc('سعر شراء القطعة الخام من المورد', 'Raw supplier unit price', 'نرخی کڕینی خاوی پارچە لە دابینکەر')} (${header.currency})`} type="number" min={0} decimals={header.currency === 'IQD' ? 0 : 6} value={l.purchase_cost_mode === 'total' ? l.source_total_amount ?? '' : l.source_unit_amount} onChange={(v) => setLineRaw(i, v)} hint={l.cost_source === 'procurement_default' ? `${loc('آخر سعر خام محفوظ لهذا الخيار والمسار، دون شحن (متوسط القطعة عند إدخال إجمالي الفاتورة)', 'Saved raw supplier price, excluding freight (unit average when entered as an invoice total)', 'دوایین نرخی خاوی پاشەکەوتکراو بۆ ئەم هەڵبژاردە و ڕێگایە، بەبێ کرێی ناردن (تێکڕای پارچە کاتێک کۆی پسوولە دەنووسرێت)')} ${l.cost_date?.slice(0, 10) || ''}` : l.cost_source === 'confirmed_purchase' || l.cost_source === 'catalogue' ? loc('قيمة المستند المحفوظة؛ راجع فصل الشحن عنها قبل التعديل', 'Saved document amount; verify whether freight is included before changing it', 'بڕی بەڵگەنامەی پاشەکەوتکراو؛ پێش دەستکاری بپشکنە ئایا کرێی ناردن لێی جیاکراوەتەوە') : loc('أدخل سعر المورد فقط، دون الشحن', 'Enter only the supplier price, excluding freight', 'تەنها نرخی دابینکەر بنووسە، بەبێ کرێی ناردن')} />
               {header.cost_profile_id && (shippingBasis === 'volume'
                 ? <Input id={`purchase-line-${i}-packed`} error={fieldError(lineChecks[i]?.packed === false, bs.required)} label={loc('حجم كرتون القطعة مع التغليف بالمتر المكعب (CBM)', 'Packed carton volume per unit (CBM)', 'قەبارەی کارتۆنی پارچە لەگەڵ پاکێج بە مەتری سێجا (CBM)')} type="number" min={0} decimals={9} value={l.volume_mm3 > 0 ? l.volume_mm3 / 1_000_000_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, volume_mm3: packedMeasureInput(v, 'volume') } : x))} hint={loc('الحجم الخارجي مع التغليف؛ ليس حجم القطعة وحدها. يُحفظ لهذا الخيار عند التأكيد.', 'Outer packed volume, not the bare item. Saved for this selection on confirmation.', 'قەبارەی دەرەوە لەگەڵ پاکێج؛ نەک قەبارەی تەنها پارچەکە. لە کاتی پشتڕاستکردنەوەدا بۆ ئەم هەڵبژاردەیە پاشەکەوت دەکرێت.')} />
                 : <Input id={`purchase-line-${i}-packed`} error={fieldError(lineChecks[i]?.packed === false, bs.required)} label={loc('وزن كرتون القطعة مع التغليف بالكيلوغرام', 'Packed carton weight per unit (kg)', 'کێشی کارتۆنی پارچە لەگەڵ پاکێج بە کیلۆگرام')} type="number" min={0} decimals={3} value={l.weight_g > 0 ? l.weight_g / 1_000 : ''} onChange={(v) => setLines((a) => a.map((x, j) => j === i ? { ...x, weight_g: packedMeasureInput(v, 'weight') } : x))} hint={loc('الوزن الإجمالي مع الكرتون والتغليف؛ يُحفظ لهذا الخيار عند التأكيد.', 'Gross weight including carton and packaging. Saved for this selection on confirmation.', 'کێشی گشتی لەگەڵ کارتۆن و پاکێج؛ لە کاتی پشتڕاستکردنەوەدا بۆ ئەم هەڵبژاردەیە پاشەکەوت دەکرێت.')} />)}
@@ -826,7 +972,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 <InlineProcurementPricing line={l} purchaseDraft={costsValid ? draftBody('ordered', false) : null}
                   value={inlinePrices[inlineKey(l)] ?? {}} onChange={(value) => setInlinePrice(inlineKey(l), value)} onQuote={onPriceQuote}
                   keepCost={keepsCost(l)}
-                  onSaved={(saved) => { pinCost(l, saved.final_cost_usd !== undefined); setInlinePrice(inlineKey(l), {}); setPricingRevision((v) => v + 1); onChanged(); }}
+                  onRegister={onRegisterSaver}
+                  onSaved={(saved) => { pinCost(l, saved.final_cost_usd !== undefined); setInlinePrice(inlineKey(l), {}); if (bulkSaving.current) { bulkSavedAny.current = true; return; } setPricingRevision((v) => v + 1); onChanged(); }}
                   revision={pricingRevision} summary={summaryOf(i)} onAdvanced={() => editPricing(l.product_id)} />
               </div>
               {pricingError && !pricingOff && <p role="status" className={`mt-2 text-[13px] ${T.text2}`}>{pricingError}</p>}
@@ -918,7 +1065,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
           {draftSerialCount > 50 && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{loc('يمكن تسجيل 50 رقمًا تسلسليًا مع التأكيد. سجّل بقية الأرقام قطعةً قطعةً بعد حفظ الشراء.', 'Register up to 50 serials with confirmation. Add the remaining serials one unit at a time after saving the purchase.', 'لەگەڵ پشتڕاستکردنەوە تا 50 ژمارە تۆمار بکە. دوای پاشەکەوتکردنی کڕین ژمارەکانی تر یەک بە یەک زیاد بکە.')}</p>}
           {/* THE DOCK (owner report 2026-11-03): the actions stay at the bottom of the screen on every step, and a
               button that cannot act yet says why — each missing field by item, with «اذهب» to it — instead of
-              sitting grey. The gates are the same expressions as before (`nextBlocked`, `confirmBlocked`). */}
+              sitting grey. The gates are the same expressions as before (`nextBlockedBase`, `confirmBlocked`). */}
           <div className="inventory-footer inventory-dock" data-purchase-dock>
             {shownBlockers.length > 0 && (
               <div className={`inventory-blockers${attempted ? ' is-alert' : ''}`} data-purchase-blockers>
@@ -934,7 +1081,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
                 {shownBlockers.length > 4 && <p className={`text-xs ${T.text3}`}>{bs.more(shownBlockers.length - 4)}</p>}
               </div>
             )}
-            {attempted && shownBlockers.length === 0 && (step < 3 ? nextBlocked : confirmBlocked && !draftBusy) && <p role="alert" className="inventory-blockers is-alert">{bs.generic}</p>}
+            {attempted && shownBlockers.length === 0 && (step < 3 ? nextBlockedBase : confirmBlocked && !draftBusy) && <p role="alert" className="inventory-blockers is-alert">{bs.generic}</p>}
             <p className="sr-only" role="alert" data-purchase-announce>{announce}</p>
             {draftNote && <p id="purchase-draft-note" role={draftNote.tone === 'error' ? 'alert' : 'status'} data-purchase-draft-note={draftNote.tone} className={`basis-full text-sm ${draftNote.tone === 'error' ? 'text-[var(--ap-danger)]' : draftNote.tone === 'ok' ? 'lv-alert lv-alert-success text-text-primary' : T.text2}`}>{draftNote.text}</p>}
             <div className="inventory-dock-row">
@@ -942,7 +1089,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
               <div className="inventory-dock-actions">
                 {step > 0 && <button type="button" className={T.btnSecondary} onClick={() => { setStep((v) => v - 1); setFocusTarget({ id: null, at: Date.now() }); }}>{loc('رجوع', 'Back', 'گەڕانەوە')}</button>}
                 {step < 3
-                  ? <button type="button" className={T.btnPrimary} disabled={op.busy} aria-disabled={nextBlocked || undefined} onClick={goNext}>{loc('التالي', 'Continue', 'بەردەوامبە')}</button>
+                  ? <button type="button" className={T.btnPrimary} disabled={op.busy || savingAll} aria-disabled={nextBlockedBase || undefined} onClick={goNext}>{loc('التالي', 'Continue', 'بەردەوامبە')}</button>
                   : <button type="button" className={T.btnPrimary} disabled={op.busy || draftBusy} aria-disabled={confirmBlocked || undefined} onClick={confirmPress}>{(quickReceive ? loc('تأكيد وإضافة المخزون', 'Confirm and receive stock', 'پشتڕاستکردنەوە و زیادکردنی کۆگا') : loc('تأكيد الشراء القادم', 'Confirm incoming purchase', 'پشتڕاستکردنەوەی کڕینی چاوەڕوانکراو'))}</button>}
                 <button type="button" className={T.btnSecondary} disabled={op.busy || draftBusy || !nameValid} aria-describedby={draftNote ? 'purchase-draft-note' : undefined} onClick={() => void saveDraft()} data-purchase-save-draft>{draftBusy ? loc('جارٍ حفظ المسودة…', 'Saving draft…', 'ڕەشنووس پاشەکەوت دەکرێت…') : loc('حفظ مسودة', 'Save draft', 'پاشەکەوتکردنی ڕەشنووس')}</button>
                 <button type="button" className={T.btnGhost} disabled={op.busy} onClick={() => setEditing(false)}>{loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}</button>
@@ -1015,6 +1162,8 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
             <button type="button" className={T.btnGhost} onClick={() => setSelected(null)}>
               {loc('إغلاق', 'Close', 'داخستن')}
             </button>
+            {/* A cancelled purchase (or an unconfirmed draft) can go for good (owner report 2026-11-17); the server refuses anything with goods, money or serials on it. */}
+            <PurchaseDeleteButton purchase={selected.purchase} onDeleted={() => { setSelected(null); void op.run(load); onChanged(); }} />
           </div>
           {(() => {
             // D1: a confirmed purchase writes no price; each product's new cost waits for the owner's review there.
@@ -1164,6 +1313,7 @@ export default function ProcurementPanel({ onChanged, initialAction }: { onChang
         <div className="inventory-lines">{purchases.filter((p) => !receiveOnly || ['ordered', 'partial'].includes(p.status)).map((p) => <article className="inventory-line" key={p.id}>
           <div className="inventory-line-head"><div><strong>{p.invoice_no || pn.fallback}</strong><small>{p.supplier_name || loc('بدون مورد', 'No supplier', 'بێ دابینکەر')} · {STATUS_LABELS[p.status] ? loc(...STATUS_LABELS[p.status]) : p.status}</small></div><button type="button" className={T.btnSecondary} disabled={op.busy} onClick={() => op.run(() => open(p.id))}>{receiveOnly ? loc('استلام', 'Receive', 'وەرگرتن') : loc('فتح', 'Open', 'کردنەوە')}</button></div>
           <div className={`flex flex-wrap gap-3 text-sm ${T.text2}`}><span>{loc('الإجمالي', 'Total', 'کۆی گشتی')}: {money(p.total_cost_iqd)}</span><span>{loc('المدفوع', 'Paid', 'پارەی دراو')}: {money(p.paid_iqd)}</span></div>
+          {p.status === 'cancelled' && <div className="mt-2"><PurchaseDeleteButton purchase={p} onDeleted={() => { if (selected?.purchase.id === p.id) setSelected(null); void op.run(load); onChanged(); }} /></div>}
         </article>)}</div>
         {!purchases.filter((p) => !receiveOnly || ['ordered', 'partial'].includes(p.status)).length && <p className={`py-3 text-sm ${T.text3}`}>{loc('لا توجد أوامر في هذه الصفحة', 'No orders on this page', 'هیچ داواکارییەک لەم پەڕەیەدا نییە')}</p>}
         <div className="mt-3 flex gap-2">

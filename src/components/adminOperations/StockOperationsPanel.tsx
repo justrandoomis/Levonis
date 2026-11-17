@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { ApiError } from '../../lib/api';
 import StockSelection from './StockSelection';
 import LotCountForm from '../adminInventory/LotCountForm';
 import LotScanner from '../adminInventory/LotScanner';
@@ -50,6 +51,8 @@ type Health = {
   available: number;
   lot_units: number;
   discrepancy: number;
+  /** A −n row whose write-off would reach an investor-funded lot: fixed by «جرد الدفعة» only. */
+  needs_lot_count?: boolean;
   incoming: number;
   recommended_purchase: number;
   cover_days: number | null;
@@ -58,6 +61,7 @@ type Health = {
   reorder_point: number;
   lead_time_days: number;
 };
+type HealthSummary = { rows_total: number; rows_differ: number; units_without_lots: number; lot_units_not_on_shelf: number };
 export default function StockOperationsPanel({ onChanged, initialTab }: { onChanged: () => void; initialTab?: 'counts' | 'locations' }) {
   const { loc } = useLabels(),
     op = useOperation();
@@ -85,6 +89,8 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
       }>
     >([]),
     [health, setHealth] = useState<Health[]>([]),
+    [healthSummary, setHealthSummary] = useState<HealthSummary | null>(null),
+    [onlyDiff, setOnlyDiff] = useState(false),
     [locations, setLocations] = useState<Named[]>([]),
     [lots, setLots] = useState<Lot[]>([]),
     [counts, setCounts] = useState<Count[]>([]),
@@ -114,10 +120,11 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
     [lead, setLead] = useState(7);
   const load = useCallback(async () => {
     if (tab === 'health') {
-      const r = await api.get<{ rows: Health[] }>(
-        `${STOCK}/health?q=${encodeURIComponent(search)}&offset=${offset}`,
+      const r = await api.get<{ rows: Health[]; summary?: HealthSummary }>(
+        `${STOCK}/health?q=${encodeURIComponent(search)}&offset=${offset}${onlyDiff ? '&only_diff=1' : ''}`,
       );
       setHealth(r.rows);
+      setHealthSummary(r.summary ?? null);
     } else if (tab === 'counts') {
       const [countRows, locationRows] = await Promise.all([api.get<{ counts: Count[] }>(`${STOCK}/counts`), api.get<{ lots: Lot[] }>(`${STOCK}/locations?q=${encodeURIComponent(search)}&offset=${offset}`)]);
       setCounts(countRows.counts);
@@ -138,7 +145,7 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
       setLocations(r.locations);
       setLots(r.lots);
     }
-  }, [tab, search, offset]);
+  }, [tab, search, offset, onlyDiff]);
   const { run } = op;
   useEffect(() => {
     run(load);
@@ -165,7 +172,7 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
           setOffset(0);
         }}
         items={[
-          { id: 'health', name: loc('المطابقة وإعادة الطلب', 'Reconciliation and reorder') },
+          { id: 'health', name: loc('المطابقة وإعادة الطلب', 'Reconciliation and reorder', 'بەراوردکردن و داواکردنەوە') },
           { id: 'locations', name: loc('المستودعات والنقل', 'Warehouses and transfers') },
           { id: 'counts', name: loc('جلسات الجرد', 'Count sessions') },
           { id: 'serials', name: loc('الأجهزة والمرتجعات', 'Serials and returns') },
@@ -209,71 +216,35 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
       </button>
       {tab === 'health' && (
         <>
-          <Card title={loc('دقة المخزون وخطة الشراء', 'Stock accuracy and replenishment')}>
-            <p className={`mb-3 text-xs ${T.text3}`}>
-              {loc(
-                'المقترح يعتمد مبيعات آخر 30 يومًا، مهلة التوريد، 7 أيام احتياط، حد الطلب، والمخزون القادم. يمكن البحث والتنقل بين صفحات من 200 بند.',
-                'Suggestions use 30-day sales, lead time, seven-day safety stock, reorder point and incoming units. Search or page through 200 selections at a time.',
-              )}
-            </p>
-            <DataTable
-              headers={[
-                loc('المنتج', 'Product'),
-                loc('فعلي / دفعات', 'Physical / lots'),
-                loc('المحجوز / المتاح', 'Reserved / available'),
-                loc('الفرق', 'Difference'),
-                loc('القادم', 'Incoming'),
-                loc('تغطية بالأيام', 'Coverage days'),
-                loc('شراء مقترح', 'Suggested purchase'),
-                '',
-              ]}
-            >
-              {health.map((r) => (
-                <tr key={`${r.product_id}:${r.scope}:${r.scope_id}`}>
-                  <Cell>
-                    {r.name_ar || r.name}
-                    <small className="block">{r.scope_id}</small>
-                  </Cell>
-                  <Cell>
-                    {r.stock} / {r.lot_units}
-                  </Cell>
-                  <Cell>
-                    {r.reserved} / {r.available}
-                  </Cell>
-                  <Cell>
-                    <span className={r.discrepancy ? 'font-bold text-red-600' : ''}>{r.discrepancy}</span>
-                  </Cell>
-                  <Cell>{r.incoming}</Cell>
-                  <Cell>{r.cover_days ?? '—'}</Cell>
-                  <Cell>{r.recommended_purchase}</Cell>
-                  <Cell>
-                    <button
-                      type="button"
-                      className={T.btnGhost}
-                      onClick={() => {
-                        setReorder(r);
-                        setPoint(r.reorder_point);
-                        setLead(r.lead_time_days);
-                      }}
-                    >
-                      {loc('ضبط التوريد', 'Set replenishment')}
-                    </button>
-                  </Cell>
-                </tr>
-              ))}
-            </DataTable>
-          </Card>
+          <StockAccuracyCard
+            rows={health}
+            summary={healthSummary}
+            onlyDiff={onlyDiff}
+            onOnlyDiff={(v) => {
+              setOnlyDiff(v);
+              setOffset(0);
+            }}
+            search={search}
+            busy={op.busy}
+            run={op.run}
+            reload={load}
+            onReorder={(r) => {
+              setReorder(r);
+              setPoint(r.reorder_point);
+              setLead(r.lead_time_days);
+            }}
+          />
           {reorder && (
             <Card title={reorder.name_ar || reorder.name}>
               <div className="grid gap-3 sm:grid-cols-3">
                 <Input
-                  label={loc('حد إعادة الطلب', 'Reorder point')}
+                  label={loc('حد إعادة الطلب', 'Reorder point', 'سنووری داواکردنەوە')}
                   type="number"
                   value={point}
                   onChange={(v) => setPoint(Number(v))}
                 />
                 <Input
-                  label={loc('مهلة التوريد بالأيام', 'Lead time days')}
+                  label={loc('مهلة التوريد بالأيام', 'Lead time days', 'ماوەی گەیاندن بە ڕۆژ')}
                   type="number"
                   value={lead}
                   onChange={(v) => setLead(Number(v))}
@@ -293,11 +264,11 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
                         setReorder(null);
                         await load();
                       },
-                      loc('تم حفظ خطة التوريد', 'Replenishment saved'),
+                      loc('تم حفظ خطة التوريد', 'Replenishment saved', 'پلانی دابینکردن پاشەکەوت کرا'),
                     )
                   }
                 >
-                  {loc('حفظ', 'Save')}
+                  {loc('حفظ', 'Save', 'پاشەکەوتکردن')}
                 </button>
               </div>
             </Card>
@@ -797,5 +768,379 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
         </>
       )}
     </div>
+  );
+}
+
+/** How many fixes one request carries (the route's RECONCILE_BATCH_MAX). */
+const RECONCILE_CHUNK = 25;
+const identityOf = (r: Pick<Health, 'product_id' | 'scope' | 'scope_id'>) => `${r.product_id}:${r.scope}:${r.scope_id}`;
+/** A signed difference with a real minus sign: «+3», «−2», «0». */
+const signed = (n: number) => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : '0');
+const diffTone = (n: number) =>
+  n > 0
+    ? 'text-[var(--ap-warning)] bg-[var(--ap-warning-bg)] border-[var(--ap-warning-border)]'
+    : n < 0
+      ? 'text-[var(--ap-danger)] bg-[var(--ap-danger-bg)] border-[var(--ap-danger-border)]'
+      : 'text-[var(--ap-success)] bg-[var(--ap-success-bg)] border-[var(--ap-success-border)]';
+
+/**
+ * «دقة المخزون وخطة الشراء». The Difference is the shelf counter minus the
+ * units in FIFO cost batches. «تصحيح» brings the batches to the shelf — never
+ * the shelf to the batches — so what the shop sells does not move
+ * (worker/lib/stockReconcile.ts). Every fix is confirmed inline first, with
+ * the list of what will change.
+ */
+function StockAccuracyCard({
+  rows,
+  summary,
+  onlyDiff,
+  onOnlyDiff,
+  search,
+  busy,
+  run,
+  reload,
+  onReorder,
+}: {
+  rows: Health[];
+  summary: HealthSummary | null;
+  onlyDiff: boolean;
+  onOnlyDiff: (v: boolean) => void;
+  search: string;
+  busy: boolean;
+  run: (work: () => Promise<unknown>, success?: string) => Promise<boolean>;
+  reload: () => Promise<void>;
+  onReorder: (r: Health) => void;
+}) {
+  const { loc } = useLabels();
+  const [pending, setPending] = useState<{ rows: Health[]; operation: string } | null>(null);
+  const differing = rows.filter((r) => Number(r.discrepancy) !== 0);
+  const plus = summary?.units_without_lots ?? 0,
+    minus = summary?.lot_units_not_on_shelf ?? 0,
+    differ = summary?.rows_differ ?? differing.length;
+  const nameOfRow = (r: Health) => r.name_ar || r.name || r.product_id;
+  const scopeLabel = (r: Health) =>
+    r.scope === 'base'
+      ? ''
+      : r.scope === 'option'
+        ? loc('خيار', 'Option', 'هەڵبژاردە')
+        : r.scope === 'color'
+          ? loc('لون', 'Colour', 'ڕەنگ')
+          : loc('تركيبة', 'Combination', 'تێکەڵە');
+  const effect = (r: Health) =>
+    r.discrepancy > 0
+      ? loc(
+          `فتح دفعة من ${r.discrepancy} وحدة بتكلفة غير معروفة`,
+          `open a batch of ${r.discrepancy} units at unknown cost`,
+          `کردنەوەی وەجبەیەکی ${r.discrepancy} یەکە بە تێچووی نەزانراو`,
+        )
+      : loc(
+          `إخراج ${Math.abs(r.discrepancy)} وحدة من أقدم الدفعات`,
+          `remove ${Math.abs(r.discrepancy)} units from the oldest batches`,
+          `دەرکردنی ${Math.abs(r.discrepancy)} یەکە لە کۆنترین وەجبەکان`,
+        );
+
+  /** Every differing row for the current search, across all pages — «fix all» means all. */
+  const allDiffering = async () => {
+    const out: Health[] = [];
+    for (let offset = 0; offset < 100000; offset += 200) {
+      const r = await api.get<{ rows: Health[] }>(`${STOCK}/health?q=${encodeURIComponent(search)}&offset=${offset}&only_diff=1`);
+      out.push(...r.rows.filter((x) => Number(x.discrepancy) !== 0));
+      if (r.rows.length < 200) break;
+    }
+    return out;
+  };
+  const ask = (list: Health[]) => {
+    if (list.length) setPending({ rows: list, operation: crypto.randomUUID() });
+  };
+  const lotCountLabel = loc('يحتاج جرد الدفعة', 'Needs a lot count', 'پێویستی بە ژماردنی وەجبەیە');
+  const apply = () => {
+    if (!pending) return;
+    const { operation } = pending;
+    // Rows that reach an investor-funded lot are never sent: «جرد الدفعة» posts the investor's loss.
+    const list = pending.rows.filter((r) => !r.needs_lot_count);
+    const skipped = pending.rows.length - list.length;
+    const skippedNote = skipped
+      ? loc(
+          ` — تُرك ${skipped} بند يحتاج «جرد الدفعة»`,
+          ` — ${skipped} left for a lot count`,
+          ` — ${skipped} ڕیز بۆ «ژماردنی وەجبە» جێهێڵدرا`,
+        )
+      : '';
+    if (!list.length) return;
+    void run(async () => {
+      let done = 0;
+      try {
+        for (let i = 0; i < list.length; i += RECONCILE_CHUNK) {
+          const chunk = list.slice(i, i + RECONCILE_CHUNK);
+          await api.post(`${STOCK}/reconcile`, {
+            // One id per chunk, stable across a retry of the same confirmation: a replay writes nothing twice.
+            operation_id: `${operation}-${i / RECONCILE_CHUNK}`,
+            rows: chunk.map((r) => ({ product_id: r.product_id, scope: r.scope, scope_id: r.scope_id, stock: r.stock, lot_units: r.lot_units })),
+          });
+          done += chunk.length;
+        }
+      } catch (e) {
+        await reload().catch(() => undefined);
+        if (done > 0) setPending(null);
+        if (e instanceof ApiError && e.code === 'STOCK_CHANGED')
+          throw new Error(
+            loc(
+              `تغيّر المخزون أثناء التصحيح؛ صُحّح ${done} من ${list.length}. حُدّثت القائمة — راجعها وأعد المحاولة.`,
+              `Stock changed while fixing; ${done} of ${list.length} fixed. The list is refreshed — check it and try again.`,
+              `کۆگا لە کاتی چاککردندا گۆڕا؛ ${done} لە ${list.length} چاک کران. لیستەکە نوێ کرایەوە — بیپشکنە و دووبارە هەوڵ بدەرەوە.`,
+            ),
+          );
+        if (e instanceof ApiError && e.code === 'RECONCILE_INVESTOR_LOT')
+          throw new Error(
+            loc(
+              `صُحّح ${done} من ${list.length}. بند يُخرج وحدات من دفعة ممولة من مستثمر: صحّحه بـ«جرد الدفعة» على تلك الدفعة ليُسجَّل أثره على رأس مال المستثمر.`,
+              `${done} of ${list.length} fixed. A row would write off units of an investor-funded batch: correct it with a lot count on that batch so the investor’s capital loss is recorded.`,
+              `${done} لە ${list.length} چاک کران. ڕیزێک یەکە لە وەجبەیەک دەردەکات کە وەبەرهێنەر پارەی داوە: بە «ژماردنی وەجبە» لەسەر ئەو وەجبەیە چاکی بکە تا کاریگەرییەکەی لەسەر سەرمایەی وەبەرهێنەر تۆمار بکرێت.`,
+            ),
+          );
+        if (e instanceof ApiError && e.code === 'UNIT_ORIGIN_LOT_COUNT_REQUIRED')
+          throw new Error(
+            loc(
+              `صُحّح ${done} من ${list.length}. دفعة فيها قطع معرّفة بأرقامها: صحّح فرقها من «جرد دفعة محددة» في جلسات الجرد.`,
+              `${done} of ${list.length} fixed. A batch holds individually numbered pieces: fix it with «Lot count» under Count sessions.`,
+              `${done} لە ${list.length} چاک کران. وەجبەیەک پارچەی ژمارەداری تێدایە: لە «ژماردنی وەجبەیەکی دیاریکراو» لە دانیشتنەکانی ژماردن چاکی بکە.`,
+            ),
+          );
+        throw e;
+      }
+      setPending(null);
+      await reload();
+    }, loc(`صُحّحت الفروقات (${list.length})`, `Differences fixed (${list.length})`, `جیاوازییەکان چاک کران (${list.length})`) + skippedNote);
+  };
+
+  return (
+    <Card title={loc('دقة المخزون وخطة الشراء', 'Stock accuracy and replenishment', 'وردی کۆگا و پلانی کڕین')}>
+      {summary && (
+        <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3" aria-live="polite">
+          <div className={`${T.surface} p-3`}>
+            <div className={`text-xs ${T.text3}`}>{loc('بنود فيها فرق', 'Rows with a difference', 'ڕیزی جیاواز')}</div>
+            <div className={`text-lg font-bold ${differ ? 'text-[var(--ap-danger)]' : 'text-[var(--ap-success)]'}`}>
+              {differ} <span className={`text-xs font-normal ${T.text3}`}>/ {summary.rows_total}</span>
+            </div>
+          </div>
+          <div className={`${T.surface} p-3`}>
+            <div className={`text-xs ${T.text3}`}>{loc('على الرف بلا دفعة تكلفة', 'On the shelf, no cost batch', 'لەسەر ڕەف، بێ وەجبەی تێچوو')}</div>
+            <div className="text-lg font-bold text-[var(--ap-warning)]">{signed(plus)}</div>
+          </div>
+          <div className={`${T.surface} p-3`}>
+            <div className={`text-xs ${T.text3}`}>{loc('في الدفعات وليست على الرف', 'In batches, not on the shelf', 'لە وەجبەکاندا، لەسەر ڕەف نییە')}</div>
+            <div className="text-lg font-bold text-[var(--ap-danger)]">{signed(-minus)}</div>
+          </div>
+        </div>
+      )}
+      <details className={`mb-3 text-xs ${T.text2}`} open={differ > 0}>
+        <summary className="cursor-pointer font-semibold">{loc('ما معنى «الفرق»؟', 'What does «Difference» mean?', '«جیاوازی» واتای چییە؟')}</summary>
+        <ul className="mt-2 list-disc space-y-1 ps-5">
+          <li>
+            {loc(
+              'الفرق = الكمية على الرف − الوحدات المسجّلة في دفعات التكلفة. الطبيعي أن يكون صفرًا.',
+              'Difference = quantity on the shelf − units recorded in cost batches. Normally it is zero.',
+              'جیاوازی = بڕی سەر ڕەف − ئەو یەکانەی لە وەجبەکانی تێچوودا تۆمار کراون. بە ئاسایی سفرە.',
+            )}
+          </li>
+          <li>
+            <span className="font-bold text-[var(--ap-warning)]">+</span>{' '}
+            {loc(
+              'موجب: وحدات على الرف بلا دفعة تكلفة (غالبًا أُضيفت من محرر المنتج دون تسجيل شراء)، فتكلفتها غير معروفة.',
+              'Positive: shelf units with no cost batch (usually added in the product editor without recording a purchase), so their cost is unknown.',
+              'پۆزەتیڤ: یەکەی سەر ڕەف کە وەجبەی تێچوویان نییە (زۆرجار لە دەستکاریکەری بەرهەم زیاد کراون بێ تۆمارکردنی کڕین)، بۆیە تێچوویان نەزانراوە.',
+            )}
+          </li>
+          <li>
+            <span className="font-bold text-[var(--ap-danger)]">−</span>{' '}
+            {loc(
+              'سالب: دفعات ما زالت تحمل وحدات لم تعد على الرف (أُنقصت الكمية دون جرد).',
+              'Negative: batches still hold units that are no longer on the shelf (the quantity was lowered without a count).',
+              'نێگەتیڤ: وەجبەکان هێشتا ئەو یەکانەیان تێدایە کە ئیتر لەسەر ڕەف نین (بڕەکە بێ ژماردن کەم کراوەتەوە).',
+            )}
+          </li>
+          <li>
+            {loc(
+              '«تصحيح» يجعل الدفعات تطابق الرف ويسجّل حركة في «الحركات». الكمية المعروضة للبيع لا تتغير. إن كان الرف نفسه خاطئًا فابدأ بجلسة جرد.',
+              '«Fix» makes the batches match the shelf and records a movement under «Movements». The quantity on sale does not change. If the shelf itself is wrong, run a count session first.',
+              '«چاککردن» وەجبەکان لەگەڵ ڕەف ڕێک دەخات و جووڵەیەک لە «جووڵەکان» تۆمار دەکات. ئەو بڕەی بۆ فرۆشتنە ناگۆڕێت. ئەگەر ڕەفەکە خۆی هەڵەیە، سەرەتا دانیشتنێکی ژماردن بکە.',
+            )}
+          </li>
+        </ul>
+      </details>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <button type="button" className={T.chip} aria-pressed={onlyDiff} onClick={() => onOnlyDiff(!onlyDiff)}>
+          {loc('فقط الفروقات', 'Only differences', 'تەنها جیاوازییەکان')}
+        </button>
+        <button
+          type="button"
+          className={T.btnSecondary}
+          disabled={busy || differ === 0 || !!pending}
+          onClick={() => void run(async () => ask(await allDiffering()))}
+        >
+          {loc('تصحيح كل الفروقات', 'Fix all differences', 'چاککردنی هەموو جیاوازییەکان')}
+        </button>
+      </div>
+      {pending && (
+        <div role="region" aria-label={loc('تأكيد التصحيح', 'Confirm the fix', 'پشتڕاستکردنەوەی چاککردن')} className={`${T.surface} mb-3 p-3`}>
+          <p className={`mb-2 text-sm font-semibold ${T.text1}`}>
+            {loc(
+              `سيتغير ${pending.rows.length} بند — الدفعات فقط، والكمية على الرف تبقى كما هي:`,
+              `${pending.rows.length} rows will change — batches only; the shelf quantity stays as it is:`,
+              `${pending.rows.length} ڕیز دەگۆڕێت — تەنها وەجبەکان؛ بڕی سەر ڕەف وەک خۆی دەمێنێتەوە:`,
+            )}
+          </p>
+          <ul className={`mb-3 max-h-60 space-y-1 overflow-y-auto text-xs ${T.text2}`}>
+            {pending.rows.map((r) => (
+              <li key={identityOf(r)} className="flex flex-wrap items-center gap-2">
+                <span className={`${T.badgeBase} ${diffTone(r.discrepancy)}`}>{signed(r.discrepancy)}</span>
+                <span className={`font-medium ${T.text1}`}>{nameOfRow(r)}</span>
+                {scopeLabel(r) && <span>({scopeLabel(r)})</span>}
+                {r.needs_lot_count ? (
+                  <span className={`${T.badgeBase} ${diffTone(-1)}`}>{lotCountLabel}</span>
+                ) : (
+                  <span>— {effect(r)}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          {pending.rows.some((r) => r.needs_lot_count) && (
+            <p className={`mb-2 text-xs ${T.text2}`}>
+              {loc(
+                `${pending.rows.filter((r) => r.needs_lot_count).length} بند يُخرج وحدات من دفعة ممولة من مستثمر فيُترك: صحّحه بـ«جرد الدفعة» على تلك الدفعة (في جلسات الجرد) ليُسجَّل أثره على رأس مال المستثمر.`,
+                `${pending.rows.filter((r) => r.needs_lot_count).length} row(s) would write off units of an investor-funded batch and are skipped: correct them with a lot count (under Count sessions) so the investor’s capital loss is recorded.`,
+                `${pending.rows.filter((r) => r.needs_lot_count).length} ڕیز یەکە لە وەجبەیەک دەردەکەن کە وەبەرهێنەر پارەی داوە، بۆیە جێدەهێڵدرێن: بە «ژماردنی وەجبە» (لە دانیشتنەکانی ژماردن) چاکیان بکە تا کاریگەرییەکەی لەسەر سەرمایەی وەبەرهێنەر تۆمار بکرێت.`,
+              )}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={T.btnPrimary} disabled={busy || pending.rows.every((r) => r.needs_lot_count)} onClick={apply}>
+              {loc('تأكيد التصحيح', 'Confirm fix', 'پشتڕاستکردنەوەی چاککردن')}
+            </button>
+            <button type="button" className={T.btnGhost} disabled={busy} onClick={() => setPending(null)}>
+              {loc('إلغاء', 'Cancel', 'هەڵوەشاندنەوە')}
+            </button>
+          </div>
+        </div>
+      )}
+      <p className={`mb-3 text-xs ${T.text3}`}>
+        {loc(
+          'الشراء المقترح يعتمد مبيعات آخر 30 يومًا، مهلة التوريد، 7 أيام احتياط، حد الطلب، والمخزون القادم. يمكن البحث والتنقل بين صفحات من 200 بند.',
+          'Suggestions use 30-day sales, lead time, seven-day safety stock, reorder point and incoming units. Search or page through 200 selections at a time.',
+          'کڕینی پێشنیارکراو پشت بە فرۆشی 30 ڕۆژی ڕابردوو، ماوەی گەیاندن، 7 ڕۆژی یەدەگ، سنووری داواکردنەوە و کۆگای داهاتوو دەبەستێت. دەتوانیت بگەڕێیت و لە پەڕەکانی 200 بڕگەیی بگوازیتەوە.',
+        )}
+      </p>
+      {rows.length === 0 ? (
+        <p className={`text-sm ${T.text3}`}>
+          {onlyDiff
+            ? loc('لا فروقات — الدفعات تطابق الرف.', 'No differences — the batches match the shelf.', 'هیچ جیاوازییەک نییە — وەجبەکان لەگەڵ ڕەف یەکدەگرنەوە.')
+            : loc('لا توجد بنود مخزون متتبعة.', 'No tracked stock rows.', 'هیچ ڕیزێکی کۆگای بەدواداچوو نییە.')}
+        </p>
+      ) : (
+        <>
+          {/* Phones: one card per row, nothing to scroll sideways. */}
+          <ul className="space-y-2 sm:hidden">
+            {rows.map((r) => (
+              <li key={identityOf(r)} className={`${T.surface} p-3`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className={`truncate font-medium ${T.text1}`}>{nameOfRow(r)}</div>
+                    {scopeLabel(r) && (
+                      <div className={`truncate text-xs ${T.text3}`}>
+                        {scopeLabel(r)} · {r.scope_id}
+                      </div>
+                    )}
+                  </div>
+                  <span className={`${T.badgeBase} ${diffTone(r.discrepancy)}`} title={loc('الفرق', 'Difference', 'جیاوازی')}>
+                    {signed(r.discrepancy)}
+                  </span>
+                </div>
+                <dl className={`mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs ${T.text2}`}>
+                  <dt>{loc('الرف / الدفعات', 'Shelf / batches', 'ڕەف / وەجبەکان')}</dt>
+                  <dd className={T.text1}>
+                    {r.stock} / {r.lot_units}
+                  </dd>
+                  <dt>{loc('المحجوز / المتاح', 'Reserved / available', 'گیراو / بەردەست')}</dt>
+                  <dd className={T.text1}>
+                    {r.reserved} / {r.available}
+                  </dd>
+                  <dt>{loc('القادم', 'Incoming', 'داهاتوو')}</dt>
+                  <dd className={T.text1}>{r.incoming}</dd>
+                  <dt>{loc('تغطية بالأيام', 'Coverage days', 'ڕۆژانی داپۆشین')}</dt>
+                  <dd className={T.text1}>{r.cover_days ?? '—'}</dd>
+                  <dt>{loc('شراء مقترح', 'Suggested purchase', 'کڕینی پێشنیارکراو')}</dt>
+                  <dd className={T.text1}>{r.recommended_purchase}</dd>
+                </dl>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {r.needs_lot_count ? (
+                    <span className={`${T.badgeBase} ${diffTone(-1)}`}>{lotCountLabel}</span>
+                  ) : r.discrepancy !== 0 && (
+                    <button type="button" className={T.btnSecondary} disabled={busy || !!pending} onClick={() => ask([r])}>
+                      {loc('تصحيح', 'Fix', 'چاککردن')}
+                    </button>
+                  )}
+                  <button type="button" className={T.btnGhost} onClick={() => onReorder(r)}>
+                    {loc('ضبط التوريد', 'Set replenishment', 'ڕێکخستنی دابینکردن')}
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="hidden sm:block">
+            <DataTable
+              headers={[
+                loc('المنتج', 'Product', 'بەرهەم'),
+                loc('الرف / الدفعات', 'Shelf / batches', 'ڕەف / وەجبەکان'),
+                loc('المحجوز / المتاح', 'Reserved / available', 'گیراو / بەردەست'),
+                loc('الفرق', 'Difference', 'جیاوازی'),
+                loc('القادم', 'Incoming', 'داهاتوو'),
+                loc('تغطية بالأيام', 'Coverage days', 'ڕۆژانی داپۆشین'),
+                loc('شراء مقترح', 'Suggested purchase', 'کڕینی پێشنیارکراو'),
+                '',
+              ]}
+            >
+              {rows.map((r) => (
+                <tr key={identityOf(r)}>
+                  <Cell>
+                    {nameOfRow(r)}
+                    {scopeLabel(r) && (
+                      <small className={`block ${T.text3}`}>
+                        {scopeLabel(r)} · {r.scope_id}
+                      </small>
+                    )}
+                  </Cell>
+                  <Cell>
+                    {r.stock} / {r.lot_units}
+                  </Cell>
+                  <Cell>
+                    {r.reserved} / {r.available}
+                  </Cell>
+                  <Cell>
+                    <span className={`${T.badgeBase} ${diffTone(r.discrepancy)}`}>{signed(r.discrepancy)}</span>
+                  </Cell>
+                  <Cell>{r.incoming}</Cell>
+                  <Cell>{r.cover_days ?? '—'}</Cell>
+                  <Cell>{r.recommended_purchase}</Cell>
+                  <Cell>
+                    <div className="flex flex-wrap gap-1">
+                      {r.needs_lot_count ? (
+                    <span className={`${T.badgeBase} ${diffTone(-1)}`}>{lotCountLabel}</span>
+                  ) : r.discrepancy !== 0 && (
+                        <button type="button" className={T.btnGhost} disabled={busy || !!pending} onClick={() => ask([r])}>
+                          {loc('تصحيح', 'Fix', 'چاککردن')}
+                        </button>
+                      )}
+                      <button type="button" className={T.btnGhost} onClick={() => onReorder(r)}>
+                        {loc('ضبط التوريد', 'Set replenishment', 'ڕێکخستنی دابینکردن')}
+                      </button>
+                    </div>
+                  </Cell>
+                </tr>
+              ))}
+            </DataTable>
+          </div>
+        </>
+      )}
+    </Card>
   );
 }

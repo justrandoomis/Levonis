@@ -153,10 +153,13 @@ test('every sentence exists in Arabic, English and Sorani, and the Sorani is nev
 test('the wizard: «التالي» and the confirm keep their gates but are never silently grey, and the dock lists why', () => {
   const panel = src('src/components/adminOperations/ProcurementPanel.tsx');
   // The gates are the old expressions, kept whole.
-  assert.match(panel, /const nextBlocked = !nameValid \|\| !fundingValid\(funding\) \|\| \(step > 0 && \(!quantitiesValid \|\| !originsValid\)\) \|\| \(step === 2 && \(!costsValid \|\| !draftSerialsValid \|\| !rateReady \|\| pendingInlinePrices\)\);/);
+  // 2026-11-17: typed prices no longer gate «التالي»; it saves them first (saveAllPrices(true)), then moves on.
+  assert.match(panel, /const nextBlockedBase = !nameValid \|\| !fundingValid\(funding\) \|\| \(step > 0 && \(!quantitiesValid \|\| !originsValid\)\) \|\| \(step === 2 && \(!costsValid \|\| !draftSerialsValid \|\| !rateReady\)\);/);
+  assert.match(panel, /if \(step === 2 && !nextBlockedBase && pendingInlinePrices\) \{/);
+  assert.match(panel, /await saveAllPrices\(true\)/);
   assert.match(panel, /fundingNeedsFinalCost \|\| !rateReady \|\| \(quickReceive && header\.cost_state !== 'final'\)/);
   // A blocked button stays pressable (aria-disabled) and its press says why instead of doing nothing.
-  assert.match(panel, /aria-disabled=\{nextBlocked \|\| undefined\} onClick=\{goNext\}/);
+  assert.match(panel, /aria-disabled=\{nextBlockedBase \|\| undefined\} onClick=\{goNext\}/);
   assert.match(panel, /aria-disabled=\{confirmBlocked \|\| undefined\}/);
   assert.doesNotMatch(panel, /disabled=\{op\.busy \|\| !nameValid \|\| !fundingValid\(funding\)/, 'the old silent disable is gone');
   assert.match(panel, /data-purchase-blockers/);

@@ -58,6 +58,7 @@ export const TIMEOUTS_MS: Readonly<Record<AiTask | 'models', number>> = Object.f
   review: 110_000,
   carousel: 110_000,
   chat: 60_000,
+  invoice: 110_000,
 });
 
 export const MAX_TOKENS: Readonly<Record<AiTask, number>> = Object.freeze({
@@ -68,6 +69,8 @@ export const MAX_TOKENS: Readonly<Record<AiTask, number>> = Object.freeze({
   edit: 8_000,
   review: 8_000,
   chat: 4_000,
+  // A purchase invoice: one compact row per colour/option line (a 60-line 1688 order is ~6k tokens).
+  invoice: 16_000,
 });
 
 /** How long a 429's retry-after may ask for and still get the one retry. */
@@ -301,7 +304,8 @@ async function send(
 
 export type ContentBlock =
   | { type: 'text'; text: string }
-  | { type: 'image'; source: { type: 'base64'; media_type: 'image/png' | 'image/jpeg' | 'image/webp'; data: string } };
+  | { type: 'image'; source: { type: 'base64'; media_type: 'image/png' | 'image/jpeg' | 'image/webp'; data: string } }
+  | { type: 'document'; source: { type: 'base64'; media_type: 'application/pdf'; data: string } };
 
 export interface MessagesRequest {
   task: AiTask;

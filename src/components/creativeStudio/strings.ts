@@ -987,6 +987,7 @@ export const TASK_TEXT: Readonly<Record<AiTask, Tri>> = {
   review: t('مراجعة بصرية', 'Visual review', 'پێداچوونەوەی بینراو'),
   carousel: t('كاروسيل', 'Carousel', 'کارۆسێل'),
   chat: t('محادثة', 'Chat', 'گفتوگۆ'),
+  invoice: t('قراءة فاتورة شراء', 'Purchase invoice reading', 'خوێندنەوەی پسوولەی کڕین'),
 };
 
 export const JOB_TEXT: Readonly<Record<JobStatus | 'ok' | 'error' | 'refused', Tri>> = {

@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { api, ApiError, isAborted } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { contractRefusal, refusalLang } from '../../lib/refusalStrings';
@@ -12,6 +12,24 @@ import { money, T, type Selection } from './shared';
 export type InlinePriceDraft = { final_cost_usd?: string; minimum_profit_usd?: string; customer_price_usd?: string };
 type PriceSelection = Pick<Selection, 'product_id' | 'scope' | 'scope_id' | 'label'> & Partial<Pick<Selection, 'option_id' | 'color_id'>>;
 export const inlinePriceKey = (line: PriceSelection) => `${line.product_id}:${line.scope}:${line.scope_id}`;
+/**
+ * The amounts as the server should read them (owner report 2026-11-17, «السعر النهائي للزبون لا يُحسب أو يختفي»):
+ * a half-typed «12.» counts as 12 and an emptied cost or customer price means «use the calculated one». Before,
+ * both made the whole card invalid, so the price cell fell to «يحتاج تسعيرًا» while the owner was still typing.
+ */
+export function cleanInlinePrice(value: InlinePriceDraft): InlinePriceDraft {
+  const out: InlinePriceDraft = {};
+  for (const key of ['final_cost_usd', 'minimum_profit_usd', 'customer_price_usd'] as const) {
+    const raw = value[key];
+    if (raw === undefined) continue;
+    const text = raw.trim().replace(/\.$/, '').replace(/^\./, '0.');
+    if (text === '' && key !== 'minimum_profit_usd') continue;
+    out[key] = text;
+  }
+  return out;
+}
+/** What a card hands the purchase for «حفظ كل الأسعار»: whether it has something to save, and the save itself. */
+export type InlinePriceSaver = { pending: boolean; typed: boolean; ready: boolean; needsConfirm: boolean; save: () => Promise<boolean> };
 /** `keepCost` (DECISIONS row 273): a final cost the owner typed and saved for this very shipment stays the cost,
  * instead of the landed cost of the shipment, until the shipment itself changes. */
 export const inlinePricingRequestKey = (line: PriceSelection, draft: Record<string, unknown> | null, value: InlinePriceDraft, revision: number, keepCost = false) =>
@@ -32,7 +50,7 @@ interface LinePrice {
   shipment?: { landed_cost_iqd: string; usd_iqd: string; final_cost_usd: string } | null;
 }
 
-export default function InlineProcurementPricing({ line, purchaseDraft, value, onChange, onSaved, revision, summary, onAdvanced, readOnly = false, onQuote, keepCost = false }: {
+export default function InlineProcurementPricing({ line, purchaseDraft, value, onChange, onSaved, revision, summary, onAdvanced, readOnly = false, onQuote, keepCost = false, onRegister }: {
   line: PriceSelection;
   purchaseDraft: Record<string, unknown> | null;
   value: InlinePriceDraft;
@@ -45,6 +63,8 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
   onAdvanced: () => void;
   readOnly?: boolean;
   onQuote?: (selectionKey: string, quote: InlinePriceQuote) => void;
+  /** The purchase's one «حفظ كل الأسعار» (owner request 2026-11-17): the card registers its save instead of showing its own button. */
+  onRegister?: (selectionKey: string, saver: InlinePriceSaver | null) => void;
 }) {
   const { lang, loc } = useLanguage();
   const id = useId();
@@ -55,10 +75,12 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
   const [confirmedKey, setConfirmedKey] = useState('');
   const [attempt, setAttempt] = useState(0);
   const dirty = Object.keys(value).length > 0;
-  const valid = (value.final_cost_usd === undefined || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.final_cost_usd))
-    && (value.minimum_profit_usd === undefined || value.minimum_profit_usd === '' || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.minimum_profit_usd))
-    && (value.customer_price_usd === undefined || /^(?:\d+)(?:\.\d{1,6})?$/.test(value.customer_price_usd));
-  const requestKey = inlinePricingRequestKey(line, purchaseDraft, value, revision, keepCost);
+  const sent = cleanInlinePrice(value);
+  const amount = /^(?:\d+)(?:\.\d{1,6})?$/;
+  const valid = (sent.final_cost_usd === undefined || amount.test(sent.final_cost_usd))
+    && (sent.minimum_profit_usd === undefined || sent.minimum_profit_usd === '' || amount.test(sent.minimum_profit_usd))
+    && (sent.customer_price_usd === undefined || amount.test(sent.customer_price_usd));
+  const requestKey = inlinePricingRequestKey(line, purchaseDraft, sent, revision, keepCost);
   useEffect(() => {
     if (!valid) return;
     const controller = new AbortController();
@@ -79,6 +101,8 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
   const answeredSelection = answer ? JSON.parse(answer.key)[0] as Selection : null;
   const latest = answeredSelection?.product_id === line.product_id && answeredSelection.scope === line.scope && answeredSelection.scope_id === line.scope_id ? answer?.data : null;
   const pending = !result && !error && valid;
+  // While a new quote is on its way the last one stays on screen (it never blinks to «يحتاج تسعيرًا»).
+  const shownPrice = result ? result.customer_price_iqd : pending && latest ? latest.customer_price_iqd : null;
   const confirmRequired = result?.preview.large_change || result?.preview.drop_flag;
   const change = (field: keyof InlinePriceDraft, text: string) => {
     setError(null); setSaved(false); setConfirmedKey('');
@@ -92,8 +116,8 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
     <UsdInput id={`${id}-${key}`} label={`${label} (USD) · ${line.label}`} placeholder="—" disabled={saving}
       value={value[key] ?? fallback ?? ''} onChange={(text) => change(key, text)} data={key} />
   );
-  const save = async () => {
-    if (!result || saving) return;
+  const save = async (): Promise<boolean> => {
+    if (!result || saving) return false;
     setSaving(true); setError(null);
     try {
       await api.put(`/api/admin/products-v2/${encodeURIComponent(line.product_id)}/pricing`, {
@@ -103,6 +127,7 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
       });
       setSaved(true);
       onSaved(value);
+      return true;
     } catch (e) {
       setError(e);
       // An obsolete preview must be read again before retrying its save.
@@ -110,8 +135,18 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
         setAnswer(null);
         setAttempt((n) => n + 1);
       }
+      return false;
     } finally { setSaving(false); }
   };
+  const canSave = dirty || result?.cost_from_purchase === true;
+  const needsConfirm = !!confirmRequired && confirmedKey !== requestKey;
+  const saveRef = useRef(save);
+  saveRef.current = save;
+  useEffect(() => {
+    if (!onRegister || readOnly) return;
+    onRegister(selectionKey, { pending: canSave, typed: dirty, ready: !!result && !saving && valid, needsConfirm, save: () => saveRef.current() });
+  }, [onRegister, readOnly, selectionKey, canSave, dirty, result, saving, valid, needsConfirm]);
+  useEffect(() => () => onRegister?.(selectionKey, null), [onRegister, selectionKey]);
   const invalidField = error instanceof ApiError ? error.details?.field : null;
   const errorText = !valid
     ? loc('أكمل المبلغ لحساب السعر وحفظه.', 'Complete the amount to preview and save the price.', 'بڕەکە تەواو بکە بۆ پێشبینیکردن و پاشەکەوتکردنی نرخ.')
@@ -151,7 +186,7 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
         cost: field('final_cost_usd', loc('التكلفة النهائية', 'Final cost', 'تێچووی کۆتایی'), latest?.final_cost_usd),
         profit: field('minimum_profit_usd', loc('الحد الأدنى للربح', 'Minimum profit', 'کەمترین قازانج'), latest?.minimum_profit_usd),
         customerUsd: field('customer_price_usd', loc('السعر النهائي للزبون', 'Final customer price', 'نرخی کۆتایی کڕیار'), latest?.customer_price_usd),
-        price: result?.customer_price_iqd ?? null,
+        price: shownPrice ?? null,
       }} />
       <p className={`mt-2 text-xs ${T.text3}`}>{loc('عدّل التكلفة أو الربح أو سعر الزبون بالدولار ثم احفظ. في التسعير حسب التكلفة، تعديل سعر الزبون يعيد حساب الربح. يظهر سعر الدينار بعد التقريب المعتمد. تكلفة الشحنة المحاسبية تبقى حسب بيانات الشراء أعلاه.', 'Edit cost, profit or customer price in USD, then save. Cost-based pricing recalculates profit when you edit the customer price. IQD reflects the configured rounding. The shipment’s accounting cost follows the purchase fields above.', 'تێچوو، قازانج یان نرخی کڕیار بە دۆلار دەستکاری بکە و پاشەکەوت بکە. لە نرخدانی بەپێی تێچوو، گۆڕینی نرخی کڕیار قازانج دووبارە دەژمێرێتەوە. نرخی دینار بەپێی خڕکردنەوەکەیە. تێچووی ژمێریاریی بارەکە بەپێی زانیاریی کڕینی سەرەوەیە.')}</p>
       <InlineSaleDiscount productId={line.product_id} label={line.label} revision={revision} onAdvanced={onAdvanced}
@@ -171,7 +206,7 @@ export default function InlineProcurementPricing({ line, purchaseDraft, value, o
       {errorText && <p role="alert" className="mt-2 text-sm text-[var(--ap-danger)]">{errorText}</p>}
       {saved && !dirty && <p role="status" className={`mt-2 text-sm ${T.text2}`}>{loc('تم حفظ تعديلات التسعير.', 'Pricing edits saved.', 'دەستکارییەکانی نرخدان پاشەکەوت کران.')}</p>}
       <div className="mt-2 flex flex-wrap gap-2">
-        {(dirty || result?.cost_from_purchase) && <button type="button" data-focus-first className={T.btnPrimary} disabled={saving || !result || (!!confirmRequired && confirmedKey !== requestKey)} onClick={save}>{saving ? loc('جارٍ الحفظ…', 'Saving…', 'پاشەکەوت دەکرێت…') : loc('حفظ التكلفة والربح والسعر', 'Save cost, profit and price', 'پاشەکەوتکردنی تێچوو، قازانج و نرخ')}</button>}
+        {!onRegister && canSave && <button type="button" data-focus-first className={T.btnPrimary} disabled={saving || !result || (!!confirmRequired && confirmedKey !== requestKey)} onClick={() => void save()}>{saving ? loc('جارٍ الحفظ…', 'Saving…', 'پاشەکەوت دەکرێت…') : loc('حفظ التكلفة والربح والسعر', 'Save cost, profit and price', 'پاشەکەوتکردنی تێچوو، قازانج و نرخ')}</button>}
         {dirty && <button type="button" className={T.btnGhost} disabled={saving} onClick={() => { onChange({}); setError(null); setConfirmedKey(''); }}>{loc('تراجع', 'Discard edits', 'پاشگەزبوونەوە')}</button>}
         <button type="button" className={T.btnGhost} disabled={saving || dirty} onClick={onAdvanced}>{loc('إعدادات التسعير', 'Pricing settings', 'ڕێکخستنەکانی نرخدان')}</button>
       </div>
