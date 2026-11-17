@@ -627,8 +627,9 @@ test('a document carded from the colo answers exactly as one carded from the row
  */
 // card-2026-11-11b: the card says what it is of (`kind`; only a catalogue card is kept), and its row is read
 // with the optimistic VISIBLE predicate (the S1 review).
-const CARD_REVISION = 'card-2026-11-11b';
-const CARD_DIGEST = '7fac65bc0156479e275598a3346e81671359379b631536d119ddf8e8bd37248a';
+// card-2026-11-17: a community demo product (an id isDemoId reads) is never a card (community demo data, DECISIONS row 343).
+const CARD_REVISION = 'card-2026-11-17';
+const CARD_DIGEST = 'a591135d0e8e7b501925b3be35eb1a3d27e5a041b07196bf33bf32f18a175d00';
 
 test('the code that builds a kept card and PRODUCT_CARD_REVISION move together', () => {
   const source = readFileSync(join(ROOT, 'worker/lib/socialPreview.ts'), 'utf8').replace(/\r\n/g, '\n');

@@ -652,7 +652,7 @@ export function productPurgePath(slug: string): string | null {
  * (worker/lib/socialPreview.ts): tests/productCardEdgeCache.test.ts pins the
  * code and this value together.
  */
-export const PRODUCT_CARD_REVISION = 'card-2026-11-11b';
+export const PRODUCT_CARD_REVISION = 'card-2026-11-17';
 
 /** The card's parameter: no route declares it, so no request can read or fill a card. */
 const PRODUCT_CARD_PARAM = '__card';
