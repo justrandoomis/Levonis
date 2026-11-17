@@ -95,6 +95,8 @@ export default {
       routes: {
         'GET /plans': 'open',
         'GET /quote': 'open',
+        // 0235: what a membership bought WITH a printer would be for this account; nothing is written.
+        'GET /order-options': 'open',
         'GET /mine': 'open',
         'GET /entitlements': 'open',
         'GET /bnpl': 'open',
@@ -109,6 +111,9 @@ export default {
         'POST /admin/pro-pause': 'op',
         'POST /admin/activate-launch': 'op',
         'POST /admin/grant': 'op',
+        // 0235: memberships bought with an order that wait or need a person; the retry moves no money.
+        'GET /admin/order-purchases': 'op',
+        'POST /admin/order-purchases/:id/retry': { cls: 'op', noBody: 'needs a real purchase id; an unknown one is refused 404' },
         'POST /admin/:id/cancel': 'op',
         'GET /admin/referrals': 'op',
         'PATCH /admin/referrals/:id': 'op',

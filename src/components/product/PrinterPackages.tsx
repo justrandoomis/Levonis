@@ -19,7 +19,6 @@ import React, { Suspense, lazy, startTransition, useCallback, useEffect, useId, 
 import { ChevronLeft, ChevronRight, SlidersHorizontal, Truck } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMoney } from '../../CurrencyContext';
-import { tierLabel } from '../subscription/tierMeta';
 import { PS_STRINGS, servicesErrorText } from './printerServicesStrings';
 import {
   deliveryFee,
@@ -38,6 +37,7 @@ import {
   type ServiceSelection,
   type ServicesOffer,
 } from './printerServicesModel';
+import type { ExtrasLabels } from './CustomizeSheet';
 
 /** «تخصيص بنفسي»: its code loads on the first open. */
 const CustomizeSheet = lazy(() => import('./CustomizeSheet'));
@@ -59,7 +59,7 @@ export interface PrinterPackagesProps {
    * transport, fulfillment] — plain values, so the product page's opening carries no
    * request shape (its bundle budget); the body is built here, in the lazy chunk.
    */
-  quoteFor?: readonly [string, string, readonly string[], string, string, string] | null;
+  quoteFor?: readonly [string, string, readonly string[], string, string, string, number?] | null;
   /** What the sheet's summary shows. */
   printer: { name: string; image: string | null };
   /** Set by the page when the customer pressed «add» before finishing: the card says what is missing. */
@@ -73,11 +73,6 @@ export interface PrinterPackagesProps {
   addable?: boolean;
   /** The page's add is in flight. */
   adding?: boolean;
-  /**
-   * Membership, information only: the server's `membership_preview` figure for this
-   * selection (never part of the services selection — the server takes no such field).
-   */
-  membership?: { tier: string; unitIqd: number; upgrade: boolean } | null;
 }
 
 type PresetId = 'just' | 'smart' | 'complete';
@@ -86,23 +81,20 @@ type PresetId = 'just' | 'smart' | 'complete';
  * What the product page hands over: the quote's `printer_services` and the product
  * whole — unpacked here, in the lazy chunk, so the page's opening stays in its budget.
  */
-export type PrinterPackagesPageProps = Omit<PrinterPackagesProps, 'offer' | 'quoted' | 'printer' | 'membership' | 'quoteState'> & {
+export type PrinterPackagesPageProps = Omit<PrinterPackagesProps, 'offer' | 'quoted' | 'printer' | 'quoteState'> & {
   /** The page's quote answers the selection on screen. */
   fresh: boolean;
   /** The page's last quote failed (and none is on its way). */
   failed: boolean;
   ps: QuotedServices | null;
   product: { name?: string | null; images?: readonly string[] | null };
-  /** The PRO unit price (`membership_preview`) when the page invites to PRO; `upgrade`: the viewer is Prime. */
-  pro?: number | null;
-  upgrade?: boolean;
 };
 
-export default function PrinterPackages({ ps, product, pro, upgrade = false, fresh, failed, ...rest }: PrinterPackagesPageProps) {
+export default function PrinterPackages({ ps, product, fresh, failed, ...rest }: PrinterPackagesPageProps) {
   const offer = ps?.offer ?? null;
   const quoteState: QuoteState = fresh ? 'fresh' : failed ? 'failed' : 'pending';
   if (!offer) return fresh ? null : <PackagesWaiting failed={quoteState === 'failed'} />;
-  return <Packages {...rest} quoteState={quoteState} offer={offer} quoted={ps?.selection ?? null} printer={{ name: product.name ?? '', image: product.images?.[0] ?? null }} membership={pro != null ? { tier: tierLabel('pro'), unitIqd: pro, upgrade } : null} />;
+  return <Packages {...rest} quoteState={quoteState} offer={offer} quoted={ps?.selection ?? null} printer={{ name: product.name ?? '', image: product.images?.[0] ?? null }} />;
 }
 
 /** The card before the first quote answered: its title, and what it waits for. */
@@ -117,7 +109,7 @@ function PackagesWaiting({ failed }: { failed: boolean }) {
   );
 }
 
-function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quoteFor, printer, attention, onAdd, addable = false, adding = false, membership = null }: PrinterPackagesProps & { offer: ServicesOffer }) {
+function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quoteFor, printer, attention, onAdd, addable = false, adding = false }: PrinterPackagesProps & { offer: ServicesOffer }) {
   // The language and the currency are read here, not passed: the product page's
   // opening stays as small as it was (tests/bundleBudget.test.ts).
   const { lang: rawLang, dir } = useLanguage();
@@ -220,13 +212,42 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
   const deliveryIds = ['economy', 'personal'] as const;
   const deliveryStop = tabStop(deliveryIds, delivery, (d) => deliveryFee(offer, d) !== null);
 
+  // The membership and the kit chosen in the sheet (phase 2) stay with a later package tap.
+  const extras = shown?.extras ? { extras: shown.extras } : {};
+  /*
+   * Phase 2: another version of the printer has other kits, and an offer that no longer carries the
+   * membership row or this kit cannot sell it — the choice is cleared, never sent as a hidden extra.
+   * (The page clears both after a successful add: the next add starts with none.)
+   */
+  const versionKey = quoteFor ? JSON.stringify([quoteFor[0], [...quoteFor[2]].sort()]) : '';
+  const lastVersion = useRef(versionKey);
+  const heldKit = selection?.extras?.kitId ?? null;
+  const heldPlan = selection?.extras?.membershipPlanId ?? null;
+  useEffect(() => {
+    const switched = lastVersion.current !== versionKey;
+    lastVersion.current = versionKey;
+    if (!selection?.extras || (!heldKit && !heldPlan)) return;
+    // The offer is judged only once it answers the selection on screen.
+    const dropKit = !!heldKit && (switched || (quoteState === 'fresh' && !offer.kits.some((k) => k.id === heldKit)));
+    const dropPlan = !!heldPlan && quoteState === 'fresh' && !offer.membership;
+    if (dropKit || dropPlan) change({ ...selection, extras: { ...selection.extras, ...(dropKit ? { kitId: null } : {}), ...(dropPlan ? { membershipPlanId: null } : {}) } });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versionKey, quoteState, offer, heldKit, heldPlan]);
+  // The names the sheet gave the chosen extras (shown on the card while they are still the choice).
+  const [extrasNames, setExtrasNames] = useState<{ plan: string | null; planName: string; kit: string | null; kitName: string }>({ plan: null, planName: '', kit: null, kitName: '' });
+  const remember = (next: ServiceSelection, labels?: ExtrasLabels) =>
+    setExtrasNames({ plan: next.extras?.membershipPlanId ?? null, planName: labels?.membership ?? '', kit: next.extras?.kitId ?? null, kitName: labels?.kit ?? '' });
+  const shownPlan = shown?.extras?.membershipPlanId ?? null;
+  const shownKit = shown?.extras?.kitId ?? null;
+  const planName = shownPlan && extrasNames.plan === shownPlan ? extrasNames.planName : '';
+  const kitName = shownKit ? offer.kits.find((k) => k.id === shownKit)?.title[lang] || (extrasNames.kit === shownKit ? extrasNames.kitName : '') : '';
   const pick = (id: PresetId) => {
     const next = presetFrom(offer, id, delivery);
-    if (next) change({ ...next, confirmed: true });
+    if (next) change({ ...next, ...extras, confirmed: true });
   };
   const setDelivery = (d: DeliveryChoice) => {
     if (shown) change({ ...shown, delivery: d });
-    else change({ ...(presetFrom(offer, 'just', d) as ServiceSelection), package: 'just', confirmed: false, delivery: d });
+    else change({ ...(presetFrom(offer, 'just', d) as ServiceSelection), ...extras, package: 'just', confirmed: false, delivery: d });
   };
 
   // The quote's fee for the choice on screen — a server figure, shown only while it answers this choice.
@@ -356,6 +377,14 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
         </span>
         <Chevron aria-hidden="true" className="w-4 h-4 shrink-0" />
       </button>
+      {/* Phase 2: the membership and the kit chosen with this printer — their own cart lines, priced there. */}
+      {shownPlan || shownKit ? (
+        <div className="mt-2 space-y-0.5 text-[11.5px] text-text-secondary" data-packages-extras>
+          {shownPlan ? <p className="truncate" data-packages-membership={shownPlan}>{s.membership}{planName ? `: ${planName}` : ''}</p> : null}
+          {shownKit ? <p className="truncate" data-packages-kit={shownKit}>{s.filament}{kitName ? `: ${kitName}` : ''}</p> : null}
+          <p>{s.extrasApart}</p>
+        </div>
+      ) : null}
 
       {standing ? (
         <p role="alert" className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 text-[12px] text-text-primary" data-packages-blocked>{standing}</p>
@@ -367,8 +396,8 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
           <CustomizeSheet
             open={sheet}
             onClose={() => setSheet(false)}
-            onApply={(next) => { change(next); setSheet(false); }}
-            onApplyAndAdd={onAdd && addable ? (next) => { change(next); queuedFor.current = JSON.stringify(next); setQueued('wait'); setSheet(false); } : undefined}
+            onApply={(next, labels) => { remember(next, labels); change(next); setSheet(false); }}
+            onApplyAndAdd={onAdd && addable ? (next, labels) => { remember(next, labels); change(next); queuedFor.current = JSON.stringify(next); setQueued('wait'); setSheet(false); } : undefined}
             adding={adding || queued !== 'no'}
             offer={offer}
             current={selection}
@@ -376,7 +405,9 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
             lang={lang}
             money={money}
             quote={quoteBase ? sheetQuote : undefined}
-            membership={membership}
+            // The owner's kits are priced for this exact version, order type, route and the page's printer quantity
+            // (a kit is one per printer unit: its items follow the printer's quantity).
+            kitsFor={quoteFor ? { slug: quoteFor[0], optionValueIds: quoteFor[2], fulfillmentType: quoteFor[5] || undefined, transportMethod: quoteFor[4] || undefined, qty: Math.max(1, quoteFor[6] ?? 1) } : null}
           />
         </Suspense>
       ) : null}

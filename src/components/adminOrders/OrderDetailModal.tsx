@@ -31,6 +31,12 @@ import type { GateMissing, OrderSerials } from './serials/types';
 import VariantImg from '../ui/VariantImg';
 import { couponPoolLabel } from '../../../packages/contracts/src/couponPool';
 import ServiceTasksSection, { type ServiceTask } from './ServiceTasksSection';
+import OrderMembershipSection, { type OrderMembershipPurchase } from './OrderMembershipSection';
+
+/** 0235: a filament-kit line names the printer line it is packed with; the membership line is its own kind. */
+type PhaseTwoLine = { id: string; kit?: { printer_item_id: string; kit_id: string | null } | null; kind?: string; line_kind?: string };
+const kitParentOf = (it: unknown): string | null => (it as PhaseTwoLine).kit?.printer_item_id ?? null;
+const isMembershipLine = (it: unknown): boolean => (it as PhaseTwoLine).kind === 'membership' || (it as PhaseTwoLine).line_kind === 'membership';
 
 // The §16 serial / warranty page, opened from a linked slot's serial.
 const SerialDetail = React.lazy(() => import('../adminWarranty/serial/SerialDetail'));
@@ -181,6 +187,8 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const govLabel = govId ? GOVERNORATE_LABELS[govId]?.[lang === 'en' ? 'en' : lang === 'ckb' ? 'ckb' : 'ar'] ?? govId : '';
   const fin = detail?.financial;
   const collectIqd = collectOnDeliveryIqd(fin, detail?.total_iqd);
+  /** 0235: the membership line's own stored total (one line per order). */
+  const membershipLineIqd = (detail?.items ?? []).filter(isMembershipLine).reduce((n, it) => n + (Number(it.line_total_iqd) || 0), 0);
   /** «بانتظار تأكيد السعر النهائي» (0218): an estimated line still waits, so the order cannot move yet. */
   const estimateOpen = detail?.price_estimate_open === true;
 
@@ -429,6 +437,20 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                   </>
                 )}
               </p>
+              {/* A GINI ORDER WITH A MEMBERSHIP (owner ruling 2026-11-17): Gini
+                  finances the goods only; the membership charge is inside the
+                  figure above and is collected in CASH — by the courier with the
+                  delivery fee, or at the counter on a store pickup. The
+                  membership starts only once that collection is recorded. */}
+              {detail.gini && collectIqd > 0 && membershipLineIqd > 0 && (
+                <p data-collect-membership className="text-[12px] font-bold text-warning mt-1">
+                  {loc(
+                    `يشمل العضوية (${formatIqd(membershipLineIqd)}) — تُحصَّل نقداً عند التسليم أو عند الاستلام من المخزن، لا يموّلها جني. تبدأ العضوية بعد تسجيل التحصيل.`,
+                    `Includes the membership (${formatIqd(membershipLineIqd)}) — collected in cash at the door or at store pickup, not financed by Gini. The membership starts once the collection is recorded.`,
+                    `ئەندامێتییەکە لەخۆدەگرێت (${formatIqd(membershipLineIqd)}) — بە نەختینە لە کاتی گەیاندن یان لە کاتی وەرگرتن لە فرۆشگا وەردەگیرێت، جینی پارەی نادات. ئەندامێتی دوای تۆمارکردنی وەرگرتنەکە دەست پێدەکات.`
+                  )}
+                </p>
+              )}
               {/* An estimated line's final price may still move this figure
                   (0218), so the sheet says so before anyone copies it onto a
                   receipt — the order cannot ship before it is settled anyway. */}
@@ -621,6 +643,10 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               )}
               <ul className="space-y-2">
                 {detail.items.map((it) => {
+                  // A kit line is drawn under its printer (below), not as a line of its own.
+                  const parentId = kitParentOf(it);
+                  if (parentId && detail.items.some((x) => x.id === parentId)) return null;
+                  const kitLines = detail.items.filter((x) => kitParentOf(x) === it.id);
                   const units = detail.units.filter((u) => u.order_item_id === it.id);
                   return (
                     <li
@@ -637,6 +663,11 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-text-primary font-bold text-sm leading-relaxed break-words">{it.name}</p>
+                        {isMembershipLine(it) && (
+                          <p className="text-[11px] text-text-muted mt-1" data-order-item-membership={it.id}>
+                            {loc('عضوية — ليست منتجاً يُغلَّف، ولا تُرجع بعد بدئها', 'Membership — not packed, not returnable once started', 'ئەندامێتی — ناپێچرێتەوە، دوای دەستپێکردن ناگەڕێندرێتەوە')}
+                          </p>
+                        )}
                         <p className="text-[12px] text-text-secondary mt-1">
                           <span className="font-bold text-text-primary">×{it.qty}</span>
                           {' · '}
@@ -708,6 +739,25 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                             ))}
                           </ul>
                         )}
+                      {/* 0235: the owner's filament kit packed WITH this printer — its lines grouped under it. */}
+                      {kitLines.length > 0 && (
+                        <div className="w-full min-w-0 border-s-2 border-border-subtle ps-3" data-order-kit={it.id}>
+                          <p className="text-[12px] font-bold text-text-secondary mb-1">{loc('باقة الفيلامنت — تُغلَّف مع الطابعة', 'Filament kit — packed with the printer', 'پاکێجی فیلامێنت — لەگەڵ پرینتەرەکە دەپێچرێتەوە')}</p>
+                          <ul className="space-y-3">
+                            {kitLines.map((k) => (
+                              <li key={k.id} className="text-[12px] text-text-secondary flex items-baseline gap-2" data-order-kit-line={k.id}>
+                                <span className="font-bold text-text-primary tabular-nums shrink-0">×{k.qty}</span>
+                                <span className="min-w-0 flex-1 break-words">
+                                  {k.name}
+                                  {k.variant && <PackingSelection value={k.variant} />}
+                                  {serialChip(k.id)}
+                                </span>
+                                <span className="shrink-0 tabular-nums">{formatIqd(k.line_total_iqd)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -730,6 +780,14 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               onOpenSerial={openSerialPage}
               focusRequest={focusRequest}
               onFocusHandled={clearFocusRequest}
+            />
+
+            {/* «العضوية مع الطلب» (0235): pending until delivered and paid, then final; blocked waits for a person. */}
+            <OrderMembershipSection
+              orderId={orderId}
+              viewerOwner={viewerOwner}
+              purchases={((detail as { membership_purchases?: OrderMembershipPurchase[] }).membership_purchases) ?? []}
+              onChanged={() => void load()}
             />
 
             {/* «مهام الخدمات» (0234): packing, inspection (blocks the hand-over), Academy. */}

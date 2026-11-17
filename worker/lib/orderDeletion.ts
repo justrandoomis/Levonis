@@ -64,6 +64,9 @@ export const ORDER_OWNED_TABLES: Owned[] = [
   // 0218: an estimated line's record and settlement (a cancelled order's lines are void). Deleted
   // explicitly, before its order line, because D1's FK cascades are not guaranteed.
   { table: 'order_price_estimates' },
+  // 0235: a membership bought with the order (pending → cancelled with it). Its row names the order LINE
+  // (order_item_id REFERENCES order_items), so it goes first. One that ever started is protected below.
+  { table: 'order_membership_purchases' },
   // 0234 «خصص طابعتك»: the warehouse tasks of a serviced printer line (packing, inspection, Academy) name the
   // order LINE (order_item_id REFERENCES order_items), so they go before it — else every cancelled printer
   // order with services fails the purge on its foreign key and the sweep stalls on it.
@@ -147,6 +150,9 @@ async function deletionSchema(db: OrderDeletionDb): Promise<DeletionSchema> {
   for (const table of allocationEvidenceTables) add(table,'allocation_id','ORDER_HAS_FINANCIAL_HISTORY',
     'Stock allocation evidence is linked to investor, cost or return history.',
     `SELECT 1 FROM ${table} WHERE allocation_id IN (SELECT id FROM order_item_inventory_allocations WHERE order_id=?1)`);
+  // 0235: a membership that started with this order (even one the owner later corrected) is account history.
+  add('order_membership_purchases','membership_id','ORDER_HAS_FINANCIAL_HISTORY','A membership started with this order must be retained.',
+    'SELECT 1 FROM order_membership_purchases WHERE order_id=?1 AND membership_id IS NOT NULL');
   add('finance_posting_errors','order_id','ORDER_FINANCIAL_RECONCILIATION_PENDING','A financial posting still requires reconciliation.',
     'SELECT 1 FROM finance_posting_errors WHERE order_id=?1');
   add('order_payment_settlements','order_id','ORDER_HAS_FINANCIAL_HISTORY','A recorded payment settlement must be retained.',

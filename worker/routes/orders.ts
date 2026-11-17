@@ -244,8 +244,12 @@ import { createInvoiceForOrder } from '../lib/invoices';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
 import { orderConfirmKeyboard } from '../lib/orderTelegramConfirm';
 import { notifyOrderPlaced } from '../lib/orderNotify';
-import { SERVICES_CODES } from '@levonis/pricing/printerServices';
-import { orderServicesView, serviceTaskStatements, servicesForMethod, SERVICES_DELIVERY_METHOD_MESSAGE, SERVICES_DELIVERY_METHOD_TEXT, withServicesSnapshot } from '../lib/printerServices';
+import { SERVICES_CODES, KIT_CHANGED, KIT_WITHOUT_PRINTER, MEMBERSHIP_NOT_OFFERED, MEMBERSHIP_NOT_WITH_BNPL, MEMBERSHIP_PRICE_CHANGED, offeredMembershipTiers } from '@levonis/pricing/printerServices';
+import { activateOrderMembership, orderMembershipPublic, orderMembershipPurchases } from '../lib/orderMembershipSale';
+import { kitLinesMatch, offeredKit } from '../lib/printerKits';
+import { membershipPlanById, orderMembershipPendingRefusal, orderMembershipQuotePayload, quoteOrderMembership, tierLabel, type MembershipPlanRow } from './memberships';
+import { publishedFromSetting } from '../lib/printerServices';
+import { orderServicesView, serviceTaskStatements, servicesForMethod, SERVICES_DELIVERY_METHOD_MESSAGE, SERVICES_DELIVERY_METHOD_TEXT, withKitLink, withServicesSnapshot } from '../lib/printerServices';
 
 /**
  * 409 PRODUCT_CURRENTLY_UNAVAILABLE naming the products (the clean start, spec addendum A.5): a line
@@ -949,6 +953,10 @@ export function orderPublic(
         ...(typeof it.services_snapshot === 'string' && it.services_snapshot
           ? { services: orderServicesView(it.services_snapshot) }
           : {}),
+        // 0235: the membership bought with the order is its own line (never returned), and a
+        // filament-kit line names the printer line it was packed with. Absent on every other line.
+        ...(it.line_kind === 'membership' ? { kind: 'membership' as const, line_kind: 'membership' as const, returnable: false } : {}),
+        ...(typeof it.kit_parent_item_id === 'string' && it.kit_parent_item_id ? { kit: { printer_item_id: it.kit_parent_item_id, kit_id: it.kit_id ?? null } } : {}),
         /**
          * The exact selection that was bought, in the shape POST /api/cart/items
          * accepts — so "buy again" repeats THIS line instead of the product's
@@ -1813,6 +1821,12 @@ export interface CheckoutInput {
    * the delivery fee that tells them what they will owe at the door.
    */
   giniOrderNo: string;
+  /**
+   * 0235: the membership charge the customer saw (the quote's
+   * `membership.charge_iqd`). Required on POST /api/orders when the cart
+   * carries a membership: a different live figure is 409 MEMBERSHIP_PRICE_CHANGED.
+   */
+  membershipChargeIqd: number | null;
 }
 
 export interface ComputedLine {
@@ -1977,6 +1991,28 @@ export interface ComputedLine {
    * not — it is priced at 0).
    */
   estimate_label?: true;
+  /** 0235: a filament-kit line — its printer's cart line, the kit, and the units per printer unit. */
+  kit?: { parent_cart_item_id: string; kit_id: string; unit_qty: number } | null;
+  /** 0235: the order type this row resolved to (`lineOrderType`) — a kit ships the way its printer ships. */
+  order_type?: OrderType;
+}
+
+/**
+ * 0235: THE MEMBERSHIP BOUGHT WITH THIS ORDER — an order line at the live plan
+ * price less the upgrade credit frozen here, excluded from every coupon,
+ * points, membership benefit and free-delivery basis (it only joins the total).
+ */
+export interface CheckoutMembership {
+  order_item_id: string;
+  printer_cart_item_id: string;
+  plan: MembershipPlanRow;
+  kind: 'new' | 'upgrade';
+  price_iqd: number;
+  credit_iqd: number;
+  charge_iqd: number;
+  base_membership_id: string | null;
+  base_expires_at: string | null;
+  payload: ReturnType<typeof orderMembershipQuotePayload>;
 }
 
 /** What the settlement resolved about this member, carried to the snapshot. */
@@ -2026,6 +2062,11 @@ export interface CheckoutComputation {
   giniPaidIqd: number;
   /** The only money a Gini order owes us — the delivery fee, 0 for a pickup. */
   giniDeliveryDueIqd: number;
+  /** The two parts of `giniDeliveryDueIqd` (they sum to it): the delivery fee
+   *  as charged, and the membership bought with the order (cash at the door,
+   *  outside Gini's part). Both 0 on every other method. */
+  giniDeliveryFeeDueIqd: number;
+  giniMembershipDueIqd: number;
   /** Actual 12-hour service verdict for this method/address/cart. */
   priorityDelivery: PriorityDeliveryVerdict;
   /** 'direct' when the lines were priced by the direct-sale rule — a direct
@@ -2137,6 +2178,14 @@ export interface CheckoutComputation {
   estimate: { lines: string[]; ordering_paused: boolean } | null;
   /** Some line's product row is labelled: the order batch holds the checkout token (T6). */
   estimateLabelled: boolean;
+  /** 0235: the membership bought with this order, or null. Its charge is inside `subtotal` and `totalIqd`. */
+  membership: CheckoutMembership | null;
+  /**
+   * 0235: the cart's membership choice that cannot be bought now (review S17):
+   * the quote shows it as `membership: { ok:false, code, plan_id, ... }` and the
+   * total leaves it out; the order door refuses with `code`.
+   */
+  membershipUnavailable: UnavailableMembership | null;
 }
 
 /**
@@ -2220,6 +2269,119 @@ function creditReserved(res: StockResolution, productId: string, credit: Readonl
       ? res.available
       : Math.min(...tracked.map((t) => Math.max(0, (t.stock as number) - t.reserved)));
   return { ...res, targets, available };
+}
+
+/**
+ * 0235 — THE PRINTER'S KIT AND MEMBERSHIP AT THE DOOR.
+ *
+ * Kits: every kit line is bought with its printer line (KIT_WITHOUT_PRINTER),
+ * and the kit is still the owner's kit for that printer — the same items at
+ * their per-unit counts × the printer's quantity (KIT_CHANGED otherwise; the
+ * customer chooses it again). Its lines were priced and their stock judged
+ * above like any line, so the kit costs the sum of its live prices.
+ *
+ * Membership: the cart's choice is bought only with the printer line it was
+ * chosen with, when that line is among the lines checked out; it is quoted
+ * NOW (`quoteOrderMembership`: live price, upgrade credit frozen here, the
+ * refusals), and the order door refuses a figure the customer did not see
+ * (409 MEMBERSHIP_PRICE_CHANGED with the fresh quote).
+ */
+async function checkoutPrinterExtras(
+  c: Context<AppContext>,
+  user: SessionUser,
+  input: CheckoutInput,
+  lines: ComputedLine[],
+  setting: unknown,
+  allocate: boolean
+): Promise<{ membership: CheckoutMembership | null; unavailable: UnavailableMembership | null }> {
+  const config = publishedFromSetting(setting);
+  const groups = new Map<string, ComputedLine[]>();
+  for (const l of lines) if (l.kit) groups.set(l.kit.parent_cart_item_id, [...(groups.get(l.kit.parent_cart_item_id) ?? []), l]);
+  for (const [parentId, kitLines] of groups) {
+    const printer = lines.find((l) => l.cart_item_id === parentId && !l.kit);
+    if (!printer) {
+      throw badRequest('A filament kit is bought together with its printer — tick the printer too.', KIT_WITHOUT_PRINTER, { cart_item_id: kitLines[0].cart_item_id });
+    }
+    const kit = printer.services_snapshot ? offeredKit(config, { productId: printer.product_id, optionValueIds: printer.option_value_ids }, kitLines[0].kit!.kit_id) : null;
+    // The kit ships the way its printer ships (review S11): the same resolved order type and route.
+    const shipsLikePrinter = kitLines.every((l) => (l.order_type ?? null) === (printer.order_type ?? null)
+      && transportOf(l.transport_snapshot) === transportOf(printer.transport_snapshot));
+    if (!kit || !shipsLikePrinter || new Set(kitLines.map((l) => l.kit!.kit_id)).size !== 1
+      || !kitLinesMatch(kit, printer.qty, kitLines.map((l) => ({ product_id: l.product_id, option_value_ids: l.option_value_ids, color_id: l.color_id, qty: l.qty })))) {
+      throw new HttpError(409, 'The filament kit of this printer changed — choose it again.', KIT_CHANGED, { cart_item_id: parentId });
+    }
+  }
+
+  let choice: { plan_id: string; printer_cart_item_id: string } | null = null;
+  try {
+    choice = await c.env.DB.prepare('SELECT plan_id, printer_cart_item_id FROM cart_membership_choice WHERE user_id = ?').bind(user.id)
+      .first<{ plan_id: string; printer_cart_item_id: string }>();
+  } catch (e) {
+    if (!/no such table/i.test(String((e as Error)?.message ?? e))) throw e;
+  }
+  if (!choice) return { membership: null, unavailable: null };
+  const printer = lines.find((l) => l.cart_item_id === choice!.printer_cart_item_id && !l.kit);
+  if (!printer) return { membership: null, unavailable: null }; // its printer is not bought now: the choice stays in the cart with it
+  /*
+   * A MEMBERSHIP THAT CANNOT BE BOUGHT NOW DOES NOT TAKE THE CHECKOUT DOWN
+   * (review S17): the quote answers it as `{ ok:false, code, plan_id }` and
+   * prices the order without it; only the order door refuses, with that code.
+   * The customer removes it (PUT /api/cart/items/:id/extras {membershipPlanId:null}).
+   */
+  const unavailable = (e: HttpError): UnavailableMembership => {
+    if (allocate) throw e;
+    return { ok: false, code: e.code ?? 'REFUSED', message: e.message, plan_id: choice!.plan_id, printer_cart_item_id: printer.cart_item_id };
+  };
+  const plan = await membershipPlanById(c.env.DB, choice.plan_id);
+  if (!printer.services_snapshot || !plan || !plan.active || !config || !offeredMembershipTiers(config).includes(plan.tier)) {
+    return { membership: null, unavailable: unavailable(new HttpError(409, 'This membership is no longer offered with the printer — remove it from the printer.', MEMBERSHIP_NOT_OFFERED, { cart_item_id: printer.cart_item_id })) };
+  }
+  // BNPL AND A MEMBERSHIP DO NOT MIX (owner ruling 2026-11-17 ~10:20).
+  if (isBnpl(input.paymentMethodId)) {
+    return { membership: null, unavailable: unavailable(new HttpError(409,
+      'العضوية مع الطابعة لا تُشترى بالتقسيط (اشترِ الآن وادفع لاحقا) — احذف العضوية أو اختر طريقة دفع أخرى / A membership with the printer is not bought with Buy Now Pay Later — remove the membership or choose another payment method',
+      MEMBERSHIP_NOT_WITH_BNPL, { cart_item_id: printer.cart_item_id })) };
+  }
+  let q: Awaited<ReturnType<typeof quoteOrderMembership>>;
+  try {
+    q = await quoteOrderMembership(c.env.DB, user.id, plan, new Date().toISOString());
+  } catch (e) {
+    if (e instanceof HttpError && (e.status === 400 || e.status === 409)) return { membership: null, unavailable: unavailable(e) };
+    throw e;
+  }
+  const payload = orderMembershipQuotePayload(q);
+  if (allocate && input.membershipChargeIqd !== q.charge_iqd) {
+    throw new HttpError(
+      409,
+      'تغير سعر العضوية أو رصيد الترقية منذ عرض الملخص — راجع الرقم الجديد ثم أكد / The membership price or upgrade credit changed since the summary — review the new figure and confirm',
+      MEMBERSHIP_PRICE_CHANGED,
+      { membership: payload }
+    );
+  }
+  return {
+    unavailable: null,
+    membership: {
+      order_item_id: newId('oi'),
+      printer_cart_item_id: printer.cart_item_id,
+      plan,
+      kind: q.kind,
+      price_iqd: q.price_iqd,
+      credit_iqd: q.credit_iqd,
+      charge_iqd: q.charge_iqd,
+      base_membership_id: q.base ? q.base.id : null,
+      base_expires_at: q.base ? q.base.expires_at : null,
+      payload,
+    },
+  };
+}
+
+/** 0235: a cart membership the checkout cannot sell now (review S17). */
+export interface UnavailableMembership {
+  ok: false;
+  code: string;
+  message: string;
+  plan_id: string;
+  printer_cart_item_id: string;
 }
 
 export async function computeCheckout(
@@ -2335,9 +2497,15 @@ export async function computeCheckout(
   const params: unknown[] = [user.id];
   const filter =
     input.itemIds.length > 0 ? ` AND ci.id IN (SELECT value FROM json_each(?))` : '';
+  // A PRINTER'S KIT IS BOUGHT WITH IT (0235): ticking the printer ticks its kit
+  // lines. Read only for a ticked cart; nothing on a database without 0235.
+  const kitChildren = input.itemIds.length > 0 && !options.source?.lines
+    ? await c.env.DB.prepare('SELECT id FROM cart_items WHERE user_id = ? AND kit_parent_id IN (SELECT value FROM json_each(?))')
+        .bind(user.id, JSON.stringify(input.itemIds)).all<{ id: string }>().then((r) => (r.results ?? []).map((x) => x.id)).catch(() => [] as string[])
+    : [];
   // One json_each parameter, not one per line: the user id + 100 item ids
   // would pass the live D1's 100-parameter cap (review F1).
-  if (input.itemIds.length > 0) params.push(JSON.stringify(input.itemIds));
+  if (input.itemIds.length > 0) params.push(JSON.stringify([...new Set([...input.itemIds, ...kitChildren])]));
   const rows = await cartLineSelect(
     c.env.DB,
     options.source?.lines?.build ??
@@ -3157,6 +3325,9 @@ export async function computeCheckout(
         // 0218: the estimate record's SKU and channel (only on an estimated line), and the label's token.
         ...(estimated && estimateChannel ? { price_estimate: { combo_key: estimateKey, channel: estimateChannel } } : {}),
         ...(isEstimateRow(row) ? { estimate_label: true as const } : {}),
+        // 0235: a filament-kit line names its printer's CART line; the order links it to the printer's order line.
+        ...(row.kit_parent_id ? { kit: { parent_cart_item_id: String(row.kit_parent_id), kit_id: String(row.kit_id ?? ''), unit_qty: Number(row.kit_unit_qty) || 0 } } : {}),
+        order_type: orderType,
       });
     }
     // THE PHYSICAL-LINE CEILING (§3.1) — a door refusal naming the limit, not a
@@ -3366,6 +3537,14 @@ export async function computeCheckout(
   const ruleConfig = await getPointsRuleConfig(c.env);
   const pointsRule = resolvePointsRule(ruleConfig, new Date().toISOString());
   const supportSnapshot = await buildSupportSnapshot(c.env, user.id, input.supportRef || null);
+
+  // 0235 — THE PRINTER'S KIT AND MEMBERSHIP, checked against the published list
+  // and frozen here (cart path only: Quick Buy sells no enrolled printer).
+  const extras = options.source?.lines
+    ? { membership: null, unavailable: null }
+    : await checkoutPrinterExtras(c, user, input, priced.lines, settings.printerServices, options.allocate === true);
+  const orderMembership = extras.membership;
+  const membershipIqd = orderMembership?.charge_iqd ?? 0;
 
   /**
    * Everything from the priced lines to the money due — shipping, coupon,
@@ -3777,7 +3956,10 @@ export async function computeCheckout(
       );
     }
 
-    const beforeDiscounts = Math.max(0, subtotal - lineDiscount + shipping.total_iqd - couponDiscount);
+    // The membership bought with the order (0235) joins the total here, after
+    // every coupon, membership-benefit and free-delivery basis above was
+    // computed without it; the points cap (`eligibleMerchandise`) never sees it.
+    const beforeDiscounts = Math.max(0, subtotal - lineDiscount + shipping.total_iqd - couponDiscount) + membershipIqd;
     const afterPoints = beforeDiscounts - pointsDiscount;
 
     // §4.2 accrual basis, computed on the ORDER TOTAL (lines summed first, one
@@ -4045,9 +4227,19 @@ export async function computeCheckout(
      * CHARGED — after the waiver and the membership subsidy — so a PRO whose
      * delivery was waived is asked for nothing at the door.
      */
+    // A MEMBERSHIP BOUGHT WITH THE ORDER IS OUTSIDE GINI'S PART (owner ruling
+    // 2026-11-17 ~10:20): Gini finances the goods; the courier collects the
+    // membership charge in cash WITH the delivery fee, and the membership
+    // starts once that collection settles the order (orderMembershipSale.ts).
     const { paidIqd: giniPaidIqd, deliveryDueIqd: giniDeliveryDueIqd } = isGiniOrder
-      ? giniSplit(payableBeforeCodTax, Math.max(0, shipping.total_iqd - couponDelivery))
+      ? giniSplit(payableBeforeCodTax, Math.max(0, shipping.total_iqd - couponDelivery) + membershipIqd)
       : { paidIqd: 0, deliveryDueIqd: 0 };
+    // The door amount in its two named parts, so the screen can say «delivery
+    // fee X + membership Y» from server figures (never browser arithmetic).
+    // The membership is carved first: it is always inside the payable, and a
+    // clamp (coupon/points below the fee) can only shrink the delivery part.
+    const giniMembershipDueIqd = isGiniOrder ? Math.min(membershipIqd, giniDeliveryDueIqd) : 0;
+    const giniDeliveryFeeDueIqd = giniDeliveryDueIqd - giniMembershipDueIqd;
 
     /**
      * NO COURIER CASH CHARGE ON A GINI ORDER, AND THAT IS A DECISION.
@@ -4148,6 +4340,8 @@ export async function computeCheckout(
        */
       giniPaidIqd,
       giniDeliveryDueIqd,
+      giniDeliveryFeeDueIqd,
+      giniMembershipDueIqd,
       /** §19 — everything the order freezes about this membership's effect. */
       benefits: {
         tier: tierStatus.tier,
@@ -4224,6 +4418,8 @@ export async function computeCheckout(
     // only one whose figures belong on this order.
     giniPaidIqd: settled.giniPaidIqd,
     giniDeliveryDueIqd: settled.giniDeliveryDueIqd,
+    giniDeliveryFeeDueIqd: settled.giniDeliveryFeeDueIqd,
+    giniMembershipDueIqd: settled.giniMembershipDueIqd,
     priorityDelivery,
     pricingBasis: priced.pricingBasis,
     codReprices,
@@ -4237,8 +4433,11 @@ export async function computeCheckout(
     mysteryLines,
     allocate: options.allocate === true,
     productIds: priced.productIds,
-    subtotal: priced.subtotal,
+    // The stored subtotal is Σ of the order's lines, the membership line (0235) included.
+    subtotal: priced.subtotal + membershipIqd,
     merchandise: priced.merchandise,
+    membership: orderMembership,
+    membershipUnavailable: extras.unavailable,
     shipping: settled.shipping,
     /**
      * WHAT EVERY OTHER DELIVERY METHOD WOULD COST, for the same cart.
@@ -4318,6 +4517,11 @@ export function checkoutInputFrom(body: Record<string, unknown>, requirePayment:
     // `computeCheckout`, where the payment method is known and a quote is
     // still allowed to answer with a price instead of an error.
     giniOrderNo: str(body.giniOrderNo, 'giniOrderNo', { max: 6, required: false }),
+    // 0235: the membership charge the page showed (absent = none shown).
+    membershipChargeIqd:
+      body.membershipChargeIqd === undefined || body.membershipChargeIqd === null
+        ? null
+        : int(body.membershipChargeIqd, 'membershipChargeIqd', { min: 0, max: 1_000_000_000 }),
   };
 }
 
@@ -4499,6 +4703,8 @@ function quoteLines(lines: ComputedLine[]) {
           : {}),
         // A gift (0175): 0 IQD, with what it is worth and which gift it is.
         ...(l.gift ? { kind: 'gift' as const, is_gift: true, gift: { id: l.gift.gift_id, level: l.gift.level, value_iqd: l.gift.value_iqd } } : {}),
+        // 0235: a filament-kit line of the printer line `printer_cart_item_id`.
+        ...(l.kit ? { kit_line: { printer_cart_item_id: l.kit.parent_cart_item_id, kit_id: l.kit.kit_id, qty_per_printer: l.kit.unit_qty } } : {}),
         ...(kids.length
           ? {
               // The two figures the disclosure struck through and badged. On
@@ -4581,6 +4787,19 @@ function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
       lines: quoteLines(comp.lines),
       merchandise_iqd: comp.merchandise,
       subtotal_iqd: comp.subtotal,
+      /**
+       * 0235: the membership bought with this order — its own line, inside
+       * `subtotal_iqd` and `total_iqd`, outside every coupon, points, benefit
+       * and free-delivery basis. POST /api/orders sends `membershipChargeIqd`
+       * = `membership.charge_iqd`; a different live figure is refused
+       * (409 MEMBERSHIP_PRICE_CHANGED). It starts when the order is delivered
+       * and fully paid, and is never refunded once it started.
+       */
+      membership: comp.membership
+        ? { ...comp.membership.payload, printer_cart_item_id: comp.membership.printer_cart_item_id, refundable_after_activation: false }
+        : comp.membershipUnavailable
+          ? { ...comp.membershipUnavailable, refundable_after_activation: false }
+          : null,
       /** §1: the journey this cart is on — unchanged by how it is paid. */
       shipping_type: comp.shippingType,
       /** The payment ids the storefront may offer for this cart. */
@@ -4609,6 +4828,10 @@ function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
         selected: comp.giniPaidIqd > 0 || comp.giniDeliveryDueIqd > 0,
         paid_iqd: comp.giniPaidIqd,
         delivery_due_iqd: comp.giniDeliveryDueIqd,
+        // Its two parts (sum = delivery_due_iqd): the delivery fee and the
+        // membership bought with the order, both collected in cash at the door.
+        delivery_fee_due_iqd: comp.giniDeliveryFeeDueIqd,
+        membership_due_iqd: comp.giniMembershipDueIqd,
         conditions: comp.giniPolicy.conditions,
         app_url: comp.giniPolicy.app_url,
         hold_hours: comp.giniPolicy.hold_hours,
@@ -5299,12 +5522,18 @@ export async function placeOrder(
     await cleanStartInstalled(c.env.DB)
   );
 
+  // 0235: each printer's ORDER line by its cart line, so its kit lines link to it.
+  const orderItemByCart = new Map(comp.lines.filter((l) => !l.kit).map((l) => [l.cart_item_id, l.id]));
   for (const it of comp.lines) {
     const basis = engineBasis.get(it.id);
     const estimate = estimates.get(it.id);
+    const kitParent = it.kit ? orderItemByCart.get(it.kit.parent_cart_item_id) ?? null : null;
     stmts.push(
       orderItemInsertStatement(c.env.DB, orderId, {
         ...it,
+        // A kit line's cart discriminator ('kit:<cart line>') is not an order fact: the order line links to its
+        // printer through kit_parent_item_id (review S13).
+        ...(it.kit ? { shipping_method_id: '' } : {}),
         // §7.7: a MYSTERY SPOOL binds NULL here on purpose — see OrderItemRow.
         // `ComputedLine.product_id` still carries the real product, which is
         // what `planInventory` reserves against below.
@@ -5327,10 +5556,14 @@ export async function placeOrder(
         coupon_discount_iqd: comp.couponLineDiscounts.get(it.id) ?? 0,
       // The two 0175 columns, on a gift line only — and the six 0181 columns on an
       // engine-priced line only; every other line's INSERT is the statement it always was.
-      }, withServicesSnapshot(it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq, ...(estimate ?? {}) } : basis || estimate ? { ...(basis ?? {}), ...(estimate ?? {}) } : undefined, it.services_snapshot ?? null))
+      }, withKitLink(withServicesSnapshot(it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq, ...(estimate ?? {}) } : basis || estimate ? { ...(basis ?? {}), ...(estimate ?? {}) } : undefined, it.services_snapshot ?? null), kitParent, it.kit?.kit_id ?? null))
     );
-    // The warehouse's work for an enrolled printer, in the order's own batch (0234).
-    stmts.push(...serviceTaskStatements(c.env.DB, orderId, it.id, it.services_snapshot ?? null, now, it.qty));
+    // The warehouse's work for an enrolled printer, in the order's own batch (0234) —
+    // its packing note names the filament kit packed with it (0235).
+    const kitNote = it.services_snapshot
+      ? comp.lines.filter((l) => l.kit?.parent_cart_item_id === it.cart_item_id).map((l) => `${l.name_ar || l.name}${l.variant ? ` (${l.variant})` : ''} ×${l.qty}`).join('، ')
+      : '';
+    stmts.push(...serviceTaskStatements(c.env.DB, orderId, it.id, it.services_snapshot ?? null, now, it.qty, kitNote ? `يُغلَّف معها باقة الفيلامنت: ${kitNote}` : ''));
     /**
      * THE GIFT IS CONSUMED HERE, IN THE ORDER'S OWN BATCH (0175, D4).
      *
@@ -5563,6 +5796,38 @@ export async function placeOrder(
     })
   );
 
+  /**
+   * 0235 — THE MEMBERSHIP BOUGHT WITH THE ORDER: its own order line (no
+   * product, no stock, cost 0 — so the sale journal books it as revenue at
+   * delivery like any line) and its purchase record, 'pending' until the order
+   * is delivered AND fully paid (worker/lib/orderMembershipSale.ts). One
+   * waiting purchase per customer: a second one aborts this batch on the
+   * unique index and is answered MEMBERSHIP_ORDER_PENDING.
+   */
+  if (comp.membership) {
+    const m = comp.membership;
+    const label = `Levo ${tierLabel(m.plan.tier)} — ${m.plan.duration_months} ${m.plan.duration_months === 1 ? 'month' : 'months'}`;
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO order_items (id, order_id, product_id, name_snapshot, image_snapshot, option_snapshot, shipping_method_id,
+                                  qty, unit_price_iqd, line_total_iqd, pricing_snapshot, cost_iqd, cost_basis, line_kind)
+         VALUES (?, ?, NULL, ?, '', ?, '', 1, ?, ?, ?, 0, 'snapshot', 'membership')`
+      ).bind(
+        m.order_item_id, orderId, label, m.kind, m.charge_iqd, m.charge_iqd,
+        JSON.stringify({ kind: 'membership', plan_id: m.plan.id, tier: m.plan.tier, duration_months: m.plan.duration_months,
+          purchase_kind: m.kind, price_iqd: m.price_iqd, credit_iqd: m.credit_iqd, charge_iqd: m.charge_iqd })
+      ),
+      c.env.DB.prepare(
+        `INSERT INTO order_membership_purchases (id, order_id, order_item_id, printer_item_id, user_id, plan_id, tier, duration_months,
+           kind, price_iqd, credit_iqd, charge_iqd, base_membership_id, base_expires_at, state, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)`
+      ).bind(
+        `omp_${m.order_item_id}`, orderId, m.order_item_id, orderItemByCart.get(m.printer_cart_item_id) ?? null, user.id, m.plan.id,
+        m.plan.tier, m.plan.duration_months, m.kind, m.price_iqd, m.credit_iqd, m.charge_iqd, m.base_membership_id, m.base_expires_at, now, now
+      )
+    );
+  }
+
   // Remove the purchased lines from the cart. A Quick Buy order never came
   // from the cart, so the customer's cart is left exactly as it was.
   if (!quickBuy) {
@@ -5681,6 +5946,10 @@ export async function placeOrder(
       throw badRequest('Policies changed; reload and review them again', 'POLICY_ACCEPTANCE_REQUIRED');
     }
     const msg = e instanceof Error ? e.message : String(e);
+    // 0235: another order's membership began waiting between the quote and this batch (one per customer).
+    if (msg.includes('UNIQUE') && msg.includes('order_membership_purchases.user_id')) {
+      throw orderMembershipPendingRefusal('');
+    }
     // The ORDERS key, and nothing else. `inventory_ledger.idempotency_key` is
     // in this very batch (the reservation rows) and is also globally UNIQUE,
     // so a bare `includes('idempotency_key')` catches a concurrent stock loss
@@ -6025,6 +6294,8 @@ orderRoutes.get('/:id', async (c) => {
       item_count: itemCount(data.items),
       store: orderStore(data.order, stores),
       invoice: invoice ?? null,
+      // 0235: the membership bought with this order — pending until it is delivered AND fully paid, then active (final).
+      membership_purchases: (await orderMembershipPurchases(c.env.DB, id)).map(orderMembershipPublic),
       maintenance_parts: maintenanceModels.map((m) => ({
         printer_slug: m.slug,
         name: m.name_en,
@@ -6577,6 +6848,16 @@ orderRoutes.post('/:id/settlement', async (c) => {
   // page open). Fully idempotent and identical to what the durable job does,
   // so a day-9 collection does not wait for the next cron tick.
   const release = result.fully_settled ? await releaseAccrualForOrder(c.env, id) : null;
+  // A membership bought with this order (0235) starts when it is delivered AND
+  // fully paid: this collection may be the second half. Idempotent; the jobs
+  // sweep retries one that failed here.
+  if (result.fully_settled) {
+    try {
+      await activateOrderMembership(c.env, id, { trigger: 'settlement', actorId: user.id });
+    } catch (e) {
+      console.error('order membership activation failed', id, e instanceof Error ? e.message : String(e));
+    }
+  }
 
   const data = (await loadOrder(c.env.DB, id))!;
   const snaps = await getOrderPointsSnapshots(c.env, [id]);

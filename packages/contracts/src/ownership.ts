@@ -164,7 +164,7 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     'mystery_pools', 'mystery_pool_entries', 'mystery_offers', 'mystery_offer_secrets',
   ]),
   ...owned('commerce', [
-    'cart_items', 'orders', 'order_items', 'order_service_tasks', 'order_payment_settlements', 'checkout_sagas', 'checkout_saga_steps', 'coupons',
+    'cart_items', 'cart_membership_choice', 'orders', 'order_items', 'order_service_tasks', 'order_membership_purchases', 'order_payment_settlements', 'checkout_sagas', 'checkout_saga_steps', 'coupons',
     'ops_guards', 'stock_return_inspections',
     'stock_return_lot_evidence',
     'stock_return_unit_evidence', 'stock_return_order_unit_evidence',

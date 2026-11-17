@@ -47,6 +47,10 @@ export const CART_LINE_COLUMNS: ReadonlyArray<{ name: string; sqlDefault: string
   // 0175: the gift a line was added from. NULL — an ordinary line — on a
   // database behind the migration, so no gift branch is ever entered there.
   { name: 'gift_entitlement_id', sqlDefault: 'NULL' }, // 0175
+  // 0235: a filament-kit line names its printer line, its kit and the units per printer unit.
+  { name: 'kit_parent_id', sqlDefault: 'NULL' }, // 0235
+  { name: 'kit_id', sqlDefault: 'NULL' }, // 0235
+  { name: 'kit_unit_qty', sqlDefault: '0' }, // 0235
 ];
 
 /** `ci.<col>, …` — the projection when the database is up to date. */

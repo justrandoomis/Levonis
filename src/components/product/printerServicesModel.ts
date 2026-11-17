@@ -9,13 +9,30 @@ import {
   EMPTY_SELECTION,
   type AcademyChoice,
   type DeliveryChoice,
-  type ServiceSelection,
+  type ServiceSelection as PricedSelection,
   type ServicesOffer,
 } from '../../../packages/pricing/src/printerServices';
 import { api } from '../../lib/api';
 
-export type { ServiceSelection, ServicesOffer, DeliveryChoice, AcademyChoice };
+export type { ServicesOffer, DeliveryChoice, AcademyChoice };
 export { EMPTY_SELECTION };
+
+/**
+ * Phase 2 (0235): the membership plan and the owner's filament kit chosen WITH the
+ * printer. Not services: the add sends them as `membershipPlanId` / `kitId` beside
+ * `services` (the product page spreads `extras` into its body; the server's
+ * selection parser ignores the key inside `services`). A field left undefined is
+ * "untouched"; null removes it.
+ */
+export interface SelectionExtras { membershipPlanId?: string | null; kitId?: string | null }
+export type ServiceSelection = PricedSelection & { extras?: SelectionExtras };
+
+/** The choice as the server's services field takes it: without the extras. */
+export function servicesOnly(s: ServiceSelection): PricedSelection {
+  const { extras: _extras, ...rest } = s;
+  void _extras;
+  return rest;
+}
 
 /** One priced service of a selection, as the server sent it. */
 export interface QuotedLine { service: string; choice: string; fee_iqd: number }
@@ -50,7 +67,9 @@ export function presetFrom(offer: ServicesOffer, id: 'just' | 'smart' | 'complet
   if (id === 'just') return { ...EMPTY_SELECTION, package: 'just', delivery: d };
   const p = offer.packages[id];
   if (!p) return null;
-  return { v: 1, package: id, ...p.includes, academy: 'recorded', delivery: d, confirmed: false, ack_no_warranty: false };
+  // `membership_tier` is only the sheet's preselect hint, never a field of the choice.
+  const { warranty, care, packaging, inspection } = p.includes;
+  return { v: 1, package: id, warranty, care, packaging, inspection, academy: 'recorded', delivery: d, confirmed: false, ack_no_warranty: false };
 }
 
 /** The offer's price for a delivery method (a server figure, looked up, never summed). */
@@ -98,7 +117,7 @@ export async function quoteDraft(
 ): Promise<{ unit_iqd: number | null; selection: QuotedSelection | null } | null> {
   const res = await api.post<{ quote?: { unit_subtotal_iqd?: number } | null; printer_services?: QuotedServices }>(
     `/api/products/${base.slug}/quote`,
-    { ...base.body, services },
+    { ...base.body, services: servicesOnly(services) },
     { signal, timeoutMs: 12000 }
   );
   if (!res.printer_services) return null;
@@ -134,4 +153,70 @@ export function moveRadioFocus(e: { key: string; currentTarget: HTMLElement; pre
 export function tabStop<T>(ids: readonly T[], chosen: T | null | undefined, enabled: (id: T) => boolean): T | undefined {
   if (chosen !== null && chosen !== undefined && ids.includes(chosen) && enabled(chosen)) return chosen;
   return ids.find(enabled);
+}
+
+// ------------------------------------------------------------ phase 2 (0235)
+
+/** One option of GET /api/memberships/order-options (the server's figures; never summed here). */
+export type MembershipOption =
+  | {
+      ok: true;
+      plan: { id: string; tier: string; duration_months: number; price_iqd: number | null; paused?: boolean };
+      /** Owner ruling (review 2026-11-17): no renewal through a printer order; a member is offered higher tiers only. */
+      kind: 'new' | 'upgrade';
+      price_iqd: number;
+      credit_iqd: number;
+      charge_iqd: number;
+      starts: 'at_activation' | 'at_current_expiry';
+      current_tier: string | null;
+      current_expires_at: string | null;
+      expires_at_if_activated_now?: string | null;
+    }
+  | { ok: false; code: string; message?: string; plan: { id: string; tier: string; duration_months: number; price_iqd: number | null } };
+
+export interface MembershipOptions {
+  offered: boolean;
+  options: MembershipOption[];
+  current: { tier: string; expires_at: string | null } | null;
+  pending_order_id: string | null;
+}
+
+/** The membership plans this viewer may buy with a printer (open; per account when signed in). */
+export async function loadMembershipOptions(signal?: AbortSignal): Promise<MembershipOptions> {
+  const r = await api.get<Partial<MembershipOptions>>('/api/memberships/order-options', { signal, timeoutMs: 12000 });
+  return {
+    offered: r.offered === true,
+    options: Array.isArray(r.options) ? r.options : [],
+    current: r.current ?? null,
+    pending_order_id: r.pending_order_id ?? null,
+  };
+}
+
+/** One kit of GET /api/products/:slug/kits, priced by the server for this printer selection. */
+export interface PricedKit {
+  id: string;
+  title: { ar: string; en: string; ckb: string };
+  available: boolean;
+  price_per_printer_iqd: number | null;
+  total_iqd: number | null;
+  items: Array<{ product_id: string; slug: string; name: string; name_ar: string; variant?: string | null; qty_per_printer: number; qty: number; unit_price_iqd: number | null; available: boolean; reason: string | null }>;
+}
+
+/** What the kits are priced for: the printer's product, version, order type, route and quantity. */
+export interface KitsFor {
+  slug: string;
+  optionValueIds: readonly string[];
+  fulfillmentType?: string;
+  transportMethod?: string;
+  qty: number;
+}
+
+export async function loadKits(f: KitsFor, signal?: AbortSignal): Promise<PricedKit[]> {
+  const q = new URLSearchParams();
+  if (f.optionValueIds.length) q.set('optionValueIds', f.optionValueIds.join(','));
+  if (f.fulfillmentType) q.set('fulfillmentType', f.fulfillmentType);
+  if (f.transportMethod) q.set('transportMethod', f.transportMethod);
+  q.set('qty', String(Math.max(1, f.qty)));
+  const r = await api.get<{ kits?: PricedKit[] }>(`/api/products/${encodeURIComponent(f.slug)}/kits?${q}`, { signal, timeoutMs: 12000 });
+  return Array.isArray(r.kits) ? r.kits : [];
 }

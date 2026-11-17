@@ -100,11 +100,24 @@ import type { PolicyDocument } from './types';
  * tiers above all, the retired Arabic word and the English "premium" beside
  * LEVO PREMIUM read as one thing; they are two. Wording only: the PRO
  * address condition itself did not move.
+ *
+ * VERSION 6 — WHY IT MOVED (owner, 2026-11-17; DECISIONS row 339, printer
+ * packages phase 2). The archive keeps version 5 byte for byte. A membership
+ * can now also be bought as a LINE OF A PRINTER ORDER (migration 0235,
+ * worker/lib/orderMembershipSale.ts), so 3.9 no longer says the wallet is the
+ * only way to buy one, 3.7 and 8.4 point at the exception, and the new 3.10
+ * states its terms: paid like the order (never with BNPL), it starts only when
+ * the order is delivered and paid in full, no benefit applies to that order, a
+ * member is offered only an upgrade to a higher tier (no renewal through an
+ * order), and once started it is not refunded. Still unpublished, 3.10 was
+ * completed in place (review, 2026-11-17): on a Gini order the membership is
+ * paid in cash at the door, not financed by Gini, and the owner alone may
+ * correct (cancel and refund) an order whose membership started.
  */
 export const membership: PolicyDocument = {
   key: 'membership',
-  version: 5,
-  effective_at: '2026-10-09',
+  version: 6,
+  effective_at: '2026-11-17',
   title: {
     ar: 'سياسة العضويات',
     en: 'Memberships Policy',
@@ -197,13 +210,22 @@ export const membership: PolicyDocument = {
 للمتجر تعديل أسعار الخطط وإضافة خطط وإيقاف خطط. ولا يسري التعديل على عضوية قائمة اشتُريت قبله، ولا يُطالب عضوها بفرق، ولا يُقصّر مدته.
 
 ### 3.7 العملة والخصم من المحفظة
-تُعرض أسعار الخطط بالدينار العراقي، ويُخصم بدل العضوية من رصيد المحفظة بالعملة التي يجري بها الخصم وفق سعر الصرف المعتمد في المنصة لحظة الشراء. وتفصيل المحفظة والأرصدة في سياسة الدفع والمحفظة.
+تُعرض أسعار الخطط بالدينار العراقي، ويُخصم بدل العضوية من رصيد المحفظة بالعملة التي يجري بها الخصم وفق سعر الصرف المعتمد في المنصة لحظة الشراء، إلا العضوية المشتراة بنداً في طلب طابعة فيُدفع بدلها مع الطلب وفق المادة 3.10. وتفصيل المحفظة والأرصدة في سياسة الدفع والمحفظة.
 
 ### 3.8 تغيّر سعر الصرف بين العرض والتأكيد
 إذا تغيّر سعر الصرف أو تغيّرت أرقام العرض بين لحظة عرض الملخص ولحظة التأكيد، رفض النظام إتمام الشراء وأعاد عرض الأرقام الجديدة لتؤكد من جديد. ولا يُخصم من الزبون مبلغ لم يره ولم يقره.
 
 ### 3.9 لا شراء خارج المنصة
-لا تُباع العضوية ولا تُجدَّد ولا تُرقّى إلا من داخل المنصة وبخصم من المحفظة. وما يُدفع خارج المنصة لا يُنشئ عضوية ولا يُلزم المتجر بشيء.
+لا تُباع العضوية ولا تُجدَّد ولا تُرقّى إلا من داخل المنصة، بخصم من المحفظة أو بنداً في طلب طابعة وفق المادة 3.10. وما يُدفع خارج المنصة لا يُنشئ عضوية ولا يُلزم المتجر بشيء.
+
+### 3.10 العضوية مع طلب طابعة
+يجوز أن تُشترى العضوية بنداً في طلب طابعة حين يعرضها المتجر مع تلك الطابعة، وعندئذ:
+- يُدفع بدلها مع الطلب وبطرق دفعه، ولا تُشترى بالدفع المؤجل (اشترِ الآن وادفع لاحقاً).
+- إذا كان الطلب بالأقساط عبر تطبيق جني فلا يموّل جني بدل العضوية، بل يُدفع نقداً عند الاستلام مع أجرة التوصيل، أو عند الاستلام من المخزن.
+- لا تبدأ إلا حين يُسلَّم الطلب ويُدفع كاملاً، ولا تسري أي من مزاياها على ذلك الطلب نفسه.
+- من كانت له عضوية فعّالة لا يُعرض عليه إلا الترقية إلى فئة أعلى، ولا تُجدَّد العضوية عن طريق طلب.
+- إذا أُلغي الطلب قبل أن تبدأ لم تبدأ، وأُعيد بدلها مع ما يُعاد من الطلب. ومتى بدأت فلا يُسترد بدلها، ولا يُقبل بند العضوية في المرتجعات.
+- استثناءً مما سبق، يجوز لمالك المتجر وحده أن يصحّح طلباً بدأت عضويته، فيُلغي الطلب ويُنهي العضوية ويُعاد ما دُفع كما في الإلغاء العادي، ولا يُعاد فتح الطلب بعد ذلك.
 
 ## 4. ما تمنحه فئة LEVO PLUS
 
@@ -344,7 +366,7 @@ export const membership: PolicyDocument = {
 لا يُخصم مبلغ ولا تُنشأ عضوية قبل تأكيد الزبون للملخص. وإذا اختلف المبلغ المعاد حسابه عند التأكيد عن المبلغ المعروض، رُفض الإتمام وأُعيد العرض بالأرقام الجديدة.
 
 ### 8.4 الخصم من المحفظة
-يُخصم بدل العضوية من الرصيد المتاح في المحفظة. والرصيد المتاح هو المسوّى بعد استنزال المحجوز لعمليات أخرى، كما تبينه سياسة الدفع والمحفظة.
+يُخصم بدل العضوية من الرصيد المتاح في المحفظة، إلا ما اشتُري بنداً في طلب طابعة فيُدفع مع الطلب (المادة 3.10). والرصيد المتاح هو المسوّى بعد استنزال المحجوز لعمليات أخرى، كما تبينه سياسة الدفع والمحفظة.
 
 ### 8.5 عدم كفاية الرصيد
 إذا لم يكفِ الرصيد المتاح، رُفض الشراء ولم يُنشأ سجل عضوية ولم يُخصم شيء. ولا تُنشأ عضوية جزئية ولا عضوية بالدين.
@@ -616,13 +638,22 @@ A plan for which the Store has set no price is not offered for sale and cannot b
 The Store may amend plan prices, add plans and withdraw plans. An amendment does not apply to a live membership bought before it, its member is not asked for any difference, and its term is not shortened.
 
 ### 3.7 Currency and the wallet debit
-Plan prices are displayed in Iraqi dinars, and the membership consideration is debited from the wallet balance in the currency in which the debit is made, at the exchange rate in force on the platform at the moment of purchase. The wallet and its balances are detailed in the Payment and Wallet Policy.
+Plan prices are displayed in Iraqi dinars, and the membership consideration is debited from the wallet balance in the currency in which the debit is made, at the exchange rate in force on the platform at the moment of purchase, except a membership bought as a line of a printer order, whose consideration is paid with the order under article 3.10. The wallet and its balances are detailed in the Payment and Wallet Policy.
 
 ### 3.8 A rate change between the summary and the confirmation
 If the exchange rate or the figures of the summary change between the moment the summary is displayed and the moment of confirmation, the system refuses to complete the purchase and displays the new figures for a fresh confirmation. No amount the customer has not seen and approved is debited.
 
 ### 3.9 No purchase outside the platform
-A membership is sold, renewed and upgraded only from within the platform and by a debit from the wallet. Anything paid outside the platform creates no membership and binds the Store to nothing.
+A membership is sold, renewed and upgraded only from within the platform, by a debit from the wallet or as a line of a printer order under article 3.10. Anything paid outside the platform creates no membership and binds the Store to nothing.
+
+### 3.10 A membership bought with a printer order
+A membership may be bought as a line of a printer order where the Store offers it with that printer. In that case:
+- its consideration is paid with the order and by the order's payment methods; it is not bought with deferred payment (Buy Now, Pay Later);
+- where the order is paid in instalments through the Gini app, Gini does not finance the membership: its consideration is paid in cash on delivery together with the delivery fee, or on collection from the store;
+- it starts only when the order is delivered and paid in full, and none of its benefits applies to that order itself;
+- a customer with an active membership is offered only an upgrade to a higher tier, and a membership is not renewed through an order;
+- if the order is cancelled before the membership starts, it never starts and its consideration is returned with what the order returns. Once it has started its consideration is not refunded, and the membership line is not accepted in a return;
+- by way of exception to the above, the owner of the Store alone may correct an order whose membership has started: the order is cancelled, the membership is ended and what was paid is returned as in an ordinary cancellation, and the order is not re-opened afterwards.
 
 ## 4. What LEVO PLUS grants
 
@@ -763,7 +794,7 @@ Before confirmation the customer is shown a summary stating the plan, its tier, 
 No amount is debited and no membership is created before the customer confirms the summary. If the amount recomputed at confirmation differs from the amount displayed, completion is refused and the summary is redisplayed with the new figures.
 
 ### 8.4 The wallet debit
-The membership consideration is debited from the available balance in the wallet. The available balance is the settled balance after deducting amounts held for other operations, as the Payment and Wallet Policy explains.
+The membership consideration is debited from the available balance in the wallet, except one bought as a line of a printer order, which is paid with the order (article 3.10). The available balance is the settled balance after deducting amounts held for other operations, as the Payment and Wallet Policy explains.
 
 ### 8.5 Insufficient balance
 Where the available balance is insufficient, the purchase is refused, no membership record is created and nothing is debited. No partial membership and no membership on credit is created.
@@ -1035,13 +1066,22 @@ The approved contact point is {{LEVONIS_SUPPORT_CONTACT}}, and the hours of busi
 فرۆشگا دەتوانێت نرخی پلانەکان بگۆڕێت، پلان زیاد بکات و پلان ڕابگرێت. گۆڕانکاری لەسەر ئەندامێتییەکی هەبوو کە پێشتر کڕدراوە جێبەجێ نابێت، داوای جیاوازی لە ئەندامەکەی ناکرێت، و ماوەکەی کورت ناکرێتەوە.
 
 ### 3.7 دراو و کەمکردنەوە لە جزدان
-نرخی پلانەکان بە دیناری عێراقی پیشان دەدرێن، و بەرامبەری ئەندامێتی لە باڵانسی جزدان کەم دەکرێتەوە بەو دراوەی کەمکردنەوەکەی پێدەکرێت بەپێی نرخی ئاڵوگۆڕی پەسەندکراوی پلاتفۆرم لە ساتی کڕیندا. وردەکاری جزدان و باڵانسەکان لە سیاسەتی پارەدان و جزداندایە.
+نرخی پلانەکان بە دیناری عێراقی پیشان دەدرێن، و بەرامبەری ئەندامێتی لە باڵانسی جزدان کەم دەکرێتەوە بەو دراوەی کەمکردنەوەکەی پێدەکرێت بەپێی نرخی ئاڵوگۆڕی پەسەندکراوی پلاتفۆرم لە ساتی کڕیندا، جگە لەو ئەندامێتییەی وەک بڕگەیەک لە داواکارییەکی چاپکەر دەکڕدرێت کە بەرامبەرەکەی لەگەڵ داواکارییەکە دەدرێت بەپێی بەندی 3.10. وردەکاری جزدان و باڵانسەکان لە سیاسەتی پارەدان و جزداندایە.
 
 ### 3.8 گۆڕانی نرخی ئاڵوگۆڕ لە نێوان پیشاندان و پەسەندکردندا
 ئەگەر نرخی ئاڵوگۆڕ گۆڕا یان ژمارەکانی پیشاندان گۆڕان لە نێوان ساتی پیشاندانی کورتەکە و ساتی پەسەندکردندا، سیستەمەکە تەواوکردنی کڕینەکە ڕەت دەکاتەوە و ژمارە نوێیەکان دووبارە پیشان دەدات بۆ پەسەندکردنەوە. هیچ بڕێک لە کڕیار کەم ناکرێتەوە کە نەیبینیبێت و پەسەندی نەکردبێت.
 
 ### 3.9 کڕین لە دەرەوەی پلاتفۆرم نییە
-ئەندامێتی تەنها لە ناو پلاتفۆرمەوە و بە کەمکردنەوە لە جزدان دەفرۆشرێت، نوێ دەکرێتەوە و بەرز دەکرێتەوە. ئەوەی لە دەرەوەی پلاتفۆرم دەدرێت هیچ ئەندامێتییەک دروست ناکات و فرۆشگا بە هیچ شتێک پابەند ناکات.
+ئەندامێتی تەنها لە ناو پلاتفۆرمەوە دەفرۆشرێت، نوێ دەکرێتەوە و بەرز دەکرێتەوە، بە کەمکردنەوە لە جزدان یان وەک بڕگەیەک لە داواکارییەکی چاپکەر بەپێی بەندی 3.10. ئەوەی لە دەرەوەی پلاتفۆرم دەدرێت هیچ ئەندامێتییەک دروست ناکات و فرۆشگا بە هیچ شتێک پابەند ناکات.
+
+### 3.10 ئەندامێتی لەگەڵ داواکاریی چاپکەر
+ئەندامێتی دەکرێت وەک بڕگەیەک لە داواکارییەکی چاپکەر بکڕدرێت کاتێک فرۆشگا لەگەڵ ئەو چاپکەرە پێشکەشی دەکات، و لەو کاتەدا:
+- بەرامبەرەکەی لەگەڵ داواکارییەکە و بە ڕێگاکانی پارەدانی داواکارییەکە دەدرێت، و بە پارەدانی دواخراو (ئێستا بیکڕە و دواتر پارە بدە) ناکڕدرێت.
+- ئەگەر داواکارییەکە بە قیست لە ڕێگەی ئەپی جینی بێت، جینی پارەی بەرامبەری ئەندامێتی نادات، بەڵکو لە کاتی وەرگرتندا لەگەڵ کرێی گەیاندن بە نەختینە دەدرێت، یان لە کاتی وەرگرتن لە فرۆشگا.
+- تەنها کاتێک دەست پێدەکات کە داواکارییەکە گەیەندرا و پارەکەی بە تەواوی درا، و هیچ سوودێکی لەسەر هەمان ئەو داواکارییە جێبەجێ نابێت.
+- ئەوەی ئەندامێتییەکی چالاکی هەیە تەنها بەرزکردنەوە بۆ پلەیەکی بەرزتری پێشکەش دەکرێت، و ئەندامێتی لە ڕێگەی داواکارییەوە نوێ ناکرێتەوە.
+- ئەگەر داواکارییەکە پێش دەستپێکردنی ئەندامێتییەکە هەڵوەشێندرایەوە، ئەندامێتییەکە دەست پێناکات و بەرامبەرەکەی لەگەڵ ئەوەی داواکارییەکە دەیگەڕێنێتەوە دەگەڕێندرێتەوە. کاتێک دەستی پێکرد بەرامبەرەکەی ناگەڕێندرێتەوە، و بڕگەی ئەندامێتی لە گەڕاندنەوەکاندا وەرناگیرێت.
+- وەک جیاکارییەک لەوەی سەرەوە، تەنها خاوەنی فرۆشگا دەتوانێت داواکارییەک ڕاست بکاتەوە کە ئەندامێتییەکەی دەستی پێکردووە: داواکارییەکە هەڵدەوەشێندرێتەوە، ئەندامێتییەکە کۆتایی پێدێت و ئەوەی دراوە وەک هەڵوەشاندنەوەی ئاسایی دەگەڕێندرێتەوە، و دوای ئەوە داواکارییەکە دووبارە ناکرێتەوە.
 
 ## 4. پلەی LEVO PLUS چی دەبەخشێت
 
@@ -1182,7 +1222,7 @@ PRO هەموو ئەوە دەبەخشێت کە PLUS و PREMIUM لە بەشەکا�
 هیچ بڕێک کەم ناکرێتەوە و هیچ ئەندامێتییەک دروست ناکرێت پێش پەسەندکردنی کڕیار بۆ کورتەکە. ئەگەر ئەو بڕەی لە کاتی پەسەندکردندا دووبارە ژمێردرایەوە لەگەڵ بڕە پیشاندراوەکە جیاواز بوو، تەواوکردن ڕەت دەکرێتەوە و کورتەکە بە ژمارە نوێیەکانەوە دووبارە پیشان دەدرێت.
 
 ### 8.4 کەمکردنەوە لە جزدان
-بەرامبەری ئەندامێتی لە باڵانسی بەردەستی جزدان کەم دەکرێتەوە. باڵانسی بەردەست ئەوەیە کە دوای لابردنی ئەوەی بۆ کردارەکانی تر حیجز کراوە یەکلایی کراوەتەوە، وەک سیاسەتی پارەدان و جزدان ڕوونی دەکاتەوە.
+بەرامبەری ئەندامێتی لە باڵانسی بەردەستی جزدان کەم دەکرێتەوە، جگە لەوەی وەک بڕگەیەک لە داواکارییەکی چاپکەر کڕدراوە کە لەگەڵ داواکارییەکە دەدرێت (بەندی 3.10). باڵانسی بەردەست ئەوەیە کە دوای لابردنی ئەوەی بۆ کردارەکانی تر حیجز کراوە یەکلایی کراوەتەوە، وەک سیاسەتی پارەدان و جزدان ڕوونی دەکاتەوە.
 
 ### 8.5 نەبوونی باڵانسی پێویست
 ئەگەر باڵانسی بەردەست بەس نەکرد، کڕینەکە ڕەت دەکرێتەوە و هیچ تۆمارێکی ئەندامێتی دروست ناکرێت و هیچ کەم ناکرێتەوە. هیچ ئەندامێتییەکی بەشەکی و هیچ ئەندامێتییەک بە قەرز دروست ناکرێت.

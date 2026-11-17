@@ -832,3 +832,23 @@ test('missing FIFO cost stays pending and posts once when the allocations become
   assert.equal(count(raw, 'SELECT SUM(amount_iqd) n FROM finance_order_costs'), 3500, '10% of net profit includes the recorded 5000 shipping income');
   assert.equal(count(raw, 'SELECT COUNT(*) n FROM finance_posting_errors'), 0);
 });
+test('0235: a membership bought with the order is not net goods — reported apart as memberships sold', async () => {
+  const { raw, db } = setup();
+  seedOrder(raw, 'withmember');
+  const before = await operationsReport(db, baghdadDay(), baghdadDay());
+  const goodsBefore = Number(before.orders.find((r) => r.id === 'withmember')!.net_goods_iqd);
+  const unitsBefore = Number(before.orders.find((r) => r.id === 'withmember')!.units);
+  raw
+    .prepare(
+      `INSERT INTO order_items(id,order_id,product_id,name_snapshot,qty,unit_price_iqd,line_total_iqd,cost_iqd,cost_basis,line_kind) VALUES ('withmember-mem','withmember',NULL,'Levo PLUS — 1 month',1,9000,9000,0,'snapshot','membership')`,
+    )
+    .run();
+  const report = await operationsReport(db, baghdadDay(), baghdadDay());
+  const row = report.orders.find((r) => r.id === 'withmember')!;
+  assert.equal(Number(row.net_goods_iqd), goodsBefore, 'the membership line is not goods');
+  assert.equal(Number(row.units), unitsBefore, 'nor a unit');
+  assert.equal(Number(row.membership_iqd), 9000);
+  assert.equal(report.memberships_sold_iqd, 9000);
+  const grossBefore = before.orders.find((r) => r.id === 'withmember')!.gross_profit_iqd;
+  if (grossBefore !== null) assert.equal(Number(row.gross_profit_iqd), Number(grossBefore) + 9000, 'its revenue is still profit');
+});

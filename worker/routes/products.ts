@@ -154,7 +154,8 @@ import { conditionSaving, parseConditionDoc } from '../lib/condition';
 import { salesBadgeFor } from '../lib/salesBadge';
 import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
 import { enrolledClasses, productEnrolled, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
-import { parseSelection, servicesOffer, SERVICES_WITH_LEGACY_WARRANTY } from '@levonis/pricing/printerServices';
+import { kitPricing, kitPublic, resolveKit } from '../lib/printerKits';
+import { kitsForPrinter, parseSelection, servicesOfferFor, SERVICES_WITH_LEGACY_WARRANTY } from '@levonis/pricing/printerServices';
 import {
   canonicalOptionValueIds as canonicalSelectionOptionValueIds,
   optionValueIdsInRelationOrder,
@@ -5805,6 +5806,38 @@ async function catalogOnlyQuoteRefusal(db: D1Database, row: Record<string, unkno
  * comes exclusively from the session — a tier in the body is ignored. The
  * result never contains cost fields; checkout re-resolves server-side.
  */
+/**
+ * «الفيلامنت» IN THE PRINTER SHEET (phase 2; owner rulings 2026-11-17): the
+ * owner's kits for this printer selection, each item judged and priced by the
+ * cart's own door for THIS viewer (a guest: the guest price) at the printer's
+ * quantity, shipping type and route — the kit's price is the sum of the live
+ * item prices (no discount), and an unavailable kit says which item and why.
+ *
+ *   GET /api/products/:slug/kits?optionValueIds=a,b&fulfillmentType=direct_sale&transportMethod=&qty=1
+ *
+ * Nothing is written; never cached (the prices are the viewer's).
+ */
+productRoutes.get('/:slug/kits', async (c) => {
+  await rateLimit(c, 'product_kits', 60, 60);
+  const row = await visibleProductBySlug(c.env.DB, c.req.param('slug'));
+  if (!row) throw notFound('Product not found');
+  const ids = (c.req.query('optionValueIds') ?? '').split(',').map((v) => v.trim()).filter((v) => v && v.length <= 60).slice(0, 12);
+  const fulfillmentType = str(c.req.query('fulfillmentType'), 'fulfillmentType', { max: 20, required: false });
+  const transportMethod = str(c.req.query('transportMethod'), 'transportMethod', { max: 30, required: false });
+  const qty = int(c.req.query('qty'), 'qty', { min: 1, max: QTY_INPUT_MAX, def: 1 });
+  const config = await publishedPrinterServices(c.env.DB);
+  const classes = enrolledClasses(config, { id: String(row.id), condition: parseConditionDoc(String(row.condition_doc ?? '')) }, ids);
+  c.header('Cache-Control', 'private, no-store');
+  if (!config || !classes) return c.json({ success: true, kits: [] });
+  const printer = { productId: String(row.id), optionValueIds: ids, fulfillmentType, transportMethod, qty };
+  // One pricing context for every item of every kit (review S15).
+  const offered = kitsForPrinter(config, printer.productId, ids);
+  const pricing = offered.length ? kitPricing(c) : null;
+  const kits = [];
+  for (const kit of offered) kits.push(kitPublic(await resolveKit(c, kit, printer, pricing!)));
+  return c.json({ success: true, kits });
+});
+
 productRoutes.post('/:slug/quote', async (c) => {
   await rateLimit(c, 'product_quote', 120, 60);
   const slug = c.req.param('slug');
@@ -6075,7 +6108,7 @@ productRoutes.post('/:slug/quote', async (c) => {
     ...(servicesClasses && servicesConfig
       ? {
           printer_services: {
-            offer: servicesOffer(servicesConfig, servicesClasses),
+            offer: servicesOfferFor(servicesConfig, servicesClasses, String(row.id), priceValueIds),
             selection: priced.services
               ? { fee_iqd: priced.services.fee_iqd, lines: priced.services.lines, warranty_months: priced.services.warranty_months,
                   delivery_fee_iqd: priced.services.delivery_fee_iqd, blockers: priced.services.blockers }

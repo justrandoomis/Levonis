@@ -270,6 +270,10 @@ test('every new customer-facing string exists in ar, en and ckb', () => {
     'giniPaidRow',
     'giniDoorRow',
     'giniPickupRow',
+    'giniDoorCashRow',
+    'giniPickupCashRow',
+    'giniDoorFeePart',
+    'giniDoorMembershipPart',
     'giniWarning',
     'giniPlacedTitle',
   ];

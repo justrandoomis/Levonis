@@ -7,6 +7,7 @@ import { processWalletNotifications } from './walletNotify';
 import type { ProcessReport } from './walletNotify';
 import { reconcileWallets } from './walletOps';
 import { reconcileSupportGifts } from './membershipOps';
+import { sweepOrderMemberships } from './orderMembershipSale';
 import { sweepDueStages } from './orderStageOps';
 import type { SweepReport } from './orderStageOps';
 import { alwaseetDriver } from './delivery/alwaseet';
@@ -108,6 +109,8 @@ export interface DurableJobsReport {
   wallet_reconciliation: { anomalies: number; sums_match: boolean; committed_holds_without_debit: number };
   /** Support-gift entitlement re-evaluation (§3.4). */
   support_gifts: SupportGiftReconciliation;
+  /** 0235: memberships bought with a printer order, started once it is delivered and fully paid. */
+  order_memberships?: { scanned: number; activated: number; blocked: number };
   /**
    * Order tracking stages promoted this run. This is the whole automation
    * engine's heartbeat: the owner ruled out timers in the browser, so the
@@ -528,6 +531,14 @@ export async function runDurableJobs(env: Env, opts: DurableJobsOptions = {}): P
   //     transition uses — UNIQUE(order_id) means a second claim cannot exist.
   await step('support_gifts', async () => {
     report.support_gifts = await reconcileSupportGifts(env, 200);
+  });
+
+  // 10b. Memberships bought with a printer order (0235): each waiting purchase
+  //      whose order is delivered is re-asked through the same idempotent,
+  //      token-guarded activation the delivered transition and the settlement
+  //      use, so a COD collected anywhere starts it without a page open.
+  await step('order_memberships', async () => {
+    report.order_memberships = await sweepOrderMemberships(env, 100);
   });
 
   // 11. Order tracking stages whose configured wait has elapsed. The sweep

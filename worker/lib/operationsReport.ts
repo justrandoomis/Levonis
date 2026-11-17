@@ -10,8 +10,13 @@ export async function operationsReport(db: D1Database, from: string, to: string)
   // reversible representation of that exact total.
   const schema = await db.prepare(`SELECT
     EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_cost_adjustments') AS cost_adjustments,
-    EXISTS(SELECT 1 FROM pragma_table_info('incoming_inventory') WHERE name='purchase_total_iqd') AS exact_purchase_total`)
-    .first<{ cost_adjustments: number; exact_purchase_total: number }>();
+    EXISTS(SELECT 1 FROM pragma_table_info('incoming_inventory') WHERE name='purchase_total_iqd') AS exact_purchase_total,
+    EXISTS(SELECT 1 FROM pragma_table_info('order_items') WHERE name='line_kind') AS line_kind`)
+    .first<{ cost_adjustments: number; exact_purchase_total: number; line_kind: number }>();
+  // 0235: a membership bought with a printer is its own order line — not goods (no units, no COGS, not
+  // net goods sales); it is reported apart as memberships sold. A database without the column has none.
+  const goods = schema?.line_kind ? "COALESCE(i.line_kind,'product')<>'membership'" : '1';
+  const membershipLine = schema?.line_kind ? "i.line_kind='membership'" : '0';
   const costAdjustments = !!schema?.cost_adjustments;
   const purchaseTotal = schema?.exact_purchase_total
     ? 'COALESCE(i.purchase_total_iqd,i.qty_ordered*i.purchase_unit_iqd)'
@@ -28,8 +33,10 @@ export async function operationsReport(db: D1Database, from: string, to: string)
       FROM order_items i),costs AS (SELECT order_id,SUM(CASE WHEN state IN ('due','approved') THEN amount_iqd ELSE 0 END) AS direct,SUM(CASE WHEN state='pending_cost' THEN 1 ELSE 0 END) AS pending FROM finance_order_costs GROUP BY order_id),
       collections AS (SELECT order_id,SUM(amount_iqd) AS collected,SUM(fee_iqd) AS fee FROM finance_collections GROUP BY order_id)
       SELECT o.id,o.delivered_at,o.delivery_provider,o.shipping_iqd,o.shipping_benefit_iqd,o.membership_discount_iqd,o.points_discount_iqd,o.coupon_discount_iqd,o.due_on_delivery_iqd,o.gini_paid_iqd,
-       SUM(CASE WHEN i.bundle_parent_item_id IS NULL THEN MAX(0,i.line_total_iqd-i.coupon_discount_iqd-i.membership_discount_iqd) ELSE 0 END)-o.points_discount_iqd AS net_goods_iqd,
-       SUM(CASE WHEN i.parent=0 THEN i.qty ELSE 0 END) AS units,SUM(CASE WHEN i.parent=0 AND i.cogs IS NULL THEN 1 ELSE 0 END) AS unknown_lines,
+       SUM(CASE WHEN i.bundle_parent_item_id IS NULL AND ${goods} THEN MAX(0,i.line_total_iqd-i.coupon_discount_iqd-i.membership_discount_iqd) ELSE 0 END)-o.points_discount_iqd AS net_goods_iqd,
+       SUM(CASE WHEN ${membershipLine} THEN i.line_total_iqd ELSE 0 END) AS membership_iqd,
+       SUM(CASE WHEN ${membershipLine} THEN i.qty ELSE 0 END) AS membership_units,
+       SUM(CASE WHEN i.parent=0 AND ${goods} THEN i.qty ELSE 0 END) AS units,SUM(CASE WHEN i.parent=0 AND i.cogs IS NULL THEN 1 ELSE 0 END) AS unknown_lines,
        SUM(CASE WHEN i.parent=0 AND i.cogs IS NOT NULL AND i.estimated=1 THEN 1 ELSE 0 END) AS estimated_lines,
        SUM(CASE WHEN i.parent=0 THEN COALESCE(i.cogs,0) ELSE 0 END) AS cogs_iqd,COALESCE(c.direct,0) AS direct_cost_iqd,COALESCE(c.pending,0) AS pending_costs,
        COALESCE(col.collected,0) AS collected_iqd,COALESCE(col.fee,0) AS courier_fee_iqd,
@@ -94,7 +101,11 @@ export async function operationsReport(db: D1Database, from: string, to: string)
   const list = rawList.map((o)=>{
     const base=bases.find((b)=>b.order_id===o.id);
     if(!base)return o;
+    // The profit base reads every line; the report's net goods and units leave the membership line out
+    // (shown apart as membership_iqd). Its revenue stays in the profit figures, as in the journal.
     return {...o,...base.totals,shipping_iqd:base.totals.shipping_income_iqd,
+      net_goods_iqd:base.totals.net_goods_iqd===null?null:Number(base.totals.net_goods_iqd)-Number(o.membership_iqd??0),
+      units:Number(base.totals.units)-Number(o.membership_units??0),
       estimated_lines:base.lines.filter((l)=>l.cost_confidence==='snapshot').length,
       warnings:base.warnings,version:base.version};
   }),
@@ -151,7 +162,8 @@ export async function operationsReport(db: D1Database, from: string, to: string)
     }
   const rows = list.slice(0, 5000).map((o, i):Record<string,unknown> => {
     const base=bases.find((b)=>b.order_id===o.id);
-    const gross = base?base.totals.gross_profit_iqd:Number(o.unknown_lines) > 0 ? null : Number(o.net_goods_iqd) - Number(o.cogs_iqd),
+    // A membership line costs nothing: its revenue is profit, though not goods (it is outside net_goods_iqd).
+    const gross = base?base.totals.gross_profit_iqd:Number(o.unknown_lines) > 0 ? null : Number(o.net_goods_iqd) + Number(o.membership_iqd ?? 0) - Number(o.cogs_iqd),
       contribution =
         base?base.totals.contribution_profit_iqd:gross === null || Number(o.pending_costs) > 0
           ? null
@@ -180,6 +192,8 @@ export async function operationsReport(db: D1Database, from: string, to: string)
     centers: centers.results ?? [],
     refunds: refunds.results ?? [],
     general_expenses_iqd: (expenses.results ?? []).reduce((s, e) => s + e.amount_iqd, 0),
+    /** Memberships sold with delivered orders in the range (0235) — outside net goods. */
+    memberships_sold_iqd: rows.reduce((s, r) => s + (Number(r.membership_iqd) || 0), 0),
     allocated_overhead_iqd: truncated ? null : overhead.reduce((a, b) => a + b, 0),
     note: 'ربح الطلبات المستلمة خلال الفترة، وتعرض المرتجعات في تاريخها منفصلة. الربح الإداري بعد توزيع المصروفات للمعاينة. التوزيع لا ينشئ مصروفًا ثانيًا. أرصدة المحافظ بعملتها الأصلية.',
   };

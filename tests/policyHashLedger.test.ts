@@ -111,9 +111,10 @@ test('the ledger is what the archive stores: a fresh sync writes exactly these h
  * The current version of each document decision 7 reworded: price_protection
  * moved again, to 5, for decision 6, and faq to 6 for the Meta Pixel; then
  * purchase to 7, price_protection to 6 and faq to 7 for the estimated price,
- * and faq to 8 for the review road.
+ * and faq to 8 for the review road; membership to 6 (owner, 2026-11-17) for
+ * a membership bought with a printer order.
  */
-const CURRENT_TODAY: Readonly<Record<string, number>> = { purchase: 7, faq: 8, membership: 5, price_protection: 6 };
+const CURRENT_TODAY: Readonly<Record<string, number>> = { purchase: 7, faq: 8, membership: 6, price_protection: 6 };
 
 test('the four documents decision 7 reworded moved to new versions, and their previous versions stay in the ledger', () => {
   const MOVED: ReadonlyArray<[string, number]> = [['purchase', 6], ['faq', 5], ['membership', 5], ['price_protection', 4]];

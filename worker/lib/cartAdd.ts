@@ -218,11 +218,18 @@ export function estimateLineRefusal(
 export async function loadAddContext(
   c: Context<AppContext>,
   product: Record<string, unknown>,
-  opts: { warrantyPlanId: string }
+  opts: {
+    warrantyPlanId: string;
+    /**
+     * The viewer's pricing context, when the caller already loaded it for this
+     * request (a filament kit judges several items: loaded once, review S15).
+     */
+    pricing?: ReturnType<typeof cartPricing>;
+  }
 ): Promise<AddContext> {
   const productId = String(product.id);
   const [{ tier, active: tierActive, status, ctx }, views, isPrinter, addOffers, pool, estimateOrdering] = await Promise.all([
-    cartPricing(c),
+    opts.pricing ?? cartPricing(c),
     loadRelationsViews(c.env.DB, [{ id: productId, inventory_mode: product.inventory_mode }]),
     // The owner's catalog flag decides whether an extended warranty may ride
     // on this line at all — "this system applies to printers only".

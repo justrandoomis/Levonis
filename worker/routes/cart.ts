@@ -180,11 +180,15 @@ import {
 import { giftSelectionOf, selectionFromColumns, type GiftSelection } from '../lib/gifts/selection';
 import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 import { auditStatements } from '../lib/audit';
-import { enrolledClasses, publishedFromSetting } from '../lib/printerServices';
-import { parseSelection, servicesOffer, SERVICES_CODES, SERVICES_NOT_OFFERED, SERVICES_REQUIRED, type PrinterClasses, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
+import { enrolledClasses, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
+import { parseConditionDoc } from '../lib/condition';
+import { kitLinesMatch, kitNotOffered, kitUnavailable, offeredKit, resolveKit, type ResolvedKit } from '../lib/printerKits';
+import { membershipPlanById, orderMembershipQuotePayload, quoteOrderMembership } from './memberships';
+import { parseSelection, servicesOfferFor, kitsForPrinter, offeredMembershipTiers, CART_MEMBERSHIP_CONFLICT, EXTRAS_NOT_PRINTER, KIT_LINE_LOCKED, KIT_UNAVAILABLE, MEMBERSHIP_NOT_OFFERED, type FilamentKit, SERVICES_CODES, SERVICES_NOT_OFFERED, SERVICES_REQUIRED, type PrinterClasses, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
 
 /** The cart line's printer-services block (absent for every other line). */
 function cartServicesView(
+  productId: string,
   config: PrinterServicesConfig | null,
   /** From resolveCartLine — the same relation-ordered value ids pricing used. */
   classes: PrinterClasses | null,
@@ -195,7 +199,7 @@ function cartServicesView(
   const p = resolved.services;
   return {
     printer_services: {
-      offer: servicesOffer(config, classes),
+      offer: servicesOfferFor(config, classes, productId, sel.optionValueIds ?? []),
       selection: sel.services ? parseSelection(sel.services) : null,
       priced: p
         ? { fee_iqd: p.fee_iqd, lines: p.lines, warranty_months: p.warranty_months, delivery_fee_iqd: p.delivery_fee_iqd, blockers: p.blockers }
@@ -228,7 +232,10 @@ export const CART_WARRANTY_CONFLICT = 'CART_WARRANTY_CONFLICT';
  * approved one sees the surcharge here exactly as the door will charge it.
  */
 async function cartTier(c: Context<AppContext>): Promise<{ tier: Tier; active: boolean; status: TierStatus; atApprovedDefault: boolean }> {
-  const user = c.get('user')!;
+  const user = c.get('user');
+  // A guest (the public kits endpoint prices kit items through the cart's own
+  // judgement, worker/lib/printerKits.ts): no membership, no PRO context.
+  if (!user) return { tier: 'free', active: false, status: { tier: 'free', active: false, expires_at: null, pending_launch: null, gated_benefits: [] } as TierStatus, atApprovedDefault: false };
   const ctx = await pricingTierContext(c.env.DB, user.id);
   // The whole TierStatus rides along because `offerEligible` (§9) needs the
   // tier, whether it is active AND which benefits an admin restriction case
@@ -954,6 +961,8 @@ export interface UnavailableCartLine {
   code: 'PRODUCT_CURRENTLY_UNAVAILABLE' | 'PRICE_NOT_AVAILABLE';
   /** The product page to ask for the price on: a `PRICE_NOT_AVAILABLE` line only (a hidden product has none). */
   slug: string | null;
+  /** 0235: an unavailable filament-kit line names its printer line and kit (it is removed with the kit, never alone). */
+  kit_line?: { printer_cart_item_id: string; kit_id: string; qty_per_printer: number };
 }
 
 function unavailableCartLine(row: Record<string, unknown>, catalogOnly = false): UnavailableCartLine {
@@ -973,6 +982,9 @@ function unavailableCartLine(row: Record<string, unknown>, catalogOnly = false):
     image,
     code: catalogOnly ? 'PRICE_NOT_AVAILABLE' : 'PRODUCT_CURRENTLY_UNAVAILABLE',
     slug: catalogOnly ? text(row.slug) || null : null,
+    ...(row.kit_parent_id
+      ? { kit_line: { printer_cart_item_id: String(row.kit_parent_id), kit_id: String(row.kit_id ?? ''), qty_per_printer: Number(row.kit_unit_qty) || 0 } }
+      : {}),
   };
 }
 
@@ -1352,6 +1364,9 @@ async function loadCart(c: Context<AppContext>) {
       option_id: row.option_id,
       color_id: row.color_id,
       transport_method: row.transport_method,
+      // The order type the row states ('' = a legacy row / a product that sells one way), so the page reads it
+      // instead of guessing a pre-order from the route (0235 review). Additive.
+      fulfillment_type: String(row.fulfillment_type ?? ''),
       warranty_plan_id: row.warranty_plan_id,
       shipping_method_id: row.shipping_method_id, // legacy column, no longer priced
       selling_type: doc.selling_type,
@@ -1368,7 +1383,11 @@ async function loadCart(c: Context<AppContext>) {
       is_printer: isPrinter,
       // «خصص طابعتك» (0234): an enrolled printer's offer, its chosen package and
       // what that adds — or `needs_choice` when the line has none yet.
-      ...cartServicesView(ctx.printerServices ?? null, servicesClasses, sel, resolved),
+      ...cartServicesView(String(row.id), ctx.printerServices ?? null, servicesClasses, sel, resolved),
+      // 0235: a filament-kit line names its printer line and kit (its quantity follows the printer).
+      ...(row.kit_parent_id
+        ? { kit_line: { printer_cart_item_id: String(row.kit_parent_id), kit_id: String(row.kit_id ?? ''), qty_per_printer: Number(row.kit_unit_qty) || 0 } }
+        : {}),
       /** Cash on delivery would change this pre-order line's price (it carries
        *  a direct premium this customer pays). False on a direct line and on a
        *  pre-order line with no premium — the cart says nothing there. */
@@ -1485,12 +1504,15 @@ async function loadCart(c: Context<AppContext>) {
     return shippingAfterBenefit(feeIqd, shipping).paid_iqd;
   };
 
+  // 0235: the printer's membership choice and each printer line's kit.
+  const printer_extras = await cartPrinterExtras(c, items as Array<Record<string, unknown>>, ctx.printerServices ?? null);
   return {
     items,
     unavailable_lines: unavailableLines,
     tier,
     tierActive,
     membership,
+    printer_extras,
     couponFactsOver,
     memberFeeAt,
     delivery_methods: {
@@ -1800,7 +1822,7 @@ cartRoutes.get('/', async (c) => {
   // holding only a store's goods answered `scope: null`, the cart page never
   // rendered the store cart — the only way to /store-checkout — and the badge
   // was reset to 0 over a full cart.
-  const [{ items, unavailable_lines, tier, tierActive, delivery_methods, delivery_tariff, membership }, allLines] = await Promise.all([
+  const [{ items, unavailable_lines, tier, tierActive, delivery_methods, delivery_tariff, membership, printer_extras }, allLines] = await Promise.all([
     loadCart(c),
     c.env.DB
       .prepare('SELECT seller_type, merchant_id, store_id, qty FROM cart_items WHERE user_id = ? ORDER BY created_at, id')
@@ -1836,6 +1858,8 @@ cartRoutes.get('/', async (c) => {
     // §10: the server's own answer about what this membership saved, so the
     // page states it instead of subtracting two numbers and hoping.
     membership,
+    // 0235: the membership chosen with a printer (its order quote, or the refusal) — kits ride on the lines.
+    printer_extras,
     // «سعر تقديري» (docs/SMART_PRICING.md §5.3): `has_estimates: true` when a line is an estimate — absent otherwise.
     ...cartEstimateFlag(items),
     delivery_methods,
@@ -2742,6 +2766,240 @@ export function upsertStatement(
     );
 }
 
+// ------------------------------------------------- the printer's extras (0235)
+
+/** `membershipPlanId` / `kitId` as posted: undefined = leave as it is, null or '' = remove, a string = choose. */
+function extrasChoice(v: unknown, field: string): string | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null || v === '') return null;
+  return str(v, field, { min: 1, max: 60 });
+}
+
+interface PlannedExtras {
+  membership?: { planId: string } | null;
+  kit?: { kit: FilamentKit; resolved: ResolvedKit } | null;
+}
+
+/** The most units of one kit item a line may hold (the cart's storage ceiling). */
+const KIT_LINE_QTY_CEILING = 9999;
+
+/**
+ * ONE KIT PER PRINTER UNIT, AND NO KIT LINE PAST THE CART'S CEILING (review
+ * S14): printer qty × an item's per-unit count above 9,999 is refused up
+ * front — clamping it would leave lines that never match the kit again
+ * (a permanent KIT_CHANGED). 409 KIT_UNAVAILABLE, `details.reason`
+ * 'KIT_QTY_LIMIT' with the most printers this kit allows.
+ */
+function kitQtyRefusal(kitId: string, perUnit: number): HttpError {
+  return new HttpError(409, 'A filament kit cannot follow this many printers — lower the quantity or remove the kit.', KIT_UNAVAILABLE, {
+    kit_id: kitId, product_id: null, reason: 'KIT_QTY_LIMIT', max_printer_qty: Math.max(1, Math.floor(KIT_LINE_QTY_CEILING / Math.max(1, perUnit))),
+  });
+}
+
+/** Refuses a printer quantity its kit lines (already in the cart) could not follow. Nothing on a database without 0235. */
+async function assertKitFollowsQty(c: Context<AppContext>, printerCartItemId: string, printerQty: number): Promise<void> {
+  let row: { u: number | null; kit_id: string | null } | null = null;
+  try {
+    row = await c.env.DB.prepare('SELECT MAX(kit_unit_qty) AS u, MAX(kit_id) AS kit_id FROM cart_items WHERE user_id = ? AND kit_parent_id = ?')
+      .bind(c.get('user')!.id, printerCartItemId).first<{ u: number | null; kit_id: string | null }>();
+  } catch (e) {
+    if (isSchemaMissing(e)) return;
+    throw e;
+  }
+  const perUnit = Number(row?.u) || 0;
+  if (perUnit > 0 && perUnit * printerQty > KIT_LINE_QTY_CEILING) throw kitQtyRefusal(String(row?.kit_id ?? ''), perUnit);
+}
+
+/**
+ * «العضوية» and «الفيلامنت» of ONE enrolled printer line (phase 2), validated
+ * BEFORE anything is written: the membership through the order quote (the
+ * refusals the checkout would give), the kit through every item's own cart
+ * door at the printer's quantity and its RESOLVED order type and route (review
+ * S11: a kit ships the way its printer ships).
+ */
+async function planPrinterExtras(
+  c: Context<AppContext>,
+  printer: { productId: string; optionValueIds: string[]; fulfillmentType: string; transportMethod: string; qty: number; services: string; cartItemId: string | null },
+  choice: { membershipPlanId?: string | null; kitId?: string | null },
+  /** The add empties the cart first (`replaceCart`): no other line holds the membership after it (review S16). */
+  opts: { cartEmptied?: boolean } = {}
+): Promise<PlannedExtras> {
+  const out: PlannedExtras = {};
+  if (choice.membershipPlanId === undefined && choice.kitId === undefined) return out;
+  const choosing = (choice.membershipPlanId ?? null) !== null || (choice.kitId ?? null) !== null;
+  const config = choosing ? await publishedPrinterServices(c.env.DB) : null;
+  if (choosing) {
+    const product = await c.env.DB.prepare('SELECT id, condition_doc FROM products WHERE id = ?').bind(printer.productId).first<{ id: string; condition_doc: string | null }>()
+      .catch(async () => c.env.DB.prepare('SELECT id FROM products WHERE id = ?').bind(printer.productId).first<{ id: string; condition_doc: string | null }>());
+    const classes = product ? enrolledClasses(config, { id: product.id, condition: parseConditionDoc(product.condition_doc ?? '') }, printer.optionValueIds) : null;
+    if (!classes || !printer.services) {
+      throw badRequest('A membership or a filament kit is chosen with an enrolled printer and its package', EXTRAS_NOT_PRINTER);
+    }
+  }
+  if (choice.membershipPlanId !== undefined) {
+    if (choice.membershipPlanId === null) out.membership = null;
+    else {
+      const plan = await membershipPlanById(c.env.DB, choice.membershipPlanId);
+      if (!plan || !plan.active || !offeredMembershipTiers(config!).includes(plan.tier)) {
+        throw badRequest('This membership is not offered with a printer', MEMBERSHIP_NOT_OFFERED);
+      }
+      // The refusals the checkout would give (downgrade, prepaid, another order's membership waiting…).
+      await quoteOrderMembership(c.env.DB, c.get('user')!.id, plan, new Date().toISOString());
+      const held = opts.cartEmptied
+        ? null
+        : await c.env.DB.prepare('SELECT printer_cart_item_id FROM cart_membership_choice WHERE user_id = ?')
+            .bind(c.get('user')!.id).first<{ printer_cart_item_id: string }>();
+      if (held && held.printer_cart_item_id !== printer.cartItemId) {
+        throw conflict('Another printer in your cart already carries the membership — change it there.', CART_MEMBERSHIP_CONFLICT);
+      }
+      out.membership = { planId: plan.id };
+    }
+  }
+  if (choice.kitId !== undefined) {
+    if (choice.kitId === null) out.kit = null;
+    else {
+      const kit = offeredKit(config, printer, choice.kitId);
+      if (!kit) throw kitNotOffered(choice.kitId);
+      const perUnit = Math.max(0, ...kit.items.map((i) => i.qty));
+      if (perUnit * Math.max(1, printer.qty) > KIT_LINE_QTY_CEILING) throw kitQtyRefusal(kit.id, perUnit);
+      const resolved = await resolveKit(c, kit, printer);
+      if (!resolved.available) throw kitUnavailable(resolved);
+      out.kit = { kit, resolved };
+    }
+  }
+  return out;
+}
+
+/**
+ * The printer line a write addresses: by id (PUT extras), or — inside the add's
+ * own batch, before the line exists — by its unique key (review S12).
+ */
+type PrinterRef = { sql: string; binds: unknown[] };
+
+/**
+ * The statements that store planned extras on the printer line `printer`. They
+ * ride the SAME batch as the printer's own write (POST /items: review S12), so
+ * the printer, its kit and its membership land together or not at all.
+ */
+function printerExtrasStatements(db: D1Database, userId: string, printer: PrinterRef, planned: PlannedExtras): D1PreparedStatement[] {
+  const out: D1PreparedStatement[] = [];
+  if (planned.membership === null) {
+    out.push(db.prepare(`DELETE FROM cart_membership_choice WHERE user_id = ? AND printer_cart_item_id = (${printer.sql})`).bind(userId, ...printer.binds));
+  } else if (planned.membership) {
+    // One per cart, decided inside the write: a choice another printer line holds is never moved here.
+    out.push(db.prepare(
+      `INSERT INTO cart_membership_choice (user_id, plan_id, printer_cart_item_id)
+       SELECT ?, ?, p.id FROM cart_items p WHERE p.id = (${printer.sql}) AND p.user_id = ? AND p.kit_parent_id IS NULL
+       ON CONFLICT(user_id) DO UPDATE SET plan_id = excluded.plan_id
+        WHERE cart_membership_choice.printer_cart_item_id = excluded.printer_cart_item_id`
+    ).bind(userId, planned.membership.planId, ...printer.binds, userId));
+    out.push(...changedExactlyOne(db));
+  }
+  if (planned.kit !== undefined) {
+    out.push(db.prepare(`DELETE FROM cart_items WHERE user_id = ? AND kit_parent_id = (${printer.sql})`).bind(userId, ...printer.binds));
+    for (const it of planned.kit?.resolved.items ?? []) {
+      const judged = it.judged!;
+      // The kit line's quantity is the printer line's AS WRITTEN × the per-unit count (the 0235 trigger
+      // keeps it so); its type and route are the printer's resolved ones (review S11).
+      out.push(db.prepare(
+        `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id, shipping_method_id,
+                                 transport_method, fulfillment_type, warranty_plan_id, qty, kit_parent_id, kit_id, kit_unit_qty)
+         SELECT ?, ?, ?, ?, ?, ?, 'kit:' || p.id, ?, ?, '', MIN(${KIT_LINE_QTY_CEILING}, p.qty * ?), p.id, ?, ?
+           FROM cart_items p WHERE p.id = (${printer.sql}) AND p.user_id = ? AND p.kit_parent_id IS NULL`
+      ).bind(
+        newId('ci'), userId, it.item.product_id, judged.primaryOption, judged.canonicalJson, it.line.colorId,
+        it.shared.transportMethod, it.shared.fulfillmentType, it.item.qty, planned.kit!.kit.id, it.item.qty,
+        ...printer.binds, userId
+      ));
+      out.push(...changedExactlyOne(db));
+    }
+  }
+  return out;
+}
+
+const printerById = (id: string): PrinterRef => ({ sql: '?', binds: [id] });
+
+/** Runs the planned extras alone (PUT extras); a membership another printer line took meanwhile is CART_MEMBERSHIP_CONFLICT. */
+async function writePrinterExtras(c: Context<AppContext>, printerCartItemId: string, planned: PlannedExtras): Promise<void> {
+  const stmts = printerExtrasStatements(c.env.DB, c.get('user')!.id, printerById(printerCartItemId), planned);
+  if (!stmts.length) return;
+  try {
+    await c.env.DB.batch(stmts);
+  } catch (e) {
+    if (isLostRace(e)) throw conflict('Another printer in your cart already carries the membership — change it there.', CART_MEMBERSHIP_CONFLICT);
+    throw e;
+  }
+}
+
+/**
+ * The type and route a printer line RESOLVES to (review S11): the kit is judged
+ * against these, never against the raw fields (a row that states no type is a
+ * direct sale or a pre-order by the read model's own rule, `lineOrderType`).
+ */
+async function printerResolvedShipping(
+  c: Context<AppContext>,
+  printer: { productId: string; optionValueIds: string[]; colorId: string; fulfillmentType: string; transportMethod: string; qty: number; services: string }
+): Promise<{ fulfillmentType: string; transportMethod: string }> {
+  try {
+    const product = await loadAddProduct(c, printer.productId);
+    const actx = await loadAddContext(c, product, { warrantyPlanId: '' });
+    const verdict = judgeLevonisLine(actx, { optionValueIds: printer.optionValueIds, colorId: printer.colorId, qty: printer.qty },
+      { transportMethod: printer.transportMethod, fulfillmentType: printer.fulfillmentType, warrantyPlanId: '', services: printer.services });
+    if (verdict.ok && verdict.judged.lineType) return { fulfillmentType: verdict.judged.lineType, transportMethod: printer.transportMethod };
+  } catch (e) {
+    if (!(e instanceof HttpError)) throw e;
+  }
+  return { fulfillmentType: printer.fulfillmentType || (printer.transportMethod ? 'pre_order' : 'direct_sale'), transportMethod: printer.transportMethod };
+}
+
+/** The printer line's extras as GET /api/cart shows them (0235); {} on a database without them. */
+async function cartPrinterExtras(c: Context<AppContext>, items: Array<Record<string, unknown>>, config: PrinterServicesConfig | null) {
+  const user = c.get('user')!;
+  let choice: { plan_id: string; printer_cart_item_id: string } | null = null;
+  try {
+    choice = await c.env.DB.prepare('SELECT plan_id, printer_cart_item_id FROM cart_membership_choice WHERE user_id = ?').bind(user.id)
+      .first<{ plan_id: string; printer_cart_item_id: string }>();
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  let membership: Record<string, unknown> | null = null;
+  if (choice) {
+    const plan = await membershipPlanById(c.env.DB, choice.plan_id);
+    let quote: Record<string, unknown>;
+    try {
+      if (!plan || !config || !offeredMembershipTiers(config).includes(plan.tier)) throw badRequest('Not offered', MEMBERSHIP_NOT_OFFERED);
+      quote = orderMembershipQuotePayload(await quoteOrderMembership(c.env.DB, user.id, plan, new Date().toISOString()));
+    } catch (e) {
+      if (!(e instanceof HttpError)) throw e;
+      quote = { ok: false, code: e.code ?? 'REFUSED', message: e.message, plan_id: choice.plan_id, printer_cart_item_id: choice.printer_cart_item_id };
+    }
+    membership = { plan_id: choice.plan_id, printer_cart_item_id: choice.printer_cart_item_id, quote };
+  }
+  // Each printer line's kit: which kit, its lines, and whether they still match the owner's kit.
+  const byParent = new Map<string, Array<Record<string, unknown>>>();
+  for (const it of items) {
+    const parent = (it.kit_line as { printer_cart_item_id?: string } | undefined)?.printer_cart_item_id;
+    if (parent) byParent.set(parent, [...(byParent.get(parent) ?? []), it]);
+  }
+  for (const it of items) {
+    const lines = byParent.get(String(it.id));
+    if (!lines?.length) continue;
+    const kitId = String((lines[0].kit_line as { kit_id?: string }).kit_id ?? '');
+    const kit = config ? kitsForPrinter(config, String(it.productId), (it.option_value_ids as string[]) ?? []).find((k) => k.id === kitId) ?? null : null;
+    it.kit = {
+      kit_id: kitId,
+      title: kit?.title ?? null,
+      line_ids: lines.map((l) => l.id),
+      total_iqd: lines.reduce((s, l) => s + (Number(l.unit_price_iqd) || 0) * (Number(l.qty) || 0), 0),
+      // false = the owner changed or withdrew this kit: the checkout refuses (KIT_CHANGED) until it is chosen again.
+      current: !!kit && kitLinesMatch(kit, Number(it.qty) || 1, lines.map((l) => ({
+        product_id: String(l.productId), option_value_ids: (l.option_value_ids as string[]) ?? [], color_id: String(l.color_id ?? ''), qty: Number(l.qty) || 0,
+      }))),
+    };
+  }
+  return { membership };
+}
+
 cartRoutes.post('/items', async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -2836,6 +3094,24 @@ cartRoutes.post('/items', async (c) => {
   if (existingLine && shared.services && servicesClash(shared.services, existingLine.services)) {
     throw conflict('This printer is already in your cart with a different package — change it from the cart.', CART_SERVICES_CONFLICT);
   }
+  // THE PRINTER'S MEMBERSHIP AND KIT (0235), judged before anything is written,
+  // at the quantity the line will hold after this add.
+  const extrasWanted = { membershipPlanId: extrasChoice(body.membershipPlanId, 'membershipPlanId'), kitId: extrasChoice(body.kitId, 'kitId') };
+  const lineQtyAfter = Math.min(judged.ceiling, (existingLine ? Number(existingLine.qty) || 0 : 0) + qty);
+  // A kit already on this line must be able to follow the new quantity (review S14).
+  if (existingLine && extrasWanted.kitId === undefined) await assertKitFollowsQty(c, String(existingLine.id), lineQtyAfter);
+  const plannedExtras = await planPrinterExtras(c, {
+    productId, optionValueIds: canonical,
+    // The kit is judged against the type this printer row RESOLVES to (review S11).
+    fulfillmentType: judged.lineType || fulfillmentType, transportMethod, qty: lineQtyAfter, services: shared.services,
+    cartItemId: existingLine ? String(existingLine.id) : null,
+  }, extrasWanted, { cartEmptied: replacing.length > 0 });
+  // THE PRINTER AND ITS EXTRAS IN ONE BATCH (review S12): the extras find the
+  // printer line by its unique key, so a new line and its kit land together.
+  const extrasStatements = printerExtrasStatements(c.env.DB, user.id, {
+    sql: `SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ? AND color_id = ? AND shipping_method_id = ''`,
+    binds: [user.id, productId, primaryOption, canonicalJson, colorId],
+  }, plannedExtras);
 
   try {
     const written = await c.env.DB.batch([
@@ -2845,12 +3121,31 @@ cartRoutes.post('/items', async (c) => {
       upsertStatement(c.env.DB, user.id, productId, judged, line, shared, {
         clearServices: !!existingLine && !shared.services && String(existingLine.services ?? '') !== '',
       }),
+      ...(extrasStatements.length && shared.services
+        ? [
+            // A concurrent add stored a different package on this line: its extras do not land either.
+            c.env.DB.prepare(`UPDATE cart_items SET qty = qty WHERE id = (SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ? AND color_id = ? AND shipping_method_id = '') AND services = ?`)
+              .bind(user.id, productId, primaryOption, canonicalJson, colorId, shared.services),
+            ...changedExactlyOne(c.env.DB),
+          ]
+        : []),
+      ...extrasStatements,
     ]);
     // A concurrent add stored a different package on this line between the read above and this write.
-    if (shared.services && (written[written.length - 1]?.meta?.changes ?? 1) === 0) {
+    if (shared.services && (written[replacing.length]?.meta?.changes ?? 1) === 0) {
       throw conflict('This printer is already in your cart with a different package — change it from the cart.', CART_SERVICES_CONFLICT);
     }
   } catch (e) {
+    if (e instanceof HttpError) throw e;
+    if (extrasStatements.length && isLostRace(e)) {
+      // The package differs (a concurrent add) or another printer line took the membership meanwhile.
+      const now = await c.env.DB.prepare(`SELECT services FROM cart_items WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ? AND color_id = ? AND shipping_method_id = ''`)
+        .bind(user.id, productId, primaryOption, canonicalJson, colorId).first<{ services: string | null }>();
+      if (now && shared.services && servicesClash(shared.services, now.services)) {
+        throw conflict('This printer is already in your cart with a different package — change it from the cart.', CART_SERVICES_CONFLICT);
+      }
+      throw conflict('Another printer in your cart already carries the membership — change it there.', CART_MEMBERSHIP_CONFLICT);
+    }
     // A store line landed between this door's read and its write; the 0114
     // trigger refused the mix inside the statement.
     if (isCartSellerAbort(e)) throw await sellerConflictRefusal(c, PLATFORM_SCOPE, 'LEVONIS');
@@ -3409,6 +3704,10 @@ cartRoutes.patch('/items/:id', async (c) => {
   if (giftEntitlementIdOf(existing)) {
     throw conflict('A gift line is fixed: its quantity and options cannot change. You can only remove it.', 'GIFT_LINE_LOCKED');
   }
+  // A FILAMENT-KIT LINE FOLLOWS ITS PRINTER (0235): its quantity is the printer's × the kit's count.
+  if (existing.kit_parent_id) {
+    throw conflict('A filament-kit line follows its printer — change the printer or its kit.', KIT_LINE_LOCKED);
+  }
 
   const lineProduct = await c.env.DB.prepare('SELECT id, name, name_ar, composition FROM products WHERE id = ?')
     .bind(existing.product_id)
@@ -3429,6 +3728,8 @@ cartRoutes.patch('/items/:id', async (c) => {
   }
 
   const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX }) : (existing.qty as number);
+  // A printer's kit follows its quantity (0235): refused up front when it could not (review S14).
+  if (body.qty !== undefined) await assertKitFollowsQty(c, id, qty);
   const submittedOptionId =
     body.optionId !== undefined ? str(body.optionId, 'optionId', { max: 60, required: false }) : null;
   const patchRawIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];
@@ -3627,6 +3928,37 @@ cartRoutes.patch('/items/:id', async (c) => {
  * atomically. This is the plain version for a customer who just wants to
  * start over, and it never touches anything but their own rows.
  */
+/**
+ * THE PRINTER'S MEMBERSHIP AND KIT, CHANGED FROM THE CART (0235):
+ *   PUT /api/cart/items/:id/extras   { membershipPlanId?: string | null, kitId?: string | null }
+ * An omitted field is left as it is; null removes it. Only an enrolled
+ * printer line that holds a package may carry either.
+ */
+cartRoutes.put('/items/:id/extras', async (c) => {
+  // Each call re-prices a kit item by item through the cart's own door (review S10).
+  await rateLimit(c, 'cart_printer_extras', 30, 60);
+  const user = c.get('user')!;
+  const body = await c.req.json().catch(() => ({}));
+  const row = await c.env.DB.prepare('SELECT * FROM cart_items WHERE id = ? AND user_id = ?').bind(c.req.param('id'), user.id).first<Record<string, unknown>>();
+  if (!row) throw notFound('Cart item not found');
+  if (row.kit_parent_id) throw conflict('A filament-kit line follows its printer — change the kit on the printer.', KIT_LINE_LOCKED);
+  const sel = selectionFromCartRow(row);
+  const choice = { membershipPlanId: extrasChoice(body.membershipPlanId, 'membershipPlanId'), kitId: extrasChoice(body.kitId, 'kitId') };
+  const optionValueIds = canonicalOptionValueIds(sel.optionValueIds ?? []);
+  const services = String(row.services ?? '');
+  const qty = Number(row.qty) || 1;
+  // The kit is judged against the type this printer row RESOLVES to (review S11).
+  const shipping = choice.kitId
+    ? await printerResolvedShipping(c, { productId: String(row.product_id), optionValueIds, colorId: sel.colorId, fulfillmentType: sel.fulfillmentType, transportMethod: sel.transportMethod, qty, services })
+    : { fulfillmentType: sel.fulfillmentType, transportMethod: sel.transportMethod };
+  const planned = await planPrinterExtras(c, {
+    productId: String(row.product_id), optionValueIds, ...shipping, qty, services, cartItemId: String(row.id),
+  }, choice);
+  await writePrinterExtras(c, String(row.id), planned);
+  const cart = await loadCart(c);
+  return c.json({ success: true, items: cart.items, unavailable_lines: cart.unavailable_lines, tier: cart.tier, tierActive: cart.tierActive, printer_extras: cart.printer_extras, ...cartEstimateFlag(cart.items) });
+});
+
 cartRoutes.delete('/', async (c) => {
   const user = c.get('user')!;
   const res = await c.env.DB.prepare('DELETE FROM cart_items WHERE user_id = ?').bind(user.id).run();
@@ -3635,6 +3967,9 @@ cartRoutes.delete('/', async (c) => {
 
 cartRoutes.delete('/items/:id', async (c) => {
   const user = c.get('user')!;
+  // A filament-kit line follows its printer (0235): the kit is removed from the printer, never one item of it.
+  const line = await c.env.DB.prepare('SELECT * FROM cart_items WHERE id = ? AND user_id = ?').bind(c.req.param('id'), user.id).first<Record<string, unknown>>();
+  if (line?.kit_parent_id) throw conflict('A filament-kit line follows its printer — remove the kit from the printer.', KIT_LINE_LOCKED);
   await c.env.DB.prepare('DELETE FROM cart_items WHERE id = ? AND user_id = ?')
     .bind(c.req.param('id'), user.id)
     .run();

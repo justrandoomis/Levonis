@@ -105,6 +105,111 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This printer is already in your cart with a different package — change it from the cart.',
     ckb: 'ئەم پرینتەرە پێشتر بە پاکێجێکی جیاواز لە سەبەتەکەتدایە — لە سەبەتەوە بیگۆڕە.',
   },
+  // Phase 2 (0235): the membership bought with a printer and the owner's filament kits.
+  MEMBERSHIP_NOT_OFFERED: {
+    ar: 'هذه العضوية غير متاحة مع الطابعة الآن — اختر غيرها أو تخطَّها.',
+    en: 'This membership is not offered with the printer right now — choose another or skip it.',
+    ckb: 'ئەم ئەندامێتییە ئێستا لەگەڵ پرینتەرەکە پێشکەش ناکرێت — یەکێکی تر هەڵبژێرە یان تێیپەڕێنە.',
+  },
+  MEMBERSHIP_ORDER_PENDING: {
+    ar: 'لديك عضوية مشتراة مع طلب سابق تبدأ عند تسليمه ودفعه — لا تُشترى عضوية ثانية قبل ذلك.',
+    en: 'A membership bought with an earlier order starts when that order is delivered and paid — a second one cannot be bought before then.',
+    ckb: 'ئەندامێتییەک کە لەگەڵ داواکارییەکی پێشووتر کڕدراوە، کاتێک ئەو داواکارییە گەیەندرا و پارەکەی درا دەست پێدەکات — پێش ئەوە ئەندامێتییەکی دووەم ناکڕدرێت.',
+  },
+  MEMBERSHIP_PRICE_CHANGED: {
+    ar: 'تغيّر سعر العضوية أو رصيد الترقية — راجع الرقم الجديد ثم أكّد الطلب.',
+    en: 'The membership price or upgrade credit changed — review the new figure, then confirm the order.',
+    ckb: 'نرخی ئەندامێتی یان بڕی بەرزکردنەوە گۆڕاوە — ژمارە نوێیەکە ببینە، پاشان داواکارییەکە پشتڕاست بکەرەوە.',
+  },
+  CART_MEMBERSHIP_CONFLICT: {
+    ar: 'العضوية مختارة مع طابعة أخرى في سلتك — غيّرها من هناك.',
+    en: 'The membership is already chosen with another printer in your cart — change it there.',
+    ckb: 'ئەندامێتییەکە پێشتر لەگەڵ پرینتەرێکی تر لە سەبەتەکەتدا هەڵبژێردراوە — لەوێ بیگۆڕە.',
+  },
+  MEMBERSHIP_NOT_RETURNABLE: {
+    ar: 'العضوية المشتراة مع الطلب لا تُرجع ولا تُسترد بعد بدئها — يُرجع المنتج فقط.',
+    en: 'A membership bought with the order is not returned or refunded once it started — only the product is.',
+    ckb: 'ئەندامێتییەک کە لەگەڵ داواکاری کڕدراوە، دوای دەستپێکردنی ناگەڕێندرێتەوە و پارەکەی نادرێتەوە — تەنها بەرهەمەکە دەگەڕێندرێتەوە.',
+  },
+  ORDER_MEMBERSHIP_ACTIVE: {
+    ar: 'بدأت العضوية المشتراة مع هذا الطلب ولا تُسترد، فلا يُلغى الطلب — أرجع الطابعة من المرتجعات.',
+    en: 'The membership bought with this order has started and is not refunded, so the order is not cancelled — return the printer through returns.',
+    ckb: 'ئەندامێتییەکەی ئەم داواکارییە دەستی پێکردووە و پارەکەی نادرێتەوە، بۆیە داواکارییەکە هەڵناوەشێتەوە — پرینتەرەکە لە ڕێگەی گەڕاندنەوەوە بگەڕێنەوە.',
+  },
+  // The owner's correction door (POST /api/admin/orders/:id/membership-correction): nothing started to end.
+  NO_STARTED_MEMBERSHIP: {
+    ar: 'لم تبدأ أي عضوية مع هذا الطلب، فلا حاجة إلى التصحيح — ألغِ الطلب إلغاءً عادياً.',
+    en: 'No membership has started with this order, so no correction is needed — cancel the order the ordinary way.',
+    ckb: 'هیچ ئەندامێتییەک لەگەڵ ئەم داواکارییە دەستی پێنەکردووە، بۆیە پێویست بە ڕاستکردنەوە ناکات — داواکارییەکە بە شێوەی ئاسایی هەڵبوەشێنەوە.',
+  },
+  // An owner-corrected order (its started membership ended and the order refunded) is never re-opened.
+  ORDER_MEMBERSHIP_CORRECTED: {
+    ar: 'صحّح المالك هذا الطلب وأنهى عضويته وأعاد مبلغه، فلا يُعاد فتحه — أنشئ طلباً جديداً.',
+    en: 'The owner corrected this order, ended its membership and refunded it, so it cannot be re-opened — create a new order.',
+    ckb: 'خاوەن ئەم داواکارییەی ڕاستکردەوە، ئەندامێتییەکەی کۆتایی پێهێنا و پارەکەی گەڕاندەوە، بۆیە دووبارە ناکرێتەوە — داواکارییەکی نوێ دروست بکە.',
+  },
+  KIT_NOT_OFFERED: {
+    ar: 'باقة الفيلامنت هذه غير متاحة مع هذه الطابعة — اختر غيرها أو تخطَّها.',
+    en: 'This filament kit is not offered with this printer — choose another or skip it.',
+    ckb: 'ئەم پاکێجی فیلامێنتە لەگەڵ ئەم پرینتەرە پێشکەش ناکرێت — یەکێکی تر هەڵبژێرە یان تێیپەڕێنە.',
+  },
+  KIT_UNAVAILABLE: {
+    ar: 'أحد منتجات باقة الفيلامنت غير متوفر الآن بهذه الكمية أو طريقة الشحن — اختر باقة أخرى أو تخطَّها.',
+    en: 'An item of the filament kit is not available now in this quantity or shipping type — choose another kit or skip it.',
+    ckb: 'یەکێک لە بەرهەمەکانی پاکێجی فیلامێنت ئێستا بەم بڕە یان بەم جۆری ناردنە بەردەست نییە — پاکێجێکی تر هەڵبژێرە یان تێیپەڕێنە.',
+  },
+  KIT_CHANGED: {
+    ar: 'تغيّرت باقة الفيلامنت لهذه الطابعة — اخترها من جديد.',
+    en: 'The filament kit for this printer has changed — choose it again.',
+    ckb: 'پاکێجی فیلامێنتی ئەم پرینتەرە گۆڕاوە — دووبارە هەڵیبژێرە.',
+  },
+  KIT_LINE_LOCKED: {
+    ar: 'منتجات باقة الفيلامنت تتبع طابعتها — غيّر الباقة أو أزلها من الطابعة.',
+    en: 'Filament-kit items follow their printer — change or remove the kit on the printer.',
+    ckb: 'بەرهەمەکانی پاکێجی فیلامێنت شوێن پرینتەرەکەیان دەکەون — پاکێجەکە لەسەر پرینتەرەکە بگۆڕە یان لای ببە.',
+  },
+  KIT_WITHOUT_PRINTER: {
+    ar: 'باقة الفيلامنت تُشترى مع طابعتها — حدّد الطابعة أيضاً.',
+    en: 'A filament kit is bought together with its printer — select the printer too.',
+    ckb: 'پاکێجی فیلامێنت لەگەڵ پرینتەرەکەی دەکڕدرێت — پرینتەرەکەش دیاری بکە.',
+  },
+  // The order-options / quote codes a chosen plan can carry (the contract change of the phase 2 review):
+  // the sheet, the add, the cart and the checkout all say them; the same words as src/lib/refusalStrings.ts.
+  PLAN_UNPRICED: {
+    ar: 'لم يُحدَّد سعر هذه العضوية بعد، فلا تُشترى الآن — أزلها أو اختر غيرها.',
+    en: 'This membership has no price yet, so it cannot be bought now — remove it or choose another.',
+    ckb: 'هێشتا نرخی ئەم ئەندامێتییە دیاری نەکراوە، بۆیە ئێستا ناکڕدرێت — لای ببە یان یەکێکی تر هەڵبژێرە.',
+  },
+  PRO_PAUSED: {
+    ar: 'الاشتراك الجديد في هذه العضوية متوقف مؤقتاً — أزلها أو اختر غيرها.',
+    en: 'New subscriptions to this membership are paused for now — remove it or choose another.',
+    ckb: 'بەشداریکردنی نوێ لەم ئەندامێتییەدا بۆ ماوەیەک ڕاگیراوە — لای ببە یان یەکێکی تر هەڵبژێرە.',
+  },
+  DOWNGRADE_BLOCKED: {
+    ar: 'هذه العضوية أدنى من عضويتك الحالية — مع الطابعة تُشترى الترقية إلى مستوى أعلى فقط. أزلها أو اختر مستوى أعلى.',
+    en: 'This membership is lower than your current one — with a printer only an upgrade to a higher tier is bought. Remove it or choose a higher tier.',
+    ckb: 'ئەم ئەندامێتییە لە ئەندامێتییە ئێستاکەت نزمترە — لەگەڵ پرینتەر تەنها بەرزکردنەوە بۆ ئاستێکی بەرزتر دەکڕدرێت. لای ببە یان ئاستێکی بەرزتر هەڵبژێرە.',
+  },
+  ALREADY_SUBSCRIBED: {
+    ar: 'أنت مشترك في هذا المستوى بالفعل — مع الطابعة تُشترى الترقية فقط، والتجديد من صفحة العضوية. أزلها أو اختر مستوى أعلى.',
+    en: 'You already hold this tier — with a printer only an upgrade is bought; renew from the membership page. Remove it or choose a higher tier.',
+    ckb: 'پێشتر ئەم ئاستەت هەیە — لەگەڵ پرینتەر تەنها بەرزکردنەوە دەکڕدرێت، نوێکردنەوە لە پەڕەی ئەندامێتییەوەیە. لای ببە یان ئاستێکی بەرزتر هەڵبژێرە.',
+  },
+  ALREADY_PREPAID: {
+    ar: 'لديك عضوية مدفوعة مسبقاً بانتظار التفعيل — لا تُشترى عضوية أخرى معها الآن. أزلها من الطابعة.',
+    en: 'You hold a prepaid membership waiting to be activated — another one is not bought with it now. Remove it from the printer.',
+    ckb: 'ئەندامێتییەکی پێشپارەدراوت هەیە کە چاوەڕێی چالاککردنە — ئێستا ئەندامێتییەکی تر لەگەڵیدا ناکڕدرێت. لە پرینتەرەکە لای ببە.',
+  },
+  MEMBERSHIP_NOT_WITH_BNPL: {
+    ar: 'لا تُشترى العضوية مع الطابعة عند الدفع لاحقاً — أزل العضوية أو اختر طريقة دفع أخرى.',
+    en: 'A membership is not bought with the printer when paying with Buy Now, Pay Later — remove the membership or choose another payment method.',
+    ckb: 'کاتێک بە ئێستا بکڕە و دواتر بدە پارە دەدەیت، ئەندامێتی لەگەڵ پرینتەرەکە ناکڕدرێت — ئەندامێتییەکە لابە یان ڕێگایەکی تری پارەدان هەڵبژێرە.',
+  },
+  EXTRAS_NOT_PRINTER: {
+    ar: 'العضوية وباقة الفيلامنت تُختاران مع طابعة مسجّلة وباقتها.',
+    en: 'A membership and a filament kit are chosen with an enrolled printer and its package.',
+    ckb: 'ئەندامێتی و پاکێجی فیلامێنت لەگەڵ پرینتەرێکی تۆمارکراو و پاکێجەکەی هەڵدەبژێردرێن.',
+  },
   // ---- «اجمع النقاط»: the missions and their video ads (0227, DECISIONS row 300) ----
   REWARD_ALREADY_CLAIMED: {
     ar: 'أخذت نقاط هذه المهمة من قبل.',
@@ -2866,6 +2971,28 @@ export function contractRefusal(err: unknown, lang: Lang, shown?: string, fieldL
 const COUNTED_STOCK_CODES = new Set(['OUT_OF_STOCK', 'PREORDER_CAPACITY_EXHAUSTED', 'QTY_UNAVAILABLE']);
 
 /**
+ * ONE KIT PER PRINTER UNIT, UP TO THE CART'S CEILING (phase 2 review S14):
+ * `KIT_UNAVAILABLE` with `details.reason:'KIT_QTY_LIMIT'` names the most
+ * printers this kit can follow (`details.max_printer_qty`). The same words as
+ * KIT_QTY_LIMIT_WORDS in src/components/product/printerServicesStrings.ts
+ * (tests/printerServicesPhase2.test.ts keeps them identical). `{n}` is the number.
+ */
+export const KIT_QTY_LIMIT_WORDS: Record<Lang, string> = {
+  ar: 'مع باقة الفيلامنت هذه تُطلب {n} طابعة على الأكثر — خفّض الكمية إلى {n} أو أزل الباقة.',
+  en: 'With this filament kit at most {n} printers can be ordered — lower the quantity to {n} or remove the kit.',
+  ckb: 'لەگەڵ ئەم پاکێجی فیلامێنتە زۆرترین {n} پرینتەر داوا دەکرێت — بڕەکە بۆ {n} کەم بکەرەوە یان پاکێجەکە لاببە.',
+};
+
+/** The KIT_QTY_LIMIT sentence with its number, or null for any other refusal (or no usable number). */
+export function kitQtyLimitRefusal(err: unknown, lang: Lang): string | null {
+  const e = err as { code?: unknown; details?: unknown } | null;
+  if (!e || e.code !== 'KIT_UNAVAILABLE' || typeof e.details !== 'object' || e.details === null) return null;
+  const d = e.details as { reason?: unknown; max_printer_qty?: unknown };
+  if (d.reason !== 'KIT_QTY_LIMIT' || typeof d.max_printer_qty !== 'number' || !Number.isFinite(d.max_printer_qty) || d.max_printer_qty < 1) return null;
+  return KIT_QTY_LIMIT_WORDS[lang].replace(/\{n\}/g, String(Math.trunc(d.max_printer_qty)));
+}
+
+/**
  * «بقي 2 فقط» — THE NUMBER, IN THE CUSTOMER'S LANGUAGE.
  *
  * The owner's scenario: stock is 3, one customer takes 1, and the second —
@@ -2887,6 +3014,9 @@ const COUNTED_STOCK_CODES = new Set(['OUT_OF_STOCK', 'PREORDER_CAPACITY_EXHAUSTE
 export function stockRefusal(err: unknown, lang: Lang): string | null {
   const e = err as { code?: unknown; details?: unknown } | null;
   const code = e && typeof e.code === 'string' ? e.code : '';
+  // A counted refusal of another kind: the kit cannot follow this many printers (the product page's add reads it here).
+  const kitLimit = kitQtyLimitRefusal(err, lang);
+  if (kitLimit) return kitLimit;
   if (!COUNTED_STOCK_CODES.has(code)) return null;
   const details = e && typeof e.details === 'object' && e.details !== null
     ? (e.details as Record<string, unknown>)

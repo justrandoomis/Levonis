@@ -81,7 +81,8 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
   // that an earned wage stopped applying. Explicit eligibility/rule endings
   // and universally applicable rules can still be calculated without it.
   // A line NULL from checkout (a mystery spool) never had a scope to lose.
-  const unlinked=base.lines.filter(line=>line.product_id===null
+  // 0235: the membership line carries no product by design, never a lost scope.
+  const unlinked=base.lines.filter(line=>line.product_id===null&&line.line_kind!=='membership'
     && !snapshots.find(snapshot=>snapshot.line_id===line.id)?.product_id).map(line=>line.id);
   const neverLinked=unlinked.length?await readNeverLinkedLines(db,unlinked):new Set<string>();
   const unknownLines=new Set(unlinked.filter(id=>!neverLinked.has(id)));

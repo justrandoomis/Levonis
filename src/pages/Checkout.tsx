@@ -112,6 +112,8 @@ import AddressForm from '../components/address/AddressForm';
  */
 import ChannelNudge from '../components/notify/ChannelNudge';
 import { apiRefusal } from '../lib/refusalStrings';
+import { PS_STRINGS, servicesErrorText } from '../components/product/printerServicesStrings';
+import type { CartMembershipQuote, CartMembershipRefusal } from '../lib/api';
 import { CELEBRATION_MOTION_MS, mascot } from '../lib/mascot';
 import { duringBackgroundRefresh } from '../lib/mascotRequest';
 import { createIntentMark, useBusy } from '../lib/busy';
@@ -177,6 +179,8 @@ interface ShippingQuoteDto {
 
 /** One priced line of the quote — the number the order will actually charge. */
 interface CheckoutQuoteLineDto {
+  /** Phase 2 (0235): a line of the owner's filament kit, packed with its printer line (drawn under it). */
+  kit_line?: { printer_cart_item_id: string; kit_id: string; qty_per_printer: number } | null;
   cart_item_id: string;
   product_id: string;
   name: string;
@@ -315,6 +319,12 @@ interface CheckoutQuoteDto {
    */
   lines: CheckoutQuoteLineDto[];
   merchandise_iqd: number;
+  /**
+   * Phase 2 (0235): the membership bought with a ticked printer — its own order line, already inside
+   * `subtotal_iqd` (never in merchandise, coupons, points or free delivery). POST /api/orders sends its
+   * `charge_iqd` back as `membershipChargeIqd`; a different figure is refused MEMBERSHIP_PRICE_CHANGED.
+   */
+  membership?: (CartMembershipQuote & { printer_cart_item_id?: string; refundable_after_activation?: false }) | null;
   subtotal_iqd: number;
   /** §1: the journey this cart is on — unchanged by how it is paid. */
   shipping_type?: 'direct' | 'preorder_air' | 'preorder_sea' | 'preorder_land' | string;
@@ -343,8 +353,12 @@ interface CheckoutQuoteDto {
     selected: boolean;
     /** Settled inside the app. Never collected by us, never from the wallet. */
     paid_iqd: number;
-    /** The ONLY money this order owes at the door: the delivery fee, 0 on pickup. */
+    /** The ONLY money this order owes at the door: the delivery fee plus a
+     *  membership bought with the order (cash, outside Gini's part). */
     delivery_due_iqd: number;
+    /** Its two named parts (sum = delivery_due_iqd). Absent from an older server. */
+    delivery_fee_due_iqd?: number;
+    membership_due_iqd?: number;
     conditions: { ar: string; en: string; ckb: string };
     app_url: string;
     /** «يبقى الطلب معلقا حتى ٢٤ ساعه» — how long before the sweep cancels it. */
@@ -493,6 +507,10 @@ const STRINGS = {
     giniPaidRow: 'مدفوع عبر تطبيق جني',
     giniDoorRow: 'يُدفع عند الاستلام — كلفة التوصيل فقط',
     giniPickupRow: 'استلام من المخزن — لا يوجد مبلغ عند الاستلام',
+    giniDoorCashRow: 'يُدفع نقداً عند الاستلام',
+    giniPickupCashRow: 'استلام من المخزن — يُدفع نقداً عند الاستلام',
+    giniDoorFeePart: 'كلفة التوصيل',
+    giniDoorMembershipPart: 'العضوية — نقداً، لا يموّلها تطبيق جني',
     giniWarning: (hours: string) =>
       `طلبك لا يُعتبر مؤكداً إلا بعد شرائه من تطبيق جني ومسح باركود الاستلام. بدون ذلك يبقى الطلب معلقاً ${hours} ساعة ثم يُلغى تلقائياً.`,
     giniPlacedTitle: 'بقي مسح باركود الاستلام',
@@ -551,6 +569,10 @@ const STRINGS = {
     giniPaidRow: 'Paid through the Gini app',
     giniDoorRow: 'Due on delivery — the delivery fee only',
     giniPickupRow: 'Store pickup — nothing is due on collection',
+    giniDoorCashRow: 'Due in cash on delivery',
+    giniPickupCashRow: 'Store pickup — due in cash on collection',
+    giniDoorFeePart: 'Delivery fee',
+    giniDoorMembershipPart: 'Membership — in cash, not financed by Gini',
     giniWarning: (hours: string) =>
       `Your order is not confirmed until you buy it in the Gini app and the receipt barcode is scanned. Without that it stays pending for ${hours} hours and is then cancelled automatically.`,
     giniPlacedTitle: 'The receipt barcode still has to be scanned',
@@ -612,6 +634,10 @@ const STRINGS = {
     giniPaidRow: 'لە ڕێگەی ئەپی جینی درا',
     giniDoorRow: 'لە کاتی وەرگرتن دەدرێت — تەنها کرێی گەیاندن',
     giniPickupRow: 'وەرگرتن لە فرۆشگا — لە کاتی وەرگرتن هیچ پارەیەک نادرێت',
+    giniDoorCashRow: 'لە کاتی وەرگرتن بە پارەی نەختینە دەدرێت',
+    giniPickupCashRow: 'وەرگرتن لە فرۆشگا — لە کاتی وەرگرتن بە نەختینە دەدرێت',
+    giniDoorFeePart: 'کرێی گەیاندن',
+    giniDoorMembershipPart: 'ئەندامێتی — بە نەختینە، جینی پارەی نادات',
     giniWarning: (hours: string) =>
       `داواکارییەکەت دڵنیا ناکرێتەوە تا لە ئەپی جینی نەیکڕیت و باڕکۆدی وەرگرتن سکان نەکرێت. بەبێ ئەوە داواکارییەکە ${hours} کاتژمێر چاوەڕوان دەمێنێتەوە و پاشان خۆکارانە هەڵدەوەشێتەوە.`,
     giniPlacedTitle: 'هێشتا دەبێت باڕکۆدی وەرگرتن سکان بکرێت',
@@ -788,6 +814,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const location = useLocation();
   const { lang, dir, loc } = useLanguage();
+  const psLang = lang === 'en' || lang === 'ckb' ? lang : 'ar';
   /** The house motion kit. Used only by the confirmation panel below, which
    *  is the one thing on this page that has an entrance. */
   const m = useMotion();
@@ -860,6 +887,11 @@ export default function Checkout() {
   // is told rather than left to spot the total changing on its own.
   const [pricesMoved, setPricesMoved] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  /** Bumped to ask for a fresh quote with nothing else changed (MEMBERSHIP_PRICE_CHANGED). */
+  const [quoteNonce, setQuoteNonce] = useState(0);
+  /** Phase 2: the membership's removal from its printer line (checkout) is on its way / was refused. */
+  const [memberRemoving, setMemberRemoving] = useState(false);
+  const [memberRemoveError, setMemberRemoveError] = useState('');
   /** The clean start (DECISIONS row 222): the product of a line is not for sale now — the way out is the cart. */
   const [unavailableInCart, setUnavailableInCart] = useState(false);
 
@@ -1187,7 +1219,7 @@ export default function Checkout() {
         if (seq === quoteSeqRef.current) setQuoteLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, protectedDelivery, itemIdsKey, supportRef, couponCode]);
+  }, [selectedAddressId, deliveryMethod, paymentMethod, usePoints, useWalletBalance, protectedDelivery, itemIdsKey, supportRef, couponCode, quoteNonce]);
 
   /**
    * THE PRE-QUOTE BALANCE, IN DINARS, AS THE SERVER COMPUTED IT (0108).
@@ -1279,6 +1311,8 @@ export default function Checkout() {
   const cartById = new Map(items.map((i) => [i.id, i] as const));
   const summaryLines: Array<{
     key: string;
+    /** Phase 2: the printer line this filament-kit line is packed with (drawn under it). */
+    kitOf?: string | null;
     productId: string;
     image: string;
     name: string;
@@ -1312,7 +1346,7 @@ export default function Checkout() {
     gift?: { level: number; value_iqd: number } | null;
     /** «سعر تقديري» (0218): the line is at an estimated pre-order price — its chip, beside the figure. */
     estimate?: boolean;
-  }> =
+  }> = kitsUnderPrinters(
     quote
       ? quote.lines.map((l) => {
           const cartLine = cartById.get(l.cart_item_id);
@@ -1372,6 +1406,7 @@ export default function Checkout() {
               usdWith
             ),
             mysterySpools: l.mystery ? l.mystery.spools : (cartLine?.composition?.mystery?.spool_qty ?? null),
+            kitOf: l.kit_line?.printer_cart_item_id ?? cartLine?.kit_line?.printer_cart_item_id ?? null,
           };
         })
       : items.map((i) => ({
@@ -1416,7 +1451,67 @@ export default function Checkout() {
             },
             usdWith
           ),
-        }));
+          kitOf: i.kit_line?.printer_cart_item_id ?? null,
+        })));
+  /**
+   * Phase 2 (0235): the membership bought with a ticked printer, drawn UNDER that printer (after its kit
+   * lines). The server's figure, already inside the subtotal when it can be bought; a plan that no longer
+   * can (`ok:false`) is out of the total, says why, and is removed here (PUT extras membershipPlanId null).
+   * Drawn here, not with the cart's PrinterExtrasLines: a module shared by the two lazy pages becomes a
+   * chunk the entry names, and the product page opens with the entry (its budget).
+   */
+  const memberPrinter = quote?.membership?.printer_cart_item_id ?? null;
+  const memberAfter = memberPrinter && summaryLines.some((l) => l.key === memberPrinter)
+    ? [...summaryLines].reverse().find((l) => l.key === memberPrinter || l.kitOf === memberPrinter)?.key ?? null
+    : null;
+  const removeMembership = async () => {
+    if (!memberPrinter || memberRemoving) return;
+    setMemberRemoving(true);
+    setMemberRemoveError('');
+    try {
+      await api.put(`/api/cart/items/${encodeURIComponent(memberPrinter)}/extras`, { membershipPlanId: null });
+      setSubmitError('');
+      setQuoteNonce((n) => n + 1);
+    } catch (err) {
+      setMemberRemoveError(apiRefusal(err, psLang, loc('تعذّرت إزالة العضوية', 'Could not remove the membership', 'ئەندامێتییەکە لانەبرا')));
+    } finally {
+      setMemberRemoving(false);
+    }
+  };
+  const renderMembership = () => {
+    const m = quote?.membership;
+    if (!m) return null;
+    const w = PS_STRINGS[psLang];
+    const refusal = m.ok ? null : (m as CartMembershipRefusal);
+    const plan = refusal ? refusal.plan ?? null : m.plan;
+    return (
+      <div key="checkout-membership" className={`rounded-xl border border-border-subtle p-2.5 ${memberAfter ? 'ms-6' : ''}`} data-checkout-membership={plan?.id ?? refusal?.plan_id ?? ''} data-checkout-membership-of={memberPrinter ?? undefined}>
+        <p className="flex items-center justify-between gap-3 text-[12px] font-bold text-text-primary">
+          <span className="min-w-0 truncate">{plan ? w.memberLine(tierLabel(plan.tier), w.months(plan.duration_months)) : w.membership}</span>
+          <span className="shrink-0 tabular-nums" dir="auto">{m.ok ? `+${money(m.charge_iqd)}` : '—'}</span>
+        </p>
+        {m.ok ? (
+          <p className="mt-0.5 text-[11px] leading-snug text-text-secondary tabular-nums" dir="auto">
+            {m.kind === 'upgrade' ? w.memberUpgrade : w.memberNew}
+            {m.credit_iqd > 0 ? ` · ${money(m.price_iqd)} · ${w.memberCredit(String(money(m.credit_iqd)))}` : ''}
+          </p>
+        ) : (
+          <p role="alert" className="mt-0.5 text-[11px] text-text-primary" data-checkout-membership-refused={refusal?.code}>{servicesErrorText(refusal?.code, psLang) || w.memberBlocked[refusal?.code ?? ''] || w.unavailable}</p>
+        )}
+        <p className="mt-1 text-[11px] leading-snug text-text-secondary">{w.memberStarts}</p>
+        <p className="text-[11px] leading-snug text-text-secondary">{w.memberFinal}</p>
+        {memberPrinter ? (
+          <button type="button" disabled={memberRemoving || submitting} onClick={() => void removeMembership()} className="inline-flex min-h-11 items-center text-[12px] font-semibold text-text-primary underline disabled:opacity-50" data-checkout-membership-remove>
+            {w.removeMembership}
+          </button>
+        ) : null}
+        {memberRemoveError ? <p role="alert" className="text-[11px] text-text-primary">{memberRemoveError}</p> : null}
+      </div>
+    );
+  };
+  /** Draws the membership right after the entry that holds the last line of its printer. */
+  const withMembership = (entry: { kind: string; item?: { key: string }; items?: Array<{ key: string }> }, el: React.ReactElement) =>
+    memberAfter && (entry.item?.key === memberAfter || entry.items?.some((l) => l.key === memberAfter)) ? [el, renderMembership()] : el;
   // A pre-order cart: which pricing rule is in force, said once, in one line,
   // and ONLY when there is something to say. Read from the quote, never
   // inferred here: a cash order the wallet settled in full is a prepaid one
@@ -1714,6 +1809,10 @@ export default function Checkout() {
    */
   const giniPaidIqd = isGiniMethod ? quote?.gini?.paid_iqd ?? 0 : 0;
   const giniDeliveryDueIqd = isGiniMethod ? quote?.gini?.delivery_due_iqd ?? 0 : 0;
+  // The door amount's two parts, as the server named them (never subtracted
+  // here). A membership on a Gini order is cash at the door with the fee.
+  const giniFeeDueIqd = isGiniMethod ? quote?.gini?.delivery_fee_due_iqd ?? 0 : 0;
+  const giniMembershipDueIqd = isGiniMethod ? quote?.gini?.membership_due_iqd ?? 0 : 0;
   /**
    * How long the order waits for its receipt scan, in the warning's sentence.
    * Unlike the two figures above this DOES fall back — to «٢٤ ساعه», the
@@ -1836,6 +1935,12 @@ export default function Checkout() {
      */
     if (isGiniMethod && !giniOrderNoValid) return S.giniOrderNoBlock;
     if (shippingNeedsConfig) return S.needsConfig;
+    // Phase 2: a membership that can no longer be bought is left out of the total and refused at the door —
+    // said here with its fix (remove it under the printer), so the press is never the first to learn it.
+    if (quote?.membership && !quote.membership.ok) {
+      const code = (quote.membership as CartMembershipRefusal).code;
+      return servicesErrorText(code, psLang) || PS_STRINGS[psLang].memberBlocked[code] || PS_STRINGS[psLang].unavailable;
+    }
     /**
      * «سعر تقديري» (§6.1–6.2): two refusals the box cannot answer come before
      * it — a tab older than the notice reloads, and the owner's pause is said
@@ -1994,6 +2099,9 @@ export default function Checkout() {
         // What the code took on this screen: a pool of reward coupons that has since
         // shrunk is refused with the new total, never charged quietly (row 295).
         couponDiscountSeen: quote?.coupon ? Number(quote.coupon.discount_iqd) || 0 : undefined,
+        // Phase 2 (0235): the membership charge THIS screen showed; a different live figure is refused
+        // (MEMBERSHIP_PRICE_CHANGED) instead of charged quietly.
+        membershipChargeIqd: quote?.membership?.ok ? quote.membership.charge_iqd : undefined,
         // Versioned consent (§7): only sent once the customer explicitly
         // checked the unchecked-by-default box for these exact versions.
         policyLocale: lang,
@@ -2105,6 +2213,18 @@ export default function Checkout() {
           setQuote(fresh);
         }
         setEstimateAck(false);
+        setSubmitError(msg);
+      } else if (err instanceof ApiError && err.code === 'MEMBERSHIP_PRICE_CHANGED') {
+        /**
+         * Phase 2 (0235): the membership's price or upgrade credit moved between the quote and the press.
+         * Nothing was written. The screen re-quotes (the new figure and total are drawn), the consent is
+         * asked again as on any moved total, and the customer presses again knowing it.
+         */
+        setPolicyAccepted((prev) => {
+          if (prev) setConsentResetNote(true);
+          return false;
+        });
+        setQuoteNonce((n) => n + 1);
         setSubmitError(msg);
       } else if (err instanceof ApiError && err.code === 'COUPON_POOL_CHANGED') {
         /**
@@ -3020,13 +3140,13 @@ export default function Checkout() {
               summaryLines.map((l) => ({
                 ...l,
                 id: l.key,
-                // Gift, bundle and mystery lines are never grouped (§6).
-                kind: l.gift ? 'gift' : (l.included?.length ?? 0) > 0 || l.mysterySpools ? 'composition' : undefined,
+                // Gift, bundle and mystery lines are never grouped (§6); nor a kit line (it sits under its printer).
+                kind: l.gift ? 'gift' : (l.included?.length ?? 0) > 0 || l.mysterySpools || l.kitOf ? 'composition' : undefined,
                 color_id: l.colourTag?.id ?? '',
                 colors: l.colourOrder,
                 options_label: l.optionsLabel,
               }))
-            ).map((entry) =>
+            ).map((entry) => withMembership(entry,
               entry.kind === 'group' ? (
                 <div key={`group-${entry.productId}`} role="group" aria-label={entry.items[0].name} data-checkout-colour-group={entry.productId} className="flex gap-3 py-3 border-b border-border-subtle last:border-0">
                   <div className="w-16 h-16 rounded-lg bg-black overflow-hidden shrink-0">
@@ -3071,7 +3191,7 @@ export default function Checkout() {
                 </div>
               ) : (
               ((line) => (
-                <div key={line.key} data-checkout-line={line.key} className="group relative flex gap-3 overflow-hidden py-3 border-b border-border-subtle last:border-0">
+                <div key={line.key} data-checkout-line={line.key} data-checkout-kit-line={line.kitOf || undefined} className={`group relative flex gap-3 overflow-hidden py-3 border-b border-border-subtle last:border-0 ${line.kitOf ? 'ms-6' : ''}`}>
                   <div className="w-16 h-16 rounded-lg bg-black overflow-hidden relative shrink-0">
                     {line.image ? (
                       <VariantImg sizes="64px" referrerPolicy="no-referrer" src={line.image} alt={line.name} className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-500" />
@@ -3082,6 +3202,8 @@ export default function Checkout() {
                   </div>
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <h4 className="text-sm font-normal text-text-primary line-clamp-2 mb-0.5">{line.name}</h4>
+                    {/* Phase 2: a filament-kit line follows its printer — no quantity of its own. */}
+                    {line.kitOf ? <p className="text-xs text-text-muted mb-0.5">{PS_STRINGS[psLang].filament} · {PS_STRINGS[psLang].kitFollows}</p> : null}
                     {line.colourTag ? (
                       // THE COLOUR, AS A SWATCH AND A NAME, WITH ITS COUNT (§6) — the last screen
                       // where 56 pieces of the wrong colour can still be seen.
@@ -3151,7 +3273,9 @@ export default function Checkout() {
                 </div>
               ))(entry.item)
               )
-            )}
+            ))}
+            {/* A membership whose printer line is not on this screen (or not named) still shows, last. */}
+            {quote?.membership && !memberAfter ? renderMembership() : null}
           </div>
 
           <div className="space-y-4 pt-6 border-t border-white/5 mt-auto text-sm">
@@ -4060,7 +4184,13 @@ export default function Checkout() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className={giniDeliveryDueIqd === 0 ? 'text-gold' : 'text-text-secondary'}>
-                        {giniDeliveryDueIqd === 0 ? S.giniPickupRow : S.giniDoorRow}
+                        {giniDeliveryDueIqd === 0
+                          ? S.giniPickupRow
+                          : giniMembershipDueIqd > 0
+                            ? quote?.is_pickup
+                              ? S.giniPickupCashRow
+                              : S.giniDoorCashRow
+                            : S.giniDoorRow}
                       </span>
                       <span
                         data-testid="checkout-gini-door"
@@ -4069,6 +4199,20 @@ export default function Checkout() {
                         {money(giniDeliveryDueIqd)}
                       </span>
                     </div>
+                    {giniMembershipDueIqd > 0 ? (
+                      <>
+                        {giniFeeDueIqd > 0 ? (
+                          <div className="flex justify-between items-center text-xs text-text-secondary ps-3">
+                            <span>{S.giniDoorFeePart}</span>
+                            <span data-testid="checkout-gini-door-fee" className="tabular-nums">{money(giniFeeDueIqd)}</span>
+                          </div>
+                        ) : null}
+                        <div className="flex justify-between items-center text-xs text-text-secondary ps-3">
+                          <span>{S.giniDoorMembershipPart}</span>
+                          <span data-testid="checkout-gini-door-membership" className="tabular-nums">{money(giniMembershipDueIqd)}</span>
+                        </div>
+                      </>
+                    ) : null}
                   </>
                 ) : isBnplMethod ? (
                   <>
@@ -4189,4 +4333,16 @@ export default function Checkout() {
       </div>
     </div>
   );
+}
+
+/** Phase 2 (0235): each filament-kit line right after its printer line (a kit whose printer is absent stays where it was). */
+function kitsUnderPrinters<L extends { key: string; kitOf?: string | null }>(lines: L[]): L[] {
+  const present = new Set(lines.map((l) => l.key));
+  const out: L[] = [];
+  for (const l of lines) {
+    if (l.kitOf && present.has(l.kitOf)) continue;
+    out.push(l);
+    for (const k of lines) if (k.kitOf === l.key) out.push(k);
+  }
+  return out;
 }

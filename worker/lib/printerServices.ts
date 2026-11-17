@@ -23,6 +23,7 @@ import {
   configIssues,
   mappingResolves,
   publishIssues,
+  withPhase2Defaults,
   type PricedServices,
   type PrinterClasses,
   type PrinterServicesConfig,
@@ -54,10 +55,11 @@ export async function loadPrinterServices(db: D1Database): Promise<{ state: Prin
   if (!row) return { state: PRINTER_SERVICES_INITIAL, token: null };
   try {
     const v = JSON.parse(row.value) as Partial<PrinterServicesState>;
-    const draft = configIssues(v.draft).length ? DEFAULT_PRINTER_SERVICES : (v.draft as PrinterServicesConfig);
+    const draft = configIssues(v.draft).length ? DEFAULT_PRINTER_SERVICES : withPhase2Defaults(v.draft as PrinterServicesConfig);
     // A published config that no longer validates is treated as OFF rather
-    // than half-applied: customers fall back to the legacy flow.
-    const published = v.published && !configIssues(v.published).length ? (v.published as PrinterServicesConfig) : null;
+    // than half-applied: customers fall back to the legacy flow. One published
+    // before phase 2 reads as «memberships off, no kits» (withPhase2Defaults).
+    const published = v.published && !configIssues(v.published).length ? withPhase2Defaults(v.published as PrinterServicesConfig) : null;
     return {
       state: { draft, published, published_at: v.published_at ?? null, published_by: v.published_by ?? null },
       token: row.value,
@@ -101,9 +103,20 @@ async function swap(
 
 /** Saves the draft. `baseRevision` must equal the stored draft's revision (the page's copy). */
 export async function saveDraft(db: D1Database, actorId: string, draft: unknown, baseRevision: number): Promise<PrinterServicesState> {
+  const { state, token } = await loadPrinterServices(db);
+  // A page that does not know the phase 2 fields (membership, kits, a
+  // package's tier) keeps what the stored draft holds instead of erasing it.
+  if (draft && typeof draft === 'object' && !Array.isArray(draft)) {
+    const d = draft as Partial<PrinterServicesConfig>;
+    if (d.membership === undefined) d.membership = state.draft.membership;
+    if (d.kits === undefined) d.kits = state.draft.kits;
+    const pk = d.packages as unknown as Record<string, Record<string, unknown>> | undefined;
+    if (pk && typeof pk === 'object') for (const id of ['smart', 'complete'] as const) {
+      if (pk[id] && typeof pk[id] === 'object' && pk[id].membership_tier === undefined) pk[id].membership_tier = state.draft.packages[id].membership_tier ?? null;
+    }
+  }
   const issues = configIssues(draft);
   if (issues.length) throw badRequest(`Invalid printer services: ${issues.slice(0, 5).join('; ')}`, 'PRINTER_SERVICES_INVALID');
-  const { state, token } = await loadPrinterServices(db);
   if (state.draft.revision !== baseRevision) throw conflict('The draft changed since you opened it. Reload.', 'PRINTER_SERVICES_STALE');
   // Every save moves the draft revision on, so a page holding an older copy is refused (409).
   // Rebuilt from the validated shape: unknown keys the page sent are not stored.
@@ -123,7 +136,7 @@ export async function saveDraft(db: D1Database, actorId: string, draft: unknown,
 export async function publishDraft(db: D1Database, actorId: string, baseRevision: number, nowIso: string): Promise<PrinterServicesState> {
   const { state, token } = await loadPrinterServices(db);
   if (state.draft.revision !== baseRevision) throw conflict('The draft changed since you opened it. Reload.', 'PRINTER_SERVICES_STALE');
-  const blocking = publishIssues(state.draft);
+  const blocking = [...publishIssues(state.draft), ...(await kitCatalogIssues(db, state.draft))];
   if (blocking.length) throw badRequest(`Not ready to publish: ${blocking.slice(0, 5).join('; ')}`, 'PRINTER_SERVICES_NOT_READY');
   const revision = Math.max(state.draft.revision, (state.published?.revision ?? 0) + 1);
   const live: PrinterServicesConfig = { ...state.draft, revision };
@@ -134,6 +147,38 @@ export async function publishDraft(db: D1Database, actorId: string, baseRevision
   // The product page's flag reads the shared pricing inputs: this isolate forgets them now.
   forgetPricingInputs(db);
   return next;
+}
+
+/**
+ * The kit checks only the catalogue can answer (phase 2): every item of an
+ * active kit is a product that exists and is not filed under a printer
+ * section. Its live price, stock and shipping type are judged where the
+ * customer buys it (worker/lib/printerKits.ts), never frozen here.
+ */
+export async function kitCatalogIssues(db: D1Database, config: PrinterServicesConfig): Promise<string[]> {
+  const kits = (config.kits ?? []).filter((k) => k.active);
+  const ids = [...new Set(kits.flatMap((k) => k.items.map((i) => i.product_id)))];
+  if (!ids.length) return [];
+  const found = new Set<string>();
+  const printers = new Set<string>();
+  for (let i = 0; i < ids.length; i += 90) {
+    const chunk = ids.slice(i, i + 90);
+    const marks = chunk.map(() => '?').join(',');
+    const { results } = await db.prepare(`SELECT id FROM products WHERE id IN (${marks})`).bind(...chunk).all<{ id: string }>();
+    for (const r of results ?? []) found.add(r.id);
+    const { results: inPrinters } = await db.prepare(
+      `SELECT DISTINCT pc.product_id AS id FROM product_catalogs pc
+         JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
+        WHERE pc.product_id IN (${marks})`
+    ).bind(...chunk).all<{ id: string }>();
+    for (const r of inPrinters ?? []) printers.add(r.id);
+  }
+  const out: string[] = [];
+  for (const k of kits) for (const it of k.items) {
+    if (!found.has(it.product_id)) out.push(`kits.${k.id}: product ${it.product_id} does not exist`);
+    else if (printers.has(it.product_id)) out.push(`kits.${k.id}: ${it.product_id} is a printer, not a kit item`);
+  }
+  return out;
 }
 
 /** Turns the feature off (published → null); the draft is kept. */
@@ -216,7 +261,7 @@ export function productEnrolled(config: PrinterServicesConfig | null, product: {
 export function publishedFromSetting(value: unknown): PrinterServicesConfig | null {
   if (!value || typeof value !== 'object') return null;
   const published = (value as { published?: unknown }).published;
-  return published && !configIssues(published).length ? (published as PrinterServicesConfig) : null;
+  return published && !configIssues(published).length ? withPhase2Defaults(published as PrinterServicesConfig) : null;
 }
 
 // ------------------------------------------------------------ the order line
@@ -228,6 +273,16 @@ export function withServicesSnapshot<T extends Record<string, string | number | 
 ): (T & { services_snapshot?: string }) | undefined {
   if (!snapshot) return extra;
   return { ...(extra ?? ({} as T)), services_snapshot: snapshot };
+}
+
+/** Adds the 0235 kit columns to an order-item INSERT only for a filament-kit line. */
+export function withKitLink<T extends Record<string, string | number | null>>(
+  extra: T | undefined,
+  parentItemId: string | null,
+  kitId: string | null
+): (T & { kit_parent_item_id?: string; kit_id?: string | null }) | undefined {
+  if (!parentItemId) return extra;
+  return { ...(extra ?? ({} as T)), kit_parent_item_id: parentItemId, kit_id: kitId };
 }
 
 /** The refusal of a serviced printer on a method that is neither standard delivery nor store pickup. */
@@ -282,7 +337,9 @@ export function serviceTaskStatements(
    * while the services are bought per unit, so the task carries the count and
    * its note says «×N»: staff pack, inspect and teach N printers.
    */
-  qty = 1
+  qty = 1,
+  /** 0235: the filament kit packed with this printer, as the packing note names it ('' = none). */
+  kitNote = ''
 ): D1PreparedStatement[] {
   if (!snapshot) return [];
   const units = Math.max(1, Math.trunc(Number(qty) || 1));
@@ -301,7 +358,8 @@ export function serviceTaskStatements(
   const pack = fee('packaging');
   const packChoice = pack?.choice === 'extra' ? 'extra' : 'standard';
   out.push(task('packaging', packChoice,
-    packChoice === 'extra' ? `${PACKAGING_NOTE.extra} (+${(pack?.fee_iqd ?? 0).toLocaleString('en-US')} د.ع)` : PACKAGING_NOTE.standard));
+    (packChoice === 'extra' ? `${PACKAGING_NOTE.extra} (+${(pack?.fee_iqd ?? 0).toLocaleString('en-US')} د.ع)` : PACKAGING_NOTE.standard)
+      + (kitNote ? ` — ${kitNote.slice(0, 600)}` : '')));
   if (fee('inspection')?.choice === 'full') {
     const [lo, hi] = priced?.inspection_lead_business_days ?? [2, 3];
     out.push(task('inspection', 'full', `فحص كامل للطابعة قبل الشحن — لا تُشحن قبل إكماله (يضيف ${lo}–${hi} أيام عمل للتجهيز)`));

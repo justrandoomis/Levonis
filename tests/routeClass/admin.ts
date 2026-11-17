@@ -64,6 +64,8 @@ export default {
         'POST /orders/:id/gini-receipt': 'op',
         'PATCH /orders/:id/stage': 'op',
         'PATCH /orders/:id': 'op',
+        // Printer phase 2 (row 344): the owner's correction of an order whose membership started.
+        'POST /orders/:id/membership-correction': { cls: 'owner', refusal: { status: 403, code: 'OWNER_ONLY' }, why: 'cancels and refunds an order whose membership started (owner ruling 2026-11-17)' },
         'GET /coupons': 'op',
         // A public promo code pays whoever holds it: the owner's alone (owner decision 3, row 223).
         'POST /coupons': { cls: 'owner', why: 'issuing a public promo code (moneyAuthority coupon_issue)' },

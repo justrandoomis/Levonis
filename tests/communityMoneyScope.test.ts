@@ -222,6 +222,9 @@ const ADMIN_ROUTES: Record<string, MoneyClass> = {
   // (review S6). A Levonis order's cancellation refund stays the shop desk's.
   'PATCH /orders/:id/stage': 'handler',
   'PATCH /orders/:id': 'handler',
+  // Printer phase 2 (row 344): cancels an order whose membership started and refunds it — the OWNER's
+  // alone; the handler refuses every other admin (403 OWNER_ONLY), an assistant included.
+  'POST /orders/:id/membership-correction': 'handler',
   'GET /coupons': 'none',
   'POST /coupons': 'none',
   'PATCH /coupons/:id': 'none',

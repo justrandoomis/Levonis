@@ -813,6 +813,41 @@ export interface CartItem {
    * the discount is stated once, on the bundle.
    */
   composition?: CartComposition;
+  /**
+   * Phase 2 (0235): a line of the owner's filament kit, packed with its printer
+   * line. Locked (no quantity or remove of its own: 409 KIT_LINE_LOCKED); its
+   * quantity follows the printer and removing the printer removes it.
+   */
+  kit_line?: { printer_cart_item_id: string; kit_id: string; qty_per_printer: number };
+  /** On a printer line that carries a kit: its lines and the server's total. `current: false` = re-choose or remove it. */
+  kit?: { kit_id: string; title: { ar: string; en: string; ckb: string } | null; line_ids: string[]; total_iqd: number | null; current: boolean };
+}
+
+/** Phase 2 (0235): one membership option as the server quotes it (GET /api/memberships/order-options shape). */
+export type CartMembershipQuote =
+  | {
+      ok: true;
+      plan: { id: string; tier: string; duration_months: number };
+      kind: 'new' | 'upgrade';
+      price_iqd: number;
+      credit_iqd: number;
+      charge_iqd: number;
+      starts: 'at_activation' | 'at_current_expiry';
+    }
+  /**
+   * No longer buyable (PLAN_UNPRICED, PRO_PAUSED, DOWNGRADE_BLOCKED, ALREADY_SUBSCRIBED, ALREADY_PREPAID,
+   * MEMBERSHIP_NOT_WITH_BNPL, MEMBERSHIP_ORDER_PENDING): the cart and the quote answer it instead of
+   * refusing, the total leaves it out, and the customer removes it (PUT extras membershipPlanId null).
+   * `plan` may be absent (the contract names only `plan_id`).
+   */
+  | { ok: false; code: string; message?: string; plan_id?: string; plan?: { id: string; tier: string; duration_months: number } | null };
+
+/** The refused half of `CartMembershipQuote` (strictNullChecks is off: `ok` alone does not narrow). */
+export type CartMembershipRefusal = Extract<CartMembershipQuote, { ok: false }>;
+
+/** `GET /api/cart` → `printer_extras`: the membership chosen with a printer line, quoted live. */
+export interface CartPrinterExtras {
+  membership: { plan_id: string; printer_cart_item_id: string; quote: CartMembershipQuote } | null;
 }
 
 /** A line's colour, as the cart and the checkout quote send it. */

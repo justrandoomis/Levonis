@@ -98,7 +98,7 @@ export async function snapshotFor(
       )
       .bind(...Array(3).fill(JSON.stringify(lines.map((l) => l.product_id).filter(Boolean))))
       .all<{ product_id: string; catalog_id: string | null }>(),
-    readDeletedProductFinanceScopes(db, lines.filter(line => line.product_id === null).map(line => line.id)),
+    readDeletedProductFinanceScopes(db, lines.filter(line => line.product_id === null && (line as { line_kind?: unknown }).line_kind !== 'membership').map(line => line.id)),
   ]);
   const parents = new Map((catalogs.results ?? []).map((c) => [c.id, c.parent_id]));
   const depth = (id: string) => {
@@ -113,6 +113,9 @@ export async function snapshotFor(
     return n;
   };
   return lines.map((l) => {
+    // 0235: the membership bought with the order is not goods — no staff
+    // profit rule, wage or material cost ever applies to it (review S5).
+    if ((l as { line_kind?: unknown }).line_kind === 'membership') return { line_id: l.id, product_id: '', rules: [] };
     const deleted = l.product_id === null ? deletedScopes.get(l.id) : undefined;
     const productId = l.product_id ?? deleted?.productId ?? '';
     const ancestors = new Map<string, number>(deleted?.catalogDepths);

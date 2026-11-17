@@ -35,6 +35,9 @@ import { emitEvent, eventsEnabled } from '../lib/eventBus';
 import { SubscriptionChangedV1 } from '@levonis/contracts/events/v1/SubscriptionChanged';
 import { rateLimit } from '../lib/ratelimit';
 import { afterSettingsWrite } from '../lib/edgePolicy';
+import { publishedPrinterServices } from '../lib/printerServices';
+import { offeredMembershipTiers } from '@levonis/pricing/printerServices';
+import { activateOrderMembership, orderMembershipPublic, type OrderMembershipPurchaseRow } from '../lib/orderMembershipSale';
 import {
   PRO_PAUSE_KEY,
   canFreeze,
@@ -337,6 +340,10 @@ export async function quotePurchase(
 ): Promise<PurchaseQuote> {
   if (!plan.active || plan.price_iqd === null) throw planUnpurchasable();
   if (plan.tier === 'pro' && (await getProPause(db)).paused) throw proPausedRefusal();
+  // A membership bought with a printer order is still waiting for that order
+  // (0235): no second membership is sold beside it, by the wallet either.
+  const waiting = await openOrderMembershipPurchase(db, user.id);
+  if (waiting) throw orderMembershipPendingRefusal(waiting.order_id);
 
   // Lazily expire overdue rows, then load the current ledger state.
   await getTierStatus(db, user.id);
@@ -541,6 +548,180 @@ export function quotePayload(q: PurchaseQuote, balanceUsdCents: number, balanceI
     pending_tiers: [] as PaidTier[],
   };
 }
+
+// ------------------------------------------------- a membership with a printer
+
+/** True when an order purchase started (or extended) this memberships row (0235). False without the table. */
+export async function orderBoughtMembership(db: D1Database, membershipId: string): Promise<boolean> {
+  try {
+    return !!(await db.prepare("SELECT 1 AS x FROM order_membership_purchases WHERE membership_id = ? AND state = 'active' LIMIT 1").bind(membershipId).first());
+  } catch (e) {
+    if (/no such table/i.test(String((e as Error)?.message ?? e))) return false;
+    throw e;
+  }
+}
+
+/** A waiting order purchase (pending or blocked) that upgrades this memberships row, or null (0235). */
+export async function upgradeWaitingOn(db: D1Database, membershipId: string): Promise<{ id: string; order_id: string } | null> {
+  try {
+    return await db
+      .prepare("SELECT id, order_id FROM order_membership_purchases WHERE base_membership_id = ? AND state IN ('pending','blocked') LIMIT 1")
+      .bind(membershipId)
+      .first<{ id: string; order_id: string }>();
+  } catch (e) {
+    if (/no such table/i.test(String((e as Error)?.message ?? e))) return null;
+    throw e;
+  }
+}
+
+/**
+ * The membership a customer bought with an order that has not activated it yet
+ * (0235: pending, or blocked for a person), or null. Null on a database
+ * without the table — no such purchase can exist there.
+ */
+export async function openOrderMembershipPurchase(
+  db: D1Database,
+  userId: string
+): Promise<{ id: string; order_id: string; state: string; tier: string } | null> {
+  try {
+    return await db
+      .prepare("SELECT id, order_id, state, tier FROM order_membership_purchases WHERE user_id = ? AND state IN ('pending','blocked') ORDER BY created_at LIMIT 1")
+      .bind(userId)
+      .first<{ id: string; order_id: string; state: string; tier: string }>();
+  } catch (e) {
+    if (/no such table/i.test(String((e as Error)?.message ?? e))) return null;
+    throw e;
+  }
+}
+
+export function orderMembershipPendingRefusal(orderId: string): HttpError {
+  return new HttpError(
+    409,
+    'لديك عضوية مشتراة مع طلب سابق تنتظر تسليمه ودفعه — تبدأ عند اكتمال ذلك الطلب / A membership bought with an earlier order is waiting for that order to be delivered and paid — it starts then',
+    'MEMBERSHIP_ORDER_PENDING',
+    { order_id: orderId }
+  );
+}
+
+/**
+ * WHAT A MEMBERSHIP BOUGHT WITH A PRINTER WOULD BE (owner rulings 2026-11-17).
+ *
+ * It is an ORDER LINE at the LIVE membership_plans price, paid like the order
+ * (cash on delivery allowed), and it starts only when that order is delivered
+ * AND fully paid (worker/lib/orderMembershipSale.ts) — no benefit before, not
+ * even on the order that buys it. The rules are `quotePurchase`'s, as of now:
+ *
+ *   no live membership        → new: the full price, starts at activation;
+ *   a lower tier active       → upgrade: the unused part of the running plan
+ *                                is credited NOW and frozen on the order; the
+ *                                running row ends at activation;
+ *   the same tier active      → ALREADY_SUBSCRIBED (no renewal through a
+ *                                printer order — owner ruling ~10:20; the
+ *                                order-options list hides it);
+ *   a higher tier active      → DOWNGRADE_BLOCKED (hidden the same way);
+ *   a reservation before the launch, or the launch not activated → refused;
+ *   another order's membership still waiting → MEMBERSHIP_ORDER_PENDING.
+ */
+export interface OrderMembershipQuote {
+  plan: PlanRow;
+  kind: 'new' | 'upgrade';
+  price_iqd: number;
+  credit_iqd: number;
+  /** What the order line charges: price − credit. */
+  charge_iqd: number;
+  /** The live row this purchase upgrades (ends at activation), or null. */
+  base: MembershipDbRow | null;
+  /** The running membership's expiry. */
+  current_expires_at: string | null;
+  /** The expiry if the order were delivered and paid right now. */
+  expires_at_if_now: string;
+}
+
+export async function quoteOrderMembership(
+  db: D1Database,
+  userId: string,
+  plan: PlanRow,
+  nowIso: string
+): Promise<OrderMembershipQuote> {
+  if (!plan.active || plan.price_iqd === null) throw planUnpurchasable();
+  if (plan.tier === 'pro' && (await getProPause(db)).paused) throw proPausedRefusal();
+  const waiting = await openOrderMembershipPurchase(db, userId);
+  if (waiting) throw orderMembershipPendingRefusal(waiting.order_id);
+  const launch = await getLaunchConfig(db);
+  if (!launch.activated) {
+    throw badRequest(
+      'العضوية مع الطابعة تُفعَّل بعد إطلاق العضويات / A membership with a printer is offered once memberships are launched',
+      'MEMBERSHIP_NOT_OFFERED'
+    );
+  }
+  await getTierStatus(db, userId);
+  const { results: current } = await db
+    .prepare(`SELECT * FROM memberships WHERE user_id = ? AND state IN ${LIVE_STATES}`)
+    .bind(userId)
+    .all<MembershipDbRow>();
+  const target = tierLabel(plan.tier);
+  if (current.some((m) => m.state === 'prepaid_pending_launch')) {
+    throw badRequest(
+      `لديك بالفعل اشتراك مدفوع مسبقا قيد التفعيل / You already have a prepaid membership being activated`,
+      'ALREADY_PREPAID'
+    );
+  }
+  const active = current.find((m) => m.state === 'active') ?? null;
+  const price: number = plan.price_iqd;
+  if (active && tierRank(active.tier) > tierRank(plan.tier)) {
+    const held = tierLabel(active.tier);
+    throw badRequest(
+      `أنت مشترك في ${held} بالفعل — يمكنك التحويل إلى ${target} بعد انتهائه / You are already on ${held} — you can switch to ${target} when it expires`,
+      'DOWNGRADE_BLOCKED'
+    );
+  }
+  if (active && active.tier === plan.tier) {
+    throw badRequest(
+      `لديك اشتراك ${target} فعال بالفعل — العضوية مع الطابعة تُعرض للترقية إلى فئة أعلى فقط / You already have an active ${target} membership — with a printer only an upgrade to a higher tier is offered`,
+      'ALREADY_SUBSCRIBED'
+    );
+  }
+  let credit = 0;
+  if (active) {
+    const nowMs = Date.parse(nowIso);
+    const expMs = active.expires_at ? Date.parse(active.expires_at) : NaN;
+    const startMs = active.starts_at ? Date.parse(active.starts_at) : NaN;
+    if (Number.isFinite(expMs) && Number.isFinite(startMs) && expMs > startMs) {
+      const remainingDays = Math.max(0, Math.ceil((expMs - nowMs) / 86_400_000));
+      const totalDays = Math.ceil((expMs - startMs) / 86_400_000);
+      credit = Math.floor(remainingDays * (totalDays > 0 ? creditBasis(active) / totalDays : 0));
+    }
+    credit = Math.min(price, Math.max(0, credit));
+  }
+  return {
+    plan, kind: active ? 'upgrade' : 'new', price_iqd: price, credit_iqd: credit, charge_iqd: price - credit, base: active,
+    current_expires_at: active?.expires_at ?? null, expires_at_if_now: addMonths(nowIso, plan.duration_months),
+  };
+}
+
+/** The quote as the API states it (GET /order-options, the cart, MEMBERSHIP_PRICE_CHANGED). */
+export function orderMembershipQuotePayload(q: OrderMembershipQuote) {
+  return {
+    ok: true as const,
+    plan: planPublic(q.plan),
+    kind: q.kind,
+    price_iqd: q.price_iqd,
+    credit_iqd: q.credit_iqd,
+    charge_iqd: q.charge_iqd,
+    /** Always 'at_activation' — when the order is delivered and fully paid (no renewal through an order). */
+    starts: 'at_activation' as const,
+    current_tier: q.base ? q.base.tier : null,
+    current_expires_at: q.current_expires_at,
+    expires_at_if_activated_now: q.expires_at_if_now,
+  };
+}
+
+/** A plan row by id (any state), for the cart and the checkout. */
+export async function membershipPlanById(db: D1Database, planId: string): Promise<PlanRow | null> {
+  return db.prepare('SELECT * FROM membership_plans WHERE id = ?').bind(planId).first<PlanRow>();
+}
+
+export type { PlanRow as MembershipPlanRow };
 
 /**
  * A replayed purchase tells the same story as the first: the charge from the
@@ -998,6 +1179,62 @@ membershipsRoutes.get('/quote', requireAuth, async (c) => {
       walletIqdAvailable(balances.usd_cents_available, dust.dust_iqd, q.exchange_rate)
     ),
   });
+});
+
+/**
+ * «العضوية» IN THE PRINTER SHEET (phase 2): every plan of the tiers the owner
+ * offers with a printer (the published printer-services list), each with what
+ * buying it WITH THE ORDER would be for this account — new, or upgrade
+ * (credit frozen at checkout) — or the refusal, with the code the cart and the
+ * checkout would answer. A guest sees every plan as new.
+ *
+ * AN EXISTING MEMBER IS OFFERED AN UPGRADE ONLY (owner ruling 2026-11-17
+ * ~10:20): the plans of its own tier and of every lower tier are LEFT OUT of
+ * `options` — not listed as refusals — and nothing is renewed through an
+ * order. Nothing is written.
+ */
+membershipsRoutes.get('/order-options', async (c) => {
+  const db = c.env.DB;
+  const user = c.get('user');
+  const config = await publishedPrinterServices(db);
+  const tiers = config ? offeredMembershipTiers(config) : [];
+  if (!tiers.length) return c.json({ success: true, offered: false, tiers: [], options: [], current: null, pending_order_id: null });
+  const pause = await getProPause(db);
+  const { results: plans } = await db
+    .prepare('SELECT * FROM membership_plans WHERE active = 1 ORDER BY sort, duration_months')
+    .all<PlanRow>();
+  const nowIso = new Date().toISOString();
+  const options: Array<Record<string, unknown>> = [];
+  const st = user ? await getTierStatus(db, user.id) : null;
+  const heldRank = st && st.active && st.tier !== 'free' ? tierRank(st.tier) : 0;
+  for (const plan of (plans ?? []).filter((p) => (tiers as string[]).includes(p.tier) && tierRank(p.tier) > heldRank)) {
+    if (!user) {
+      if (plan.price_iqd === null || (plan.tier === 'pro' && pause.paused)) {
+        options.push({ ok: false, code: plan.price_iqd === null ? 'PLAN_UNPRICED' : 'PRO_PAUSED', plan: planPublic(plan, pause) });
+      } else {
+        options.push({
+          ok: true, plan: planPublic(plan, pause), kind: 'new', price_iqd: plan.price_iqd, credit_iqd: 0, charge_iqd: plan.price_iqd,
+          starts: 'at_activation', current_tier: null, current_expires_at: null,
+          expires_at_if_activated_now: addMonths(nowIso, plan.duration_months),
+        });
+      }
+      continue;
+    }
+    try {
+      options.push(orderMembershipQuotePayload(await quoteOrderMembership(db, user.id, plan, nowIso)));
+    } catch (e) {
+      if (e instanceof HttpError && (e.status === 400 || e.status === 409)) {
+        options.push({ ok: false, code: e.code ?? 'REFUSED', message: e.message, plan: planPublic(plan, pause) });
+      } else throw e;
+    }
+  }
+  let current: { tier: string; expires_at: string | null } | null = null;
+  let pending: { order_id: string } | null = null;
+  if (user && st) {
+    current = st.active && st.tier !== 'free' ? { tier: st.tier, expires_at: st.expires_at } : null;
+    pending = await openOrderMembershipPurchase(db, user.id);
+  }
+  return c.json({ success: true, offered: true, tiers, options, current, pending_order_id: pending?.order_id ?? null });
 });
 
 membershipsRoutes.get('/mine', requireAuth, async (c) => {
@@ -1664,6 +1901,51 @@ membershipsRoutes.post('/admin/grant', async (c) => {
   });
 });
 
+/**
+ * MEMBERSHIPS BOUGHT WITH AN ORDER (0235) that are waiting or need a person:
+ * pending (the order is not delivered and paid yet) and blocked (activation
+ * found another live membership it cannot replace). No money moves here.
+ */
+membershipsRoutes.get('/admin/order-purchases', async (c) => {
+  const state = c.req.query('state') === 'blocked' ? ['blocked'] : ['pending', 'blocked'];
+  try {
+    const { results } = await c.env.DB.prepare(
+      `SELECT p.*, o.status AS order_status, u.email AS user_email FROM order_membership_purchases p
+         JOIN orders o ON o.id = p.order_id LEFT JOIN users u ON u.id = p.user_id
+        WHERE p.state IN (${state.map(() => '?').join(',')}) ORDER BY p.updated_at DESC LIMIT 200`
+    ).bind(...state).all<Record<string, unknown>>();
+    return c.json({
+      success: true,
+      purchases: (results ?? []).map((r) => ({
+        id: r.id, order_id: r.order_id, order_status: r.order_status, user_id: r.user_id, user_email: r.user_email,
+        ...orderMembershipPublic(r as OrderMembershipPurchaseRow),
+      })),
+    });
+  } catch (e) {
+    if (/no such table/i.test(String((e as Error)?.message ?? e))) return c.json({ success: true, purchases: [] });
+    throw e;
+  }
+});
+
+/** After a person resolved the conflict (e.g. cancelled the other membership): try the activation again. */
+membershipsRoutes.post('/admin/order-purchases/:id/retry', async (c) => {
+  const admin = c.get('user')!;
+  const row = await c.env.DB.prepare('SELECT order_id, state FROM order_membership_purchases WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first<{ order_id: string; state: string }>()
+    .catch(() => null);
+  if (!row) throw notFound('Purchase not found');
+  if (row.state === 'active' || row.state === 'cancelled') {
+    return c.json({ success: true, state: row.state, activated: false });
+  }
+  const res = await activateOrderMembership(c.env, row.order_id, { trigger: 'admin_retry', actorId: admin.id, retryBlocked: true });
+  const now = await c.env.DB.prepare('SELECT state, review_reason FROM order_membership_purchases WHERE id = ?')
+    .bind(c.req.param('id'))
+    .first<{ state: string; review_reason: string }>();
+  await audit(c.env.DB, admin.id, 'membership.order_retry', c.req.param('id'), { order_id: row.order_id, result: now?.state ?? null, waiting: res.waiting });
+  return c.json({ success: true, state: now?.state ?? row.state, review_reason: now?.review_reason || null, waiting: res.waiting, activated: now?.state === 'active' });
+});
+
 membershipsRoutes.post('/admin/:id/cancel', async (c) => {
   const admin = c.get('user')!;
   const id = c.req.param('id');
@@ -1677,12 +1959,51 @@ membershipsRoutes.post('/admin/:id/cancel', async (c) => {
   if (!['active', 'prepaid_pending_launch', 'pending_payment'].includes(m.state)) {
     throw badRequest('Only active, prepaid or pending memberships can be cancelled', 'NOT_CANCELLABLE');
   }
+  // A MEMBERSHIP BOUGHT WITH AN ORDER IS NON-REFUNDABLE once it started (owner
+  // ruling 2026-11-17): this door gives no wallet refund for it — not a whole
+  // one, not a prorated one. Cancelling it without a refund stays possible.
+  if (refund && (await orderBoughtMembership(db, id))) {
+    throw new HttpError(
+      409,
+      'هذه العضوية اشتُريت مع طلب ولا تُسترد بعد بدئها / This membership was bought with an order and is not refunded once it started',
+      'MEMBERSHIP_NOT_RETURNABLE'
+    );
+  }
+  // THE UPGRADE CREDIT IS NOT PAID TWICE (review S4): an order waiting to be
+  // delivered and paid already took this row's unused value as its upgrade
+  // credit (frozen at checkout, order_membership_purchases.base_membership_id).
+  // Refunding the same value to the wallet now would pay it out a second time.
+  // Cancel that order first (its purchase then never starts), or cancel this
+  // row without a refund.
+  const upgradePendingRefusal = (upgrading: { id: string; order_id: string }) =>
+    new HttpError(
+      409,
+      'طلب بانتظار التسليم يرقّي هذه العضوية واحتسب قيمتها المتبقية رصيدا للترقية — لا تُسترد قيمتها مرة ثانية؛ ألغِ ذلك الطلب أولا أو ألغِ العضوية دون استرداد / An order waiting for delivery upgrades this membership and already credited its unused value — it is not refunded twice; cancel that order first, or cancel the membership without a refund',
+      'MEMBERSHIP_ORDER_PENDING',
+      { order_id: upgrading.order_id, purchase_id: upgrading.id }
+    );
+  if (refund) {
+    const upgrading = await upgradeWaitingOn(db, id);
+    if (upgrading) throw upgradePendingRefusal(upgrading);
+  }
 
-  const flip = await db
-    .prepare("UPDATE memberships SET state = 'cancelled' WHERE id = ? AND state = ?")
-    .bind(id, m.state)
-    .run();
-  if (flip.meta.changes === 0) throw badRequest('Membership state changed concurrently — reload and retry', 'CONFLICT_RETRY');
+  // The flip is the refund's commit point, and on a refund it carries the S4 rule ITSELF: a waiting order
+  // purchase that credited this row, written after the read above, makes it change nothing (no refund).
+  const flipSql = "UPDATE memberships SET state = 'cancelled' WHERE id = ? AND state = ?";
+  const guardSql = " AND NOT EXISTS (SELECT 1 FROM order_membership_purchases w WHERE w.base_membership_id = memberships.id AND w.state IN ('pending','blocked'))";
+  let flip: D1Result;
+  try {
+    flip = await db.prepare(refund ? flipSql + guardSql : flipSql).bind(id, m.state).run();
+  } catch (e) {
+    // A database without 0235 has no order purchases to guard against.
+    if (!refund || !/no such table/i.test(String((e as Error)?.message ?? e))) throw e;
+    flip = await db.prepare(flipSql).bind(id, m.state).run();
+  }
+  if (flip.meta.changes === 0) {
+    const upgrading = refund ? await upgradeWaitingOn(db, id) : null;
+    if (upgrading) throw upgradePendingRefusal(upgrading);
+    throw badRequest('Membership state changed concurrently — reload and retry', 'CONFLICT_RETRY');
+  }
 
   const nowIso = new Date().toISOString();
   if (eventsEnabled(c.env)) {

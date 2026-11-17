@@ -18,6 +18,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useOptionalAuth } from '../../AuthContext';
 import { Layers, Save, Send, Power } from 'lucide-react';
+import { KitsPanel, MembershipPanel, issueText, kitsBlocked } from './PrinterExtrasPanels';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import {
@@ -47,7 +48,7 @@ const CLASS_LABEL: Record<DeliveryClass, string> = {
 };
 
 export default function AdminPrinterServices({ productId, onDirtyChange }: { productId: string; onDirtyChange?: (dirty: boolean) => void }) {
-  const { loc, dir } = useLanguage() as { loc: Loc; dir: 'rtl' | 'ltr' };
+  const { loc, dir, lang } = useLanguage() as { loc: Loc; dir: 'rtl' | 'ltr'; lang: string };
   // A server hint, never the gate: the routes refuse a non-owner regardless.
   const isOwner = useOptionalAuth()?.user?.is_owner === true;
   const readOnly = !isOwner;
@@ -96,6 +97,10 @@ export default function AdminPrinterServices({ productId, onDirtyChange }: { pro
         } catch (re) {
           setMessage(re instanceof Error ? re.message : String(re));
         }
+      } else if (e instanceof ApiError && (e.code === 'PRINTER_SERVICES_INVALID' || e.code === 'PRINTER_SERVICES_NOT_READY')) {
+        // The server lists its issues in English (`…: path: message; …`): each is said in the reader's language.
+        const list = e.message.replace(/^[^:]*?: /, '').split('; ').map((i) => issueText(i, loc, draft?.kits ?? []).text);
+        setMessage(`${e.code === 'PRINTER_SERVICES_NOT_READY' ? loc('غير جاهزة للنشر', 'Not ready to publish', 'ئامادە نییە بۆ بڵاوکردنەوە') : loc('لم تُحفظ', 'Not saved', 'پاشەکەوت نەکرا')}: ${list.join(' · ')}`);
       } else {
         setMessage(e instanceof ApiError ? `${e.message}` : String(e));
       }
@@ -132,6 +137,8 @@ export default function AdminPrinterServices({ productId, onDirtyChange }: { pro
   if (!state || !draft) return <p className="p-4 text-sm text-text-secondary">{message ?? loc('جارٍ التحميل…', 'Loading…', 'باردەکرێت…')}</p>;
 
   const money = (v: number | null) => (v === null ? '—' : formatIqd(v));
+  // The kit editor's own checks (U9): a save the server would refuse is not sent; each problem is said on its kit.
+  const kitsHeld = kitsBlocked(draft.kits ?? [], new Set([...state.printers.map((p) => p.id), ...Object.keys(draft.products)]));
   const num = (v: number | null, on: (n: number | null) => void, label: string) => (
     <label className="flex flex-col gap-1 text-[12px] text-text-secondary">
       {label}
@@ -277,10 +284,13 @@ export default function AdminPrinterServices({ productId, onDirtyChange }: { pro
               {[draft.packages[id].warranty, draft.packages[id].care, draft.packages[id].packaging, draft.packages[id].inspection].join(' · ')}
             </p>
             {/* No package discount (owner, 2026-11-17): a package is the sum of its parts; the server refuses one. */}
-            {id === 'complete' ? <p className="mt-1">{loc('العضوية في هذه الباقة: لم تُحدَّد بعد (المرحلة 2).', 'Membership in this package: not set yet (phase 2).', 'ئەندامێتی لەم پاکێجەدا: هێشتا دیاری نەکراوە.')}</p> : null}
+            {/* Phase 2: the membership a package PRESELECTS is set in the membership panel below (never priced in it). */}
           </div>
         ))}
       </section>
+
+      <MembershipPanel draft={draft} upd={upd} loc={loc} />
+      <KitsPanel draft={draft} upd={upd} loc={loc} lang={lang} printers={state.printers} productId={productId} />
 
       </details>
       </fieldset>
@@ -309,7 +319,10 @@ export default function AdminPrinterServices({ productId, onDirtyChange }: { pro
       {state.publish_issues.length ? (
         <section className="rounded-lg border border-border-subtle p-3 text-[12px] text-text-secondary">
           <p className="font-semibold text-text-primary">{loc('قبل النشر:', 'Before publishing:', 'پێش بڵاوکردنەوە:')}</p>
-          <ul className="list-disc ps-5">{state.publish_issues.map((i) => <li key={i} dir="ltr">{i}</li>)}</ul>
+          <ul className="list-disc ps-5">{state.publish_issues.map((i) => {
+            const said = issueText(i, loc, draft.kits ?? []);
+            return <li key={i} dir={said.translated ? undefined : 'ltr'}>{said.text}</li>;
+          })}</ul>
         </section>
       ) : null}
 
@@ -326,7 +339,7 @@ export default function AdminPrinterServices({ productId, onDirtyChange }: { pro
 
       {readOnly ? null : (
       <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-3">
-        <button type="button" className="lv-button lv-button-secondary" disabled={busy || !dirty || !!stale} onClick={() => void save()}>
+        <button type="button" className="lv-button lv-button-secondary" disabled={busy || !dirty || !!stale || kitsHeld} onClick={() => void save()}>
           <Save aria-hidden="true" className="w-4 h-4" /> {loc('حفظ المسودة', 'Save draft', 'پاشەکەوتی ڕەشنووس')}
         </button>
         <button type="button" className="lv-button lv-button-primary" disabled={busy || dirty || !!stale || state.publish_issues.length > 0} onClick={() => void publish()}>

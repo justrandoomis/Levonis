@@ -25,6 +25,14 @@
  *    printer's delivery class) but charged in the shipping total, not inside
  *    the line price; null = to be chosen at checkout.
  *  - All money is integer IQD.
+ *
+ * PHASE 2 (owner rulings 2026-11-17, DECISIONS row 339): the membership a
+ * customer may buy WITH a printer (`membership`: which tiers are offered; the
+ * price is the live membership_plans row, never stored here) and the owner's
+ * filament kits (`kits`: real products / variants, priced at the sum of their
+ * live prices, no discount). Both are optional in a stored config: a config
+ * saved before phase 2 reads as «memberships off, no kits»
+ * (`withPhase2Defaults`), so a published phase 1 list never becomes invalid.
  */
 
 export const WARRANTY_FAMILIES = ['a1', 'xpa2', 'h2', 'h3c'] as const;
@@ -60,6 +68,10 @@ export interface ProductMapping {
   by_option_value?: Record<string, { warranty_family?: WarrantyFamily | null; delivery_class?: DeliveryClass | null }>;
 }
 
+/** The membership_plans tier ids (`prime` is PREMIUM's storage id, never renamed). */
+export const MEMBERSHIP_TIERS = ['plus', 'prime', 'pro'] as const;
+export type MembershipTier = (typeof MEMBERSHIP_TIERS)[number];
+
 export interface PackagePreset {
   active: boolean;
   warranty: WarrantyChoice;
@@ -68,6 +80,44 @@ export interface PackagePreset {
   inspection: InspectionChoice;
   /** Always null (owner ruling: packages are exactly the sum of their parts; configIssues refuses any other value). */
   discount_iqd: number | null;
+  /**
+   * The membership tier the page PRESELECTS in the membership row for this
+   * package, or null (owner ruling 2026-11-17: Complete includes NO membership;
+   * the field exists, default null). Never part of the package price: the
+   * membership is its own order line at the live plan price.
+   */
+  membership_tier?: MembershipTier | null;
+}
+
+/** One product (or one exact variant) inside an owner-made filament kit, per printer unit. */
+export interface KitItem {
+  product_id: string;
+  /** The exact selection (option value ids); [] for a product without options. */
+  option_value_ids: string[];
+  /** The colour id, or null for a product without colours. */
+  color_id: string | null;
+  /** Units of this item per printer unit (the kit follows the printer's quantity). */
+  qty: number;
+}
+
+/** Which printer a kit belongs to: a mapped product, optionally one version of it. */
+export interface KitPrinterRef { product_id: string; option_value_id: string | null }
+
+/** An owner-made filament kit (brief §H; owner ruling: the sum of real live prices, no discount). */
+export interface FilamentKit {
+  id: string;
+  active: boolean;
+  sort: number;
+  title: Text3;
+  items: KitItem[];
+  /** null = every enrolled printer; otherwise these printers (or versions) only. */
+  printers: KitPrinterRef[] | null;
+}
+
+export interface MembershipOffer {
+  active: boolean;
+  /** The tiers a customer may buy with a printer; prices are the live membership_plans rows. */
+  tiers: MembershipTier[];
 }
 
 export interface PrinterServicesConfig {
@@ -87,6 +137,10 @@ export interface PrinterServicesConfig {
   academy: { active: boolean; recorded_iqd: number | null; live_iqd: number | null };
   delivery: { active: boolean; classes: Record<DeliveryClass, { economy_iqd: number | null; personal_iqd: number | null }> };
   packages: { smart: PackagePreset; complete: PackagePreset };
+  /** Phase 2; optional in a stored config (`withPhase2Defaults`). */
+  membership?: MembershipOffer;
+  /** Phase 2; optional in a stored config (`withPhase2Defaults`). */
+  kits?: FilamentKit[];
 }
 
 /**
@@ -119,10 +173,41 @@ export const DEFAULT_PRINTER_SERVICES: PrinterServicesConfig = {
     },
   },
   packages: {
-    smart: { active: true, warranty: 'w12', care: 'c12', packaging: 'standard', inspection: 'none', discount_iqd: null },
-    complete: { active: true, warranty: 'w24', care: 'c12', packaging: 'extra', inspection: 'full', discount_iqd: null },
+    smart: { active: true, warranty: 'w12', care: 'c12', packaging: 'standard', inspection: 'none', discount_iqd: null, membership_tier: null },
+    complete: { active: true, warranty: 'w24', care: 'c12', packaging: 'extra', inspection: 'full', discount_iqd: null, membership_tier: null },
   },
+  membership: { active: true, tiers: ['plus', 'prime', 'pro'] },
+  kits: [],
 };
+
+/** A config stored before phase 2 has neither field: memberships off, no kits. */
+const STORED_MEMBERSHIP_DEFAULT: MembershipOffer = Object.freeze({ active: false, tiers: [] as MembershipTier[] }) as MembershipOffer;
+
+/** The membership offer of a config (absent = off). */
+export function membershipOf(c: PrinterServicesConfig): MembershipOffer {
+  return c.membership ?? STORED_MEMBERSHIP_DEFAULT;
+}
+/** The kits of a config (absent = none). */
+export function kitsOf(c: PrinterServicesConfig): FilamentKit[] {
+  return c.kits ?? [];
+}
+
+/**
+ * A validated config with the phase 2 fields filled — what every reader works
+ * on. A config written before phase 2 (or saved by a page that does not know
+ * the new fields) reads as memberships off, no kits, no package tier.
+ */
+export function withPhase2Defaults(c: PrinterServicesConfig): PrinterServicesConfig {
+  return {
+    ...c,
+    packages: {
+      smart: { ...c.packages.smart, membership_tier: c.packages.smart.membership_tier ?? null },
+      complete: { ...c.packages.complete, membership_tier: c.packages.complete.membership_tier ?? null },
+    },
+    membership: c.membership ? { active: c.membership.active, tiers: [...c.membership.tiers] } : { active: false, tiers: [] },
+    kits: c.kits ?? [],
+  };
+}
 
 // ------------------------------------------------------------ validation
 
@@ -224,7 +309,83 @@ export function configIssues(raw: unknown): string[] {
     for (const k of Object.keys(p)) {
       if (k !== 'discount_iqd' && /discount/i.test(k)) out.push(`packages.${id}.${idLabel(k)}: packages carry no discount`);
     }
+    if (p.membership_tier !== undefined && p.membership_tier !== null && !oneOf(MEMBERSHIP_TIERS, p.membership_tier)) {
+      out.push(`packages.${id}.membership_tier: plus, prime, pro or null`);
+    }
   }
+  if (c.membership !== undefined) {
+    const m = c.membership as unknown;
+    if (!isObj(m) || typeof m.active !== 'boolean' || !Array.isArray(m.tiers)) out.push('membership: {active, tiers}');
+    else {
+      const tiers = m.tiers as unknown[];
+      if (tiers.some((t) => !oneOf(MEMBERSHIP_TIERS, t))) out.push('membership.tiers: plus, prime, pro');
+      if (new Set(tiers).size !== tiers.length) out.push('membership.tiers: each tier once');
+    }
+  }
+  if (c.kits !== undefined) out.push(...kitIssues(c.kits));
+  return out;
+}
+
+/** Size caps on the kits (owner-made; far above a shop's needs). */
+export const MAX_KITS = 30;
+export const MAX_KIT_ITEMS = 12;
+export const MAX_KIT_ITEM_QTY = 20;
+export const MAX_KIT_PRINTERS = 100;
+const KIT_ID = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+const isText3 = (v: unknown): v is Text3 =>
+  isObj(v) && (['ar', 'en', 'ckb'] as const).every((k) => typeof v[k] === 'string' && (v[k] as string).length <= 80);
+
+/** The identity of a kit item: one product + selection + colour appears once per kit. */
+export function kitItemKey(i: Pick<KitItem, 'product_id' | 'option_value_ids' | 'color_id'>): string {
+  return `${i.product_id}|${[...i.option_value_ids].sort().join(',')}|${i.color_id ?? ''}`;
+}
+
+function kitIssues(raw: unknown): string[] {
+  const out: string[] = [];
+  if (!Array.isArray(raw)) return ['kits: array'];
+  if (raw.length > MAX_KITS) return [`kits: at most ${MAX_KITS}`];
+  const ids = new Set<string>();
+  raw.forEach((k: unknown, n) => {
+    const at = `kits[${n}]`;
+    if (!isObj(k)) { out.push(`${at}: object`); return; }
+    if (typeof k.id !== 'string' || !KIT_ID.test(k.id)) out.push(`${at}.id: a-z, 0-9, _ or -, at most 32`);
+    else if (ids.has(k.id)) out.push(`${at}.id: used twice`);
+    else ids.add(k.id);
+    if (typeof k.active !== 'boolean') out.push(`${at}.active: boolean`);
+    if (!(Number.isInteger(k.sort) && (k.sort as number) >= 0 && (k.sort as number) <= 999)) out.push(`${at}.sort: 0..999`);
+    if (!isText3(k.title)) out.push(`${at}.title: {ar, en, ckb}, at most 80 characters each`);
+    if (!Array.isArray(k.items)) out.push(`${at}.items: array`);
+    else if (k.items.length > MAX_KIT_ITEMS) out.push(`${at}.items: at most ${MAX_KIT_ITEMS}`);
+    else {
+      const keys = new Set<string>();
+      (k.items as unknown[]).forEach((it, j) => {
+        const ia = `${at}.items[${j}]`;
+        if (!isObj(it)) { out.push(`${ia}: object`); return; }
+        const pidOk = typeof it.product_id === 'string' && !badId(it.product_id);
+        if (!pidOk) out.push(`${ia}.product_id: bad id`);
+        const ovs = it.option_value_ids;
+        const ovsOk = Array.isArray(ovs) && ovs.length <= 12 && ovs.every((v) => typeof v === 'string' && !badId(v));
+        if (!ovsOk) out.push(`${ia}.option_value_ids: at most 12 ids`);
+        if (!(it.color_id === null || (typeof it.color_id === 'string' && !badId(it.color_id)))) out.push(`${ia}.color_id: id or null`);
+        if (!(Number.isInteger(it.qty) && (it.qty as number) >= 1 && (it.qty as number) <= MAX_KIT_ITEM_QTY)) out.push(`${ia}.qty: 1..${MAX_KIT_ITEM_QTY}`);
+        if (pidOk && ovsOk) {
+          const key = kitItemKey({ product_id: it.product_id as string, option_value_ids: ovs as string[], color_id: typeof it.color_id === 'string' ? it.color_id : null });
+          if (keys.has(key)) out.push(`${ia}: the same product and selection twice — raise its qty instead`);
+          keys.add(key);
+        }
+      });
+    }
+    if (k.printers !== null) {
+      if (!Array.isArray(k.printers) || k.printers.length > MAX_KIT_PRINTERS) out.push(`${at}.printers: null or at most ${MAX_KIT_PRINTERS} printers`);
+      else (k.printers as unknown[]).forEach((pr, j) => {
+        if (!isObj(pr) || typeof pr.product_id !== 'string' || badId(pr.product_id)
+          || !(pr.option_value_id === null || (typeof pr.option_value_id === 'string' && !badId(pr.option_value_id)))) {
+          out.push(`${at}.printers[${j}]: {product_id, option_value_id | null}`);
+        }
+      });
+    }
+    for (const key of Object.keys(k)) if (/discount/i.test(key)) out.push(`${at}.${idLabel(key)}: kits carry no discount`);
+  });
   return out;
 }
 
@@ -251,7 +412,15 @@ export function canonicalConfig(c: PrinterServicesConfig): PrinterServicesConfig
     Object.fromEntries(WARRANTY_FAMILIES.map((f) => [f, t[f]])) as Record<WarrantyFamily, number | null>;
   const pkg = (p: PackagePreset): PackagePreset => ({
     active: p.active, warranty: p.warranty, care: p.care, packaging: p.packaging, inspection: p.inspection, discount_iqd: null,
+    membership_tier: p.membership_tier ?? null,
   });
+  const m = membershipOf(c);
+  const kits: FilamentKit[] = kitsOf(c).map((k) => ({
+    id: k.id, active: k.active, sort: k.sort,
+    title: { ar: k.title.ar.trim(), en: k.title.en.trim(), ckb: k.title.ckb.trim() },
+    items: k.items.map((i) => ({ product_id: i.product_id, option_value_ids: [...i.option_value_ids].sort(), color_id: i.color_id ?? null, qty: i.qty })),
+    printers: k.printers === null ? null : k.printers.map((p) => ({ product_id: p.product_id, option_value_id: p.option_value_id ?? null })),
+  }));
   return {
     version: 1,
     revision: c.revision,
@@ -269,6 +438,8 @@ export function canonicalConfig(c: PrinterServicesConfig): PrinterServicesConfig
       classes: Object.fromEntries(DELIVERY_CLASSES.map((k) => [k, { economy_iqd: c.delivery.classes[k].economy_iqd, personal_iqd: c.delivery.classes[k].personal_iqd }])) as PrinterServicesConfig['delivery']['classes'],
     },
     packages: { smart: pkg(c.packages.smart), complete: pkg(c.packages.complete) },
+    membership: { active: m.active, tiers: MEMBERSHIP_TIERS.filter((t) => m.tiers.includes(t)) },
+    kits,
   };
 }
 
@@ -295,8 +466,40 @@ export function publishIssues(c: PrinterServicesConfig): string[] {
     if (p.inspection === 'full' && (!c.inspection.active || c.inspection.price_iqd === null)) out.push(`packages.${id}: includes the inspection, which is not priced`);
     if (p.warranty !== 'none' && !c.warranty.active) out.push(`packages.${id}: includes a warranty, but the warranty is off`);
     if (p.warranty === 'none') out.push(`packages.${id}: a package must include a warranty`);
+    if (p.membership_tier) {
+      const m = membershipOf(c);
+      if (!m.active || !m.tiers.includes(p.membership_tier)) out.push(`packages.${id}: preselects a membership tier that is not offered`);
+    }
+  }
+  // Kits: an active kit names its three titles and at least one item, belongs
+  // to mapped printers only, and never contains a mapped printer itself.
+  for (const k of kitsOf(c)) {
+    if (!k.active) continue;
+    if (!k.title.ar.trim() || !k.title.en.trim() || !k.title.ckb.trim()) out.push(`kits.${k.id}: needs a title in Arabic, English and Kurdish`);
+    if (!k.items.length) out.push(`kits.${k.id}: needs at least one item`);
+    for (const it of k.items) if (Object.hasOwn(c.products, it.product_id)) out.push(`kits.${k.id}: a printer cannot be a kit item`);
+    for (const pr of k.printers ?? []) if (!Object.hasOwn(c.products, pr.product_id)) out.push(`kits.${k.id}: printer ${idLabel(pr.product_id)} is not mapped`);
   }
   return out;
+}
+
+/**
+ * The active kits offered with THIS printer selection, in the owner's order:
+ * a kit for every enrolled printer (printers = null), or one naming this
+ * product (and, when it names a version, that version is chosen).
+ */
+export function kitsForPrinter(config: PrinterServicesConfig, productId: string, optionValueIds: readonly string[]): FilamentKit[] {
+  return kitsOf(config)
+    .filter((k) => k.active && k.items.length > 0)
+    .filter((k) => k.printers === null
+      || k.printers.some((p) => p.product_id === productId && (p.option_value_id === null || optionValueIds.includes(p.option_value_id))))
+    .sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/** The tiers a printer may be bought with (empty = no membership row). */
+export function offeredMembershipTiers(config: PrinterServicesConfig): MembershipTier[] {
+  const m = membershipOf(config);
+  return m.active ? [...m.tiers] : [];
 }
 
 // ------------------------------------------------------------ resolution
@@ -442,6 +645,42 @@ export const SERVICES_NOT_OFFERED = 'SERVICES_NOT_OFFERED';
 /** A legacy extended-warranty plan sent with the services (never both). */
 export const SERVICES_WITH_LEGACY_WARRANTY = 'SERVICES_WITH_LEGACY_WARRANTY';
 
+// ---- phase 2 refusal codes (a membership with a printer, the owner's filament kits)
+/** The membership row is off, or this tier is not offered with a printer. */
+export const MEMBERSHIP_NOT_OFFERED = 'MEMBERSHIP_NOT_OFFERED';
+/** A membership bought with an earlier order is still waiting for that order (never a second one). */
+export const MEMBERSHIP_ORDER_PENDING = 'MEMBERSHIP_ORDER_PENDING';
+/** The membership's price (or the upgrade credit) moved since the customer saw it. */
+export const MEMBERSHIP_PRICE_CHANGED = 'MEMBERSHIP_PRICE_CHANGED';
+/** Another printer in this cart already carries the membership. */
+export const CART_MEMBERSHIP_CONFLICT = 'CART_MEMBERSHIP_CONFLICT';
+/** A membership bought with an order is never returned or refunded. */
+export const MEMBERSHIP_NOT_RETURNABLE = 'MEMBERSHIP_NOT_RETURNABLE';
+/** The order's membership is active: the order is not cancelled (return the printer instead). */
+export const ORDER_MEMBERSHIP_ACTIVE = 'ORDER_MEMBERSHIP_ACTIVE';
+/** The kit is not offered with this printer (off, unknown or another printer's). */
+export const KIT_NOT_OFFERED = 'KIT_NOT_OFFERED';
+/** An item of the kit cannot be sold now (stock, price, selection or the printer's shipping type). */
+export const KIT_UNAVAILABLE = 'KIT_UNAVAILABLE';
+/** The owner changed the kit since it was put in the cart: choose it again. */
+export const KIT_CHANGED = 'KIT_CHANGED';
+/** A kit line follows its printer: change or remove the kit from the printer. */
+export const KIT_LINE_LOCKED = 'KIT_LINE_LOCKED';
+/** A kit line is bought only together with its printer. */
+export const KIT_WITHOUT_PRINTER = 'KIT_WITHOUT_PRINTER';
+/** A membership or a kit was sent with a product that is not an enrolled printer. */
+export const EXTRAS_NOT_PRINTER = 'EXTRAS_NOT_PRINTER';
+/** A membership with a printer is not bought with Buy Now Pay Later (owner ruling 2026-11-17 ~10:20). */
+export const MEMBERSHIP_NOT_WITH_BNPL = 'MEMBERSHIP_NOT_WITH_BNPL';
+
+/** The phase 2 codes the page words (src/lib/refusalStrings.ts and SERVICES_ERRORS carry each). */
+export const PHASE2_CODES: ReadonlySet<string> = new Set<string>([
+  MEMBERSHIP_NOT_OFFERED, MEMBERSHIP_ORDER_PENDING, MEMBERSHIP_PRICE_CHANGED, CART_MEMBERSHIP_CONFLICT,
+  MEMBERSHIP_NOT_RETURNABLE, ORDER_MEMBERSHIP_ACTIVE,
+  KIT_NOT_OFFERED, KIT_UNAVAILABLE, KIT_CHANGED, KIT_LINE_LOCKED, KIT_WITHOUT_PRINTER, EXTRAS_NOT_PRINTER,
+  MEMBERSHIP_NOT_WITH_BNPL,
+]);
+
 /** Every services refusal, each answered with its own code so the page can name the fix. */
 export const SERVICES_CODES: ReadonlySet<string> = new Set<string>([
   SERVICES_REQUIRED, SERVICES_NOT_OFFERED, SERVICES_WITH_LEGACY_WARRANTY,
@@ -561,6 +800,10 @@ export interface ServicesOffer {
     smart: { price_iqd: number; includes: Omit<PackagePreset, 'active' | 'discount_iqd'>; discount_iqd: number } | null;
     complete: { price_iqd: number; includes: Omit<PackagePreset, 'active' | 'discount_iqd'>; discount_iqd: number } | null;
   };
+  /** Phase 2: the tiers offered with this printer (null = no membership row). Prices: GET /api/memberships/order-options. */
+  membership: { tiers: MembershipTier[] } | null;
+  /** Phase 2: the owner's kits for this selection (ids and titles; priced by GET /api/products/:slug/kits). */
+  kits: Array<{ id: string; title: Text3 }>;
 }
 
 export function servicesOffer(config: PrinterServicesConfig, classes: PrinterClasses): ServicesOffer {
@@ -574,10 +817,11 @@ export function servicesOffer(config: PrinterServicesConfig, classes: PrinterCla
     const gross = priceServices(config, classes, { ...presetSelection(config, id), confirmed: true });
     return {
       price_iqd: price,
-      includes: { warranty: p.warranty, care: p.care, packaging: p.packaging, inspection: p.inspection },
+      includes: { warranty: p.warranty, care: p.care, packaging: p.packaging, inspection: p.inspection, membership_tier: p.membership_tier ?? null },
       discount_iqd: gross.package_discount_iqd,
     };
   };
+  const tiers = offeredMembershipTiers(config);
   return {
     revision: config.revision,
     warranty: config.warranty.active
@@ -593,5 +837,12 @@ export function servicesOffer(config: PrinterServicesConfig, classes: PrinterCla
     academy: config.academy.active ? { recorded: config.academy.recorded_iqd, live: config.academy.live_iqd } : null,
     delivery: config.delivery.active ? { economy: d.economy_iqd, personal: d.personal_iqd } : null,
     packages: { just: { price_iqd: 0 }, smart: pkg('smart'), complete: pkg('complete') },
+    membership: tiers.length ? { tiers } : null,
+    kits: [],
   };
+}
+
+/** The offer with THIS selection's kits (a kit may belong to one version only). */
+export function servicesOfferFor(config: PrinterServicesConfig, classes: PrinterClasses, productId: string, optionValueIds: readonly string[]): ServicesOffer {
+  return { ...servicesOffer(config, classes), kits: kitsForPrinter(config, productId, optionValueIds).map((k) => ({ id: k.id, title: k.title })) };
 }

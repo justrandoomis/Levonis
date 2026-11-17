@@ -50,6 +50,7 @@ import { recordFinancialFailure, runOrderFinancialEffects } from './orderFinance
 import { baghdadDay } from './operations';
 import { completeTradeInsForOrder } from './tradeInStock';
 import { issuePrinterRewards } from './rewards/coupons';
+import { activateOrderMembership } from './orderMembershipSale';
 
 export interface DeliveredEffectsResult {
   deviceUnits: CreateUnitsResult | null;
@@ -155,6 +156,15 @@ export async function runOrderDeliveredEffects(
     await issuePrinterRewards(env, orderId);
   } catch (e) {
     console.error('reward coupons not issued for order', orderId, e instanceof Error ? e.message : String(e));
+  }
+
+  // A membership bought with this order (0235) starts now when the order is
+  // also fully paid (a prepaid order); a cash order's starts at its collection
+  // (POST /api/orders/:id/settlement) or the jobs sweep. Idempotent, token-guarded.
+  try {
+    await activateOrderMembership(env, orderId, { trigger: 'order_delivered' });
+  } catch (e) {
+    console.error('order membership activation failed', orderId, e instanceof Error ? e.message : String(e));
   }
 
   // Referral 9.1 milestone and the support-code gift: delivered_at-based

@@ -47,6 +47,7 @@ import { rasterDimensions, validRasterDimensions } from '../lib/imageMetadata';
 import { sniff } from './uploads';
 import { deductOrderStock, planOrderReopen, planOrderReturn, stockReturnNote, type ReopenRefusal } from '../lib/orderInventory';
 import { cancelledOrderRefundStatements, orderReturnMoved, returnedOrderCancelRefusal } from '../lib/orderCancelOps';
+import { isOrderMembershipActiveAbort, isOrderMembershipCorrectedAbort, ORDER_MEMBERSHIP_CORRECTED_MESSAGE, orderMembershipActive, orderMembershipPublic, orderMembershipPurchases, ORDER_MEMBERSHIP_ACTIVE_MESSAGE, OWNER_CORRECTION_NOTHING } from '../lib/orderMembershipSale';
 import { voidReviewGiftsOfOrder } from '../lib/gifts/reviewCode';
 import { cancelStoreOrder, notifyMerchantOfStoreOrder, storeCancelMovesMoney } from '../lib/storeOrderOps';
 import { assertFinancialScope } from '../lib/walletAdjust';
@@ -2685,6 +2686,8 @@ adminRoutes.get('/orders/:id', async (c) => {
       // The warehouse's work for the printer services (0234): packing
       // instruction, inspection (blocks dispatch until done), Academy request.
       service_tasks: await orderServiceTasks(c.env.DB, id),
+      // 0235: the membership bought with the order (pending / active / blocked / cancelled), with its id for the retry.
+      membership_purchases: (await orderMembershipPurchases(c.env.DB, id)).map((p) => ({ id: p.id, ...orderMembershipPublic(p) })),
       customer: {
         id: o.user_id,
         name: o.user_name ?? null,
@@ -3863,6 +3866,9 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     if (res.reason === 'TRADE_IN_ORDER_DELIVERED') throw tradeInDeliveredRefusal();
     // «أُرجع، لا يُلغى» (Q7, DECISIONS row 319): a return already gave part of it back.
     if (res.reason === 'ORDER_CANCEL_RETURNED') throw returnedOrderCancelRefusal();
+    // 0235: the membership bought with this order started — it is final; return the printer instead.
+    if (res.reason === 'ORDER_MEMBERSHIP_ACTIVE') throw new HttpError(409, ORDER_MEMBERSHIP_ACTIVE_MESSAGE, 'ORDER_MEMBERSHIP_ACTIVE');
+    if (res.reason === 'ORDER_MEMBERSHIP_CORRECTED') throw new HttpError(409, ORDER_MEMBERSHIP_CORRECTED_MESSAGE, 'ORDER_MEMBERSHIP_CORRECTED');
     // «الفحص قبل الشحن» (0234): finish the inspection first.
     if (res.reason === 'INSPECTION_NOT_DONE') throw inspectionNotDoneRefusal();
     // «بانتظار موافقة الزبون على السعر» (0140): withdraw the proposal or wait.
@@ -3908,6 +3914,55 @@ adminRoutes.patch('/orders/:id/stage', async (c) => {
     next_stage: res.next_stage,
     next_stage_at: res.next_stage_at,
     ...(notes.length ? { notes } : {}),
+  });
+});
+
+/**
+ * 0235 — THE OWNER'S CORRECTION (owner ruling 2026-11-17 ~10:20):
+ *   POST /api/admin/orders/:id/membership-correction   { reason }
+ * An order whose membership already started is never cancelled by staff or by
+ * the customer (ORDER_MEMBERSHIP_ACTIVE). The OWNER may still correct it: this
+ * door cancels the order through the stage door (forced, from any stage) and,
+ * in that same batch, ends the membership, marks its purchase cancelled
+ * ('owner_correction') and writes an audit row; the order's ordinary cancel
+ * refund carries the money back. Anyone but the owner: 403 OWNER_ONLY.
+ * An order with no started membership: 409 NO_STARTED_MEMBERSHIP (use the
+ * ordinary cancel).
+ */
+adminRoutes.post('/orders/:id/membership-correction', async (c) => {
+  const adminUser = c.get('user')!;
+  if (adminUser.role !== 'admin' || !isOwner(c.env, adminUser)) throw ownerOnly();
+  const id = c.req.param('id');
+  const body = await c.req.json().catch(() => ({}));
+  const reason = str(body.reason, 'reason', { min: 3, max: 500 });
+  const started = (await orderMembershipPurchases(c.env.DB, id)).filter((p) => p.state === 'active');
+  if (!started.length) throw new HttpError(409, OWNER_CORRECTION_NOTHING, 'NO_STARTED_MEMBERSHIP');
+  const res = await moveOrderStage(c.env, {
+    orderId: id,
+    to: 'cancelled',
+    source: 'manual',
+    changedBy: adminUser.id,
+    note: reason,
+    force: true,
+    defer: (work) => c.executionCtx.waitUntil(work),
+    membershipCorrection: { actorId: adminUser.id, reason },
+  });
+  if (!res.moved) {
+    if (res.reason === 'NOT_FOUND') throw notFound('Order not found');
+    if (res.reason === 'RACED') throw badRequest('The order changed while you were editing — reload and retry');
+    if (res.reason === 'ORDER_CANCEL_RETURNED') throw returnedOrderCancelRefusal();
+    if (res.reason === 'TRADE_IN_ORDER_DELIVERED') throw tradeInDeliveredRefusal();
+    throw badRequest(`Cannot cancel this order (${res.reason ?? 'refused'})`, res.reason ?? 'ILLEGAL_STAGE_MOVE', { from: res.from });
+  }
+  await audit(c.env.DB, adminUser.id, 'order.membership_correction', id, {
+    from: res.from, legacy: `${res.legacy_from} -> ${res.legacy_to}`, reason,
+    purchases: started.map((p) => p.id),
+  });
+  return c.json({
+    success: true,
+    stage: 'cancelled',
+    legacy_status: res.legacy_to,
+    membership_purchases: (await orderMembershipPurchases(c.env.DB, id)).map((p) => ({ id: p.id, ...orderMembershipPublic(p) })),
   });
 });
 
@@ -4010,6 +4065,8 @@ adminRoutes.patch('/orders/:id', async (c) => {
     // reservation or the accrual. A lost flip aborts the whole batch.
     // «أُرجع، لا يُلغى» (Q7, DECISIONS row 319): not when a return already gave part of it back.
     if (await orderReturnMoved(c.env.DB, id)) throw returnedOrderCancelRefusal();
+    // 0235: an order whose membership started is never cancelled (the membership is final).
+    if (await orderMembershipActive(c.env.DB, id)) throw new HttpError(409, ORDER_MEMBERSHIP_ACTIVE_MESSAGE, 'ORDER_MEMBERSHIP_ACTIVE');
     const stock = await planOrderReturn(c.env.DB, id, adminUser.id);
     try {
       const res = await c.env.DB.batch([
@@ -4023,6 +4080,7 @@ adminRoutes.patch('/orders/:id', async (c) => {
       if (again && again.status !== from) throw badRequest('The order changed while you were editing — reload and retry');
       // 0192 (S-P2): a delivered order that completed a trade-in is returned, never cancelled.
       if (/TRADE_IN_ORDER_DELIVERED/.test(e instanceof Error ? e.message : String(e))) throw tradeInDeliveredRefusal();
+      if (isOrderMembershipActiveAbort(e)) throw new HttpError(409, ORDER_MEMBERSHIP_ACTIVE_MESSAGE, 'ORDER_MEMBERSHIP_ACTIVE');
       // A return refunded between the read above and the batch: the refund's fence aborted it.
       if (await orderReturnMoved(c.env.DB, id)) throw returnedOrderCancelRefusal();
       throw e;
@@ -4036,6 +4094,10 @@ adminRoutes.patch('/orders/:id', async (c) => {
     // transaction so a concurrent historical repair cannot slip past it.
     // Its stock (DECISIONS row 310): units only held are held again in this
     // batch, under its own fence; units taken and put back refuse the re-open.
+    // 0235: an owner-corrected order stays cancelled (its membership is not revived; the trigger guards the flip).
+    if ((await orderMembershipPurchases(c.env.DB, id)).some((p) => p.cancel_reason === 'owner_correction')) {
+      throw new HttpError(409, ORDER_MEMBERSHIP_CORRECTED_MESSAGE, 'ORDER_MEMBERSHIP_CORRECTED');
+    }
     const reopenStock = await planOrderReopen(c.env.DB, id, adminUser.id);
     if (reopenStock.refused) throw reopenStockRefusal(reopenStock.refused);
     try {
@@ -4066,6 +4128,7 @@ adminRoutes.patch('/orders/:id', async (c) => {
         );
       }
       if (msg.includes('GIFT_ORDER_REOPEN_REFUSED')) throw giftReopenRefusal();
+      if (isOrderMembershipCorrectedAbort(e)) throw new HttpError(409, ORDER_MEMBERSHIP_CORRECTED_MESSAGE, 'ORDER_MEMBERSHIP_CORRECTED');
       if (ORDER_REOPEN_COUPON_SPENT_RE.test(msg)) throw couponSpentReopenRefusal();
       if (msg.includes('TRADE_IN_DEVICE_NOT_RECEIVED')) throw tradeInNotReceivedReopenRefusal();
       // A cancelled order that held estimated lines stays cancelled (0218, T9).

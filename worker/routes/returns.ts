@@ -348,6 +348,18 @@ returnRoutes.post('/', async (c) => {
     item = await readItem(CONDITION_DOC_DEFAULT_SQL);
   }
   if (!item || item.user_id !== user.id) throw notFound('Order item not found');
+  // 0235: A MEMBERSHIP BOUGHT WITH THE ORDER IS NEVER RETURNED (owner ruling
+  // 2026-11-17): a printer return refunds the printer and its services only.
+  // (trg_return_cases_no_membership_line is the same rule inside the write.)
+  const kind = await c.env.DB.prepare('SELECT line_kind FROM order_items WHERE id = ?').bind(orderItemId)
+    .first<{ line_kind: string | null }>().catch(() => null);
+  if (kind?.line_kind === 'membership') {
+    throw new HttpError(
+      409,
+      'العضوية المشتراة مع الطلب لا تُرجع ولا تُسترد — يُرجع المنتج فقط / A membership bought with the order is not returned or refunded — only the product is',
+      'MEMBERSHIP_NOT_RETURNABLE'
+    );
+  }
 
   /**
    * A COMMUNITY-STORE ORDER IS NOT RETURNED THROUGH LEVONIS'S RETURNS DESK.

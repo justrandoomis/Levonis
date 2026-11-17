@@ -44,13 +44,20 @@ export function calculateGoods(order: Row, all: GoodsLine[], allocations: Alloca
     const discount = Math.min(total, n(parent.coupon_discount_iqd) + membershipDiscountAtLine(order, parent));
     if (discount > 0 && indices.length) spread(discount, indices.map((i) => net[i])).forEach((v, j) => net[indices[j]] -= v);
   }
-  const goods = net.reduce((a, b) => a + b, 0);
+  // 0235: THE MEMBERSHIP LINE IS NOT GOODS for any allocation (review S5): the
+  // checkout kept it out of the points cap and every discount basis, so the
+  // points discount and an accepted price adjustment are spread over the goods
+  // lines only — the membership keeps exactly what it charged.
+  const goodsLine = items.map((v) => v.line_kind !== 'membership');
+  const goodsNet = net.map((v, i) => goodsLine[i] ? v : 0);
+  const goods = goodsNet.reduce((a, b) => a + b, 0);
   const points = Math.min(goods, n(order.points_discount_iqd));
-  if (points > 0) spread(points, net).forEach((v, i) => net[i] -= v);
-  const original = [...net], beforePrice = net.reduce((a, b) => a + b, 0);
+  if (points > 0) spread(points, goodsNet).forEach((v, i) => net[i] -= v);
+  const original = [...net], beforePrice = net.reduce((a, b, i) => a + (goodsLine[i] ? b : 0), 0);
   const priceDelta = n(order.price_adjustment_iqd);
   const goodsDelta = Math.max(-beforePrice, priceDelta);
-  const shares = spread(goodsDelta, net.some((v) => v > 0) ? net : items.map((v) => v.qty));
+  const priceWeights = net.map((v, i) => goodsLine[i] ? v : 0);
+  const shares = spread(goodsDelta, priceWeights.some((v) => v > 0) ? priceWeights : items.map((v, i) => goodsLine[i] ? v.qty : 0));
   shares.forEach((v, i) => net[i] += v);
   let excessCut = Math.max(0, -priceDelta - beforePrice);
   const shippingCut = Math.min(excessCut, n(order.shipping_iqd));

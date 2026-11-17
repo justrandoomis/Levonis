@@ -49,13 +49,37 @@ export interface PsStrings {
   addToCart: string;
   /** While the page waits for the server's price of the applied choice before adding. */
   adding: string;
-  /** Membership: information only — the server's membership_preview, never a service of the selection. */
+  /**
+   * Membership WITH the printer (phase 2, 0235): its own order line at the live plan price, starting
+   * only when the order is delivered and paid, non-refundable once started. Figures: the server's.
+   */
   membership: string; membershipSub: string;
-  memberPays: (tier: string) => string;
-  membershipJoin: string; membershipUpgrade: (tier: string) => string;
-  membershipApart: string;
-  /** Filament: an ordinary product, bought through the normal cart — not a printer service. */
-  filament: string; filamentSub: string; filamentNote: string; filamentShop: string;
+  memberNone: string;
+  memberStarts: string; memberFinal: string;
+  memberCurrent: (tier: string, until: string) => string;
+  memberPendingOrder: string;
+  memberSignIn: string; signIn: string;
+  memberNew: string; memberUpgrade: string;
+  memberCredit: (amount: string) => string;
+  /** An existing member: only a HIGHER tier is offered with a printer (owner ruling; no renewal here). */
+  memberUpgradeOnly: string; memberNoUpgrade: string;
+  memberLoading: string; memberFailed: string; retry: string;
+  memberOff: string;
+  /** Why one plan cannot be bought now (the server's option code). */
+  memberBlocked: Record<string, string>;
+  membershipTerms: string;
+  /** The owner's filament kits (phase 2): one kit or skip; the sum of the items' live prices, no discount. */
+  filament: string; filamentSub: string; kitSkip: string; kitNote: string; kitPerPrinter: string;
+  kitItemOut: string; kitsLoading: string; kitsFailed: string;
+  /** No kit for this printer: filament stays an ordinary product, bought through the normal cart. */
+  filamentNote: string; filamentShop: string;
+  /** The footer: the membership and the kit are their own lines, outside the printer's total. */
+  extrasApart: string;
+  /** The cart and the checkout: the membership line and the kit lines under their printer. */
+  memberLine: (tier: string, months: string) => string;
+  memberAtCheckout: string;
+  removeMembership: string; removeKit: string; rechoose: string;
+  kitFollows: string;
 }
 
 const AR: PsStrings = {
@@ -98,11 +122,37 @@ const AR: PsStrings = {
   deliveryApart: 'يُضاف التوصيل إلى أجور الشحن عند الدفع.',
   addToCart: 'أضف إلى السلة',
   adding: 'جارٍ الإضافة…',
-  membership: 'العضوية', membershipSub: 'سعر الأعضاء لهذه الطابعة',
-  memberPays: (tier) => `أعضاء ${tier} يدفعون للطابعة`,
-  membershipJoin: 'اشترك', membershipUpgrade: (tier) => `الترقية إلى ${tier}`,
-  membershipApart: 'العضوية اشتراك مستقل ولا تُضاف إلى هذه الطابعة.',
-  filament: 'الخيوط', filamentSub: 'تُشترى كمنتج مستقل', filamentNote: 'الخيوط ليست من خدمات الطابعة — أضفها إلى السلة من صفحتها.', filamentShop: 'تصفّح الخيوط',
+  membership: 'العضوية', membershipSub: 'اشترك مع الطابعة — اختياري',
+  memberNone: 'بدون عضوية',
+  memberStarts: 'تبدأ عند تسليم الطلب ودفعه — لا تشمل مزاياها هذا الطلب.',
+  memberFinal: 'لا تُسترد بعد بدئها. إن أُلغي الطلب قبل ذلك فلا تبدأ وتُرد مع الطلب.',
+  memberCurrent: (tier, until) => `عضويتك الحالية: ${tier}${until ? ` حتى ${until}` : ''}`,
+  memberPendingOrder: 'لديك عضوية مع طلب سابق تبدأ عند تسليمه ودفعه.',
+  memberSignIn: 'سجّل الدخول لتختار عضوية مع الطابعة.', signIn: 'تسجيل الدخول',
+  memberNew: 'اشتراك جديد', memberUpgrade: 'ترقية',
+  memberCredit: (amount) => `رصيد الترقية −${amount}`,
+  memberUpgradeOnly: 'مع الطابعة تُعرض الترقية إلى مستوى أعلى فقط، ويُخصم منها رصيد عضويتك الحالية. التجديد من صفحة العضوية.',
+  memberNoUpgrade: 'لا يوجد مستوى أعلى من عضويتك للترقية إليه مع الطابعة.',
+  memberLoading: 'جارٍ تحميل خيارات العضوية…', memberFailed: 'تعذّر تحميل خيارات العضوية.', retry: 'إعادة المحاولة',
+  memberOff: 'العضوية غير متاحة مع الطابعة الآن.',
+  memberBlocked: {
+    DOWNGRADE_BLOCKED: 'أقل من عضويتك الحالية',
+    ALREADY_PREPAID: 'محجوزة لك مسبقاً',
+    PLAN_UNPRICED: 'لم يُحدَّد سعرها بعد',
+    PRO_PAUSED: 'متوقفة مؤقتاً',
+    MEMBERSHIP_ORDER_PENDING: 'بانتظار طلبك السابق',
+    MEMBERSHIP_NOT_OFFERED: 'غير متاحة الآن',
+  },
+  membershipTerms: 'شروط العضوية',
+  filament: 'باقة الفيلامنت', filamentSub: 'اختر باقة أو تخطَّ', kitSkip: 'تخطٍّ — بدون باقة',
+  kitNote: 'باقات يعدّها فريق Levonis من منتجات المتجر. سعرها مجموع أسعار منتجاتها الحالية بلا خصم، وتُضاف كسطور تتبع الطابعة.',
+  kitPerPrinter: 'لكل طابعة', kitItemOut: 'غير متوفر', kitsLoading: 'جارٍ تحميل الباقات…', kitsFailed: 'تعذّر تحميل باقات الفيلامنت.',
+  filamentNote: 'لا توجد باقة فيلامنت لهذه الطابعة — أضف الخيوط إلى السلة من صفحتها.', filamentShop: 'تصفّح الخيوط',
+  extrasApart: 'العضوية وباقة الفيلامنت سطور مستقلة في السلة، خارج هذا الإجمالي.',
+  memberLine: (tier, months) => `عضوية ${tier} · ${months}`,
+  memberAtCheckout: 'سطر مستقل يُضاف إلى إجمالي الطلب عند الدفع.',
+  removeMembership: 'إزالة العضوية', removeKit: 'إزالة الباقة', rechoose: 'اختر من جديد',
+  kitFollows: 'كميتها تتبع الطابعة، وتُزال مع الطابعة.',
 };
 
 const EN: PsStrings = {
@@ -145,11 +195,37 @@ const EN: PsStrings = {
   deliveryApart: 'Delivery is added to the shipping at checkout.',
   addToCart: 'Add to cart',
   adding: 'Adding…',
-  membership: 'Membership', membershipSub: 'Member price for this printer',
-  memberPays: (tier) => `${tier} members pay for the printer`,
-  membershipJoin: 'Subscribe', membershipUpgrade: (tier) => `Upgrade to ${tier}`,
-  membershipApart: 'Membership is a separate subscription and is not added to this printer.',
-  filament: 'Filament', filamentSub: 'Bought as a separate product', filamentNote: 'Filament is not a printer service — add it to the cart from its own page.', filamentShop: 'Browse filament',
+  membership: 'Membership', membershipSub: 'Subscribe with the printer — optional',
+  memberNone: 'No membership',
+  memberStarts: 'Starts when the order is delivered and paid — its benefits do not apply to this order.',
+  memberFinal: 'Non-refundable once started. If the order is cancelled before then, it never starts and is refunded with the order.',
+  memberCurrent: (tier, until) => `Your membership: ${tier}${until ? ` until ${until}` : ''}`,
+  memberPendingOrder: 'You have a membership with an earlier order; it starts when that order is delivered and paid.',
+  memberSignIn: 'Sign in to choose a membership with the printer.', signIn: 'Sign in',
+  memberNew: 'New', memberUpgrade: 'Upgrade',
+  memberCredit: (amount) => `Upgrade credit −${amount}`,
+  memberUpgradeOnly: 'With a printer, only an upgrade to a higher tier is offered, less the credit of your current membership. Renew from the membership page.',
+  memberNoUpgrade: 'There is no higher tier than yours to upgrade to with the printer.',
+  memberLoading: 'Loading membership options…', memberFailed: 'The membership options could not be loaded.', retry: 'Try again',
+  memberOff: 'Membership is not offered with the printer right now.',
+  memberBlocked: {
+    DOWNGRADE_BLOCKED: 'Lower than your membership',
+    ALREADY_PREPAID: 'Already reserved for you',
+    PLAN_UNPRICED: 'Not priced yet',
+    PRO_PAUSED: 'Paused for now',
+    MEMBERSHIP_ORDER_PENDING: 'Waiting on your earlier order',
+    MEMBERSHIP_NOT_OFFERED: 'Not offered now',
+  },
+  membershipTerms: 'Membership terms',
+  filament: 'Filament kit', filamentSub: 'Pick a kit or skip', kitSkip: 'Skip — no kit',
+  kitNote: 'Kits put together by the Levonis team from shop products. The price is the sum of their current prices, no discount; they are added as lines that follow the printer.',
+  kitPerPrinter: 'per printer', kitItemOut: 'Unavailable', kitsLoading: 'Loading kits…', kitsFailed: 'The filament kits could not be loaded.',
+  filamentNote: 'No filament kit for this printer — add filament to the cart from its own page.', filamentShop: 'Browse filament',
+  extrasApart: 'The membership and the filament kit are their own cart lines, outside this total.',
+  memberLine: (tier, months) => `${tier} membership · ${months}`,
+  memberAtCheckout: 'Its own line, added to the order total at checkout.',
+  removeMembership: 'Remove membership', removeKit: 'Remove kit', rechoose: 'Choose again',
+  kitFollows: 'Its quantity follows the printer, and it is removed with the printer.',
 };
 
 const CKB: PsStrings = {
@@ -192,11 +268,37 @@ const CKB: PsStrings = {
   deliveryApart: 'گەیاندن لە کاتی پارەدان دەخرێتە سەر کرێی ناردن.',
   addToCart: 'بیخە ناو سەبەتە',
   adding: 'زیاد دەکرێت…',
-  membership: 'ئەندامێتی', membershipSub: 'نرخی ئەندامان بۆ ئەم پرینتەرە',
-  memberPays: (tier) => `ئەندامانی ${tier} بۆ پرینتەرەکە دەدەن`,
-  membershipJoin: 'بەشداربە', membershipUpgrade: (tier) => `بەرزکردنەوە بۆ ${tier}`,
-  membershipApart: 'ئەندامێتی بەشداریکردنێکی جیایە و ناخرێتە سەر ئەم پرینتەرە.',
-  filament: 'دەزوو', filamentSub: 'وەک بەرهەمێکی جیا دەکڕدرێت', filamentNote: 'دەزوو خزمەتگوزاری پرینتەر نییە — لە پەڕەی خۆیەوە بیخە ناو سەبەتە.', filamentShop: 'سەیری دەزووەکان بکە',
+  membership: 'ئەندامێتی', membershipSub: 'لەگەڵ پرینتەرەکە بەشداربە — ئارەزوومەندانە',
+  memberNone: 'بێ ئەندامێتی',
+  memberStarts: 'کاتێک داواکارییەکە گەیەندرا و پارەکەی درا دەست پێدەکات — سوودەکانی ئەم داواکارییە ناگرنەوە.',
+  memberFinal: 'دوای دەستپێکردن پارەکەی نادرێتەوە. ئەگەر داواکارییەکە پێشتر هەڵوەشایەوە، دەست پێناکات و لەگەڵ داواکارییەکە پارەکەی دەدرێتەوە.',
+  memberCurrent: (tier, until) => `ئەندامێتییەکەت: ${tier}${until ? ` تا ${until}` : ''}`,
+  memberPendingOrder: 'ئەندامێتییەکت لەگەڵ داواکارییەکی پێشووتر هەیە؛ کاتێک ئەو داواکارییە گەیەندرا و پارەکەی درا دەست پێدەکات.',
+  memberSignIn: 'بچۆ ژوورەوە بۆ هەڵبژاردنی ئەندامێتی لەگەڵ پرینتەرەکە.', signIn: 'چوونەژوورەوە',
+  memberNew: 'نوێ', memberUpgrade: 'بەرزکردنەوە',
+  memberCredit: (amount) => `بڕی بەرزکردنەوە −${amount}`,
+  memberUpgradeOnly: 'لەگەڵ پرینتەر تەنها بەرزکردنەوە بۆ ئاستێکی بەرزتر پێشکەش دەکرێت، و بڕی ئەندامێتییە ئێستاکەتی لێ دەبڕدرێت. نوێکردنەوە لە پەڕەی ئەندامێتییەوە.',
+  memberNoUpgrade: 'هیچ ئاستێک لە ئەندامێتییەکەت بەرزتر نییە بۆ بەرزکردنەوە لەگەڵ پرینتەرەکە.',
+  memberLoading: 'بژاردەکانی ئەندامێتی بار دەکرێن…', memberFailed: 'بژاردەکانی ئەندامێتی بار نەکران.', retry: 'دووبارە هەوڵ بدەرەوە',
+  memberOff: 'ئەندامێتی ئێستا لەگەڵ پرینتەرەکە پێشکەش ناکرێت.',
+  memberBlocked: {
+    DOWNGRADE_BLOCKED: 'لە ئەندامێتییەکەت نزمترە',
+    ALREADY_PREPAID: 'پێشتر بۆت گیراوە',
+    PLAN_UNPRICED: 'هێشتا نرخی دیاری نەکراوە',
+    PRO_PAUSED: 'بۆ ماوەیەک ڕاگیراوە',
+    MEMBERSHIP_ORDER_PENDING: 'چاوەڕێی داواکارییە پێشووەکەتە',
+    MEMBERSHIP_NOT_OFFERED: 'ئێستا پێشکەش ناکرێت',
+  },
+  membershipTerms: 'مەرجەکانی ئەندامێتی',
+  filament: 'پاکێجی فیلامێنت', filamentSub: 'پاکێجێک هەڵبژێرە یان تێیپەڕێنە', kitSkip: 'تێپەڕاندن — بێ پاکێج',
+  kitNote: 'پاکێجەکان تیمی Levonis لە بەرهەمەکانی فرۆشگا ئامادەیان دەکات. نرخەکەی کۆی نرخە ئێستاکانی بەرهەمەکانیەتی بێ داشکاندن، و وەک دێڕگەلێک زیاد دەکرێن کە شوێن پرینتەرەکە دەکەون.',
+  kitPerPrinter: 'بۆ هەر پرینتەرێک', kitItemOut: 'بەردەست نییە', kitsLoading: 'پاکێجەکان بار دەکرێن…', kitsFailed: 'پاکێجەکانی فیلامێنت بار نەکران.',
+  filamentNote: 'هیچ پاکێجێکی فیلامێنت بۆ ئەم پرینتەرە نییە — لە پەڕەی خۆیەوە دەزوو بخە ناو سەبەتە.', filamentShop: 'سەیری دەزووەکان بکە',
+  extrasApart: 'ئەندامێتی و پاکێجی فیلامێنت دێڕی جیان لە سەبەتەدا، دەرەوەی ئەم کۆیە.',
+  memberLine: (tier, months) => `ئەندامێتی ${tier} · ${months}`,
+  memberAtCheckout: 'دێڕێکی جیایە، لە کاتی پارەداندا دەخرێتە سەر کۆی داواکاری.',
+  removeMembership: 'لابردنی ئەندامێتی', removeKit: 'لابردنی پاکێج', rechoose: 'دووبارە هەڵبژێرە',
+  kitFollows: 'بڕەکەی شوێن پرینتەرەکە دەکەوێت، و لەگەڵ پرینتەرەکە لادەبرێت.',
 };
 
 export const PS_STRINGS: Record<PsLang, PsStrings> = { ar: AR, en: EN, ckb: CKB };
@@ -267,6 +369,75 @@ export const SERVICES_ERRORS: Record<string, Record<PsLang, string>> = {
     en: 'This printer is already in your cart with a different package — change it from the cart.',
     ckb: 'ئەم پرینتەرە پێشتر بە پاکێجێکی جیاواز لە سەبەتەکەتدایە — لە سەبەتەوە بیگۆڕە.',
   },
+  // Phase 2 (0235): what the sheet and the add can answer about the membership and the kit. The cart,
+  // checkout, returns and admin codes are in src/lib/refusalStrings.ts only (the product page's budget).
+  MEMBERSHIP_NOT_OFFERED: {
+    ar: 'هذه العضوية غير متاحة مع الطابعة الآن — اختر غيرها أو تخطَّها.',
+    en: 'This membership is not offered with the printer right now — choose another or skip it.',
+    ckb: 'ئەم ئەندامێتییە ئێستا لەگەڵ پرینتەرەکە پێشکەش ناکرێت — یەکێکی تر هەڵبژێرە یان تێیپەڕێنە.',
+  },
+  MEMBERSHIP_ORDER_PENDING: {
+    ar: 'لديك عضوية مشتراة مع طلب سابق تبدأ عند تسليمه ودفعه — لا تُشترى عضوية ثانية قبل ذلك.',
+    en: 'A membership bought with an earlier order starts when that order is delivered and paid — a second one cannot be bought before then.',
+    ckb: 'ئەندامێتییەک کە لەگەڵ داواکارییەکی پێشووتر کڕدراوە، کاتێک ئەو داواکارییە گەیەندرا و پارەکەی درا دەست پێدەکات — پێش ئەوە ئەندامێتییەکی دووەم ناکڕدرێت.',
+  },
+  CART_MEMBERSHIP_CONFLICT: {
+    ar: 'العضوية مختارة مع طابعة أخرى في سلتك — غيّرها من هناك.',
+    en: 'The membership is already chosen with another printer in your cart — change it there.',
+    ckb: 'ئەندامێتییەکە پێشتر لەگەڵ پرینتەرێکی تر لە سەبەتەکەتدا هەڵبژێردراوە — لەوێ بیگۆڕە.',
+  },
+  KIT_NOT_OFFERED: {
+    ar: 'باقة الفيلامنت هذه غير متاحة مع هذه الطابعة — اختر غيرها أو تخطَّها.',
+    en: 'This filament kit is not offered with this printer — choose another or skip it.',
+    ckb: 'ئەم پاکێجی فیلامێنتە لەگەڵ ئەم پرینتەرە پێشکەش ناکرێت — یەکێکی تر هەڵبژێرە یان تێیپەڕێنە.',
+  },
+  KIT_UNAVAILABLE: {
+    ar: 'أحد منتجات باقة الفيلامنت غير متوفر الآن بهذه الكمية أو طريقة الشحن — اختر باقة أخرى أو تخطَّها.',
+    en: 'An item of the filament kit is not available now in this quantity or shipping type — choose another kit or skip it.',
+    ckb: 'یەکێک لە بەرهەمەکانی پاکێجی فیلامێنت ئێستا بەم بڕە یان بەم جۆری ناردنە بەردەست نییە — پاکێجێکی تر هەڵبژێرە یان تێیپەڕێنە.',
+  },
+  KIT_CHANGED: {
+    ar: 'تغيّرت باقة الفيلامنت لهذه الطابعة — اخترها من جديد.',
+    en: 'The filament kit for this printer has changed — choose it again.',
+    ckb: 'پاکێجی فیلامێنتی ئەم پرینتەرە گۆڕاوە — دووبارە هەڵیبژێرە.',
+  },
+  // The order-options / quote codes a chosen plan can carry (the contract change of the phase 2 review):
+  // the sheet, the add, the cart and the checkout all say them; the same words as src/lib/refusalStrings.ts.
+  PLAN_UNPRICED: {
+    ar: 'لم يُحدَّد سعر هذه العضوية بعد، فلا تُشترى الآن — أزلها أو اختر غيرها.',
+    en: 'This membership has no price yet, so it cannot be bought now — remove it or choose another.',
+    ckb: 'هێشتا نرخی ئەم ئەندامێتییە دیاری نەکراوە، بۆیە ئێستا ناکڕدرێت — لای ببە یان یەکێکی تر هەڵبژێرە.',
+  },
+  PRO_PAUSED: {
+    ar: 'الاشتراك الجديد في هذه العضوية متوقف مؤقتاً — أزلها أو اختر غيرها.',
+    en: 'New subscriptions to this membership are paused for now — remove it or choose another.',
+    ckb: 'بەشداریکردنی نوێ لەم ئەندامێتییەدا بۆ ماوەیەک ڕاگیراوە — لای ببە یان یەکێکی تر هەڵبژێرە.',
+  },
+  DOWNGRADE_BLOCKED: {
+    ar: 'هذه العضوية أدنى من عضويتك الحالية — مع الطابعة تُشترى الترقية إلى مستوى أعلى فقط. أزلها أو اختر مستوى أعلى.',
+    en: 'This membership is lower than your current one — with a printer only an upgrade to a higher tier is bought. Remove it or choose a higher tier.',
+    ckb: 'ئەم ئەندامێتییە لە ئەندامێتییە ئێستاکەت نزمترە — لەگەڵ پرینتەر تەنها بەرزکردنەوە بۆ ئاستێکی بەرزتر دەکڕدرێت. لای ببە یان ئاستێکی بەرزتر هەڵبژێرە.',
+  },
+  ALREADY_SUBSCRIBED: {
+    ar: 'أنت مشترك في هذا المستوى بالفعل — مع الطابعة تُشترى الترقية فقط، والتجديد من صفحة العضوية. أزلها أو اختر مستوى أعلى.',
+    en: 'You already hold this tier — with a printer only an upgrade is bought; renew from the membership page. Remove it or choose a higher tier.',
+    ckb: 'پێشتر ئەم ئاستەت هەیە — لەگەڵ پرینتەر تەنها بەرزکردنەوە دەکڕدرێت، نوێکردنەوە لە پەڕەی ئەندامێتییەوەیە. لای ببە یان ئاستێکی بەرزتر هەڵبژێرە.',
+  },
+  ALREADY_PREPAID: {
+    ar: 'لديك عضوية مدفوعة مسبقاً بانتظار التفعيل — لا تُشترى عضوية أخرى معها الآن. أزلها من الطابعة.',
+    en: 'You hold a prepaid membership waiting to be activated — another one is not bought with it now. Remove it from the printer.',
+    ckb: 'ئەندامێتییەکی پێشپارەدراوت هەیە کە چاوەڕێی چالاککردنە — ئێستا ئەندامێتییەکی تر لەگەڵیدا ناکڕدرێت. لە پرینتەرەکە لای ببە.',
+  },
+  MEMBERSHIP_NOT_WITH_BNPL: {
+    ar: 'لا تُشترى العضوية مع الطابعة عند الدفع لاحقاً — أزل العضوية أو اختر طريقة دفع أخرى.',
+    en: 'A membership is not bought with the printer when paying with Buy Now, Pay Later — remove the membership or choose another payment method.',
+    ckb: 'کاتێک بە ئێستا بکڕە و دواتر بدە پارە دەدەیت، ئەندامێتی لەگەڵ پرینتەرەکە ناکڕدرێت — ئەندامێتییەکە لابە یان ڕێگایەکی تری پارەدان هەڵبژێرە.',
+  },
+  EXTRAS_NOT_PRINTER: {
+    ar: 'العضوية وباقة الفيلامنت تُختاران مع طابعة مسجّلة وباقتها.',
+    en: 'A membership and a filament kit are chosen with an enrolled printer and its package.',
+    ckb: 'ئەندامێتی و پاکێجی فیلامێنت لەگەڵ پرینتەرێکی تۆمارکراو و پاکێجەکەی هەڵدەبژێردرێن.',
+  },
 };
 
 /** The reader's sentence for a services refusal; '' when the code is not one of them. */
@@ -274,4 +445,26 @@ export function servicesErrorText(code: string | null | undefined, lang: string)
   const e = code ? SERVICES_ERRORS[code] : undefined;
   if (!e) return '';
   return e[lang === 'en' || lang === 'ckb' ? lang : 'ar'];
+}
+
+/**
+ * KIT_UNAVAILABLE with `details.reason:'KIT_QTY_LIMIT'` (review S14): the kit cannot follow this many
+ * printers — its own sentence, with `details.max_printer_qty`. The same words as KIT_QTY_LIMIT_WORDS in
+ * src/lib/refusalStrings.ts (copied, not imported: this file rides the product page's lazy chunk).
+ */
+export const KIT_QTY_LIMIT_WORDS: Record<'ar' | 'en' | 'ckb', string> = {
+  ar: 'مع باقة الفيلامنت هذه تُطلب {n} طابعة على الأكثر — خفّض الكمية إلى {n} أو أزل الباقة.',
+  en: 'With this filament kit at most {n} printers can be ordered — lower the quantity to {n} or remove the kit.',
+  ckb: 'لەگەڵ ئەم پاکێجی فیلامێنتە زۆرترین {n} پرینتەر داوا دەکرێت — بڕەکە بۆ {n} کەم بکەرەوە یان پاکێجەکە لاببە.',
+};
+
+/** A services refusal from the server (`{code, details}`): the kit-quantity sentence first, else the code's words; '' when neither. */
+export function servicesRefusalText(err: unknown, lang: string): string {
+  const e = err as { code?: unknown; details?: unknown } | null;
+  const code = e && typeof e.code === 'string' ? e.code : '';
+  const d = e && typeof e.details === 'object' && e.details !== null ? (e.details as { reason?: unknown; max_printer_qty?: unknown }) : null;
+  if (code === 'KIT_UNAVAILABLE' && d?.reason === 'KIT_QTY_LIMIT' && typeof d.max_printer_qty === 'number' && Number.isFinite(d.max_printer_qty) && d.max_printer_qty >= 1) {
+    return KIT_QTY_LIMIT_WORDS[lang === 'en' || lang === 'ckb' ? lang : 'ar'].replace(/\{n\}/g, String(Math.trunc(d.max_printer_qty)));
+  }
+  return servicesErrorText(code, lang);
 }

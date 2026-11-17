@@ -11,15 +11,22 @@
  * — the browser never adds them up.
  *
  * On the product page it also carries «أضف إلى السلة» (apply, then the page's
- * own add once the server priced the choice), a Membership row that only
- * shows the server's `membership_preview` figure, and a Filament row that
- * links to the ordinary listing — neither is a service the server accepts.
+ * own add once the server priced the choice). Phase 2 (0235): the Membership
+ * row is a real choice (GET /api/memberships/order-options, read when the row
+ * opens: the server's charge, kind and blocker per plan) and the Filament row
+ * lists the owner's kits for this printer (GET /api/products/:slug/kits). Both
+ * travel as `extras` (membershipPlanId / kitId), never as services, and both
+ * are their own cart lines: the footer lists their server figures beside the
+ * printer's total, it never adds them in.
  * Motion is transform and opacity only, from the shared animate-in utilities (no stylesheet of its own: the public CSS budget).
  *
  * Loaded lazily from the product page: its code is paid for only on open.
  */
 import React, { useEffect, useId, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../../AuthContext';
+import { authPathWithSupportRef } from '../../lib/supportRef';
+import { TIER_ORDER, tierLabel, type AnyTier } from '../subscription/tierMeta';
 import { CirclePlay, Check, ChevronDown, ClipboardCheck, Crown, Heart, Package, Shield, ShoppingCart, SlidersHorizontal, Spool, Truck, X } from 'lucide-react';
 import { Sheet } from '../ui/Sheet';
 import VariantImg from '../ui/VariantImg';
@@ -29,9 +36,17 @@ import {
   asCustom,
   deliveryFee,
   firstBlocker,
+  loadKits,
+  loadMembershipOptions,
   moveRadioFocus,
   readyToBuy,
+  servicesOnly,
   tabStop,
+  type KitsFor,
+  type MembershipOption,
+  type MembershipOptions,
+  type PricedKit,
+  type SelectionExtras,
   type AcademyChoice,
   type QuotedSelection,
   type DeliveryChoice,
@@ -42,16 +57,19 @@ import {
 /** Where «تصفّح الخيوط» goes: the ordinary FDM-materials listing (src/lib/homeLayout.ts `filament`). */
 const FILAMENT_LISTING = '/products?category=cat_materials_fdm';
 
+/** What the card says about the chosen membership and kit (their names; the figures stay the server's). */
+export interface ExtrasLabels { membership?: string | null; kit?: string | null }
+
 export interface CustomizeSheetProps {
   open: boolean;
   onClose: () => void;
-  onApply: (s: ServiceSelection) => void;
+  onApply: (s: ServiceSelection, labels?: ExtrasLabels) => void;
   /**
    * The product page's «أضف إلى السلة»: apply this confirmed choice and add the
    * printer through the page's own add once the server priced it. Absent (the
    * cart, or a selection the page cannot sell) = «تطبيق» is the only action.
    */
-  onApplyAndAdd?: (s: ServiceSelection) => void;
+  onApplyAndAdd?: (s: ServiceSelection, labels?: ExtrasLabels) => void;
   /** The page's add is in flight: «أضف إلى السلة» is busy. */
   adding?: boolean;
   offer: ServicesOffer;
@@ -66,18 +84,20 @@ export interface CustomizeSheetProps {
   /** The caller's save was refused: said inside the sheet, which stays open. */
   error?: string | null;
   /**
-   * Membership, information only — the server's `membership_preview` figure. It
-   * is NOT a service: the selection has no membership field and the server
-   * refuses unknown ones. Absent or null = the row is not drawn.
+   * What the owner's kits are priced for (GET /api/products/:slug/kits): this
+   * printer's product, version, order type, route and quantity. Absent = the
+   * Filament row only links to the ordinary listing.
    */
-  membership?: { tier: string; unitIqd: number; upgrade: boolean } | null;
+  kitsFor?: KitsFor | null;
 }
+
+type Loaded<T> = { state: 'loading' } | { state: 'failed' } | { state: 'ready'; data: T };
 
 type DraftQuote = { key: string; state: 'fresh' | 'failed'; unit: number | null; sel: QuotedSelection | null };
 
 type RowKey = 'warranty' | 'care' | 'membership' | 'packaging' | 'delivery' | 'inspection' | 'academy' | 'filament';
 
-export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, adding = false, offer, current, printer, lang, money, quote, busy = false, error = null, membership = null }: CustomizeSheetProps) {
+export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, adding = false, offer, current, printer, lang, money, quote, busy = false, error = null, kitsFor = null }: CustomizeSheetProps) {
   const s = PS_STRINGS[lang];
   const titleId = useId();
   const keyDir = lang === 'en' ? 'ltr' : 'rtl';
@@ -117,8 +137,104 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   }, [open]);
 
   const set = (patch: Partial<ServiceSelection>) => setDraft((d) => ({ ...d, ...patch }));
+  const setExtra = (patch: SelectionExtras) => setDraft((d) => ({ ...d, extras: { ...d.extras, ...patch } }));
+
+  // ---- phase 2: the membership and the kit, each read from its own endpoint when its row opens
+  // (or at once when the confirmed choice already holds one, so its figure is the server's).
+  const { user } = useAuth();
+  const location = useLocation();
+  const memberOffered = !!offer.membership && offer.membership.tiers.length > 0;
+  const kitsOffered = offer.kits.length > 0 && !!kitsFor;
+  const [members, setMembers] = useState<Loaded<MembershipOptions> | null>(null);
+  const [kits, setKits] = useState<Loaded<PricedKit[]> | null>(null);
+  const [memberTry, setMemberTry] = useState(0);
+  const [kitTry, setKitTry] = useState(0);
+  const wantMembers = open && memberOffered && !!user && (openRow === 'membership' || !!draft.extras?.membershipPlanId);
+  const wantKits = open && kitsOffered && (openRow === 'filament' || !!draft.extras?.kitId);
+  const kitsKey = kitsFor ? JSON.stringify(kitsFor) : '';
+  // The printer itself (product and version): another one = other kits, so a chosen kit is dropped.
+  const versionKey = kitsFor ? JSON.stringify([kitsFor.slug, [...kitsFor.optionValueIds].sort()]) : '';
+  const offerMemberKey = JSON.stringify(offer.membership ?? null);
+  const offerKitsKey = offer.kits.map((k) => k.id).join(',');
+  /*
+   * A version switch, or an offer that no longer carries the membership row or
+   * this kit, clears the choice (never kept as a hidden extra the add would
+   * send), and the lists are read again for what is on screen now.
+   */
+  const lastVersion = useRef(versionKey);
+  useEffect(() => {
+    const switched = lastVersion.current !== versionKey;
+    lastVersion.current = versionKey;
+    setDraft((d) => {
+      const x = d.extras;
+      if (!x) return d;
+      const dropKit = !!x.kitId && (switched || !offer.kits.some((k) => k.id === x.kitId));
+      const dropPlan = !!x.membershipPlanId && !offer.membership;
+      if (!dropKit && !dropPlan) return d;
+      return { ...d, extras: { ...x, ...(dropKit ? { kitId: null } : {}), ...(dropPlan ? { membershipPlanId: null } : {}) } };
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [versionKey, offerKitsKey, offerMemberKey, open]);
+  useEffect(() => { setKits(null); }, [kitsKey]);
+  useEffect(() => { setMembers(null); }, [offerMemberKey]);
+  useEffect(() => {
+    if (!wantMembers) return;
+    const ac = new AbortController();
+    setMembers((m) => (m?.state === 'ready' ? m : { state: 'loading' }));
+    loadMembershipOptions(ac.signal).then(
+      (data) => { if (!ac.signal.aborted) setMembers({ state: 'ready', data }); },
+      () => { if (!ac.signal.aborted) setMembers({ state: 'failed' }); }
+    );
+    return () => ac.abort();
+  }, [wantMembers, memberTry, user?.id, offerMemberKey]);
+  useEffect(() => {
+    if (!wantKits || !kitsKey) return;
+    const ac = new AbortController();
+    setKits({ state: 'loading' });
+    loadKits(JSON.parse(kitsKey) as KitsFor, ac.signal).then(
+      (data) => { if (!ac.signal.aborted) setKits({ state: 'ready', data }); },
+      () => { if (!ac.signal.aborted) setKits({ state: 'failed' }); }
+    );
+    return () => ac.abort();
+  }, [wantKits, kitsKey, kitTry]);
+  const blockedWords = (code: string) => s.memberBlocked[code] || servicesErrorText(code, lang) || s.unavailable;
+  const blockedSentence = (code: string) => servicesErrorText(code, lang) || s.memberBlocked[code] || s.unavailable;
+  const memberList = members?.state === 'ready' ? members.data : null;
+  const planId = draft.extras?.membershipPlanId ?? null;
+  /*
+   * An existing member is offered an UPGRADE only (owner ruling): the same and lower tiers are hidden, and
+   * there is no renewal through a printer order. The server already leaves them out; this holds the line
+   * if an answer still lists one (an option at or below the current tier, or its refusal).
+   */
+  const rank = (t: string | null | undefined) => TIER_ORDER[(t || 'free') as AnyTier] ?? 0;
+  const upward = (o: MembershipOption) => !memberList?.current || rank(o.plan.tier) > rank(memberList.current.tier);
+  const chosenPlan = planId ? memberList?.options.find((o) => o.plan.id === planId) ?? null : null;
+  const kitId = draft.extras?.kitId ?? null;
+  const kitList = kitsOffered && kits?.state === 'ready' ? kits.data : null;
+  const chosenKit = kitId ? kitList?.find((k) => k.id === kitId) ?? null : null;
+  // A chosen plan or kit the server no longer sells holds the apply, with its reason — and so does one
+  // whose options are still loading or could not be read (its figure is not the server's yet).
+  const extrasBlock =
+    planId && !user ? s.memberSignIn
+    : planId && !memberList ? (members?.state === 'failed' ? s.memberFailed : s.memberLoading)
+    : chosenPlan && !chosenPlan.ok ? blockedSentence(codeOf(chosenPlan))
+    : chosenPlan && !upward(chosenPlan) ? blockedSentence('ALREADY_SUBSCRIBED')
+    : planId && memberList && !chosenPlan ? servicesErrorText('MEMBERSHIP_NOT_OFFERED', lang)
+    : kitId && !kitsOffered ? servicesErrorText('KIT_NOT_OFFERED', lang)
+    : kitId && !kitList ? (kits?.state === 'failed' ? s.kitsFailed : s.kitsLoading)
+    : chosenKit && !chosenKit.available ? servicesErrorText('KIT_UNAVAILABLE', lang)
+    : kitId && kitList && !chosenKit ? servicesErrorText('KIT_NOT_OFFERED', lang)
+    : '';
+  const memberCharge = chosenPlan?.ok ? chosenPlan.charge_iqd : null;
+  const kitTotal = chosenKit?.available ? chosenKit.total_iqd : null;
   const applied: ServiceSelection = { ...asCustom(draft), confirmed: true };
-  const draftKey = JSON.stringify(applied);
+  // The names the card shows for the chosen extras (a name only: the figures stay the server's, in the cart).
+  const labels: ExtrasLabels = {
+    membership: chosenPlan ? `${tierLabel(chosenPlan.plan.tier)} · ${s.months(chosenPlan.plan.duration_months)}` : null,
+    kit: kitId ? offer.kits.find((k) => k.id === kitId)?.title[lang] || chosenKit?.title[lang] || null : null,
+  };
+  // The server prices the services only; the extras are priced by their own endpoints below.
+  const draftKey = JSON.stringify(servicesOnly(applied));
   const [q, setQ] = useState<DraftQuote | null>(null);
   // The caller may hand a new function each render: the latest one is used, the draft is what re-asks.
   const quoteRef = useRef(quote);
@@ -143,8 +259,8 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const blocker = firstBlocker(priced);
   const complete = readyToBuy(applied, offer);
   const quoted = !quote || (fresh?.state === 'fresh' && !!priced && !blocker);
-  const ready = complete && quoted && !busy && !adding;
-  const hint = !complete
+  const ready = complete && quoted && !extrasBlock && !busy && !adding;
+  const hint = extrasBlock ? extrasBlock : !complete
     ? offer.delivery && draft.delivery === null ? s.deliveryChoose : draft.warranty === 'none' && !draft.ack_no_warranty ? s.justAck : ''
     : !quote ? ''
     : !fresh ? s.pending
@@ -230,6 +346,126 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const academyLive = draft.academy !== 'recorded';
   const actionBusy = busy || adding;
 
+  /** One column of choices whose right side and lines are the server's words and figures. */
+  const list = (name: string, options: Array<{ id: string; label: string; right: string; lines: string[]; disabled: boolean; suggested?: boolean }>, value: string, onPick: (id: string) => void) => {
+    const stop = tabStop(options.map((o) => o.id), value, (id) => !options.find((o) => o.id === id)?.disabled);
+    return (
+      <div className="space-y-2" role="radiogroup" aria-label={name} onKeyDown={(e) => moveRadioFocus(e, keyDir)}>
+        {options.map((o) => {
+          const on = value === o.id;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              tabIndex={stop === o.id ? 0 : -1}
+              disabled={o.disabled}
+              onClick={() => onPick(o.id)}
+              data-sheet-option={o.id}
+              className={`min-h-12 w-full rounded-xl border px-2.5 py-1.5 text-start press-scale [touch-action:manipulation] disabled:opacity-50 ${on ? 'bg-white text-black border-transparent' : o.suggested ? 'border-dashed border-text-muted text-text-primary' : 'border-border-subtle text-text-primary'}`}
+            >
+              <span className="flex items-center justify-between gap-1.5">
+                <span className="text-[12.5px] font-semibold leading-tight">{o.label}</span>
+                <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-semibold tabular-nums" dir="auto">
+                  {o.right}
+                  {on ? <Check aria-hidden="true" className="animate-in fade-in duration-200 motion-reduce:animate-none w-3.5 h-3.5 shrink-0" /> : null}
+                </span>
+              </span>
+              {o.lines.filter(Boolean).map((l, i) => (
+                <span key={i} className={`block text-[11px] leading-snug ${on ? 'opacity-70' : 'text-text-secondary'}`} dir="auto">{l}</span>
+              ))}
+            </button>
+          );
+        })}
+      </div>
+    );
+  };
+
+  const loadingLine = (state: 'loading' | 'failed', loading: string, failed: string, again: () => void) =>
+    state === 'loading' ? (
+      <p role="status" className="text-[11.5px] text-text-secondary">{loading}</p>
+    ) : (
+      <p role="alert" className="flex flex-wrap items-center gap-2 text-[11.5px] text-text-primary">
+        {failed}
+        <button type="button" onClick={again} className="inline-flex min-h-11 items-center font-semibold underline">{s.retry}</button>
+      </p>
+    );
+
+  function membershipBody() {
+    const terms = (
+      <>
+        <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary">{s.memberStarts}</p>
+        <p className="mt-1 text-[11.5px] leading-relaxed text-text-secondary">{s.memberFinal}</p>
+        <Link to="/policies/membership" className="mt-1 inline-flex min-h-11 items-center text-[12px] text-text-secondary underline">{s.membershipTerms}</Link>
+      </>
+    );
+    if (!user) {
+      return (
+        <>
+          <p className="text-[12px] text-text-primary">{s.memberSignIn}</p>
+          <Link to={authPathWithSupportRef(`${location.pathname}${location.search}`)} className="mt-1 inline-flex min-h-11 items-center text-[12.5px] font-semibold text-text-primary underline">{s.signIn}</Link>
+          {terms}
+        </>
+      );
+    }
+    if (!members || members.state !== 'ready') return <>{loadingLine(members?.state === 'failed' ? 'failed' : 'loading', s.memberLoading, s.memberFailed, () => setMemberTry((n) => n + 1))}{terms}</>;
+    const m = members.data;
+    if (!m.offered) return <p className="text-[11.5px] text-text-secondary">{s.memberOff}</p>;
+    // The package's tier is only drawn as a suggestion until the customer taps (a visual default is not consent).
+    const pkg = current?.confirmed && (current.package === 'smart' || current.package === 'complete') ? offer.packages[current.package] : null;
+    const hintTier = draft.extras?.membershipPlanId === undefined ? pkg?.includes.membership_tier ?? null : null;
+    const shownOptions = m.options.filter((o) => upward(o) && !['DOWNGRADE_BLOCKED', 'ALREADY_SUBSCRIBED'].includes(codeOf(o)));
+    return (
+      <>
+        {m.current ? <p className="mb-2 text-[12px] text-text-primary" data-sheet-member-current>{s.memberCurrent(tierLabel(m.current.tier), (m.current.expires_at ?? '').slice(0, 10))}</p> : null}
+        {m.current ? <p className="mb-2 text-[11.5px] text-text-secondary" data-sheet-member-upgrade-only>{shownOptions.length ? s.memberUpgradeOnly : s.memberNoUpgrade}</p> : null}
+        {m.pending_order_id ? <p className="mb-2 text-[11.5px] text-text-secondary">{s.memberPendingOrder}</p> : null}
+        {list(s.membership, [
+          { id: '', label: s.memberNone, right: '', lines: [], disabled: false },
+          ...shownOptions.map((o) => ({
+            id: o.plan.id,
+            label: `${tierLabel(o.plan.tier)} · ${s.months(o.plan.duration_months)}`,
+            right: o.ok ? `+${money(o.charge_iqd)}` : blockedWords(codeOf(o)),
+            lines: o.ok
+              ? [
+                  o.kind === 'upgrade' ? s.memberUpgrade : s.memberNew,
+                  o.credit_iqd > 0 ? `${money(o.price_iqd)} · ${s.memberCredit(money(o.credit_iqd))}` : '',
+                ]
+              : [],
+            disabled: !o.ok,
+            suggested: !!hintTier && o.plan.tier === hintTier,
+          })),
+        ], planId ?? '', (id) => setExtra({ membershipPlanId: id || null }))}
+        {terms}
+      </>
+    );
+  }
+
+  function kitsBody() {
+    const note = <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary">{s.kitNote}</p>;
+    if (!kits || kits.state !== 'ready') return <>{loadingLine(kits?.state === 'failed' ? 'failed' : 'loading', s.kitsLoading, s.kitsFailed, () => setKitTry((n) => n + 1))}{note}</>;
+    const name = (i: PricedKit['items'][number]) => `${lang === 'en' ? i.name : i.name_ar || i.name}${i.variant ? ` (${i.variant})` : ''} ×${i.qty_per_printer}${i.available ? '' : ` — ${s.kitItemOut}`}`;
+    return (
+      <>
+        {list(s.filament, [
+          { id: '', label: s.kitSkip, right: '', lines: [], disabled: false },
+          ...kits.data.map((k) => ({
+            id: k.id,
+            label: k.title[lang] || k.title.ar,
+            right: k.available && k.total_iqd !== null ? `+${money(k.total_iqd)}` : s.unavailable,
+            lines: [
+              k.items.map(name).join(' · '),
+              k.available && k.price_per_printer_iqd !== null && k.total_iqd !== k.price_per_printer_iqd ? `${money(k.price_per_printer_iqd)} ${s.kitPerPrinter}` : '',
+            ],
+            disabled: !k.available,
+          })),
+        ], kitId ?? '', (id) => setExtra({ kitId: id || null }))}
+        {note}
+      </>
+    );
+  }
+
   return (
     <Sheet
       open={open}
@@ -267,6 +503,10 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               {figures && figures.sel.fee_iqd > 0 ? <span className="block tabular-nums" dir="auto">{s.services}: + {money(figures.sel.fee_iqd)}</span> : null}
               {dFee !== null ? <span className="block tabular-nums" dir="auto">{s.deliveryLine}: + {money(dFee)}</span> : null}
               {dFee !== null ? <span className="block">{s.deliveryApart}</span> : null}
+              {/* Phase 2: their own cart lines — each figure from its own endpoint, never added to the total. */}
+              {memberCharge !== null ? <span className="block tabular-nums" dir="auto" data-sheet-membership-charge>{s.membership}: + {money(memberCharge)}</span> : null}
+              {kitTotal !== null ? <span className="block tabular-nums" dir="auto" data-sheet-kit-total>{s.filament}: + {money(kitTotal)}</span> : null}
+              {memberCharge !== null || kitTotal !== null ? <span className="block">{s.extrasApart}</span> : null}
             </div>
             <div className="text-end" aria-live="polite" aria-atomic="true">
               <span className="block text-[11.5px] text-text-secondary">{s.total}</span>
@@ -286,7 +526,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               <button
                 type="button"
                 disabled={!ready}
-                onClick={() => { if (ready) onApply(applied); }}
+                onClick={() => { if (ready) onApply(applied, labels); }}
                 className="min-h-12 shrink-0 rounded-full border border-border-subtle px-4 text-[14px] font-semibold text-text-primary press-scale disabled:opacity-50"
                 data-sheet-apply
               >
@@ -296,7 +536,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
                 type="button"
                 disabled={!ready}
                 aria-busy={actionBusy || undefined}
-                onClick={() => { if (ready) onApplyAndAdd(applied); }}
+                onClick={() => { if (ready) onApplyAndAdd(applied, labels); }}
                 className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-white text-[15px] font-bold text-black press-scale disabled:opacity-50"
                 data-sheet-add
               >
@@ -308,7 +548,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               type="button"
               disabled={!ready}
               aria-busy={busy || undefined}
-              onClick={() => { if (ready) onApply(applied); }}
+              onClick={() => { if (ready) onApply(applied, labels); }}
               className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-[15px] font-bold text-black press-scale disabled:opacity-50"
               data-sheet-apply
             >
@@ -348,21 +588,10 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
             { id: 'c12' as const, label: s.careOption, price: priceOf(offer.care?.c12) },
           ], draft.care, (v) => set({ care: v })), !offer.care)}
 
-        {/* Information only: the server's member price for this printer, and where to subscribe. */}
+        {/* Phase 2: the membership bought WITH the printer — its own order line at the live plan price. */}
         {row('membership', <Crown className="w-5 h-5" aria-hidden="true" />, s.membership, s.membershipSub,
-          membership ? money(membership.unitIqd) : '',
-          membership ? (
-            <>
-              <p className="flex items-baseline justify-between gap-3 text-[12.5px] text-text-primary">
-                <span>{s.memberPays(membership.tier)}</span>
-                <span className="shrink-0 font-semibold tabular-nums" dir="auto">{money(membership.unitIqd)}</span>
-              </p>
-              <p className="mt-1.5 text-[11.5px] leading-relaxed text-text-secondary">{s.membershipApart}</p>
-              <Link to="/subscription" className="mt-1 inline-flex min-h-11 items-center text-[12.5px] font-semibold text-text-primary underline">
-                {membership.upgrade ? s.membershipUpgrade(membership.tier) : s.membershipJoin}
-              </Link>
-            </>
-          ) : null, !membership)}
+          memberCharge !== null ? `+${money(memberCharge)}` : draft.extras?.membershipPlanId === null ? s.none : '',
+          membershipBody(), !memberOffered)}
 
         {row('packaging', <Package className="w-5 h-5" aria-hidden="true" />, s.packaging, s.packagingSub,
           draft.packaging === 'extra' ? shown(priceOf(offer.packaging?.extra)) : s.packagingStandard,
@@ -399,16 +628,23 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
             {academyLive ? <p className="mt-2 text-[11.5px] text-text-secondary">{s.academyNote}</p> : null}
           </>, !offer.academy)}
 
-        {/* Not a service: filament is an ordinary product, bought through the normal cart. */}
-        {row('filament', <Spool className="w-5 h-5" aria-hidden="true" />, s.filament, s.filamentSub, '', (
-          <>
-            <p className="text-[11.5px] leading-relaxed text-text-secondary">{s.filamentNote}</p>
-            <Link to={FILAMENT_LISTING} className="mt-1 inline-flex min-h-11 items-center text-[12.5px] font-semibold text-text-primary underline">{s.filamentShop}</Link>
-          </>
-        ))}
+        {/* Phase 2: the owner's filament kits for this printer — one kit or skip; no kit = the ordinary listing. */}
+        {row('filament', <Spool className="w-5 h-5" aria-hidden="true" />, s.filament, kitsOffered ? s.filamentSub : s.filamentNote,
+          kitTotal !== null ? `+${money(kitTotal)}` : draft.extras?.kitId === null ? s.none : '',
+          kitsOffered ? kitsBody() : (
+            <>
+              <p className="text-[11.5px] leading-relaxed text-text-secondary">{s.filamentNote}</p>
+              <Link to={FILAMENT_LISTING} className="mt-1 inline-flex min-h-11 items-center text-[12.5px] font-semibold text-text-primary underline">{s.filamentShop}</Link>
+            </>
+          ))}
       </div>
     </Sheet>
   );
+}
+
+/** A refused plan's code (the server's `options[].code`). */
+function codeOf(o: MembershipOption): string {
+  return 'code' in o ? o.code : '';
 }
 
 /** The sheet starts from what was confirmed, or from nothing paid (never from a package). */
@@ -416,5 +652,5 @@ function start(current: ServiceSelection | null, offer: ServicesOffer): ServiceS
   // A delivery the offer no longer has (switched off) is not carried into the draft.
   const delivery = offer.delivery ? current?.delivery ?? null : null;
   if (current?.confirmed) return { ...current, delivery };
-  return { ...EMPTY_SELECTION, delivery };
+  return { ...EMPTY_SELECTION, delivery, ...(current?.extras ? { extras: current.extras } : {}) };
 }

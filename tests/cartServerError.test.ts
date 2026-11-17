@@ -100,6 +100,10 @@ function without(raw: DatabaseSync, opts: { tables?: string[]; columns?: Array<[
     if (t === 'cart_items' && c === 'option_value_ids') {
       raw.exec('DROP INDEX IF EXISTS idx_cart_levonis_line_v2; DROP INDEX IF EXISTS idx_cart_levonis_line;');
     }
+    // 0235's kit-follows-printer trigger names both columns; a database without either never ran 0235.
+    if (t === 'cart_items' && (c === 'fulfillment_type' || c === 'transport_method')) {
+      raw.exec('DROP TRIGGER IF EXISTS trg_cart_kit_follows_printer_type;');
+    }
     raw.exec(`ALTER TABLE ${t} DROP COLUMN ${c};`);
   }
   raw.exec('PRAGMA foreign_keys = ON;');

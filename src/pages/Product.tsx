@@ -2295,6 +2295,8 @@ export default function Product() {
         setCartLines(items);
         // The answer IS the whole cart: the page now knows what every line holds.
         setCartLinesLoaded(true);
+        // The membership and kit went with this printer line: the next add starts with none.
+        setSvc((v) => (v?.extras ? { ...v, extras: undefined } : v));
         setShippingConflict(null);
         const chosen = chosenColourOf(product, relations, colorId, optionValueIds);
         if (chosen) {
@@ -2336,7 +2338,12 @@ export default function Product() {
         // customer chose rather than what a transport implies.
         if (requestedOrderType) body.fulfillmentType = requestedOrderType;
         if (warrantyPlanId) body.warrantyPlanId = warrantyPlanId;
-        if (psQuoted && svc) body.services = svc;
+        // A null extra («none») is a removal only on the line's own PUT extras: on an add it would strip the
+        // kit/membership the merged printer line already holds, so only chosen ones travel.
+        if (psQuoted && svc) {
+          for (const [k, v] of Object.entries(svc.extras ?? {})) if (v) body[k] = v;
+          body.services = svc;
+        }
         if (replaceCart) body.replaceCart = true;
         // What the page believes this exact line holds — only when it really read the cart.
         if (cartLinesLoaded) body.inCart = before;
@@ -4866,14 +4873,12 @@ export default function Product() {
             fresh={quotedFor === priceKey}
             failed={!!quoteError && !quoteLoading}
             onReady={setSvcReady}
-            quoteFor={[productSlug ?? '', optionId, optionValueIds, colorId, effectiveTransport, requestedOrderType]}
+            quoteFor={[productSlug ?? '', optionId, optionValueIds, colorId, effectiveTransport, requestedOrderType, qty]}
             product={product}
             attention={psAttention}
             onAdd={handleAddToCart}
             addable={source === 'catalog' && !noPrice && mode !== 'unavailable'}
             adding={addingToCart}
-            pro={proInvite?.unit_iqd}
-            upgrade={isPrime}
           />
         </React.Suspense>
       ) : null}

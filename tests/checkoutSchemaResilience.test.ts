@@ -69,6 +69,11 @@ function setup(dropColumn?: string) {
     if (dropColumn === 'gift_entitlement_id') {
       raw.exec('DROP INDEX IF EXISTS idx_cart_items_gift_line; DROP TRIGGER IF EXISTS trg_cart_gift_line_removed;');
     }
+    // 0235's kit lines follow their printer's type and route through a trigger naming both columns; a database
+    // without either column never ran 0235, so it has no such trigger either.
+    if (dropColumn === 'fulfillment_type' || dropColumn === 'transport_method') {
+      raw.exec('DROP TRIGGER IF EXISTS trg_cart_kit_follows_printer_type;');
+    }
     raw.exec(`ALTER TABLE cart_items DROP COLUMN ${dropColumn};`);
   }
   return { raw, db: new SqliteD1(raw) as unknown as D1Database };

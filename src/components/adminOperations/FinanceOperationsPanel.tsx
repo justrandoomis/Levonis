@@ -986,6 +986,8 @@ function Reports({ config, from, to }: { config: Config; from: string; to: strin
         disposition: string;
       }>;
       general_expenses_iqd: number;
+      /** Memberships sold with delivered orders (0235) — outside net goods. Absent from an older server. */
+      memberships_sold_iqd?: number;
       allocated_overhead_iqd: number | null;
       truncated: boolean;
       suppliers: Array<
@@ -1087,6 +1089,12 @@ function Reports({ config, from, to }: { config: Config; from: string; to: strin
             {loc('المصروفات العامة / الموزعة', 'General / allocated overhead')}:{' '}
             {money(data?.general_expenses_iqd)} / {money(data?.allocated_overhead_iqd)}
           </span>
+          {data?.memberships_sold_iqd ? (
+            <span className={`text-sm ${T.text2}`}>
+              {loc('عضويات مُباعة مع الطلبات (خارج صافي البضاعة)', 'Memberships sold with orders (outside net goods)', 'ئەندامێتییە فرۆشراوەکان لەگەڵ داواکارییەکان (دەرەوەی کاڵای پاک)')}:{' '}
+              {money(data.memberships_sold_iqd)}
+            </span>
+          ) : null}
         </div>
         <DataTable
           headers={[

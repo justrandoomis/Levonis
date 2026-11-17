@@ -8,7 +8,7 @@ import {
 import { useWallet } from '../WalletContext';
 import { mascot } from '../lib/mascot';
 import { api, ApiError, CartItem } from '../lib/api';
-import type { CartWarrantyPlan } from '../lib/api';
+import type { CartPrinterExtras, CartWarrantyPlan } from '../lib/api';
 import { shippingTypeLabel, type ShippingType } from '../lib/shippingType';
 import { methodDesc, methodTitle } from '../lib/methodText';
 import { deliveryCharge, type DeliveryPolicy } from '../../packages/shipping/src/storeDelivery';
@@ -46,7 +46,8 @@ import { groupCartLines, groupPictures } from '../lib/cartGroups';
 import { colourLang, colourStrings, groupSummaryText, isolate } from '../lib/colourQuantities';
 import { ColourSwatch, ColourTag } from '../components/product/ColourTag';
 import VariantChoices from '../components/cart/VariantChoices';
-import { PS_STRINGS, servicesErrorText } from '../components/product/printerServicesStrings';
+import { PS_STRINGS, servicesErrorText, servicesRefusalText } from '../components/product/printerServicesStrings';
+import PrinterExtrasLines from '../components/cart/PrinterExtrasLines';
 /** «تخصيص بنفسي» from the cart (DECISIONS row 339): loaded only when opened. */
 const CustomizeSheet = React.lazy(() => import('../components/product/CustomizeSheet'));
 import { ESTIMATE_TEXT } from '../lib/priceStatus';
@@ -356,6 +357,8 @@ interface UnavailableLine {
   code: 'PRODUCT_CURRENTLY_UNAVAILABLE' | 'PRICE_NOT_AVAILABLE';
   /** Its page, where «طلب السعر» is: a `PRICE_NOT_AVAILABLE` line only (absent from an older server). */
   slug?: string | null;
+  /** Phase 2 (0235): a filament-kit line, when the server names it (else known from its printer's `kit.line_ids`). */
+  kit_line?: { printer_cart_item_id: string } | null;
 }
 
 /** The server's delivery-policy inputs for the cart's ESTIMATE («إدارة التوصيل»). */
@@ -402,6 +405,8 @@ interface CartResponse {
   membership?: CartMembership | null;
   delivery_tariff?: CartDeliveryTariff;
   scope?: { seller_type?: string } | null;
+  /** Phase 2 (0235): the membership chosen with a printer line, quoted live. */
+  printer_extras?: CartPrinterExtras;
 }
 
 /**
@@ -415,6 +420,7 @@ interface CartWriteResponse {
   items: CartItem[];
   unavailable_lines?: UnavailableLine[];
   membership?: CartMembership | null;
+  printer_extras?: CartPrinterExtras;
 }
 
 /**
@@ -554,6 +560,8 @@ export default function Cart() {
   const [warrantyPickerId, setWarrantyPickerId] = useState<string | null>(null);
   /** The printer line whose package the sheet is changing (0234). */
   const [servicesLineId, setServicesLineId] = useState<string | null>(null);
+  /** Phase 2 (0235): the membership chosen with a printer line (`printer_extras`), as the server last quoted it. */
+  const [printerExtras, setPrinterExtras] = useState<CartPrinterExtras | null>(null);
   const [servicesError, setServicesError] = useState<Record<string, string>>({});
   /** The printer line whose choice is being saved: «تطبيق» is busy, a second press sends nothing. */
   const [servicesSavingId, setServicesSavingId] = useState<string | null>(null);
@@ -667,6 +675,10 @@ export default function Cart() {
     (data: CartWriteResponse) => {
       applyItems(data.items || []);
       if (Array.isArray(data.unavailable_lines)) setUnavailableLines(data.unavailable_lines);
+      // A write that does not carry the extras keeps them only while their printer line is still there.
+      const ids = new Set((data.items || []).map((i) => i.id));
+      if ('printer_extras' in data) setPrinterExtras(data.printer_extras ?? null);
+      else setPrinterExtras((x) => (x?.membership && !ids.has(x.membership.printer_cart_item_id) ? { ...x, membership: null } : x));
       if ('membership' in data) putMembership(data.membership ?? null);
       else void refreshMembership();
     },
@@ -725,7 +737,7 @@ export default function Cart() {
         : null;
       if (estimateSaid) return estimateSaid;
       // «خصص طابعتك»: a services refusal names its fix in the reader’s language (never the server’s English).
-      const servicesSaid = servicesErrorText(code, lang);
+      const servicesSaid = servicesRefusalText(err, lang);
       if (servicesSaid) return servicesSaid;
       const said = apiRefusal(err, lang as 'ar' | 'en' | 'ckb', fallback);
       const counter = counterNamed(code);
@@ -763,6 +775,7 @@ export default function Cart() {
       setMerchantScope(data.scope?.seller_type === 'merchant');
       applyItems(data.items || [], { detectPriceChange: !!opts?.silent });
       setUnavailableLines(Array.isArray(data.unavailable_lines) ? data.unavailable_lines : []);
+      setPrinterExtras(data.printer_extras ?? null);
       // §10: the server's own answer about what this membership saved, per
       // line and in total — null for a customer without one, and for one whose
       // membership has lapsed.
@@ -963,6 +976,10 @@ export default function Cart() {
    * mean "no opinion", not "blocked". strictNullChecks is off here, so that
    * distinction is this comparison's job and not the compiler's.
    */
+  /** The printer line an unavailable line is a filament-kit line of (phase 2), or null. */
+  const kitLineOf = (line: UnavailableLine): string | null =>
+    line.kit_line?.printer_cart_item_id ?? items.find((p) => p.kit?.line_ids.includes(line.cart_item_id))?.id ?? null;
+
   const lineBlocked = (item: CartItem): boolean => {
     if (item.composition) return BLOCKING_STATES.has(item.composition.availability_state);
     const a = item.availability;
@@ -1067,10 +1084,15 @@ export default function Cart() {
   };
 
   const toggleSelect = (itemId: string) => {
+    // A printer's kit lines (phase 2) are ticked and unticked with it: the checkout refuses a kit without its printer.
+    const kitIds = items.filter((i) => i.kit_line?.printer_cart_item_id === itemId).map((i) => i.id);
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (next.has(itemId)) next.delete(itemId);
-      else next.add(itemId);
+      const on = !next.has(itemId);
+      for (const id of [itemId, ...kitIds]) {
+        if (on) next.add(id);
+        else next.delete(id);
+      }
       return next;
     });
   };
@@ -1083,9 +1105,11 @@ export default function Cart() {
 
   /** A colour group's header selects or clears every colour of the product at once (§5.2). */
   const toggleGroup = (ids: string[], on: boolean) => {
+    // A printer's kit lines (phase 2) go with it, as in toggleSelect.
+    const withKits = [...ids, ...items.filter((i) => i.kit_line && ids.includes(i.kit_line.printer_cart_item_id)).map((i) => i.id)];
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      for (const id of ids) {
+      for (const id of withKits) {
         if (on) next.add(id);
         else next.delete(id);
       }
@@ -1156,8 +1180,9 @@ export default function Cart() {
   // ------------------------------------------------- printer services (0234)
   // One save at a time (a ref, so two taps in one tick cannot both PATCH). A
   // refusal is said INSIDE the open sheet, which stays open to fix the choice.
-  const chooseServices = async (item: CartItem, services: unknown) => {
+  const chooseServices = async (item: CartItem, next: object & { extras?: { membershipPlanId?: string | null; kitId?: string | null } }) => {
     if (servicesSavingRef.current) return;
+    const { extras, ...services } = next;
     servicesSavingRef.current = true;
     setServicesSavingId(item.id);
     setServicesError((prev) => { const next = { ...prev }; delete next[item.id]; return next; });
@@ -1165,6 +1190,14 @@ export default function Cart() {
     try {
       const data = await api.patch<CartWriteResponse>(`/api/cart/items/${item.id}`, { services });
       applyCartWrite(data);
+      // Phase 2: the membership and the kit are saved on the printer line by their own door, only when they changed.
+      const held = extrasOf(item);
+      const changed: Record<string, string | null> = {};
+      if (extras?.membershipPlanId !== undefined && (extras.membershipPlanId ?? null) !== held.membershipPlanId) changed.membershipPlanId = extras.membershipPlanId ?? null;
+      if (extras?.kitId !== undefined && (extras.kitId ?? null) !== held.kitId) changed.kitId = extras.kitId ?? null;
+      if (Object.keys(changed).length && (data.items || []).some((i) => i.id === item.id)) {
+        applyCartWrite(await api.put<CartWriteResponse>(`/api/cart/items/${item.id}/extras`, changed));
+      }
       setServicesLineId(null);
     } catch (err) {
       const said = cartRefusal(err, loc('تعذّر حفظ اختيار الخدمات', 'Could not save the services choice', 'هەڵبژاردنی خزمەتگوزارییەکان پاشەکەوت نەکرا'));
@@ -1173,6 +1206,29 @@ export default function Cart() {
       actionBusyRef.current -= 1;
       servicesSavingRef.current = false;
       setServicesSavingId(null);
+    }
+  };
+  /** What the printer line holds now: its membership plan (printer_extras) and its kit. */
+  const extrasOf = (item: CartItem) => ({
+    membershipPlanId: printerExtras?.membership?.printer_cart_item_id === item.id ? printerExtras.membership.plan_id : null,
+    kitId: item.kit?.kit_id ?? null,
+  });
+  /** Removes the printer line's membership or kit (PUT extras null); a refusal is said on the line. */
+  const [extrasBusyId, setExtrasBusyId] = useState<string | null>(null);
+  const [extrasError, setExtrasError] = useState<Record<string, string>>({});
+  const removeExtra = async (item: CartItem, patch: { membershipPlanId?: null; kitId?: null }) => {
+    if (extrasBusyId) return;
+    setExtrasBusyId(item.id);
+    setExtrasError((prev) => { const next = { ...prev }; delete next[item.id]; return next; });
+    actionBusyRef.current += 1;
+    try {
+      applyCartWrite(await api.put<CartWriteResponse>(`/api/cart/items/${item.id}/extras`, patch));
+    } catch (err) {
+      const said = cartRefusal(err, loc('تعذّر حفظ التغيير', 'Could not save the change', 'گۆڕانکارییەکە پاشەکەوت نەکرا'));
+      setExtrasError((prev) => ({ ...prev, [item.id]: said }));
+    } finally {
+      actionBusyRef.current -= 1;
+      setExtrasBusyId(null);
     }
   };
   const closeServices = (id: string) => {
@@ -1688,6 +1744,8 @@ export default function Cart() {
   const renderLine = (item: CartItem, inGroup = false, picture?: { image: string; hex: string }) => {
     // The server alone marks a gift line (`kind: 'gift'`, locked, priced 0).
     if (item.kind === 'gift') return giftRow(item, item.gift ?? { level: 0, value_iqd: 0 });
+    // Phase 2 (0235): a filament-kit line is drawn under its printer (PrinterExtrasLines), locked.
+    if (item.kit_line) return null;
     const hasVariants = (item.options ?? []).length > 0 || (item.colors ?? []).length > 0;
     const hasShippingOptions = (item.shipping_methods ?? []).length > 0;
     // A LIVE OFFER strikes the published price it replaced (docs/ux/PRODUCT-DISCOUNT.md §8.4) — the
@@ -2022,6 +2080,26 @@ export default function Cart() {
                   <ChevronRight className={`w-3.5 h-3.5 text-text-muted shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />
                 </button>
                 {blockerSaid ? <p role="alert" className="mt-1 text-[11px] text-text-primary" data-cart-services-blocked>{blockerSaid}</p> : null}
+                {/* Phase 2: the membership and the filament kit chosen with this printer, locked under it. */}
+                <>
+                  <PrinterExtrasLines
+                    lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'}
+                    money={(v) => money(v)}
+                    membership={printerExtras?.membership?.printer_cart_item_id === item.id ? printerExtras.membership.quote : null}
+                    kit={item.kit ?? null}
+                    kitLines={[
+                      ...items.filter((k) => k.kit_line?.printer_cart_item_id === item.id).map((k) => ({ id: k.id, name: k.name, name_ar: k.name_ar, variant: k.options_label ?? k.variantLabel, qty: k.qty, blocked: lineBlocked(k) })),
+                      // A kit line whose product is not for sale now is listed apart by the server (unavailable_lines):
+                      // the printer's kit says it is blocked, and its fix is on the kit (re-choose or remove), never on the line.
+                      ...unavailableLines.filter((u) => kitLineOf(u) === item.id).map((u) => ({ id: u.cart_item_id, name: u.name.en, name_ar: lang === 'ckb' ? u.name.ckb : u.name.ar, qty: 0, blocked: true })),
+                    ]}
+                    onRemoveMembership={() => void removeExtra(item, { membershipPlanId: null })}
+                    onRemoveKit={() => void removeExtra(item, { kitId: null })}
+                    onRechoose={() => setServicesLineId(item.id)}
+                    busy={extrasBusyId === item.id}
+                  />
+                  {extrasError[item.id] ? <p role="alert" className="mt-1 text-[11px] text-text-primary" data-cart-extras-error>{extrasError[item.id]}</p> : null}
+                </>
                 {servicesLineId === item.id ? (
                   <React.Suspense fallback={null}>
                     <CustomizeSheet
@@ -2029,7 +2107,8 @@ export default function Cart() {
                       onClose={() => closeServices(item.id)}
                       onApply={(next) => void chooseServices(item, next)}
                       offer={ps.offer}
-                      current={ps.selection}
+                      current={ps.selection ? { ...ps.selection, extras: extrasOf(item) } : null}
+                      kitsFor={{ slug: item.slug, optionValueIds: item.option_value_ids ?? [], fulfillmentType: item.transport_method ? 'pre_order' : undefined, transportMethod: item.transport_method || undefined, qty: item.qty }}
                       printer={{ name: item.name, image: item.image ?? null, versionLabel: item.options_label ?? item.variantLabel ?? '' }}
                       lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'}
                       money={(v) => money(v)}
@@ -2430,7 +2509,9 @@ export default function Cart() {
                           'This product’s price is not available yet, so it cannot be bought now. Request the price and we will tell you when it is ready.',
                           'نرخی ئەم بەرهەمە هێشتا بەردەست نییە، بۆیە ئێستا ناتوانرێت بکڕدرێت. داوای نرخ بکە و کاتێک ئامادە بوو ئاگادارت دەکەینەوە.'
                         )
-                      : loc('غير متاح حاليًا — أزله من السلة', 'Not available right now — remove it from your cart', 'ئێستا بەردەست نییە — لە سەبەتەکەت لای ببە')}
+                      : kitLineOf(line)
+                        ? loc('غير متاح حاليًا — ضمن باقة الفيلامنت: غيّر الباقة أو أزلها من الطابعة', 'Not available right now — part of a filament kit: change or remove the kit on the printer', 'ئێستا بەردەست نییە — بەشێکە لە پاکێجی فیلامێنت: پاکێجەکە لەسەر پرینتەرەکە بگۆڕە یان لای ببە')
+                        : loc('غير متاح حاليًا — أزله من السلة', 'Not available right now — remove it from your cart', 'ئێستا بەردەست نییە — لە سەبەتەکەت لای ببە')}
                   </p>
                 </div>
                 {/* The sentence names a next step, so the line offers it: the product's page, where «طلب السعر» is. */}
@@ -2444,6 +2525,9 @@ export default function Cart() {
                       {loc('طلب السعر', 'Request price', 'داوای نرخ بکە')}
                     </Link>
                   ) : null}
+                  {/* A filament-kit line is locked to its printer (409 KIT_LINE_LOCKED): no Remove here — the kit
+                      under the printer says it is blocked and offers re-choose / remove kit. */}
+                  {kitLineOf(line) ? null : (
                   <button
                     type="button"
                     onClick={() => void removeUnavailable(line)}
@@ -2452,6 +2536,7 @@ export default function Cart() {
                   >
                     {loc('أزل', 'Remove', 'لای ببە')}
                   </button>
+                  )}
                 </div>
               </div>
             ))}

@@ -52,6 +52,7 @@ import {
 } from './orderStages';
 import { deductOrderStock, planOrderReopen, planOrderReturn, stockReturnNote, type ReopenRefusal } from './orderInventory';
 import { cancelledOrderRefundStatements, orderReturnMoved } from './orderCancelOps';
+import { orderMembershipPurchases, ownerCorrectionStatements } from './orderMembershipSale';
 import { emitEvent, eventsEnabled } from './eventBus';
 import { OrderStatusChangedV1 } from '@levonis/contracts/events/v1/OrderStatusChanged';
 import { OrderDeliveredV1 } from '@levonis/contracts/events/v1/OrderDelivered';
@@ -129,6 +130,10 @@ export interface MoveResult {
     | 'TRADE_IN_ORDER_DELIVERED'
     /** «أُرجع، لا يُلغى»: a return of this order already gave money or stock back (Q7, DECISIONS row 319). */
     | 'ORDER_CANCEL_RETURNED'
+    /** 0235: the membership bought with this order started; it is final, so the order is not cancelled. */
+    | 'ORDER_MEMBERSHIP_ACTIVE'
+    /** 0235: the owner corrected this order (ended its started membership, refunded it); it stays cancelled. */
+    | 'ORDER_MEMBERSHIP_CORRECTED'
     /** A pre-dispatch inspection bought on this order is not done yet (0234, DECISIONS row 339). */
     | 'INSPECTION_NOT_DONE'
     | 'ORDER_REOPEN_TRADE_IN_NOT_RECEIVED'
@@ -181,6 +186,14 @@ export interface MoveOptions {
    * aborts the whole move and the result says `SERIALS_REQUIRED`.
    */
   guardStatements?: D1PreparedStatement[];
+  /**
+   * 0235 — THE OWNER'S CORRECTION (owner ruling 2026-11-17 ~10:20): cancel an
+   * order whose membership already started. Only the owner's door sets it
+   * (POST /api/admin/orders/:id/membership-correction checks); the membership
+   * and its purchase are ended FIRST in the cancel's own batch, with an audit
+   * row. Without it a cancel of such an order is ORDER_MEMBERSHIP_ACTIVE.
+   */
+  membershipCorrection?: { actorId: string; reason: string };
 }
 
 export function newHistoryId(orderId: string, at: string): string {
@@ -420,6 +433,18 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   if (legacyTo === 'cancelled' && legacyFrom !== 'cancelled' && await orderReturnMoved(env.DB, order.id)) {
     return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_CANCEL_RETURNED' };
   }
+  // 0235: the membership bought with this order started — final, so the order is not cancelled (not even
+  // forced) — unless this is the owner's correction, which ends it in the cancel's own batch below.
+  const startedMemberships = legacyTo === 'cancelled' && legacyFrom !== 'cancelled'
+    ? (await orderMembershipPurchases(env.DB, order.id)).filter((p) => p.state === 'active')
+    : [];
+  if (startedMemberships.length && !opts.membershipCorrection) {
+    return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_MEMBERSHIP_ACTIVE' };
+  }
+  const correction = startedMemberships.length && opts.membershipCorrection
+    ? ownerCorrectionStatements(env.DB, { id: order.id, stage: storedStage, status: legacyFrom }, startedMemberships,
+        opts.membershipCorrection.actorId, opts.membershipCorrection.reason, nowIso)
+    : [];
 
   const durations = resolveDurations(await getSetting(env.DB, 'orderStageDurations'));
   const schedule = scheduleFrom(opts.to, order.shipping_type, durations, nowIso, spreadFor(order.id));
@@ -431,6 +456,11 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   const reopening = legacyFrom === 'cancelled' && legacyTo !== 'cancelled';
   // Its stock (DECISIONS row 310): units only held are held again in the flip's
   // batch, under their own fence; units taken and put back refuse the re-open.
+  // 0235: an owner-corrected order stays cancelled — re-opening it would charge the membership line again
+  // for a membership that is not revived (trg_orders_membership_corrected_no_reopen guards the flip too).
+  if (reopening && (await orderMembershipPurchases(env.DB, order.id)).some((p) => p.cancel_reason === 'owner_correction')) {
+    return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_MEMBERSHIP_CORRECTED' };
+  }
   const reopenStock = reopening ? await planOrderReopen(env.DB, order.id, opts.changedBy || null) : null;
   if (reopenStock?.refused) {
     return { moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo, next_stage: null, next_stage_at: null, notes: [], reason: reopenStock.refused };
@@ -501,7 +531,9 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   // the move does not happen either, which is the honest outcome. This is only
   // a re-claim. Cancellation returns the wallet, points, stock and offer slot
   // in this same transaction, just like the customer and legacy status doors.
-  const moveStatements = [flipStatement];
+  // The owner's correction (0235) runs BEFORE the flip, so trg_orders_membership_active_no_cancel finds no
+  // started membership; fenced on the same stage and status, so a lost race writes none of it.
+  const moveStatements = [...correction, flipStatement];
   // The serial gate's fence, inside the flip's transaction (H2).
   const guards = opts.guardStatements ?? [];
   if (guards.length) moveStatements.push(...guards);
@@ -534,7 +566,7 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
   if (reopenStock?.plan) moveStatements.push(...reopenStock.plan.statements);
   let flipResult;
   try {
-    [flipResult] = await env.DB.batch(moveStatements);
+    flipResult = (await env.DB.batch(moveStatements))[correction.length];
   } catch (e) {
     // The units were taken between the plan and the commit: the fence rolled it all back.
     if (reopenStock?.plan && String(e instanceof Error ? e.message : e).includes('actual = expected')) {
@@ -610,6 +642,12 @@ export async function moveOrderStage(env: Env, opts: MoveOptions): Promise<MoveR
     // A cancelled order that held a gift line stays cancelled (0175,
     // trg_orders_gift_reopen_guard): its gift went back to the customer and may
     // already sit in a new order.
+    if (msg.includes('ORDER_MEMBERSHIP_CORRECTED')) {
+      return {
+        moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,
+        next_stage: null, next_stage_at: null, notes: [], reason: 'ORDER_MEMBERSHIP_CORRECTED',
+      };
+    }
     if (msg.includes('GIFT_ORDER_REOPEN_REFUSED')) {
       return {
         moved: false, from, to: opts.to, legacy_from: legacyFrom, legacy_to: legacyTo,

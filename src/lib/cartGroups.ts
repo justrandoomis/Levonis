@@ -27,6 +27,8 @@ export interface GroupableLine {
   color_id?: string;
   colors?: Array<{ id: string }> | null;
   options_label?: string;
+  /** Phase 2 (0235): a filament-kit line is drawn under its printer, never grouped. */
+  kit_line?: unknown;
   variantLabel?: string;
 }
 
@@ -35,7 +37,7 @@ export type CartEntry<L extends GroupableLine> =
   | { kind: 'group'; productId: string; items: L[] };
 
 const groupable = (line: GroupableLine) =>
-  !!line.productId && !line.kind && (line.seller_type ?? 'levonis') !== 'merchant';
+  !!line.productId && !line.kind && !line.kit_line && (line.seller_type ?? 'levonis') !== 'merchant';
 
 export function groupCartLines<L extends GroupableLine>(items: readonly L[]): CartEntry<L>[] {
   const counts = new Map<string, number>();
