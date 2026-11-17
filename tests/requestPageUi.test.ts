@@ -92,6 +92,7 @@ const states = await import('../src/components/community/requests/requestStates'
 const compare = await import('../src/components/community/requests/OfferCompare');
 const composer = await import('../src/components/community/requests/OfferComposer');
 const discussion = await import('../src/components/community/requests/Discussion');
+const await_compareSheet = await import('../src/components/community/requests/CompareSheet');
 const { REQUEST_STRINGS, requestStrings, daysLabel, jobsLabel, shortDay, offerStateWords, orderStateWord, escrowSentence, systemUpdateLabel, fillNodes, handoverLabel, composerHandover, fill } = strings;
 const { requestStepIndex, requestStateTone, requestTakesOffers, requestPath, requestRedirect, REQUEST_STEPS, REQUEST_SECTIONS, latestEvent } = states;
 const OfferCompare = compare.default;
@@ -244,7 +245,7 @@ test('counted words, dates and states — the Arabic noun agrees with its number
   assert.equal(systemUpdateLabel('brand_new', {}, s), 'brand_new');
   assert.equal(fill('خلال {days}', { days: daysLabel(3, 'ar') }), 'خلال 3 أيام');
   const nodes = renderToStaticMarkup(createElement('p', null, ...fillNodes(s.was, { price: createElement('b', null, '50') })));
-  assert.equal(nodes, '<p>كان <b>50</b></p>', 'an element keeps its place in the sentence');
+  assert.equal(nodes, '<p>كان السعر <b>50</b></p>', 'an element keeps its place in the sentence');
 });
 
 test('a handover reads in the reader\'s words on a card, in the merchant\'s own voice in the composer', () => {
@@ -659,4 +660,87 @@ test('tokens only: no hex, no dark:, no physical sides, no legacy greys in the n
   assert.match(route, /words\[last\.kind\] \?\? t\.event\.other/);
   // The chat door is the one door: POST /api/chats/open { requestId, merchantId }.
   assert.match(route, /offersApi\.openThread\(current\.id, merchantId\)/);
+});
+
+// ------------------------------------------------------------ review 2026-11-17 (community UI plan C3)
+
+test('«كان» sets the old PRICE beside the price: the history keeps no fee, so it is never weighed against the total', () => {
+  const revised = offer({
+    revised: true,
+    history: [
+      { revision: 1, request_revision: 1, price_iqd: 21000, completion_days: 3, delivery_method: 'merchant_delivery', reason: 'create', created_at: day(-2) },
+      { revision: 2, request_revision: 1, price_iqd: 18000, completion_days: 3, delivery_method: 'merchant_delivery', reason: 'edit', created_at: day(-1) },
+    ],
+  });
+  for (const lang of ['ar', 'en', 'ckb'] as const) {
+    const s = requestStrings(lang);
+    const price = requestStrings(lang).price;
+    assert.ok(s.was.includes(price), `${lang}: «${s.was}» names the price («${price}»), not a bare «was»`);
+    assert.ok(s.was.includes('{price}'));
+  }
+  assert.notEqual(requestStrings('ckb').was, requestStrings('ar').was);
+  const t = text(html(createElement(OfferCompare, { requestId: 'req_1', offers: [revised], takingOffers: true, materials, onChanged: noop })));
+  assert.ok(t.includes('كان السعر'), t);
+  for (const f of ['OfferCard', 'OfferDetailsSheet']) {
+    const src = code(`src/components/community/requests/${f}.tsx`);
+    assert.match(src, /fillNodes\(s\.was, \{ price: <Money iqd=\{prev\.price_iqd\}/, `${f}: the old price as the server sent it`);
+    assert.doesNotMatch(src, /prev\.price_iqd\s*\+/, `${f}: no total the server did not send`);
+  }
+});
+
+test('the offer radio names the offer AND is described by its marks: partial, substitutes, revised, stale, unable', () => {
+  // A radio is a live offer, so of the marks it can wear the partial, the substitutes and «عرض معدّل».
+  const subs = offer({ revised: true, substitutions: [{ part_id: 'pa', material_row_id: 'ma', material_id: 'pla', note: '' }] } as never);
+  const h = html(createElement(OfferCompare, { requestId: 'req_1', offers: [subs], takingOffers: true, materials, onChanged: noop }));
+  const radio = /<div[^>]*role="radio"[^>]*>/.exec(h)?.[0] ?? '';
+  assert.match(radio, /aria-label="/);
+  const ids = (/aria-describedby="([^"]+)"/.exec(radio)?.[1] ?? '').split(' ').filter(Boolean);
+  assert.equal(ids.length, 2, `the substitutes chip and «عرض معدّل» describe the radio: ${radio}`);
+  for (const id of ids) assert.ok(h.includes(`id="${id}"`), `${id} is on the page`);
+  const plain = html(createElement(OfferCompare, { requestId: 'req_1', offers: [offer()], takingOffers: true, materials, onChanged: noop }));
+  assert.doesNotMatch(/<div[^>]*role="radio"[^>]*>/.exec(plain)?.[0] ?? '', /aria-describedby/, 'an offer with no marks has nothing to describe');
+  const src = code('src/components/community/requests/OfferCard.tsx');
+  for (const k of ['partial', 'substitution', 'revised', 'stale', 'unable']) assert.ok(src.includes(`id={markId('${k}')}`), `the ${k} mark has its id`);
+});
+
+test('a delivery names no governorate under the handover: the workshop\'s is not the customer\'s', () => {
+  const m = { ...merchant('m1', 'Ali 3D', 4.8), governorate: 'basra' };
+  const deliver = html(createElement(OfferCompare, { requestId: 'req_1', offers: [offer({ merchant: m as never })], takingOffers: true, materials, onChanged: noop }));
+  const cell = (h: string) => /data-offer-handover="[^"]*"[\s\S]*?<\/div>/.exec(h)?.[0] ?? '';
+  assert.doesNotMatch(text(cell(deliver)), /البصرة/, cell(deliver));
+  assert.ok(text(cell(deliver)).includes(handoverLabel('merchant_delivery', requestStrings('ar'))));
+  const pickup = html(createElement(OfferCompare, { requestId: 'req_1', offers: [offer({ merchant: m as never, delivery_method: 'pickup', delivery_fee_iqd: 0, total_iqd: 18000 })], takingOffers: true, materials, onChanged: noop }));
+  assert.match(text(cell(pickup)), /البصرة/, 'a pickup says where the workshop is');
+  assert.equal('withinGov' in requestStrings('ar'), false, '«ضمن …» is gone');
+});
+
+test('«مقارنة العروض» stands only the live offers side by side', () => {
+  const CompareSheet = await_compareSheet.default;
+  const offers = [
+    offer({ id: 'live_1' }),
+    offer({ id: 'live_2', merchant_id: 'm2', merchant: merchant('m2', 'B', 4) }),
+    offer({ id: 'gone', state: 'declined' as never }),
+    offer({ id: 'old', expired: true }),
+    offer({ id: 'stale', state: 'superseded', stale: true }),
+  ];
+  const h = html(createElement(CompareSheet, { open: true, offers, materials, parts: [], onClose: noop }));
+  assert.deepEqual(attrs(h, 'data-compare-column').sort(), ['live_1', 'live_2']);
+});
+
+test('the owner page: the tab count is the live offers, a tab is written into the address, `#files` changes no tab, a repeat says it is a draft', () => {
+  const src = code('src/pages/community/Request.tsx');
+  assert.match(src, /const liveOffers = offers\?\.filter\(offerIsLive\)\.length \?\? 0;/, 'counted as OfferCompare counts them');
+  assert.match(src, /onClick=\{\(\) => chooseTab\(t\)\}/);
+  assert.match(src, /chooseTab\(next\);/, 'the arrows write the address too');
+  assert.match(src, /navigate\(\{ pathname: location\.pathname, search: location\.search, hash: `#\$\{t\}` \}, \{ replace: true \}\);/, 'replaced, never pushed');
+  assert.match(src, /scrolled\.current = true;\s*unanchor\.current\?\.\(\);\s*navigate/, 'a tapped tab does not scroll the page');
+  const tabOf = /export function hashTab[\s\S]*?\n\}/.exec(src)?.[0] ?? '';
+  assert.doesNotMatch(tabOf, /'files'/, '`#files` is in the header, above both tabs');
+  assert.match(tabOf, /h === 'details' \|\| h === 'discussion' \|\| h === 'timeline'/);
+  // «إعادة الطلب» lands on the copy, a draft: said in a toast, which outlives the page turning.
+  assert.match(src, /if \(!d\.published\) toast\.info\(s\.repeatedDraft\);\s*navigate\(requestPath\(d\.request_id\)\);/);
+  const list = code('src/components/print/MyRequestsList.tsx');
+  assert.match(list, /if \(!d\.published\) toast\.info\(s\.repeatedDraft\);\s*onOpen\(d\.request_id\);/);
+  assert.doesNotMatch(list, /setNotice/, 'no notice set on a list that is left at once');
+  assert.doesNotMatch(read('src/components/print/MyRequestsList.tsx'), /PUBLISHES it/, 'the header no longer says a repeat publishes');
 });

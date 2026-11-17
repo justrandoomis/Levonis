@@ -4,7 +4,7 @@
  * wins on each of the three things a customer weighs (the cheapest total, the
  * fastest, the best rated; from the complete offers when a partial one would
  * otherwise win, and said so), sorted as the customer asks; from a wide screen
- * the offers also stand side by side, every one answering the same rows.
+ * the live offers also stand side by side, every one answering the same rows.
  *
  * A lazy chunk, like the details sheet: the request page does not carry it.
  */
@@ -17,7 +17,7 @@ import { StatusChip } from '../../ui/Badge';
 import { SegmentedTrack } from '../kit/controls';
 import type { CatalogMaterial, OfferV2 } from './api';
 import { OfferFacts } from './OfferDetailsSheet';
-import { bestOffers, partialLabel, sortOffers, type OfferSort, type PartRef } from './offerParts';
+import { bestOffers, offerIsLive, partialLabel, sortOffers, type OfferSort, type PartRef } from './offerParts';
 import { daysLabel, requestLang, useRequestStrings } from './strings';
 
 function CompareRow({ label, o, value, partial = '' }: { label: string; o: OfferV2 | null; value: ReactNode; partial?: string }) {
@@ -52,7 +52,8 @@ export default function CompareSheet({ open, offers, materials, parts, onClose }
   const L = requestLang(lang);
   const titleId = useId();
   const [sort, setSort] = useState<OfferSort>('price');
-  const sorted = useMemo(() => sortOffers(offers, sort), [offers, sort]);
+  // The columns weigh what can still be chosen: a declined, withdrawn, expired or stale offer is not beside them.
+  const sorted = useMemo(() => sortOffers(offers.filter(offerIsLive), sort), [offers, sort]);
   const best = useMemo(() => bestOffers(offers), [offers]);
   return (
     <Sheet

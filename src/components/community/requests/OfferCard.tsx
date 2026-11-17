@@ -6,12 +6,14 @@
  *          verified mark, «governorate · ★ rating (n) · jobs done», and at the
  *          end the TOTAL the customer agrees to, over «السعر الإجمالي»
  *   chips  every honesty mark of P1-05, kept: the state, «جزئي k/n», the
- *          substitutes, «عرض معدّل · كان …», and the stale and the
- *          no-longer-possible notes
+ *          substitutes, «عرض معدّل · كان السعر …» (the price beside the price,
+ *          the history keeping no fee), and the stale and the no-longer-possible
+ *          notes, each also the radio's description
  *   row 2  three cells: the expected time, the materials, the handover
  *          («يشمل التوصيل» when the fee is nothing and the workshop brings
  *          it, «+ fee توصيل» when there is a fee, «استلام من الورشة» with the
- *          governorate, never a district: plan R3)
+ *          governorate, never a district: plan R3; a delivery names no
+ *          governorate, the workshop's not being the customer's)
  *   row 3  «التفاصيل» (every fact, in OfferDetailsSheet) and «مراسلة» (a live
  *          offer only)
  *
@@ -23,6 +25,7 @@
  * says «محدد» in its name: never colour alone. The radio holds only words;
  * the two buttons sit beside it in the card, never inside it.
  */
+import { useId } from 'react';
 import type React from 'react';
 import { AlertTriangle, BadgeCheck, Check, Clock, FileText, Layers, MapPin, MessageCircle, Star, Store, Truck } from 'lucide-react';
 import { GOVERNORATE_LABELS } from '../../../lib/governorates';
@@ -72,6 +75,19 @@ export default function OfferCard({ o, s, lang, parts, materials, selectable, se
   const mats = o.material_ids?.length ? o.material_ids.map((id) => localMaterial(id, lang, materials) || id).join(listSep(lang)) : o.materials || '—';
   const pickup = o.delivery_method === 'pickup';
   const fee = Number(o.delivery_fee_iqd ?? 0);
+  // The marks, read after the radio's name: its children are presentational, so a mark reaches a screen reader only by its id.
+  const marksId = useId();
+  const markId = (k: string) => `${marksId}-${k}`;
+  const marks = [
+    partial && 'partial',
+    substitutesSomething(o) && 'substitution',
+    o.revised && 'revised',
+    o.stale && o.state !== 'accepted' && 'stale',
+    o.workshop_unable && o.state === 'pending' && 'unable',
+  ]
+    .filter((k): k is string => !!k)
+    .map(markId)
+    .join(' ');
   const sr = fill(s.offerSr, { name, total: offerTotalWords(o.total_iqd, lang), state: selected ? s.offerChosen : s.offerNotChosen });
   const icon = 'h-5 w-5 shrink-0 text-text-secondary';
 
@@ -118,17 +134,17 @@ export default function OfferCard({ o, s, lang, parts, materials, selectable, se
       <p className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]" data-offer-chips>
         <StatusChip tone={st.tone}>{st.text}</StatusChip>
         {partial && (
-          <span data-offer-partial-chip>
+          <span id={markId('partial')} data-offer-partial-chip>
             <StatusChip tone="warning">{partial}</StatusChip>
           </span>
         )}
         {substitutesSomething(o) && (
-          <span data-offer-substitution-chip>
+          <span id={markId('substitution')} data-offer-substitution-chip>
             <StatusChip tone="warning">{s.substitutesLabel}</StatusChip>
           </span>
         )}
         {o.revised && (
-          <span className="inline-flex flex-wrap items-center gap-1.5" data-offer-edited>
+          <span id={markId('revised')} className="inline-flex flex-wrap items-center gap-1.5" data-offer-edited>
             <StatusChip tone="info">{s.revised}</StatusChip>
             {prev && prev.price_iqd !== o.price_iqd && (
               <span className="text-text-muted" data-offer-was>
@@ -139,13 +155,13 @@ export default function OfferCard({ o, s, lang, parts, materials, selectable, se
         )}
       </p>
       {o.stale && o.state !== 'accepted' && (
-        <p className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-warning" data-offer-note="stale">
+        <p id={markId('stale')} className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-warning" data-offer-note="stale">
           <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {s.staleNote}
         </p>
       )}
       {o.workshop_unable && o.state === 'pending' && (
-        <p className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-warning" data-offer-unable>
+        <p id={markId('unable')} className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-warning" data-offer-unable>
           <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           {s.unableNote}
         </p>
@@ -177,7 +193,8 @@ export default function OfferCard({ o, s, lang, parts, materials, selectable, se
             <span className="block text-[14px] font-semibold leading-snug text-text-primary">
               {pickup ? s.handoverPickup : fee > 0 ? fillNodes(s.plusDelivery, { fee: <Money iqd={fee} /> }) : s.deliveryIncluded}
             </span>
-            <span className="block text-[12px] leading-snug text-text-muted">{pickup ? gov || s.handover : gov ? fill(s.withinGov, { gov }) : handoverLabel(o.delivery_method, s)}</span>
+            <span className="block text-[12px] leading-snug text-text-muted">{/* The workshop's governorate is where a pickup happens; under a delivery it would read as the customer's own area. */}
+              {pickup ? gov || s.handover : handoverLabel(o.delivery_method, s)}</span>
           </span>
         </div>
       </div>
@@ -201,6 +218,7 @@ export default function OfferCard({ o, s, lang, parts, materials, selectable, se
           role="radio"
           aria-checked={selected}
           aria-label={sr}
+          aria-describedby={marks || undefined}
           tabIndex={tabStop ? 0 : -1}
           onClick={onSelect}
           onKeyDown={onRadioKeyDown}

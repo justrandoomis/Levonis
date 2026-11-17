@@ -47,7 +47,7 @@ import { requestPath } from '../../components/community/requests/requestStates';
 import { formatDate } from '../../components/orders/format';
 import { AttachmentList, type RequestFile } from '../../components/media/RequestAttachments';
 import PrintSummary, { type PrintModelExtra } from '../../components/print/PrintSummary';
-import { coverageOf, isPartialOffer, listSep, partialLabel, partName, readerDir, substitutionPieces, type PartRef } from '../../components/community/requests/offerParts';
+import { coverageOf, isPartialOffer, listSep, offerIsLive, partialLabel, partName, readerDir, substitutionPieces, type PartRef } from '../../components/community/requests/offerParts';
 import { SubstitutionText } from '../../components/community/requests/SubstitutionText';
 import { SourceLinkCard } from '../../components/community/links/LinkCard';
 import { localColour, localMaterial } from '../../components/community/requests/mirrors';
@@ -149,11 +149,14 @@ export interface OrderView {
 /** The two tabs of the owner page. */
 type RequestTab = 'offers' | 'details';
 
-/** The tab a hash in the address lives in: `#offers` the offers, `#files`, `#details`, `#discussion` and `#timeline` the details. */
+/**
+ * The tab a hash in the address lives in: `#offers` the offers, `#details`, `#discussion` and `#timeline`
+ * the details. `#files` changes no tab: the files sit in the header, above both.
+ */
 export function hashTab(hash: string): RequestTab | null {
   const h = decodeURIComponent(hash.replace(/^#/, ''));
   if (h === 'offers') return 'offers';
-  return h === 'files' || h === 'details' || h === 'discussion' || h === 'timeline' ? 'details' : null;
+  return h === 'details' || h === 'discussion' || h === 'timeline' ? 'details' : null;
 }
 
 /** A full list row, or only an id to fetch. */
@@ -497,6 +500,8 @@ export function RequestDetail({
       const d = await printApi.repeat(current.id);
       setRepeatOpen(false);
       forgetCommunityFeed('requests');
+      // A repeat is always a DRAFT (W5-A): said before the page turns to it, so the copy is not taken for the original.
+      if (!d.published) toast.info(s.repeatedDraft);
       navigate(requestPath(d.request_id));
     } catch (e) {
       setRepeatError(apiRefusal(e, L, s.couldNotRepeat));
@@ -565,7 +570,8 @@ export function RequestDetail({
   const gov = GOVERNORATE_LABELS[current.governorate];
   /** THE OWNER TABS (plan C3): «العروض (n)» and «تفاصيل الطلب». A workshop and an onlooker read one column, as before. */
   const tabbed = isOwner && !draft;
-  const liveOffers = offers?.filter((o) => o.state === 'pending' || o.state === 'superseded').length ?? 0;
+  /** «العروض (n)» and «بانتظار الاختيار»: the offers the customer can still take, as OfferCompare counts them. */
+  const liveOffers = offers?.filter(offerIsLive).length ?? 0;
   const others = accepted ? (offers ?? []).filter((o) => o.id !== accepted.id) : [];
   const canEditFiles = isOwner && ['open', 'receiving_offers', 'draft'].includes(current.state);
   const panel = (id: RequestTab) =>
@@ -591,6 +597,18 @@ export function RequestDetail({
     />
   );
 
+  /**
+   * A tab the reader picks is written into the address (replaced, never pushed), so a reload or a Back
+   * from the next page returns to it. The page does not scroll for it: the reader is already there.
+   */
+  const chooseTab = (t: RequestTab) => {
+    setTab(t);
+    if (hashTab(location.hash) === t) return;
+    scrolled.current = true;
+    unanchor.current?.();
+    navigate({ pathname: location.pathname, search: location.search, hash: `#${t}` }, { replace: true });
+  };
+
   /** Tabs follow the writing direction with the arrows (the house strip does the same). */
   const onTabKey = (e: KeyboardEvent<HTMLElement>) => {
     const { key } = e;
@@ -600,7 +618,7 @@ export function RequestDetail({
     if (!forward && !back && key !== 'Home' && key !== 'End') return;
     e.preventDefault();
     const next: RequestTab = key === 'Home' ? 'offers' : key === 'End' ? 'details' : tab === 'offers' ? 'details' : 'offers';
-    setTab(next);
+    chooseTab(next);
     document.getElementById(`request-tab-${next}`)?.focus();
   };
 
@@ -901,7 +919,7 @@ export function RequestDetail({
                   aria-selected={tab === t}
                   aria-controls={`request-panel-${t}`}
                   tabIndex={tab === t ? 0 : -1}
-                  onClick={() => setTab(t)}
+                  onClick={() => chooseTab(t)}
                   className={`cm-sel flex min-h-11 flex-1 items-center justify-center rounded-sm border border-transparent text-[15px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${tab === t ? '' : 'text-text-secondary'}`}
                   data-request-tab={t}
                 >

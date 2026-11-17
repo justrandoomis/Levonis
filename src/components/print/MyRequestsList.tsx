@@ -17,13 +17,12 @@
  * The board filters (the owner states, the process, the governorate) and
  * its search narrow the rows read so far.
  *
- * "إعادة الطلب" copies a request into a NEW one and PUBLISHES it — the copy
- * goes through the same matching as a first publish, so the merchants who can
- * make it are told (audit 03 §10 E: copies used to land on the board unmatched).
- * It asks first, in a sheet, because it duplicates files, starts a fresh 30-day
- * clock and notifies merchants; then it takes the person to the copy. If the
- * publish step failed, the copy is a draft and the person is told so, with the
- * draft's own Publish button one tap away — never a success that was not one.
+ * "إعادة الطلب" copies a request into a NEW DRAFT (W5-A): the person reviews
+ * it (the deadline, the quantity) and publishes it with the draft's own
+ * Publish button, and only that publish goes through the matching and tells
+ * the merchants. It asks first, in a sheet, because it duplicates files; then
+ * it says «نُسخ الطلب مسودةً…» in a toast, which outlives the page turning, and
+ * takes the person to the copy — never a success that was not one.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -38,6 +37,7 @@ import { apiRefusal } from '../../lib/refusalStrings';
 import { asLang } from '../orders/format';
 import ConfirmSheet from './ConfirmSheet';
 import { CommunityLoadError } from '../../pages/community/access';
+import { useToast } from '../ui/Toast';
 import { fill, requestStrings } from '../community/requests/strings';
 import { customOrderChips } from '../chat/cards/cardWords';
 import RequestListCard from '../community/requests/RequestListCard';
@@ -81,6 +81,7 @@ export default function MyRequestsList({ onOpen, filters = NO_FILTERS, q = '' }:
   const { lang, loc } = useLanguage();
   const s = requestStrings(lang);
   const { isAuthenticated } = useAuth();
+  const toast = useToast();
   const [rows, setRows] = useState<MyRequestRow[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [more, setMore] = useState(false);
@@ -89,7 +90,6 @@ export default function MyRequestsList({ onOpen, filters = NO_FILTERS, q = '' }:
   const [error, setError] = useState('');
   /** The request the customer asked to repeat — the sheet confirms it. */
   const [asking, setAsking] = useState<MyRequestRow | null>(null);
-  const [notice, setNotice] = useState('');
   const [loadError, setLoadError] = useState<unknown>(null);
 
   const load = useCallback(() => {
@@ -127,13 +127,12 @@ export default function MyRequestsList({ onOpen, filters = NO_FILTERS, q = '' }:
   async function repeat(row: MyRequestRow) {
     setRepeating(row.id);
     setError('');
-    setNotice('');
     try {
       const d = await printApi.repeat(row.id);
       setAsking(null);
       load();
-      // W5-A: a repeat is always a DRAFT — reviewed, then published.
-      if (!d.published) setNotice(s.repeatedDraft);
+      // W5-A: a repeat is always a DRAFT — reviewed, then published. A toast: the list is left at once.
+      if (!d.published) toast.info(s.repeatedDraft);
       onOpen(d.request_id);
     } catch (e) {
       setError(apiRefusal(e, asLang(lang), s.couldNotRepeat));
@@ -169,12 +168,6 @@ export default function MyRequestsList({ onOpen, filters = NO_FILTERS, q = '' }:
   const L = asLang(lang);
   return (
     <div className="space-y-3" data-my-requests>
-      {notice && (
-        <p role="status" className="lv-alert lv-alert-warning text-[12.5px] text-text-primary">
-          {notice}
-        </p>
-      )}
-
       <ConfirmSheet
         open={!!asking}
         testId="repeat-request"
