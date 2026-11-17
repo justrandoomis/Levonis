@@ -6,6 +6,8 @@ import { Select } from '../ui/Field';
 import { api, Button, Dialog, Empty, Feedback, Field, Loading, Money, PEOPLE, Surface, useLanguage, useMutation, useReloadOn, useRemote, type Account, type PanelProps } from './shared';
 import { investmentReturnStrings } from '../../lib/investmentReturn';
 import { personFinanceStrings } from '../../lib/personFinanceStrings';
+import { personStatementStrings } from '../../lib/personStatementStrings';
+import { PeopleSummary } from './PersonStatement';
 import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { PersonCard, PersonSheet, type PersonFinance } from './PersonFinanceView';
 
@@ -24,7 +26,7 @@ type List = { profiles: Profile[]; accounts: Account[] };
  */
 export default function InvestorProfiles({ from, to, month, onChanged, openContract, openOrder, revision }: PanelProps & { openContract: (id: string) => void }) {
   const { loc, lang, dir } = useLanguage();
-  const s = personFinanceStrings(lang);
+  const s = personFinanceStrings(lang), t = personStatementStrings(lang);
   const query = new URLSearchParams(from || to ? { from: from || '', to: to || '' } : month ? { month } : {});
   const remote = useRemote<List>(`${API}/profiles?${query}`);
   const people = useRemote<{ people: PersonFinance[] }>(`${PEOPLE}/people?${query}`);
@@ -36,18 +38,15 @@ export default function InvestorProfiles({ from, to, month, onChanged, openContr
   // One poll a minute: two finance reads share the owner's hourly read budget with every finance screen.
   useFreshOnReturn(reload, { pollWhileVisibleMs: 60_000, minIntervalMs: 10_000, enabled: !remote.loading && !people.loading && !editing && !selected });
   const saved = async () => { setEditing(null); await reload(); onChanged?.(); };
-  const sum = (f: (p: NonNullable<PersonFinance['investor']>) => number) => investors.reduce((n, p) => n + f(p.investor!), 0);
   const person = (id: string) => people.data?.people.find((p) => p.user_id === id);
   const open = selected ? person(selected) : undefined;
   return <div className="ap fp fp-stack" dir={dir}>
     <Surface title={loc('حسابات المستثمرين', 'Investor accounts', 'هەژماری وەبەرهێنەران')} hint={s.peopleHint} action={<Button variant="primary" icon={<Plus size={16} />} onClick={() => setEditing('new')}>{loc('إضافة مستثمر', 'Add investor', 'زیادکردنی وەبەرهێنەر')}</Button>}>
       {!data ? <Loading error={remote.error} retry={reload} /> : <div className="fp-stack"><Feedback error={remote.error || people.error} />
-        <div className="fp-stats">
-          <div className="fp-stat"><span>{s.capitalPutIn}</span><Money value={people.data ? sum((i) => i.capital.put_in_iqd) : null} /></div>
-          <div className="fp-stat"><span>{s.profitEarned}</span><Money value={people.data ? sum((i) => i.profit.earned_iqd) : null} /></div>
-          <div className="fp-stat fp-stat-good"><span>{s.availableNow}</span><Money value={people.data ? sum((i) => i.profit.available_iqd + i.capital.available_iqd) : null} /></div>
-          <div className="fp-stat"><span>{s.heldNow}</span><Money value={people.data ? sum((i) => i.profit.held_iqd) : null} /></div>
-        </div>
+        {/* One line per investor, since the start (DECISIONS row 342); the old four totals are its total line. */}
+        {people.data && <PeopleSummary title={t.investorSummary} columns={[s.capitalPutIn, s.profitEarned, t.paid, t.waiting, t.canWithdraw]}
+          rows={investors.map((p) => ({ key: p.user_id ?? p.name, name: p.name, onOpen: p.user_id ? () => setSelected(p.user_id) : undefined,
+            cells: [p.investor!.capital.put_in_iqd, p.investor!.profit.earned_iqd, p.investor!.profit.paid_iqd, p.investor!.profit.held_iqd + p.investor!.profit.reserved_iqd, p.investor!.profit.available_iqd + p.investor!.capital.available_iqd] }))} />}
         {!data.profiles.length ? <Empty>{loc('اختر حساب مساعد لإضافة مستثمر، ثم اختره في خطوة تمويل الشراء.', 'Choose an assistant account to register an investor, then select it when funding a purchase.', 'هەژمارێکی یاریدەدەر هەڵبژێرە بۆ تۆمارکردنی وەبەرهێنەر، پاشان لە هەنگاوی پارەدارکردنی کڕیندا هەڵیبژێرە.')}</Empty> : <div className="fp-stack">{data.profiles.map((p) => {
           const pf = person(p.user_id);
           const settings = <Button variant="ghost" size="sm" icon={<Pencil size={15} />} onClick={() => setEditing(p)}>{s.settings}</Button>;
