@@ -120,11 +120,10 @@ export default {
         // The scan answers the whole lot row — stripped for a non-owner.
         'POST /scan': { cls: 'op', body: { code: 'lot1' } },
         'POST /lot-counts': { cls: 'op', body: { operation_id: 'rm-lot-count-1', lot_id: 'lot1', counted_qty: 1 } },
-        // «تصحيح الفرق»: the seeded counter 5 against lot1's 2 units; a non-owner hears no cost fact (tests/stockReconcile.test.ts).
-        'POST /reconcile': {
-          cls: 'op',
-          body: { operation_id: 'rm-reconcile-1', rows: [{ product_id: 'p_a1', scope: 'base', scope_id: '', stock: 5, lot_units: 2 }] },
-        },
+        // «تصحيح الفرق» books cost (an opening at the cost price, a FIFO write-off) and its refusals name
+        // investor-funded batches: the owner's alone, refused for everyone else before anything is read
+        // (tests/stockReconcile.test.ts walks the owner's success and the refusal).
+        'POST /reconcile': { cls: 'cost_write', why: 'reconcile books inventory cost and reveals investor funding' },
       },
     },
   ],

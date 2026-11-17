@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError } from '../../lib/api';
+import { useOptionalAuth } from '../../AuthContext';
 import StockSelection from './StockSelection';
 import LotCountForm from '../adminInventory/LotCountForm';
 import LotScanner from '../adminInventory/LotScanner';
@@ -64,7 +65,9 @@ type Health = {
 type HealthSummary = { rows_total: number; rows_differ: number; units_without_lots: number; lot_units_not_on_shelf: number };
 export default function StockOperationsPanel({ onChanged, initialTab }: { onChanged: () => void; initialTab?: 'counts' | 'locations' }) {
   const { loc } = useLabels(),
-    op = useOperation();
+    op = useOperation(),
+    // Fixing a difference books cost: the owner's alone (fail closed).
+    canFix = useOptionalAuth()?.user?.can_view_cost === true;
   const [tab, setTab] = useState(initialTab ?? 'health'),
     [search, setSearch] = useState(''),
     [offset, setOffset] = useState(0),
@@ -217,6 +220,7 @@ export default function StockOperationsPanel({ onChanged, initialTab }: { onChan
       {tab === 'health' && (
         <>
           <StockAccuracyCard
+            canFix={canFix}
             rows={health}
             summary={healthSummary}
             onlyDiff={onlyDiff}
@@ -791,6 +795,7 @@ const diffTone = (n: number) =>
  * the list of what will change.
  */
 function StockAccuracyCard({
+  canFix,
   rows,
   summary,
   onlyDiff,
@@ -801,6 +806,7 @@ function StockAccuracyCard({
   reload,
   onReorder,
 }: {
+  canFix: boolean;
   rows: Health[];
   summary: HealthSummary | null;
   onlyDiff: boolean;
@@ -972,16 +978,22 @@ function StockAccuracyCard({
         <button type="button" className={T.chip} aria-pressed={onlyDiff} onClick={() => onOnlyDiff(!onlyDiff)}>
           {loc('فقط الفروقات', 'Only differences', 'تەنها جیاوازییەکان')}
         </button>
-        <button
-          type="button"
-          className={T.btnSecondary}
-          disabled={busy || differ === 0 || !!pending}
-          onClick={() => void run(async () => ask(await allDiffering()))}
-        >
-          {loc('تصحيح كل الفروقات', 'Fix all differences', 'چاککردنی هەموو جیاوازییەکان')}
-        </button>
+        {canFix ? (
+          <button
+            type="button"
+            className={T.btnSecondary}
+            disabled={busy || differ === 0 || !!pending}
+            onClick={() => void run(async () => ask(await allDiffering()))}
+          >
+            {loc('تصحيح كل الفروقات', 'Fix all differences', 'چاککردنی هەموو جیاوازییەکان')}
+          </button>
+        ) : (
+          <span className={`text-xs ${T.text3}`}>
+            {loc('تصحيح الفروقات يقوم به المالك.', 'The owner fixes differences.', 'خاوەنەکە جیاوازییەکان چاک دەکات.')}
+          </span>
+        )}
       </div>
-      {pending && (
+      {canFix && pending && (
         <div role="region" aria-label={loc('تأكيد التصحيح', 'Confirm the fix', 'پشتڕاستکردنەوەی چاککردن')} className={`${T.surface} mb-3 p-3`}>
           <p className={`mb-2 text-sm font-semibold ${T.text1}`}>
             {loc(
@@ -1074,7 +1086,7 @@ function StockAccuracyCard({
                 <div className="mt-2 flex flex-wrap gap-2">
                   {r.needs_lot_count ? (
                     <span className={`${T.badgeBase} ${diffTone(-1)}`}>{lotCountLabel}</span>
-                  ) : r.discrepancy !== 0 && (
+                  ) : canFix && r.discrepancy !== 0 && (
                     <button type="button" className={T.btnSecondary} disabled={busy || !!pending} onClick={() => ask([r])}>
                       {loc('تصحيح', 'Fix', 'چاککردن')}
                     </button>
@@ -1125,7 +1137,7 @@ function StockAccuracyCard({
                     <div className="flex flex-wrap gap-1">
                       {r.needs_lot_count ? (
                     <span className={`${T.badgeBase} ${diffTone(-1)}`}>{lotCountLabel}</span>
-                  ) : r.discrepancy !== 0 && (
+                  ) : canFix && r.discrepancy !== 0 && (
                         <button type="button" className={T.btnGhost} disabled={busy || !!pending} onClick={() => ask([r])}>
                           {loc('تصحيح', 'Fix', 'چاککردن')}
                         </button>

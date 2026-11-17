@@ -51,36 +51,119 @@ test('reserved units are not a difference: a held order leaves counter and lots 
   assert.equal(a1(await health(raw)).discrepancy, 0);
 });
 
-test('+3: an unpriced lot of 3 is opened, the counter stays 5, a reconcile movement is recorded, and the row reads 0', async () => {
+const journal = (raw: DatabaseSync, account: string, side: 'debit' | 'credit') =>
+  count(
+    raw,
+    `SELECT COALESCE(SUM(l.${side}_iqd),0) n FROM accounting_lines l JOIN accounting_entries e ON e.id=l.entry_id WHERE l.account_code='${account}' AND e.title='تسوية دفعات المخزون'`,
+  );
+
+test('+3: a lot of 3 opens at the product cost price with the 1200/5300 gain journal; the counter stays 5 and the row reads 0', async () => {
   const raw = seededCopy();
-  const res = await call(appFor(raw, ROLES.assistant!, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
+  const res = await call(appFor(raw, OWNER, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
     operation_id: 'reconcile-test-0001',
     rows: [{ product_id: 'p_a1', scope: 'base', scope_id: '', stock: 5, lot_units: 2 }],
   });
   assert.equal(res.status, 200, JSON.stringify(res.body));
-  assert.deepEqual(res.body, { success: true, fixed: 1, already: false }, 'no cost fact for a non-owner');
+  assert.deepEqual(res.body, { success: true, fixed: 1, already: false, unknown_cost_rows: 0 });
   assert.equal(shelf(raw), 5);
   assert.equal(lotUnits(raw), 5);
   assert.equal(
-    count(raw, "SELECT COUNT(*) n FROM inventory_lots WHERE product_id='p_a1' AND cost_basis='opening_unpriced' AND unit_cost_iqd IS NULL AND qty_remaining=3"),
+    count(
+      raw,
+      `SELECT COUNT(*) n FROM inventory_lots WHERE product_id='p_a1' AND cost_basis='opening' AND unit_cost_iqd=${COST.product}
+         AND purchase_unit_iqd=${COST.product} AND total_cost_iqd=${3 * COST.product} AND qty_received=3 AND qty_remaining=3`,
+    ),
     1,
   );
+  assert.equal(journal(raw, '1200', 'debit'), 3 * COST.product);
+  assert.equal(journal(raw, '5300', 'credit'), 3 * COST.product);
   assert.equal(count(raw, "SELECT COUNT(*) n FROM inventory_ledger WHERE product_id='p_a1' AND kind='adjust_in' AND qty=3 AND reason LIKE 'reconcile%'"), 1);
   assert.equal(a1(await health(raw)).discrepancy, 0);
 
   // A replay is a no-op; the same id for a different correction is refused.
-  const again = await call(appFor(raw, ROLES.assistant!, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
+  const again = await call(appFor(raw, OWNER, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
     operation_id: 'reconcile-test-0001',
     rows: [{ product_id: 'p_a1', scope: 'base', scope_id: '', stock: 5, lot_units: 2 }],
   });
   assert.equal(again.status, 200);
   assert.equal((again.body as { already: boolean }).already, true);
   assert.equal(lotUnits(raw), 5);
-  const other = await call(appFor(raw, ROLES.assistant!, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
+  assert.equal(journal(raw, '1200', 'debit'), 3 * COST.product, 'no second journal');
+  const other = await call(appFor(raw, OWNER, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
     operation_id: 'reconcile-test-0001',
     rows: [{ product_id: 'p_a1', scope: 'base', scope_id: '', stock: 6, lot_units: 2 }],
   });
   assert.equal(other.status, 409);
+});
+
+test('+2 on an option: the 0098 ladder takes cost_adjust over the product cost when the option has no own cost', async () => {
+  const raw = seededCopy();
+  raw.exec(`UPDATE products SET inventory_mode='OPTION', product_cost_iqd=100000 WHERE id='p_a1';
+    UPDATE product_option_values SET stock=2, cost_iqd=NULL, cost_adjust_iqd=-30000 WHERE id='v_a1';`);
+  const res = await call(appFor(raw, OWNER, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
+    operation_id: 'reconcile-test-0008',
+    rows: [{ product_id: 'p_a1', scope: 'option', scope_id: 'v_a1', stock: 2, lot_units: 0 }],
+  });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal(
+    count(raw, "SELECT COUNT(*) n FROM inventory_lots WHERE scope='option' AND scope_id='v_a1' AND cost_basis='opening' AND unit_cost_iqd=70000 AND total_cost_iqd=140000"),
+    1,
+  );
+  assert.equal(journal(raw, '1200', 'debit'), 140000);
+});
+
+test('+n with no cost on any rung: an unpriced opening and no journal', async () => {
+  const raw = seededCopy();
+  raw.exec("UPDATE products SET product_cost_iqd=NULL WHERE id='p_a1'");
+  const res = await call(appFor(raw, OWNER, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
+    operation_id: 'reconcile-test-0009',
+    rows: [{ product_id: 'p_a1', scope: 'base', scope_id: '', stock: 5, lot_units: 2 }],
+  });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.equal((res.body as { unknown_cost_rows: number }).unknown_cost_rows, 1);
+  assert.equal(
+    count(raw, "SELECT COUNT(*) n FROM inventory_lots WHERE product_id='p_a1' AND cost_basis='opening_unpriced' AND unit_cost_iqd IS NULL AND total_cost_iqd IS NULL AND qty_remaining=3"),
+    1,
+  );
+  assert.equal(journal(raw, '1200', 'debit'), 0);
+});
+
+test('a cost price changed between the plan and the commit trips the fence', async () => {
+  const raw = seededCopy();
+  const db = asD1(raw);
+  const plan = await planReconcile(db, {
+    operationId: 'reconcile-test-0010', productId: 'p_a1', scope: 'base', scopeId: '',
+    expectedStock: 5, expectedLotUnits: 2, actorUserId: 'usr_owner',
+  });
+  raw.exec("UPDATE products SET product_cost_iqd=product_cost_iqd+1 WHERE id='p_a1'");
+  await assert.rejects(db.batch(plan.statements), (e: unknown) => isFenceMiss(e));
+  assert.equal(lotUnits(raw), 2);
+});
+
+test('non-owners (assistant, full admin) hear the generic cost refusal for real and invented rows; nothing is written; no needs_lot_count', async () => {
+  for (const user of [ROLES.assistant!, ROLES.full!]) {
+    const raw = seededCopy();
+    const answers: string[] = [];
+    for (const row of [
+      { product_id: 'p_a1', scope: 'base', scope_id: '', stock: 5, lot_units: 2 },
+      { product_id: 'p_invented', scope: 'base', scope_id: '', stock: 9, lot_units: 0 },
+    ]) {
+      const res = await call(appFor(raw, user, MOUNTS), 'POST', `${PREFIX}/reconcile`, { operation_id: 'reconcile-test-0011', rows: [row] });
+      assert.equal(res.status, 403, JSON.stringify(res.body));
+      assert.equal((res.body as { code?: string }).code, 'COST_ACCESS_DENIED');
+      answers.push(JSON.stringify(res.body));
+    }
+    assert.equal(answers[0], answers[1], 'one answer for a real and an invented row');
+    // An empty body too: the refusal comes before validation.
+    const empty = await call(appFor(raw, user, MOUNTS), 'POST', `${PREFIX}/reconcile`, {});
+    assert.equal(JSON.stringify(empty.body), answers[0]);
+    assert.equal(lotUnits(raw), 2);
+    assert.equal(count(raw, "SELECT COUNT(*) n FROM inventory_ledger WHERE reason LIKE 'reconcile%'"), 0);
+    const funded = fundedWorld(1);
+    const row = a1(await health(funded, user)) as Row & { needs_lot_count?: boolean };
+    assert.equal(row.discrepancy, -3);
+    assert.ok(!('needs_lot_count' in row), 'investor funding is not answered to a non-owner');
+  }
 });
 
 test('−2: lot units above the counter leave FIFO, oldest first, with the count journal; the counter stays', async () => {
@@ -165,14 +248,12 @@ test('−n that would reach an investor-funded lot is refused (RECONCILE_INVESTO
   const row = a1(await health(raw));
   assert.equal(row.discrepancy, -3);
   assert.equal((row as Row & { needs_lot_count?: boolean }).needs_lot_count, true);
-  for (const user of [OWNER, ROLES.assistant!]) {
-    const res = await call(appFor(raw, user, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
-      operation_id: 'reconcile-test-0006',
-      rows: [{ product_id: 'p_a1', scope: 'base', scope_id: '', stock: 1, lot_units: 4 }],
-    });
-    assert.equal(res.status, 409, JSON.stringify(res.body));
-    assert.equal((res.body as { code?: string }).code, 'RECONCILE_INVESTOR_LOT');
-  }
+  const res = await call(appFor(raw, OWNER, MOUNTS), 'POST', `${PREFIX}/reconcile`, {
+    operation_id: 'reconcile-test-0006',
+    rows: [{ product_id: 'p_a1', scope: 'base', scope_id: '', stock: 1, lot_units: 4 }],
+  });
+  assert.equal(res.status, 409, JSON.stringify(res.body));
+  assert.equal((res.body as { code?: string }).code, 'RECONCILE_INVESTOR_LOT');
   assert.equal(lotUnits(raw), 4);
   assert.equal(count(raw, "SELECT qty_remaining n FROM inventory_lots WHERE id='lot1'"), 2);
   assert.equal(count(raw, "SELECT COUNT(*) n FROM inventory_ledger WHERE reason LIKE 'reconcile%'"), 0);

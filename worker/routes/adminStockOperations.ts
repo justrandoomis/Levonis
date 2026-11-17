@@ -11,6 +11,7 @@ import { planAtomicAdjustment } from '../lib/inventoryAdjustment';
 import { requireSelection, selectionStock } from '../lib/inventorySelection';
 import { baghdadDay, fence, isFenceMiss, journalPlan, requireCapability, whole } from '../lib/operations';
 import { fundedWriteOffRows, planReconcile } from '../lib/stockReconcile';
+import { costRefusal } from '../lib/costAccess';
 import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 import { normalizeSerial } from '../lib/deviceOps';
 import { counterTarget } from '../lib/inventoryReceiving';
@@ -410,7 +411,9 @@ adminStockOperationsRoutes.get('/health', async (c) => {
   ).bind(q, q, onlyDiff).first<{ rows_total: number; rows_differ: number; units_without_lots: number; lot_units_not_on_shelf: number }>()]);
   // A −n row whose FIFO write-off would reach an investor-funded lot is fixed by
   // a lot count only (RECONCILE_INVESTOR_LOT); the screen marks it beforehand.
-  const lotCountOnly = await fundedWriteOffRows(
+  // Investor funding is a cost fact: computed and answered for the owner only.
+  const owner = canViewCost(c.env, c.get('user'));
+  const lotCountOnly = !owner ? new Set<string>() : await fundedWriteOffRows(
     c.env.DB,
     (results ?? [])
       .filter((r) => Number(r.discrepancy) < 0)
@@ -418,7 +421,7 @@ adminStockOperationsRoutes.get('/health', async (c) => {
   );
   const rows = (results ?? []).map((r) => ({
     ...r,
-    needs_lot_count: lotCountOnly.has(`${r.product_id}:${r.scope}:${r.scope_id ?? ''}`),
+    ...(owner ? { needs_lot_count: lotCountOnly.has(`${r.product_id}:${r.scope}:${r.scope_id ?? ''}`) } : {}),
     available: Number(r.stock) - Number(r.reserved),
     recommended_purchase: Math.max(
       0,
@@ -474,6 +477,10 @@ const RECONCILE_BATCH_MAX = 25;
 adminStockOperationsRoutes.post('/reconcile', async (c) => {
   const user = c.get('user')!;
   await requireCapability(c.env, user, 'count');
+  // OWNER ONLY, decided before anything is read: a fix books cost (an opening at
+  // the cost price, a write-off at FIFO cost) and its refusals name investor-funded
+  // batches. Every other admin hears the one generic cost refusal.
+  if (!canViewCost(c.env, user)) throw costRefusal(c.env, user);
   const b = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>),
     db = c.env.DB,
     operationId = str(b.operation_id, 'operation_id', { min: 8, max: 60 });
@@ -505,7 +512,7 @@ adminStockOperationsRoutes.post('/reconcile', async (c) => {
     if (plan.already) already++;
     else if (plan.delta) {
       fixed++;
-      if (plan.delta < 0 && plan.valueIqd === null) unknown++;
+      if (plan.valueIqd === null) unknown++;
     }
     statements.push(...plan.statements);
   }
@@ -519,9 +526,7 @@ adminStockOperationsRoutes.post('/reconcile', async (c) => {
     }
     await audit(db, user.id, 'stock.reconciled', operationId, { rows: fixed });
   }
-  // Whether a written-off layer had a recorded cost is the owner's to know (DECISIONS row 219).
-  const answer = { success: true, fixed, already: already > 0 && fixed === 0 };
-  return c.json(canViewCost(c.env, user) ? { ...answer, unknown_cost_rows: unknown } : answer);
+  return c.json({ success: true, fixed, already: already > 0 && fixed === 0, unknown_cost_rows: unknown });
 });
 adminStockOperationsRoutes.get('/trace', async (c) => {
   await requireCapability(c.env, c.get('user')!, 'receive');

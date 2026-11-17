@@ -21,13 +21,17 @@
  * that changes the layers changes only the cost bookkeeping:
  *
  *   stock > lots  (+n)  n units on the shelf have no cost layer. One lot of n is
- *                       opened at UNKNOWN cost ('opening_unpriced', unit cost
- *                       NULL — 0098 §21 "do NOT invent one"); finance then says
- *                       those units' COGS is unknown instead of silently zero.
+ *                       opened at the product's cost price, by 0098's opening
+ *                       ladder ('opening'; owner decision 2026-11-17), and the
+ *                       gain is journalled 1200/5300 like a lot count's. No
+ *                       cost on any rung: 'opening_unpriced', NULL, no journal.
  *   stock < lots  (−n)  the layers hold n units the shelf no longer has. They
  *                       leave FIFO, oldest first — exactly as a count session's
  *                       write-off takes them (planAtomicAdjustment) — and their
  *                       known value is journalled 5300/1200 like a count's.
+ *
+ * OWNER ONLY (POST /reconcile): the + fix books cost and the − fix's refusal
+ * names investor-funded batches — both the owner's to know.
  *
  * Each fix writes one `inventory_ledger` row (adjust_in / adjust_out, reason
  * `reconcile`) so it is visible under «الحركات» with its actor; its UNIQUE
@@ -75,6 +79,19 @@ export async function fundedWriteOffRows(
 }
 
 export const RECONCILE_REASON = 'reconcile';
+/**
+ * The cost price an opening lot takes, by scope — migration 0098's opening
+ * backfill ladder exactly (owner decision 2026-11-17). One `?` = the counter
+ * row's id (the product's own id for base). NULL when no rung has a cost.
+ */
+const COST_LADDER: Record<string, string> = {
+  base: 'SELECT product_cost_iqd FROM products WHERE id = ?',
+  option:
+    'SELECT COALESCE(x.cost_iqd, MAX(0, p.product_cost_iqd + x.cost_adjust_iqd), p.product_cost_iqd) FROM product_option_values x JOIN products p ON p.id = x.product_id WHERE x.id = ?',
+  color:
+    'SELECT COALESCE(x.cost_iqd, MAX(0, p.product_cost_iqd + x.cost_adjust_iqd), p.product_cost_iqd) FROM product_colors x JOIN products p ON p.id = x.product_id WHERE x.id = ?',
+  variant: 'SELECT COALESCE(x.cost_iqd, p.product_cost_iqd) FROM product_variants x JOIN products p ON p.id = x.product_id WHERE x.id = ?',
+};
 const SCOPE_MODE: Record<string, string> = { base: 'BASE', option: 'OPTION', color: 'COLOR', variant: 'VARIANT_COMBINATION' };
 
 export interface ReconcileInput {
@@ -94,7 +111,7 @@ export interface ReconcilePlan {
   /** Units the layers move by: + opened at unknown cost, − written off FIFO. */
   delta: number;
   statements: D1PreparedStatement[];
-  /** The known value written off; null when a consumed lot has no cost; 0 for an opening. */
+  /** The known value booked: written off (−) or opened at cost price (+); null when a cost is unknown. */
   valueIqd: number | null;
 }
 
@@ -182,15 +199,25 @@ export async function planReconcile(db: D1Database, input: ReconcileInput): Prom
     if (left > 0) throw conflict('تغيّرت الدفعات أثناء القراءة؛ حدّث الصفحة', 'STOCK_CHANGED');
   }
 
-  // THE FENCE: the counter, the identity's lot total and each touched lot exactly as read.
+  // A + fix opens its lot at the product's cost price — 0098's opening ladder, read now.
+  const ladder = COST_LADDER[input.scope];
+  const openingCost =
+    delta > 0
+      ? ((await db.prepare(`SELECT (${ladder}) AS cost`).bind(rowId).first<{ cost: number | null }>())?.cost ?? null)
+      : null;
+  if (delta > 0) valueIqd = openingCost === null ? null : openingCost * qty;
+
+  // THE FENCE: the counter, the identity's lot total and each touched lot exactly
+  // as read — and, for an opening, the cost price it is opened at (-1 = none).
   const statements: D1PreparedStatement[] = [
     ...fence(
       db,
       `(SELECT stock FROM ${target.table} WHERE id = ?) = ?
         AND (SELECT COALESCE(SUM(qty_remaining),0) FROM inventory_lots WHERE product_id = ? AND scope = ? AND scope_id = ?) = ?
         AND NOT EXISTS (SELECT 1 FROM json_each(?) g LEFT JOIN inventory_lots l ON l.id = json_extract(g.value,'$.id')
-                         WHERE l.qty_remaining IS NOT json_extract(g.value,'$.remaining'))`,
-      [rowId, shelf.stock, input.productId, input.scope, scopeId, lotUnits, JSON.stringify(touched)],
+                         WHERE l.qty_remaining IS NOT json_extract(g.value,'$.remaining'))
+        AND (? = 0 OR COALESCE((${ladder}), -1) = ?)`,
+      [rowId, shelf.stock, input.productId, input.scope, scopeId, lotUnits, JSON.stringify(touched), delta > 0 ? 1 : 0, rowId, openingCost ?? -1],
     ),
     db
       .prepare(
@@ -216,10 +243,26 @@ export async function planReconcile(db: D1Database, input: ReconcileInput): Prom
           `INSERT INTO inventory_lots
              (id, product_id, scope, scope_id, qty_received, qty_remaining, unit_cost_iqd, purchase_unit_iqd,
               shipping_share_iqd, internal_share_iqd, total_cost_iqd, cost_basis, received_at, created_by)
-           VALUES (?, ?, ?, ?, ?, ?, NULL, NULL, 0, 0, NULL, 'opening_unpriced', ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, ?, ?, ?)`,
         )
-        .bind(newId('ilot_rec'), input.productId, input.scope, scopeId, qty, qty, new Date().toISOString(), input.actorUserId),
+        .bind(
+          newId('ilot_rec'), input.productId, input.scope, scopeId, qty, qty,
+          openingCost, openingCost, valueIqd, openingCost === null ? 'opening_unpriced' : 'opening',
+          new Date().toISOString(), input.actorUserId,
+        ),
     );
+    // The lot count's journal for units found (POST /lot-counts): an inventory gain at the lot's cost.
+    if (valueIqd !== null && valueIqd > 0)
+      statements.push(
+        ...journalPlan(
+          db,
+          { key, day: baghdadDay(), title: 'تسوية دفعات المخزون', source: 'count', sourceId: input.operationId, actor: input.actorUserId },
+          [
+            { account: '1200', debit: valueIqd },
+            { account: '5300', credit: valueIqd },
+          ],
+        ).statements,
+      );
   } else {
     for (const lot of touched) {
       try {
@@ -251,5 +294,5 @@ export async function planReconcile(db: D1Database, input: ReconcileInput): Prom
         ).statements,
       );
   }
-  return { already: false, delta, statements, valueIqd: delta > 0 ? null : valueIqd };
+  return { already: false, delta, statements, valueIqd };
 }
