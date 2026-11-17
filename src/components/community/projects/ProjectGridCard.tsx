@@ -17,7 +17,7 @@ import { Link } from 'react-router-dom';
 import { Box, Clock, MessageCircle, Play } from 'lucide-react';
 import SafeImage from '../../ui/SafeImage';
 import { useLanguage } from '../../../LanguageContext';
-import { KitAvatar } from '../kit/display';
+import { DemoPill, KitAvatar } from '../kit/display';
 import LikeButton from '../social/LikeButton';
 import SaveButton from '../social/SaveButton';
 import { commentsLabel, socialLang } from '../social/strings';
@@ -74,6 +74,7 @@ export default function ProjectGridCard({ post: p, eager = false, onPatch }: { p
             {p.title}
           </Link>
         </h3>
+        <DemoPill id={p.id} />
         <p className="flex min-w-0 items-center gap-2 text-[13px] text-text-secondary">
           <KitAvatar src={p.author.avatarUrl} name={p.author.name} size={24} />
           {author ? (

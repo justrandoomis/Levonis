@@ -35,7 +35,7 @@ import { iqdNumber, iqdUnit } from '../../../lib/money';
 import { Money } from '../../ui/Money';
 import { StatusChip } from '../../ui/Badge';
 import { KitButton } from '../kit/buttons';
-import { KitAvatar } from '../kit/display';
+import { DemoPill, KitAvatar } from '../kit/display';
 import type { CatalogMaterial, OfferV2 } from './api';
 import { localMaterial } from './mirrors';
 import { listSep, partialLabel, substitutesSomething, type PartRef } from './offerParts';
@@ -112,6 +112,7 @@ export default function OfferCard({ o, s, lang, parts, materials, selectable, se
           <p className="flex items-center gap-1.5 text-[17px] font-bold leading-snug text-text-primary">
             <bdi className="truncate">{name}</bdi>
             {m?.verified && <BadgeCheck aria-label={s.verified} className="h-4 w-4 shrink-0 text-gold" />}
+            <DemoPill id={o.id} />
           </p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-text-secondary">
             {gov && (

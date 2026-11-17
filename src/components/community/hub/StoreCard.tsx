@@ -25,6 +25,7 @@ import ProMerchantBadge from '../../merchant/ProMerchantBadge';
 import PremiumMemberBadge from '../../merchant/PremiumMemberBadge';
 import SafeImage from '../../ui/SafeImage';
 import { ApprovedMark, HubLink, StoreMark } from './parts';
+import { DemoPill } from '../kit/display';
 import { completedLabel, followersLabel, productsLabel } from './copy';
 import { useHubStrings } from './strings';
 import type { CommunityStore, CommunityWork } from './api';
@@ -84,6 +85,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
             >
               {name}
             </HubLink>
+            <DemoPill id={m.id} />
             {m.accepts_custom_requests && (
               <span className="mt-0.5 flex items-center gap-1 text-[11px] text-text-muted" data-store-takes-requests>
                 <Hammer className="h-3 w-3" aria-hidden="true" />
@@ -129,6 +131,7 @@ export default function StoreCard({ store: m, canFollow, busy, onToggleFollow, v
           </HubLink>
           {m.verified && <BadgeCheck className="h-4 w-4 shrink-0 text-gold" aria-label={s.verified} role="img" />}
           {m.approved_provider === true && <ApprovedMark />}
+          <DemoPill id={m.id} />
           {m.pro_badge && <ProMerchantBadge compact />}
           {m.premium_badge && <PremiumMemberBadge compact />}
         </h3>

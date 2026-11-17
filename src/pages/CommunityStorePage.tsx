@@ -155,13 +155,11 @@ export default function CommunityStorePage() {
         setLoading(false);
       })
       .catch(async (e: unknown) => {
-        if (refused(e)) {
-          if (alive) {
-            setUnavailable(true);
-            setLoading(false);
-          }
-          return;
-        }
+        // A refused storefront is still asked of the in-community profile once: a
+        // community DEMO shop (worker/lib/communityDemo.ts) has no public storefront
+        // but is served there to whoever may enter the community. Every other refused
+        // shop is refused there too, and stays «غير متاح» whatever that answer is.
+        const storefrontRefused = refused(e);
         // No store row — assemble the profile-only view from community data.
         try {
           const d = await api.get<LegacyStorePayload>(`/api/community/store/${encodeURIComponent(id)}`);
@@ -170,7 +168,7 @@ export default function CommunityStorePage() {
           setProfileProducts((d.products ?? []) as unknown as MerchantProduct[]);
         } catch (legacy) {
           // A suspended merchant with no store row is refused here.
-          if (alive && refused(legacy)) setUnavailable(true);
+          if (alive && (storefrontRefused || refused(legacy))) setUnavailable(true);
           /* otherwise the merchant is truly gone — the legacy page below owns not-found */
         }
         if (alive) setLoading(false);

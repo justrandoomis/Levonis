@@ -53,6 +53,7 @@ import { Button } from '../ui/Button';
 import { useLanguage } from '../../LanguageContext';
 import { adminSubstitutionSides, reviewLang } from './reviewWords';
 import { requestsApi, type CatalogMaterial } from '../community/requests/api';
+import { DEMO_CARD_STRINGS } from './demoStrings';
 
 // P1-05: the technical review queue loads only when an admin opens it.
 const TechnicalReviewPanel = lazy(() => import('./TechnicalReviewPanel'));
@@ -112,6 +113,7 @@ export default function AdminCommunity({ dir }: { dir: 'ltr' | 'rtl' }) {
               maintenance is far more likely to be here for the switch than
               for a commission percentage. */}
           <CommunityGatePanel t={t} />
+          <DemoDataCard />
           <SettingsSection t={t} />
         </div>
       )}
@@ -2486,6 +2488,134 @@ function NumField({ label, value, onChange }: { label: string; value: number; on
 }
 
 // ------------------------------------------------------------------- bits
+
+// ------------------------------------------------------------ demo data
+
+interface DemoStatus {
+  present: boolean;
+  total: number;
+  counts: Record<string, number>;
+  community_open: boolean;
+}
+
+/**
+ * «بيانات تجريبية» (worker/lib/communityDemo.ts): the owner's demo content for
+ * testing the closed community — the counts, one press to add the set, one
+ * to remove all of it behind the app's own confirm. The owner or a full
+ * admin only: an assistant's status read is refused, and the card is not
+ * drawn. Adding is disabled, with the reason, while the community is open.
+ */
+function DemoDataCard() {
+  const { lang } = useLanguage();
+  const s = DEMO_CARD_STRINGS[lang] ?? DEMO_CARD_STRINGS.ar;
+  const [confirm, confirmDialog] = useConfirm();
+  const [st, setSt] = useState<DemoStatus | null>(null);
+  const [hidden, setHidden] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      setSt(await api.get<DemoStatus>('/api/admin/community/demo'));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) setHidden(true);
+      else toast.error(s.failed);
+    }
+  }, [s.failed]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  if (hidden) return null;
+  if (!st) return <Spin />;
+
+  const failure = (e: unknown) => {
+    const code = e instanceof ApiError ? e.code ?? '' : '';
+    toast.error(code ? `${s.failed} (${code})` : s.failed);
+  };
+
+  async function seed() {
+    setBusy(true);
+    try {
+      const r = await api.post<{ created: boolean; already_present: boolean; counts: Record<string, number> }>('/api/admin/community/demo/seed', {});
+      const n = Object.values(r.counts ?? {}).reduce((a, b) => a + b, 0);
+      if (r.created) toast.success(s.seeded(n));
+      else toast.info(s.alreadyPresent);
+    } catch (e) {
+      failure(e);
+    } finally {
+      setBusy(false);
+      void load();
+    }
+  }
+
+  async function remove() {
+    if (!st) return;
+    const ok = await confirm({
+      title: s.removeTitle,
+      consequence: s.removeConsequence(st.total),
+      confirmLabel: s.removeConfirm,
+      cancelLabel: s.cancel,
+      destructive: true,
+    });
+    if (!ok) return;
+    setBusy(true);
+    try {
+      const r = await api.post<{ total: number }>('/api/admin/community/demo/remove', {});
+      toast.success(s.removed(r.total));
+    } catch (e) {
+      failure(e);
+    } finally {
+      setBusy(false);
+      void load();
+    }
+  }
+
+  const rows = Object.entries(st.counts).filter(([, n]) => n > 0);
+  return (
+    <div className="lv-surface p-4" data-demo-card>
+      <h3 className="text-gold font-bold text-[13px] mb-3">{s.title}</h3>
+      <p className="text-text-muted text-[11.5px] leading-relaxed">{s.intro}</p>
+      {rows.length ? (
+        <div className="mt-3 space-y-1">
+          <p className="text-text-primary text-[12.5px] font-semibold">{s.total(st.total)}</p>
+          <ul className="grid grid-cols-2 gap-x-3 gap-y-1 text-[12px] text-text-secondary">
+            {rows.map(([k, n]) => (
+              <li key={k} className="flex justify-between gap-2">
+                <span>{s.tables[k] ?? k}</span>
+                <span className="tabular-nums">{n}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <p className="mt-3 text-text-secondary text-[12.5px]">{s.none}</p>
+      )}
+      {st.community_open && <p className="text-warning text-[11.5px] mt-3 leading-relaxed">{s.openBlocked}</p>}
+      <div className="mt-4 flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={seed}
+          disabled={busy || st.community_open || st.present}
+          className="lv-button lv-button-secondary lv-button-sm"
+          data-demo-seed
+        >
+          {s.seed}
+        </button>
+        <button
+          type="button"
+          onClick={remove}
+          disabled={busy || st.total === 0}
+          className="lv-button lv-button-danger lv-button-sm"
+          data-demo-remove
+        >
+          {s.remove}
+        </button>
+      </div>
+      {confirmDialog}
+    </div>
+  );
+}
 
 function Spin() {
   return (

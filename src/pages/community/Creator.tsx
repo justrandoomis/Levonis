@@ -42,6 +42,7 @@ import { followersLabel, socialLang, useSocialStrings } from '../../components/c
 import { dateLocale } from '../../components/orders/format';
 import VariantImg from '../../components/ui/VariantImg';
 import CommunitySurface from '../../components/community/CommunitySurface';
+import { DemoPill } from '../../components/community/kit/display';
 
 const TABS = ['projects', 'posts', 'about'] as const;
 type Tab = (typeof TABS)[number];
@@ -215,6 +216,7 @@ export default function CreatorPage() {
                 <p className="mt-0.5 text-[13px] text-text-muted" dir="ltr">
                   @{creator.username}
                 </p>
+                <DemoPill id={creator.id} />
                 {(creator.badges.verified_merchant || creator.badges.approved_provider === true || creator.badges.pro || creator.badges.premium) && (
                   <p className="mt-2 flex flex-wrap gap-1.5">
                     {creator.badges.verified_merchant && <Badge icon={<BadgeCheck className="h-3.5 w-3.5" />}>{s.verifiedMerchant}</Badge>}

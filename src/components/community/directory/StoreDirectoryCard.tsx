@@ -26,6 +26,7 @@ import { badgeLabel, storeHref } from '../../../lib/merchant';
 import VariantImg from '../../ui/VariantImg';
 import FollowButton, { type FollowButtonProps } from '../kit/FollowButton';
 import { OnwardChevron } from '../kit/buttons';
+import { DemoPill } from '../kit/display';
 import { ApprovedMark, HubLink } from '../hub/parts';
 import { useHubStrings } from '../hub/strings';
 import type { CommunityStore } from '../hub/api';
@@ -62,6 +63,7 @@ export default function StoreDirectoryCard({ store: m, follow }: { store: Commun
             </bdi>
             {m.verified && <BadgeCheck className="h-4 w-4 shrink-0 text-gold" aria-label={s.verified} role="img" />}
             {m.approved_provider === true && <ApprovedMark />}
+            <DemoPill id={m.id} />
           </h3>
           <p data-store-place className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[14px] text-text-secondary">
             {place && (

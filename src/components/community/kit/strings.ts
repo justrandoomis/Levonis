@@ -57,6 +57,8 @@ export interface KitStrings {
   /** The follow button, for a person and for a store (plan R12: one form). */
   follow: string;
   following: string;
+  /** The badge on the owner's community demo content (DemoPill). */
+  demo: string;
 }
 
 const STRINGS: Record<'ar' | 'en' | 'ckb', KitStrings> = {
@@ -94,6 +96,7 @@ const STRINGS: Record<'ar' | 'en' | 'ckb', KitStrings> = {
     close: 'إغلاق',
     follow: 'متابعة',
     following: 'تتابعه',
+    demo: 'تجريبي',
   },
   en: {
     clear: 'Clear',
@@ -129,6 +132,7 @@ const STRINGS: Record<'ar' | 'en' | 'ckb', KitStrings> = {
     close: 'Close',
     follow: 'Follow',
     following: 'Following',
+    demo: 'Demo',
   },
   ckb: {
     clear: 'سڕینەوە',
@@ -166,6 +170,7 @@ const STRINGS: Record<'ar' | 'en' | 'ckb', KitStrings> = {
     close: 'داخستن',
     follow: 'شوێنکەوتن',
     following: 'شوێنی دەکەویت',
+    demo: 'تاقیکاری',
   },
 };
 

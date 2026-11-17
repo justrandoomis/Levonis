@@ -12,6 +12,7 @@ import { Clock, Heart, Play } from 'lucide-react';
 import SafeImage from '../../ui/SafeImage';
 import { useLanguage } from '../../../LanguageContext';
 import { creatorHref, type PostCard } from './api';
+import { DemoPill } from '../kit/display';
 import { printTimeLabel, useProjectStrings } from './strings';
 import VariantImg from '../../ui/VariantImg';
 
@@ -61,6 +62,7 @@ export default function ProjectCard({
             {p.title}
           </Link>
         </h3>
+        <DemoPill id={p.id} />
         <p className="mt-1 flex items-center gap-1.5 text-[12px] text-text-muted">
           <span aria-hidden="true" className="size-4 shrink-0 overflow-hidden rounded-full bg-surface-selected">
             {p.author.avatarUrl && <VariantImg sizes="24px" src={p.author.avatarUrl} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="h-full w-full object-cover" />}

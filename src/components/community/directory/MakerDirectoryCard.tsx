@@ -14,6 +14,7 @@
 import { Link } from 'react-router-dom';
 import { BadgeCheck } from 'lucide-react';
 import { OnwardChevron } from '../kit/buttons';
+import { DemoPill } from '../kit/display';
 import FollowUserButton from '../social/FollowUserButton';
 import { creatorHref, type CreatorCard } from '../social/api';
 import { ApprovedMark, Avatar } from '../hub/parts';
@@ -42,6 +43,7 @@ export default function MakerDirectoryCard({ creator: c }: { creator: CreatorCar
             </bdi>
             {c.badges.verified_merchant && <BadgeCheck className="h-4 w-4 shrink-0 text-gold" aria-label={s.verifiedMerchant} role="img" />}
             {c.badges.approved_provider === true && <ApprovedMark />}
+            <DemoPill id={c.id} />
           </h3>
           {line && (
             <p dir="auto" data-maker-line className="mt-0.5 line-clamp-1 text-start text-[15px] text-text-secondary">

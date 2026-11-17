@@ -40,7 +40,7 @@ import FollowUserButton from '../social/FollowUserButton';
 import { creatorHref, type PostCard as PostCardData } from '../projects/api';
 import { KindIcon } from '../projects/kindIcons';
 import { useProjectStrings } from '../projects/strings';
-import { KitAvatar } from '../kit/display';
+import { DemoPill, KitAvatar } from '../kit/display';
 import { KitButtonLink, OnwardChevron, kitButtonClass } from '../kit/buttons';
 import { HubLink } from '../hub/parts';
 import { timeAgo } from '../hub/copy';
@@ -106,7 +106,8 @@ function PostCard({ post: p, eager = false, onPatch }: { post: PostCardData; eag
           )}
         </div>
         <div className="flex shrink-0 flex-col items-start gap-1">
-          <div className="flex items-center">
+          <div className="flex items-center gap-1">
+            <DemoPill id={p.id} />
             <span
               data-post-kind-badge
               className="inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[13px] font-bold"

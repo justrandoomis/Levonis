@@ -55,7 +55,7 @@ import { GOVERNORATE_LABELS } from '../../../lib/governorates';
 import { formatDate } from '../../orders/format';
 import { iqdUnit } from '../../../lib/money';
 import { OnwardChevron, kitButtonClass } from '../kit/buttons';
-import { StatePill } from '../kit/display';
+import { DemoPill, StatePill } from '../kit/display';
 import { jobCountWords, localMaterial } from './mirrors';
 import { RequestThumb } from './RequestFileThumbs';
 import { CARD_WORDS, asCardLang, attachmentsWord, offersWord, piecesWord, requestGlyph, requestStateWord, type CardLang } from './requestWords';
@@ -274,6 +274,7 @@ export default function RequestListCard(props: RequestListCardProps) {
         </div>
         {/* The end column (IMG_8487 row 8): the state pill beside the chevron, centred on the card. */}
         <span className="ms-auto flex shrink-0 items-center gap-1.5" data-request-end>
+          <DemoPill id={r.id} />
           <StatePill tone={state.tone}>{state.word}</StatePill>
           <OnwardChevron className="h-[18px] w-[18px] shrink-0 text-text-secondary" />
         </span>
@@ -356,7 +357,8 @@ export default function RequestListCard(props: RequestListCardProps) {
       <Link to={to} data-request-card="list" data-community-request={r.id} className={`cm-card flex items-center gap-3 rounded-xl p-2.5 shadow-sm active:shadow-press sm:p-3 ${LINK_FOCUS} ${className}`}>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5" data-request-main>
           <div className="flex flex-col items-start gap-0.5">
-            <StatePill tone={state.tone}>{state.word}</StatePill>
+            <DemoPill id={r.id} />
+          <StatePill tone={state.tone}>{state.word}</StatePill>
             {/* One line, as the reference holds it: the whole title is still read aloud. */}
             <H dir="auto" className="w-full truncate text-start text-[17px] font-bold leading-snug text-text-primary">
               {r.title}
@@ -389,6 +391,7 @@ export default function RequestListCard(props: RequestListCardProps) {
     <article data-request-card="owner" data-community-request={r.id} className={`cm-card relative flex items-center gap-3 rounded-xl p-2.5 shadow-sm sm:p-3 ${className}`}>
       <div className="flex min-w-0 flex-1 flex-col gap-1.5" data-request-main>
         <div className="flex flex-col items-start gap-0.5">
+          <DemoPill id={r.id} />
           <StatePill tone={state.tone}>{state.word}</StatePill>
           <H dir="auto" className="w-full truncate text-start text-[17px] font-bold leading-snug text-text-primary">
             <Link to={to} className={`rounded-sm after:absolute after:inset-0 after:rounded-xl after:content-[''] ${LINK_FOCUS}`}>

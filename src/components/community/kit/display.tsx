@@ -22,6 +22,7 @@ import { Check, ExternalLink, GripVertical, Plus, X } from 'lucide-react';
 import VariantImg from '../../ui/VariantImg';
 import { OnwardChevron, TextLink } from './buttons';
 import { useKitStrings } from './strings';
+import { isDemoId } from '../../../../packages/contracts/src/demoData';
 
 type CardTag = 'div' | 'section' | 'article' | 'li' | 'aside';
 
@@ -113,6 +114,24 @@ export function StatePill({ tone, children, className = '' }: { tone: StateTone;
   return (
     <span data-state-pill={tone} className={`cm-pill cm-pill-${tone} inline-flex h-6 items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 text-[12px] font-semibold ${className}`}>
       {children}
+    </span>
+  );
+}
+
+/**
+ * «تجريبي» — the owner's community demo content (worker/lib/communityDemo.ts),
+ * told apart by its id alone. Draws nothing for every other id, so a card
+ * passes the ids it shows and never asks itself. A StatePill, so no new style.
+ */
+export function DemoPill({ id, className = '' }: { id: unknown | readonly unknown[]; className?: string }) {
+  const s = useKitStrings();
+  const ids = Array.isArray(id) ? id : [id];
+  if (!ids.some(isDemoId)) return null;
+  return (
+    <span data-demo-badge="">
+      <StatePill tone="waiting" className={className}>
+        {s.demo}
+      </StatePill>
     </span>
   );
 }

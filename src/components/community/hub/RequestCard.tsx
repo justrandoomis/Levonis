@@ -27,6 +27,7 @@ import { GOVERNORATE_LABELS } from '../../../lib/governorates';
 import { offersLabel, shortDate, timeAgo } from './copy';
 import { fill, useHubStrings } from './strings';
 import type { CommunityRequest } from './api';
+import { DemoPill } from '../kit/display';
 import { jobCountWords, localMaterial } from '../requests/mirrors';
 
 const CHIP = 'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-border-subtle/60 bg-surface px-2 py-0.5';
@@ -107,7 +108,10 @@ export default function RequestCard({ request: r, compact = false }: { request: 
         className="lv-section flex min-w-0 flex-col gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         <h3 dir="auto" className="line-clamp-1 break-words text-start text-[14.5px] font-semibold leading-snug text-text-primary">{r.title}</h3>
-        <div className="flex flex-wrap gap-1.5 text-[11.5px] text-text-secondary">{chips}</div>
+        <div className="flex flex-wrap gap-1.5 text-[11.5px] text-text-secondary">
+          <DemoPill id={r.id} />
+          {chips}
+        </div>
         {footer}
       </Link>
     );
@@ -123,6 +127,7 @@ export default function RequestCard({ request: r, compact = false }: { request: 
           `dir="auto"` lays an English title out left-to-right inside the
           Arabic page instead of moving its full stop to the front. */}
       <h3 dir="auto" className="break-words text-start text-[14.5px] font-semibold leading-snug text-text-primary">{r.title}</h3>
+      <DemoPill id={r.id} />
       {r.description && (
         <p dir="auto" className="line-clamp-2 break-words text-start text-[12.5px] leading-relaxed text-text-secondary">{r.description}</p>
       )}
