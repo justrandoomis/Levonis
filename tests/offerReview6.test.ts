@@ -241,7 +241,7 @@ test('list: «طلباتي» says an accepted order is partial and substituted, 
   assert.equal(p.substitutes, true);
   assert.equal(p.offer_snapshot, undefined, 'the snapshots stay on the order page');
   const w = list.find((r) => r.id === whole)!.accepted;
-  assert.deepEqual(Object.keys(w), ['offer_id', 'order_id', 'merchant_name', 'price_iqd', 'completion_days']);
+  assert.deepEqual(Object.keys(w), ['offer_id', 'order_id', 'merchant_name', 'price_iqd', 'delivery_fee_iqd', 'total_iqd', 'completion_days'], 'a whole order adds nothing beyond the money it holds (price, fee, total)');
 });
 
 // ============================================================== revision
