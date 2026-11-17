@@ -26,10 +26,10 @@
  * request's own read is refused, so the detail starts from the row it is
  * handed and keeps it when the re-read fails.
  */
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import * as Motion from 'motion/react-m';
-import { ArrowLeft, ArrowRight, Box, FilePen, MapPin, MessageCircle, PencilLine, Phone, Plus, Store } from 'lucide-react';
+import { Box, FilePen, MapPin, MessageCircle, MoreHorizontal, Phone, Plus, Store } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
 import { useSignInPrompt } from '../../lib/guest';
@@ -43,6 +43,7 @@ import { merchantHref } from '../../lib/merchantRoutes';
 import { applicationCta } from '../../components/merchantApplication/approvalWords';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import { printApi } from '../../lib/printApi';
+import { requestPath } from '../../components/community/requests/requestStates';
 import { formatDate } from '../../components/orders/format';
 import { AttachmentList, type RequestFile } from '../../components/media/RequestAttachments';
 import PrintSummary, { type PrintModelExtra } from '../../components/print/PrintSummary';
@@ -63,7 +64,13 @@ import OfferCompare, { Breakdown, OfferFiles } from '../../components/community/
 import { MerchantOfferSection } from '../../components/community/requests/OfferComposer';
 import Discussion from '../../components/community/requests/Discussion';
 import { discussionApi, offersV2Api, requestsApi, type CatalogMaterial, type OfferV2, type OrderTimeline as OrderTimelineData } from '../../components/community/requests/api';
-import { latestEvent, REQUEST_STEPS, requestStateLabel, requestStateTone, requestStepIndex, requestTakesOffers } from '../../components/community/requests/requestStates';
+import { latestEvent, REQUEST_STEPS, requestStepIndex, requestTakesOffers } from '../../components/community/requests/requestStates';
+import RequestHeaderCard from '../../components/community/requests/RequestHeaderCard';
+import { AttachmentsSheet } from '../../components/community/requests/AttachmentsPreview';
+import { asCardLang } from '../../components/community/requests/requestWords';
+import SectionPageHeader from '../../components/community/kit/SectionPageHeader';
+import { KitIconButton } from '../../components/community/kit/buttons';
+import { Menu, type MenuEntry } from '../../components/ui/Menu';
 import {
   daysLabel,
   escrowSentence,
@@ -77,7 +84,7 @@ import {
   type RequestLang,
   type RequestStrings,
 } from '../../components/community/requests/strings';
-import { Button, IconButton } from '../../components/ui/Button';
+import { Button } from '../../components/ui/Button';
 import { StatusChip } from '../../components/ui/Badge';
 import { Money } from '../../components/ui/Money';
 import { Sheet } from '../../components/ui/Sheet';
@@ -137,6 +144,16 @@ export interface OrderView {
     refunded_at: string | null;
   } | null;
   can: Record<string, boolean>;
+}
+
+/** The two tabs of the owner page. */
+type RequestTab = 'offers' | 'details';
+
+/** The tab a hash in the address lives in: `#offers` the offers, `#files`, `#details`, `#discussion` and `#timeline` the details. */
+export function hashTab(hash: string): RequestTab | null {
+  const h = decodeURIComponent(hash.replace(/^#/, ''));
+  if (h === 'offers') return 'offers';
+  return h === 'files' || h === 'details' || h === 'discussion' || h === 'timeline' ? 'details' : null;
 }
 
 /** A full list row, or only an id to fetch. */
@@ -238,26 +255,6 @@ export default function RequestPage() {
   );
 }
 
-function TopBar({ onBack, kicker }: { onBack: () => void; kicker: string }) {
-  const s = useRequestStrings();
-  const { dir } = useLanguage();
-  const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
-  return (
-    <div className="material scroll-edge sticky top-0 z-40 h-14 px-4">
-      <div className="mx-auto flex h-full max-w-2xl items-center gap-2">
-        <IconButton
-          label={s.back}
-          onClick={onBack}
-          className="-ms-2"
-          data-request-back
-          icon={<Back aria-hidden="true" className="h-5 w-5" />}
-        />
-        <span className="min-w-0 flex-1 truncate text-[13px] text-text-muted">{kicker}</span>
-      </div>
-    </div>
-  );
-}
-
 // ------------------------------------------------------------------ detail
 
 export function RequestDetail({
@@ -329,6 +326,16 @@ export function RequestDetail({
   /** The discussion's read was refused by the maintenance wall: its section folds away. */
   const [discussionShut, setDiscussionShut] = useState(false);
   const seed = useRef(request);
+  /** The owner tabs (plan C3): a hash in the address picks its tab before the page scrolls to it. */
+  const [tab, setTab] = useState<RequestTab>(() => hashTab(location.hash) ?? 'offers');
+  useEffect(() => {
+    const t = hashTab(location.hash);
+    if (t) setTab(t);
+  }, [location.hash]);
+  const [filesOpen, setFilesOpen] = useState(false);
+  const [repeatOpen, setRepeatOpen] = useState(false);
+  const [repeating, setRepeating] = useState(false);
+  const [repeatError, setRepeatError] = useState('');
 
   const loadRequest = useCallback(() => {
     api
@@ -399,7 +406,8 @@ export function RequestDetail({
     const hash = decodeURIComponent(location.hash.replace(/^#/, ''));
     if (scrolled.current || !hash || !current || offers === null) return;
     const el = document.getElementById(hash);
-    if (!el) return;
+    // In a tab not shown yet: the tab switches first (above), then this runs again.
+    if (!el || el.closest('[hidden]')) return;
     scrolled.current = true;
     el.scrollIntoView({ block: 'start', behavior: m.reduced ? 'auto' : 'smooth' });
     /**
@@ -434,7 +442,7 @@ export function RequestDetail({
     }
     for (const t of stopOn) window.addEventListener(t, stop, { passive: true });
     unanchor.current = stop;
-  }, [location.hash, current, offers, orderId, m.reduced]);
+  }, [location.hash, current, offers, orderId, m.reduced, tab]);
   useEffect(() => () => unanchor.current?.(), []);
 
   const fallback = s.couldNot;
@@ -481,10 +489,48 @@ export function RequestDetail({
     }
   }
 
-  const frame = (body: ReactNode) => (
+  async function repeatRequest() {
+    if (!current) return;
+    setRepeating(true);
+    setRepeatError('');
+    try {
+      const d = await printApi.repeat(current.id);
+      setRepeatOpen(false);
+      forgetCommunityFeed('requests');
+      navigate(requestPath(d.request_id));
+    } catch (e) {
+      setRepeatError(apiRefusal(e, L, s.couldNotRepeat));
+    } finally {
+      setRepeating(false);
+    }
+  }
+
+  /** «مشاركة الرابط»: the system share sheet where there is one, else the address copied. */
+  async function shareLink() {
+    if (!current) return;
+    const url = `${window.location.origin}${requestPath(current.id)}`;
+    if (typeof navigator.share === 'function') {
+      try {
+        await navigator.share({ title: current.title, url });
+      } catch {
+        // Closed by the reader: nothing to say.
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(s.linkCopied);
+    } catch {
+      toast.error(fallback);
+    }
+  }
+
+  const frame = (body: ReactNode, trailing?: ReactNode) => (
     <div className="min-h-screen pb-28 text-text-primary" data-request-page={request.id}>
-      <TopBar onBack={onBack} kicker={s.kicker} />
-      <div className="mx-auto max-w-2xl px-4">{body}</div>
+      <div className="mx-auto max-w-2xl px-4">
+        <SectionPageHeader title={isOwner ? s.myRequestTitle : s.details} onBack={onBack} trailing={trailing} />
+        {body}
+      </div>
     </div>
   );
 
@@ -517,332 +563,392 @@ export function RequestDetail({
   const chatWith: 'merchant' | 'customer' | null = isCustomer ? (accepted ? 'merchant' : null) : myLive ? 'customer' : null;
   const role: 'customer' | 'merchant' | null = order?.role ?? (isCustomer ? 'customer' : accepted ? 'merchant' : null);
   const gov = GOVERNORATE_LABELS[current.governorate];
+  /** THE OWNER TABS (plan C3): «العروض (n)» and «تفاصيل الطلب». A workshop and an onlooker read one column, as before. */
+  const tabbed = isOwner && !draft;
+  const liveOffers = offers?.filter((o) => o.state === 'pending' || o.state === 'superseded').length ?? 0;
+  const others = accepted ? (offers ?? []).filter((o) => o.id !== accepted.id) : [];
+  const canEditFiles = isOwner && ['open', 'receiving_offers', 'draft'].includes(current.state);
+  const panel = (id: RequestTab) =>
+    tabbed ? { role: 'tabpanel', id: `request-panel-${id}`, 'aria-labelledby': `request-tab-${id}`, hidden: tab !== id, 'data-request-panel': id } : {};
+
+  /** «⋯»: what the reader may do with the request as a whole. */
+  const menu: MenuEntry[] = [];
+  if (isOwner && draft) {
+    if (onEdit) menu.push({ id: 'continue', label: s.continueEditing, onSelect: () => onEdit(current.id, true) });
+    menu.push({ id: 'discard', label: s.discardDraft, destructive: true, onSelect: () => { setDiscardError(''); setDiscardOpen(true); } });
+  } else {
+    if (isOwner && open && onEdit) menu.push({ id: 'edit', label: s.editRequest, onSelect: () => onEdit(current.id) });
+    if (isOwner && open) menu.push({ id: 'close', label: s.closeRequest, destructive: true, onSelect: () => { setCloseError(''); setCloseOpen(true); } });
+    if (isOwner) menu.push({ id: 'repeat', label: s.repeatRequest, onSelect: () => { setRepeatError(''); setRepeatOpen(true); } });
+    menu.push({ id: 'share', label: s.shareLink, onSelect: shareLink });
+  }
+  const trailing = (
+    <Menu
+      label={s.requestActions}
+      items={menu}
+      align="end"
+      trigger={(p) => <KitIconButton {...p} shape="square" icon={<MoreHorizontal aria-hidden="true" className="h-5 w-5" />} label={s.requestActions} data-request-menu />}
+    />
+  );
+
+  /** Tabs follow the writing direction with the arrows (the house strip does the same). */
+  const onTabKey = (e: KeyboardEvent<HTMLElement>) => {
+    const { key } = e;
+    const rtl = document.documentElement.dir === 'rtl';
+    const forward = key === (rtl ? 'ArrowLeft' : 'ArrowRight');
+    const back = key === (rtl ? 'ArrowRight' : 'ArrowLeft');
+    if (!forward && !back && key !== 'Home' && key !== 'End') return;
+    e.preventDefault();
+    const next: RequestTab = key === 'Home' ? 'offers' : key === 'End' ? 'details' : tab === 'offers' ? 'details' : 'offers';
+    setTab(next);
+    document.getElementById(`request-tab-${next}`)?.focus();
+  };
+
+
+  // ------------------------------------------------------------ the pieces
+  const statusSection = (
+    <section aria-label={s.status} data-request-section="status" className="lv-section">
+      {step >= 0 ? (
+        <>
+          <ol className="flex gap-1.5" data-request-steps>
+            {REQUEST_STEPS.map((k, i) => (
+              <li key={k} aria-current={i === step ? 'step' : undefined} data-step={k} data-step-state={i < step ? 'done' : i === step ? 'current' : 'next'} className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <span aria-hidden="true" className={`block h-1 rounded-full ${i <= step ? 'bg-gold' : 'bg-surface-selected'}`} />
+                {/* Six words do not fit the width of a phone: there, the current one is said in full below —
+                    and the words stay in the accessibility tree, so the list is never six empty items.
+                    The column's gap spaces the word from its bar once it is shown (an sr-only item is out of the flow). */}
+                <span className={`sr-only text-[11px] leading-tight sm:not-sr-only ${i === step ? 'font-semibold text-text-primary' : 'text-text-muted'}`}>{s.steps[k]}</span>
+              </li>
+            ))}
+          </ol>
+          <p aria-hidden="true" className="mt-2 text-[12.5px] text-text-secondary sm:hidden" data-request-step-line>
+            {fill(s.stepOf, { n: step + 1, total: REQUEST_STEPS.length, label: s.steps[REQUEST_STEPS[step]] })}
+          </p>
+        </>
+      ) : draft && isOwner ? null : (
+        // The owner of a draft reads it on the draft card below — said once, not twice.
+        <p className={`lv-alert ${current.state === 'disputed' ? 'lv-alert-danger' : 'lv-alert-info'} text-[13px] text-text-primary`} data-request-status-line={current.state}>
+          {current.state === 'draft' ? s.statusDraft : current.state === 'expired' ? s.statusExpired : current.state === 'disputed' ? s.statusDisputed : s.statusClosed}
+        </p>
+      )}
+
+      {isOwner && draft && (
+        <div className="lv-surface p-4" data-requests="draft">
+          <p className="flex items-center gap-2 text-[13.5px] font-semibold text-text-primary">
+            <FilePen aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />
+            {s.draftTitle}
+          </p>
+          <p className="mt-1 text-[12.5px] leading-relaxed text-text-secondary">{s.draftBody}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {onFinish && (
+              <Button variant="primary" size="sm" onClick={() => onFinish(current.id)} data-requests="publish-draft">
+                {loc('أكمل وانشر', 'Finish and publish', 'تەواوی بکە و بڵاوی بکەرەوە')}
+              </Button>
+            )}
+            {/* With no «أكمل وانشر» beside it, continuing is the way forward: the primary button. */}
+            {onEdit && (
+              <Button variant={onFinish ? 'secondary' : 'primary'} size="sm" onClick={() => onEdit(current.id, true)} data-requests="continue-draft">
+                {s.continueEditing}
+              </Button>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setDiscardError('');
+                setDiscardOpen(true);
+              }}
+              data-requests="discard-draft"
+            >
+              {s.discardDraft}
+            </Button>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+
+  const detailsSection = (
+    <section id="details" aria-labelledby="request-details-title" data-request-section="details" className="lv-section scroll-mt-14">
+      <h2 id="request-details-title" className="mb-2 text-[13px] font-semibold text-text-muted">
+        {s.details}
+      </h2>
+      {(current.customer_name || chosenName) && (
+        <p className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-[12.5px] text-text-muted">
+          {current.customer_name && <span data-request-customer>{fillNodes(s.by, { name: <bdi>{current.customer_name}</bdi> })}</span>}
+          {chosenName && <span data-request-merchant>{fillNodes(s.chosenMerchant, { name: <bdi className="font-semibold text-text-secondary">{chosenName}</bdi> })}</span>}
+        </p>
+      )}
+      {current.description && (
+        <p dir="auto" className="mb-3 whitespace-pre-wrap break-words text-start text-[14px] leading-relaxed text-text-secondary">
+          {current.description}
+        </p>
+      )}
+      {sourceUrl && (
+        <div className="mb-3" data-request="source-link">
+          <p className="mb-1 text-[11.5px] text-text-muted">{s.sourceLink}</p>
+          <SourceLinkCard url={sourceUrl} />
+        </div>
+      )}
+      <dl className="grid grid-cols-2 gap-x-4 gap-y-3" data-request-facts>
+        {/* Q2: the server sends a budget to its owner (and an eligible merchant when shown); never to the public. */}
+        {current.budget_iqd !== null && current.budget_iqd !== undefined && <Fact label={s.budget} value={<Money iqd={current.budget_iqd} />} />}
+        {current.quantity > 1 && <Fact label={s.quantity} value={`×${current.quantity}`} />}
+        {/* The mirrors are stored in English; each reader gets their own words (R8). */}
+        {current.material && <Fact label={s.material} value={localMaterial(current.material, L, materials)} />}
+        {current.color && <Fact label={s.colour} value={localColour(current.color, L)} />}
+        {current.dimensions && <Fact label={s.dimensions} value={current.dimensions} />}
+        {current.deadline && <Fact label={s.deadline} value={formatDate(current.deadline, lang) || current.deadline} />}
+        {/* Where it goes, when it was asked, and until when offers are taken. */}
+        {current.governorate && <Fact label={s.governorate} value={gov ? gov[L] : current.governorate} />}
+        {current.state !== 'draft' && formatDate(current.created_at, lang) && <Fact label={s.publishedOn} value={formatDate(current.created_at, lang)} />}
+        {open && formatDate(current.expires_at, lang) && (
+          <Fact label={s.offersClose} value={formatDate(current.expires_at, lang)} />
+        )}
+      </dl>
+      {current.customer_notes && (
+        <div className="lv-well mt-3 rounded-md px-3 py-2.5" data-request="customer-notes">
+          <p className="mb-0.5 text-[11.5px] text-text-muted">{s.notesForMerchants}</p>
+          <p dir="auto" className="whitespace-pre-wrap break-words text-start text-[13px] leading-relaxed text-text-secondary">
+            {current.customer_notes}
+          </p>
+        </div>
+      )}
+      {/* What Levonis measured and estimated — the estimate card. Renders
+          nothing for a request that carries no print row. */}
+      <div className="mt-4">
+        <PrintSummary
+          requestId={current.id}
+          onLoaded={(f, extra) => {
+            setPrimaryFile(f?.primary_file_id ?? null);
+            setSourceUrl(f?.source_url ? f.source_url : null);
+            if (extra) setModelExtra(extra);
+          }}
+        />
+      </div>
+    </section>
+  );
+
+  const discussionSection = !draft && !discussionShut && (
+    <section id="discussion" aria-labelledby="request-discussion-title" data-request-section="discussion" className="lv-section scroll-mt-14">
+      <h2 id="request-discussion-title" className="mb-2 text-[13px] font-semibold text-text-muted">
+        {s.discussion}
+      </h2>
+      <Discussion requestId={current.id} open={open} onUnavailable={() => setDiscussionShut(true)} />
+    </section>
+  );
+
+  const offersSection = !draft && !(accepted && !isCustomer) && (
+    <section
+      id="offers"
+      aria-label={isCustomer ? s.offers : onlookers ? s.wantLikeThis : s.yourOffer}
+      data-request-section="offers"
+      className="lv-section scroll-mt-14"
+    >
+      {/* «عرضك» is the heading of a merchant; a visitor gets the card below instead. The owner reads the tab name. */}
+      {!tabbed && (isCustomer || !onlookers) && !(isCustomer && accepted) && (
+        <h2 className="mb-3 text-[13px] font-semibold text-text-muted">{isCustomer ? s.offers : s.yourOffer}</h2>
+      )}
+      {/* The own verdict of the workshop on this request, with the reasons and
+          the screen that fixes each, and its private costing (W5-B). */}
+      {me?.store && !isCustomer && !isOwner && current.state !== 'draft' && (
+        <div className="mb-3">
+          <WorkshopRequestCard requestId={current.id} takingOffers={open} openCosting={openCosting} onUseAsOffer={setPrefill} />
+        </div>
+      )}
+      {offers === null || !meReady ? (
+        offersError ? (
+          <CommunityLoadError error={offersError} onRetry={load} compact />
+        ) : (
+          <SkeletonGroup className="space-y-2">
+            <Skeleton className="h-40 w-full rounded-2xl" />
+          </SkeletonGroup>
+        )
+      ) : isCustomer ? (
+        accepted ? (
+          // The choice is made: the accepted card leads, and the other offers stay on the record, folded.
+          <>
+            <AcceptedOffer o={accepted} s={s} lang={L} materials={materials} mine={false} orderState={order?.order.state ?? null} parts={partRefs} />
+            {others.length > 0 && (
+              <details className="group mt-3" data-request-other-offers>
+                <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg text-[13px] font-semibold text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
+                  {fill(s.otherOffers, { n: others.length })}
+                </summary>
+                <div className="pt-2">
+                  <OfferCompare requestId={current.id} offers={others} takingOffers={false} materials={materials} onChanged={refreshAll} parts={partRefs} />
+                </div>
+              </details>
+            )}
+          </>
+        ) : (
+          <OfferCompare requestId={current.id} offers={offers} takingOffers={open} materials={materials} onChanged={refreshAll} parts={partRefs} />
+        )
+      ) : onlookers ? (
+        <OnlookerCard me={me} onNewRequest={onNewRequest} />
+      ) : (
+        <MerchantOfferSection
+          requestId={current.id}
+          offers={offers}
+          draft={myDraft}
+          canOffer={canOffer}
+          gate={me?.store && me.approved === false ? approvalGateText(loc) : null}
+          takingOffers={open}
+          materials={materials}
+          defaultQuantity={current.quantity}
+          deliveryPref={current.delivery_pref}
+          parts={modelExtra.parts}
+          requestHash={modelExtra.revisionHash}
+          onChanged={load}
+          prefill={prefill}
+          onPrefillDone={() => setPrefill(null)}
+          jobFiles={files}
+          sourceUrl={sourceUrl}
+        />
+      )}
+    </section>
+  );
+
+  const chatSection = chatWith && (
+    <section aria-labelledby="request-chat-title" data-request-section="chat" className="lv-section">
+      <h2 id="request-chat-title" className="text-[13px] font-semibold text-text-muted">
+        {s.chat}
+      </h2>
+      <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">{chatWith === 'merchant' ? s.chatWithMerchant : s.chatWithCustomer}</p>
+      <Button
+        variant="secondary"
+        size="sm"
+        className="mt-2"
+        icon={<MessageCircle aria-hidden="true" className="h-4 w-4" />}
+        onClick={() => openChat(chatWith === 'merchant' ? accepted?.merchant_id : undefined)}
+        data-request-chat={chatWith}
+      >
+        {chatWith === 'merchant' ? s.openConversation : s.messageCustomer}
+      </Button>
+    </section>
+  );
+
+  // The workshop reads the offer its customer accepted; the customer reads it at the head of the offers tab.
+  const acceptedSection = accepted && !isCustomer && (
+    <section aria-labelledby="request-accepted-title" data-request-section="accepted" className="lv-section">
+      <h2 id="request-accepted-title" className="mb-2 text-[13px] font-semibold text-text-muted">
+        {s.accepted}
+      </h2>
+      <AcceptedOffer o={accepted} s={s} lang={L} materials={materials} mine={!isCustomer} orderState={order?.order.state ?? null} parts={partRefs} />
+    </section>
+  );
+
+  const orderSections = (
+    <>
+      {orderId && (
+        <section id="timeline" aria-labelledby="request-timeline-title" data-request-section="timeline" className="lv-section scroll-mt-14">
+          <h2 id="request-timeline-title" className="mb-2 text-[13px] font-semibold text-text-muted">
+            {s.timeline}
+          </h2>
+          <TimelinePeek timeline={timeline} failed={timelineFailed} onRetry={retryTimeline} s={s} lang={L} onOpen={() => setTimelineOpen(true)} />
+        </section>
+      )}
+      {order && (
+        <section aria-labelledby="request-escrow-title" data-request-section="escrow" className="lv-section">
+          <h2 id="request-escrow-title" className="mb-2 text-[13px] font-semibold text-text-muted">
+            {s.escrow}
+          </h2>
+          <EscrowLine order={order} s={s} lang={L} />
+        </section>
+      )}
+      {order && (
+        <section aria-labelledby="request-delivery-title" data-request-section="delivery" className="lv-section">
+          <h2 id="request-delivery-title" className="mb-2 text-[13px] font-semibold text-text-muted">
+            {s.delivery}
+          </h2>
+          <ContactCard order={order} s={s} lang={L} />
+        </section>
+      )}
+      {orderId && role === 'customer' && order?.order.state === 'completed' && <ReviewSection orderId={orderId} s={s} />}
+    </>
+  );
 
   return frame(
     <MotionFeatures>
       <Motion.article initial={{ opacity: 0, y: m.travel(10) }} animate={{ opacity: 1, y: 0 }} transition={m.spring('ui')} className="flex flex-col" data-request={current.id} data-request-state={current.state}>
         {/* ---------------------------------------------------------- header */}
-        <header data-request-section="header" className="pb-4 pt-3">
-          <div className="flex items-start justify-between gap-3">
-            {/* The customer's own words keep their own direction: an Arabic
-                «80×60 ملم» read in the English interface must not come out as
-                60×80. */}
-            <h1 dir="auto" className="min-w-0 flex-1 break-words text-[19px] font-bold leading-snug text-text-primary">
-              {current.title}
-            </h1>
-            <StatusChip tone={requestStateTone(current.state)} className="mt-0.5 shrink-0">
-              {requestStateLabel(current.state, loc)}
-            </StatusChip>
-          </div>
+        <RequestHeaderCard
+          request={current}
+          files={files}
+          isOwner={isOwner}
+          waitingOffers={accepted ? 0 : liveOffers}
+          piecesPerSet={modelExtra.summary?.pieces_per_set ?? 1}
+          lang={asCardLang(lang)}
+          s={s}
+          onOpenFiles={() => setFilesOpen(true)}
+          canAddFiles={canEditFiles}
+        >
           {modelExtra.summary?.review_state === 'needs_technical_review' && (
             <p className="mt-1.5" data-request-review>
               <StatusChip tone="warning">{s.reviewChip}</StatusChip>
             </p>
           )}
-          {(current.customer_name || chosenName) && (
-            <p className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-[12.5px] text-text-muted">
-              {current.customer_name && <span data-request-customer>{fillNodes(s.by, { name: <bdi>{current.customer_name}</bdi> })}</span>}
-              {chosenName && (
-                <span data-request-merchant>{fillNodes(s.chosenMerchant, { name: <bdi className="font-semibold text-text-secondary">{chosenName}</bdi> })}</span>
-              )}
-            </p>
-          )}
-        </header>
+        </RequestHeaderCard>
 
-        {/* ---------------------------------------------------- status strip */}
-        <section aria-label={s.status} data-request-section="status" className="lv-section">
-          {step >= 0 ? (
-            <>
-              <ol className="flex gap-1.5" data-request-steps>
-                {REQUEST_STEPS.map((k, i) => (
-                  <li key={k} aria-current={i === step ? 'step' : undefined} data-step={k} data-step-state={i < step ? 'done' : i === step ? 'current' : 'next'} className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <span aria-hidden="true" className={`block h-1 rounded-full ${i <= step ? 'bg-gold' : 'bg-surface-selected'}`} />
-                    {/* Six words do not fit a phone's width: there, the current one is said in full below —
-                        and the words stay in the accessibility tree, so the list is never six empty items.
-                        The column's gap spaces the word from its bar once it is shown (an sr-only item is out of the flow). */}
-                    <span className={`sr-only text-[11px] leading-tight sm:not-sr-only ${i === step ? 'font-semibold text-text-primary' : 'text-text-muted'}`}>{s.steps[k]}</span>
-                  </li>
-                ))}
-              </ol>
-              <p aria-hidden="true" className="mt-2 text-[12.5px] text-text-secondary sm:hidden" data-request-step-line>
-                {fill(s.stepOf, { n: step + 1, total: REQUEST_STEPS.length, label: s.steps[REQUEST_STEPS[step]] })}
-              </p>
-            </>
-          ) : draft && isOwner ? null : (
-            // The owner of a draft reads it on the draft card below — said once, not twice.
-            <p className={`lv-alert ${current.state === 'disputed' ? 'lv-alert-danger' : 'lv-alert-info'} text-[13px] text-text-primary`} data-request-status-line={current.state}>
-              {current.state === 'draft' ? s.statusDraft : current.state === 'expired' ? s.statusExpired : current.state === 'disputed' ? s.statusDisputed : s.statusClosed}
-            </p>
-          )}
-
-          {isOwner && draft && (
-            <div className="lv-surface p-4" data-requests="draft">
-              <p className="flex items-center gap-2 text-[13.5px] font-semibold text-text-primary">
-                <FilePen aria-hidden="true" className="h-4 w-4 shrink-0 text-text-muted" />
-                {s.draftTitle}
-              </p>
-              <p className="mt-1 text-[12.5px] leading-relaxed text-text-secondary">{s.draftBody}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {onFinish && (
-                  <Button variant="primary" size="sm" onClick={() => onFinish(current.id)} data-requests="publish-draft">
-                    {loc('أكمل وانشر', 'Finish and publish', 'تەواوی بکە و بڵاوی بکەرەوە')}
-                  </Button>
-                )}
-                {/* With no «أكمل وانشر» beside it, continuing is the way forward: the primary button. */}
-                {onEdit && (
-                  <Button variant={onFinish ? 'secondary' : 'primary'} size="sm" onClick={() => onEdit(current.id, true)} data-requests="continue-draft">
-                    {s.continueEditing}
-                  </Button>
-                )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setDiscardError('');
-                    setDiscardOpen(true);
-                  }}
-                  data-requests="discard-draft"
+        {tabbed ? (
+          <>
+            <div role="tablist" aria-label={s.requestTabs} onKeyDown={onTabKey} className="cm-card mt-4 flex gap-1 rounded-md p-1 shadow-sm" data-request-tabs>
+              {(['offers', 'details'] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  role="tab"
+                  id={`request-tab-${t}`}
+                  aria-selected={tab === t}
+                  aria-controls={`request-panel-${t}`}
+                  tabIndex={tab === t ? 0 : -1}
+                  onClick={() => setTab(t)}
+                  className={`cm-sel flex min-h-11 flex-1 items-center justify-center rounded-sm border border-transparent text-[15px] font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${tab === t ? '' : 'text-text-secondary'}`}
+                  data-request-tab={t}
                 >
-                  {s.discardDraft}
-                </Button>
-              </div>
+                  {t === 'offers' ? fill(s.offersTab, { n: liveOffers }) : s.details}
+                </button>
+              ))}
             </div>
-          )}
-        </section>
-
-        {/* ----------------------------------------------------------- files */}
-        {(files.length > 0 || isOwner) && (
-          <section id="files" aria-label={s.files} data-request-section="files" className="lv-section">
-            <AttachmentList
-              requestId={current.id}
-              files={files}
-              /* Adding or removing is only offered while the request still
-                 takes offers — the merchants priced against these files. */
-              canEdit={isOwner && ['open', 'receiving_offers', 'draft'].includes(current.state)}
-              onChanged={() => {
-                loadRequest();
-                // A change to a published job makes standing offers stale.
-                load();
-              }}
-            />
-            <ModelDoors requestId={current.id} files={files} skip={primaryFile} lang={L} s={s} />
-          </section>
-        )}
-
-        {/* --------------------------------------------------------- details */}
-        <section id="details" aria-labelledby="request-details-title" data-request-section="details" className="lv-section">
-          <h2 id="request-details-title" className="mb-2 text-[13px] font-semibold text-text-muted">
-            {s.details}
-          </h2>
-          {current.description && (
-            <p dir="auto" className="mb-3 whitespace-pre-wrap break-words text-start text-[14px] leading-relaxed text-text-secondary">
-              {current.description}
-            </p>
-          )}
-          {sourceUrl && (
-            <div className="mb-3" data-request="source-link">
-              <p className="mb-1 text-[11.5px] text-text-muted">{s.sourceLink}</p>
-              <SourceLinkCard url={sourceUrl} />
+            <div {...panel('offers')} className="flex flex-col">
+              {offersSection}
+              {chatSection}
             </div>
-          )}
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-3" data-request-facts>
-            {current.budget_iqd !== null && current.budget_iqd !== undefined && <Fact label={s.budget} value={<Money iqd={current.budget_iqd} />} />}
-            {current.quantity > 1 && <Fact label={s.quantity} value={`×${current.quantity}`} />}
-            {/* The mirrors are stored in English; each reader gets their own words (R8). */}
-            {current.material && <Fact label={s.material} value={localMaterial(current.material, L, materials)} />}
-            {current.color && <Fact label={s.colour} value={localColour(current.color, L)} />}
-            {current.dimensions && <Fact label={s.dimensions} value={current.dimensions} />}
-            {current.deadline && <Fact label={s.deadline} value={formatDate(current.deadline, lang) || current.deadline} />}
-            {/* Where it goes, when it was asked, and until when offers are taken. */}
-            {current.governorate && <Fact label={s.governorate} value={gov ? gov[L] : current.governorate} />}
-            {current.state !== 'draft' && formatDate(current.created_at, lang) && <Fact label={s.publishedOn} value={formatDate(current.created_at, lang)} />}
-            {open && formatDate(current.expires_at, lang) && (
-              <Fact label={s.offersClose} value={formatDate(current.expires_at, lang)} />
-            )}
-          </dl>
-          {current.customer_notes && (
-            <div className="lv-well mt-3 rounded-md px-3 py-2.5" data-request="customer-notes">
-              <p className="mb-0.5 text-[11.5px] text-text-muted">{s.notesForMerchants}</p>
-              <p dir="auto" className="whitespace-pre-wrap break-words text-start text-[13px] leading-relaxed text-text-secondary">
-                {current.customer_notes}
-              </p>
+            <div {...panel('details')} className="flex flex-col">
+              {statusSection}
+              {detailsSection}
+              {discussionSection}
+              {orderSections}
             </div>
-          )}
-          {isOwner && open && (
-            <div className="mt-3 flex flex-wrap items-center gap-2">
-              {onEdit && (
-                <Button variant="secondary" size="sm" icon={<PencilLine aria-hidden="true" className="h-4 w-4" />} onClick={() => onEdit(current.id)} data-request="edit">
-                  {s.editRequest}
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setCloseError('');
-                  setCloseOpen(true);
-                }}
-                data-requests="close-request"
-              >
-                {s.closeRequest}
-              </Button>
-            </div>
-          )}
-          {/* What Levonis measured and estimated — the estimate card. Renders
-              nothing for a request that carries no print row. */}
-          <div className="mt-4">
-            <PrintSummary
-              requestId={current.id}
-              onLoaded={(f, extra) => {
-                setPrimaryFile(f?.primary_file_id ?? null);
-                setSourceUrl(f?.source_url ? f.source_url : null);
-                if (extra) setModelExtra(extra);
-              }}
-            />
-          </div>
-        </section>
-
-        {/* ------------------------------------------------------ discussion */}
-        {!draft && !discussionShut && (
-          <section id="discussion" aria-labelledby="request-discussion-title" data-request-section="discussion" className="lv-section scroll-mt-14">
-            <h2 id="request-discussion-title" className="mb-2 text-[13px] font-semibold text-text-muted">
-              {s.discussion}
-            </h2>
-            <Discussion requestId={current.id} open={open} onUnavailable={() => setDiscussionShut(true)} />
-          </section>
+          </>
+        ) : (
+          <>
+            {statusSection}
+            {detailsSection}
+            {discussionSection}
+            {offersSection}
+            {chatSection}
+            {acceptedSection}
+            {orderSections}
+          </>
         )}
-
-        {/* ---------------------------------------------------------- offers */}
-        {!draft && !(accepted && !isCustomer) && (
-          <section
-            id="offers"
-            aria-label={isCustomer ? s.offers : onlookers ? s.wantLikeThis : s.yourOffer}
-            data-request-section="offers"
-            className="lv-section scroll-mt-14"
-          >
-            {/* «عرضك» is a merchant's heading; a visitor gets the card below instead. */}
-            {(isCustomer || !onlookers) && !(isCustomer && accepted) && (
-              <h2 className="mb-3 text-[13px] font-semibold text-text-muted">{isCustomer ? s.offers : s.yourOffer}</h2>
-            )}
-            {/* The workshop's own verdict on this request, with the reasons and
-                the screen that fixes each, and its private costing (W5-B). */}
-            {me?.store && !isCustomer && !isOwner && current.state !== 'draft' && (
-              <div className="mb-3">
-                <WorkshopRequestCard requestId={current.id} takingOffers={open} openCosting={openCosting} onUseAsOffer={setPrefill} />
-              </div>
-            )}
-            {offers === null || !meReady ? (
-              offersError ? (
-                <CommunityLoadError error={offersError} onRetry={load} compact />
-              ) : (
-                <SkeletonGroup className="space-y-2">
-                  <Skeleton className="h-40 w-full rounded-2xl" />
-                </SkeletonGroup>
-              )
-            ) : isCustomer ? (
-              accepted ? (
-                // The choice is made: the other offers stay on the record, folded.
-                <details className="group" data-request-other-offers>
-                  <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-lg text-[13px] font-semibold text-text-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
-                    <span>
-                      {s.offers} <span className="tabular-nums text-text-muted">({offers.length})</span>
-                    </span>
-                  </summary>
-                  <div className="pt-2">
-                    <OfferCompare requestId={current.id} offers={offers} takingOffers={false} materials={materials} onChanged={refreshAll} parts={partRefs} />
-                  </div>
-                </details>
-              ) : (
-                <OfferCompare requestId={current.id} offers={offers} takingOffers={open} materials={materials} onChanged={refreshAll} parts={partRefs} />
-              )
-            ) : onlookers ? (
-              <OnlookerCard me={me} onNewRequest={onNewRequest} />
-            ) : (
-              <MerchantOfferSection
-                requestId={current.id}
-                offers={offers}
-                draft={myDraft}
-                canOffer={canOffer}
-                gate={me?.store && me.approved === false ? approvalGateText(loc) : null}
-                takingOffers={open}
-                materials={materials}
-                defaultQuantity={current.quantity}
-                deliveryPref={current.delivery_pref}
-                parts={modelExtra.parts}
-                requestHash={modelExtra.revisionHash}
-                onChanged={load}
-                prefill={prefill}
-                onPrefillDone={() => setPrefill(null)}
-                jobFiles={files}
-                sourceUrl={sourceUrl}
-              />
-            )}
-          </section>
-        )}
-
-        {/* ------------------------------------------------------- chat door */}
-        {chatWith && (
-          <section aria-labelledby="request-chat-title" data-request-section="chat" className="lv-section">
-            <h2 id="request-chat-title" className="text-[13px] font-semibold text-text-muted">
-              {s.chat}
-            </h2>
-            <p className="mt-1 text-[13px] leading-relaxed text-text-secondary">{chatWith === 'merchant' ? s.chatWithMerchant : s.chatWithCustomer}</p>
-            <Button
-              variant="secondary"
-              size="sm"
-              className="mt-2"
-              icon={<MessageCircle aria-hidden="true" className="h-4 w-4" />}
-              onClick={() => openChat(chatWith === 'merchant' ? accepted?.merchant_id : undefined)}
-              data-request-chat={chatWith}
-            >
-              {chatWith === 'merchant' ? s.openConversation : s.messageCustomer}
-            </Button>
-          </section>
-        )}
-
-        {/* -------------------------------------------------- accepted offer */}
-        {accepted && (
-          <section aria-labelledby="request-accepted-title" data-request-section="accepted" className="lv-section">
-            <h2 id="request-accepted-title" className="mb-2 text-[13px] font-semibold text-text-muted">
-              {s.accepted}
-            </h2>
-            <AcceptedOffer o={accepted} s={s} lang={L} materials={materials} mine={!isCustomer} orderState={order?.order.state ?? null} parts={partRefs} />
-          </section>
-        )}
-
-        {/* -------------------------------------------------------- timeline */}
-        {orderId && (
-          <section id="timeline" aria-labelledby="request-timeline-title" data-request-section="timeline" className="lv-section scroll-mt-14">
-            <h2 id="request-timeline-title" className="mb-2 text-[13px] font-semibold text-text-muted">
-              {s.timeline}
-            </h2>
-            <TimelinePeek timeline={timeline} failed={timelineFailed} onRetry={retryTimeline} s={s} lang={L} onOpen={() => setTimelineOpen(true)} />
-          </section>
-        )}
-
-        {/* --------------------------------------------------------- escrow */}
-        {order && (
-          <section aria-labelledby="request-escrow-title" data-request-section="escrow" className="lv-section">
-            <h2 id="request-escrow-title" className="mb-2 text-[13px] font-semibold text-text-muted">
-              {s.escrow}
-            </h2>
-            <EscrowLine order={order} s={s} lang={L} />
-          </section>
-        )}
-
-        {/* -------------------------------------------------------- delivery */}
-        {order && (
-          <section aria-labelledby="request-delivery-title" data-request-section="delivery" className="lv-section">
-            <h2 id="request-delivery-title" className="mb-2 text-[13px] font-semibold text-text-muted">
-              {s.delivery}
-            </h2>
-            <ContactCard order={order} s={s} lang={L} />
-          </section>
-        )}
-
-        {/* ---------------------------------------------------------- review */}
-        {orderId && role === 'customer' && order?.order.state === 'completed' && <ReviewSection orderId={orderId} s={s} />}
       </Motion.article>
+
+      {/* EVERY FILE: the list with the owner add and remove, and the model doors. */}
+      <AttachmentsSheet open={filesOpen} onClose={() => setFilesOpen(false)} title={s.files}>
+        <AttachmentList
+          requestId={current.id}
+          files={files}
+          /* Adding or removing is only offered while the request still
+             takes offers — the merchants priced against these files. */
+          canEdit={canEditFiles}
+          onChanged={() => {
+            loadRequest();
+            // A change to a published job makes standing offers stale.
+            load();
+          }}
+        />
+        <ModelDoors requestId={current.id} files={files} skip={primaryFile} lang={L} s={s} />
+      </AttachmentsSheet>
 
       {/* THE ORDER'S TIMELINE (Client 5d), behind the «آخر تحديث» door. */}
       {orderId && (
@@ -913,7 +1019,21 @@ export function RequestDetail({
       >
         {s.closeBody}
       </ConfirmSheet>
-    </MotionFeatures>
+      <ConfirmSheet
+        open={repeatOpen}
+        testId="repeat-request"
+        title={s.repeatQ}
+        confirmLabel={s.repeatConfirm}
+        busyLabel={s.repeating}
+        busy={repeating}
+        error={repeatError}
+        onConfirm={repeatRequest}
+        onClose={() => setRepeatOpen(false)}
+      >
+        {fill(s.repeatBody, { title: current.title })}
+      </ConfirmSheet>
+    </MotionFeatures>,
+    trailing
   );
 }
 

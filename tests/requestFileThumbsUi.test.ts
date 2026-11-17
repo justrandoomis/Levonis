@@ -324,7 +324,8 @@ test('the request page: session uploads draw the shared tile, the meta line foll
     assert.doesNotMatch(h, /<p[^>]*dir="ltr"[^>]*>[^<]*(صورة|وێنە|مجسم|مۆدێل)/, `${lang}: the kind word is not forced left-to-right`);
     assert.match(h, /<span dir="ltr">[0-9.]+ (KB|MB)<\/span>/, `${lang}: only the size is isolated`);
   }
-  assert.match(code('src/components/print/MyRequestsList.tsx'), /localColour\(p\.color_name \|\| p\.color_hex,/);
+  // The colour in the reader words: the head of the request page (community UI plan C3).
+  assert.match(code('src/components/community/requests/RequestHeaderCard.tsx'), /localColour\(r\.color, lang\)/);
   assert.match(read('src/components/community/requests/RequestWizard.tsx'), /`هەنگاوی \$\{step\} لە 4`/, 'one digit system in the step line');
 });
 
@@ -406,7 +407,7 @@ test('R8: the English mirrors read in the reader language — Sorani its own, fr
   assert.equal(localColour('dark teal', 'ckb'), 'dark teal');
   // The stored colour word stays English: it is a priced fact (REVISION_FIELDS `color_name`).
   assert.match(code('src/components/community/requests/RequestWizard.tsx'), /color_hex: c\.hex, color_name: c\.en/);
-  for (const f of ['src/components/community/hub/RequestCard.tsx', 'src/components/chat/cards/DealCards.tsx', 'src/components/print/MyRequestsList.tsx']) {
+  for (const f of ['src/components/community/hub/RequestCard.tsx', 'src/components/chat/cards/DealCards.tsx', 'src/components/community/requests/RequestListCard.tsx']) {
     assert.match(code(f), /localMaterial\(/, `${f} renders the material through the table`);
   }
 });

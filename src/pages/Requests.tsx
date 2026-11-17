@@ -1,14 +1,27 @@
 /**
- * The customer-request marketplace — /requests.
+ * The customer-request marketplace — /requests (community UI plan C3,
+ * IMG_8468, IMG_8483, IMG_8475).
  *
  * A customer describes a job; merchants offer; the customer picks one and the
  * money is held until the work is done.
  *
+ *   header   «طلبات الطباعة» with the back chevron and the one gold verb,
+ *            «طلب جديد» (a guest is asked to sign in first)
+ *   search   «ابحث في الطلبات», scoped to the list on screen
+ *   tabs     «طلبات المجتمع | طلباتي», and «قيد التنفيذ» once the customer
+ *            has a running order; the tab is in the address (`?view=mine`)
+ *   filters  «الحالة», «طريقة الطباعة», «المحافظة», in the address too
+ *   list     the shared request card: the public `list` card on the board,
+ *            the `owner` card on «طلباتي»; the next page as the list end
+ *            comes into view, «المزيد» kept for everyone else
+ *
  * WHAT THIS PAGE SHOWS AND DOES NOT. The board is public, so it shows the JOB
  * — title, quantity, material, governorate — and never a phone, an email, an
- * address or the budget (Q2: private by default, never on the public board).
- * That is enforced by the server whitelist rather than by this page choosing
- * what to render (§24). If this component asked for more, it would not get it.
+ * address, a person, a picture or the budget (Q2: private by default, never on
+ * the public board; plan R2, R3, R10). That is enforced by the server
+ * whitelist rather than by this page choosing what to render (§24); the board
+ * row type here has no budget field at all, and the card is handed only the
+ * fields a public card reads.
  *
  * ACCEPTING AN OFFER MOVES MONEY, so the confirmation says so plainly: the
  * amount leaves the customer's available balance and is HELD, not paid, and
@@ -19,13 +32,12 @@
 
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Loader2, PackageSearch, MapPin, Search, X } from 'lucide-react';
+import { Box, Loader2, PackageSearch } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
 import { api, ApiError } from '../lib/api';
 import { iqd, merchantApi, communityOrdersApi, type MerchantMe, type CommunityOrderRow } from '../lib/merchant';
-import { GOVERNORATE_LABELS } from '../lib/governorates';
 import MyRequestsList from '../components/print/MyRequestsList';
 /**
  * A NEW REQUEST HAS ITS OWN ADDRESS (community UI plan B4): /requests/new,
@@ -34,7 +46,16 @@ import MyRequestsList from '../components/print/MyRequestsList';
  * (src/pages/community/Request.tsx, Client 5c).
  */
 import { requestsApi, type CatalogMaterial } from '../components/community/requests/api';
-import { requestPath, requestRedirect, requestStateLabel, requestStateTone } from '../components/community/requests/requestStates';
+import { requestPath, requestRedirect } from '../components/community/requests/requestStates';
+import { fill, useRequestStrings } from '../components/community/requests/strings';
+import RequestListCard, { type PublicRequestCard } from '../components/community/requests/RequestListCard';
+import BoardFilters, { PageSentinel, readBoardFilters, type BoardFilterValues } from '../components/community/requests/FilterSelect';
+import SectionPageHeader from '../components/community/kit/SectionPageHeader';
+import { kitButtonClass } from '../components/community/kit/buttons';
+import { SegmentedTrack, UnderlineTabs } from '../components/community/kit/controls';
+import { SearchField } from '../components/community/kit/fields';
+import { panelId, tabId } from '../components/ui/Tabs';
+import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import { CommunityLoadError } from './community/access';
 import PendingStoreReviews from '../components/community/reviews/StoreReviews';
 import OrderContactCard from '../components/community/offers/OrderContactCard';
@@ -44,10 +65,8 @@ import OrderContactCard from '../components/community/offers/OrderContactCard';
  * request, with its private costing, is on the request's page.
  */
 import RequestBoard from '../components/merchant/workshop/RequestBoard';
-import { Segmented } from '../components/ui/Segmented';
 import { StatusChip } from '../components/ui/Badge';
 import { customOrderChips, customOrderReminder } from '../components/chat/cards/cardWords';
-import FilterChip from '../components/community/FilterChip';
 import { merchantHref } from '../lib/merchantRoutes';
 import ConfirmSheet from '../components/print/ConfirmSheet';
 import { apiRefusal } from '../lib/refusalStrings';
@@ -87,6 +106,7 @@ export function RequestEditor() {
  */
 const RequestDetail = lazy(() => import('./community/Request').then((m) => ({ default: m.RequestDetail })));
 
+/** A board row: the public whitelist (worker `publicRequest`). No budget field, on purpose (plan R2). */
 interface RequestRow {
   id: string;
   title: string;
@@ -96,18 +116,36 @@ interface RequestRow {
   material: string;
   color: string;
   dimensions: string;
-  budget_iqd: number | null;
   deadline: string | null;
   governorate: string;
   state: string;
   offer_count: number;
   created_at: string;
+  file_count?: number;
+  summary?: { parts_count: number; pieces_per_set: number } | null;
   /** Only on the customer's own list; the board carries nobody's name (acceptance 34). */
   customer_name?: string | null;
   expires_at?: string | null;
   /** Notes the customer wrote for the merchants (0130). */
   customer_notes?: string;
   revision?: number;
+}
+
+/** What the public card reads of a board row, and nothing more (plan R2, R3, R10). */
+export function publicCard(r: RequestRow): PublicRequestCard {
+  return {
+    id: r.id,
+    title: r.title,
+    quantity: r.quantity,
+    material: r.material,
+    governorate: r.governorate,
+    state: r.state,
+    offer_count: r.offer_count,
+    file_count: r.file_count ?? null,
+    deadline: r.deadline,
+    created_at: r.created_at,
+    summary: r.summary ?? null,
+  };
 }
 
 type View = 'board' | 'mine' | 'orders' | 'new';
@@ -124,7 +162,8 @@ export function newRequestTarget(params: URLSearchParams): string {
 }
 
 export default function Requests() {
-  const { loc, t } = useLanguage();
+  const { lang } = useLanguage();
+  const s = useRequestStrings();
   const { user } = useAuth();
   const { signIn } = useSignInPrompt();
   /**
@@ -142,13 +181,12 @@ export default function Requests() {
       : params.get('link') ?? '';
   /**
    * A SECTION NAMED IN THE ADDRESS — `?view=new|mine|orders`, what the
-   * community page's shortcuts link to (src/pages/Community.tsx). Read once,
-   * at mount, and then dropped from the URL, so a reload after closing the
-   * wizard does not open it again. A guest who asks for the wizard or «تنفيذ
-   * طلباتي» lands on the board; the community page sends a guest through
-   * sign-in before it links here.
+   * community page shortcuts link to (src/pages/Community.tsx). Read at
+   * mount; the tabs then keep it in the address (`?view=mine`), so Back and a
+   * reload return to the same tab. A guest who asks for the wizard or «قيد
+   * التنفيذ» lands on the board; a guest on «طلباتي» is asked to sign in.
    */
-  const [view, setView] = useState<View>(() => {
+  const [view, setViewState] = useState<View>(() => {
     // A carried link outranks the address: it is the wizard, with the link in it.
     const asked = carriedLink ? '' : params.get('view');
     if (asked === 'mine') return 'mine';
@@ -170,19 +208,65 @@ export default function Requests() {
       navigate(newRequestTarget(params), { replace: true, state: location.state });
       return;
     }
-    if (!params.has('view')) return;
+    // The address says the tab the page opened on (a guest asking for «قيد التنفيذ» is on the board).
+    const want = view === 'board' ? null : view;
+    if (params.get('view') === want) return;
     setParams(
       (prev) => {
         const p = new URLSearchParams(prev);
-        p.delete('view');
+        if (want) p.set('view', want);
+        else p.delete('view');
         return p;
       },
       { replace: true }
     );
-    // Once, at mount: the section it named is already in state.
+    // Once, at mount: the tabs keep the address from here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  /** A tab is a place in the address; the status filter means another thing on each tab, so it is dropped. */
+  const setView = (next: View) => {
+    setViewState(next);
+    setDraft('');
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (next === 'board') p.delete('view');
+        else p.set('view', next);
+        p.delete('state');
+        return p;
+      },
+      { replace: true }
+    );
+  };
+  const filters = readBoardFilters(params, view === 'mine');
+  const setFilter = (key: keyof BoardFilterValues, value: string | null) =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        if (value) p.set(key, value);
+        else p.delete(key);
+        return p;
+      },
+      { replace: true }
+    );
+  const clearFilters = () =>
+    setParams(
+      (prev) => {
+        const p = new URLSearchParams(prev);
+        for (const k of ['state', 'process', 'governorate']) p.delete(k);
+        return p;
+      },
+      { replace: true }
+    );
+  // One search for the list on screen: the board asks the server (title and description), «طلباتي» narrows its rows.
+  const [draft, setDraft] = useState('');
+  const [q, setQ] = useState('');
+  const settle = useCallback((v: string) => setQ(v.trim().slice(0, 60)), []);
+
   const [me, setMe] = useState<MerchantMe | null>(null);
+  /** The customer has a running order: «قيد التنفيذ» is a tab. */
+  const [hasOrders, setHasOrders] = useState(false);
   /**
    * THE BOARD SAID THE COMMUNITY IS SHUT (503 COMMUNITY_CLOSED). The route
    * gate can let the page through on a verdict it has not refreshed, and the
@@ -216,77 +300,94 @@ export default function Requests() {
   useEffect(() => {
     if (!user || deepLinked || view === 'new') return;
     merchantApi.me().then(setMe).catch(() => {});
-  }, [user, deepLinked, view]);
+    communityOrdersApi
+      .list()
+      .then((d) => setHasOrders(d.orders.some((o) => o.role === 'customer')))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, deepLinked]);
 
   /** Opening a request is a step forward to its own page, so Back returns here. */
   const openRequestId = useCallback((id: string) => navigate(requestPath(id)), [navigate]);
-  const openRequest = useCallback((r: RequestRow) => openRequestId(r.id), [openRequestId]);
 
   // On its way to /requests/<id> or to the editor: nothing of the board flashes first.
   if (deepLinked || view === 'new') return null;
 
+  const tabs = [
+    { id: 'board', label: s.tabCommunity },
+    { id: 'mine', label: s.tabMine },
+    ...(user && (hasOrders || view === 'orders') ? [{ id: 'orders', label: s.tabOrders }] : []),
+  ];
+
   return (
     <CommunitySurface>
-      <div className="min-h-screen text-text-secondary pb-28">
-        <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6">
-          <h1 className="text-text-primary font-bold text-lg mb-1">
-            {loc('طلبات العملاء', 'Customer requests', 'داواکاری کڕیاران')}
-          </h1>
-          <p className="text-text-muted text-[12.5px] mb-5">
-            {loc(
-              'اطلب شيئًا مخصصًا، واستقبل عروضًا من التجار.',
-              'Ask for something custom, and receive offers from merchants.',
-              'داوای شتێکی تایبەت بکە و ئۆفەر لە بازرگانەکانەوە وەربگرە.'
-            )}
-          </p>
+      <div className="min-h-screen pb-28 text-text-secondary">
+        <div className="mx-auto max-w-2xl px-4 sm:px-6">
+          <SectionPageHeader
+            title={s.boardTitle}
+            trailing={
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (closed) return;
+                    // A step forward to the editor, so Back returns to the board; the
+                    // editor leaves a new request with «طلباتي» in the place of this
+                    // board entry (RequestNew.tsx leaveNewRequest, B2R3-REG-1).
+                    if (user) navigate('/requests/new', { state: { from: 'board' } });
+                    else signIn();
+                  }}
+                  aria-disabled={closed || undefined}
+                  aria-describedby={closed ? 'requests-closed-note' : undefined}
+                  className={kitButtonClass('gold', 'sm')}
+                  data-requests-new
+                >
+                  <Box aria-hidden="true" className="h-4 w-4" />
+                  {s.newRequest}
+                </button>
+                {closed && (
+                  <span id="requests-closed-note" className="sr-only">
+                    {s.closedNote}
+                  </span>
+                )}
+              </>
+            }
+          />
 
-          {/* The sections are filter chips (pressed when chosen, never an ink
-              fill); «طلب جديد» is the page's one primary. The row scrolls
-              sideways, so it pads the button's cast in rather than cutting it. */}
-          <div className="flex items-center gap-1.5 mb-3 -mt-2 py-2 overflow-x-auto hide-scrollbar">
-            {([['board', loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان')],
-               ['mine', loc('طلباتي', 'My requests', 'داواکاریەکانم')],
-               ...(user ? [['orders', loc('تنفيذ طلباتي', 'My custom orders', 'داواکاریە تایبەتەکانم')] as [View, string]] : []),
-              ] as Array<[View, string]>).map(([v, label]) => (
-              <FilterChip key={v} on={view === v} onClick={() => setView(v)}>
-                {label}
-              </FilterChip>
-            ))}
-            {(
-              <button
-                type="button"
-                onClick={() => {
-                  if (closed) return;
-                  // A step forward to the editor, so Back returns to the board; the
-                  // editor leaves a new request with «طلباتي» in the place of this
-                  // board entry (RequestNew.tsx leaveNewRequest, B2R3-REG-1).
-                  if (user) navigate('/requests/new', { state: { from: 'board' } });
-                  else signIn();
-                }}
-                aria-disabled={closed || undefined}
-                aria-describedby={closed ? 'requests-closed-note' : undefined}
-                className="lv-button lv-button-primary lv-button-sm ms-auto shrink-0 gap-1.5"
-              >
-                <Plus className="w-4 h-4" aria-hidden="true" />
-                {loc('طلب جديد', 'New', 'نوێ')}
-              </button>
-            )}
-            {closed && (
-              <span id="requests-closed-note" className="sr-only">
-                {loc('ليفو كوميونيتي تحت الصيانة', 'Levo Community is under maintenance', `${t('community')} — ${t('maintenanceMain')}`)}
-              </span>
-            )}
-          </div>
-
-          {view === 'orders' ? (
-            <MyCommunityOrders />
-          ) : view === 'mine' ? (
-            <MyRequestsList onOpen={openRequestId} />
-          ) : (
-            // A PLUS member with no store yet has no workshop: «مناسب لي» is the
-            // workshop's board, and it answered them 404.
-            <RequestList onOpen={openRequest} canOffer={!!me?.store && !!me?.can.offers} onClosed={setClosed} />
+          {view !== 'orders' && (
+            <SearchField
+              label={s.searchRequests}
+              placeholder={s.searchRequests}
+              value={draft}
+              onValueChange={setDraft}
+              onSettled={settle}
+              debounceMs={300}
+              maxLength={60}
+              enterKeyHint="search"
+              autoComplete="off"
+              data-requests-search
+              className="mt-2"
+            />
           )}
+
+          <UnderlineTabs group="requests-view" label={s.boardTabs} items={tabs} value={view} onChange={(id) => setView(id as View)} panels className="mt-3" />
+
+          <div role="tabpanel" id={panelId('requests-view', view)} aria-labelledby={tabId('requests-view', view)} className="pt-3" data-requests-panel={view}>
+            {view !== 'orders' && (
+              <BoardFilters values={filters} mine={view === 'mine'} s={s} lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'} onChange={setFilter} />
+            )}
+            <div className="mt-3">
+              {view === 'orders' ? (
+                <MyCommunityOrders />
+              ) : view === 'mine' ? (
+                <MyRequestsList onOpen={openRequestId} filters={filters} q={q} />
+              ) : (
+                // A PLUS member with no store yet has no workshop: «مناسب لي» is the
+                // workshop board, and it answered them 404.
+                <RequestList canOffer={!!me?.store && !!me?.can.offers} onClosed={setClosed} q={q} filters={filters} onClearFilters={clearFilters} onOpen={openRequestId} />
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </CommunitySurface>
@@ -299,8 +400,22 @@ export default function Requests() {
  * route carrying the estimate and the chosen merchant — data this component
  * deliberately never receives.
  */
-function RequestList({ onOpen, canOffer = false, onClosed }: { onOpen: (r: RequestRow) => void; canOffer?: boolean; onClosed?: (closed: boolean) => void }) {
-  const { loc, lang } = useLanguage();
+function RequestList({
+  canOffer = false,
+  onClosed,
+  q,
+  filters,
+  onClearFilters,
+  onOpen,
+}: {
+  canOffer?: boolean;
+  onClosed?: (closed: boolean) => void;
+  q: string;
+  filters: BoardFilterValues;
+  onClearFilters: () => void;
+  onOpen: (id: string) => void;
+}) {
+  const s = useRequestStrings();
   // A workshop that can offer lands on the requests it can MAKE; the whole
   // board stays one tap away (docs/MERCHANT_PLATFORM.md §2 decision 5).
   const [scope, setScope] = useState<'mine' | 'all'>(canOffer ? 'mine' : 'all');
@@ -314,46 +429,55 @@ function RequestList({ onOpen, canOffer = false, onClosed }: { onOpen: (r: Reque
   return (
     <>
       {canOffer && (
-        <Segmented
+        <SegmentedTrack
           group="requests-scope"
           size="sm"
           className="mb-4"
-          label={loc('أي الطلبات', 'Which requests', 'کام داواکاری')}
+          label={s.whichRequests}
           value={scope}
           onChange={(id) => setScope(id as 'mine' | 'all')}
           dataAttr="data-requests-scope"
           items={[
-            { id: 'mine', label: loc('مناسب لي', 'Fits my workshop', 'گونجاو بۆ وۆرکشۆپەکەم') },
-            { id: 'all', label: loc('كل الطلبات', 'All requests', 'هەموو داواکاریەکان') },
+            { id: 'mine', label: s.fitsMe },
+            { id: 'all', label: s.allRequests },
           ]}
         />
       )}
       {scope === 'mine' && canOffer ? (
-        <RequestBoard
-          materials={materials}
-          workshopHref={merchantHref.printers()}
-          onOpen={(r) => onOpen({ ...r, customer_name: null } as unknown as RequestRow)}
-        />
+        <RequestBoard materials={materials} workshopHref={merchantHref.printers()} onOpen={(r) => onOpen(r.id)} />
       ) : (
-        <AllRequests onOpen={onOpen} loc={loc} lang={lang} onClosed={onClosed} />
+        <AllRequests onClosed={onClosed} q={q} filters={filters} onClearFilters={onClearFilters} />
       )}
     </>
   );
 }
 
+/** The address of one page of the board: the search and the filters, ANDed on the server. */
+export function boardUrl(q: string, f: BoardFilterValues, after?: string): string {
+  const p = new URLSearchParams();
+  if (q) p.set('q', q);
+  if (f.state) p.set('offers', f.state);
+  if (f.process) p.set('process', f.process);
+  if (f.governorate) p.set('governorate', f.governorate);
+  if (after) p.set('cursor', after);
+  const qs = p.toString();
+  return `/api/marketplace/requests${qs ? `?${qs}` : ''}`;
+}
+
 /** Every request on the public board, newest first, a page at a time. */
 function AllRequests({
-  onOpen,
-  loc,
-  lang,
   onClosed,
+  q,
+  filters,
+  onClearFilters,
 }: {
-  onOpen: (r: RequestRow) => void;
-  loc: ReturnType<typeof useLanguage>['loc'];
-  lang: ReturnType<typeof useLanguage>['lang'];
   /** Told whether the last board read was refused as COMMUNITY_CLOSED. */
   onClosed?: (closed: boolean) => void;
+  q: string;
+  filters: BoardFilterValues;
+  onClearFilters: () => void;
 }) {
+  const s = useRequestStrings();
   const [rows, setRows] = useState<RequestRow[] | null>(null);
   const [cursor, setCursor] = useState<string | null>(null);
   const [more, setMore] = useState(false);
@@ -364,25 +488,8 @@ function AllRequests({
   useEffect(() => {
     onClosed?.(loadError instanceof ApiError && loadError.code === 'COMMUNITY_CLOSED');
   }, [loadError, onClosed]);
-  // Searched on the server (title and description), like the community page's
-  // requests: a filter over the twenty rows on screen would miss page two.
-  const [draft, setDraft] = useState('');
-  const [q, setQ] = useState('');
-  useEffect(() => {
-    const t = window.setTimeout(() => setQ(draft.trim().slice(0, 60)), 300);
-    return () => window.clearTimeout(t);
-  }, [draft]);
-
-  const boardUrl = useCallback(
-    (after?: string) => {
-      const p = new URLSearchParams();
-      if (q) p.set('q', q);
-      if (after) p.set('cursor', after);
-      const qs = p.toString();
-      return `/api/marketplace/requests${qs ? `?${qs}` : ''}`;
-    },
-    [q]
-  );
+  const { state, process, governorate } = filters;
+  const url = useCallback((after?: string) => boardUrl(q, { state, process, governorate }, after), [q, state, process, governorate]);
 
   useEffect(() => {
     let alive = true;
@@ -390,7 +497,7 @@ function AllRequests({
     setLoadError(null);
     setMoreError(false);
     api
-      .get<{ requests: RequestRow[]; next_cursor: string | null }>(boardUrl())
+      .get<{ requests: RequestRow[]; next_cursor: string | null }>(url())
       .then((d) => {
         if (!alive) return;
         setRows(d.requests);
@@ -401,14 +508,14 @@ function AllRequests({
     return () => {
       alive = false;
     };
-  }, [attempt, boardUrl]);
+  }, [attempt, url]);
 
   async function loadMore() {
-    if (!cursor) return;
+    if (!cursor || more) return;
     setMore(true);
     setMoreError(false);
     try {
-      const d = await api.get<{ requests: RequestRow[]; next_cursor: string | null }>(boardUrl(cursor));
+      const d = await api.get<{ requests: RequestRow[]; next_cursor: string | null }>(url(cursor));
       setRows((r) => [...(r ?? []), ...d.requests.filter((x) => !(r ?? []).some((y) => y.id === x.id))]);
       setCursor(d.next_cursor ?? null);
     } catch {
@@ -419,129 +526,40 @@ function AllRequests({
     }
   }
 
-  const search = (
-    <form role="search" onSubmit={(e) => e.preventDefault()} className="relative">
-      <label htmlFor="requests-search" className="sr-only">
-        {loc('ابحث في طلبات الطباعة', 'Search print requests', 'لە داواکارییەکانی چاپ بگەڕێ')}
-      </label>
-      <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-      <input
-        id="requests-search"
-        type="search"
-        enterKeyHint="search"
-        autoComplete="off"
-        className="lv-input w-full rounded-full ps-10 pe-10 [&::-webkit-search-cancel-button]:appearance-none"
-        value={draft}
-        maxLength={60}
-        onChange={(e) => setDraft(e.target.value)}
-        placeholder={loc('ابحث في طلبات الطباعة', 'Search print requests', 'لە داواکارییەکانی چاپ بگەڕێ')}
-        data-requests-search
-      />
-      {draft && (
-        <button
-          type="button"
-          onClick={() => setDraft('')}
-          aria-label={loc('مسح البحث', 'Clear search', 'گەڕان بسڕەوە')}
-          className="absolute end-1.5 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-        </button>
-      )}
-    </form>
-  );
-
-  // One frame for every state, so the search box is never remounted (and
-  // never loses the keyboard) while a search loads.
+  const filtered = !!(state || process || governorate);
   let body: ReactNode = null;
   if (rows === null) {
     body = loadError ? (
       <CommunityLoadError error={loadError} onRetry={() => setAttempt((n) => n + 1)} />
     ) : (
-      <div className="py-12 flex justify-center">
-        <Loader2 className="w-5 h-5 text-gold animate-spin" />
-      </div>
+      <SkeletonGroup className="space-y-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-40 w-full rounded-xl" />
+        ))}
+      </SkeletonGroup>
     );
   } else if (!rows.length) {
     body = (
-      <div className="py-14 text-center" data-requests-empty={q ? 'search' : 'board'}>
-        <PackageSearch className="w-9 h-9 text-text-muted mx-auto mb-3" />
-        <p className="text-text-secondary text-[13px]">
-          {q ? (
-            <bdi>{loc(`لا نتائج لـ «${q}»`, `No results for “${q}”`, `هیچ ئەنجامێک نییە بۆ «${q}»`)}</bdi>
-          ) : (
-            loc('لا توجد طلبات مفتوحة', 'No open requests', 'هیچ داواکارییەکی کراوە نییە')
-          )}
-        </p>
+      <div className="py-14 text-center" data-requests-empty={q ? 'search' : filtered ? 'filters' : 'board'}>
+        <PackageSearch aria-hidden="true" className="mx-auto mb-3 h-9 w-9 text-text-muted" />
+        <p className="text-[13px] text-text-secondary">{q ? <bdi>{fill(s.noResultsFor, { q })}</bdi> : filtered ? s.noFilterMatch : s.noOpenRequests}</p>
+        {filtered && (
+          <button type="button" onClick={onClearFilters} className={`${kitButtonClass('secondary', 'sm')} mt-3`} data-requests-clear-filters>
+            {s.clearFilters}
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="space-y-3">
-      {search}
+    <div className="space-y-3" data-requests-board>
       {body}
       {rows?.map((r) => (
-        <button
-          key={r.id}
-          onClick={() => onOpen(r)}
-          className="lv-surface w-full text-start p-4 active:shadow-press"
-        >
-          <div className="flex items-start justify-between gap-3 mb-1.5">
-            <h3 className="text-text-primary font-semibold text-[14px] leading-snug">{r.title}</h3>
-            <StateChip state={r.state} />
-          </div>
-          <p className="text-text-secondary text-[12.5px] line-clamp-2 leading-relaxed mb-2.5">{r.description}</p>
-
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-text-muted">
-            {r.quantity > 1 && <span>×{r.quantity}</span>}
-            {r.material && <span>{r.material}</span>}
-            {r.governorate && (
-              <span className="flex items-center gap-1">
-                <MapPin className="w-3 h-3" />
-                {GOVERNORATE_LABELS[r.governorate]?.[lang === 'ckb' ? 'ckb' : lang] ?? r.governorate}
-              </span>
-            )}
-            <span className="ms-auto text-text-secondary font-semibold">
-              {/* «عرضان», «5 عروض», «12 عرضًا» — not «5 عرض». */}
-              {offersLabel(r.offer_count, lang)}
-            </span>
-          </div>
-        </button>
+        <RequestListCard key={r.id} variant="list" level={2} request={publicCard(r)} />
       ))}
-      {cursor && (
-        <button
-          type="button"
-          onClick={loadMore}
-          disabled={more}
-          data-requests-more
-          className="lv-button lv-button-secondary w-full"
-        >
-          {more
-            ? loc('جارٍ التحميل…', 'Loading…', 'بارکردن…')
-            : moreError
-              ? loc('تعذّر التحميل — حاول مجددًا', 'Could not load — try again', 'بار نەکرا — دووبارە هەوڵ بدەرەوە')
-              : loc('المزيد', 'Load more', 'زیاتر پیشان بدە')}
-        </button>
-      )}
+      {rows && <PageSentinel more={!!cursor} busy={more} failed={moreError} onMore={loadMore} s={s} />}
     </div>
-  );
-}
-
-
-// --------------------------------------------------------------- detail
-//
-// THE REQUEST'S OWN PAGE moved to its own route: src/pages/community/Request.tsx
-// (`/requests/:id`, Client 5c) — header, status strip, files, details, the
-// discussion, the offers, the order and its money. This page keeps the board,
-// «طلباتي», «تنفيذ طلباتي», the wizard for a NEW request, and the redirect
-// from the old `?request=<id>` above.
-
-function StateChip({ state }: { state: string }) {
-  const { loc } = useLanguage();
-  return (
-    <StatusChip tone={requestStateTone(state)} className="shrink-0">
-      {requestStateLabel(state, loc)}
-    </StatusChip>
   );
 }
 

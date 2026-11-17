@@ -205,7 +205,8 @@ test('compare: the complete-offers note only when complete and partial offers ar
   assert.equal(onlyPartial.completeOnly, false, 'the picks come from the partial pool');
   assert.equal(onlyPartial.cheapest?.id, 'pb');
   assert.equal(parts.bestOffers([whole, offer({ ...pa, expired: true })]).completeOnly, false, 'an expired partial offer is no reason');
-  const compare = code('src/components/community/requests/OfferCompare.tsx');
+  // The quick comparison is the lazy CompareSheet (community UI plan C3).
+  const compare = code('src/components/community/requests/CompareSheet.tsx');
   assert.match(compare, /best\.completeOnly &&/);
   assert.doesNotMatch(compare, /offers\.some\(isPartialOffer\) &&/);
   assert.match(compare, /data-compare-partial/);
@@ -281,7 +282,7 @@ test('bidi: a substitution line is drawn in the reader direction with each side 
   assert.equal(renderToStaticMarkup(createElement(SubstitutionText, { x, s: requestStrings('ar'), dir: 'rtl' })), '<bdi dir="rtl">PETG</bdi> بدل <bdi dir="rtl">PLA</bdi> (<bdi dir="rtl">المقبض</bdi>)');
   const compare = code('src/components/community/requests/OfferCompare.tsx');
   assert.match(compare, /<li key=\{x\.line\} dir=\{readerDir\(L\)\}>/, 'the acknowledged list');
-  assert.match(compare, /<Row k=\{s\.substitutesLabel\} dir=\{readerDir\(lang\)\}>/, 'the offer column');
+  assert.match(code('src/components/community/requests/OfferDetailsSheet.tsx'), /<Row k=\{s\.substitutesLabel\} dir=\{readerDir\(lang\)\}>/, 'the offer facts (details sheet, compare columns)');
   assert.doesNotMatch(compare, /<li key=\{line\} dir="auto">/);
   for (const f of ['src/components/community/requests/OfferCompare.tsx', 'src/pages/community/Request.tsx', 'src/components/community/requests/OfferComposer.tsx']) {
     assert.match(code(f), /<SubstitutionText x=\{x\} s=\{s\} dir=\{readerDir\((lang|L)\)\} \/>/, f);

@@ -248,11 +248,11 @@ export interface FilterSelectProps {
  * A filter chip that opens its options. At rest it says the filter («الحالة
  * ⌄»); once a value is chosen it says the value in the sand fill, and a ×
  * beside it clears it. The options are house menu items; the chosen row
- * wears the check and says «محدد» in its name. The radio role
- * (`menuitemradio`, the chosen one `aria-checked`) needs a field in
- * ui/Menu.tsx, the menu every merchant screen loads, so it lands with the
- * first page that renders a FilterSelect and not before
- * (B1FIX-R3-REG-2; tests/communityScope.test.ts holds that page to it).
+ * wears the check and says «محدد» in its name. The options are radio
+ * items (`menuitemradio`, the chosen one `aria-checked`, the `radio` field
+ * of ui/Menu.tsx), given with the first page that renders a FilterSelect,
+ * the requests board (B1FIX-R3-REG-2, community UI plan C3;
+ * tests/communityScope.test.ts holds that page to it).
  */
 export function FilterSelect({ label, icon, options, value, onChange, className = '' }: FilterSelectProps) {
   const s = useKitStrings();
@@ -267,6 +267,7 @@ export function FilterSelect({ label, icon, options, value, onChange, className 
           label: o.label,
           icon: o.id === value ? <Check className="h-4 w-4" /> : <span className="block h-4 w-4" />,
           hint: o.id === value ? s.selected : undefined,
+          radio: { role: 'menuitemradio', 'aria-checked': o.id === value },
           onSelect: () => onChange(o.id),
         }))}
         trigger={(p) => (

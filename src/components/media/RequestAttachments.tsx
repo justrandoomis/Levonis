@@ -67,7 +67,7 @@ export function formatBytes(n: number): string {
   return n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`;
 }
 
-function KindIcon({ kind, className }: { kind: string; className?: string }) {
+export function KindIcon({ kind, className }: { kind: string; className?: string }) {
   if (kind === 'model') return <Box className={className} />;
   if (kind === 'document') return <FileText className={className} />;
   return <ImageIcon className={className} />;

@@ -47,6 +47,8 @@ export interface MenuItem {
   disabled?: boolean;
   /** A second, quieter line — for a disabled item, the reason. */
   hint?: string;
+  /** One choice of several (a filter): its radio role and state, spread on the row. */
+  radio?: { role: 'menuitemradio'; 'aria-checked': boolean };
 }
 
 export interface MenuSeparator {
@@ -163,6 +165,7 @@ function MenuList({ id, label, items, start, large, onPick, onTab }: MenuListPro
             refs.current[i] = el;
           },
           role: 'menuitem',
+          ...entry.radio,
           tabIndex: -1,
           'aria-disabled': entry.disabled || undefined,
           'data-menu-item': entry.id,

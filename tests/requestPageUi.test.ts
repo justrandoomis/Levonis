@@ -321,10 +321,14 @@ test('the landmarks come in the owner\'s order', () => {
   assert.deepEqual([...REQUEST_SECTIONS], ['header', 'status', 'files', 'details', 'discussion', 'offers', 'compare', 'chat', 'accepted', 'timeline', 'escrow', 'delivery', 'review']);
   // In the page's source every section is drawn in that order; `compare`
   // is the offers' own table (OfferCompare), drawn inside the offers.
+  // Community UI plan C3: the header and the files are one card (RequestHeaderCard, AttachmentsPreview
+  // under its hairline, `#files` still an anchor), and the quick comparison is the lazy CompareSheet.
   const route = code('src/pages/community/Request.tsx');
   const drawn = [...route.matchAll(/data-request-section="([a-z]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(drawn, REQUEST_SECTIONS.filter((x) => x !== 'compare'));
-  assert.match(code('src/components/community/requests/OfferCompare.tsx'), /data-request-section="compare"/);
+  assert.deepEqual(drawn, REQUEST_SECTIONS.filter((x) => x !== 'compare' && x !== 'header' && x !== 'files'));
+  assert.match(code('src/components/community/requests/RequestHeaderCard.tsx'), /data-request-section="header"/);
+  assert.match(code('src/components/community/requests/AttachmentsPreview.tsx'), /id="files"/);
+  assert.match(code('src/components/community/requests/CompareSheet.tsx'), /data-request-section="compare"/);
   assert.deepEqual(REQUEST_STEPS, ['published', 'offers', 'chosen', 'in_progress', 'delivered', 'completed']);
   assert.equal(requestStepIndex('receiving_offers'), 1);
   assert.equal(requestStepIndex('in_progress'), 3);
@@ -360,13 +364,23 @@ test('the customer\'s offers: every card shows its TOTAL; a revised offer says s
   assert.ok(t.includes(s.revised), '«عرض معدّل»');
   assert.equal(count(h, /data-offer-was/g), 1, 'the price it replaced');
   assert.ok(t.includes('21,000') || t.includes('٢١٬٠٠٠'), 'the old price is on the card');
-  assert.equal(count(h, /data-offer-history="off_1"/g), 1, 'the history opens from the card');
-  assert.deepEqual(attrs(h, 'data-offer-accept'), ['off_1', 'off_2'], 'only a live offer can be accepted');
+  // Every fact, the files and «سجل التعديلات» are one tap away, in the lazy OfferDetailsSheet.
+  assert.deepEqual(attrs(h, 'data-offer-details'), ['off_1', 'off_2', 'off_3']);
+  assert.match(code('src/components/community/requests/OfferDetailsSheet.tsx'), /data-offer-history=\{o\.id\}/);
+  // Only a live offer is a radio of the group; nothing is chosen until the customer chooses (plan R8).
+  assert.deepEqual(attrs(h, 'data-offer-accept'), ['off_1', 'off_2'], 'only a live offer can be chosen');
+  assert.equal(count(h, /role="radiogroup"/g), 1);
+  assert.equal(count(h, /role="radio"/g), 2);
+  assert.equal(count(h, /aria-checked="true"/g), 0, 'no offer is chosen for the customer');
+  assert.match(h, /<button type="button" aria-disabled="true" aria-describedby="[^"]+"[^>]*data-offer-continue="">/, 'the dock waits for a choice and says why');
+  assert.ok(t.includes(s.chooseOfferFirst) && t.includes(s.continueWithOffer));
   assert.equal(count(h, /data-offer-note="stale"/g), 1, 'the stale one says why');
-  assert.ok(t.includes(s.feeShort) && t.includes(s.noFee), 'the fee is named where there is one, «بلا رسوم» where there is none');
-  assert.equal(count(h, /data-request-section="compare"/g), 1, 'the quick comparison, two offers being live');
+  assert.ok(t.includes(s.deliveryIncluded) && t.includes('توصيل'), 'the fee is named where there is one, «يشمل التوصيل» where there is none');
+  assert.equal(count(h, /data-offer-compare-open/g), 1, 'the comparison door, two offers being live');
   assert.ok(t.includes(daysLabel(2, 'ar')), '«يومان», not «2 يوم»');
-  assert.equal(attrs(h, 'href').filter((x) => x.includes('/offers/off_1/files/ofl_1')).length, 1, 'the file is a URL on the Worker');
+  // The files of an offer, as its details sheet lists them: a URL on the Worker.
+  const filesHtml = html(createElement(compare.OfferFiles, { files: revised.files ?? [], label: 'files' }));
+  assert.equal(attrs(filesHtml, 'href').filter((x) => x.includes('/offers/off_1/files/ofl_1')).length, 1, 'the file is a URL on the Worker');
   assert.doesNotMatch(h, /merchants\/[^"]*\/offers\//, 'never a key');
   // A request that no longer takes offers: nothing to accept or decline.
   const closed = html(createElement(OfferCompare, { requestId: 'req_1', offers: [revised, free], takingOffers: false, materials, onChanged: noop }));

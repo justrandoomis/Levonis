@@ -8,6 +8,15 @@
  * (`GET /api/marketplace/print/my-requests`) rather than from widening the
  * board's privacy whitelist — see the comment on that handler.
  *
+ * Each row is the owner card of the shared request card (community UI plan
+ * C3, `RequestListCard variant="owner"`): the first picture, the own
+ * budget, the estimate, the chosen merchant and its price, and the marks a
+ * row must keep (the technical review, an estimate over some parts only,
+ * models left out of it, the estimate confidence, a partial or substituted
+ * order). Pages arrive as the list end comes into view (plan B3 `cursor`).
+ * The board filters (the owner states, the process, the governorate) and
+ * its search narrow the rows read so far.
+ *
  * "إعادة الطلب" copies a request into a NEW one and PUBLISHES it — the copy
  * goes through the same matching as a first publish, so the merchants who can
  * make it are told (audit 03 §10 E: copies used to land on the board unmatched).
@@ -18,27 +27,21 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import {
-  Loader2, PackageSearch, MapPin, Repeat2, FileBox, Link2, ChevronLeft,
-  BadgeCheck, CalendarClock,
-} from 'lucide-react';
+import { PackageSearch } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
-import { localColour, localMaterial } from '../community/requests/mirrors';
 import { useAuth } from '../../AuthContext';
 import { UnauthorizedState } from '../ui/AsyncStates';
-import { ApiError } from '../../lib/api';
-import { GOVERNORATE_LABELS } from '../../lib/governorates';
-import { printApi, priceRange, type MyRequestRow, type Confidence } from '../../lib/printApi';
-import { useMoney } from '../../CurrencyContext';
+import { Skeleton, SkeletonGroup } from '../ui/Skeleton';
+import { printApi, type MyRequestRow } from '../../lib/printApi';
+import { iqdNumber, iqdUnit } from '../../lib/money';
 import { apiRefusal } from '../../lib/refusalStrings';
 import { asLang } from '../orders/format';
 import ConfirmSheet from './ConfirmSheet';
-import { requestStateLabel, requestStateTone } from '../community/requests/requestStates';
-import { StatusChip } from '../ui/Badge';
 import { CommunityLoadError } from '../../pages/community/access';
-import { offersLabel } from '../community/hub/copy';
 import { fill, requestStrings } from '../community/requests/strings';
 import { customOrderChips } from '../chat/cards/cardWords';
+import RequestListCard from '../community/requests/RequestListCard';
+import { MINE_STATES, PageSentinel, type BoardFilterValues } from '../community/requests/FilterSelect';
 
 /**
  * WHAT THE SUMMARY ADDS TO A ROW OF «طلباتي» (P1-05, DECISIONS row 267 §8;
@@ -60,18 +63,28 @@ export function myRequestNotes(r: Pick<MyRequestRow, 'summary' | 'print'>, lang:
   };
 }
 
-const CONFIDENCE_TEXT: Record<Confidence, [string, string]> = {
-  high: ['دقة عالية', 'High confidence'],
-  medium: ['دقة متوسطة', 'Medium confidence'],
-  low: ['تقدير مبدئي', 'Rough estimate'],
-};
+const NO_FILTERS: BoardFilterValues = { state: null, process: null, governorate: null };
 
+/** The rows the filters and the search keep: the owner states, the process, the governorate, the title. */
+export function filterMine(rows: MyRequestRow[], f: BoardFilterValues, q: string): MyRequestRow[] {
+  const needle = q.trim().toLowerCase();
+  return rows.filter(
+    (r) =>
+      (!f.state || (MINE_STATES[f.state] ?? []).includes(r.state)) &&
+      (!f.process || r.print?.process === f.process) &&
+      (!f.governorate || r.governorate === f.governorate) &&
+      (!needle || r.title.toLowerCase().includes(needle))
+  );
+}
 
-export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => void }) {
-  const { money } = useMoney();
-  const { loc, lang } = useLanguage();
+export default function MyRequestsList({ onOpen, filters = NO_FILTERS, q = '' }: { onOpen: (id: string) => void; filters?: BoardFilterValues; q?: string }) {
+  const { lang, loc } = useLanguage();
+  const s = requestStrings(lang);
   const { isAuthenticated } = useAuth();
   const [rows, setRows] = useState<MyRequestRow[] | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [more, setMore] = useState(false);
+  const [moreError, setMoreError] = useState(false);
   const [repeating, setRepeating] = useState('');
   const [error, setError] = useState('');
   /** The request the customer asked to repeat — the sheet confirms it. */
@@ -87,11 +100,29 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
     setLoadError(null);
     printApi
       .myRequests()
-      .then((d) => setRows(d.requests))
+      .then((d) => {
+        setRows(d.requests);
+        setCursor(d.next_cursor ?? null);
+      })
       .catch((e: unknown) => setLoadError(e));
   }, [isAuthenticated]);
 
   useEffect(load, [load]);
+
+  async function loadMore() {
+    if (!cursor || more) return;
+    setMore(true);
+    setMoreError(false);
+    try {
+      const d = await printApi.myRequests(cursor);
+      setRows((r) => [...(r ?? []), ...d.requests.filter((x) => !(r ?? []).some((y) => y.id === x.id))]);
+      setCursor(d.next_cursor ?? null);
+    } catch {
+      setMoreError(true);
+    } finally {
+      setMore(false);
+    }
+  }
 
   async function repeat(row: MyRequestRow) {
     setRepeating(row.id);
@@ -101,58 +132,45 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
       const d = await printApi.repeat(row.id);
       setAsking(null);
       load();
-      if (!d.published) {
-        // W5-A: a repeat is always a DRAFT — reviewed, then published.
-        // OWNER: Sorani to be written by hand.
-        setNotice(
-          loc(
-            'نُسخ الطلب مسودةً — راجعه (الموعد والكمية) ثم انشره.',
-            'The request was copied as a draft — review it (deadline, quantity), then publish it.'
-          )
-        );
-      }
+      // W5-A: a repeat is always a DRAFT — reviewed, then published.
+      if (!d.published) setNotice(s.repeatedDraft);
       onOpen(d.request_id);
     } catch (e) {
-      setError(
-        e instanceof ApiError
-          ? apiRefusal(e, asLang(lang), loc('تعذّرت إعادة الطلب', 'Could not repeat the request', 'نەتوانرا دووبارە بکرێتەوە'))
-          : loc('تعذّرت إعادة الطلب', 'Could not repeat the request', 'نەتوانرا دووبارە بکرێتەوە')
-      );
+      setError(apiRefusal(e, asLang(lang), s.couldNotRepeat));
     } finally {
       setRepeating('');
     }
   }
 
+  if (!isAuthenticated) return <UnauthorizedState next="/requests?view=mine" />;
+
   if (rows === null) {
     // A list that did not load is not «you have no requests».
     if (loadError) return <CommunityLoadError error={loadError} onRetry={load} />;
     return (
-      <div className="py-12 flex justify-center">
-        <Loader2 className="w-5 h-5 text-gold animate-spin" />
-      </div>
+      <SkeletonGroup className="space-y-3">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-40 w-full rounded-xl" />
+        ))}
+      </SkeletonGroup>
     );
   }
-
-  if (!isAuthenticated) return <UnauthorizedState next="/requests" />;
 
   if (!rows.length) {
     return (
-      <div className="py-14 text-center">
-        <PackageSearch className="w-9 h-9 text-text-muted mx-auto mb-3" />
-        <p className="text-text-secondary text-[13px]">
-          {loc('لم تنشئ أي طلب بعد', 'You have not created a request yet', 'هێشتا داواکاریت دروست نەکردووە')}
-        </p>
+      <div className="py-14 text-center" data-requests-empty="mine">
+        <PackageSearch aria-hidden="true" className="mx-auto mb-3 h-9 w-9 text-text-muted" />
+        <p className="text-[13px] text-text-secondary">{s.noRequestsYet}</p>
       </div>
     );
   }
 
+  const shown = filterMine(rows, filters, q);
+  const L = asLang(lang);
   return (
     <div className="space-y-3" data-my-requests>
       {notice && (
-        <p
-          role="status"
-          className="rounded-2xl border border-amber-500/25 bg-amber-500/10 px-3.5 py-2.5 text-[12.5px] text-amber-200"
-        >
+        <p role="status" className="lv-alert lv-alert-warning text-[12.5px] text-text-primary">
           {notice}
         </p>
       )}
@@ -160,179 +178,82 @@ export default function MyRequestsList({ onOpen }: { onOpen: (id: string) => voi
       <ConfirmSheet
         open={!!asking}
         testId="repeat-request"
-        // OWNER: Sorani to be written by hand.
-        title={loc('إعادة هذا الطلب؟', 'Repeat this request?')}
-        confirmLabel={loc('إعادة الطلب', 'Repeat', 'دووبارە')}
-        // OWNER: Sorani to be written by hand.
-        busyLabel={loc('جارٍ النسخ…', 'Copying…')}
+        title={s.repeatQ}
+        confirmLabel={s.repeatConfirm}
+        busyLabel={s.repeating}
         busy={!!asking && repeating === asking.id}
         error={error}
         onConfirm={() => asking && repeat(asking)}
         onClose={() => setAsking(null)}
       >
-        {/* OWNER: Sorani to be written by hand. */}
-        {asking &&
-          loc(
-            `سيُنشأ طلب جديد مسودةً بنفس تفاصيل «${asking.title}» وبنسخة من ملفاته. تراجعه وتختار موعدًا جديدًا، ثم تنشره ليصل إلى التجار المناسبين بتقدير سعر جديد.`,
-            `A new DRAFT will be created with the same details as “${asking.title}” and a copy of its files. You review it and pick a new deadline, then publish it to the merchants who can make it, with a fresh estimate.`
-          )}
+        {asking && fill(s.repeatBody, { title: asking.title })}
       </ConfirmSheet>
 
-      {rows.map((r) => {
+      {!shown.length && (
+        <p className="py-10 text-center text-[13px] text-text-secondary" data-requests-empty={q ? 'search' : 'filters'}>
+          {q ? <bdi>{fill(s.noResultsFor, { q })}</bdi> : s.noFilterMatch}
+        </p>
+      )}
+
+      {shown.map((r) => {
         const p = r.print;
         const notes = myRequestNotes(r, lang);
+        const accepted = r.accepted;
+        // A partial or substituted order is never read as the whole job (P1-05 review 6).
+        const orderChips = r.accepted ? customOrderChips(r.accepted, loc) : [];
+        const estimated = !!p && (p.estimate_low_iqd !== null || p.estimate_high_iqd !== null);
+        const chips = [
+          notes.review,
+          // A sum over some parts is not the job price: said beside it (R10, P1-05).
+          estimated ? notes.partial : '',
+          notes.unpriced,
+          estimated && p?.estimate_confidence ? s.confidence[p.estimate_confidence] : '',
+          ...orderChips,
+        ].filter(Boolean);
+        const chosen = accepted
+          ? accepted.price_iqd !== null
+            ? `${accepted.merchant_name} · ${iqdNumber(accepted.price_iqd, L)} ${iqdUnit(L)}`
+            : accepted.merchant_name
+          : null;
         return (
           <div
             key={r.id}
             data-my-request={r.id}
-            className="lv-surface overflow-hidden"
+            data-my-request-review={notes.review ? '' : undefined}
+            data-my-request-partial={estimated && notes.partial ? '' : undefined}
+            data-my-request-accepted-chip={orderChips.length ? '' : undefined}
           >
-            <button
-              onClick={() => onOpen(r.id)}
-              className="w-full text-start p-4 active:scale-[0.995] transition-transform"
-            >
-              <div className="flex items-start gap-3">
-                {/* The thumbnail slot is a shape, not a fetched image: the
-                    preview object is private and reaching it needs the
-                    authorised file route. An icon that says WHAT the request
-                    carries is more honest than a broken <img>. */}
-                <div className="w-12 h-12 rounded-md lv-well flex items-center justify-center shrink-0">
-                  {p?.source_kind === 'link' ? (
-                    <Link2 className="w-5 h-5 text-text-secondary" />
-                  ) : (
-                    <FileBox className="w-5 h-5 text-text-secondary" />
-                  )}
-                </div>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-text-primary font-semibold text-[14px] leading-snug truncate">{r.title}</h3>
-                    <StatusChip tone={requestStateTone(r.state)} className="shrink-0">
-                      {requestStateLabel(r.state, loc)}
-                    </StatusChip>
-                  </div>
-                  {notes.review && (
-                    <p className="mt-1" data-my-request-review>
-                      <StatusChip tone="warning">{notes.review}</StatusChip>
-                    </p>
-                  )}
-
-                  <p className="text-[11px] text-text-muted mt-0.5" dir="ltr">
-                    {r.created_at.slice(0, 10)}
-                    {p?.primary_file_name ? ` · ${p.primary_file_name}` : ''}
-                  </p>
-
-                  {p && (p.estimate_low_iqd !== null || p.estimate_high_iqd !== null) && (
-                    <p className="mt-2 text-gold font-bold text-[13.5px]" dir="ltr" data-my-request-estimate>
-                      {priceRange(p.estimate_low_iqd, p.estimate_high_iqd, money)}
-                      {p.estimate_confidence && (
-                        <span className="ms-2 text-[10.5px] font-semibold text-text-secondary" dir="auto">
-                          {loc(...CONFIDENCE_TEXT[p.estimate_confidence])}
-                        </span>
-                      )}
-                    </p>
-                  )}
-                  {/* A sum over some parts is not the job price: said beside it (R10, P1-05). */}
-                  {p && (p.estimate_low_iqd !== null || p.estimate_high_iqd !== null) && notes.partial && (
-                    <p className="mt-0.5 text-[11.5px] font-semibold text-warning" data-my-request-partial>
-                      {notes.partial}
-                    </p>
-                  )}
-                  {notes.unpriced && (
-                    <p className="mt-0.5 text-[11.5px] text-warning" data-my-request-unpriced>
-                      {notes.unpriced}
-                    </p>
-                  )}
-
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11.5px] text-text-muted mt-2">
-                    {(p?.material_id || r.material) && (
-                      <span>{localMaterial(p?.material_id || r.material, lang === 'en' || lang === 'ckb' ? lang : 'ar')}</span>
-                    )}
-                    {p?.color_hex && (
-                      <span className="flex items-center gap-1.5">
-                        <span
-                          className="w-3 h-3 rounded-full border border-white/25"
-                          style={{ background: p.color_hex }}
-                        />
-                        {localColour(p.color_name || p.color_hex, lang === 'en' || lang === 'ckb' ? lang : 'ar')}
-                      </span>
-                    )}
-                    {r.quantity > 1 && <span dir="ltr">×{r.quantity}</span>}
-                    {r.governorate && (
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3" />
-                        {GOVERNORATE_LABELS[r.governorate]?.[lang === 'ckb' ? 'ckb' : lang] ?? r.governorate}
-                      </span>
-                    )}
-                    <span className="ms-auto text-gold/80 font-semibold">
-                      {offersLabel(r.offer_count, lang)}
-                    </span>
-                  </div>
-
-                  {r.accepted && (
-                    <div className="mt-2.5 rounded-xl border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2">
-                      <p className="text-emerald-300 text-[12px] font-semibold flex items-center gap-1.5">
-                        <BadgeCheck className="w-3.5 h-3.5" />
-                        {r.accepted.merchant_name}
-                        {r.accepted.price_iqd !== null && (
-                          <span className="ms-auto" dir="ltr">{money(r.accepted.price_iqd)}</span>
-                        )}
-                      </p>
-                      {/* A partial or substituted order is never read as the whole job (P1-05 review 6). */}
-                      {customOrderChips(r.accepted, loc).length > 0 && (
-                        <p className="mt-1 flex flex-wrap gap-1.5" data-my-request-accepted-chip>
-                          {customOrderChips(r.accepted, loc).map((c) => (
-                            <StatusChip key={c} tone="warning">
-                              {c}
-                            </StatusChip>
-                          ))}
-                        </p>
-                      )}
-                      {r.accepted.completion_days !== null && r.accepted.completion_days > 0 && (
-                        <p className="text-[11px] text-emerald-200/70 mt-0.5 flex items-center gap-1.5">
-                          <CalendarClock className="w-3 h-3" />
-                          {loc(
-                            `التسليم خلال ${r.accepted.completion_days} يوم`,
-                            `Delivery in ${r.accepted.completion_days} days`,
-                            `گەیاندن لە ${r.accepted.completion_days} ڕۆژدا`
-                          )}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </button>
-
-            <div className="flex border-t border-border-subtle">
-              <button
-                onClick={() => onOpen(r.id)}
-                className="flex-1 min-h-[42px] text-[12.5px] font-semibold text-text-secondary flex items-center justify-center gap-1.5"
-              >
-                {loc('فتح الطلب', 'Open request', 'کردنەوە')}
-                <ChevronLeft className="w-3.5 h-3.5 rotate-180 rtl:rotate-0" />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setError('');
-                  setAsking(r);
-                }}
-                disabled={repeating === r.id}
-                data-my-request-repeat={r.id}
-                className="flex-1 min-h-[42px] border-s border-border-subtle text-[12.5px] font-semibold text-gold flex items-center justify-center gap-1.5 disabled:opacity-60"
-              >
-                {repeating === r.id ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Repeat2 className="w-3.5 h-3.5" />
-                )}
-                {loc('إعادة الطلب', 'Repeat', 'دووبارە')}
-              </button>
-            </div>
+            <RequestListCard
+              variant="owner"
+              request={{
+                id: r.id,
+                title: r.title,
+                state: r.state,
+                quantity: r.quantity,
+                material: p?.material_id || r.material,
+                governorate: r.governorate,
+                offer_count: r.offer_count,
+                file_count: r.file_count,
+                deadline: r.deadline,
+                created_at: r.created_at,
+                summary: r.summary ? { parts_count: r.summary.parts_count, pieces_per_set: r.summary.pieces_per_set } : null,
+                cover_url: r.cover_url ?? null,
+                budget_iqd: r.budget_iqd,
+                estimate_low_iqd: p?.estimate_low_iqd ?? null,
+                estimate_high_iqd: p?.estimate_high_iqd ?? null,
+                accepted_merchant: chosen,
+              }}
+              chips={chips}
+              onRepeat={() => {
+                if (repeating) return;
+                setError('');
+                setAsking(r);
+              }}
+            />
           </div>
         );
       })}
+      <PageSentinel more={!!cursor} busy={more} failed={moreError} onMore={loadMore} s={s} />
     </div>
   );
 }
