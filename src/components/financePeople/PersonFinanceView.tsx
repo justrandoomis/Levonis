@@ -2,6 +2,7 @@ import { ChevronLeft } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { personFinanceStrings, percentText, type HoldReasonKey, type PersonFinanceStrings } from '../../lib/personFinanceStrings';
 import { Button, Dialog, Money, dateLabel, useLanguage, type OpenOrder } from './shared';
+import { InvestmentsTable, MoneyFlow } from './PersonStatement';
 
 /**
  * «الأشخاص» — one person, one picture (worker/lib/personFinance.ts; DECISIONS
@@ -143,7 +144,7 @@ export function WorkHolds({ work, owner, s }: { work: Work; owner: boolean; s: P
 function ShareStat({ investor: inv, s }: { investor: Investor; s: PersonFinanceStrings }) {
   const { min_bps: min, max_bps: max } = inv.share, fallback = inv.default_profit_share_bps;
   return <div className="fp-stat"><span>{s.share}</span>
-    <strong className="fp-big">{min == null || max == null ? <Pct bps={fallback} /> : min === max ? <Pct bps={min} /> : <><Pct bps={min} />–<Pct bps={max} /></>}</strong>
+    <strong className="fp-big">{min == null || max == null ? <Pct bps={fallback} /> : min === max ? <Pct bps={min} /> : <bdi dir="ltr"><Pct bps={min} />–<Pct bps={max} /></bdi>}</strong>
     <p className="fp-row-meta">{min != null && (min === max ? s.allAgreements(inv.agreements.length) : s.byAgreement)}
       {fallback != null && fallback !== max && <>{min != null && ' · '}{s.defaultShare} <Pct bps={fallback} /></>}</p></div>;
 }
@@ -160,43 +161,32 @@ export function PersonCard({ person, onOpen, actions, own = false, openOrder }: 
         <div className="min-w-0"><h3>{person.name}</h3><p className="fp-chips">{inv && <span className="fp-status fp-status-approved">{s.investor}</span>}{roles.map((r) => <span key={r.staff_id} className="fp-status">{s.works} · {r.role || r.name}</span>)}</p></div></div>
       {actions}
     </header>
+    {/* The headline: what was earned in all, and in the chosen period. */}
     <section className="fp-person-total" aria-label={totalLabel}>
       <span>{totalLabel}</span><Money value={c.earned_iqd} />
       {inv && work && <p className="fp-row-meta">{s.fromInvesting} <Money value={inv.profit.earned_iqd} /> · {s.fromWork} <Money value={work.earned_iqd} /></p>}
       {person.period && (person.period.profit_iqd > 0 || person.period.wages_iqd > 0) && <p className="fp-row-meta">{s.period}: {inv && <>{s.periodProfit} <Money value={person.period.profit_iqd} /></>}{inv && work && ' · '}{work && <>{s.periodWages} <Money value={person.period.wages_iqd} /></>}</p>}
     </section>
-    <div className="fp-stats fp-person-combined">
-      <Stat label={s.availableNow} value={c.available_iqd} tone={c.available_iqd > 0 ? 'good' : undefined}
-        hint={c.available_capital_iqd > 0 ? <>{s.earningsPart} <Money value={c.available_earnings_iqd} /> · {s.capital} <Money value={c.available_capital_iqd} /></> : undefined} />
-      <Stat label={s.paidOut} value={c.paid_iqd} />
-      <Stat label={s.heldNow} value={c.held_iqd} tone={c.held_iqd > 0 ? 'wait' : undefined} />
-      {c.reserved_iqd > 0 && <Stat label={s.reservedNow} value={c.reserved_iqd} />}
-    </div>
+    {/* «الحساب باختصار»: earned − paid − waiting = left to withdraw, from work, from investing and together (DECISIONS row 342). */}
+    <MoneyFlow person={person} />
     {inv && <section className="fp-person-block" aria-label={s.investmentTitle}>
       <h4>{s.investmentTitle}</h4>
       {invested ? <>
         <div className="fp-stats">
           <Stat label={s.capitalPutIn} value={inv.capital.put_in_iqd} />
-          <Stat label={s.profitEarned} value={inv.profit.earned_iqd} />
           <div className="fp-stat"><span>{s.roi}</span><strong className="fp-big"><Pct bps={inv.roi_bps} decimals={1} /></strong><p className="fp-row-meta">{s.roiHint}</p></div>
           <ShareStat investor={inv} s={s} />
           {inv.profit.debt_iqd > 0 && <Stat label={s.profitDebt} value={inv.profit.debt_iqd} />}
         </div>
+        <InvestmentsTable person={person} />
         <CapitalBar capital={inv.capital} holds={inv.holds} s={s} />
-        {inv.units.received + inv.units.ordered > 0 && <p className="fp-row-meta">{s.unitsLine(inv.units.in_stock, inv.units.in_orders, inv.units.sold, Math.max(0, inv.units.ordered - inv.units.received))}</p>}
         <InvestmentHolds investor={inv} owner={!own} s={s} openOrder={own ? undefined : openOrder} />
       </> : <div className="fp-stats"><ShareStat investor={inv} s={s} /><p className="fp-muted">{s.noAgreements}</p></div>}
     </section>}
     {work && <section className="fp-person-block" aria-label={s.workTitle}>
       <h4>{s.workTitle}</h4>
       {work.roles.map((r) => <WorkStatus key={r.staff_id} role={r} s={s} />)}
-      <div className="fp-stats">
-        <Stat label={s.wagesEarned} value={work.earned_iqd} />
-        <Stat label={s.wagesPaid} value={work.paid_iqd} />
-        <Stat label={s.wagesAvailable} value={work.available_iqd} />
-        {work.held_iqd > 0 && <Stat label={s.wagesHeld} value={work.held_iqd} />}
-        {work.debt_iqd > 0 && <Stat label={s.wageDebt} value={work.debt_iqd} />}
-      </div>
+      {work.debt_iqd > 0 && <div className="fp-stats"><Stat label={s.wageDebt} value={work.debt_iqd} /></div>}
       <WorkHolds work={work} owner={!own} s={s} />
     </section>}
     {onOpen && <Button variant="ghost" onClick={onOpen}>{s.details}<ChevronLeft size={16} aria-hidden="true" /></Button>}

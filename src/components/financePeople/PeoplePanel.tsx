@@ -15,6 +15,8 @@ import { Select } from '../ui/Field';
 import { AccountPicker, api, Button, dateLabel, Dialog, Empty, Feedback, Field, Input, Loading, Money, PEOPLE, Surface, useLanguage, useMutation, useReloadOn, useRemote, type Account, type PanelProps } from './shared';
 import { PersonSheet, WorkHolds, WorkStatus, type PersonFinance } from './PersonFinanceView';
 import { personFinanceStrings } from '../../lib/personFinanceStrings';
+import { personStatementStrings } from '../../lib/personStatementStrings';
+import { MoneyFlow, PeopleSummary } from './PersonStatement';
 
 type Named = { id: string; name?: string; name_ar?: string; name_en?: string; parent_id?: string | null };
 type Scope = { catalog_ids: string[]; product_ids: string[]; excluded_product_ids: string[] };
@@ -39,7 +41,7 @@ function ArchivedBalance({ pf, staffId, s }: { pf: PersonFinance | undefined; st
 
 export default function PeoplePanel({ onChanged, from, to, month, openOrder, revision }: PanelProps = {}) {
   const { loc, lang, dir } = useLanguage();
-  const s = personFinanceStrings(lang);
+  const s = personFinanceStrings(lang), t = personStatementStrings(lang);
   const query = new URLSearchParams(from || to ? {from: from || '', to: to || ''} : month ? {month} : {});
   const staffRemote = useRemote<Config>(`${PEOPLE}/staff?${query}`), op = useMutation();
   // The one-person picture (worker/lib/personFinance.ts): work status, why
@@ -113,22 +115,37 @@ export default function PeoplePanel({ onChanged, from, to, month, openOrder, rev
     const activity = activities[person.id];
     return <div className="fp-note"><p role="status">{job.state === 'failed' ? loc('حُفظ التعديل ويحتاج حساب المستحقات إلى متابعة.', 'Saved. The earnings calculation needs to be resumed.') : loc(`احتساب المستحقات السابقة · تمت مراجعة ${job.processed_orders} طلب`, `Calculating past earnings · ${job.processed_orders} orders reviewed`)}</p>{activity?.deferred && job.state !== 'failed' && <p className="fp-muted">{loc('يتابع الخادم الحساب في الخلفية؛ يتحدث العدد هنا خلال دقائق.', 'The server keeps calculating in the background; the count here updates within a few minutes.', 'سێرڤەرەکە لە پشتەوە بەردەوامە لە حیسابکردن؛ ژمارەکە لێرە لە ماوەی چەند خولەکێکدا نوێ دەبێتەوە.')}</p>}{activity?.error && <p role="alert">{activity.error} {activity.retrying ? loc('سنتحقق من التقدم المحفوظ ثم نتابع تلقائيًا.', 'We will verify saved progress and resume automatically.') : loc('تعذرت المتابعة التلقائية؛ أعد المحاولة.', 'Automatic continuation stopped. Please retry.')}</p>}{canManage && !activity?.busy && (job.state === 'failed' || activity?.error && !activity.retrying) && <Button size="sm" className="mt-2" onClick={() => resume(job)}>{loc('متابعة الحساب', 'Continue calculation')}</Button>}</div>;
   };
+  // One line per employee, since the start (DECISIONS row 342): work and, for someone who also invests, investing, and what can be withdrawn now.
+  const staffSummary = () => {
+    const seen = new Set<string>(), rows = live.flatMap((person) => {
+      const pf = personOf(person.id), key = pf?.user_id ?? pf?.staff_id ?? person.id;
+      if (!pf?.work || seen.has(key)) return [];
+      seen.add(key);
+      return [{ pf, person }];
+    });
+    const investing = rows.some((r) => r.pf.investor);
+    const columns = [t.colWork, ...(investing ? [t.colInvest] : []), t.paid, t.waiting, t.canWithdraw];
+    return <PeopleSummary title={t.staffSummary} columns={columns} rows={rows.map(({ pf, person }) => ({ key: person.id, name: pf.name || person.name,
+      onOpen: () => document.getElementById(`fp-staff-${person.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }),
+      cells: [pf.work!.earned_iqd, ...(investing ? [pf.investor?.profit.earned_iqd ?? 0] : []), pf.combined.paid_iqd, pf.combined.held_iqd + pf.combined.reserved_iqd, pf.combined.available_iqd] }))} />;
+  };
   return <div className="ap fp fp-stack" dir={dir}>
     <Surface title={loc('الموظفون والأجور', 'Staff and earnings')} hint={loc('الأجر يُحتسب تلقائيًا عند تسليم الطلب، وفق المنتجات المشمولة وقاعدة الموظف وتاريخ استحقاقه.', 'Pay is calculated automatically on delivery from eligible products, the employee’s rule and earning date.')} action={<Button variant="primary" icon={<Plus size={16} />} disabled={!canManage || op.busy} onClick={() => { op.clear(); setPersonEditor({}); }}>{loc('إضافة موظف', 'Add employee')}</Button>}>
       <Feedback error={op.error} notice={op.notice} />
       {!config ? <Loading error={remote.error} retry={remote.load} /> : <>
         <Feedback error={remote.error} />
         {remote.error && <div className="fp-row-actions"><p className="fp-muted" role="status">{loc('تعذر تحديث الأرصدة المعروضة. أعد تحميلها لمعرفة آخر نتيجة محفوظة.', 'Displayed balances could not refresh. Reload to see the latest saved result.')}</p><Button size="sm" loading={remote.loading} onClick={remote.load}>{loc('تحديث الأرصدة', 'Refresh balances')}</Button></div>}
+        {live.length > 1 && people.data && staffSummary()}
         {!live.length ? <Empty><Users size={26} className="mb-3" aria-hidden="true" />{loc('أضف أول موظف ليبدأ إعداد أجره.', 'Add your first employee to set up their pay.')}</Empty> : <div className="fp-stack">{live.map((person) => {
           const rules = config.rules.filter((rule) => rule.staff_id === person.id);
           const pf = personOf(person.id), role = pf?.work?.roles.find((r) => r.staff_id === person.id);
-          return <article className="fp-rule" key={person.id}>
+          return <article className="fp-rule" key={person.id} id={`fp-staff-${person.id}`}>
             <div className="fp-rule-heading fp-staff-heading"><div className="flex items-center gap-3 min-w-0"><span className="fp-avatar" aria-hidden="true">{person.name.slice(0, 1)}</span><div className="min-w-0"><h3>{person.name}</h3><p className="fp-muted">{person.role || loc('موظف', 'Staff')}</p></div></div>{!role && <span className={`fp-status ${person.active ? 'fp-status-available' : ''}`}>{person.active ? loc('نشط', 'Active', 'چالاک') : loc('متوقف', 'Paused', 'وەستاوە')}</span>}</div>
             {role && <WorkStatus role={role} s={s} />}
             {person.start_work_date && <p className="fp-row-meta">{loc('بدء العمل: ', 'Started: ', 'دەستپێکی کار: ')}{dateLabel(person.start_work_date, lang)} · {loc('الاستحقاق من ', 'Eligible from ', 'شایستەبوون لە: ')}{dateLabel(firstEarningDay(person.start_work_date), lang)}</p>}
             {pf?.investor && <div className="fp-row-actions"><span className="fp-status fp-status-approved">{s.investor}</span><Button size="sm" variant="ghost" onClick={() => setSheet(pf)}>{loc('حسابه الكامل: العمل والاستثمار', 'Full account: work and investment', 'هەژماری تەواو: کار و وەبەرهێنان')}</Button></div>}
             {person.cutoff_earnings && <p className="fp-note" role="status">{loc(`هناك ${person.cutoff_earnings.orders} طلبات بأجور سابقة أُلغيت وأصبحت خارج تاريخ بدء العمل الحالي، أقدمها ${dateLabel(person.cutoff_earnings.first_day, lang)}. إذا استُخدم تاريخ الإيقاف أو العودة كتاريخ بداية، صحّح تاريخ التعيين وسجّل فترة التوقف من «البيانات والإيقاف والاستئناف».`, `${person.cutoff_earnings.orders} previously earned orders are now excluded by the current work start date, beginning ${dateLabel(person.cutoff_earnings.first_day, lang)}. If a pause or return date was entered as the start date, correct the hiring date and record the pause under Details, pause and resume.`)}</p>}
-            {person.balance && <div className="fp-stats">
+            {pf?.work ? <MoneyFlow person={pf} /> : person.balance && <div className="fp-stats">
               <div className="fp-stat"><span>{s.wagesEarned}</span><Money value={person.balance.staff_iqd ?? null} /></div>
               <div className="fp-stat"><span>{s.wagesPaid}</span><Money value={person.balance.staff_paid_iqd ?? null} /></div>
               <div className={`fp-stat${person.balance.staff_available_iqd > 0 ? ' fp-stat-good' : ''}`}><span>{s.availableNow}</span><Money value={person.balance.staff_available_iqd} /></div>
