@@ -144,7 +144,7 @@ export function WorkHolds({ work, owner, s }: { work: Work; owner: boolean; s: P
 function ShareStat({ investor: inv, s }: { investor: Investor; s: PersonFinanceStrings }) {
   const { min_bps: min, max_bps: max } = inv.share, fallback = inv.default_profit_share_bps;
   return <div className="fp-stat"><span>{s.share}</span>
-    <strong className="fp-big">{min == null || max == null ? <Pct bps={fallback} /> : min === max ? <Pct bps={min} /> : <><Pct bps={min} />–<Pct bps={max} /></>}</strong>
+    <strong className="fp-big">{min == null || max == null ? <Pct bps={fallback} /> : min === max ? <Pct bps={min} /> : <bdi dir="ltr"><Pct bps={min} />–<Pct bps={max} /></bdi>}</strong>
     <p className="fp-row-meta">{min != null && (min === max ? s.allAgreements(inv.agreements.length) : s.byAgreement)}
       {fallback != null && fallback !== max && <>{min != null && ' · '}{s.defaultShare} <Pct bps={fallback} /></>}</p></div>;
 }

@@ -36,7 +36,15 @@ export interface PersonStatementStrings {
   capital: string;
   share: string;
   sold: string;
-  left: string;
+  unitsLeft: (n: number) => string;
+  returnPct: string;
+  waitingShort: string;
+  stageIncoming: string;
+  stageSoldOut: string;
+  stageSelling: string;
+  earnedWork: string;
+  earnedInvest: string;
+  withdrawHint: string;
   profit: string;
   profitAvailable: string;
   capitalReturned: string;
@@ -73,7 +81,15 @@ export const PERSON_STATEMENT_STRINGS: Readonly<Record<Language, PersonStatement
     capital: 'رأس المال',
     share: 'الحصة',
     sold: 'مباع من الكل',
-    left: 'قطع باقية',
+    unitsLeft: (n) => `باقٍ ${n}`,
+    returnPct: 'العائد',
+    waitingShort: 'ينتظر',
+    stageIncoming: 'جزء من البضاعة لم يصل بعد',
+    stageSoldOut: 'بيعت كل القطع',
+    stageSelling: 'قيد البيع',
+    earnedWork: 'المكتسب من العمل',
+    earnedInvest: 'المكتسب من الاستثمار',
+    withdrawHint: 'التفصيل كاملًا في «الحساب باختصار» أدناه.',
     profit: 'الربح المكتسب',
     profitAvailable: 'منه متاح',
     capitalReturned: 'رأس المال الراجع',
@@ -108,7 +124,15 @@ export const PERSON_STATEMENT_STRINGS: Readonly<Record<Language, PersonStatement
     capital: 'Capital',
     share: 'Share',
     sold: 'Sold of all',
-    left: 'Units left',
+    unitsLeft: (n) => `${n} left`,
+    returnPct: 'Return',
+    waitingShort: 'Waiting',
+    stageIncoming: 'Some goods have not arrived yet',
+    stageSoldOut: 'All units sold',
+    stageSelling: 'Selling',
+    earnedWork: 'Earned from work',
+    earnedInvest: 'Earned from investing',
+    withdrawHint: 'The full breakdown is in “The account at a glance” below.',
     profit: 'Profit earned',
     profitAvailable: 'Of it available',
     capitalReturned: 'Capital returned',
@@ -143,7 +167,15 @@ export const PERSON_STATEMENT_STRINGS: Readonly<Record<Language, PersonStatement
     capital: 'سەرمایە',
     share: 'بەش',
     sold: 'فرۆشراو لە کۆی',
-    left: 'پارچەی ماوە',
+    unitsLeft: (n) => `${n} ماوە`,
+    returnPct: 'گەڕانەوە',
+    waitingShort: 'چاوەڕوان',
+    stageIncoming: 'بەشێک لە کاڵاکان هێشتا نەگەیشتوون',
+    stageSoldOut: 'هەموو پارچەکان فرۆشران',
+    stageSelling: 'لە فرۆشتندایە',
+    earnedWork: 'بەدەستهاتوو لە کار',
+    earnedInvest: 'بەدەستهاتوو لە وەبەرهێنان',
+    withdrawHint: 'وردەکاریی تەواو لە «کورتەی هەژمار» لە خوارەوەیە.',
     profit: 'قازانجی بەدەستهاتوو',
     profitAvailable: 'لەوە بەردەستە',
     capitalReturned: 'سەرمایەی گەڕاوە',

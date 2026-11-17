@@ -1,5 +1,5 @@
 import type { CSSProperties, ReactNode } from 'react';
-import { personStatementStrings } from '../../lib/personStatementStrings';
+import { personStatementStrings, type PersonStatementStrings } from '../../lib/personStatementStrings';
 import { percentText } from '../../lib/personFinanceStrings';
 import { Money, useLanguage } from './shared';
 import type { AgreementFinance, PersonFinance } from './PersonFinanceView';
@@ -56,7 +56,14 @@ export function MoneyFlow({ person }: { person: PersonFinance }) {
 const byAge = (a: AgreementFinance, b: AgreementFinance) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
 const agreementTitle = (a: AgreementFinance, lang: string) => (lang === 'en' ? a.product_name : a.product_name_ar || a.product_name) || a.label || a.name;
 
-/** «استثمار 1», «استثمار 2», … oldest first: capital, share, units sold and left, profit and what of it is available. */
+/** Where one investment stands, in words (no amount): goods still on the way, all sold, or selling. */
+const stageOf = (a: AgreementFinance, t: PersonStatementStrings) => a.units.ordered > a.units.received ? t.stageIncoming
+  : a.units.received > 0 && a.units.in_stock + a.units.in_orders === 0 ? t.stageSoldOut : t.stageSelling;
+/** Profit earned ÷ capital, the same rule as the account's return (roi_bps, rounded down). */
+const returnBps = (profit: number, capital: number) => capital > 0 ? Math.floor(profit * 10000 / capital) : null;
+
+/** «استثمار 1», «استثمار 2», … oldest first: where it stands, capital, share, units sold of all with a bar,
+ * profit, its return, and that profit split into available and waiting; then the capital returned. */
 export function InvestmentsTable({ person }: { person: PersonFinance }) {
   const { lang } = useLanguage(), t = strings(lang);
   const inv = person.investor;
@@ -65,36 +72,44 @@ export function InvestmentsTable({ person }: { person: PersonFinance }) {
   const sum = (f: (a: AgreementFinance) => number) => rows.reduce((n, a) => n + f(a), 0);
   const all = (a: AgreementFinance) => Math.max(a.units.ordered, a.units.received);
   const left = (a: AgreementFinance) => a.units.in_stock + a.units.in_orders + Math.max(0, a.units.ordered - a.units.received);
-  const other = inv.profit.earned_iqd - sum((a) => a.profit.earned_iqd), otherAvailable = inv.profit.available_iqd - sum((a) => a.profit.available_iqd);
-  const cols = [t.capital, t.share, t.sold, t.left, t.profit, t.profitAvailable, t.capitalReturned];
+  const other = inv.profit.earned_iqd - sum((a) => a.profit.earned_iqd), otherAvailable = inv.profit.available_iqd - sum((a) => a.profit.available_iqd), otherHeld = inv.profit.held_iqd - sum((a) => a.profit.held_iqd);
+  const cols = [t.capital, t.share, t.sold, t.profit, t.returnPct, t.profitAvailable, t.waitingShort, t.capitalReturned];
+  const sold = (n: number, of: number, rest: number) => <span className="fp-units"><span>{t.unitsOf(n, of)}</span>
+    {of > 0 && <span className="fp-meter" aria-hidden="true"><i style={{ width: `${Math.min(100, (n / of) * 100)}%` }} /></span>}
+    <span className="fp-row-meta">{t.unitsLeft(rest)}</span></span>;
+  const pct = (bps: number | null) => <bdi dir="ltr">{percentText(bps, 1)}</bdi>;
+  const capital = sum((a) => a.principal_iqd);
   return <section className="fp-stack" aria-label={t.investTitle}>
     <div><h4>{t.investTitle}</h4><p className="fp-row-meta">{t.investHint}</p></div>
     <div className="fp-ledger-wrap"><table className="fp-ledger fp-cards">
       <thead><tr><th scope="col">{t.item}</th>{cols.map((c) => <th key={c} scope="col">{c}</th>)}</tr></thead>
       <tbody>
         {rows.map((a, i) => <tr key={a.id}>
-          <th scope="row"><strong>{t.invNo(i + 1)}</strong><span className="fp-row-meta">{agreementTitle(a, lang)}</span></th>
+          <th scope="row"><strong>{t.invNo(i + 1)}</strong><span className="fp-row-meta">{agreementTitle(a, lang)}</span><span className="fp-row-meta fp-stage">{stageOf(a, t)}</span></th>
           <td data-label={t.capital}><Money value={a.principal_iqd} /></td>
           <td data-label={t.share}><bdi dir="ltr">{percentText(a.profit_share_bps)}</bdi></td>
-          <td data-label={t.sold}>{t.unitsOf(a.units.sold, all(a))}</td>
-          <td data-label={t.left}>{left(a)}</td>
+          <td data-label={t.sold}>{sold(a.units.sold, all(a), left(a))}</td>
           <td data-label={t.profit}><Money value={a.profit.earned_iqd} /></td>
+          <td data-label={t.returnPct}>{pct(returnBps(a.profit.earned_iqd, a.principal_iqd))}</td>
           <td data-label={t.profitAvailable}><Money value={a.profit.available_iqd} /></td>
+          <td data-label={t.waitingShort} className={a.profit.held_iqd > 0 ? 'fp-ledger-waitcell' : undefined}><Money value={a.profit.held_iqd} /></td>
           <td data-label={t.capitalReturned}><Money value={a.capital.back_from_sales_iqd} /></td>
         </tr>)}
-        {(other !== 0 || otherAvailable !== 0) && <tr>
+        {(other !== 0 || otherAvailable !== 0 || otherHeld !== 0) && <tr>
           <th scope="row"><span className="fp-row-meta">{t.other}</span></th>
-          <td data-label={t.capital} /><td data-label={t.share} /><td data-label={t.sold} /><td data-label={t.left} />
-          <td data-label={t.profit}><Money value={other} /></td><td data-label={t.profitAvailable}><Money value={otherAvailable} /></td><td data-label={t.capitalReturned} />
+          <td data-label={t.capital} /><td data-label={t.share} /><td data-label={t.sold} />
+          <td data-label={t.profit}><Money value={other} /></td><td data-label={t.returnPct} />
+          <td data-label={t.profitAvailable}><Money value={otherAvailable} /></td><td data-label={t.waitingShort}><Money value={otherHeld} /></td><td data-label={t.capitalReturned} />
         </tr>}
         {rows.length > 1 || other !== 0 ? <tr className="fp-ledger-sum">
           <th scope="row">{t.total}</th>
-          <td data-label={t.capital}><Money value={sum((a) => a.principal_iqd)} /></td>
+          <td data-label={t.capital}><Money value={capital} /></td>
           <td data-label={t.share} />
-          <td data-label={t.sold}>{t.unitsOf(sum((a) => a.units.sold), sum(all))}</td>
-          <td data-label={t.left}>{sum(left)}</td>
+          <td data-label={t.sold}>{sold(sum((a) => a.units.sold), sum(all), sum(left))}</td>
           <td data-label={t.profit}><Money value={inv.profit.earned_iqd} /></td>
+          <td data-label={t.returnPct}>{pct(returnBps(inv.profit.earned_iqd, capital))}</td>
           <td data-label={t.profitAvailable}><Money value={inv.profit.available_iqd} /></td>
+          <td data-label={t.waitingShort}><Money value={inv.profit.held_iqd} /></td>
           <td data-label={t.capitalReturned}><Money value={sum((a) => a.capital.back_from_sales_iqd)} /></td>
         </tr> : null}
       </tbody>

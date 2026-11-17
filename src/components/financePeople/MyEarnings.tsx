@@ -6,6 +6,7 @@ import { useFreshOnReturn } from '../../lib/useFreshOnReturn';
 import { investmentReturnStrings, investorReturnView } from '../../lib/investmentReturn';
 import { api, Button, dateLabel, Dialog, EARNINGS, Empty, Feedback, Field, Loading, Money, StateBadge, Surface, useLanguage, useMutation, useRemote, type Withdrawal } from './shared';
 import { PersonCard, PersonSheet, type PersonFinance } from './PersonFinanceView';
+import { personStatementStrings } from '../../lib/personStatementStrings';
 
 type Entry = { id: string; kind: 'staff' | 'investor_profit' | 'investor_capital'; title: string; order_id?: string; day: string; amount_iqd: number; accrued_iqd?: number; paid_iqd: number; held_iqd: number; available_iqd: number; state: string };
 export type EarningsData = {
@@ -48,7 +49,7 @@ export function EarningsSources({ summary, capitalAvailable, onWithdrawCapital }
 
 export default function MyEarnings() {
   const { loc, lang, dir } = useLanguage();
-  const ir = investmentReturnStrings(lang);
+  const ir = investmentReturnStrings(lang), t = personStatementStrings(lang);
   const remote = useRemote<EarningsData>(EARNINGS), op = useMutation();
   const [open, setOpen] = useState(false), [amount, setAmount] = useState<number | null>(null), [balanceType, setBalanceType] = useState<'earnings' | 'capital'>('earnings');
   const [details, setDetails] = useState(false);
@@ -78,10 +79,12 @@ export default function MyEarnings() {
     {!data || !s ? <Loading error={remote.error} retry={remote.load} /> : <>
       <Feedback error={remote.error} />
       {/* The one picture the owner also reads (DECISIONS row 304), then what can be withdrawn now. */}
-      {person && <PersonCard person={person} own onOpen={person.investor?.agreements.length ? () => setDetails(true) : undefined} />}
       <section className="fp-hero"><div><p className="flex items-center gap-2"><Wallet size={17} aria-hidden="true" />{loc('متاح للسحب الآن', 'Available to withdraw now', 'ئێستا بەردەستە بۆ ڕاکێشان')}</p><Money value={balance('earnings') + balance('capital')} />
+        {person && <ul className="fp-hero-facts">{person.work && <li><span>{t.earnedWork}</span><Money value={person.work.earned_iqd} /></li>}{person.investor && <li><span>{t.earnedInvest}</span><Money value={person.investor.profit.earned_iqd} /></li>}{person.combined.held_iqd + person.combined.reserved_iqd > 0 && <li className="fp-hero-wait"><span>{t.waiting}</span><Money value={person.combined.held_iqd + person.combined.reserved_iqd} /></li>}</ul>}
+        {person && <p className="text-xs mt-1">{t.withdrawHint}</p>}
         {returnView.hero_capital_iqd > 0 && <p className="text-xs mt-1">{loc('أرباح', 'Earnings', 'قازانج')} <Money value={balance('earnings')} /> · {ir.heroCapital}: <Money value={returnView.hero_capital_iqd} /></p>}</div>
         <div className="fp-row-actions"><Button variant="primary" icon={<ArrowDownToLine size={17} />} disabled={balance('earnings') <= 0} onClick={() => startWithdrawal('earnings')}>{loc('طلب سحب الأرباح', 'Request withdrawal')}</Button>{balance('capital') > 0 && <Button onClick={() => startWithdrawal('capital')}>{loc('سحب رأس المال', 'Withdraw capital', 'ڕاکێشانی سەرمایە')}</Button>}</div></section>
+      {person && <PersonCard person={person} own onOpen={person.investor?.agreements.length ? () => setDetails(true) : undefined} />}
       {data.employment?.filter((e) => !e.archived && (e.first_earning_day || !e.active || !e.has_rules || (e.reconciliation_state && e.reconciliation_state !== 'complete'))).map((employment, index) => <div className="fp-note" key={index} role="status">
         {employment.first_earning_day && <p>{loc('تُحتسب أجورك على الطلبات المسلّمة من ', 'Delivery earnings start on ')}<strong>{dateLabel(employment.first_earning_day, lang)}</strong>{loc(' بتوقيت بغداد، ضمن الأقسام والمنتجات المحددة لك.', ' in Baghdad time, for your assigned categories and products.')}</p>}
         {!employment.active ? <p>{loc('احتساب الأجور الجديدة متوقف حاليًا. مستحقاتك السابقة محفوظة.', 'New work earnings are paused. Your past earnings are preserved.')}</p>

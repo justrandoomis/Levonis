@@ -150,6 +150,15 @@
 .fp-ledger-wait th { color:var(--ap-warning); }
 .fp-sign { color:var(--ap-text-2); margin-inline-end:2px; }
 .fp-ledger .fp-link { font-weight:600; text-align:start; }
+.fp-units { display:inline-grid; gap:3px; min-width:96px; }
+.fp-meter { display:block; height:4px; border-radius:2px; background:var(--ap-surface-3); overflow:hidden; }
+.fp-meter>i { display:block; height:100%; background:var(--ap-accent); }
+.fp-ledger .fp-stage { color:var(--ap-accent-text); }
+.fp-ledger .fp-ledger-waitcell .fp-money { color:var(--ap-warning); }
+.fp-hero-facts { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-wrap:wrap; gap:6px 18px; font-size:13px; }
+.fp-hero-facts li { display:inline-flex; gap:6px; align-items:baseline; color:var(--ap-text-2); }
+.fp-hero .fp-hero-facts .fp-money { font-size:14px; color:var(--ap-text-1); }
+.fp-hero .fp-hero-wait .fp-money { color:var(--ap-warning); }
 @media (max-width:540px) {
   .fp-flow thead tr,.fp-flow tbody tr { display:grid; grid-template-columns:repeat(var(--cols),minmax(0,1fr)); }
   .fp-flow thead tr>:first-child { display:none; }
@@ -161,5 +170,7 @@
   .fp-cards th,.fp-cards td { border:0; padding:2px 0; text-align:start; white-space:normal; }
   .fp-cards tbody th { grid-column:1 / -1; }
   .fp-cards td:empty { display:none; }
+  .fp-ledger.fp-cards .fp-ledger-sum>* { background:none; border-top:0; }
+  .fp-cards tr.fp-ledger-sum { background:var(--ap-surface-2); border-color:var(--ap-border-strong); }
   .fp-cards td::before { content:attr(data-label); display:block; color:var(--ap-text-2); font-size:11px; }
 }

@@ -81,8 +81,8 @@ test('the three screens draw the one-person card, and the old capital grid is go
   const own = codeOf('src/components/financePeople/MyEarnings.tsx');
   assert.match(own, /<PersonCard person=\{person\} own /);
   assert.match(own, /<PersonSheet person=\{person\} own /);
-  // What can be withdrawn now sits right under the card; the older figures are details.
-  assert.ok(own.indexOf('<PersonCard ') < own.indexOf('fp-hero') && own.indexOf('fp-hero') < own.indexOf('<EarningsSources '));
+  // What can be withdrawn now, with its buttons, comes first; then the card that explains it (owner 2026-11-17; DECISIONS row 342).
+  assert.ok(own.indexOf('fp-hero') < own.indexOf('<PersonCard ') && own.indexOf('<PersonCard ') < own.indexOf('<EarningsSources '));
   const view = codeOf('src/components/financePeople/PersonFinanceView.tsx');
   // Any debt the server reports is drawn (profit, wages, capital) — the old grid showed them (final review).
   for (const debt of [/s\.profitDebt/, /s\.wageDebt/, /s\.capitalDebt/]) assert.match(view, debt);
