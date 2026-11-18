@@ -40,23 +40,31 @@ test('the four fixed slots are gone from /edit-profile', () => {
   assert.ok(!/setPrinter[1-4]\(/.test(src), 'and the state behind them');
 });
 
-test('and nothing stored is deleted — the spread carries it', () => {
+test('and nothing stored is deleted — the profile blob is not written from here', () => {
   /**
-   * This is the whole difference between a move and a data loss. The save
-   * body spreads the existing profile before adding its own keys, so
-   * `printer1`–`printer4` ride along untouched on every save from a screen
-   * that no longer shows them.
+   * This is the whole difference between a move and a data loss. Since
+   * 2026-11-18 this screen sends only what it shows (name, bio, username,
+   * country): no `profile`, no `website`, no `creator_public`. The server
+   * keeps every field a PATCH leaves out, so `printer1`–`printer4`, socials
+   * and the website ride along untouched.
    */
   const src = read('src/pages/EditProfile.tsx');
-  const at = src.indexOf('profile: {');
-  assert.ok(at > 0, 'the profile blob is still written');
-  const body = src.slice(at, at + 400);
-  assert.ok(body.includes('...user.profile'), 'the existing profile is spread FIRST');
-  assert.ok(
-    body.indexOf('...user.profile') < body.indexOf('instagram'),
-    'before the keys this screen owns, so it never overwrites them'
-  );
-  assert.ok(!/\bprinter[1-4],/.test(body), 'and the four are not re-sent');
+  const at = src.indexOf('const body');
+  assert.ok(at > 0, 'the save body is still built');
+  const body = src.slice(at, src.indexOf("api.patch('/api/profile', body)", at));
+  assert.ok(!/\bprofile\s*:/.test(body), 'the profile blob is not sent');
+  assert.ok(!/\bwebsite\b/.test(body), 'nor the website');
+  assert.ok(!/creator_public/.test(body), 'nor the creator switch');
+  const server = read('worker/routes/profile.ts');
+  assert.match(server, /body\.website !== undefined \?.+: user\.website/, 'an omitted website is kept');
+  assert.match(server, /if \(body\.profile !== undefined\)/, 'an omitted profile is kept');
+});
+
+test('website, public page, socials and the store link are off /edit-profile', () => {
+  const src = read('src/pages/EditProfile.tsx');
+  for (const gone of ['Manage my store', '>Website<', '>Socials<', 'creatorPage', 'data-profile-printers', 'InstagramIcon']) {
+    assert.ok(!src.includes(gone), `${gone} is gone`);
+  }
 });
 
 test('the merchant surface it moved to is real, unlimited, and made of facts', () => {

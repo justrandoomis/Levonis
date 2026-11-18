@@ -133,7 +133,7 @@ test('the legacy delete door archives an ordered product instead of deleting it 
   assert.equal(count(raw, "SELECT COUNT(*) AS n FROM community_products WHERE id = 'cpx'"), 1);
 });
 
-test('the community routes write no product rows at all, and the profile editor sends merchants to /merchant', () => {
+test('the community routes write no product rows at all, and merchants reach /merchant from the store CTA', () => {
   const community = readFileSync(join(ROOT, 'worker/routes/community.ts'), 'utf8');
   assert.doesNotMatch(community, /INSERT\s+INTO\s+community_products/i);
   assert.doesNotMatch(community, /DELETE\s+FROM\s+community_products/i);
@@ -141,5 +141,7 @@ test('the community routes write no product rows at all, and the profile editor 
 
   const editProfile = readFileSync(join(ROOT, 'src/pages/EditProfile.tsx'), 'utf8');
   assert.doesNotMatch(editProfile, /import\s+MerchantDashboard\b/, 'the legacy «Merchant Mode» editor is no longer mounted');
-  assert.match(editProfile, /to="\/merchant"/);
+  // The «Manage my store» link left the page on 2026-11-18 (owner); merchants
+  // reach /merchant from the dashboard and the store CTA instead.
+  assert.match(readFileSync(join(ROOT, 'src/components/merchant/StoreCta.tsx'), 'utf8'), /to="\/merchant"/);
 });
