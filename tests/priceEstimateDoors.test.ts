@@ -476,7 +476,7 @@ function filamentShop(raw: DatabaseSync): string {
   return pla;
 }
 
-test('print quotes: a labelled filament prices no material — neither the linked-product rung nor the type rung', async () => {
+test('print quotes: a labelled filament never prices the linked (exact) rung, and still feeds the type rung (row 356)', async () => {
   const raw = freshDb();
   const pla = filamentShop(raw);
   await publishSeededV2(raw);
@@ -488,7 +488,9 @@ test('print quotes: a labelled filament prices no material — neither the linke
   labelEstimate(raw, 'p_fil_pla');
   const after = await loadMaterialPrices(db, null, [pla], { platformDefaults: false });
   assert.equal(after.catalogue?.[pla], undefined, 'no catalogue rung from an estimate');
-  assert.equal(after.platformByType?.PLA, undefined, 'no type rung either');
+  // Owner 2026-11-18 (row 356): the type rung is `platform`, answered as `estimated` ±12%, so an
+  // estimated spool price may feed it — the calculator follows the FDM shelf automatically.
+  assert.ok(Number(after.platformByType?.PLA) > 0, 'the type rung reads the estimated spool');
 });
 
 // ============================================================== deploy-ahead

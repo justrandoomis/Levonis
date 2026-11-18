@@ -312,3 +312,36 @@ test('the picker leads with priced materials and defaults to a priced PLA', asyn
   assert.equal(defaultMaterial([{ id: 'pla', material_type: 'PLA', priced: true }, ...list])?.id, 'pla');
   assert.equal(defaultMaterial([{ id: 'x', material_type: 'ABS', priced: false }])?.id, 'x', 'nothing priced: still a choice');
 });
+
+test('the FDM shelf as it is written: polymer names, glass fill and nylon (owner, 2026-11-18, row 356)', async () => {
+  const { isBuildSpool } = await import('../worker/lib/printQuote/repository');
+  const known = new Set(['ABS', 'ASA', 'PA-CF', 'PC', 'PETG', 'PLA', 'PLA-CF', 'PVA', 'TPU']);
+  const t = (m: string) => productMaterialType(JSON.stringify({ material_type: m }), known);
+  assert.equal(t('Polyvinyl alcohol'), 'PVA');
+  assert.equal(t('acrylonitrile - styrene - acrylate'), 'ASA');
+  assert.equal(t('Acrylonitrile - butadiene - styrene'), 'ABS');
+  assert.equal(t('Acrylonitrile - butadiene - styrene, glass fiber'), '', 'glass-filled ABS is not ABS');
+  assert.equal(t('Nylon 6, glass fiber'), '');
+  assert.equal(t('Nylon 6, carbon fiber'), 'PA-CF');
+  assert.equal(t('PA 12 and other long-chain PA, carbon fiber'), 'PA-CF');
+  assert.equal(t('Nylon'), '', 'the engine holds no plain PA');
+  assert.equal(t('Semi-aromatic Nylon, carbon fiber'), '', 'PPA is not PA6');
+  assert.equal(t('PLA (Polylactic Acid)'), 'PLA');
+  assert.equal(t('PLA Silk+'), 'PLA');
+  for (const n of ['Support for PLA (New Version)', 'Support for ABS', 'Bambu Filament Swatches', 'PLA Basic Color Trial Set', 'PLA Basic Starter Classic Pack', 'PLA CMYK Lithophane Bundle']) {
+    assert.equal(isBuildSpool(n), false, n);
+  }
+  for (const n of ['PETG Matte', 'Bambu Lab PLA Basic Filament 1kg', 'eSUN PLA+ Filament — 1 kg', 'TPU for AMS']) assert.equal(isBuildSpool(n), true, n);
+});
+
+test('a support spool never prices the build material (the estimated case: priceEstimateDoors)', async () => {
+  const { raw } = shopThatSellsFilament();
+  sellFilament(raw, { id: 'fil_petg', type: 'PETG', priceIqd: 20000, netWeight: '1000' });
+  sellFilament(raw, { id: 'fil_sup', type: 'PETG, PET', priceIqd: 5000, netWeight: '500' });
+  raw.prepare("UPDATE products SET name = 'Support for PLA' WHERE id = 'fil_sup'").run();
+  await publishSeededV2(raw);
+  const sources = await loadMaterialPrices(asD1(raw), null, ['petg']);
+  const petg = resolveMaterialPrice({ materialId: 'petg', materialType: 'PETG' }, sources);
+  assert.ok(petg && petg.iqdPerKg >= 19000 && petg.iqdPerKg <= 21000, `PETG from the PETG spool, not the 10,000/kg support (got ${petg?.iqdPerKg})`);
+  assert.equal(petg?.from, 'platform');
+});

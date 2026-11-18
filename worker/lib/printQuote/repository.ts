@@ -379,18 +379,27 @@ export async function loadMaterialPrices(
   // is the provenance that makes `cost.ts` answer `estimated` with a ±12%
   // band rather than `exact` to the dinar.
   if (wantedTypes.size) {
-    // Never an estimated price (0218): a type is priced only from filament whose price the owner confirmed.
-    const { results: filaments } = await runWithEstimateClause(
-      db,
-      `SELECT price_iqd, spec_fields
-         FROM products
-        WHERE ${(await listing(db)).sellable('products')} AND template_family = 'materials' AND price_iqd > 0${estimateClause('products')}
-        LIMIT 500`,
-      (sql) => db.prepare(sql).all<Row>()
-    );
+    // AN ESTIMATED SHELF PRICE COUNTS HERE (owner 2026-11-18, DECISIONS row 356:
+    // «sync the FDM materials to the calculator so the price calculates
+    // automatically»). This rung is `platform`, which cost.ts already answers
+    // as `estimated` with a ±12% band, so an estimated spool price never
+    // reaches the customer as an exact figure. The linked-product rung above,
+    // which can answer `exact`, still refuses a labelled product.
+    const { results: filaments } = await db
+      .prepare(
+        `SELECT name, price_iqd, spec_fields
+           FROM products
+          WHERE ${(await listing(db)).sellable('products')} AND template_family = 'materials' AND price_iqd > 0
+          LIMIT 500`
+      )
+      .all<Row>();
     for (const row of filaments ?? []) {
       const price = num(row.price_iqd);
       if (!(price > 0)) continue;
+      // A support filament, a swatch card or a multi-spool pack is not a kilo
+      // of the build material: «Support for PLA» is PETG-based, a trial set
+      // prices several colours together.
+      if (!isBuildSpool(str(row.name))) continue;
       const grams = netWeightGrams(row.spec_fields);
       if (!(grams > 0)) continue;
       const type = productMaterialType(row.spec_fields, wantedTypes);
@@ -430,7 +439,8 @@ export function productMaterialType(specFields: unknown, known: ReadonlySet<stri
   } catch {
     return '';
   }
-  const normalised = stated.trim().toUpperCase().replace(/\s+/g, ' ');
+  // «Acrylonitrile - butadiene - styrene» → one token per chemical name.
+  const normalised = stated.trim().toUpperCase().replace(/\s+/g, ' ').replace(/\s*-\s*/g, '-');
   if (!normalised) return '';
   if (known.has(normalised)) return normalised;
   // «لا يمكن تسعير هذه المادة» on PLA (owner, 2026-11-18): the one filament the
@@ -444,6 +454,9 @@ export function productMaterialType(specFields: unknown, known: ReadonlySet<stri
   // worse than no number (the PLA-CF rule in tests/materialPricedFromShopFilament).
   // A whole word: «POLYCARBONATE» contains CARBON and is not carbon-filled.
   const carbon = /\bCARBON\b|(^|[\s,/-])CF\b/.test(normalised);
+  // Glass-filled is its own material too («ABS, glass fiber» is not ABS); the
+  // engine holds no -GF type, so it stays unpriced rather than priced as resin.
+  if (/\bGLASS\b|(^|[\s,/-])GF\b/.test(normalised)) return '';
   const head = (normalised.split(/[,/]/)[0] ?? '').trim();
   const firstWord = head.split(' ')[0] ?? '';
   const candidates = [head, firstWord].flatMap((t) => [t, t.replace(/\s*(\+|PLUS)$/, ''), TYPE_NAMES[t] ?? '']);
@@ -455,11 +468,24 @@ export function productMaterialType(specFields: unknown, known: ReadonlySet<stri
   return '';
 }
 
+/** False for a support filament, a swatch card or a multi-spool set / pack / bundle. */
+export function isBuildSpool(name: string): boolean {
+  return !/\bSUPPORT\b|\bSWATCH(ES)?\b|\bTRIAL\b|\bSET\b|\bPACK\b|\bBUNDLE\b|\bSAMPLER?\b|دعم/i.test(name);
+}
+
 /** Product pages name the polymer; the engine holds the code. Same material only. */
 const TYPE_NAMES: Record<string, string> = {
   'POLYLACTIC ACID': 'PLA',
   'THERMOPLASTIC POLYURETHANE': 'TPU',
   POLYCARBONATE: 'PC',
+  'POLYVINYL ALCOHOL': 'PVA',
+  'ACRYLONITRILE-BUTADIENE-STYRENE': 'ABS',
+  'ACRYLONITRILE-STYRENE-ACRYLATE': 'ASA',
+  // Nylon is polyamide; the engine holds no plain PA, so these only ever land as PA-CF.
+  NYLON: 'PA',
+  'NYLON 6': 'PA',
+  PA6: 'PA',
+  PA12: 'PA',
 };
 
 /** The materials template stores net weight as a string: "1000", "1000 g",
