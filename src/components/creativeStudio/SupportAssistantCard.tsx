@@ -88,7 +88,7 @@ function Body({
       <Switch checked={draft.wiki} onChange={(v) => setDraft({ ...draft, wiki: v })} label={w(S.saWiki)} description={w(S.saWikiHint)} disabled={busy} />
       <Switch checked={draft.photos} onChange={(v) => setDraft({ ...draft, photos: v })} label={w(S.saPhotos)} description={w(S.saPhotosHint)} disabled={busy} />
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label={w(S.saDaily)}><Input type="number" ltr min={1} max={5000} value={draft.daily_turns} onChange={(e) => setDraft({ ...draft, daily_turns: num(e.target.value) })} /></Field>
+        <Field label={w(S.saDaily)}><Input type="number" ltr min={1} max={1000000} value={draft.daily_turns} onChange={(e) => setDraft({ ...draft, daily_turns: num(e.target.value) })} /></Field>
         <Field label={w(S.saGuestShare)}><Input type="number" ltr min={0} max={100} value={draft.guest_share_pct} onChange={(e) => setDraft({ ...draft, guest_share_pct: num(e.target.value) })} /></Field>
       </div>
       <div>

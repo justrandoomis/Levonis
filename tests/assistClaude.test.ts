@@ -35,7 +35,7 @@ test('the switch reads off from anything that is not a clear decision', () => {
   for (const v of [null, '', 'nope', '[]', '{"enabled":"true","model":"m-1"}', '{"enabled":true}', '{"enabled":true,"model":"https://x"}']) {
     assert.equal(assistAiFromSetting(v).enabled, false, String(v));
   }
-  const on = assistAiFromSetting(JSON.stringify({ enabled: true, model: 'model-a', daily_turns: 99999, guest_share_pct: -1 }));
+  const on = assistAiFromSetting(JSON.stringify({ enabled: true, model: 'model-a', daily_turns: 1_000_001, guest_share_pct: -1 }));
   assert.equal(on.enabled, true);
   assert.equal(on.daily_turns, ASSIST_AI_OFF.daily_turns, 'an out-of-range cap falls back to the default');
   assert.equal(on.guest_share_pct, ASSIST_AI_OFF.guest_share_pct);

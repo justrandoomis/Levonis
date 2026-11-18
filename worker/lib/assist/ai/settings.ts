@@ -32,7 +32,7 @@ export interface AssistAiSettings {
 }
 
 export const DAILY_TURNS_DEFAULT = 300;
-export const DAILY_TURNS_MAX = 5000;
+export const DAILY_TURNS_MAX = 1_000_000;
 export const GUEST_SHARE_DEFAULT = 50;
 
 export const ASSIST_AI_OFF: AssistAiSettings = Object.freeze({
