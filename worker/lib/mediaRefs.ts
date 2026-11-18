@@ -925,6 +925,8 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
   'order_items.warranty_snapshot': 'the warranty as sold',
   'order_items.services_snapshot': 'the printer services as sold (choices, fees, months); no media',
   'care_claim_benefits.quote_json': 'a Levo Care repair quote (part keys, prices); no media',
+  // 0244 — the monthly Levo Care draw: the user ids passed over this month (a JSON list of ids).
+  'care_draws.passed_user_ids': 'user ids passed over in a month of the Levo Care draw; no media',
   // 0234 — the warehouse's work for a printer line: codes and staff notes.
   'order_service_tasks.kind': 'a task kind code; no media',
   'order_service_tasks.choice': 'a service choice code; no media',

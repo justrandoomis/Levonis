@@ -386,6 +386,11 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
         </div>
       ) : null}
 
+      {/* What Levo Care includes, wherever it is on sale (DECISIONS row 359): one calm line. */}
+      {offer.care ? (
+        <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary" data-packages-care-includes>{s.care} — {s.careIncludes(offer.care.max_discount_pct ?? 90)}</p>
+      ) : null}
+
       {standing ? (
         <p role="alert" className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 text-[12px] text-text-primary" data-packages-blocked>{standing}</p>
       ) : attention && missing ? (

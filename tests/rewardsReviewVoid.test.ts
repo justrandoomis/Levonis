@@ -574,5 +574,5 @@ test('policy 8.16 and 8.5 say it in three languages', async () => {
   assert.match(rewards.body.ar, /### 8\.16 [^\n]*\n[^\n]*ويسري عليها الفصل الثالث عشر\. فإن أُلغي الطلب الذي طُلبت فيه هذه الهدية قبل تسليمها أُلغيت الهدية معه، ولا يمكن طلبها مرة أخرى\./);
   assert.match(rewards.body.en, /### 8\.16 [^\n]*\n[^\n]*chapter 13 applies to it\. If the order holding such a gift is cancelled before the gift is delivered, the gift is cancelled with it and cannot be ordered again\./);
   assert.match(rewards.body.ckb, /### 8\.16 [^\n]*\n[^\n]*بەسەردا دەسەپێت\. ئەگەر ئەو داواکارییەی ئەم دیارییەی تێدا داوا کراوە پێش گەیاندنی هەڵبوەشێنرێتەوە، دیارییەکەش لەگەڵیدا هەڵدەوەشێنرێتەوە و ناتوانرێت دووبارە داوا بکرێتەوە\./);
-  assert.equal(rewards.version, 8, 'the unpublished version 8, not a ninth');
+  assert.equal(rewards.version, 9, 'version 9 (Levo Care, DECISIONS row 359) keeps these sentences word for word');
 });

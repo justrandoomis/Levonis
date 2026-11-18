@@ -174,7 +174,7 @@ test('R3: the minimum counts, and every text of the rule says so — «من … 
 
 test('policy v8: 14.10 returns a withdrawn coupon’s points and 7.8 pays a refused printer review, in three languages', async () => {
   const { rewards } = await import('../worker/lib/policies/rewards');
-  assert.equal(rewards.version, 8, 'the unpublished version 8, not a ninth');
+  assert.equal(rewards.version, 9, 'version 9 (Levo Care, DECISIONS row 359) keeps these sentences word for word');
   assert.match(rewards.body.ar, /### 14\.10 متى تعود النقاط المستبدلة\n.*وإذا سحب المتجر كوبوناً استُبدل بالنقاط قبل أن يُستعمل وقبل انتهاء صلاحيته عادت نقاطه إلى صاحبه مرة واحدة/);
   assert.match(rewards.body.en, /### 14\.10 When exchanged points return\n.*If the Store withdraws a coupon exchanged for points before it is used and before it expires, its points return to its holder once/);
   assert.match(rewards.body.ckb, /### 14\.10 کەی خاڵی گۆڕدراو دەگەڕێتەوە\n.*خاڵەکانی یەک جار بۆ خاوەنەکەی دەگەڕێنەوە/);

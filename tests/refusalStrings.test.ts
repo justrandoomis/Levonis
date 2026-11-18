@@ -259,6 +259,8 @@ test('every code the table translates is one the server can actually emit', () =
     // Printer services phase 3 (row 347): Levo Care claims and a claim's money — CARE_* and CLAIM_COST_*.
     'worker/lib/careClaims.ts',
     'worker/routes/deviceCare.ts',
+    // The monthly Levo Care draw (row 359; migration 0244): CARE_DRAW_*, thrown from the admin's rewards routes.
+    'worker/lib/careDraw.ts',
     // «ملف بيانات المنتج» (row 204): the round trip's DATA_FILE_* refusals,
     // rendered by code on the sheet (packages/contracts/src/dataFileRefusals.ts).
     'worker/routes/templateDataFile.ts',

@@ -2364,6 +2364,67 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The Levo Care discount on this order changed since the total was shown (the offer ended, was revoked or was used). Nothing was placed — review the new total and confirm again.',
     ckb: 'داشکاندنی لیڤۆ کێر لەسەر ئەم داواکارییە لەو کاتەوەی کۆی گشتی پیشان درا گۆڕاوە (پێشنیارەکە کۆتایی هاتووە، هەڵوەشێنراوەتەوە یان بەکارهاتووە). هیچ شتێک تۆمار نەکرا — سەیری کۆی نوێ بکە و دووبارە پشتڕاستی بکەرەوە.',
   },
+  // ---- phase 5b: the monthly Levo Care draw (DECISIONS row 359; migration 0244; worker/lib/careDraw.ts)
+  CARE_DRAW_NOT_INSTALLED: {
+    ar: 'سحب ليفو كير غير مفعّل بعد على قاعدة البيانات.',
+    en: 'The Levo Care draw is not set up on the database yet.',
+    ckb: 'تیروپشکی لیڤۆ کێر هێشتا لە بنکەدراوەکەدا ئامادە نەکراوە.',
+  },
+  CARE_DRAW_EXISTS: {
+    ar: 'لهذا الشهر سحب مسجَّل بالفعل — حدّث الصفحة.',
+    en: 'This month already has a draw — reload the page.',
+    ckb: 'ئەم مانگە پێشتر تیروپشکێکی تۆمارکراوی هەیە — لاپەڕەکە نوێ بکەرەوە.',
+  },
+  CARE_DRAW_NOT_PROPOSED: {
+    ar: 'هذا السحب لم يعد بانتظار التأكيد (أُكِّد أو تُخطّي) — حدّث الصفحة.',
+    en: 'This draw is no longer waiting for confirmation (it was confirmed or skipped) — reload the page.',
+    ckb: 'ئەم تیروپشکە چیتر چاوەڕێی پشتڕاستکردنەوە نییە (پشتڕاستکراوەتەوە یان تێپەڕێنراوە) — لاپەڕەکە نوێ بکەرەوە.',
+  },
+  CARE_DRAW_CHANGED: {
+    ar: 'تغيّر الاسم المقترح منذ فتحت الصفحة — حدّثها وراجع الاسم الجديد قبل التأكيد.',
+    en: 'The proposed name changed since you opened the page — reload and review the new name before confirming.',
+    ckb: 'ناوە پێشنیارکراوەکە لەو کاتەوەی لاپەڕەکەت کردەوە گۆڕاوە — نوێی بکەرەوە و پێش پشتڕاستکردنەوە سەیری ناوە نوێیەکە بکە.',
+  },
+  CARE_DRAW_WINNER_INELIGIBLE: {
+    ar: 'الاسم المقترح لم يعد لديه ليفو كير سارٍ (انتهى أو أُرجع الجهاز أو انتقل) — اسحب اسماً آخر.',
+    en: 'The proposed winner no longer holds an active Levo Care (it ended, the device was returned or it changed hands) — draw another name.',
+    ckb: 'ناوە پێشنیارکراوەکە چیتر لیڤۆ کێری کارای نییە (کۆتایی هاتووە، ئامێرەکە گەڕێنراوەتەوە یان گواستراوەتەوە) — ناوێکی تر ڕابکێشە.',
+  },
+  CARE_DRAW_NO_OTHER_CANDIDATE: {
+    ar: 'لا يوجد مشترك آخر مؤهل لهذا الشهر — أكّد الاسم الحالي أو تخطَّ الشهر.',
+    en: 'No other eligible holder this month — confirm the current name or skip the month.',
+    ckb: 'هیچ بەشداربوویەکی تری شیاو بۆ ئەم مانگە نییە — ناوی ئێستا پشتڕاست بکەرەوە یان مانگەکە تێپەڕێنە.',
+  },
+  CARE_DRAW_REASON_REQUIRED: {
+    ar: 'اكتب السبب (5 أحرف على الأقل) — يُحفظ في سجل التدقيق.',
+    en: 'Write the reason (at least 5 characters) — it is kept in the audit log.',
+    ckb: 'هۆکارەکە بنووسە (لانیکەم 5 پیت) — لە تۆماری وردبینیدا هەڵدەگیرێت.',
+  },
+  CARE_DRAW_PRIZE_INVALID: {
+    ar: 'هذه الجائزة لا تُمنح كهدية: اختر منتجاً منشوراً مع موديله ولونه، والكمية من 1 إلى 10.',
+    en: 'This prize cannot be granted as a gift: pick a product on sale with its model and colour, and a quantity from 1 to 10.',
+    ckb: 'ئەم خەڵاتە وەک دیاری نادرێت: بەرهەمێکی بڵاوکراوە لەگەڵ مۆدێل و ڕەنگەکەی هەڵبژێرە، و ژمارە لە 1 تا 10.',
+  },
+  CARE_DRAW_PRIZE_OUT_OF_STOCK: {
+    ar: 'الكمية المتوفرة الآن من هذه الجائزة أقل من الكمية المختارة — قلّل الكمية أو اختر منتجاً آخر. لم يُمنح شيء.',
+    en: 'Fewer units of this prize are available now than the quantity chosen — lower the quantity or pick another product. Nothing was granted.',
+    ckb: 'ئەو ژمارەیەی ئێستا لەم خەڵاتە بەردەستە کەمترە لەو ژمارەیەی هەڵبژێردراوە — ژمارەکە کەم بکەرەوە یان بەرهەمێکی تر هەڵبژێرە. هیچ شتێک نەدرا.',
+  },
+  CARE_DRAW_MONTH_PASSED: {
+    ar: 'انتهى شهر هذا السحب دون تأكيد، فلا يُؤكَّد ولا يُعاد سحبه الآن. سحب الشهر الحالي هو المعروض.',
+    en: 'This draw’s month ended without a confirmation, so it can no longer be confirmed or redrawn. The current month’s draw is the one on screen.',
+    ckb: 'مانگی ئەم تیروپشکە بەبێ پشتڕاستکردنەوە کۆتایی هات، بۆیە ئێستا نە پشتڕاست دەکرێتەوە و نە دووبارە ڕادەکێشرێت. تیروپشکی مانگی ئێستا ئەوەیە کە پیشان دراوە.',
+  },
+  CARE_DRAW_NOT_CONFIRMED: {
+    ar: 'تُلغى جائزة سحب مؤكَّد فقط — حدّث الصفحة.',
+    en: 'Only a confirmed draw’s prize can be cancelled — reload the page.',
+    ckb: 'تەنها خەڵاتی تیروپشکێکی پشتڕاستکراو هەڵدەوەشێنرێتەوە — لاپەڕەکە نوێ بکەرەوە.',
+  },
+  CARE_DRAW_PRIZE_REDEEMED: {
+    ar: 'استرد الفائز جائزته أو طلبها، فلا تُلغى من هنا.',
+    en: 'The winner already redeemed or ordered the prize, so it cannot be cancelled from here.',
+    ckb: 'براوەکە خەڵاتەکەی وەرگرتووەتەوە یان داوای کردووە، بۆیە لێرەوە هەڵناوەشێنرێتەوە.',
+  },
   CARE_PART_COUPON_MANAGED: {
     ar: 'هذا الكوبون يحمل عرض قطعة ليفو كير — ألغِ العرض من مطالبته في مكتب الضمان.',
     en: 'This coupon carries a Levo Care part offer — revoke the offer from its claim on the warranty desk.',

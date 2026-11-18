@@ -30,6 +30,7 @@ const STOPPED: Readonly<Record<PrinterStopped, CopyKey>> = {
   traded_in: 'printers.stopped.traded_in',
   in_shop: 'printers.stopped.in_shop',
   programme_off: 'printers.stopped.programme_off',
+  no_care: 'printers.stopped.no_care',
 };
 
 export function PrintersBlock({ read }: { read: Read<RewardPrintersData> }) {

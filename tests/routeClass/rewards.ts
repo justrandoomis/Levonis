@@ -9,6 +9,7 @@
  * competition's prizes give value to a person: `money` ('gift_grant').
  * Withdrawing a coupon, cancelling a competition (every entry fee comes back)
  * and writing a draft give nothing away: `op`. No route here reads a cost.
+ * The monthly Levo Care draw (0244, row 359) is the owner's to run and confirm: `owner`.
  * The products of the points shop (DECISIONS row 299) add no route: their rows are in
  * `PUT /config`, the owner's, and `GET /config` says what each is, at its retail value.
  */
@@ -46,6 +47,16 @@ export default {
         'GET /competitions/:id/entries': 'op',
         'POST /competitions/:id/entries/:entryId/disqualify': { cls: 'op', noBody: 'refuses one entry by id; needs an entry the role fixture does not seed' },
         'POST /competitions/:id/finish': 'money',
+        // 0244 — the monthly Levo Care draw (DECISIONS row 359): any admin reads it (names, no cost); drawing, drawing
+        // another name, skipping and confirming (which grants the gift) are the owner's alone — «I confirm each month».
+        'GET /care-draws': 'op',
+        'POST /care-draws/draw': 'owner',
+        'POST /care-draws/:id/redraw': 'owner',
+        'POST /care-draws/:id/skip': 'owner',
+        'POST /care-draws/:id/confirm': 'owner',
+        'POST /care-draws/:id/void': 'owner',
+        // Is a prize giftable and how many units are sellable now: stock counts, no cost.
+        'GET /care-draws/prize-check': 'op',
         // 0227 — the points mission's video ads: what every customer is shown and paid for is the owner's act.
         'GET /ads': 'op',
         'POST /ads': 'owner',

@@ -66,7 +66,7 @@ export interface RewardCouponPrinter {
 }
 
 /** Why a printer earns nothing: the server's own list (worker/lib/rewards/earning.ts). */
-export type PrinterStopped = 'warranty_closed' | 'warranty_over' | 'returned' | 'traded_in' | 'in_shop' | 'programme_off';
+export type PrinterStopped = 'warranty_closed' | 'warranty_over' | 'returned' | 'traded_in' | 'in_shop' | 'programme_off' | 'no_care';
 
 /** One of the customer's printers and what it earns: GET /api/rewards/program/printers. */
 export interface RewardPrinter {

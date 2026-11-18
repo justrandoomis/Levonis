@@ -64,6 +64,7 @@ import {
 import {
   SLOT_IS_PRINTER_SQL,
   SLOT_SOLD_HERE_SQL,
+  slotCareSql,
   slotInShopSql,
   slotInsideMonthsSql,
   slotJoins,
@@ -238,7 +239,8 @@ export interface PrinterUnit {
  * Every printer UNIT a delivered order bought, one per physical printer.
  * The predicate is the one docs and the device projection use: a product line,
  * not a gift, not a bundle parent (its printer component line counts), placed
- * in a printer catalog.
+ * in a printer catalog — and, sold through the printer services, sold with Levo
+ * Care (`slotCareSql`, DECISIONS row 359): a serviced line without it earns nothing.
  */
 export async function printerUnitsOfOrder(db: D1Database, orderId: string): Promise<PrinterUnit[]> {
   const { results } = await db
@@ -251,6 +253,7 @@ export async function printerUnitsOfOrder(db: D1Database, orderId: string): Prom
           AND NOT EXISTS (SELECT 1 FROM order_items k WHERE k.bundle_parent_item_id = oi.id)
           AND EXISTS (SELECT 1 FROM product_catalogs pc JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
                        WHERE pc.product_id = oi.product_id)
+          AND ${slotCareSql()}
         ORDER BY oi.rowid`
     )
     .bind(orderId)
@@ -479,6 +482,7 @@ export async function issueWeeklyRewards(env: Env, startedAt: string, nowIso: st
           AND ${slotInShopSql()} IS NULL
           AND ${slotNotRefundedSql()}
           AND ${SLOT_IS_PRINTER_SQL}
+          AND ${slotCareSql()}
         LIMIT ?4`
     )
     .bind(nowIso, startedAt, config.weekly.months, WEEKLY_UNIT_LIMIT)

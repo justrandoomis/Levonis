@@ -129,7 +129,8 @@ import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
 import { MAINTENANCE_ROOT_ID, maintenanceFor } from '../lib/printerFits';
 import { warranty as WARRANTY_POLICY } from '../lib/policies/warranty';
-import { careBenefitOf, careClaimsInstalled, careEntitlements, carePublic, careQuotePublic, careRefusal, claimMoneySummaries } from '../lib/careClaims';
+import { careBenefitOf, careClaimsInstalled, careEntitlements, carePublic, careQuotePublic, careRefusal, claimMoneySummaries, type CareEntitlement } from '../lib/careClaims';
+import { carePerksFor } from '../lib/careDraw';
 import { carePartGrantsInstalled, grantsOfClaim, liveOfferCounts } from '../lib/carePartGrants';
 import { partGrantViews, type PartGrantPublic } from '../lib/carePartGrantViews';
 import { careApprovalPending, careVoidOnReject, mountDeviceCareRoutes, partOffersRevokeOnReject } from './deviceCare';
@@ -660,7 +661,15 @@ deviceRoutes.get('/mine', async (c) => {
   // null on a device without Care, and on every device of a database without 0236.
   // A device the user transferred away (still linked, owned by someone else) shows no Care: Care is the holder's.
   const held = results.filter((r) => r.owner_user_id === user.id);
-  const care = held.length && (await careClaimsInstalled(c.env.DB)) ? await careEntitlements(c.env.DB, held.map((r) => r.id)) : new Map();
+  const care: Map<string, CareEntitlement> = held.length && (await careClaimsInstalled(c.env.DB)) ? await careEntitlements(c.env.DB, held.map((r) => r.id)) : new Map();
+  // Phase 5b (DECISIONS row 359): what else Levo Care includes — until when the weekly coupons run, and this
+  // month's draw. null without a Care in force; a failed read never costs the page its devices.
+  const carePerks = care.size
+    ? await carePerksFor(c.env.DB, user.id, care).catch((e) => {
+        console.error('care perks not read', e instanceof Error ? e.message : String(e));
+        return null;
+      })
+    : null;
   return c.json({
     success: true,
     devices: results.map((r) => {
@@ -672,6 +681,7 @@ deviceRoutes.get('/mine', async (c) => {
         care: r.owner_user_id === user.id ? carePublic(care.get(r.id)) : null,
       };
     }),
+    care_perks: carePerks,
     maintenance_path: idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null,
     // The PRO membership's warranty perk: priority service on claims. Read
     // here so the page can say it without a second request.

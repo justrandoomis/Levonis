@@ -693,10 +693,14 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
 
         {row('care', <Heart className="w-5 h-5" aria-hidden="true" />, s.care, s.careSub(offer.care?.max_discount_pct ?? 90),
           draft.care === 'c12' ? shown(priceOf(offer.care?.c12)) : s.none,
-          choice(s.care, [
-            { id: 'none' as const, label: s.none, price: 0 },
-            { id: 'c12' as const, label: s.careOption(draft.warranty === 'w24' ? 36 : draft.warranty === 'w12' ? 24 : 12), price: priceOf(offer.care?.c12) },
-          ], draft.care, (v) => set({ care: v })), !offer.care)}
+          <>
+            {choice(s.care, [
+              { id: 'none' as const, label: s.none, price: 0 },
+              { id: 'c12' as const, label: s.careOption(draft.warranty === 'w24' ? 36 : draft.warranty === 'w12' ? 24 : 12), price: priceOf(offer.care?.c12) },
+            ], draft.care, (v) => set({ care: v }))}
+            {/* What Care includes (DECISIONS row 359): the parts discount, the weekly coupons, the monthly draw. */}
+            <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary" data-sheet-care-includes>{s.careIncludes(offer.care?.max_discount_pct ?? 90)}</p>
+          </>, !offer.care)}
 
         {/* Phase 2: the membership bought WITH the printer — its own order line at the live plan price. */}
         {row('membership', <Crown className="w-5 h-5" aria-hidden="true" />, s.membership, s.membershipSub,

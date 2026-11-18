@@ -157,8 +157,20 @@ export interface EligibleUnit extends Device {
 
 export type MembershipTier = 'free' | 'plus' | 'prime' | 'pro';
 
+/**
+ * What else Levo Care includes for this customer (phase 5b, DECISIONS row 359): until when the weekly coupons of
+ * each Care device run, and this month's draw. null without a Care in force; absent from an older server.
+ */
+export interface CarePerks {
+  weekly_coupons_until: string | null;
+  weekly_coupons_by_unit?: Record<string, string>;
+  /** null on a database without the draw. `won` only for the CONFIRMED winner of the month. */
+  draw: { month: string; won: boolean; prize: { name: string; name_ar: string; name_ku: string; qty: number } | null; gift_id: string | null } | null;
+}
+
 export interface MineResponse {
   devices: Device[];
+  care_perks?: CarePerks | null;
   priority_service: boolean;
   /** 0148 — `/categories/maintenance-parts/all`, or null when the section is not in the tree. */
   maintenance_path?: string | null;

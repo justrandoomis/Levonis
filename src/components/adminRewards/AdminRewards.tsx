@@ -14,6 +14,8 @@
  *               filaments it covers), how long a coupon lasts, and what the
  *               points shop charges and sells (./RewardsShopProducts). The owner's
  *               to save: the server refuses everyone else (OWNER_REQUIRED).
+ *   سحب ليفو كير the monthly Levo Care draw: the proposed name, the prize, the owner's
+ *               confirmation (./AdminCareDraw, migration 0244, DECISIONS row 359).
  *   الإعلانات   the video ads of «شاهد إعلانًا» (AdminAds.tsx, migration 0227).
  *
  * Nothing here decides money: each figure is validated and applied by the
@@ -34,6 +36,8 @@ import RewardsPrinters from './RewardsPrinters';
 import { shopProductRefusal, type ShopProductRow, type ShopProductView } from './shopProductWords';
 
 const RewardsShopProducts = lazy(() => import('./RewardsShopProducts'));
+// The monthly Levo Care draw (0244, DECISIONS row 359): its own chunk, loaded when its tab is opened.
+const AdminCareDraw = lazy(() => import('./AdminCareDraw'));
 
 type Tri = { ar: string; en: string; ckb: string };
 type Kind = 'free_shipping' | 'filament_discount';
@@ -65,13 +69,13 @@ export default function AdminRewards() {
         </h2>
         <p className="text-text-secondary text-xs mt-1">
           {loc(
-            'تصدر كل أسبوع لكل طابعة تحت الضمان، والزبون يراها في صفحة المكافآت ويطبّقها من سلته.',
-            'Issued every week for each printer under warranty; the customer sees them on the Rewards page and applies them from the cart.',
-            'هەموو هەفتەیەک بۆ هەر چاپکەرێکی ژێر گەرەنتی دەردەچن، و کڕیار لە پەڕەی خەڵاتەکان دەیانبینێت و لە سەبەتەکەیەوە جێبەجێیان دەکات.'
+            'تصدر كل أسبوع لكل طابعة بيعت مع ليفو كير، 12 شهرًا من تسليمها (والطابعات المباعة قبل خدمات الطابعة تكمل مدتها). الزبون يراها في صفحة المكافآت ويطبّقها من سلته.',
+            'Issued every week for each printer sold with Levo Care, for 12 months from its delivery (printers sold before the printer services finish their own period). The customer sees them on the Rewards page and applies them from the cart.',
+            'هەموو هەفتەیەک بۆ هەر چاپکەرێک دەردەچن کە لەگەڵ لیڤۆ کێر فرۆشرابێت، 12 مانگ لە گەیاندنییەوە (ئەو چاپکەرانەی پێش خزمەتگوزارییەکانی چاپکەر فرۆشراون ماوەی خۆیان تەواو دەکەن). کڕیار لە پەڕەی خەڵاتەکان دەیانبینێت و لە سەبەتەکەیەوە جێبەجێیان دەکات.'
           )}
         </p>
       </div>
-      {/* Six names: two rows of three on a phone, one row from about 700 px. Nothing is cut or scrolled away, and every tab is 44 px. Inline: the stylesheet pays nothing. */}
+      {/* Seven names: rows of three on a phone, one row from about 700 px. Nothing is cut or scrolled away, and every tab is 44 px. Inline: the stylesheet pays nothing. */}
       <Segmented
         value={view}
         onChange={(v) => setView(v as typeof view)}
@@ -82,6 +86,7 @@ export default function AdminRewards() {
           { id: 'printers', label: loc('الطابعات', 'Printers', 'چاپکەران') },
           { id: 'coupons', label: loc('الكوبونات', 'Coupons', 'کۆپۆنەکان') },
           { id: 'competitions', label: loc('المسابقات', 'Contests', 'پێشبڕکێ') },
+          { id: 'care_draw', label: loc('سحب ليفو كير', 'Care draw', 'تیروپشکی کێر') },
           { id: 'ads', label: loc('الإعلانات', 'Ads', 'ڕیکلامەکان') },
           { id: 'settings', label: loc('الإعدادات', 'Settings', 'ڕێکخستن') },
         ]}
@@ -98,6 +103,11 @@ export default function AdminRewards() {
       )}
       {view === 'coupons' && <RewardsCoupons customer={customer} onClearCustomer={() => setCustomer(null)} />}
       {view === 'competitions' && <AdminCompetitions />}
+      {view === 'care_draw' && (
+        <Suspense fallback={<p className="text-text-secondary text-sm">{loc('جارٍ التحميل…', 'Loading…', 'بار دەکرێت…')}</p>}>
+          <AdminCareDraw />
+        </Suspense>
+      )}
       {view === 'ads' && <AdminAds />}
       {view === 'settings' && <SettingsPanel />}
     </div>
@@ -134,12 +144,12 @@ export function weeklyEarnSummary(
   if (!cfg.enabled || parts.length === 0) return say('لا تصدر كوبونات بهذه الإعدادات.', 'No coupons are issued on these settings.', 'بەم ڕێکخستنانە هیچ کۆپۆنێک دەرناچێت.');
   const what = parts.join(say(' و', ' and ', ' و '));
   const days = countText('days', cfg.valid_days, lang);
-  if (!cfg.weekly.enabled) return say(`كل طابعة تكسب عند تسليمها فقط: ${what}، صالحة ${days}.`, `Each printer earns on delivery only: ${what}, valid ${days}.`, `هەر چاپکەرێک تەنها لە کاتی گەیاندن بەدەستی دەهێنێت: ${what}، ${days} بەکاردێت.`);
+  if (!cfg.weekly.enabled) return say(`كل طابعة بيعت مع ليفو كير تكسب عند تسليمها فقط: ${what}، صالحة ${days}.`, `Each printer sold with Levo Care earns on delivery only: ${what}, valid ${days}.`, `هەر چاپکەرێک کە لەگەڵ لیڤۆ کێر فرۆشرابێت تەنها لە کاتی گەیاندن بەدەستی دەهێنێت: ${what}، ${days} بەکاردێت.`);
   const months = countText('months', cfg.weekly.months, lang);
   return say(
-    `كل طابعة تكسب كل أسبوع: ${what}، طوال ${months} من ضمانها، صالحة ${days}.`,
-    `Each printer earns every week: ${what}, for ${months} of its warranty, valid ${days}.`,
-    `هەر چاپکەرێک هەموو هەفتەیەک بەدەستی دەهێنێت: ${what}، بۆ ماوەی ${months} لە گەرەنتییەکەی، ${days} بەکاردێت.`
+    `كل طابعة بيعت مع ليفو كير تكسب كل أسبوع: ${what}، طوال ${months} من تسليمها، صالحة ${days}.`,
+    `Each printer sold with Levo Care earns every week: ${what}, for ${months} from its delivery, valid ${days}.`,
+    `هەر چاپکەرێک کە لەگەڵ لیڤۆ کێر فرۆشرابێت هەموو هەفتەیەک بەدەستی دەهێنێت: ${what}، بۆ ماوەی ${months} لە گەیاندنییەوە، ${days} بەکاردێت.`
   );
 }
 
@@ -243,10 +253,10 @@ function SettingsPanel() {
         </label>
         <label className="flex items-center gap-2 text-sm text-text-primary self-end">
           <input type="checkbox" checked={cfg.weekly.enabled} onChange={(e) => set((c) => ((c.weekly.enabled = e.target.checked), c))} />
-          {loc('كوبونات جديدة كل أسبوع طوال ضمان الطابعة', 'New coupons every week through the printer’s warranty', 'کۆپۆنی نوێ هەموو هەفتەیەک بە درێژایی گەرەنتی چاپکەر')}
+          {loc('كوبونات جديدة كل أسبوع لطابعات ليفو كير', 'New coupons every week for Levo Care printers', 'کۆپۆنی نوێ هەموو هەفتەیەک بۆ چاپکەرەکانی لیڤۆ کێر')}
         </label>
         <div>
-          <label className={label} htmlFor="rw-months">{loc('أقصى مدة من ضمانها (أشهر)', 'At most, of its warranty (months)', 'زۆرترین ماوە لە گەرەنتییەکەی (مانگ)')}</label>
+          <label className={label} htmlFor="rw-months">{loc('المدة من تسليم الطابعة (أشهر)', 'Period from the printer’s delivery (months)', 'ماوە لە گەیاندنی چاپکەرەوە (مانگ)')}</label>
           <input id="rw-months" className="lv-input text-sm" dir="ltr" type="number" min={1} max={60} value={cfg.weekly.months}
             onChange={(e) => set((c) => ((c.weekly.months = Math.min(60, Math.max(1, Math.trunc(Number(e.target.value) || 1)))), c))} />
         </div>

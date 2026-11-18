@@ -1,12 +1,16 @@
 import { useId, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ChevronDown, BadgePercent } from 'lucide-react';
 import type { Language } from '../../translations';
 import { formatMoney } from '../../lib/money';
-import type { CarePublic } from './types';
+import type { CarePerks, CarePublic } from './types';
 import { careText, fmtCount, fmtDate } from './types';
 import type { CareStrings } from './strings';
 import { StatusChip } from '../ui/Badge';
-import { FOCUS } from './ui';
+import { FOCUS, LINK_QUIET } from './ui';
+
+/** A link inside the perks list: a 44 px target, like every link of the card. */
+const PERK_LINK = LINK_QUIET.replace('min-h-[32px]', 'min-h-[44px]');
 
 /**
  * «ليفو كير» on a printer: what it IS (a discount on the part you need, never
@@ -14,13 +18,24 @@ import { FOCUS } from './ui';
  * (the discount, the requests, the money), and — folded — the terms it was
  * bought under. Only what the server sends is said; a field an older server
  * leaves out is not.
+ *
+ * «ما يشمله ليفو كير» (DECISIONS row 359) — while Care runs: the discount on parts,
+ * the weekly coupons with the day they end for THIS device (delivery + 12 months,
+ * the server's date) and the monthly draw, said as a chance. The confirmed winner
+ * of the month reads one clear line with the way to his gift.
  */
 export function CarePanel({
   care,
   warrantyActive,
   lang,
   c,
+  perks = null,
+  couponsUntil = null,
 }: {
+  /** What else Care includes for this customer (GET /api/devices/mine `care_perks`); null from an older server. */
+  perks?: CarePerks | null;
+  /** The day this device's weekly coupons end, or null when the programme issues none. */
+  couponsUntil?: string | null;
   care: CarePublic;
   /** The warranty still runs: Care then serves damage from use only. */
   warrantyActive: boolean;
@@ -49,6 +64,10 @@ export function CarePanel({
   const parts = (care.eligible_parts ?? []).map((p) => careText(p.label, lang)).filter(Boolean);
   const exclusions = (care.exclusions ?? []).map((x) => careText(x, lang)).filter(Boolean);
   const hasTerms = care.discount_pct != null || parts.length > 0 || exclusions.length > 0;
+  const inForce = active || care.state === 'terms_missing';
+  const couponsRun = !!couponsUntil && Date.parse(couponsUntil) > Date.now();
+  const prize = perks?.draw?.won && perks.draw.prize ? perks.draw.prize : null;
+  const prizeName = prize ? (lang === 'en' ? prize.name || prize.name_ar : lang === 'ckb' ? prize.name_ku || prize.name_ar || prize.name : prize.name_ar || prize.name) : '';
 
   return (
     <section className="rounded-xl border border-border-subtle p-3" data-device-care={care.state}>
@@ -70,6 +89,37 @@ export function CarePanel({
         </ul>
       )}
       {active && <p className="mt-2 text-[12px] leading-relaxed text-text-muted">{warrantyActive ? c.duringWarranty : c.afterWarranty}</p>}
+      {perks && inForce && (
+        <div className="mt-2 space-y-1.5 text-[12px] leading-relaxed text-text-secondary" data-device-care-perks>
+          <p className="font-bold text-text-primary">{c.includesTitle}:</p>
+          <ul className="list-disc ps-5">
+            <li>{c.perkParts}</li>
+            {couponsUntil && (
+              <li data-device-care-coupons={couponsRun ? 'running' : 'ended'}>
+                {couponsRun ? c.perkCouponsUntil(fmtDate(couponsUntil, lang)) : c.perkCouponsEnded(fmtDate(couponsUntil, lang))}
+                {couponsRun && (
+                  <>
+                    {' · '}
+                    <Link to="/rewards/coupons" className={PERK_LINK}>
+                      {c.couponsLink}
+                    </Link>
+                  </>
+                )}
+              </li>
+            )}
+            {perks.draw && <li>{c.perkDraw}</li>}
+          </ul>
+          {prize && (
+            <p className="font-bold text-text-primary" data-device-care-draw-won>
+              {c.drawWon(`${prizeName} × ${fmtCount(prize.qty)}`)}
+              {' · '}
+              <Link to="/gifts" className={PERK_LINK}>
+                {c.drawClaim}
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
       {hasTerms && (
         <>
           <button

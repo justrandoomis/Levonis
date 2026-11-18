@@ -1,9 +1,10 @@
 import type { Language } from '../../../translations';
 
 /**
- * LEVO CARE ON THE WARRANTY PAGE (DECISIONS rows 347 and 358): what it gives on
- * a device, the quote on a claim, and the discounted part the team sends in the
- * conversation. Care is never a free replacement — every sentence here says
+ * LEVO CARE ON THE WARRANTY PAGE (DECISIONS rows 347, 358 and 359): what it gives on
+ * a device, what else it includes (the weekly coupons of the first year and the
+ * monthly draw — a chance, never a promise), the quote on a claim, and the
+ * discounted part the team sends in the conversation. Care is never a free replacement — every sentence here says
  * «خصم». A key missing from a language is a type error; the Sorani is Sorani.
  */
 export interface CareStrings {
@@ -73,6 +74,18 @@ export interface CareStrings {
   productGone: string;
   unavailable: string;
   addFailed: string;
+
+  // what else Levo Care includes (phase 5b, DECISIONS row 359)
+  includesTitle: string;
+  perkParts: string;
+  /** The weekly coupons of this device run until that day. */
+  perkCouponsUntil: (date: string) => string;
+  perkCouponsEnded: (date: string) => string;
+  couponsLink: string;
+  /** The monthly draw: entered automatically while Care runs. A chance, not a promise. */
+  perkDraw: string;
+  drawWon: (prize: string) => string;
+  drawClaim: string;
 }
 
 const careAr: CareStrings = {
@@ -141,6 +154,15 @@ const careAr: CareStrings = {
   productGone: 'هذه القطعة لم تعد في المتجر.',
   unavailable: 'القطعة غير متوفرة الآن.',
   addFailed: 'تعذّرت الإضافة إلى السلة. حاول مجددًا.',
+
+  includesTitle: 'ما يشمله ليفو كير',
+  perkParts: 'خصم على القطعة التي تحتاجها',
+  perkCouponsUntil: (d) => `كوبونات أسبوعية حتى ${d}`,
+  perkCouponsEnded: (d) => `انتهت الكوبونات الأسبوعية في ${d}`,
+  couponsLink: 'كوبوناتي',
+  perkDraw: 'السحب الشهري: تدخل تلقائيًا كل شهر ما دام ليفو كير ساريًا — فرصة للفوز لا وعد.',
+  drawWon: (p) => `فزت بسحب هذا الشهر: ${p}`,
+  drawClaim: 'استلم جائزتك من «هداياي»',
 };
 
 const careEn: CareStrings = {
@@ -209,6 +231,15 @@ const careEn: CareStrings = {
   productGone: 'This part is no longer in the store.',
   unavailable: 'The part is not available right now.',
   addFailed: 'It could not be added to the cart. Try again.',
+
+  includesTitle: 'What Levo Care includes',
+  perkParts: 'A discount on the part you need',
+  perkCouponsUntil: (d) => `Weekly coupons until ${d}`,
+  perkCouponsEnded: (d) => `The weekly coupons ended on ${d}`,
+  couponsLink: 'My coupons',
+  perkDraw: 'The monthly draw: you are entered automatically every month while Levo Care is active — a chance to win, not a promise.',
+  drawWon: (p) => `You won this month's draw: ${p}`,
+  drawClaim: 'Claim your prize in "My gifts"',
 };
 
 const careCkb: CareStrings = {
@@ -277,6 +308,15 @@ const careCkb: CareStrings = {
   productGone: 'ئەم پارچەیە چیتر لە فرۆشگاکەدا نییە.',
   unavailable: 'پارچەکە ئێستا بەردەست نییە.',
   addFailed: 'نەتوانرا بخرێتە سەبەتەوە. دووبارە هەوڵ بدەوە.',
+
+  includesTitle: 'لیڤۆ کێر چی لەخۆدەگرێت',
+  perkParts: 'داشکاندن لەسەر ئەو پارچەیەی پێویستتە',
+  perkCouponsUntil: (d) => `کۆپۆنی هەفتانە تا ${d}`,
+  perkCouponsEnded: (d) => `کۆپۆنە هەفتانەکان لە ${d} کۆتایییان هات`,
+  couponsLink: 'کۆپۆنەکانم',
+  perkDraw: 'تیروپشکی مانگانە: هەموو مانگێک خۆکارانە بەشدار دەبیت تا لیڤۆ کێرەکەت چالاک بێت — دەرفەتێکە بۆ بردنەوە، نەک بەڵێن.',
+  drawWon: (p) => `براوەی تیروپشکی ئەم مانگەیت: ${p}`,
+  drawClaim: 'خەڵاتەکەت لە «دیارییەکانم» وەربگرە',
 };
 
 export const CARE_STRINGS: Record<Language, CareStrings> = { ar: careAr, en: careEn, ckb: careCkb };

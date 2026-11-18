@@ -46,7 +46,7 @@ export interface OverviewData {
   attention: { shop_without_price: Kind[]; filament_on_offer?: Array<{ id: string; name: { ar: string; en: string; ckb: string } }>; reviews_waiting: number; competitions_open: number; competitions_awaiting_verdict: number };
 }
 
-export type RewardsView = 'overview' | 'printers' | 'coupons' | 'competitions' | 'ads' | 'settings';
+export type RewardsView = 'overview' | 'printers' | 'coupons' | 'competitions' | 'care_draw' | 'ads' | 'settings';
 
 export default function RewardsOverview({ onGo }: { onGo: (view: RewardsView) => void }) {
   const { loc } = useLanguage();

@@ -54,12 +54,17 @@ import { resetPolicyCorpusMemo } from '../worker/lib/policySync';
 
 const LEDGER = JSON.parse(readFileSync(join(ROOT, 'tests', 'fixtures', 'policyHashes.json'), 'utf8')) as Record<string, string>;
 
-/** Live serves rewards 7 and faq 7; version 8 of each is the unpublished one the rulings of 2026-11-09 change in place. */
-const VERSION = 8;
+/**
+ * faq is at version 8 (the review road, live since 2026-11-10). rewards moved to 9 on 2026-11-19 (DECISIONS row 359:
+ * the weekly coupons belong to Levo Care, and the monthly Levo Care draw is the new chapter 16), which moved its
+ * final provisions from chapter 16 to 17: the withheld contact article is 17.6 and the filled governing-law line 17.5.
+ * Everything else this file holds about the rulings of 2026-11-09 is unchanged in version 9.
+ */
+const VERSION = { rewards: 9, faq: 8 } as const;
 const DOCS = ['rewards', 'faq'] as const;
 type DocKey = (typeof DOCS)[number];
 /** What rewards v8 withholds, as live withholds it: the unknowns (1.2, 7.6, 13.6, 16.6) and nothing that cites them. */
-const WITHHELD = ['1.2', '7.6', '13.6', '16.6'];
+const WITHHELD = ['1.2', '7.6', '13.6', '17.6'];
 /** The articles the rulings of 2026-11-09 and the lead's calls write into, beside 7.8. */
 const PUBLISHED_WHOLE = ['8.5', '8.16', '14.4', '14.6', '14.10'];
 
@@ -78,8 +83,8 @@ const WITHHELD_LINES: Readonly<Record<DocKey, readonly string[]>> = {
     '7.6 {{REVIEW_BASE_POINTS}}',
     '13.6 ###',
     '13.6 {{ACCOUNT_APPEAL_DAYS}}',
-    '16.6 ###',
-    '16.6 {{LEVONIS_SUPPORT_HOURS}}',
+    '17.6 ###',
+    '17.6 {{LEVONIS_SUPPORT_HOURS}}',
   ],
   faq: [
     '2.6 ###',
@@ -103,7 +108,7 @@ const WITHHELD_LINES: Readonly<Record<DocKey, readonly string[]>> = {
  * every unknown they name. Rewards 16.5 is the governing-law line round 4 counted as a ninth withheld one.
  */
 const FILLED_LINES: Readonly<Record<DocKey, readonly string[]>> = {
-  rewards: ['16.5 {{GOVERNING_LAW_JURISDICTION}} {{COMPETENT_COURT}}'],
+  rewards: ['17.5 {{GOVERNING_LAW_JURISDICTION}} {{COMPETENT_COURT}}'],
   faq: ['2.5 {{LEVONIS_SUPPORT_CONTACT}}'],
 };
 
@@ -281,16 +286,16 @@ async function readServed() {
 test('GET /api/policies/rewards and /api/policies/faq serve version 8 in ar, en and ckb: the source through the real facts and render passes, archived and hashed as the ledger holds it', async () => {
   const { raw, policy } = await served();
   for (const key of DOCS) {
-    assert.equal(SOURCE[key].version, VERSION, `${key}: the unpublished version 8, not a ninth`);
+    assert.equal(SOURCE[key].version, VERSION[key], `${key}: the version this file reads`);
     for (const lang of POLICY_LANGS) {
       const p = policy[key][lang];
-      assert.equal(p.version, VERSION, `${key}/${lang}`);
+      assert.equal(p.version, VERSION[key], `${key}/${lang}`);
       assert.equal(p.lang, lang, `${key}: ${lang} fell back to another language`);
       assert.equal(p.status, 'published', `${key}/${lang}`);
       assert.equal(p.body, PUBLISHED[key].body[lang], `${key}/${lang}: the route serves the published corpus`);
       assert.equal(p.body, publish(SOURCE[key].body[lang], lang), `${key}/${lang}: the published corpus is the source through facts.ts and render.ts`);
-      assert.equal(p.hash, LEDGER[`${key}@${VERSION}:${lang}`], `${key}/${lang}: the hash a consent names is the ledgered one`);
-      const archived = row<{ body: string; hash: string }>(raw, 'SELECT body, hash FROM policy_documents WHERE key = ? AND version = ? AND lang = ?', key, VERSION, lang);
+      assert.equal(p.hash, LEDGER[`${key}@${VERSION[key]}:${lang}`], `${key}/${lang}: the hash a consent names is the ledgered one`);
+      const archived = row<{ body: string; hash: string }>(raw, 'SELECT body, hash FROM policy_documents WHERE key = ? AND version = ? AND lang = ?', key, VERSION[key], lang);
       assert.ok(archived, `${key}/${lang}: the read mirrors version 8 into the archive`);
       assert.equal(archived.body, p.body, `${key}/${lang}: the archive holds the bytes a customer reads`);
       assert.equal(archived.hash, p.hash, `${key}/${lang}`);
@@ -369,7 +374,7 @@ test('the guard is armed: round 3’s 7.8, citing 7.5 and 7.6, is withheld whole
     const shown = publish(round3, lang);
     assert.equal(article(shown, '7.8'), null, `${lang}: a 7.8 that cites the withheld 7.6 is published`);
     assert.ok(!shown.includes(L2[lang]), `${lang}: L2's sentence outlived its article`);
-    assert.deepEqual(withheld(round3, shown), ['1.2', '7.6', '7.8', '13.6', '16.6'], lang);
+    assert.deepEqual(withheld(round3, shown), ['1.2', '7.6', '7.8', '13.6', '17.6'], lang);
   }
 });
 

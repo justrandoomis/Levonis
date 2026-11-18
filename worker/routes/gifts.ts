@@ -76,7 +76,7 @@ import {
 import { GIFT_COPY, notifyGiftGranted, planGrant } from '../lib/gifts/grant';
 import { giftAuditTimeline, listGrants, loadAdminGift, parseGrantFilters } from '../lib/gifts/admin';
 import { canViewCost } from '../lib/adminScope';
-import { pointsBackStatements } from '../lib/rewards/shopItems';
+import { planGiftCancel } from '../lib/gifts/cancel';
 import {
   LEGACY_POOL_FILTER,
   legacyEntitlementView,
@@ -682,35 +682,10 @@ giftRoutes.patch('/admin/grants/:id', async (c) => {
 async function cancelGift(c: Context<AppContext>, id: string, reasonText: string) {
   const admin = c.get('user')!;
   const g = await adminRow(c.env.DB, id);
-  const legacy = text(g.grant_mode || 'legacy') === 'legacy';
-  const state = text(g.state);
-  if (state === 'ordered') {
-    throw conflict('This gift is in an order — cancel the order instead; the gift then comes back to the customer.', 'GIFT_ALREADY_ORDERED');
-  }
-  const cancellable = legacy ? state === 'available' : ['granted', 'ready_to_redeem', 'redeemed'].includes(state);
-  if (!cancellable) throw conflict('This gift can no longer be cancelled.', 'GIFT_STATE');
-  const now = new Date().toISOString();
-  const audit = await auditStatements(c.env.DB, admin.id, 'gift.cancel', id, {
-    user_id: text(g.user_id),
-    level: g.level ?? g.max_level ?? null,
-    actor: admin.id,
-    from: state,
-    reason: reasonText,
-    product_id: g.gift_product_id ?? null,
-    ...(Number(g.points_spent) > 0 ? { points_returned: Number(g.points_spent), points_tx_id: g.points_tx_id ?? null } : {}),
-  });
+  // The one cancel writer (worker/lib/gifts/cancel.ts): the fence, the cart line, the points, the audit row.
+  const statements = await planGiftCancel(c.env.DB, g, admin.id, reasonText, new Date().toISOString());
   try {
-    await c.env.DB.batch([
-      c.env.DB.prepare(
-        `UPDATE gift_entitlements
-            SET state = 'cancelled', cancelled_at = ?, cancelled_by = ?, cancel_reason = ?, updated_at = ?, version = version + 1
-          WHERE id = ? AND state = ? AND version = ?`
-      ).bind(now, admin.id, reasonText, now, id, state, Number(g.version)),
-      ...changedExactlyOne(c.env.DB),
-      c.env.DB.prepare('DELETE FROM cart_items WHERE gift_entitlement_id = ?').bind(id),
-      ...pointsBackStatements(c.env.DB, g, now),
-      ...audit.statements,
-    ]);
+    await c.env.DB.batch(statements);
   } catch (e) {
     if (isLostRace(e)) throw conflict('This gift changed meanwhile — reload and try again.', 'GIFT_CHANGED');
     throw e;

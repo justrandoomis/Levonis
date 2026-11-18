@@ -70,9 +70,10 @@ export const COPY = {
   // ------------------------------------------------------------ §8.2 a guest
   'guest.hub.title': ['مكافآتك في Levonis', 'Your Levonis rewards', 'خەڵاتەکانت لە Levonis'],
   'guest.benefit.coupons': [
-    'كوبونات مع كل طابعة تستلمها من Levonis.',
-    'Coupons with every printer Levonis delivers to you.',
-    'کۆپۆن لەگەڵ هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت.',
+    // DECISIONS row 359: the weekly coupons belong to Levo Care (a printer sold before the printer services keeps its own).
+    'كوبونات أسبوعية مع ليفو كير على طابعتك من Levonis.',
+    'Weekly coupons with Levo Care on your Levonis printer.',
+    'کۆپۆنی هەفتانە لەگەڵ لیڤۆ کێر لەسەر چاپکەرەکەت لە Levonis.',
   ],
   'guest.benefit.rate': [
     'هدية من Levonis على مراجعتك المفيدة لطابعتك.',
@@ -150,14 +151,14 @@ export const COPY = {
   'door.coupons.hours': ['أقرب كوبون ينتهي خلال ساعات', 'The next one ends within hours', 'نزیکترین کۆپۆن لە چەند کاتژمێرێکدا کۆتایی دێت'],
   'door.coupons.soonest': ['أقرب كوبون ينتهي في {date}', 'The next one ends on {date}', 'نزیکترین کۆپۆن لە {date} کۆتایی دێت'],
   'door.coupons.how': [
-    'تصلك مع كل طابعة تستلمها من Levonis',
-    'You get them with every printer Levonis delivers to you',
-    'لەگەڵ هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت وەریاندەگریت',
+    'تصلك مع ليفو كير على طابعتك من Levonis',
+    'You get them with Levo Care on your Levonis printer',
+    'لەگەڵ لیڤۆ کێر لەسەر چاپکەرەکەت لە Levonis وەریاندەگریت',
   ],
   'door.coupons.howWeekly': [
-    'تصلك كل أسبوع مع كل طابعة تستلمها من Levonis',
-    'You get them every week with every printer Levonis delivers to you',
-    'هەموو هەفتەیەک لەگەڵ هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت وەریاندەگریت',
+    'تصلك كل أسبوع مع ليفو كير على طابعتك من Levonis',
+    'You get them every week with Levo Care on your Levonis printer',
+    'هەموو هەفتەیەک لەگەڵ لیڤۆ کێر لەسەر چاپکەرەکەت لە Levonis وەریاندەگریت',
   ],
   'door.shop.from': ['كوبونات تبدأ من {points}', 'Coupons from {points}', 'کۆپۆن لە {points}ەوە'], // † pointsObj
   'door.shop.fromBoth': ['كوبونات ومنتجات تبدأ من {points}', 'Coupons and products from {points}', 'کۆپۆن و بەرهەم لە {points}ەوە'], // † pointsObj
@@ -242,14 +243,14 @@ export const COPY = {
   'chip.withdrawn': ['سُحب', 'Withdrawn', 'کشێنرایەوە'],
   'coupons.empty.title': ['لا كوبونات صالحة الآن', 'No coupons to use right now', 'ئێستا هیچ کۆپۆنێکی چالاکت نییە'],
   'coupons.empty.body': [
-    'كل طابعة تستلمها من Levonis تمنحك {what}، ويصلح كل كوبون {days} من لحظة إصداره.',
-    'Every printer Levonis delivers to you earns {what}; each coupon is valid for {days} from the moment it is issued.',
-    'هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت {what}ت پێدەدات، و هەر کۆپۆنێک {days} لە کاتی دەرچوونییەوە بەکاردێت.',
+    'طابعتك من Levonis مع ليفو كير تمنحك {what}، ويصلح كل كوبون {days} من لحظة إصداره. والطابعة التي استلمتها قبل خدمات الطابعة تبقى على كوبوناتها.',
+    'Your Levonis printer with Levo Care earns {what}; each coupon is valid for {days} from the moment it is issued. A printer delivered before the printer services keeps its coupons.',
+    'چاپکەرەکەت لە Levonis لەگەڵ لیڤۆ کێر {what}ت پێدەدات، و هەر کۆپۆنێک {days} لە کاتی دەرچوونییەوە بەکاردێت. ئەو چاپکەرەی پێش خزمەتگوزارییەکانی چاپکەر وەرتگرتووە لەسەر کۆپۆنەکانی دەمێنێتەوە.',
   ],
   'coupons.empty.bodyWeekly': [
-    'كل طابعة تستلمها من Levonis تمنحك كل أسبوع {what} طوال {months} من ضمانها، ويصلح كل كوبون {days} من لحظة إصداره.',
-    'Every printer Levonis delivers to you earns {what} every week for {months} of its warranty; each coupon is valid for {days} from the moment it is issued.',
-    'هەر چاپکەرێک کە Levonis بۆتی دەگەیەنێت هەموو هەفتەیەک {what}ت پێدەدات بۆ ماوەی {months} لە گەرەنتییەکەی، و هەر کۆپۆنێک {days} لە کاتی دەرچوونییەوە بەکاردێت.',
+    'طابعتك من Levonis مع ليفو كير تمنحك كل أسبوع {what} طوال {months} من استلامها، ويصلح كل كوبون {days} من لحظة إصداره. والطابعة التي استلمتها قبل خدمات الطابعة تكمل كوبوناتها حتى تنتهي مدتها.',
+    'Your Levonis printer with Levo Care earns {what} every week for {months} from its delivery; each coupon is valid for {days} from the moment it is issued. A printer delivered before the printer services keeps earning until its period ends.',
+    'چاپکەرەکەت لە Levonis لەگەڵ لیڤۆ کێر هەموو هەفتەیەک {what}ت پێدەدات بۆ ماوەی {months} لە وەرگرتنییەوە، و هەر کۆپۆنێک {days} لە کاتی دەرچوونییەوە بەکاردێت. ئەو چاپکەرەی پێش خزمەتگوزارییەکانی چاپکەر وەرتگرتووە تا تەواوبوونی ماوەکەی لەسەر کۆپۆنەکانی بەردەوام دەبێت.',
   ],
   'coupons.what.bothTerms': [
     'كوبون توصيل مجاني بقيمة {amount} للطلبات من {min} فأكثر، وكوبون خصم {percent} على {pieces} من الفلامنت المختار',
@@ -847,6 +848,12 @@ export const COPY = {
   'printers.stopped.traded_in': ['توقفت كوبوناتها: استُبدلت الطابعة', 'Its coupons stopped: the printer was traded in', 'کۆپۆنەکانی وەستان: چاپکەرەکە گۆڕدرایەوە'],
   'printers.stopped.in_shop': ['متوقفة وهي عندنا للاستبدال', 'Paused while it is with us for a trade-in', 'ڕاگیراوە تا لای ئێمەیە بۆ گۆڕینەوە'],
   'printers.stopped.programme_off': ['برنامج الكوبونات متوقف الآن', 'The coupon programme is paused now', 'بەرنامەی کۆپۆن ئێستا ڕاگیراوە'],
+  // Sold through the printer services without Levo Care: one calm line, nothing to sell (DECISIONS row 359).
+  'printers.stopped.no_care': [
+    'الكوبونات الأسبوعية من مزايا ليفو كير، وهذه الطابعة بيعت بدونه',
+    'Weekly coupons come with Levo Care, and this printer was sold without it',
+    'کۆپۆنە هەفتانەکان لە سوودەکانی لیڤۆ کێرن، ئەم چاپکەرەش بەبێ ئەو فرۆشراوە',
+  ],
   'printers.showAll': ['عرض الكل ({n})', 'Show all ({n})', 'هەموویان پیشان بدە ({n})'],
   'printers.showFewer': ['عرض أقل', 'Show fewer', 'کەمتر پیشان بدە'],
   // No fixed word for «printer»: the shop's own names carry it («طابعة Bambu Lab …»), and the line doubled it.

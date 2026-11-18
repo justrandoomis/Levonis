@@ -27,6 +27,8 @@ export interface PsStrings {
   warrantyNote: string;
   /** Care = 12 months AFTER the warranty; `careOption` takes the total for the choice on screen (12 / 24 / 36). */
   care: string; careSub: (pct: number) => string; careOption: (total: number) => string;
+  /** What Levo Care includes, one short line (DECISIONS row 359). The draw is a chance, never a promise. */
+  careIncludes: (pct: number) => string;
   packaging: string; packagingSub: string; packagingStandard: string; packagingExtra: string;
   inspection: string; inspectionSub: string; inspectionOption: string; inspectionLead: (lo: number, hi: number) => string;
   academy: string; academySub: string; academyRecorded: string; academyWhatsapp: string; academyInPerson: string;
@@ -102,6 +104,7 @@ const AR: PsStrings = {
   warranty: 'الضمان', warrantySub: 'اختر مدة الضمان', none: 'بدون', months: (n) => `${n} شهر`,
   warrantyNote: 'المدة كاملة من تاريخ التسليم، تشمل العتاد والبرمجيات والإرجاع المجاني للعيب المؤكد وفق الشروط.',
   care: 'Levo Care', careSub: (pct) => `12 شهر بعد الضمان: خصم حتى ${pct}% على القطع، لا استبدال مجاني`, careOption: (n) => (n > 12 ? `+12 شهر · المجموع ${n} شهر` : '12 شهر'),
+  careIncludes: (pct) => `يشمل: خصم على القطع حتى ${pct}% • كوبونات أسبوعية لمدة 12 شهراً من الاستلام • دخول سحب شهري على فلمنت مجاني (فرصة لا وعد)`,
   packaging: 'التغليف', packagingSub: 'تغليف المصنع الآمن مشمول دائماً', packagingStandard: 'القياسي', packagingExtra: 'حماية إضافية',
   inspection: 'الفحص قبل الشحن', inspectionSub: 'فحص كامل للطابعة قبل إرسالها', inspectionOption: 'فحص كامل',
   inspectionLead: (lo, hi) => `يضيف ${lo}–${hi} أيام عمل للتجهيز`,
@@ -173,6 +176,7 @@ const EN: PsStrings = {
   warranty: 'Warranty', warrantySub: 'Choose how long', none: 'None', months: (n) => `${n} months`,
   warrantyNote: 'Total months from delivery: hardware, software and free return of a confirmed defect, under the terms.',
   care: 'Levo Care', careSub: (pct) => `12 months after the warranty: up to ${pct}% off parts, not a free replacement`, careOption: (n) => (n > 12 ? `+12 months · ${n} in total` : '12 months'),
+  careIncludes: (pct) => `Includes: up to ${pct}% off parts • weekly coupons for 12 months from delivery • entry in a monthly free-filament draw (a chance, not a promise)`,
   packaging: 'Packaging', packagingSub: 'Safe factory packaging is always included', packagingStandard: 'Standard', packagingExtra: 'Extra protection',
   inspection: 'Pre-dispatch inspection', inspectionSub: 'A full check before it ships', inspectionOption: 'Full inspection',
   inspectionLead: (lo, hi) => `Adds ${lo}–${hi} business days to preparation`,
@@ -244,6 +248,7 @@ const CKB: PsStrings = {
   warranty: 'گەرەنتی', warrantySub: 'ماوەی گەرەنتی هەڵبژێرە', none: 'هیچ', months: (n) => `${n} مانگ`,
   warrantyNote: 'هەموو ماوەکە لە ڕۆژی گەیاندنەوە: ڕەقەکاڵا، نەرمەکاڵا و گەڕاندنەوەی بەخۆڕایی بۆ کەموکوڕی سەلمێنراو، بەپێی مەرجەکان.',
   care: 'Levo Care', careSub: (pct) => `12 مانگ دوای گەرەنتی: داشکاندن تا ${pct}% لەسەر پارچە، گۆڕینی بەخۆڕایی نییە`, careOption: (n) => (n > 12 ? `+12 مانگ · کۆی ${n} مانگ` : '12 مانگ'),
+  careIncludes: (pct) => `لەخۆدەگرێت: داشکاندن تا ${pct}% لەسەر پارچە • کۆپۆنی هەفتانە بۆ 12 مانگ لە وەرگرتنەوە • بەشداری لە تیروپشکی مانگانەی فیلامێنتی بەخۆڕایی (دەرفەتە، بەڵێن نییە)`,
   packaging: 'پێچانەوە', packagingSub: 'پێچانەوەی سەلامەتی کارگە هەمیشە لەخۆدەگرێت', packagingStandard: 'ئاسایی', packagingExtra: 'پاراستنی زیادە',
   inspection: 'پشکنین پێش ناردن', inspectionSub: 'پشکنینی تەواوی پرینتەر پێش ناردن', inspectionOption: 'پشکنینی تەواو',
   inspectionLead: (lo, hi) => `${lo}–${hi} ڕۆژی کار بۆ ئامادەکردن زیاد دەکات`,

@@ -205,13 +205,39 @@ test('the estimated price moved purchase to 7, price_protection to 6 and faq to 
 test('the review road moved rewards to 8 and faq to 8 on one date; rewards 7 and faq 7 stay in the ledger', () => {
   for (const [key, version] of [['rewards', 8], ['faq', 8]] as const) {
     const doc = POLICY_DOCUMENTS.find((d) => d.key === key)!;
-    assert.equal(doc.version, version, key);
-    assert.equal(doc.effective_at, '2026-11-10', `${key}: the day version 8 went live with the rewards build (row 303), not the day it was drafted`);
+    // rewards has moved on since (version 9, below); its version 8 and 7 stay in the ledger as the archive holds them.
+    if (key === 'faq') {
+      assert.equal(doc.version, version, key);
+      assert.equal(doc.effective_at, '2026-11-10', `${key}: the day version 8 went live with the rewards build (row 303), not the day it was drafted`);
+    }
     for (const lang of POLICY_LANGS) {
       assert.ok(`${key}@${version}:${lang}` in LEDGER, `${key}@${version}:${lang}`);
       assert.ok(`${key}@${version - 1}:${lang}` in LEDGER, `${key}@${version - 1}:${lang} left the ledger`);
       assert.notEqual(LEDGER[`${key}@${version}:${lang}`], LEDGER[`${key}@${version - 1}:${lang}`], `${key}/${lang}: the new version is the old text`);
     }
+  }
+  for (const [key, version] of [['terms', 4], ['privacy', 4], ['quick_buy', 1]] as const) {
+    assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, `${key} moved: every consent would be asked again`);
+  }
+});
+
+/**
+ * LEVO CARE MOVED rewards TO 9 (owner, 2026-11-18/19; DECISIONS row 359): the weekly coupons belong to
+ * Levo Care (14.1, 14.2), the monthly Levo Care draw is the new chapter 16, 15.4 and 15.9 each gain one
+ * sentence, and the final provisions move to chapter 17. rewards is not a consent document, so nobody is
+ * asked to accept again, and version 8 stays in the ledger as the archive holds it.
+ */
+test('Levo Care moved rewards to 9; rewards 8 stays in the ledger and no consent document moved', () => {
+  const doc = POLICY_DOCUMENTS.find((d) => d.key === 'rewards')!;
+  assert.equal(doc.version, 9);
+  assert.equal(doc.effective_at, '2026-11-19', 'the day version 9 goes live: move it with the push if the build ships later');
+  for (const lang of POLICY_LANGS) {
+    assert.ok(`rewards@9:${lang}` in LEDGER, `rewards@9:${lang}`);
+    assert.ok(`rewards@8:${lang}` in LEDGER, `rewards@8:${lang} left the ledger`);
+    assert.notEqual(LEDGER[`rewards@9:${lang}`], LEDGER[`rewards@8:${lang}`], `rewards/${lang}: the new version is the old text`);
+    assert.match(doc.body[lang], /^## 16\. .*(ليفو كير|Levo Care|لیڤۆ کێر)/m, `${lang}: chapter 16 is the Levo Care draw`);
+    assert.match(doc.body[lang], /^## 17\. /m, `${lang}: the final provisions are chapter 17`);
+    assert.doesNotMatch(doc.body[lang], /^## 18\. /m);
   }
   for (const [key, version] of [['terms', 4], ['privacy', 4], ['quick_buy', 1]] as const) {
     assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, `${key} moved: every consent would be asked again`);

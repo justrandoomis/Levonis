@@ -29,6 +29,7 @@ import type { Env } from '../types';
 import { isSchemaMissing } from '../membershipBenefits';
 import { notifyStatement } from '../notifications';
 import { issuePrinterRewards, issueWeeklyRewards, type WeeklyIssueReport } from './coupons';
+import { slotCareSql } from './earning';
 import { SPENT_SQL } from './pool';
 import { rewardText } from './strings';
 
@@ -91,7 +92,8 @@ async function catchUp(env: Env, nowIso: string, report: RewardSweepReport): Pro
           AND EXISTS (SELECT 1 FROM order_items oi
                        WHERE oi.order_id = o.id AND oi.product_id IS NOT NULL AND oi.gift_entitlement_id IS NULL
                          AND EXISTS (SELECT 1 FROM product_catalogs pc JOIN catalogs c ON c.id = pc.catalog_id AND c.is_printer_catalog = 1
-                                      WHERE pc.product_id = oi.product_id))
+                                      WHERE pc.product_id = oi.product_id)
+                         AND ${slotCareSql()})
         ORDER BY o.delivered_at ASC
         LIMIT ?2`
     )

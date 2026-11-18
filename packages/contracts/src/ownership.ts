@@ -364,6 +364,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // 0243 (printer services phase 5, DECISIONS row 358): a claim's Levo Care part offers — a discount on one store
     // part, carried by a personal coupon and answered in the claim thread.
     'care_part_grants',
+    // 0244 (printer services phase 5b, DECISIONS row 359): the monthly Levo Care draw — one row per Baghdad month,
+    // its seed, the hash of who was in it, the proposed winner and the gift the owner's confirmation granted.
+    'care_draws',
     // 0178 — a serial bound to an order unit at preparation, before delivery
     // creates the warranty unit (worker/lib/serialAssignments.ts). The
     // device's own history, so Devices' — like device_serials beside it.

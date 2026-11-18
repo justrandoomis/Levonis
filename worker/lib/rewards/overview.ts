@@ -17,6 +17,7 @@ import { DAY_MS, GRANT_STATE_SQL, printerSourceRefSql, type RewardGrantState } f
 import {
   SLOT_IS_PRINTER_SQL,
   SLOT_SOLD_HERE_SQL,
+  slotCareSql,
   slotInShopSql,
   slotInsideMonthsSql,
   slotJoins,
@@ -129,7 +130,8 @@ export async function rewardsOverview(db: D1Database, nowIso = new Date().toISOS
                 AND ${slotTradedInSql()} IS NULL
                 AND ${slotInShopSql()} IS NULL
                 AND ${slotNotRefundedSql()}
-                AND ${SLOT_IS_PRINTER_SQL}`
+                AND ${SLOT_IS_PRINTER_SQL}
+                AND ${slotCareSql()}`
           )
           .bind(nowIso, startedAt ?? nowIso, config.weekly.months)
           .first<{ earning: number; customers: number; due: number }>(),

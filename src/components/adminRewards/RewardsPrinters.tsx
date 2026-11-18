@@ -23,7 +23,7 @@ import { Segmented } from '../ui/Segmented';
 import { GrantCard, useGrantActions, useRewardsRefusal, type AdminGrant, type CustomerFilter } from './RewardsCoupons';
 
 type Tri = { ar: string; en: string; ckb: string };
-type Stopped = 'warranty_closed' | 'warranty_over' | 'returned' | 'traded_in' | 'in_shop' | 'programme_off';
+type Stopped = 'warranty_closed' | 'warranty_over' | 'returned' | 'traded_in' | 'in_shop' | 'programme_off' | 'no_care';
 
 export interface AdminPrinter {
   unit_id: string;
@@ -174,6 +174,8 @@ export function useStoppedWord() {
         return loc('مستبدلة', 'Traded in', 'گۆڕدراوەتەوە');
       case 'in_shop':
         return loc('في المتجر للاستبدال', 'In the shop for a trade-in', 'لە فرۆشگایە بۆ گۆڕینەوە');
+      case 'no_care':
+        return loc('بيعت بدون ليفو كير', 'Sold without Levo Care', 'بەبێ لیڤۆ کێر فرۆشراوە');
       default:
         return loc('البرنامج متوقف', 'Programme off', 'بەرنامەکە ڕاگیراوە');
     }

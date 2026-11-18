@@ -18,8 +18,15 @@
  *     scope ('gift_grant'), and the owner when the admin is that person (four eyes).
  *
  * The overview and the printers (DECISIONS row 298) read no cost: any admin.
+ *
+ *   · THE MONTHLY LEVO CARE DRAW (0244, DECISIONS row 359): drawing, drawing another name, skipping,
+ *     CONFIRMING (which grants the gift) and cancelling a confirmed prize are the owner's alone — «I confirm
+ *     each month». Any admin reads the months, their states and counts and a confirmed winner's name; the
+ *     proposed name, the seed and the candidate hash are the owner's read. The winner and the candidates
+ *     are never taken from the request.
  */
 import { Hono } from 'hono';
+import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, int, oneOf, str, HttpError } from '../lib/http';
 import { audit, auditStatements } from '../lib/audit';
@@ -59,6 +66,8 @@ import {
 } from '../lib/rewards/competitions';
 import { adActiveFrom, assertAdFiles, createAd, listAdsForAdmin, parseAdInput, setAdActive, updateAd } from '../lib/rewards/ads';
 import { getRewardTaskConfig } from '../lib/pointsTasks';
+import { careDrawsForAdmin, confirmCareDraw, drawNow, prizeCheck, redrawCareDraw, skipCareDraw, voidCareDraw } from '../lib/careDraw';
+import { isOwner, isUnverifiedOwner } from '../lib/adminScope';
 
 export const adminRewardsRoutes = new Hono<AppContext>();
 adminRewardsRoutes.use('*', requireAdmin);
@@ -503,4 +512,78 @@ adminRewardsRoutes.post('/ads/:id/toggle', async (c) => {
   const out = await setAdActive(c.env.DB, id, active, new Date().toISOString());
   if (out.changed) await audit(c.env.DB, admin.id, 'rewards.ad.toggle', id, { active });
   return c.json({ success: true, active, changed: out.changed });
+});
+
+// ------------------------------------------------------------- the monthly Levo Care draw
+
+/**
+ * «سحب ليفو كير الشهري» (migration 0244; docs/DECISIONS.md row 359; worker/lib/careDraw.ts). The system
+ * proposes one random holder of an active Levo Care on the 1st of each Baghdad month; the owner sees the name
+ * here, chooses the prize and confirms, and only then is the gift granted and the customer told. A database
+ * before 0244 reads `installed: false` and refuses a write with 503.
+ */
+/** The draw as THIS admin may read it: the whole of it for the verified owner, the outline for anyone else. */
+const drawsFor = (c: Context<AppContext>) => {
+  const user = c.get('user');
+  return careDrawsForAdmin(c.env.DB, new Date().toISOString(), { owner: !!user && isOwner(c.env, user) && !isUnverifiedOwner(c.env, user) });
+};
+
+adminRewardsRoutes.get('/care-draws', async (c) => {
+  return c.json({ success: true, ...(await drawsFor(c)) });
+});
+
+/**
+ * Is this prize giftable, and how many units of it are sellable now? The picker's read, by the two checks
+ * the confirmation itself runs. Stock counts only, no cost: any admin.
+ */
+adminRewardsRoutes.get('/care-draws/prize-check', async (c) => {
+  const q = c.req.query();
+  const check = await prizeCheck(c.env, {
+    productId: q.productId ?? '',
+    optionValueIds: (q.optionValueIds ?? '').split(',').filter(Boolean),
+    colorId: q.colorId ?? '',
+    saleType: q.saleType === 'pre_order' ? 'pre_order' : 'direct_sale',
+    transportMethod: q.transportMethod ?? '',
+    qty: Number(q.qty) || 1,
+  });
+  return c.json({ success: true, ...check });
+});
+
+adminRewardsRoutes.post('/care-draws/draw', requireMoneyAuthority('care_draw'), async (c) => {
+  await rateLimit(c, 'care_draw_write', 30, 300);
+  const out = await drawNow(c.env, c.get('user')!.id);
+  return c.json({ success: true, ...out, ...(await drawsFor(c)) });
+});
+
+adminRewardsRoutes.post('/care-draws/:id/redraw', requireMoneyAuthority('care_draw'), async (c) => {
+  await rateLimit(c, 'care_draw_write', 30, 300);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  await redrawCareDraw(c.env, c.req.param('id') ?? '', c.get('user')!.id, body.reason);
+  return c.json({ success: true, ...(await drawsFor(c)) });
+});
+
+adminRewardsRoutes.post('/care-draws/:id/skip', requireMoneyAuthority('care_draw'), async (c) => {
+  await rateLimit(c, 'care_draw_write', 30, 300);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  await skipCareDraw(c.env, c.req.param('id') ?? '', c.get('user')!.id, body.reason);
+  return c.json({ success: true, ...(await drawsFor(c)) });
+});
+
+adminRewardsRoutes.post('/care-draws/:id/confirm', requireMoneyAuthority('care_draw'), async (c) => {
+  await rateLimit(c, 'care_draw_write', 30, 300);
+  const admin = c.get('user')!;
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  // A gift gives value away (owner decision 3). The owner's door above already refused everyone else; this
+  // records the act in the vocabulary every money door uses.
+  assertMoneyAuthority(c, { act: 'gift_grant' });
+  const out = await confirmCareDraw(c.env, c.req.param('id') ?? '', admin.id, { winnerSeen: body.winner_user_id, prize: body.prize, note: body.note });
+  return c.json({ success: true, already: out.already, gift_id: out.gift_id, ...(await drawsFor(c)) });
+});
+
+/** «إلغاء الجائزة»: a confirmed draw whose gift is still unredeemed is undone, with the owner's reason. */
+adminRewardsRoutes.post('/care-draws/:id/void', requireMoneyAuthority('care_draw'), async (c) => {
+  await rateLimit(c, 'care_draw_write', 30, 300);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  await voidCareDraw(c.env, c.req.param('id') ?? '', c.get('user')!.id, body.reason);
+  return c.json({ success: true, ...(await drawsFor(c)) });
 });

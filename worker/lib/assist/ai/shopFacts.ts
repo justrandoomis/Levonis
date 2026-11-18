@@ -42,7 +42,7 @@ WARRANTY (owner's terms; the published site policies still show older text until
 
 REWARDS
 - Memberships: LEVO PLUS and LEVO PREMIUM (free standard delivery above 75,000 IQD, no discounts). LEVO PRO is discontinued.
-- Weekly printer coupons: per printer with active warranty, weekly for 12 months from warranty start, one filament discount coupon and one 5,000 IQD delivery coupon for orders over 100,000. Two printers = two of each; combinable in one order; valid 7 days, not cumulative. Location: الحساب ← المكافآت ← كوبوناتي.
+- Weekly printer coupons are a Levo Care benefit: a printer bought with Levo Care earns, weekly for 12 months from its delivery (whatever warranty was chosen), one filament discount coupon and one 5,000 IQD delivery coupon for orders over 100,000. A printer bought through the printer services WITHOUT Levo Care earns none. A printer delivered before the printer services existed keeps its weekly coupons until its 12 months end. Two printers = two of each; combinable in one order; valid 7 days, not cumulative. Location: الحساب ← المكافآت ← كوبوناتي.
 - Review gift: only for a printer bought from us. The customer writes a review on the site (text, photos, video; an Instagram story mentioning @levonis_iq is optional, +8). Score 1-100, every 20 points unlock a gift level; the shop decides what each level holds (in-kind only). After approval the team hands him a one-time code personally; he enters it at الحساب ← المكافآت ← قيّم طابعتك, picks one gift (added at zero; he pays delivery only).
 - A printer bought via someone's support code / share link earns that code owner a filament spool.
 - Discount codes are entered in the cart.

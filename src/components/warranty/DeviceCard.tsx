@@ -11,7 +11,7 @@ import { StatusChip } from '../ui/Badge';
 import { CoverTimeline } from './CoverTimeline';
 import { CarePanel } from './CarePanel';
 import { ClaimRow } from './ClaimCard';
-import type { Claim, Device } from './types';
+import type { CarePerks, Claim, Device } from './types';
 import { claimOpen, productName, fmtCount, fmtInt, fmtDate } from './types';
 import type { WarrantyStrings } from './strings';
 import { CARE_STRINGS } from './strings';
@@ -56,7 +56,10 @@ export function DeviceCard({
   onOpenThread,
   onRemove,
   maintenancePath = null,
+  carePerks = null,
 }: {
+  /** Phase 5b: what else Levo Care includes for this customer (the page's `care_perks`). */
+  carePerks?: CarePerks | null;
   device: Device;
   /** Every request of the customer's own on this device (open and closed), newest first. */
   claims?: Claim[];
@@ -163,7 +166,7 @@ export function DeviceCard({
       {/* ---------------------------------------------- what Care gives */}
       {care && (
         <div className="mt-4">
-          <CarePanel care={care} warrantyActive={warrantyActive} lang={lang} c={c} />
+          <CarePanel care={care} warrantyActive={warrantyActive} lang={lang} c={c} perks={carePerks} couponsUntil={carePerks?.weekly_coupons_by_unit?.[device.unit_id] ?? null} />
         </div>
       )}
 

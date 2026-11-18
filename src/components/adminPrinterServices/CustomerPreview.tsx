@@ -24,6 +24,7 @@ import {
 import { Fold, perPrinterEstimate, pick3, text3, useDocs, useNames } from './itemToolkit';
 import { bundleName, useStoreBundles } from './StoreBundlesPanel';
 import { S, discountPreview, packageContents, pkgName, say, type Loc, type Tri } from './adminPrinterStrings';
+import { PS_STRINGS } from '../product/printerServicesStrings';
 import type { ServicesPrinter } from './PrinterThisTab';
 
 export default function CustomerPreview({ draft, loc, lang, printer }: { draft: PrinterServicesConfig; loc: Loc; lang: string; printer: ServicesPrinter }) {
@@ -96,6 +97,10 @@ export default function CustomerPreview({ draft, loc, lang, printer }: { draft: 
 
           {offer.care ? group('care', S.pvCare, <>
             {row('c12', say(loc, S.pvCarePrice), money(offer.care.c12))}
+            {/* The customer's own line of what Care includes (DECISIONS row 359): the same words the product page says. */}
+            <li className="py-1" data-preview-care-includes>
+              <span className="text-[12px] text-text-secondary">{PS_STRINGS[lang === 'en' || lang === 'ckb' ? lang : 'ar'].careIncludes(offer.care.max_discount_pct ?? 90)}</span>
+            </li>
             {offer.care.c12 !== null ? (
               <li className="py-1" data-preview-care-totals>
                 <span className="text-[12px] text-text-secondary">{say(loc, S.pvCareTotal)}</span>

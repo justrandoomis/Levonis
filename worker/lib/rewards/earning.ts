@@ -14,7 +14,11 @@
  *   · it was not traded in and is not in the shop for a trade-in;
  *   · no refund took this slot (`slotNotRefundedSql`);
  *   · it is a printer, not a bundle parent (`SLOT_IS_PRINTER_SQL`);
- *   · it is inside the owner's months of its base warranty (`slotInsideMonthsSql`);
+ *   · sold through the printer services («خصص طابعتك»), it was sold WITH Levo Care
+ *     (`slotCareSql`; owner, 2026-11-19; DECISIONS row 359). A line with no frozen
+ *     services (sold before them, or a printer outside them) earns as it always did;
+ *   · it is inside the owner's months of its base warranty, or, sold with Levo Care,
+ *     inside the owner's months from its delivery (`slotInsideMonthsSql`);
  *   · its first week has come (`d.week >= 0`).
  *
  * This file holds no statement of its own and reads no configuration.
@@ -74,9 +78,44 @@ const iso = (expression: string) => `strftime('%Y-%m-%dT%H:%M:%fZ', ${expression
 /** When a slot's week 0 began: the instant every later week is counted from. */
 export const slotFirstWeekAtSql = (b: Pick<EarningBinds, 'started'>, u = 'd') => iso(firstWeekJulian(b, u));
 
-/** At most `months` of its base warranty, from the warranty's own start: an extended warranty adds nothing. */
+/**
+ * A LINE'S FROZEN PRINTER SERVICES (order_items.services_snapshot, migration 0234), or NULL.
+ * Written so that a database WITHOUT that column still runs the statement: the name is
+ * looked up in order_items first and, when the table has no such column, falls out to the
+ * one-row `SELECT NULL AS services_snapshot` around it. So every reader below says «no
+ * services» there, which is what such a database means.
+ */
+const lineServicesSql = (line: string) =>
+  `(SELECT (SELECT services_snapshot FROM order_items sx WHERE sx.id = ${line}) FROM (SELECT NULL AS services_snapshot))`;
+
+/** 1 when the line was sold with Levo Care (its frozen services say care_months > 0), else 0. Never NULL. */
+export const lineHasCareSql = (line: string) =>
+  `COALESCE((SELECT CASE WHEN json_valid(cs.snap) THEN COALESCE(CAST(json_extract(cs.snap, '$.care_months') AS INTEGER), 0) > 0 ELSE 0 END
+                FROM (SELECT ${lineServicesSql(line)} AS snap) cs), 0)`;
+
+/**
+ * THE WEEKLY COUPONS BELONG TO LEVO CARE (owner, 2026-11-19: «Only Levo Care buyers»;
+ * DECISIONS row 359). Over the slot's line `oi`: a line sold through the printer services
+ * earns only when Levo Care was bought with it; a line with no frozen services keeps what
+ * it had («printers already sold keep theirs until their 12 months end»), with no date
+ * switch. Never NULL. Every issuing path and every screen reads this one test.
+ */
+export const slotCareSql = (line = 'oi.id') =>
+  `COALESCE((SELECT CASE WHEN cs.snap IS NULL OR cs.snap = '' THEN 1
+                           WHEN json_valid(cs.snap) THEN COALESCE(CAST(json_extract(cs.snap, '$.care_months') AS INTEGER), 0) > 0
+                           ELSE 0 END
+                FROM (SELECT ${lineServicesSql(line)} AS snap) cs), 1)`;
+
+/**
+ * At most `months` of its base warranty, from the warranty's own start: an extended warranty adds nothing.
+ * A printer sold with Levo Care has the owner's whole `months` from its delivery whatever warranty was
+ * bought with it (none, 12 or 24): «for 12m only, start from day of delivery and end on 12m». The Care
+ * itself may run 24 or 36 months; the coupons do not follow it.
+ */
 const monthsFrom = (b: Pick<EarningBinds, 'months'>, u: string) =>
-  `COALESCE(${u}.warranty_start_at, ${u}.delivered_at), '+' || MIN(COALESCE(${u}.warranty_base_months, 12), ${b.months}) || ' months'`;
+  `COALESCE(${u}.warranty_start_at, ${u}.delivered_at), '+' || CASE
+       WHEN COALESCE(${u}.warranty_base_months, 12) < ${b.months} AND ${lineHasCareSql(`${u}.order_item_id`)} THEN ${b.months}
+       ELSE MIN(COALESCE(${u}.warranty_base_months, 12), ${b.months}) END || ' months'`;
 
 export const slotInsideMonthsSql = (b: Pick<EarningBinds, 'now' | 'months'>, u = 'u') => `julianday(${monthsFrom(b, u)}) > julianday(${b.now})`;
 
@@ -117,7 +156,7 @@ export const slotNotRefundedSql = () => `(SELECT COUNT(*) FROM order_item_units 
                                     WHERE rc.order_item_id = oi.id AND rc.state = 'resolved' AND rc.resolution = 'refund'), 0)`;
 
 /** Why a printer of this customer earns nothing. The server's list, in the words of the spec. */
-export type PrinterStopped = 'warranty_closed' | 'warranty_over' | 'returned' | 'traded_in' | 'in_shop' | 'programme_off';
+export type PrinterStopped = 'warranty_closed' | 'warranty_over' | 'returned' | 'traded_in' | 'in_shop' | 'programme_off' | 'no_care';
 
 /**
  * WHY A PRINTER STOPPED, or NULL while it earns. NULL holds exactly when every test
@@ -129,6 +168,7 @@ export const slotStoppedSql = (b: Pick<EarningBinds, 'now' | 'months'>) => `CASE
            WHEN ${slotInShopSql()} IS NOT NULL THEN 'in_shop'
            WHEN (${slotNotRefundedSql()}) IS NOT TRUE THEN 'returned'
            WHEN (${slotOpenSql()}) IS NOT TRUE THEN CASE WHEN ${chainEnd('warranty_closed_reason')} = 'returned' THEN 'returned' ELSE 'warranty_closed' END
+           WHEN NOT ${slotCareSql()} THEN 'no_care'
            WHEN d.week IS NULL THEN 'programme_off'
            WHEN (${slotInsideMonthsSql(b, 'd')}) IS NOT TRUE THEN 'warranty_over'
            WHEN d.week < 0 THEN 'programme_off'

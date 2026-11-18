@@ -195,11 +195,30 @@ import type { PolicyDocument } from './types';
  *     2026-11-06 and carried that date while live kept serving version 7. The archive row written at the
  *     first request makes published_at and effective_at permanent (migration 0070), so the date is the day
  *     this version was actually published with the rewards build, never the day it was drafted.
+ *
+ * VERSION 9 — WHY IT MOVED (owner, 2026-11-18/19; migration 0244; DECISIONS row 359). The archive keeps
+ * version 8 byte for byte.
+ *   * THE WEEKLY COUPONS BELONG TO LEVO CARE — 14.1 and 14.2. «weekly coupons … is included with levo
+ *     care», «for 12m only, start from day of delivery and end on 12m», and, asked who gets them from now
+ *     on: «Only Levo Care buyers». A printer sold with the printer services earns its coupons only when
+ *     Levo Care was bought with it, for twelve months from its delivery whatever warranty and however long
+ *     the Care; a printer sold before the services, or outside them, keeps what 14.1 already said until
+ *     its period ends. worker/lib/rewards/earning.ts `slotCareSql` is every sentence of it.
+ *   * THE MONTHLY LEVO CARE DRAW — new chapter 16. «monthly competitions of free filaments to random
+ *     customer who have active levo care», «Random, I confirm each month», «I set the prize each month».
+ *     Who is entered, one ticket per account, a winner rests three draws, the 1st of the month, random
+ *     and recorded, final only once the Store confirms, the prize a gift in «هداياي» at 0 with delivery
+ *     paid, no cash, a month may have no draw. worker/lib/careDraw.ts is every sentence of it.
+ *   * 15.4 and 15.9 keep every word and each gains one sentence: they speak of COMPETITIONS, and the
+ *     draw is not one. Row 25 («is a random draw allowed in Iraq») stays the owner's call; he chose to run it.
+ *   * The final provisions move from chapter 16 to chapter 17, unchanged.
+ *   * EFFECTIVE ON THE DAY IT GOES LIVE. Written 2026-11-19; if the build ships on a later day, move
+ *     `effective_at` to that day before the push (the archive row of the first request is permanent).
  */
 export const rewards: PolicyDocument = {
   key: 'rewards',
-  version: 8,
-  effective_at: '2026-11-10',
+  version: 9,
+  effective_at: '2026-11-19',
   title: {
     ar: 'سياسة النقاط والمراجعات والهدايا والإحالات',
     en: 'Points, Reviews, Gifts and Referrals Policy',
@@ -636,10 +655,10 @@ export const rewards: PolicyDocument = {
 ## 14. كوبونات المكافأة ومتجر النقاط
 
 ### 14.1 كوبونات الطابعة
-عن كل طابعة يُسجَّل تسليمها للزبون من متجر Levonis الرسمي يُصدر المتجر باسم صاحب الحساب كل أسبوع كوبونين: كوبون توصيل مجاني، وكوبون خصم على خيط الطباعة (الفلامنت) الذي يختاره المتجر. يصدر الزوج الأول عند التسليم، ثم زوج جديد كل سبعة أيام طوال ضمان الطابعة الأساسي، بما لا يجاوز اثني عشر شهراً من بدء ضمانها؛ ولا يُحسب الضمان الممدَّد. ويُحسب ذلك لكل طابعة على حدة، فمن عنده طابعتان نال كل أسبوع أربعة كوبونات. والطابعة كل منتج مصنَّف في أقسام الطابعات في المتجر.
+عن كل طابعة يُسجَّل تسليمها للزبون من متجر Levonis الرسمي يُصدر المتجر باسم صاحب الحساب كل أسبوع كوبونين: كوبون توصيل مجاني، وكوبون خصم على خيط الطباعة (الفلامنت) الذي يختاره المتجر. يصدر الزوج الأول عند التسليم، ثم زوج جديد كل سبعة أيام طوال ضمان الطابعة الأساسي، بما لا يجاوز اثني عشر شهراً من بدء ضمانها؛ ولا يُحسب الضمان الممدَّد. ويُحسب ذلك لكل طابعة على حدة، فمن عنده طابعتان نال كل أسبوع أربعة كوبونات. والطابعة كل منتج مصنَّف في أقسام الطابعات في المتجر. والكوبونات الأسبوعية من مزايا ليفو كير: الطابعة التي تُباع مع خدمات الطابعة (ما يُختار معها عند الشراء من ضمان وليفو كير وغيرهما) تنال هذه الكوبونات إذا اشتُري معها ليفو كير، وتصدر لها اثني عشر شهراً من يوم تسليمها، أياً كان الضمان المختار معها وأياً كانت مدة ليفو كير. والطابعة التي بيعت قبل العمل بخدمات الطابعة، أو بيعت خارجها، تبقى على ما سبق في هذه المادة حتى تنتهي مدتها.
 
 ### 14.2 ما لا يُنشئ كوبونات
-لا يُنشئ كوبوناتٍ ما وصل هديةً، ولا طلبٌ من متجر في مجتمع ليفو، ولا طلبٌ لم يُسجَّل تسليمه. وتتوقف كوبونات الطابعة إذا أُرجعت واستُرد ثمنها، أو عادت إلى Levonis باستبدال (Trade-in)، أو أُغلق ضمانها. ولا يُصدر إلا كوبون الأسبوع الجاري: لا يُعوَّض أسبوع مضى. والطابعة التي سُلِّمت قبل بدء الكوبونات الأسبوعية وضمانها قائم تنال كوبوناتها من ذلك اليوم لما بقي من مدتها.
+لا يُنشئ كوبوناتٍ ما وصل هديةً، ولا طلبٌ من متجر في مجتمع ليفو، ولا طلبٌ لم يُسجَّل تسليمه، ولا طابعةٌ بيعت مع خدمات الطابعة دون ليفو كير. وتتوقف كوبونات الطابعة إذا أُرجعت واستُرد ثمنها، أو عادت إلى Levonis باستبدال (Trade-in)، أو أُغلق ضمانها. ولا يُصدر إلا كوبون الأسبوع الجاري: لا يُعوَّض أسبوع مضى. والطابعة التي سُلِّمت قبل بدء الكوبونات الأسبوعية وضمانها قائم تنال كوبوناتها من ذلك اليوم لما بقي من مدتها.
 
 ### 14.3 الصلاحية
 يصلح كوبون المكافأة سبعة أيام كاملة من لحظة إصداره، ما لم يعلن المتجر مدة أخرى قبل إصداره. وتُعرض نهاية صلاحية كل كوبون معه في صفحة المكافآت، ولا يُقبل بعدها.
@@ -685,7 +704,7 @@ export const rewards: PolicyDocument = {
 يرسل المشترك ما تطلبه المسابقة: إجابة مكتوبة، أو صورة، أو كليهما. ويجب أن تكون المشاركة من عمله هو، والصورة لشيء طبعه أو صوّره بنفسه.
 
 ### 15.4 اختيار الفائزين
-يختار فريق Levonis الفائزين بعد انتهاء مدة المسابقة وفق المعايير المعلنة فيها. ولا تُحدَّد النتيجة بالقرعة ولا بالحظ.
+يختار فريق Levonis الفائزين بعد انتهاء مدة المسابقة وفق المعايير المعلنة فيها. ولا تُحدَّد النتيجة بالقرعة ولا بالحظ. وسحب ليفو كير الشهري ليس مسابقة، وله أحكامه في الفصل السادس عشر.
 
 ### 15.5 الجوائز
 تُضاف جوائز النقاط إلى رصيد الفائز لحظة إعلان النتيجة. وتُسلَّم الجوائز العينية وفق ما يعلنه المتجر، وتسري عليها أحكام التوصيل المعتادة.
@@ -700,26 +719,52 @@ export const rewards: PolicyDocument = {
 يُعرض في صفحة المكافآت اسم الفائز مختصراً ومركزه وجائزته ومشاركته الفائزة.
 
 ### 15.9 ما ليست عليه المسابقة
-المسابقة ليست قرعة ولا رهاناً، ولا تُستبدل جوائزها بنقد.
+المسابقة ليست قرعة ولا رهاناً، ولا تُستبدل جوائزها بنقد. وسحب ليفو كير الشهري ميزة مستقلة من مزايا ليفو كير يحكمها الفصل السادس عشر.
 
-## 16. أحكام ختامية
+## 16. سحب ليفو كير الشهري
 
-### 16.1 التعديل
+### 16.1 ما هو
+سحب ليفو كير ميزة من مزايا ليفو كير، وليس مسابقة من مسابقات الفصل الخامس عشر: في كل شهر يختار نظام المتجر عشوائياً صاحب حساب واحداً من بين أصحاب ليفو كير الساري، ويمنحه المتجر جائزة عينية من منتجاته، كخيط الطباعة (الفلامنت).
+
+### 16.2 من يدخل السحب
+يدخل السحب تلقائياً، دون طلب ولا رسم ولا شراء غير ليفو كير نفسه، كل صاحب حساب عنده وقت السحب طابعة واحدة على الأقل ليفو كير عليها سارٍ: سُلِّمت، ولم تُرجَع، ولم تنتهِ مدة ليفو كير عليها. ولا تدخله حسابات فريق المتجر. وليفو كير يتبع الجهاز: فإن انتقلت الطابعة إلى حساب آخر دخل السحبَ حائزُها الجديد.
+
+### 16.3 تذكرة واحدة لكل حساب
+لكل حساب تذكرة واحدة في سحب الشهر مهما كان عدد طابعاته. ومن فاز في سحب لا يدخل السحوبات الثلاثة التالية له ما دام في السحب غيره.
+
+### 16.4 الموعد وطريقة الاختيار
+يُجرى السحب في اليوم الأول من كل شهر ميلادي بتوقيت بغداد، أو بعده بقليل. والاختيار عشوائي يجريه النظام آلياً، ولكل تذكرة الفرصة نفسها، ويحفظ المتجر سجلاً يُثبت كيف جرى الاختيار. والدخول في السحب فرصة للفوز وليس وعداً به.
+
+### 16.5 تأكيد النتيجة
+لا تصير النتيجة نهائية إلا بعد أن يؤكدها المتجر. وللمتجر قبل التأكيد أن يعيد السحب لسبب يسجّله، كأن يتبيّن أن صاحب الاسم لم يعد عنده ليفو كير سارٍ؛ ومن استُبعد اسمه لا يُسحب مرة أخرى في ذلك الشهر. ولا يُبلَّغ أحد بشيء قبل التأكيد.
+
+### 16.6 الجائزة
+يحدد المتجر جائزة كل شهر وكميتها عند تأكيد النتيجة، ويُبلَّغ بها الفائز في إشعاره. وتصير الجائزة هدية في «هداياي» تُطلب عبر السلة بسعر صفر، فلا يدفع الفائز عنها إلا أجرة التوصيل، وتسري عليها أحكام الهدايا في هذه الوثيقة. ولا تُستبدل الجائزة بنقد ولا بنقاط ولا بمنتج آخر، ولا تُنقل إلى حساب آخر.
+
+### 16.7 شهر بلا سحب
+إذا لم يكن في شهرٍ صاحبُ ليفو كير سارٍ فلا سحب فيه. وللمتجر أن يتخطى سحب شهر لسبب يسجّله، ولا يُعوَّض عنه في شهر لاحق.
+
+### 16.8 تعديل السحب
+للمتجر أن يعدّل للمستقبل موعد السحب وجوائزه، أو أن يوقفه. وما تأكد من نتائج قبل التعديل يبقى على حاله.
+
+## 17. أحكام ختامية
+
+### 17.1 التعديل
 للمتجر تعديل هذه الوثيقة بإصدار نسخة جديدة برقم وتاريخ نفاذ، ولا يسري التعديل بأثر رجعي على واقعة تمت قبل نفاذه.
 
-### 16.2 الأولوية عند التعارض
+### 17.2 الأولوية عند التعارض
 إذا تعارض نص هذه الوثيقة مع وعد شفهي أو رسالة من موظف أو منشور تسويقي أو صورة في إعلان، فنص هذه الوثيقة هو المعتمد.
 
-### 16.3 حجية السجلات
+### 17.3 حجية السجلات
 سجلات المتجر الإلكترونية هي المرجع في إثبات المنح والصرف والعكس ومواعيدها.
 
-### 16.4 استقلال البنود
+### 17.4 استقلال البنود
 بطلان بند لا يمس صحة سائر البنود.
 
-### 16.5 القانون والاختصاص
+### 17.5 القانون والاختصاص
 تحكم هذه الوثيقة {{GOVERNING_LAW_JURISDICTION}}، والاختصاص بالنزاع ل{{COMPETENT_COURT}}.
 
-### 16.6 التواصل
+### 17.6 التواصل
 قناة التواصل المعتمدة في شأن هذه الوثيقة: {{LEVONIS_SUPPORT_CONTACT}}، في أوقات {{LEVONIS_SUPPORT_HOURS}}.`,
 
     en: `## 1. Preamble, Scope and Definitions
@@ -1152,10 +1197,10 @@ The measures in this chapter are without prejudice to the Store's right to claim
 ## 14. Reward coupons and the points shop
 
 ### 14.1 Printer coupons
-For every printer recorded as delivered to a customer by the official Levonis store, the Store issues two coupons every week in the account holder's name: a free-delivery coupon, and a discount coupon on the print filament the Store selects. The first pair is issued on delivery, then a new pair every seven days through the printer's base warranty, for at most twelve months from the start of its warranty; an extended warranty does not count. This is counted per printer: a customer with two printers receives four coupons every week. A printer is any product classified under the Store's printer sections.
+For every printer recorded as delivered to a customer by the official Levonis store, the Store issues two coupons every week in the account holder's name: a free-delivery coupon, and a discount coupon on the print filament the Store selects. The first pair is issued on delivery, then a new pair every seven days through the printer's base warranty, for at most twelve months from the start of its warranty; an extended warranty does not count. This is counted per printer: a customer with two printers receives four coupons every week. A printer is any product classified under the Store's printer sections. The weekly coupons are a benefit of Levo Care: a printer sold with the printer services (what is chosen with it at purchase: a warranty, Levo Care and the rest) receives these coupons when Levo Care was bought with it, and they are issued for twelve months from the day it was delivered, whatever warranty was chosen with it and however long its Levo Care runs. A printer sold before the printer services, or sold outside them, keeps what this article already said, until its period ends.
 
 ### 14.2 What creates no coupons
-No coupons are created by a printer received as a gift, by an order from a store in the Levo Community, or by an order whose delivery has not been recorded. A printer's coupons stop if it is returned and refunded, returns to Levonis through a trade-in, or its warranty is closed. Only the current week's coupon is issued: a week that has passed is not made up. A printer delivered before the weekly coupons began, whose warranty is still running, earns them from that day for what remains of its period.
+No coupons are created by a printer received as a gift, by an order from a store in the Levo Community, by an order whose delivery has not been recorded, or by a printer sold with the printer services without Levo Care. A printer's coupons stop if it is returned and refunded, returns to Levonis through a trade-in, or its warranty is closed. Only the current week's coupon is issued: a week that has passed is not made up. A printer delivered before the weekly coupons began, whose warranty is still running, earns them from that day for what remains of its period.
 
 ### 14.3 Validity
 A reward coupon is valid for seven full days from the moment it is issued, unless the Store announces another period before it is issued. The end of each coupon's validity is shown with it on the Rewards page, and it is not accepted after that.
@@ -1201,7 +1246,7 @@ Entry is free, or costs a number of points announced with the competition and de
 The entrant sends what the competition asks for: a written answer, a photo, or both. The entry must be the entrant's own work, and the photo of something they printed or photographed themselves.
 
 ### 15.4 Choosing the winners
-The Levonis team chooses the winners after the competition ends, by the criteria announced in it. The result is never decided by lot or by chance.
+The Levonis team chooses the winners after the competition ends, by the criteria announced in it. The result is never decided by lot or by chance. The monthly Levo Care draw is not a competition, and its provisions are in chapter 16.
 
 ### 15.5 Prizes
 Prizes in points are added to the winner's balance when the result is announced. Prizes in kind are handed over as the Store announces, and the ordinary delivery provisions apply to them.
@@ -1216,26 +1261,52 @@ The Store may refuse an entry that breaks the competition's conditions or the pr
 The Rewards page shows each winner's shortened name, place, prize and winning entry.
 
 ### 15.9 What a competition is not
-A competition is neither a lottery nor a wager, and its prizes are not exchanged for cash.
+A competition is neither a lottery nor a wager, and its prizes are not exchanged for cash. The monthly Levo Care draw is a separate benefit of Levo Care, governed by chapter 16.
 
-## 16. Final provisions
+## 16. The monthly Levo Care draw
 
-### 16.1 Amendment
+### 16.1 What it is
+The Levo Care draw is a benefit of Levo Care, not one of the competitions of chapter 15: every month the Store's system picks at random one account holder among the holders of an active Levo Care, and the Store grants that holder a prize in kind from its products, such as print filament.
+
+### 16.2 Who is entered
+Every account holder who, at the time of the draw, holds at least one printer with Levo Care in force (delivered, not returned, and its Levo Care period not ended) is entered automatically, with no request, no fee and no purchase other than Levo Care itself. The accounts of the Store's team are not entered. Levo Care follows the device: if the printer passes to another account, its new holder is entered.
+
+### 16.3 One ticket per account
+Each account has one ticket in a month's draw however many printers it holds. A holder who won a draw is not entered in the three draws after it while anyone else is in the draw.
+
+### 16.4 When and how the pick is made
+The draw is made on the first day of each calendar month, Baghdad time, or shortly after it. The pick is random and made automatically by the system, every ticket has the same chance, and the Store keeps a record that shows how the pick was made. Being entered is a chance to win, not a promise of winning.
+
+### 16.5 Confirming the result
+The result becomes final only when the Store confirms it. Before confirming, the Store may draw again for a reason it records, for example when the holder picked turns out to hold no active Levo Care any more; a name passed over is not drawn again in that month. Nobody is told anything before the confirmation.
+
+### 16.6 The prize
+The Store sets each month's prize and its quantity when it confirms the result, and the winner is told of it in the notice. The prize becomes a gift in «My gifts», ordered through the cart at a price of zero, so that the winner pays only for delivery, and the provisions on gifts in this document apply to it. The prize is not exchanged for cash, for points or for another product, and is not transferred to another account.
+
+### 16.7 A month without a draw
+If nobody holds an active Levo Care in a month, there is no draw in it. The Store may skip a month's draw for a reason it records, and it is not made up in a later month.
+
+### 16.8 Changing the draw
+The Store may change the draw's date and prizes for the future, or stop it. Results confirmed before the change stand.
+
+## 17. Final provisions
+
+### 17.1 Amendment
 The Store may amend this document by issuing a new version with a number and an effective date; an amendment does not apply retroactively to an event completed before it took effect.
 
-### 16.2 Priority in case of conflict
+### 17.2 Priority in case of conflict
 Where the text of this document conflicts with an oral promise, a message from a member of staff, a marketing publication or an image in an advertisement, the text of this document governs.
 
-### 16.3 The authority of the records
+### 17.3 The authority of the records
 The Store's electronic records are the reference in proving awards, redemptions, reversals and their timing.
 
-### 16.4 Severability
+### 17.4 Severability
 The invalidity of one provision does not affect the validity of the remaining provisions.
 
-### 16.5 Governing law and jurisdiction
+### 17.5 Governing law and jurisdiction
 This document is governed by {{GOVERNING_LAW_JURISDICTION}}, and {{COMPETENT_COURT}} have jurisdiction over disputes.
 
-### 16.6 Contact
+### 17.6 Contact
 The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONTACT}}, during {{LEVONIS_SUPPORT_HOURS}}.`,
 
     ckb: `## 1. پێشەکی و بوار و پێناسەکان
@@ -1668,10 +1739,10 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 ## 14. کۆپۆنەکانی پاداشت و فرۆشگای خاڵ
 
 ### 14.1 کۆپۆنەکانی چاپکەر
-بۆ هەر چاپکەرێک کە گەیاندنی بۆ کڕیار لە فرۆشگای فەرمی Levonis ەوە تۆمار کرابێت، فرۆشگا هەموو هەفتەیەک دوو کۆپۆن بە ناوی خاوەنی هەژمارەکە دەردەکات: کۆپۆنێکی گەیاندنی بەخۆڕایی، و کۆپۆنێکی داشکاندن لەسەر ئەو دەزووی چاپەی (فیلامێنت) کە فرۆشگا هەڵیدەبژێرێت. جووتی یەکەم لە کاتی گەیاندن دەردەچێت، پاشان هەر حەوت ڕۆژ جووتێکی نوێ بە درێژایی گەرەنتی بنەڕەتی چاپکەرەکە، بە زۆرترین دوازدە مانگ لە دەستپێکی گەرەنتییەکەی؛ گەرەنتی درێژکراوە ناژمێردرێت. ئەمە بۆ هەر چاپکەرێک جیا دەژمێردرێت: کەسێک کە دوو چاپکەری هەبێت هەموو هەفتەیەک چوار کۆپۆن وەردەگرێت. چاپکەر هەر بەرهەمێکە کە لە بەشەکانی چاپکەری فرۆشگادا پۆلێن کرابێت.
+بۆ هەر چاپکەرێک کە گەیاندنی بۆ کڕیار لە فرۆشگای فەرمی Levonis ەوە تۆمار کرابێت، فرۆشگا هەموو هەفتەیەک دوو کۆپۆن بە ناوی خاوەنی هەژمارەکە دەردەکات: کۆپۆنێکی گەیاندنی بەخۆڕایی، و کۆپۆنێکی داشکاندن لەسەر ئەو دەزووی چاپەی (فیلامێنت) کە فرۆشگا هەڵیدەبژێرێت. جووتی یەکەم لە کاتی گەیاندن دەردەچێت، پاشان هەر حەوت ڕۆژ جووتێکی نوێ بە درێژایی گەرەنتی بنەڕەتی چاپکەرەکە، بە زۆرترین دوازدە مانگ لە دەستپێکی گەرەنتییەکەی؛ گەرەنتی درێژکراوە ناژمێردرێت. ئەمە بۆ هەر چاپکەرێک جیا دەژمێردرێت: کەسێک کە دوو چاپکەری هەبێت هەموو هەفتەیەک چوار کۆپۆن وەردەگرێت. چاپکەر هەر بەرهەمێکە کە لە بەشەکانی چاپکەری فرۆشگادا پۆلێن کرابێت. کۆپۆنە هەفتانەکان لە سوودەکانی لیڤۆ کێرن: چاپکەرێک کە لەگەڵ خزمەتگوزارییەکانی چاپکەر بفرۆشرێت (ئەوەی لە کاتی کڕیندا لەگەڵی هەڵدەبژێردرێت: گەرەنتی، لیڤۆ کێر و ئەوانی تر) ئەم کۆپۆنانە وەردەگرێت ئەگەر لیڤۆ کێری لەگەڵ کڕدرابێت، و بۆ ماوەی دوازدە مانگ لە ڕۆژی گەیاندنییەوە بۆی دەردەچن، هەر گەرەنتییەک لەگەڵی هەڵبژێردرابێت و ماوەی لیڤۆ کێرەکەی هەرچەند بێت. چاپکەرێک کە پێش کارپێکردنی خزمەتگوزارییەکانی چاپکەر فرۆشرابێت، یان لە دەرەوەی ئەوان فرۆشرابێت، لەسەر ئەوەی پێشتر لەم ماددەیەدا هاتووە دەمێنێتەوە تا ماوەکەی تەواو دەبێت.
 
 ### 14.2 ئەوەی کۆپۆن دروست ناکات
-چاپکەرێک کە وەک دیاری گەیشتبێت، داواکارییەک لە فرۆشگایەکی کۆمەڵگەی لێڤۆ، و داواکارییەک کە گەیاندنەکەی تۆمار نەکرابێت، هیچ کۆپۆنێک دروست ناکەن. کۆپۆنەکانی چاپکەرێک دەوەستن ئەگەر بگەڕێنرێتەوە و نرخەکەی بدرێتەوە، یان بە گۆڕینەوە (Trade-in) بگەڕێتەوە بۆ Levonis، یان گەرەنتییەکەی داخرابێت. تەنها کۆپۆنی هەفتەی ئێستا دەردەچێت: هەفتەیەکی ڕابردوو قەرەبوو ناکرێتەوە. چاپکەرێک کە پێش دەستپێکردنی کۆپۆنە هەفتانەکان گەیەنرابێت و گەرەنتییەکەی هێشتا کارا بێت، لەو ڕۆژەوە بۆ ئەوەی لە ماوەکەی ماوە کۆپۆنەکانی وەردەگرێت.
+چاپکەرێک کە وەک دیاری گەیشتبێت، داواکارییەک لە فرۆشگایەکی کۆمەڵگەی لێڤۆ، داواکارییەک کە گەیاندنەکەی تۆمار نەکرابێت، و چاپکەرێک کە لەگەڵ خزمەتگوزارییەکانی چاپکەر بەبێ لیڤۆ کێر فرۆشرابێت، هیچ کۆپۆنێک دروست ناکەن. کۆپۆنەکانی چاپکەرێک دەوەستن ئەگەر بگەڕێنرێتەوە و نرخەکەی بدرێتەوە، یان بە گۆڕینەوە (Trade-in) بگەڕێتەوە بۆ Levonis، یان گەرەنتییەکەی داخرابێت. تەنها کۆپۆنی هەفتەی ئێستا دەردەچێت: هەفتەیەکی ڕابردوو قەرەبوو ناکرێتەوە. چاپکەرێک کە پێش دەستپێکردنی کۆپۆنە هەفتانەکان گەیەنرابێت و گەرەنتییەکەی هێشتا کارا بێت، لەو ڕۆژەوە بۆ ئەوەی لە ماوەکەی ماوە کۆپۆنەکانی وەردەگرێت.
 
 ### 14.3 ماوەی بەکارهێنان
 کۆپۆنی پاداشت حەوت ڕۆژی تەواو لە ساتی دەرچوونییەوە بەکاردێت، مەگەر فرۆشگا پێش دەرکردنی ماوەیەکی تر ڕابگەیەنێت. کۆتایی ماوەی هەر کۆپۆنێک لەگەڵیدا لە پەڕەی پاداشتەکاندا پیشان دەدرێت، و دوای ئەوە وەرناگیرێت.
@@ -1717,7 +1788,7 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 بەشداربوو ئەوەی پێشبڕکێکە داوای دەکات دەینێرێت: وەڵامێکی نووسراو، یان وێنەیەک، یان هەردووکیان. بەشدارییەکە دەبێت کاری خۆی بێت، و وێنەکە هی شتێک بێت کە خۆی چاپی کردبێت یان وێنەی گرتبێت.
 
 ### 15.4 هەڵبژاردنی براوەکان
-تیمی Levonis دوای کۆتاییهاتنی ماوەی پێشبڕکێکە، بەپێی ئەو پێوەرانەی تێیدا ڕاگەیەنراون، براوەکان هەڵدەبژێرێت. ئەنجامەکە هەرگیز بە تیروپشک یان بەخت دیاری ناکرێت.
+تیمی Levonis دوای کۆتاییهاتنی ماوەی پێشبڕکێکە، بەپێی ئەو پێوەرانەی تێیدا ڕاگەیەنراون، براوەکان هەڵدەبژێرێت. ئەنجامەکە هەرگیز بە تیروپشک یان بەخت دیاری ناکرێت. تیروپشکی مانگانەی لیڤۆ کێر پێشبڕکێ نییە، و حوکمەکانی لە بەشی شازدەیەمدان.
 
 ### 15.5 خەڵاتەکان
 خەڵاتی خاڵ لە ساتی ڕاگەیاندنی ئەنجامەکەدا دەخرێتە سەر باڵانسی براوە. خەڵاتی ماددی بەو شێوەیەی فرۆشگا ڕایدەگەیەنێت دەدرێت، و حوکمە ئاساییەکانی گەیاندنی بەسەردا جێبەجێ دەبێت.
@@ -1732,26 +1803,52 @@ The approved channel of contact concerning this document: {{LEVONIS_SUPPORT_CONT
 پەڕەی پاداشتەکان ناوی کورتکراوەی هەر براوەیەک و پلە و خەڵات و بەشدارییە براوەکەی پیشان دەدات.
 
 ### 15.9 پێشبڕکێ چی نییە
-پێشبڕکێ نە تیروپشکە و نە گرەو، و خەڵاتەکانی بە پارە ناگۆڕدرێنەوە.
+پێشبڕکێ نە تیروپشکە و نە گرەو، و خەڵاتەکانی بە پارە ناگۆڕدرێنەوە. تیروپشکی مانگانەی لیڤۆ کێر سوودێکی سەربەخۆی لیڤۆ کێرە و بەشی شازدەیەم حوکمی دەکات.
 
-## 16. حوکمە کۆتاییەکان
+## 16. تیروپشکی مانگانەی لیڤۆ کێر
 
-### 16.1 گۆڕانکاری
+### 16.1 چییە
+تیروپشکی لیڤۆ کێر یەکێکە لە سوودەکانی لیڤۆ کێر، و پێشبڕکێیەک نییە لە پێشبڕکێکانی بەشی پازدەیەم: هەموو مانگێک سیستەمی فرۆشگا بە هەڕەمەکی خاوەن هەژمارێک لەنێو خاوەنانی لیڤۆ کێری کارادا هەڵدەبژێرێت، و فرۆشگا خەڵاتێکی کاڵایی لە بەرهەمەکانی خۆی پێ دەبەخشێت، وەک دەزووی چاپ (فیلامێنت).
+
+### 16.2 کێ بەشدار دەبێت
+هەر خاوەن هەژمارێک کە لە کاتی تیروپشکەکەدا لانیکەم یەک چاپکەری هەبێت لیڤۆ کێری لەسەر کارا بێت (گەیەنرابێت، نەگەڕێنرابێتەوە، و ماوەی لیڤۆ کێرەکەی تەواو نەبووبێت) خۆکارانە بەشدار دەبێت، بەبێ داواکاری و بەبێ کرێ و بەبێ هیچ کڕینێک جگە لە خودی لیڤۆ کێر. هەژمارەکانی تیمی فرۆشگا بەشدار نابن. لیڤۆ کێر لەگەڵ ئامێرەکەدایە: ئەگەر چاپکەرەکە بۆ هەژمارێکی تر گواسترایەوە، خاوەنە نوێیەکەی بەشدار دەبێت.
+
+### 16.3 بۆ هەر هەژمارێک یەک بلیت
+هەر هەژمارێک لە تیروپشکی مانگێکدا یەک بلیتی هەیە، چەند چاپکەری هەبێت. ئەوەی لە تیروپشکێکدا بیباتەوە لە سێ تیروپشکی دوای ئەوەدا بەشدار نابێت، تا کەسێکی تر لە تیروپشکەکەدا هەبێت.
+
+### 16.4 کات و شێوازی هەڵبژاردن
+تیروپشکەکە لە یەکەم ڕۆژی هەر مانگێکی زایینیدا بە کاتی بەغدا، یان کەمێک دوای ئەوە، ئەنجام دەدرێت. هەڵبژاردنەکە هەڕەمەکییە و سیستەمەکە خۆکارانە ئەنجامی دەدات، هەموو بلیتێک هەمان دەرفەتی هەیە، و فرۆشگا تۆمارێک دەپارێزێت کە پیشانی دەدات هەڵبژاردنەکە چۆن کراوە. بەشداربوون دەرفەتێکە بۆ بردنەوە، نەک بەڵێنی بردنەوە.
+
+### 16.5 پشتڕاستکردنەوەی ئەنجام
+ئەنجامەکە تەنها کاتێک کۆتایی دەبێت کە فرۆشگا پشتڕاستی بکاتەوە. پێش پشتڕاستکردنەوە فرۆشگا دەتوانێت بە هۆکارێکی تۆمارکراو تیروپشکەکە دووبارە بکاتەوە، بۆ نموونە کاتێک دەردەکەوێت خاوەنی ناوەکە چیتر لیڤۆ کێری کارای نییە؛ ناوێک کە لابرابێت لەو مانگەدا دووبارە ڕاناکێشرێت. پێش پشتڕاستکردنەوە کەس لە هیچ شتێک ئاگادار ناکرێتەوە.
+
+### 16.6 خەڵاتەکە
+فرۆشگا خەڵاتی هەر مانگێک و ژمارەکەی لە کاتی پشتڕاستکردنەوەی ئەنجامدا دیاری دەکات، و براوە لە ئاگادارییەکەیدا پێی دەزانێت. خەڵاتەکە دەبێتە دیارییەک لە «دیارییەکانم» کە لە ڕێگەی سەبەتەوە بە نرخی سفر داوا دەکرێت، بۆیە براوە تەنها کرێی گەیاندن دەدات، و حوکمەکانی دیاری لەم بەڵگەنامەیەدا بەسەریدا جێبەجێ دەبن. خەڵاتەکە بە پارە یان بە خاڵ یان بە بەرهەمێکی تر ناگۆڕدرێتەوە، و بۆ هەژمارێکی تر ناگوازرێتەوە.
+
+### 16.7 مانگێک بەبێ تیروپشک
+ئەگەر لە مانگێکدا هیچ خاوەنێکی لیڤۆ کێری کارا نەبێت، ئەو مانگە تیروپشکی نابێت. فرۆشگا دەتوانێت بە هۆکارێکی تۆمارکراو تیروپشکی مانگێک تێپەڕێنێت، و لە مانگێکی دواتردا قەرەبوو ناکرێتەوە.
+
+### 16.8 گۆڕینی تیروپشکەکە
+فرۆشگا دەتوانێت بۆ داهاتوو کات و خەڵاتەکانی تیروپشکەکە بگۆڕێت، یان ڕایبگرێت. ئەو ئەنجامانەی پێش گۆڕانکارییەکە پشتڕاستکراونەتەوە وەک خۆیان دەمێننەوە.
+
+## 17. حوکمە کۆتاییەکان
+
+### 17.1 گۆڕانکاری
 فرۆشگا دەتوانێت ئەم بەڵگەنامەیە بگۆڕێت بە دەرکردنی وەشانێکی نوێ بە ژمارە و بەرواری کارپێکردن؛ گۆڕانکاری بە کاریگەری دواکەوتوو لەسەر ڕووداوێک جێبەجێ نابێت کە پێش کارپێکردنی تەواو بووە.
 
-### 16.2 پێشینە لە کاتی ناکۆکیدا
+### 17.2 پێشینە لە کاتی ناکۆکیدا
 کاتێک دەقی ئەم بەڵگەنامەیە لەگەڵ بەڵێنێکی زارەکی یان نامەیەکی کارمەند یان بڵاوکراوەیەکی بازرگانی یان وێنەیەک لە ڕیکلامدا ناکۆک بێت، دەقی ئەم بەڵگەنامەیە بنەمایە.
 
-### 16.3 کاریگەری تۆمارەکان
+### 17.3 کاریگەری تۆمارەکان
 تۆمارە ئەلیکترۆنییەکانی فرۆشگا سەرچاوەن لە سەلماندنی بەخشین و خەرجکردن و گەڕاندنەوە و کاتەکانیان.
 
-### 16.4 سەربەخۆیی بڕگەکان
+### 17.4 سەربەخۆیی بڕگەکان
 پووچی بڕگەیەک کاریگەری لەسەر دروستی بڕگەکانی تر نییە.
 
-### 16.5 یاسا و دەسەڵاتی دادوەری
+### 17.5 یاسا و دەسەڵاتی دادوەری
 ئەم بەڵگەنامەیە بە {{GOVERNING_LAW_JURISDICTION}} ڕێک دەخرێت، و {{COMPETENT_COURT}} دەسەڵاتی هەیە لەسەر ناکۆکییەکان.
 
-### 16.6 پەیوەندی
+### 17.6 پەیوەندی
 کەناڵی پەیوەندی پەسەندکراو سەبارەت بەم بەڵگەنامەیە: {{LEVONIS_SUPPORT_CONTACT}}، لە کاتەکانی {{LEVONIS_SUPPORT_HOURS}}.`,
   },
 };

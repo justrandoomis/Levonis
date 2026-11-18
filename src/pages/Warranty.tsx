@@ -419,6 +419,7 @@ export default function Warranty() {
                   onOpenThread={(claim, trigger) => openThread(claim.id, trigger)}
                   onRemove={askUnlink}
                   maintenancePath={mine?.maintenance_path ?? null}
+                  carePerks={mine?.care_perks ?? null}
                 />
               ))}
             </div>

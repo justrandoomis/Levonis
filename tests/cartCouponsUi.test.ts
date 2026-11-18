@@ -414,11 +414,11 @@ test('the hub’s tile says weekly plainly while weekly is on, on a live-like hu
       competitions: [],
     }) as unknown as RewardsHubData;
   const line = (h: RewardsHubData | null, lang: Lang) => doorText(doorLines(h).coupons.lines[0], lang, '2026-11-05T00:00:00.000Z');
-  assert.equal(line(hub({ enabled: true, months: 12 }), 'ar'), 'تصلك كل أسبوع مع كل طابعة تستلمها من Levonis');
+  assert.equal(line(hub({ enabled: true, months: 12 }), 'ar'), 'تصلك كل أسبوع مع ليفو كير على طابعتك من Levonis');
   assert.match(line(hub({ enabled: true, months: 12 }), 'en'), /every week/);
   assert.match(line(hub({ enabled: true, months: 12 }), 'ckb'), /هەموو هەفتەیەک/);
-  assert.equal(line(hub({ enabled: false, months: 12 }), 'ar'), 'تصلك مع كل طابعة تستلمها من Levonis', 'the old line only while the weeks are off');
-  assert.equal(line(null, 'ar'), 'تصلك كل أسبوع مع كل طابعة تستلمها من Levonis', 'and with no answer to read, the owner’s programme');
+  assert.equal(line(hub({ enabled: false, months: 12 }), 'ar'), 'تصلك مع ليفو كير على طابعتك من Levonis', 'the old line only while the weeks are off');
+  assert.equal(line(null, 'ar'), 'تصلك كل أسبوع مع ليفو كير على طابعتك من Levonis', 'and with no answer to read, the owner’s programme');
 });
 
 // ------------------------------------------------------------ the admin
@@ -428,7 +428,7 @@ test('the admin’s tabs, in the owner’s order, overview first, and no native 
   const order = ['overview', 'printers', 'coupons', 'competitions', 'settings'].map((id) => page.indexOf(`{ id: '${id}', label:`));
   assert.ok(order.every((at, i) => at > 0 && (i === 0 || at > order[i - 1])), JSON.stringify(order));
   assert.match(page, /useState<RewardsView>\('overview'\)/);
-  assert.match(page, /تصدر كل أسبوع لكل طابعة تحت الضمان/);
+  assert.match(page, /تصدر كل أسبوع لكل طابعة بيعت مع ليفو كير/, 'the weekly coupons belong to Levo Care (DECISIONS row 359)');
   for (const file of ['AdminRewards.tsx', 'RewardsCoupons.tsx', 'RewardsPrinters.tsx', 'RewardsOverview.tsx']) {
     assert.doesNotMatch(src(`src/components/adminRewards/${file}`), /window\.(prompt|confirm|alert)/, file);
   }
@@ -454,7 +454,7 @@ test('the settings’ one line sums the fields on screen, in three languages', (
   };
   const money = (n: number) => n.toLocaleString('en-US');
   const ar = weeklyEarnSummary(cfg, 'ar', money);
-  assert.match(ar, /كل طابعة تكسب كل أسبوع/);
+  assert.match(ar, /كل طابعة بيعت مع ليفو كير تكسب كل أسبوع/);
   assert.match(ar, /5,000/);
   assert.match(ar, /100,000/);
   assert.match(ar, /15%/);
@@ -464,7 +464,7 @@ test('the settings’ one line sums the fields on screen, in three languages', (
   assert.notEqual(ckb, ar);
   assert.match(ckb, /هەموو هەفتەیەک/);
   assert.doesNotMatch(ckb.replace(/[\d,%]/g, ''), ARABIC_ONLY);
-  assert.match(weeklyEarnSummary(cfg, 'en', money), /Each printer earns every week/);
+  assert.match(weeklyEarnSummary(cfg, 'en', money), /Each printer sold with Levo Care earns every week/);
 
   assert.match(weeklyEarnSummary({ ...cfg, weekly: { enabled: false, months: 12 } }, 'ar', money), /عند تسليمها فقط/);
   assert.match(weeklyEarnSummary({ ...cfg, enabled: false }, 'ar', money), /لا تصدر كوبونات/);
