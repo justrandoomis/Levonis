@@ -345,3 +345,11 @@ test('a support spool never prices the build material (the estimated case: price
   assert.ok(petg && petg.iqdPerKg >= 19000 && petg.iqdPerKg <= 21000, `PETG from the PETG spool, not the 10,000/kg support (got ${petg?.iqdPerKg})`);
   assert.equal(petg?.from, 'platform');
 });
+
+test('a net weight written in kilograms is kilograms', async () => {
+  const { netWeightGrams } = await import('../worker/lib/printQuote/repository');
+  assert.equal(netWeightGrams(JSON.stringify({ net_weight: '1 kg' })), 1000);
+  assert.equal(netWeightGrams(JSON.stringify({ net_weight: '0.5kg' })), 500);
+  assert.equal(netWeightGrams(JSON.stringify({ net_weight: '1,000 g' })), 1000);
+  assert.equal(netWeightGrams(JSON.stringify({ net_weight: '750' })), 750);
+});

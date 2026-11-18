@@ -495,7 +495,9 @@ export function netWeightGrams(specFields: unknown): number {
   try {
     const specs = JSON.parse(str(specFields) || '{}') as Record<string, unknown>;
     const raw = str(specs.net_weight).replace(/[,\s]/g, '');
-    const grams = Number(raw.replace(/[^0-9.]/g, ''));
+    // «1 kg» / «0.5كغم» is kilograms, not 1 g — a stated unit is honoured.
+    const kilos = /(kg|كغم|كغ|کگ|كيلو)/i.test(raw);
+    const grams = Number(raw.replace(/[^0-9.]/g, '')) * (kilos ? 1000 : 1);
     return Number.isFinite(grams) && grams > 0 ? grams : 0;
   } catch {
     return 0;
