@@ -5,8 +5,10 @@
  *
  *   printerBreakdown(bases)      a serviced printer line's net goods split into the printer and its
  *                                services (pro rata of the frozen fee inside the line price), each
- *                                service by allocateExact; the kits' and the membership's lines; the
- *                                courier fee. The parts add up to the existing net, exactly.
+ *                                service by allocateExact; the kits', the add-ons' (phase 4) and the
+ *                                membership's lines; the courier fee. The parts add up to the existing
+ *                                net, exactly. Phase 4 also sums the owner's kit / add-on discounts
+ *                                given (printer_discount_iqd) — already inside those prices, shown only.
  *   serviceClaimsSummary(db, r)  the period's claim costs (already inside general expenses — shown as a
  *                                line, never subtracted twice), the Care discount given, the co-pay
  *                                collected (service income, owner ruling D2) and the inspections done
@@ -37,6 +39,14 @@ export interface PrinterBreakdown {
   services: Record<PrinterServiceKey, number>;
   /** Owner-made filament kit lines (0235), net. */
   kits_net_iqd: number;
+  /** Phase 4 (0242; DECISIONS row 355): the add-on lines sold with printers, net. 0 on a database without order_items.addon_id. */
+  addons_net_iqd: number;
+  /**
+   * Phase 4: «خصومات الطابعة الممنوحة» — the owner's kit / add-on discounts given (Σ order_items.printer_discount_iqd,
+   * net of returns: × (qty − returned_qty) / qty, floored).
+   * INFORMATIONAL: already inside the lines' prices (money rule D2), never subtracted again. 0 without the column.
+   */
+  printer_discounts_iqd: number;
   /** The membership lines bought with a printer (0235), net. */
   membership_iqd: number;
   /** The courier's fee on these orders (finance_collections). */
@@ -81,11 +91,20 @@ export function splitServicedLine(line: { qty: unknown; line_total_iqd: unknown;
   return { serviced: !!snap, gross, services_net: servicesNet, printer_net: N - servicesNet, services };
 }
 
+/** A line's printer discount kept after its returns: floor(discount × (qty − returned) / qty); 0 when nothing is kept. */
+function keptDiscount(row: Record<string, unknown>): number {
+  const d = Math.max(0, Math.trunc(n(row.printer_discount_iqd)));
+  const qty = Math.max(0, Math.trunc(n(row.qty)));
+  if (!d || !qty) return 0;
+  const returned = Math.min(qty, Math.max(0, Math.trunc(n(row.returned_qty))));
+  return returned ? mulDivFloor(d, qty - returned, qty) : d;
+}
+
 export function emptyBreakdown(): PrinterBreakdown {
   return {
     printer_lines: 0, printer_net_iqd: 0, services_gross_iqd: 0, services_net_iqd: 0,
     services: Object.fromEntries(PRINTER_SERVICE_KEYS.map((k) => [k, 0])) as Record<PrinterServiceKey, number>,
-    kits_net_iqd: 0, membership_iqd: 0, courier_fee_iqd: 0,
+    kits_net_iqd: 0, addons_net_iqd: 0, printer_discounts_iqd: 0, membership_iqd: 0, courier_fee_iqd: 0,
   };
 }
 
@@ -97,7 +116,11 @@ export function printerBreakdown(bases: Pick<OrderProfitBase, 'lines' | 'totals'
     for (const l of b.lines ?? []) {
       const row = l as unknown as Record<string, unknown>;
       if (row.line_kind === 'membership') { out.membership_iqd += Math.trunc(n(row.net_goods_iqd)); continue; }
+      // Phase 4: the owner's discount given on a kit / add-on line (report-only; absent column = 0), net of returns
+      // like the line's own net: × (qty − returned_qty) / qty, floored (the profit engine's returned_qty).
+      out.printer_discounts_iqd += keptDiscount(row);
       if (row.kit_id) { out.kits_net_iqd += Math.trunc(n(row.net_goods_iqd)); continue; }
+      if (row.addon_id) { out.addons_net_iqd += Math.trunc(n(row.net_goods_iqd)); continue; }
       if (!row.services_snapshot) continue;
       const s = splitServicedLine(row as never);
       if (!s.serviced) continue;

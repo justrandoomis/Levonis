@@ -112,7 +112,7 @@ export async function operationsReport(db: D1Database, from: string, to: string)
       units:Number(base.totals.units)-Number(o.membership_units??0),
       estimated_lines:base.lines.filter((l)=>l.cost_confidence==='snapshot').length,
       warnings:base.warnings,version:base.version,
-      // Printer services phase 3 (DECISIONS row 347): the order's printer / services / kits / membership split, report-only.
+      // Printer services phase 3 (DECISIONS row 347; phase 4 row 355 adds the add-ons and the discounts given): the order's split, report-only.
       printer_breakdown:printerBreakdown([base])};
   }),
     truncated = list.length > 5000;
@@ -204,6 +204,8 @@ export async function operationsReport(db: D1Database, from: string, to: string)
      * Printer services phase 3 (DECISIONS row 347): the period's serviced printer lines split into the printer and its
      * services (sums of each order's `printer_breakdown`; empty without the profit workspace), and the claims' money —
      * costs already inside general_expenses_iqd, the Care discount given, the co-pay collected (service income).
+     * Phase 4 (DECISIONS row 355): it also carries addons_net_iqd and printer_discounts_iqd (the owner's kit / add-on
+     * discounts — already inside the line prices, shown only); both read 0 on a database without 0242's columns.
      */
     services_breakdown: bases.length ? printerBreakdown(bases) : emptyBreakdown(),
     service_claims: await serviceClaimsSummary(db, { from, to }, { installed: !!schema?.service_claims }),

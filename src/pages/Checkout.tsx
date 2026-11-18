@@ -181,6 +181,8 @@ interface ShippingQuoteDto {
 interface CheckoutQuoteLineDto {
   /** Phase 2 (0235): a line of the owner's filament kit, packed with its printer line (drawn under it). */
   kit_line?: { printer_cart_item_id: string; kit_id: string; qty_per_printer: number } | null;
+  /** Phase 4 (0242): a discounted add-on packed with its printer line (drawn under it, like a kit line). */
+  addon_line?: { printer_cart_item_id: string; addon_id: string; qty_per_printer: number } | null;
   cart_item_id: string;
   product_id: string;
   name: string;
@@ -1313,6 +1315,8 @@ export default function Checkout() {
     key: string;
     /** Phase 2: the printer line this filament-kit line is packed with (drawn under it). */
     kitOf?: string | null;
+    /** Phase 4: the line under its printer is an add-on, not a filament-kit line. */
+    addonOf?: boolean;
     productId: string;
     image: string;
     name: string;
@@ -1406,7 +1410,8 @@ export default function Checkout() {
               usdWith
             ),
             mysterySpools: l.mystery ? l.mystery.spools : (cartLine?.composition?.mystery?.spool_qty ?? null),
-            kitOf: l.kit_line?.printer_cart_item_id ?? cartLine?.kit_line?.printer_cart_item_id ?? null,
+            kitOf: l.kit_line?.printer_cart_item_id ?? cartLine?.kit_line?.printer_cart_item_id ?? l.addon_line?.printer_cart_item_id ?? (cartLine as { addon_line?: { printer_cart_item_id: string } | null } | undefined)?.addon_line?.printer_cart_item_id ?? null,
+            addonOf: !!(l.addon_line ?? (cartLine as { addon_line?: unknown } | undefined)?.addon_line),
           };
         })
       : items.map((i) => ({
@@ -1451,7 +1456,8 @@ export default function Checkout() {
             },
             usdWith
           ),
-          kitOf: i.kit_line?.printer_cart_item_id ?? null,
+          kitOf: i.kit_line?.printer_cart_item_id ?? (i as { addon_line?: { printer_cart_item_id: string } | null }).addon_line?.printer_cart_item_id ?? null,
+          addonOf: !!(i as { addon_line?: unknown }).addon_line,
         })));
   /**
    * Phase 2 (0235): the membership bought with a ticked printer, drawn UNDER that printer (after its kit
@@ -3203,7 +3209,7 @@ export default function Checkout() {
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <h4 className="text-sm font-normal text-text-primary line-clamp-2 mb-0.5">{line.name}</h4>
                     {/* Phase 2: a filament-kit line follows its printer — no quantity of its own. */}
-                    {line.kitOf ? <p className="text-xs text-text-muted mb-0.5">{PS_STRINGS[psLang].filament} · {PS_STRINGS[psLang].kitFollows}</p> : null}
+                    {line.kitOf && !line.addonOf ? <p className="text-xs text-text-muted mb-0.5">{PS_STRINGS[psLang].filament} · {PS_STRINGS[psLang].kitFollows}</p> : null}
                     {line.colourTag ? (
                       // THE COLOUR, AS A SWATCH AND A NAME, WITH ITS COUNT (§6) — the last screen
                       // where 56 pieces of the wrong colour can still be seen.

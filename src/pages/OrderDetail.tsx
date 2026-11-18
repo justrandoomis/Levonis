@@ -744,6 +744,20 @@ export default function OrderDetail() {
                           extras.push(s.warrantyMonths(months));
                         }
                       }
+                      // 0242 (phase 4): a kit or add-on line packed with its printer says so, how its colour was
+                      // decided, and — when no struck offer price says it already — its price before the owner's discount.
+                      const attached = it as unknown as {
+                        kit?: { color_mode?: string | null } | null;
+                        addon?: { color_mode?: string | null } | null;
+                        printer_discount?: { before_unit_iqd: number; discount_unit_iqd: number } | null;
+                      };
+                      if (attached.addon) extras.push(loc('إضافة مع الطابعة', 'Add-on with the printer', 'زیادکراو لەگەڵ پرینتەرەکە'));
+                      else if (attached.kit) extras.push(loc('ضمن باقة الفيلامنت', 'Part of the filament kit', 'بەشێک لە پاکێجی فیلامێنت'));
+                      const colourMode = attached.kit?.color_mode ?? attached.addon?.color_mode;
+                      if (colourMode === 'chosen') extras.push(loc('لون اخترته', 'Your chosen colour', 'ڕەنگی هەڵبژاردەی خۆت'));
+                      else if (colourMode === 'random') extras.push(loc('لون عشوائي', 'Random colour', 'ڕەنگی هەڕەمەکی'));
+                      const pd = attached.printer_discount;
+                      if (!struckShown && pd && pd.discount_unit_iqd > 0) extras.push(`${loc('السعر قبل الخصم', 'Price before discount', 'نرخ پێش داشکاندن')}: ${money(pd.before_unit_iqd)}`);
                       const method = it.transport?.method;
                       if (method && s.transport[method]) extras.push(s.transport[method]);
                       // A pre-order paid cash on delivery: the line kept its

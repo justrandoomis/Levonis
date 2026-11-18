@@ -7,8 +7,16 @@
  *   includes no membership). The price is never stored here: it is the live
  *   membership_plans row, shown read-only with a link to the memberships admin.
  * - THE FILAMENT KITS: owner-made from real products / variants / colours, with
- *   a per-printer quantity and the printers they fit. A kit costs the sum of its
- *   items' live prices — there is no discount field anywhere.
+ *   a per-printer quantity. A kit costs the sum of its items' live prices, less
+ *   the owner's kit discount when one is set (phase 4, DECISIONS row 355 —
+ *   supersedes phase 2's «no discount»); each item's colour is fixed or the
+ *   customer's pick.
+ *
+ * PHASE 4 SCOPE (owner, 2026-11-18): the kits panel sits on ONE printer's page
+ * and shows only what that printer offers. Whether a kit shows with this
+ * printer is one switch that edits this printer's entry alone; kits made for
+ * other printers are counted and folded, never listed by printer — a printer's
+ * page never names another printer.
  *
  * Both edit the same draft as the rest of the list (`upd`); the fieldset of the
  * parent disables every control for a non-owner.
@@ -20,22 +28,28 @@ import ProductPicker from '../adminProducts/form/ProductPicker';
 import { resolveProductNames } from '../adminBenefits/shared';
 import { refusalText } from '../../lib/refusalStrings';
 import {
+  MAX_DISCOUNT_FIXED_IQD,
+  MAX_DISCOUNT_PERCENT,
   MAX_KITS,
   MAX_KIT_ITEMS,
   MAX_KIT_ITEM_QTY,
   MEMBERSHIP_TIERS,
+  colorModeOf,
   kitItemKey,
   type FilamentKit,
+  type KitColorMode,
   type KitItem,
+  type KitPrinterRef,
   type MembershipTier,
+  type PrinterDiscount,
   type PrinterServicesConfig,
 } from '../../../packages/pricing/src/printerServices';
+import { S, discountPreview, say, sharedWithOthers, type Loc } from './adminPrinterStrings';
 
-type Loc = (ar: string, en: string, ckb: string) => string;
 type Upd = (fn: (d: PrinterServicesConfig) => void) => void;
-interface Printer { id: string; slug: string; name: string; versions: Array<{ id: string; name: string }> }
+export interface Printer { id: string; slug: string; name: string; versions: Array<{ id: string; name: string }> }
 
-const KIT_ID = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+export const KIT_ID = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 
 /**
  * What the save and publish would refuse in the kits, found before asking (phase 2 review U9): an
@@ -51,12 +65,19 @@ export function kitProblems(kits: readonly FilamentKit[], printerIds: ReadonlySe
     const dupId = !badId && seen.has(k.id);
     seen.add(k.id);
     const keys = new Set<string>();
+    // Phase 4: a product whose colour the customer picks appears once (with its selection) in the kit.
+    const selections = new Set<string>();
+    const customerSelections = new Set<string>();
     const dupItems: number[] = [];
     const printerItems: number[] = [];
     k.items.forEach((it, j) => {
       const key = kitItemKey(it);
-      if (keys.has(key)) dupItems.push(j);
+      const sel = `${it.product_id}|${[...it.option_value_ids].sort().join(',')}`;
+      const customer = colorModeOf(it) === 'customer';
+      if (keys.has(key) || customerSelections.has(sel) || (customer && selections.has(sel))) dupItems.push(j);
       keys.add(key);
+      selections.add(sel);
+      if (customer) customerSelections.add(sel);
       if (printerIds.has(it.product_id)) printerItems.push(j);
     });
     return { badId, dupId, dupItems, printerItems };
@@ -77,7 +98,36 @@ export function issueText(issue: string, loc: Loc, kits: readonly FilamentKit[] 
     return loc(`الباقة «${id}»`, `Kit «${id}»`, `پاکێجی «${id}»`);
   };
   const n1 = (v: string) => Number(v) + 1;
+  const addonName = (ref: string) => {
+    const at = /^addons\[(\d+)\]$/.exec(ref);
+    const id = at ? `#${Number(at[1]) + 1}` : ref.replace(/^addons\./, '');
+    return loc(`الإضافة «${id}»`, `Add-on «${id}»`, `زیادکراوی «${id}»`);
+  };
+  const discountRule = loc(
+    `الخصم: نسبة من 1 إلى ${MAX_DISCOUNT_PERCENT}% أو مبلغ ثابت لكل طابعة حتى ${formatIqd(MAX_DISCOUNT_FIXED_IQD)}`,
+    `discount: 1 to ${MAX_DISCOUNT_PERCENT}% or a fixed amount per printer up to ${formatIqd(MAX_DISCOUNT_FIXED_IQD)}`,
+    `داشکاندن: لە 1 تا ${MAX_DISCOUNT_PERCENT}% یان بڕێکی جێگیر بۆ هەر پرینتەرێک تا ${formatIqd(MAX_DISCOUNT_FIXED_IQD)}`
+  );
+  const noColour = loc('لا ألوان مفعّلة له ليختار الزبون منها', 'it has no active colour for the customer to pick', 'هیچ ڕەنگێکی چالاکی نییە بۆ ئەوەی کڕیار هەڵیبژێرێت');
   const rules: Array<[RegExp, (m: RegExpExecArray) => string]> = [
+    // Phase 4 (DECISIONS row 355): kit discounts and customer colours, add-ons, store bundles.
+    [/^(kits\[\d+\])\.(\S+\.)?discount/, (m) => `${kitName(m[1])}: ${discountRule}`],
+    [/^(kits\[\d+\])\.items\[(\d+)\]: a product whose colour the customer picks appears once/, (m) => `${kitName(m[1])}: ${loc(`المنتج ${n1(m[2])} يختار الزبون لونه، فيظهر مرة واحدة — ارفع كميته بدلاً من تكراره`, `item ${n1(m[2])} has a customer-picked colour, so it appears once — raise its quantity instead`, `بەرهەمی ${n1(m[2])} ڕەنگەکەی کڕیار هەڵیدەبژێرێت، بۆیە یەکجار دەردەکەوێت — لەبری دووبارەکردنەوە بڕەکەی زیاد بکە`)}`],
+    [/^(kits\.[^:]+): \S+ has no active colour for the customer to pick/, (m) => `${kitName(m[1])}: ${noColour}`],
+    [/^(addons\[\d+\])\.id: used twice$/, (m) => `${addonName(m[1])}: ${say(loc, S.idDup)}`],
+    [/^(addons\[\d+\])\.id: /, (m) => `${addonName(m[1])}: ${say(loc, S.idRule)}`],
+    [/^(addons\[\d+\])\.qty/, (m) => `${addonName(m[1])}: ${loc('الكمية لكل طابعة من 1 إلى 20', 'quantity per printer 1 to 20', 'بڕ بۆ هەر پرینتەرێک لە 1 تا 20')}`],
+    [/^(addons\[\d+\])\.(\S+\.)?discount/, (m) => `${addonName(m[1])}: ${discountRule}`],
+    [/^(addons\[\d+\])\.title/, (m) => `${addonName(m[1])}: ${loc('الاسم الخاص بثلاث لغات، حتى 80 حرفاً لكل منها', 'its own name in three languages, up to 80 characters each', 'ناوی تایبەت بە سێ زمان، هەریەکە تا 80 پیت')}`],
+    [/^addons: at most/, () => loc('حتى 40 إضافة', 'at most 40 add-ons', 'تا 40 زیادکراو')],
+    [/^(addons\.[^:]+): a title needs/, (m) => `${addonName(m[1])}: ${loc('الاسم الخاص يحتاج العربية والإنجليزية والكردية، أو اتركه ليظهر باسم المنتج', 'its own name needs Arabic, English and Kurdish — or none, to show the product\'s name', 'ناوی تایبەت پێویستی بە عەرەبی و ئینگلیزی و کوردی هەیە — یان هیچ، بۆ پیشاندانی ناوی بەرهەمەکە')}`],
+    [/^(addons\.[^:]+): (a printer cannot be an add-on|\S+ is a printer, not an add-on)/, (m) => `${addonName(m[1])}: ${say(loc, S.addonNoPrinter)}`],
+    [/^(addons\.[^:]+): \S+ is a bundle or a mystery offer/, (m) => `${addonName(m[1])}: ${loc('العرض المجمّع أو الصندوق المفاجئ لا يكون إضافة', 'a bundle or mystery offer cannot be an add-on', 'پاکێجی کۆکراوە یان سندووقی سەرسوڕهێنەر نابێتە زیادکراو')}`],
+    [/^(addons\.[^:]+): \S+ has no active colour for the customer to pick/, (m) => `${addonName(m[1])}: ${noColour}`],
+    [/^(addons\.[^:]+): product (\S+) does not exist/, (m) => `${addonName(m[1])}: ${loc(`المنتج ${m[2]} غير موجود`, `product ${m[2]} does not exist`, `بەرهەمی ${m[2]} بوونی نییە`)}`],
+    [/^(addons\.[^:]+): printer \S+ is not mapped/, (m) => `${addonName(m[1])}: ${loc('مربوطة بطابعة غير مسجّلة في الخدمات', 'tied to a printer that is not enrolled', 'بە پرینتەرێکەوە بەستراوە کە تۆمار نەکراوە')}`],
+    [/^products\.\S+?\.?store_bundle_ids?: /, () => loc('العروض المجمّعة: حتى 8، كل عرض مرة واحدة', 'store bundles: up to 8, each once', 'پاکێجە کۆکراوەکان: تا 8، هەریەکە یەکجار')],
+    [/^products\.\S+: (store bundle \S+ (does not exist|is a printer)|\S+ is not a store bundle)/, () => loc('عرض مجمّع مربوط لم يعد موجوداً أو ليس عرضاً مجمّعاً — احذفه', 'a linked store bundle no longer exists or is not a store bundle — remove it', 'پاکێجێکی کۆکراوەی بەستراو ئیتر بوونی نییە یان پاکێجی کۆکراوە نییە — لای ببە')],
     [/^(kits\[\d+\])\.id: used twice$/, (m) => `${kitName(m[1])}: ${loc('المعرّف مستخدم لباقة أخرى', 'the id is used by another kit', 'ناسنامەکە بۆ پاکێجێکی تر بەکارهاتووە')}`],
     [/^(kits\[\d+\])\.id: /, (m) => `${kitName(m[1])}: ${loc('المعرّف: حروف إنجليزية صغيرة وأرقام و _ أو -، حتى 32', 'id: lowercase letters, digits, _ or -, up to 32', 'ناسنامە: پیتی بچووکی ئینگلیزی، ژمارە، _ یان -، تا 32')}`],
     [/^(kits\[\d+\])\.items\[(\d+)\]: the same product and selection twice/, (m) => `${kitName(m[1])}: ${loc(`المنتج ${n1(m[2])} مكرر بنفس الاختيار — ارفع كمية الأول بدلاً منه`, `item ${n1(m[2])} repeats the same product and selection — raise the first one's quantity instead`, `بەرهەمی ${n1(m[2])} هەمان بەرهەم و هەڵبژاردە دووبارە دەکاتەوە — لەبری ئەوە بڕی یەکەم زیاد بکە`)}`],
@@ -90,7 +140,7 @@ export function issueText(issue: string, loc: Loc, kits: readonly FilamentKit[] 
     [/^(kits\.[^:]+): needs a title/, (m) => `${kitName(m[1])}: ${loc('تحتاج اسماً بالعربية والإنجليزية والكردية', 'needs a name in Arabic, English and Kurdish', 'پێویستی بە ناو بە عەرەبی و ئینگلیزی و کوردی هەیە')}`],
     [/^(kits\.[^:]+): needs at least one item/, (m) => `${kitName(m[1])}: ${loc('تحتاج منتجاً واحداً على الأقل', 'needs at least one item', 'لانیکەم پێویستی بە یەک بەرهەم هەیە')}`],
     [/^(kits\.[^:]+): (a printer cannot be a kit item|\S+ is a printer, not a kit item)/, (m) => `${kitName(m[1])}: ${loc('الطابعة لا تكون منتجاً داخل باقة', 'a printer cannot be a kit item', 'پرینتەر نابێتە بەرهەمێکی ناو پاکێج')}`],
-    [/^(kits\.[^:]+): printer (\S+) is not mapped/, (m) => `${kitName(m[1])}: ${loc(`الطابعة ${m[2]} غير مربوطة بالخدمات`, `printer ${m[2]} is not mapped`, `پرینتەری ${m[2]} نەبەستراوەتەوە`)}`],
+    [/^(kits\.[^:]+): printer \S+ is not mapped/, (m) => `${kitName(m[1])}: ${loc('مربوطة بطابعة غير مسجّلة في الخدمات', 'tied to a printer that is not enrolled', 'بە پرینتەرێکەوە بەستراوە کە تۆمار نەکراوە')}`],
     [/^(kits\.[^:]+): product (\S+) does not exist/, (m) => `${kitName(m[1])}: ${loc(`المنتج ${m[2]} غير موجود`, `product ${m[2]} does not exist`, `بەرهەمی ${m[2]} بوونی نییە`)}`],
     [/^packages\.(smart|complete)(\.membership_tier)?: (preselects a membership tier|plus, prime, pro)/, (m) => `${m[1] === 'smart' ? loc('الاختيار الذكي', 'Smart Choice', 'هەڵبژاردنی زیرەک') : loc('التجربة الكاملة', 'Complete', 'ئەزموونی تەواو')}: ${loc('يقترح مستوى عضوية غير معروض', 'preselects a membership tier that is not offered', 'ئاستێکی ئەندامێتی پێشنیار دەکات کە پێشکەش ناکرێت')}`],
     [/^membership/, () => loc('العضوية: التشغيل والمستويات (Plus وPrime وPro، كلٌّ مرة واحدة)', 'Membership: on/off and tiers (Plus, Prime, Pro, each once)', 'ئەندامێتی: کردنەوە و ئاستەکان (Plus، Prime، Pro، هەریەکە یەکجار)')],
@@ -192,15 +242,22 @@ export function MembershipPanel({ draft, upd, loc }: { draft: PrinterServicesCon
   );
 }
 
-// ------------------------------------------------------------- kits
+// ------------------------------------------------------------- the shared item toolkit (kits and add-ons)
 
-interface ProductDoc {
+export interface ProductDoc {
   id: string; slug: string; name_ar: string; name_en: string; name_ckb?: string;
+  /** What the admin read answers today: an ESTIMATE base only (the cart prices at the customer's tier). */
+  price_iqd?: number | null;
+  /** Owner-only (projectForAdmin strips it for anyone else): the below-cost warning reads it when present. */
+  cost_iqd?: number | null;
+  composition?: string;
   options: Array<{ id: string; name_ar: string; name_en: string; name_ckb: string; active: boolean; group_en?: string; order: number }>;
-  colors: Array<{ id: string; name_ar: string; name_en: string; name_ckb: string; active: boolean; option_id: string | null; option_ids?: string[]; order: number }>;
+  colors: Array<{ id: string; name_ar: string; name_en: string; name_ckb: string; active: boolean; option_id: string | null; option_ids?: string[]; order: number; hex?: string; stock?: number | null }>;
 }
 interface PreviewKit {
-  id: string; title: { ar: string; en: string; ckb: string }; available: boolean; price_per_printer_iqd: number | null; total_iqd: number | null;
+  id: string; title: { ar: string; en: string; ckb: string } | null; available: boolean; price_per_printer_iqd: number | null; total_iqd: number | null;
+  /** Phase 4 (WP-B): the price before the owner's kit discount; absent from an older server. */
+  before_per_printer_iqd?: number | null;
   items: Array<{ product_id: string; name: string; name_ar: string; variant: string; qty: number; unit_price_iqd: number | null; available: boolean; reason: string | null }>;
 }
 
@@ -214,7 +271,7 @@ function productDoc(id: string): Promise<ProductDoc | null> {
   return p;
 }
 
-function useDocs(ids: string[]): Record<string, ProductDoc | null> {
+export function useDocs(ids: string[]): Record<string, ProductDoc | null> {
   const [docs, setDocs] = useState<Record<string, ProductDoc | null>>({});
   const key = [...new Set(ids)].sort().join(',');
   useEffect(() => {
@@ -227,32 +284,197 @@ function useDocs(ids: string[]): Record<string, ProductDoc | null> {
   return docs;
 }
 
-const pick3 = (o: { name_ar: string; name_en: string; name_ckb?: string }, lang: string) =>
+export function useNames(ids: string[], lang: string): Map<string, string> {
+  const [names, setNames] = useState<Map<string, string>>(new Map());
+  const key = [...new Set(ids)].sort().join(',');
+  useEffect(() => {
+    let live = true;
+    if (key) void resolveProductNames(key.split(','), lang).then((m) => { if (live) setNames(m); });
+    return () => { live = false; };
+  }, [key, lang]);
+  return names;
+}
+
+export const pick3 = (o: { name_ar: string; name_en: string; name_ckb?: string }, lang: string) =>
   (lang === 'en' ? o.name_en || o.name_ar : lang === 'ckb' ? o.name_ckb || o.name_en || o.name_ar : o.name_ar || o.name_en) || '';
+export const text3 = (t: { ar: string; en: string; ckb: string } | null | undefined, lang: string) =>
+  (t ? (lang === 'en' ? t.en : lang === 'ckb' ? t.ckb || t.en : t.ar) || t.en || t.ar : '') || '';
+
+/** One printer's worth of the items at today's admin prices (null when any price is unknown). */
+export function perPrinterEstimate(items: ReadonlyArray<{ product_id: string; qty: number }>, docs: Record<string, ProductDoc | null>, field: 'price_iqd' | 'cost_iqd'): number | null {
+  if (!items.length) return null;
+  let sum = 0;
+  for (const it of items) {
+    const v = docs[it.product_id]?.[field];
+    if (typeof v !== 'number' || !Number.isFinite(v)) return null;
+    sum += v * it.qty;
+  }
+  return sum;
+}
+
+// ------------------------------------------------------------- this printer's entry
+
+/** Whether a kit or an add-on shows with this printer (null = every enrolled printer). */
+export const onThisPrinter = (refs: KitPrinterRef[] | null | undefined, productId: string) =>
+  refs === null || refs === undefined || refs.some((r) => r.product_id === productId);
+
+/**
+ * The printers list after the switch on THIS printer — no other printer's entry moves. Off on a kit
+ * for every printer keeps it on every OTHER enrolled printer (their ids, never shown).
+ */
+export function withThisPrinter(refs: KitPrinterRef[] | null, productId: string, on: boolean, enrolledIds: readonly string[]): KitPrinterRef[] | null {
+  if (on) {
+    if (refs === null) return null;
+    return refs.some((r) => r.product_id === productId) ? refs : [...refs, { product_id: productId, option_value_id: null }];
+  }
+  if (refs === null) return enrolledIds.filter((id) => id !== productId).map((id) => ({ product_id: id, option_value_id: null }));
+  return refs.filter((r) => r.product_id !== productId);
+}
+
+/** How many OTHER printers a list of printers names besides this one (0 for «every printer»: that has its own badge). */
+export function otherPrintersCount(refs: KitPrinterRef[] | null, productId: string): number {
+  return refs === null ? 0 : new Set(refs.filter((r) => r.product_id !== productId).map((r) => r.product_id)).size;
+}
+
+/** «مشتركة مع N طابعات أخرى» — only for a list that shows with this printer AND others; a count, never names. */
+export function SharedBadge({ refs, productId, loc }: { refs: KitPrinterRef[] | null; productId: string; loc: Loc }) {
+  const n = otherPrintersCount(refs, productId);
+  if (!n || !onThisPrinter(refs, productId)) return null;
+  return <span className="lv-chip [--chip:var(--color-info)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold" data-shared-printers={n}>{say(loc, sharedWithOthers(n))}</span>;
+}
+
+/** «يظهر مع هذه الطابعة» and, for a printer with versions, which of ITS versions. */
+export function PrinterScope({ refs, printer, productId, enrolledIds, loc, onChange }: {
+  refs: KitPrinterRef[] | null; printer: Printer | null; productId: string; enrolledIds: readonly string[]; loc: Loc;
+  onChange: (refs: KitPrinterRef[] | null) => void;
+}) {
+  const on = onThisPrinter(refs, productId);
+  const mine = refs?.filter((r) => r.product_id === productId) ?? [];
+  const whole = refs === null || mine.some((r) => r.option_value_id === null);
+  const versions = printer?.versions ?? [];
+  const rest = () => (refs ?? []).filter((r) => r.product_id !== productId);
+  return (
+    <div className="space-y-1" data-printer-scope>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-text-primary">
+          <input type="checkbox" role="switch" checked={on} onChange={(e) => onChange(withThisPrinter(refs, productId, e.target.checked, enrolledIds))} />
+          {say(loc, S.showsHere)}
+        </label>
+        {refs === null ? <span className="lv-chip [--chip:var(--color-info)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold" data-every-printer>{say(loc, S.everyPrinter)}</span> : null}
+        <SharedBadge refs={refs} productId={productId} loc={loc} />
+      </div>
+      {refs === null ? <p className="text-[11px] text-text-muted">{say(loc, S.everyPrinterOffNote)}</p> : null}
+      {on && refs !== null && versions.length > 1 ? (
+        <div className="flex flex-wrap gap-3 ps-6">
+          <label className="flex items-center gap-2">
+            <input type="checkbox" checked={whole} onChange={(e) => onChange(e.target.checked
+              ? [...rest(), { product_id: productId, option_value_id: null }]
+              : [...rest(), { product_id: productId, option_value_id: versions[0].id }])} />
+            {say(loc, S.everyVersion)}
+          </label>
+          {whole ? null : versions.map((v) => (
+            <label key={v.id} className="flex items-center gap-2">
+              <input type="checkbox" checked={mine.some((r) => r.option_value_id === v.id)} onChange={(e) => onChange(e.target.checked
+                ? [...(refs ?? []), { product_id: productId, option_value_id: v.id }]
+                : (refs ?? []).filter((r) => !(r.product_id === productId && r.option_value_id === v.id)))} />
+              {v.name}
+            </label>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------- discount
+
+/** «بدون | نسبة % | مبلغ ثابت لكل طابعة», the value, and the live «قبل — بعد (وفّر %)». */
+export function DiscountRow({ value, onChange, beforeIqd, costIqd, loc, label }: {
+  value: PrinterDiscount | null | undefined; onChange: (d: PrinterDiscount | null) => void;
+  beforeIqd: number | null; costIqd: number | null; loc: Loc; label: string;
+}) {
+  const d = value ?? null;
+  const mode = d?.mode ?? 'none';
+  const seg = (m: 'none' | PrinterDiscount['mode'], text: string) => (
+    <button
+      type="button"
+      className={`lv-button lv-button-sm ${mode === m ? 'lv-button-primary' : 'lv-button-secondary'}`}
+      aria-pressed={mode === m}
+      onClick={() => onChange(m === 'none' ? null : m === 'percent' ? { mode: 'percent', value: d?.mode === 'percent' ? d.value : 10 } : { mode: 'fixed_iqd', value: d?.mode === 'fixed_iqd' ? d.value : 5_000 })}
+    >
+      {text}
+    </button>
+  );
+  const view = discountPreview(d, beforeIqd);
+  const below = !!view && costIqd !== null && view.after < costIqd;
+  return (
+    <div className="space-y-2" data-printer-discount>
+      <h4 className="text-[12px] font-semibold text-text-primary">{label}</h4>
+      <div className="flex flex-wrap gap-1.5" role="group" aria-label={label}>
+        {seg('none', say(loc, S.discNone))}
+        {seg('percent', say(loc, S.discPercent))}
+        {seg('fixed_iqd', say(loc, S.discFixed))}
+      </div>
+      {d ? (
+        <label className="flex flex-col gap-1 text-[12px] text-text-secondary">
+          {say(loc, d.mode === 'percent' ? S.discValuePercent : S.discValueFixed)}
+          <input
+            className="lv-input h-10 w-40 px-2 tabular-nums"
+            inputMode="numeric"
+            dir="ltr"
+            // A fixed amount is shown with its thousands separators (5,000); typing strips them again.
+            value={d.mode === 'fixed_iqd' ? d.value.toLocaleString('en-US') : String(d.value)}
+            onChange={(e) => {
+              const n = Number(e.target.value.replace(/[^\d]/g, '') || 0);
+              onChange(d.mode === 'percent'
+                ? { mode: 'percent', value: Math.max(1, Math.min(MAX_DISCOUNT_PERCENT, n)) }
+                : { mode: 'fixed_iqd', value: Math.max(1, Math.min(MAX_DISCOUNT_FIXED_IQD, n)) });
+            }}
+          />
+        </label>
+      ) : null}
+      {d ? (
+        view ? (
+          <p className="flex flex-wrap items-baseline gap-2 text-[12px]" data-discount-preview>
+            <span className="text-text-muted">{say(loc, S.before)}</span>
+            <span dir="ltr" className="tabular-nums line-through text-text-muted">{formatIqd(view.before)}</span>
+            <span className="text-text-muted">{say(loc, S.after)}</span>
+            <span dir="ltr" className="tabular-nums font-bold text-text-primary">{formatIqd(view.after)}</span>
+            <span className="text-success">({say(loc, S.save)} {view.pct}%)</span>
+            <span className="text-text-muted">{say(loc, S.perPrinter)}</span>
+          </p>
+        ) : <p className="text-[12px] text-text-muted">{say(loc, S.priceUnknown)}</p>
+      ) : null}
+      {below ? <p className="text-[12px] font-semibold text-warning" role="alert" data-discount-below-cost>{say(loc, S.belowCost)} ({formatIqd(costIqd as number)})</p> : null}
+      {d ? <p className="text-[11px] text-text-muted">{say(loc, S.estimateNote)}</p> : null}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------- kits (this printer only)
 
 export function KitsPanel({ draft, upd, loc, lang, printers, productId }: { draft: PrinterServicesConfig; upd: Upd; loc: Loc; lang: string; printers: Printer[]; productId: string }) {
   const kits = draft.kits ?? [];
   const itemIds = kits.flatMap((k) => k.items.map((i) => i.product_id));
   const docs = useDocs(itemIds);
-  const [names, setNames] = useState<Map<string, string>>(new Map());
-  const namesKey = [...new Set(itemIds)].sort().join(',');
-  useEffect(() => {
-    let live = true;
-    if (namesKey) void resolveProductNames(namesKey.split(','), lang).then((m) => { if (live) setNames(m); });
-    return () => { live = false; };
-  }, [namesKey, lang]);
+  const names = useNames(itemIds, lang);
   const [adding, setAdding] = useState<number | null>(null);
-  const mapped = printers.filter((p) => draft.products[p.id]);
+  const printer = printers.find((p) => p.id === productId) ?? null;
+  const enrolledIds = Object.keys(draft.products);
   // Every product in a printer section (mapped or not): none of them can be a kit item.
-  const printerIds = new Set([...printers.map((p) => p.id), ...Object.keys(draft.products)]);
+  const printerIds = new Set([...printers.map((p) => p.id), ...enrolledIds]);
   const problems = kitProblems(kits, printerIds);
+  // Only the kits this printer offers; their index in the shared list is what `upd` edits.
+  const here = kits.map((k, n) => ({ k, n })).filter(({ k }) => onThisPrinter(k.printers, productId));
 
   const kitAt = (d: PrinterServicesConfig, n: number) => (d.kits ?? [])[n];
   const addKit = () => upd((d) => {
     const list = d.kits ?? [];
     let n = list.length + 1;
     while (list.some((k) => k.id === `kit-${n}`)) n += 1;
-    d.kits = [...list, { id: `kit-${n}`, active: false, sort: list.length, title: { ar: '', en: '', ckb: '' }, items: [], printers: null }];
+    // A kit made on a printer's page starts on that printer alone.
+    d.kits = [...list, { id: `kit-${n}`, active: false, sort: list.length, title: { ar: '', en: '', ckb: '' }, items: [], printers: [{ product_id: productId, option_value_id: null }], discount: null }];
+    setAdding(list.length);
   });
   const removeKit = (n: number) => upd((d) => { d.kits = (d.kits ?? []).filter((_, j) => j !== n); });
   const setItem = (n: number, j: number, patch: Partial<KitItem>) => upd((d) => {
@@ -262,23 +484,17 @@ export function KitsPanel({ draft, upd, loc, lang, printers, productId }: { draf
   });
 
   return (
-    <section className="mt-3 rounded-lg border border-border-subtle p-3 text-[12px] text-text-secondary" data-printer-services-kits>
+    <section className="rounded-lg border border-border-subtle p-3 text-[12px] text-text-secondary space-y-2" data-printer-services-kits>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[14px] font-bold text-text-primary">{loc('باقات الفيلامنت', 'Filament kits', 'پاکێجەکانی فیلامێنت')}</h2>
+        <h3 className="text-[14px] font-bold text-text-primary">{say(loc, S.kits)}</h3>
         <button type="button" className="lv-button lv-button-secondary lv-button-sm" disabled={kits.length >= MAX_KITS} onClick={addKit}>
           + {loc('باقة جديدة', 'New kit', 'پاکێجی نوێ')}
         </button>
       </div>
-      <p className="mt-1">
-        {loc(
-          'من منتجات حقيقية. سعر الباقة = مجموع الأسعار الحالية لمنتجاتها، بلا خصم. الكمية لكل طابعة وتتبع عدد الطابعات. تظهر غير متوفرة إذا نفد أحد منتجاتها أو لا يُشحن بطريقة شحن الطابعة.',
-          'Made of real products. A kit costs the sum of its items\' live prices, no discount. Quantities are per printer and follow the printer quantity. It shows as unavailable when an item is out or cannot ship the printer\'s way.',
-          'لە بەرهەمی ڕاستەقینە. نرخی پاکێج = کۆی نرخی ئێستای بەرهەمەکانی، بێ داشکاندن. بڕەکان بۆ هەر پرینتەرێکن و بە ژمارەی پرینتەرەکان دەچن. ئەگەر بەرهەمێکی نەما یان بە جۆری ناردنی پرینتەرەکە نەنێردرێت، وەک بەردەست نییە پیشان دەدرێت.'
-        )}
-      </p>
-      {kits.length === 0 ? <p className="mt-2">{loc('لا توجد باقات بعد.', 'No kits yet.', 'هێشتا هیچ پاکێجێک نییە.')}</p> : null}
-      <div className="mt-2 space-y-3">
-        {kits.map((k, n) => (
+      <p className="leading-relaxed">{say(loc, S.kitsHint)}</p>
+      {here.length === 0 ? <p>{say(loc, S.noKitsHere)}</p> : null}
+      <div className="space-y-3">
+        {here.map(({ k, n }) => (
           <KitEditor
             key={n}
             kit={k}
@@ -286,7 +502,9 @@ export function KitsPanel({ draft, upd, loc, lang, printers, productId }: { draf
             lang={lang}
             docs={docs}
             names={names}
-            mapped={mapped}
+            printer={printer}
+            productId={productId}
+            enrolledIds={enrolledIds}
             adding={adding === n}
             problems={problems[n]}
             isPrinter={(id) => printerIds.has(id)}
@@ -297,13 +515,14 @@ export function KitsPanel({ draft, upd, loc, lang, printers, productId }: { draf
           />
         ))}
       </div>
-      <KitPreview printers={printers.filter((p) => p.id === productId && draft.products[p.id])} loc={loc} lang={lang} />
+      <KitPreview printer={printer && draft.products[printer.id] ? printer : null} loc={loc} lang={lang} />
     </section>
   );
 }
 
-function KitEditor({ kit, loc, lang, docs, names, mapped, adding, onAdding, onKit, onItem, onRemove, problems, isPrinter }: {
-  kit: FilamentKit; loc: Loc; lang: string; docs: Record<string, ProductDoc | null>; names: Map<string, string>; mapped: Printer[];
+function KitEditor({ kit, loc, lang, docs, names, printer, productId, enrolledIds, adding, onAdding, onKit, onItem, onRemove, problems, isPrinter }: {
+  kit: FilamentKit; loc: Loc; lang: string; docs: Record<string, ProductDoc | null>; names: Map<string, string>;
+  printer: Printer | null; productId: string; enrolledIds: readonly string[];
   adding: boolean; onAdding: (on: boolean) => void; onKit: (fn: (k: FilamentKit) => void) => void;
   onItem: (j: number, patch: Partial<KitItem>) => void; onRemove: () => void;
   problems: KitProblems; isPrinter: (productId: string) => boolean;
@@ -322,136 +541,123 @@ function KitEditor({ kit, loc, lang, docs, names, mapped, adding, onAdding, onKi
       />
     </label>
   );
-  const anyPrinter = kit.printers === null;
-  const onPrinter = (pid: string) => kit.printers?.filter((r) => r.product_id === pid) ?? [];
+  const before = perPrinterEstimate(kit.items, docs, 'price_iqd');
+  const cost = perPrinterEstimate(kit.items, docs, 'cost_iqd');
+  const view = discountPreview(kit.discount ?? null, before);
+  const hasProblem = idBad || problems.dupId || problems.dupItems.length > 0 || problems.printerItems.length > 0;
 
   return (
-    <div className="rounded-lg border border-border-subtle p-2" data-printer-services-kit={kit.id}>
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1">
-          {loc('المعرّف', 'Id', 'ناسنامە')}
-          <input className="lv-input h-9 px-2 text-[12px]" dir="ltr" maxLength={32} aria-invalid={idBad || undefined} value={kit.id} onChange={(e) => onKit((k) => { k.id = e.target.value.toLowerCase(); })} />
-        </label>
-        <label className="flex flex-col gap-1">
-          {loc('الترتيب', 'Sort', 'ڕیزبەندی')}
-          <input
-            className="lv-input h-9 px-2 text-[12px] tabular-nums"
-            inputMode="numeric"
-            dir="ltr"
-            value={String(kit.sort)}
-            onChange={(e) => onKit((k) => { k.sort = Math.min(999, Number(e.target.value.replace(/[^\d]/g, '') || 0)); })}
-          />
-        </label>
-        <label className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-text-primary">
-          <input type="checkbox" checked={kit.active} onChange={(e) => onKit((k) => { k.active = e.target.checked; })} />
-          {loc('مفعّلة', 'Active', 'چالاک')}
-        </label>
-        <button type="button" className="lv-button lv-button-ghost lv-button-sm" onClick={onRemove}>
-          {loc('حذف الباقة', 'Remove the kit', 'سڕینەوەی پاکێج')}
-        </button>
-      </div>
-      {idBad ? <p className="mt-1 text-text-primary" role="alert">{loc('المعرّف: حروف إنجليزية صغيرة وأرقام و _ أو -، حتى 32.', 'Id: lowercase letters, digits, _ or -, up to 32.', 'ناسنامە: پیتی بچووکی ئینگلیزی، ژمارە، _ یان -، تا 32.')}</p> : null}
-      {problems.dupId ? <p className="mt-1 text-text-primary" role="alert" data-kit-problem="dup-id">{loc('هذا المعرّف مستخدم لباقة أخرى — اختر معرّفاً آخر.', 'This id is used by another kit — choose another id.', 'ئەم ناسنامەیە بۆ پاکێجێکی تر بەکارهاتووە — ناسنامەیەکی تر هەڵبژێرە.')}</p> : null}
-      <div className="mt-2 grid gap-2 sm:grid-cols-2">
-        {text('ar', loc('الاسم بالعربية', 'Name in Arabic', 'ناو بە عەرەبی'))}
-        {text('en', loc('الاسم بالإنجليزية', 'Name in English', 'ناو بە ئینگلیزی'))}
-        {text('ckb', loc('الاسم بالكردية', 'Name in Kurdish', 'ناو بە کوردی'))}
-      </div>
+    <details className="rounded-lg border border-border-subtle p-2" open={adding || hasProblem || kit.items.length === 0 || undefined} data-printer-services-kit={kit.id}>
+      <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-[13px] text-text-primary">
+        <span className="min-w-0 flex-1 font-semibold">{text3(kit.title, lang) || kit.id}</span>
+        {kit.printers === null ? <span className="lv-chip [--chip:var(--color-info)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">{say(loc, S.everyPrinter)}</span> : null}
+        <SharedBadge refs={kit.printers} productId={productId} loc={loc} />
+        {!kit.active ? <span className="lv-chip [--chip:var(--color-warning)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">{loc('موقوفة', 'Off', 'ڕاگیراو')}</span> : null}
+        {view ? (
+          <span className="inline-flex items-baseline gap-1.5 text-[12px]">
+            <span dir="ltr" className="tabular-nums line-through text-text-muted">{formatIqd(view.before)}</span>
+            <span dir="ltr" className="tabular-nums font-bold">{formatIqd(view.after)}</span>
+          </span>
+        ) : before !== null ? <span dir="ltr" className="tabular-nums text-[12px]">{formatIqd(before)}</span> : null}
+      </summary>
 
-      <h3 className="mt-3 font-semibold text-text-primary">{loc('المنتجات (الكمية لكل طابعة)', 'Items (quantity per printer)', 'بەرهەمەکان (بڕ بۆ هەر پرینتەرێک)')}</h3>
-      <ul className="mt-1 space-y-2">
-        {kit.items.map((it, j) => (
-          <ItemRow key={`${it.product_id}-${j}`} item={it} doc={docs[it.product_id]} name={names.get(it.product_id) ?? it.product_id} loc={loc} lang={lang}
-            problem={problems.printerItems.includes(j) ? 'printer' : problems.dupItems.includes(j) ? 'duplicate' : null}
-            onChange={(patch) => onItem(j, patch)}
-            onRemove={() => onKit((k) => { k.items = k.items.filter((_, x) => x !== j); })}
-          />
-        ))}
-      </ul>
-      {kit.items.length < MAX_KIT_ITEMS ? (
-        adding ? (
-          <div className="mt-2">
-            <ProductPicker
-              value=""
-              ariaLabel={loc('ابحث عن منتج للباقة', 'Find a product for the kit', 'بەرهەمێک بۆ پاکێجەکە بدۆزەوە')}
-              onChange={(id) => {
-                if (!id) return;
-                // A printer is never a kit item; the same product with no selection yet is already in the kit.
-                if (isPrinter(id)) { setPickRefused(loc('الطابعة لا تكون منتجاً داخل باقة.', 'A printer cannot be a kit item.', 'پرینتەر نابێتە بەرهەمێکی ناو پاکێج.')); return; }
-                if (kit.items.some((i) => i.product_id === id && !i.option_value_ids.length && !i.color_id)) {
-                  setPickRefused(loc('هذا المنتج في الباقة بلا اختيار — اختر نسخته أو لونه هناك، أو ارفع كميته.', 'This product is already in the kit with no selection — choose its version or colour there, or raise its quantity.', 'ئەم بەرهەمە بێ هەڵبژاردە لە پاکێجەکەدایە — لەوێ وەشان یان ڕەنگەکەی هەڵبژێرە، یان بڕەکەی زیاد بکە.'));
-                  return;
-                }
-                setPickRefused('');
-                onKit((k) => { k.items = [...k.items, { product_id: id, option_value_ids: [], color_id: null, qty: 1 }]; });
-                onAdding(false);
-              }}
+      <div className="mt-2 space-y-3">
+        <PrinterScope refs={kit.printers} printer={printer} productId={productId} enrolledIds={enrolledIds} loc={loc} onChange={(refs) => onKit((k) => { k.printers = refs; })} />
+
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-1">
+            {say(loc, S.id)}
+            <input className="lv-input h-9 px-2 text-[12px]" dir="ltr" maxLength={32} aria-invalid={idBad || undefined} value={kit.id} onChange={(e) => onKit((k) => { k.id = e.target.value.toLowerCase(); })} />
+          </label>
+          <label className="flex flex-col gap-1">
+            {say(loc, S.sort)}
+            <input
+              className="lv-input h-9 px-2 text-[12px] tabular-nums"
+              inputMode="numeric"
+              dir="ltr"
+              value={String(kit.sort)}
+              onChange={(e) => onKit((k) => { k.sort = Math.min(999, Number(e.target.value.replace(/[^\d]/g, '') || 0)); })}
             />
-            {pickRefused ? <p className="mt-1 text-text-primary" role="alert" data-kit-pick-refused>{pickRefused}</p> : null}
-          </div>
-        ) : (
-          <button type="button" className="lv-button lv-button-secondary lv-button-sm mt-2" onClick={() => onAdding(true)}>
-            + {loc('أضف منتجاً', 'Add an item', 'بەرهەمێک زیاد بکە')}
+          </label>
+          <label className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-text-primary">
+            <input type="checkbox" checked={kit.active} onChange={(e) => onKit((k) => { k.active = e.target.checked; })} />
+            {say(loc, S.active)}
+          </label>
+          <button type="button" className="lv-button lv-button-ghost lv-button-sm" onClick={onRemove}>
+            {loc('حذف الباقة', 'Remove the kit', 'سڕینەوەی پاکێج')}
           </button>
-        )
-      ) : null}
+        </div>
+        {idBad ? <p className="text-text-primary" role="alert">{say(loc, S.idRule)}</p> : null}
+        {problems.dupId ? <p className="text-text-primary" role="alert" data-kit-problem="dup-id">{loc('هذا المعرّف مستخدم لباقة أخرى — اختر معرّفاً آخر.', 'This id is used by another kit — choose another id.', 'ئەم ناسنامەیە بۆ پاکێجێکی تر بەکارهاتووە — ناسنامەیەکی تر هەڵبژێرە.')}</p> : null}
+        <div className="grid gap-2 sm:grid-cols-3">
+          {text('ar', say(loc, S.nameAr))}
+          {text('en', say(loc, S.nameEn))}
+          {text('ckb', say(loc, S.nameCkb))}
+        </div>
 
-      <h3 className="mt-3 font-semibold text-text-primary">{loc('الطابعات التي تناسبها', 'Printers it fits', 'ئەو پرینتەرانەی بۆی دەگونجێن')}</h3>
-      <label className="mt-1 flex items-center gap-2 text-[13px] text-text-primary">
-        <input type="checkbox" checked={anyPrinter} onChange={(e) => onKit((k) => { k.printers = e.target.checked ? null : []; })} />
-        {loc('كل الطابعات المسجّلة', 'Every enrolled printer', 'هەموو پرینتەرە تۆمارکراوەکان')}
-      </label>
-      {anyPrinter ? null : (
-        <ul className="mt-1 space-y-1">
-          {mapped.map((p) => {
-            const rows = onPrinter(p.id);
-            const whole = rows.some((r) => r.option_value_id === null);
-            return (
-              <li key={p.id}>
-                <label className="flex items-center gap-2 text-text-primary">
-                  <input type="checkbox" checked={rows.length > 0} onChange={(e) => onKit((k) => {
-                    const rest = (k.printers ?? []).filter((r) => r.product_id !== p.id);
-                    k.printers = e.target.checked ? [...rest, { product_id: p.id, option_value_id: null }] : rest;
-                  })} />
-                  {p.name}
-                </label>
-                {rows.length > 0 && p.versions.length > 1 ? (
-                  <div className="mt-1 flex flex-wrap gap-3 ps-6">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={whole} onChange={(e) => onKit((k) => {
-                        const rest = (k.printers ?? []).filter((r) => r.product_id !== p.id);
-                        k.printers = e.target.checked ? [...rest, { product_id: p.id, option_value_id: null }] : [...rest, { product_id: p.id, option_value_id: p.versions[0].id }];
-                      })} />
-                      {loc('كل النسخ', 'Every version', 'هەموو وەشانەکان')}
-                    </label>
-                    {whole ? null : p.versions.map((v) => (
-                      <label key={v.id} className="flex items-center gap-2">
-                        <input type="checkbox" checked={rows.some((r) => r.option_value_id === v.id)} onChange={(e) => onKit((k) => {
-                          const list = k.printers ?? [];
-                          k.printers = e.target.checked
-                            ? [...list, { product_id: p.id, option_value_id: v.id }]
-                            : list.filter((r) => !(r.product_id === p.id && r.option_value_id === v.id));
-                        })} />
-                        {v.name}
-                      </label>
-                    ))}
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
-          {mapped.length === 0 ? <li>{loc('لا توجد طابعات مربوطة بعد.', 'No printers mapped yet.', 'هێشتا هیچ پرینتەرێک نەبەستراوەتەوە.')}</li> : null}
-        </ul>
-      )}
-    </div>
+        <div>
+          <h4 className="font-semibold text-text-primary">{loc('المنتجات (الكمية لكل طابعة)', 'Items (quantity per printer)', 'بەرهەمەکان (بڕ بۆ هەر پرینتەرێک)')}</h4>
+          <ul className="mt-1 space-y-2">
+            {kit.items.map((it, j) => (
+              <ItemRow key={`${it.product_id}-${j}`} item={it} doc={docs[it.product_id]} name={names.get(it.product_id) ?? it.product_id} loc={loc} lang={lang}
+                problem={problems.printerItems.includes(j) ? 'printer' : problems.dupItems.includes(j) ? 'duplicate' : null}
+                onChange={(patch) => onItem(j, patch)}
+                onRemove={() => onKit((k) => { k.items = k.items.filter((_, x) => x !== j); })}
+              />
+            ))}
+          </ul>
+          {kit.items.length < MAX_KIT_ITEMS ? (
+            adding ? (
+              <div className="mt-2">
+                <ProductPicker
+                  value=""
+                  ariaLabel={loc('ابحث عن منتج للباقة', 'Find a product for the kit', 'بەرهەمێک بۆ پاکێجەکە بدۆزەوە')}
+                  onChange={(id) => {
+                    if (!id) return;
+                    // A printer is never a kit item; the same product with no selection yet is already in the kit.
+                    if (isPrinter(id)) { setPickRefused(loc('الطابعة لا تكون منتجاً داخل باقة.', 'A printer cannot be a kit item.', 'پرینتەر نابێتە بەرهەمێکی ناو پاکێج.')); return; }
+                    if (kit.items.some((i) => i.product_id === id && !i.option_value_ids.length && !i.color_id)) {
+                      setPickRefused(loc('هذا المنتج في الباقة بلا اختيار — اختر نسخته أو لونه هناك، أو ارفع كميته.', 'This product is already in the kit with no selection — choose its version or colour there, or raise its quantity.', 'ئەم بەرهەمە بێ هەڵبژاردە لە پاکێجەکەدایە — لەوێ وەشان یان ڕەنگەکەی هەڵبژێرە، یان بڕەکەی زیاد بکە.'));
+                      return;
+                    }
+                    setPickRefused('');
+                    onKit((k) => { k.items = [...k.items, { product_id: id, option_value_ids: [], color_id: null, qty: 1, color_mode: 'fixed' }]; });
+                    onAdding(false);
+                  }}
+                />
+                {pickRefused ? <p className="mt-1 text-text-primary" role="alert" data-kit-pick-refused>{pickRefused}</p> : null}
+              </div>
+            ) : (
+              <button type="button" className="lv-button lv-button-secondary lv-button-sm mt-2" onClick={() => onAdding(true)}>
+                + {loc('أضف منتجاً', 'Add an item', 'بەرهەمێک زیاد بکە')}
+              </button>
+            )
+          ) : null}
+        </div>
+
+        <DiscountRow
+          value={kit.discount}
+          onChange={(d) => onKit((k) => { k.discount = d; })}
+          beforeIqd={before}
+          costIqd={cost}
+          loc={loc}
+          label={loc('خصم الباقة', 'Kit discount', 'داشکاندنی پاکێج')}
+        />
+      </div>
+    </details>
   );
 }
 
-function ItemRow({ item, doc, name, loc, lang, onChange, onRemove, problem = null }: {
-  item: KitItem; doc: ProductDoc | null | undefined; name: string; loc: Loc; lang: string;
-  onChange: (patch: Partial<KitItem>) => void; onRemove: () => void;
+/** One product of a kit or an add-on: its version, its colour (fixed, or the customer's pick) and its quantity. */
+export interface ItemLike { product_id: string; option_value_ids: string[]; color_id: string | null; qty: number; color_mode?: KitColorMode }
+
+export function ItemRow({ item, doc, name, loc, lang, onChange, onRemove, problem = null, maxQty = MAX_KIT_ITEM_QTY, qtyLabel }: {
+  item: ItemLike; doc: ProductDoc | null | undefined; name: string; loc: Loc; lang: string;
+  onChange: (patch: Partial<ItemLike>) => void; onRemove?: () => void;
   /** What the save would refuse about this item: a printer, or the same product and selection twice. */
   problem?: 'printer' | 'duplicate' | null;
+  maxQty?: number;
+  qtyLabel?: string;
 }) {
   // The product's option groups (by their English group name), one value chosen in each.
   const options = (doc?.options ?? []).filter((o) => o.active || item.option_value_ids.includes(o.id)).sort((a, b) => a.order - b.order);
@@ -464,59 +670,103 @@ function ItemRow({ item, doc, name, loc, lang, onChange, onRemove, problem = nul
     })
     .sort((a, b) => a.order - b.order);
   const display = doc ? pick3(doc, lang) || name : name;
+  const mode = colorModeOf(item);
+  const modeSeg = (m: KitColorMode, text: string) => (
+    <button
+      type="button"
+      className={`lv-button lv-button-sm ${mode === m ? 'lv-button-primary' : 'lv-button-secondary'}`}
+      aria-pressed={mode === m}
+      onClick={() => onChange(m === 'customer' ? { color_mode: 'customer', color_id: null } : { color_mode: 'fixed' })}
+    >
+      {text}
+    </button>
+  );
   return (
-    <li className="rounded-lg border border-border-subtle p-2">
+    <li className="rounded-lg border border-border-subtle p-2 space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <span className="min-w-0 flex-1 text-[13px] text-text-primary">{display}</span>
-        <label className="flex items-center gap-1">
-          {loc('الكمية', 'Qty', 'بڕ')}
+        {/* A long label («الكمية لكل طابعة») sits above its input on one line, never wrapped beside it. */}
+        <label className={qtyLabel ? 'flex flex-col gap-1 whitespace-nowrap' : 'flex items-center gap-1'}>
+          {qtyLabel ?? loc('الكمية', 'Qty', 'بڕ')}
           <input
             className="lv-input h-9 px-2 text-[12px] tabular-nums"
             inputMode="numeric"
             dir="ltr"
             size={3}
             value={String(item.qty)}
-            onChange={(e) => onChange({ qty: Math.max(1, Math.min(MAX_KIT_ITEM_QTY, Number(e.target.value.replace(/[^\d]/g, '') || 1))) })}
+            onChange={(e) => onChange({ qty: Math.max(1, Math.min(maxQty, Number(e.target.value.replace(/[^\d]/g, '') || 1))) })}
           />
         </label>
-        <button type="button" className="lv-button lv-button-ghost lv-button-sm" onClick={onRemove}>
-          {loc('حذف المنتج', 'Remove the item', 'سڕینەوەی بەرهەم')}
-        </button>
+        {onRemove ? (
+          <button type="button" className="lv-button lv-button-ghost lv-button-sm" onClick={onRemove}>
+            {loc('حذف المنتج', 'Remove the item', 'سڕینەوەی بەرهەم')}
+          </button>
+        ) : null}
       </div>
-      {doc === null ? <p className="mt-1">{loc('تعذّرت قراءة المنتج.', 'The product could not be read.', 'بەرهەمەکە نەخوێندرایەوە.')}</p> : null}
-      {problem === 'printer' ? <p className="mt-1 text-text-primary" role="alert" data-kit-problem="printer">{loc('الطابعة لا تكون منتجاً داخل باقة — احذفه.', 'A printer cannot be a kit item — remove it.', 'پرینتەر نابێتە بەرهەمێکی ناو پاکێج — بیسڕەوە.')}</p> : null}
-      {problem === 'duplicate' ? <p className="mt-1 text-text-primary" role="alert" data-kit-problem="dup-item">{loc('نفس المنتج والاختيار مرتين — احذف هذا وارفع كمية الأول.', "The same product and selection twice — remove this one and raise the first one's quantity.", 'هەمان بەرهەم و هەڵبژاردە دوو جار — ئەمە بسڕەوە و بڕی یەکەم زیاد بکە.')}</p> : null}
-      {doc && (groups.length > 0 && options.length > 0 || colours.length > 0) ? (
-        <div className="mt-1 flex flex-wrap gap-2">
-          {options.length > 0 ? groups.map((g) => {
+      {doc === null ? <p>{loc('تعذّرت قراءة المنتج.', 'The product could not be read.', 'بەرهەمەکە نەخوێندرایەوە.')}</p> : null}
+      {problem === 'printer' ? <p className="text-text-primary" role="alert" data-kit-problem="printer">{loc('الطابعة لا تكون منتجاً داخل باقة — احذفه.', 'A printer cannot be a kit item — remove it.', 'پرینتەر نابێتە بەرهەمێکی ناو پاکێج — بیسڕەوە.')}</p> : null}
+      {problem === 'duplicate' ? <p className="text-text-primary" role="alert" data-kit-problem="dup-item">{loc('نفس المنتج والاختيار مرتين — احذف هذا وارفع كمية الأول.', "The same product and selection twice — remove this one and raise the first one's quantity.", 'هەمان بەرهەم و هەڵبژاردە دوو جار — ئەمە بسڕەوە و بڕی یەکەم زیاد بکە.')}</p> : null}
+      {doc && groups.length > 0 && options.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {groups.map((g) => {
             const inGroup = options.filter((o) => (o.group_en ?? '') === g);
             const chosen = inGroup.find((o) => item.option_value_ids.includes(o.id))?.id ?? '';
             return (
-              <select
-                key={g || 'options'}
-                className="lv-input h-9 px-2 text-[12px]"
-                aria-label={g || loc('النسخة', 'Version', 'وەشان')}
-                value={chosen}
-                onChange={(e) => {
-                  const rest = item.option_value_ids.filter((id) => !inGroup.some((o) => o.id === id));
-                  onChange({ option_value_ids: e.target.value ? [...rest, e.target.value] : rest });
-                }}
-              >
-                <option value="">{g ? `${g} — ?` : loc('اختر النسخة', 'Choose the version', 'وەشانەکە هەڵبژێرە')}</option>
-                {inGroup.map((o) => <option key={o.id} value={o.id}>{pick3(o, lang)}</option>)}
-              </select>
+              <label key={g || 'options'} className="flex flex-col gap-1">
+                {g || loc('النسخة', 'Version', 'وەشان')}
+                <select
+                  className="lv-input h-9 px-2 text-[12px]"
+                  value={chosen}
+                  onChange={(e) => {
+                    const rest = item.option_value_ids.filter((id) => !inGroup.some((o) => o.id === id));
+                    onChange({ option_value_ids: e.target.value ? [...rest, e.target.value] : rest });
+                  }}
+                >
+                  <option value="">{say(loc, S.choose)}</option>
+                  {inGroup.map((o) => <option key={o.id} value={o.id}>{pick3(o, lang)}</option>)}
+                </select>
+              </label>
             );
-          }) : null}
-          {colours.length > 0 ? (
-            <select
-              className="lv-input h-9 px-2 text-[12px]"
-              aria-label={loc('اللون', 'Colour', 'ڕەنگ')}
-              value={item.color_id ?? ''}
-              onChange={(e) => onChange({ color_id: e.target.value || null })}
-            >
-              <option value="">{loc('اختر اللون', 'Choose the colour', 'ڕەنگەکە هەڵبژێرە')}</option>
-              {colours.map((c) => <option key={c.id} value={c.id}>{pick3(c, lang)}</option>)}
-            </select>
+          })}
+        </div>
+      ) : null}
+      {doc && (colours.length > 0 || mode === 'customer') ? (
+        <div className="space-y-1" data-item-colour-mode={mode}>
+          <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={say(loc, S.colourMode)}>
+            <span className="text-text-secondary">{say(loc, S.colourMode)}</span>
+            {modeSeg('fixed', say(loc, S.colourFixed))}
+            {modeSeg('customer', say(loc, S.colourCustomer))}
+          </div>
+          {mode === 'fixed' && colours.length > 0 ? (
+            <label className="flex flex-col gap-1">
+              {loc('اللون', 'Colour', 'ڕەنگ')}
+              <select className="lv-input h-9 px-2 text-[12px]" value={item.color_id ?? ''} onChange={(e) => onChange({ color_id: e.target.value || null })}>
+                <option value="">{say(loc, S.choose)}</option>
+                {colours.map((c) => <option key={c.id} value={c.id}>{pick3(c, lang)}</option>)}
+              </select>
+            </label>
+          ) : null}
+          {mode === 'customer' ? (
+            colours.filter((c) => c.active).length ? (
+              <>
+                <p className="text-[11px] text-text-muted">{say(loc, S.colourCustomerHint)}</p>
+                <ul className="flex flex-wrap gap-1.5" data-item-colour-swatches>
+                  {colours.filter((c) => c.active).map((c) => {
+                    const out = typeof c.stock === 'number' && c.stock <= 0;
+                    return (
+                      <li key={c.id} className="inline-flex items-center gap-1 rounded-full border border-border-subtle px-2 py-0.5 text-[11px]">
+                        <span aria-hidden="true" className="h-3 w-3 shrink-0 rounded-full border border-border-subtle" style={{ background: c.hex || 'transparent' }} />
+                        {pick3(c, lang)}
+                        {out ? <span className="text-text-muted">· {say(loc, S.outOfStock)}</span> : null}
+                      </li>
+                    );
+                  })}
+                  <li className="inline-flex items-center gap-1 rounded-full border border-dashed border-border-subtle px-2 py-0.5 text-[11px]">
+                    {loc('لون عشوائي', 'Random colour', 'ڕەنگی هەڕەمەکی')}
+                  </li>
+                </ul>
+              </>
+            ) : <p className="text-warning" role="alert">{say(loc, S.colourNone)}</p>
           ) : null}
         </div>
       ) : null}
@@ -525,13 +775,12 @@ function ItemRow({ item, doc, name, loc, lang, onChange, onRemove, problem = nul
 }
 
 /**
- * The customer's view of the kits for this printer, from the PUBLISHED list
- * (GET /api/products/:slug/kits — the live prices and availability the shop
- * would answer now, priced as for a guest). A saved draft shows here only after
- * it is published.
+ * The customer's view of the kits for THIS printer, from the PUBLISHED list (GET
+ * /api/products/:slug/kits — the live prices and availability the shop would answer now, priced as
+ * for a guest). A saved draft shows here only after it is published.
  */
-function KitPreview({ printers, loc, lang }: { printers: Printer[]; loc: Loc; lang: string }) {
-  const [at, setAt] = useState(printers[0] ? `${printers[0].slug}|` : '');
+function KitPreview({ printer, loc, lang }: { printer: Printer | null; loc: Loc; lang: string }) {
+  const [at, setAt] = useState(printer ? `${printer.slug}|` : '');
   const [kits, setKits] = useState<PreviewKit[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [tick, setTick] = useState(0);
@@ -548,22 +797,25 @@ function KitPreview({ printers, loc, lang }: { printers: Printer[]; loc: Loc; la
       .catch(() => { if (live) setFailed(true); });
     return () => { live = false; };
   }, [at, tick]);
-  if (!printers.length) return null;
-  const title = (k: PreviewKit) => (lang === 'en' ? k.title.en : lang === 'ckb' ? k.title.ckb : k.title.ar) || k.title.en || k.id;
+  if (!printer) return null;
+  const title = (k: PreviewKit) => text3(k.title, lang) || k.id;
   return (
-    <div className="mt-3 border-t border-border-subtle pt-3" data-printer-services-kit-preview>
-      <h3 className="font-semibold text-text-primary">{loc('معاينة: الأسعار والتوفر الآن (من القائمة المنشورة)', 'Preview: prices and availability now (from the published list)', 'پێشبینین: نرخ و بەردەستبوون ئێستا (لە لیستی بڵاوکراوە)')}</h3>
-      <div className="mt-1 flex flex-wrap items-center gap-2">
-        <select className="lv-input h-9 px-2 text-[12px]" value={at} onChange={(e) => setAt(e.target.value)} aria-label={loc('الطابعة', 'Printer', 'پرینتەر')}>
-          {printers.flatMap((p) => [
-            <option key={p.id} value={`${p.slug}|`}>{p.name}</option>,
-            ...p.versions.map((v) => <option key={v.id} value={`${p.slug}|${v.id}`}>{`${p.name} — ${v.name}`}</option>),
-          ])}
-        </select>
+    <details className="border-t border-border-subtle pt-3" data-printer-services-kit-preview>
+      <summary className="cursor-pointer font-semibold text-text-primary">{loc('معاينة: الأسعار والتوفر الآن (من القائمة المنشورة)', 'Preview: prices and availability now (from the published list)', 'پێشبینین: نرخ و بەردەستبوون ئێستا (لە لیستی بڵاوکراوە)')}</summary>
+      <div className="mt-1 flex flex-wrap items-end gap-2">
+        {printer.versions.length > 1 ? (
+          <label className="flex flex-col gap-1">
+            {say(loc, S.version)}
+            <select className="lv-input h-9 px-2 text-[12px]" value={at} onChange={(e) => setAt(e.target.value)}>
+              <option value={`${printer.slug}|`}>{say(loc, S.wholePrinter)}</option>
+              {printer.versions.map((v) => <option key={v.id} value={`${printer.slug}|${v.id}`}>{v.name}</option>)}
+            </select>
+          </label>
+        ) : null}
         <button type="button" className="lv-button lv-button-ghost lv-button-sm" onClick={() => setTick((n) => n + 1)}>{loc('تحديث', 'Refresh', 'نوێکردنەوە')}</button>
       </div>
       {failed ? <p className="mt-1">{loc('تعذّر تحميل المعاينة.', 'The preview could not be loaded.', 'پێشبینینەکە بار نەکرا.')}</p>
-        : !kits ? <p className="mt-1">{loc('جارٍ التحميل…', 'Loading…', 'باردەکرێت…')}</p>
+        : !kits ? <p className="mt-1">{say(loc, S.loading)}</p>
         : kits.length === 0 ? <p className="mt-1">{loc('لا باقات منشورة لهذه الطابعة.', 'No published kits for this printer.', 'هیچ پاکێجێکی بڵاوکراوە بۆ ئەم پرینتەرە نییە.')}</p>
         : (
           <ul className="mt-1 space-y-2">
@@ -571,8 +823,13 @@ function KitPreview({ printers, loc, lang }: { printers: Printer[]; loc: Loc; la
               <li key={k.id} className="rounded-lg border border-border-subtle p-2">
                 <p className="flex flex-wrap items-center justify-between gap-2 text-text-primary">
                   <span className="font-semibold">{title(k)}</span>
-                  <span dir="ltr" className="tabular-nums">
-                    {k.available && k.price_per_printer_iqd !== null ? formatIqd(k.price_per_printer_iqd) : loc('غير متوفرة', 'Unavailable', 'بەردەست نییە')}
+                  <span className="inline-flex items-baseline gap-1.5">
+                    {k.available && k.price_per_printer_iqd !== null && (k.before_per_printer_iqd ?? 0) > k.price_per_printer_iqd
+                      ? <span dir="ltr" className="tabular-nums line-through text-text-muted">{formatIqd(k.before_per_printer_iqd as number)}</span>
+                      : null}
+                    <span dir="ltr" className="tabular-nums">
+                      {k.available && k.price_per_printer_iqd !== null ? formatIqd(k.price_per_printer_iqd) : loc('غير متوفرة', 'Unavailable', 'بەردەست نییە')}
+                    </span>
                   </span>
                 </p>
                 <ul className="mt-1 space-y-0.5">
@@ -587,6 +844,6 @@ function KitPreview({ printers, loc, lang }: { printers: Printer[]; loc: Loc; la
             ))}
           </ul>
         )}
-    </div>
+    </details>
   );
 }

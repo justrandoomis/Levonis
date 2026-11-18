@@ -29,6 +29,8 @@ export interface GroupableLine {
   options_label?: string;
   /** Phase 2 (0235): a filament-kit line is drawn under its printer, never grouped. */
   kit_line?: unknown;
+  /** Phase 4 (0242): an add-on bought with a printer is drawn under it too, never grouped. */
+  addon_line?: unknown;
   variantLabel?: string;
 }
 
@@ -37,7 +39,20 @@ export type CartEntry<L extends GroupableLine> =
   | { kind: 'group'; productId: string; items: L[] };
 
 const groupable = (line: GroupableLine) =>
-  !!line.productId && !line.kind && !line.kit_line && (line.seller_type ?? 'levonis') !== 'merchant';
+  !!line.productId && !line.kind && !line.kit_line && !line.addon_line && (line.seller_type ?? 'levonis') !== 'merchant';
+
+/**
+ * Phase 2 / 4: the printer line a kit or add-on line is packed with (the
+ * server's `kit_line` / `addon_line`), or null. Ticking, drawing and removing
+ * follow that printer.
+ */
+export function attachedPrinterOf(line: { kit_line?: unknown; addon_line?: unknown }): string | null {
+  for (const link of [line.kit_line, line.addon_line]) {
+    const id = link && typeof link === 'object' ? (link as { printer_cart_item_id?: unknown }).printer_cart_item_id : null;
+    if (typeof id === 'string' && id) return id;
+  }
+  return null;
+}
 
 export function groupCartLines<L extends GroupableLine>(items: readonly L[]): CartEntry<L>[] {
   const counts = new Map<string, number>();

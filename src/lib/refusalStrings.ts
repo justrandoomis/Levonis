@@ -173,6 +173,32 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'A filament kit is bought together with its printer — select the printer too.',
     ckb: 'پاکێجی فیلامێنت لەگەڵ پرینتەرەکەی دەکڕدرێت — پرینتەرەکەش دیاری بکە.',
   },
+  // Phase 4 (DECISIONS row 355): a kit / add-on colour the customer chose, and the printer's add-ons.
+  KIT_COLOR_UNAVAILABLE: {
+    ar: 'اللون الذي اخترته غير متوفر الآن بهذه الكمية — اختر لوناً آخر أو «لون عشوائي».',
+    en: 'The colour you chose is not available now in this quantity — choose another colour or "random colour".',
+    ckb: 'ئەو ڕەنگەی هەڵتبژاردووە ئێستا بەم بڕە بەردەست نییە — ڕەنگێکی تر یان «ڕەنگی هەڕەمەکی» هەڵبژێرە.',
+  },
+  ADDON_NOT_OFFERED: {
+    ar: 'هذه الإضافة غير متاحة مع هذه الطابعة — أزلها أو اختر غيرها.',
+    en: 'This add-on is not offered with this printer — remove it or choose another.',
+    ckb: 'ئەم پاشکۆیە لەگەڵ ئەم پرینتەرە پێشکەش ناکرێت — لای ببە یان یەکێکی تر هەڵبژێرە.',
+  },
+  ADDON_UNAVAILABLE: {
+    ar: 'هذه الإضافة غير متوفرة الآن بهذه الكمية أو طريقة الشحن — أزلها أو حاول لاحقاً.',
+    en: 'This add-on is not available now in this quantity or shipping type — remove it or try again later.',
+    ckb: 'ئەم پاشکۆیە ئێستا بەم بڕە یان بەم جۆری ناردنە بەردەست نییە — لای ببە یان دواتر هەوڵ بدەرەوە.',
+  },
+  ADDON_CHANGED: {
+    ar: 'تغيّرت إحدى إضافات هذه الطابعة — اخترها من جديد.',
+    en: 'An add-on of this printer has changed — choose it again.',
+    ckb: 'یەکێک لە پاشکۆکانی ئەم پرینتەرە گۆڕاوە — دووبارە هەڵیبژێرە.',
+  },
+  ADDON_WITHOUT_PRINTER: {
+    ar: 'الإضافة تُشترى مع طابعتها — حدّد الطابعة أيضاً.',
+    en: 'An add-on is bought together with its printer — select the printer too.',
+    ckb: 'پاشکۆ لەگەڵ پرینتەرەکەی دەکڕدرێت — پرینتەرەکەش دیاری بکە.',
+  },
   // The order-options / quote codes a chosen plan can carry (the contract change of the phase 2 review):
   // the sheet, the add, the cart and the checkout all say them; the same words as src/lib/refusalStrings.ts.
   PLAN_UNPRICED: {

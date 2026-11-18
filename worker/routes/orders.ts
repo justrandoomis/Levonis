@@ -37,6 +37,7 @@ import {
   type DeliveryDayPolicy,
 } from '../lib/deliveryDay';
 import {
+  randomColourRow,
   resolveCartLine,
   pricingContextFrom,
   publicBreakdown,
@@ -246,10 +247,11 @@ import { orderConfirmKeyboard } from '../lib/orderTelegramConfirm';
 import { notifyOrderPlaced } from '../lib/orderNotify';
 import { SERVICES_CODES, KIT_CHANGED, KIT_WITHOUT_PRINTER, MEMBERSHIP_NOT_OFFERED, MEMBERSHIP_NOT_WITH_BNPL, MEMBERSHIP_PRICE_CHANGED, offeredMembershipTiers } from '@levonis/pricing/printerServices';
 import { activateOrderMembership, orderMembershipPublic, orderMembershipPurchases } from '../lib/orderMembershipSale';
-import { kitLinesMatch, offeredKit } from '../lib/printerKits';
+import { addonLinesMatch, kitLinesMatch, offeredAddon, offeredKit } from '../lib/printerKits';
+import { addonChanged, addonWithoutPrinter, applyPrinterDiscount, attachedLineOf, benefitRegularUnit, printerDiscountView, printerLineDiscount, type AppliedPrinterDiscount } from '../lib/printerOffers';
 import { membershipPlanById, orderMembershipPendingRefusal, orderMembershipQuotePayload, quoteOrderMembership, tierLabel, type MembershipPlanRow } from './memberships';
 import { publishedFromSetting } from '../lib/printerServices';
-import { orderServicesView, serviceTaskStatements, servicesForMethod, SERVICES_DELIVERY_METHOD_MESSAGE, SERVICES_DELIVERY_METHOD_TEXT, withKitLink, withServicesSnapshot } from '../lib/printerServices';
+import { orderServicesView, serviceTaskStatements, servicesForMethod, SERVICES_DELIVERY_METHOD_MESSAGE, SERVICES_DELIVERY_METHOD_TEXT, withAttachedLink, withServicesSnapshot } from '../lib/printerServices';
 
 /**
  * 409 PRODUCT_CURRENTLY_UNAVAILABLE naming the products (the clean start, spec addendum A.5): a line
@@ -956,7 +958,14 @@ export function orderPublic(
         // 0235: the membership bought with the order is its own line (never returned), and a
         // filament-kit line names the printer line it was packed with. Absent on every other line.
         ...(it.line_kind === 'membership' ? { kind: 'membership' as const, line_kind: 'membership' as const, returnable: false } : {}),
-        ...(typeof it.kit_parent_item_id === 'string' && it.kit_parent_item_id ? { kit: { printer_item_id: it.kit_parent_item_id, kit_id: it.kit_id ?? null } } : {}),
+        // 0242 (phase 4): an add-on line names its add-on instead; both say who picked the colour, and a line
+        // the owner's printer discount lowered carries it (already inside its unit price — report-only).
+        ...(typeof it.kit_parent_item_id === 'string' && it.kit_parent_item_id
+          ? typeof it.addon_id === 'string' && it.addon_id
+            ? { addon: { printer_item_id: it.kit_parent_item_id, addon_id: it.addon_id, color_mode: orderColourMode(it.kit_color_mode) } }
+            : { kit: { printer_item_id: it.kit_parent_item_id, kit_id: it.kit_id ?? null, color_mode: orderColourMode(it.kit_color_mode) } }
+          : {}),
+        ...orderPrinterDiscountView(it.printer_discount_iqd, it.pricing_snapshot),
         /**
          * The exact selection that was bought, in the shape POST /api/cart/items
          * accepts — so "buy again" repeats THIS line instead of the product's
@@ -1993,6 +2002,12 @@ export interface ComputedLine {
   estimate_label?: true;
   /** 0235: a filament-kit line — its printer's cart line, the kit, and the units per printer unit. */
   kit?: { parent_cart_item_id: string; kit_id: string; unit_qty: number } | null;
+  /** 0242: a printer add-on line — its printer's cart line, the add-on, and the units per printer unit. */
+  addon?: { parent_cart_item_id: string; addon_id: string; unit_qty: number } | null;
+  /** 0242: who picked an attached line's colour ('chosen' = the customer, 'random' = the system); null = fixed. */
+  kit_color_mode?: 'chosen' | 'random' | null;
+  /** 0242: the owner's printer discount inside this line's unit price (report-only; never subtracted again). */
+  printer_discount?: AppliedPrinterDiscount | null;
   /** 0235: the order type this row resolved to (`lineOrderType`) — a kit ships the way its printer ships. */
   order_type?: OrderType;
 }
@@ -2271,6 +2286,37 @@ function creditReserved(res: StockResolution, productId: string, credit: Readonl
   return { ...res, targets, available };
 }
 
+/** 0242: who picked an attached order line's colour; null = the owner's fixed colour (or a line before 0242). */
+const orderColourMode = (v: unknown): 'chosen' | 'random' | null => (v === 'chosen' || v === 'random' ? v : null);
+
+/**
+ * 0242: the owner's printer discount an order line's unit price holds — «السعر قبل الخصم» for the order screens.
+ * Absent when none (or the column predates the line). Report-only: `unit_price_iqd` is already the after price.
+ */
+function orderPrinterDiscountView(totalIqd: unknown, pricingSnapshot: unknown) {
+  const total = Math.trunc(Number(totalIqd) || 0);
+  if (total <= 0) return {};
+  const pd = safeParse<{ printer_discount?: { before_unit_iqd?: unknown; discount_unit_iqd?: unknown } } | null>(
+    typeof pricingSnapshot === 'string' ? pricingSnapshot : null, null
+  )?.printer_discount;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : null);
+  return { printer_discount: { before_unit_iqd: num(pd?.before_unit_iqd), discount_unit_iqd: num(pd?.discount_unit_iqd), total_iqd: total } };
+}
+
+/**
+ * The packing instruction of a printer line (0235, phase 4): the filament kit packed with it — each line with who
+ * picked its colour — and its add-ons. '' when it has neither.
+ *   «يُغلَّف معها باقة الفيلامنت: PLA أحمر ×2 (لون اختاره الزبون)، PETG أسود ×1 (لون عشوائي — اختاره النظام من المخزون)؛ الإضافات: فوهة 0.4 ×1»
+ */
+export function printerPackingNote(lines: readonly ComputedLine[], printerCartItemId: string): string {
+  const label = (l: ComputedLine) => `${l.name_ar || l.name}${l.variant ? ` (${l.variant})` : ''} ×${l.qty}${
+    l.kit_color_mode === 'chosen' ? ' (لون اختاره الزبون)' : l.kit_color_mode === 'random' ? ' (لون عشوائي — اختاره النظام من المخزون)' : ''}`;
+  const kit = lines.filter((l) => l.kit?.parent_cart_item_id === printerCartItemId).map(label).join('، ');
+  const addons = lines.filter((l) => l.addon?.parent_cart_item_id === printerCartItemId).map(label).join('، ');
+  const parts = [kit ? `يُغلَّف معها باقة الفيلامنت: ${kit}` : '', addons ? `${kit ? 'الإضافات' : 'يُغلَّف معها من الإضافات'}: ${addons}` : ''].filter(Boolean);
+  return parts.join('؛ ');
+}
+
 /**
  * 0235 — THE PRINTER'S KIT AND MEMBERSHIP AT THE DOOR.
  *
@@ -2295,10 +2341,27 @@ async function checkoutPrinterExtras(
   allocate: boolean
 ): Promise<{ membership: CheckoutMembership | null; unavailable: UnavailableMembership | null }> {
   const config = publishedFromSetting(setting);
+  const isAttached = (l: ComputedLine) => !!l.kit || !!l.addon;
   const groups = new Map<string, ComputedLine[]>();
   for (const l of lines) if (l.kit) groups.set(l.kit.parent_cart_item_id, [...(groups.get(l.kit.parent_cart_item_id) ?? []), l]);
+  // Phase 4: each add-on is bought with its printer and is still the owner's add-on for it (the same product and
+  // selection, its colour rule, its count × the printer's quantity), shipping the way the printer ships.
+  const addonGroups = new Map<string, ComputedLine[]>();
+  for (const l of lines) if (l.addon) addonGroups.set(`${l.addon.parent_cart_item_id}\u0000${l.addon.addon_id}`, [...(addonGroups.get(`${l.addon.parent_cart_item_id}\u0000${l.addon.addon_id}`) ?? []), l]);
+  for (const addonLines of addonGroups.values()) {
+    const { parent_cart_item_id: parentId, addon_id: addonId } = addonLines[0].addon!;
+    const printer = lines.find((l) => l.cart_item_id === parentId && !isAttached(l));
+    if (!printer) throw addonWithoutPrinter(addonLines[0].cart_item_id);
+    const addon = printer.services_snapshot ? offeredAddon(config, { productId: printer.product_id, optionValueIds: printer.option_value_ids }, addonId) : null;
+    const shipsLikePrinter = addonLines.every((l) => (l.order_type ?? null) === (printer.order_type ?? null)
+      && transportOf(l.transport_snapshot) === transportOf(printer.transport_snapshot));
+    if (!addon || !shipsLikePrinter
+      || !addonLinesMatch(addon, printer.qty, addonLines.map((l) => ({ product_id: l.product_id, option_value_ids: l.option_value_ids, color_id: l.color_id, qty: l.qty })))) {
+      throw addonChanged(parentId, addonId);
+    }
+  }
   for (const [parentId, kitLines] of groups) {
-    const printer = lines.find((l) => l.cart_item_id === parentId && !l.kit);
+    const printer = lines.find((l) => l.cart_item_id === parentId && !isAttached(l));
     if (!printer) {
       throw badRequest('A filament kit is bought together with its printer — tick the printer too.', KIT_WITHOUT_PRINTER, { cart_item_id: kitLines[0].cart_item_id });
     }
@@ -2320,7 +2383,7 @@ async function checkoutPrinterExtras(
     if (!/no such table/i.test(String((e as Error)?.message ?? e))) throw e;
   }
   if (!choice) return { membership: null, unavailable: null };
-  const printer = lines.find((l) => l.cart_item_id === choice!.printer_cart_item_id && !l.kit);
+  const printer = lines.find((l) => l.cart_item_id === choice!.printer_cart_item_id && !l.kit && !l.addon);
   if (!printer) return { membership: null, unavailable: null }; // its printer is not bought now: the choice stays in the cart with it
   /*
    * A MEMBERSHIP THAT CANNOT BE BOUGHT NOW DOES NOT TAKE THE CHECKOUT DOWN
@@ -2962,6 +3025,16 @@ export async function computeCheckout(
 
       if (!listingNow.isSellableRow(row, heldLines)) throw productsUnavailable([String(row.id)]);
       const view = views.get(String(row.id));
+      // PHASE 4: a «random» colour that can no longer serve this line is picked again for the order, by the rule
+      // the cart used (cheapest, most free stock, colour order, id) — the order and its reservation take the new
+      // colour. A colour the customer CHOSE is never swapped: a short one is refused below like any line.
+      if (row.kit_color_mode === 'random') {
+        const repickOffer = lineOffers.get(offerKey(subjectOf(String(row.id)))) ?? null;
+        const repickInput = { view: repickOffer, eligible: offerEligible(tierStatus, repickOffer, offerNow).ok, nowMs: offerNow };
+        row.color_id = randomColourRow(row, view, pricingCtx, (r) =>
+          resolveCartLine(r, selectionFromCartRow(r), tierStatus.tier, pricingTierActive, pricingCtx, view, preorderPricing, printerIds.has(String(row.id)), repickInput)
+        ).color_id;
+      }
       const sel = selectionFromCartRow(row);
       const isPrinter = printerIds.has(String(row.id));
       // THE DOOR RE-CHECKS THE OFFER, independently of the list and of the
@@ -2983,7 +3056,7 @@ export async function computeCheckout(
           required_tiers: offerCheck.required_tiers,
         });
       }
-      const { doc, resolved: resolvedLive, variantLabel, selectionErrors, offerId, colorTag, optionsLabel } = resolveCartLine(
+      const { doc, resolved: resolvedPriced, variantLabel, selectionErrors, offerId, colorTag, optionsLabel } = resolveCartLine(
         row,
         sel,
         tierStatus.tier,
@@ -2994,6 +3067,10 @@ export async function computeCheckout(
         isPrinter,
         { view: offerView, eligible: offerCheck.ok, nowMs: offerNow }
       );
+      // THE OWNER'S PRINTER DISCOUNT, INSIDE THE UNIT PRICE (phase 4) — the checkout's one call point, right after
+      // the line is priced and before its stock, benefits, coupon facts and totals: unit × qty is what is charged.
+      const { resolved: resolvedLive, applied: printerDiscount } = applyPrinterDiscount(resolvedPriced, printerLineDiscount(pricingCtx.printerServices ?? null, row));
+      const attached = attachedLineOf(row);
       // Quick Buy's price lock (§20, D12); the cart path passes no ceilings.
       const resolved = lockUnitPrice(resolvedLive, options.source?.unitCeilings?.get(String(row.cart_item_id)));
       // A window with LIMITS but no price still needs its redemption row, or
@@ -3158,6 +3235,10 @@ export async function computeCheckout(
           requested: qty,
           coarse,
           ...(coarse ? {} : { available: stockRes.available }),
+          // Phase 4: a kit / add-on line names its colour and its printer — a chosen colour is never swapped.
+          ...(attached
+            ? { cart_item_id: String(row.cart_item_id), color_id: String(row.color_id ?? ''), printer_cart_item_id: attached.parentId, [attached.kind === 'addon' ? 'addon_id' : 'kit_id']: attached.id }
+            : {}),
         };
         if (orderType === 'pre_order') {
           // A PRE-ORDER IS NOT "OUT OF STOCK": there is no shelf, the import
@@ -3299,7 +3380,12 @@ export async function computeCheckout(
         line,
         applied_iqd: resolved.applied_iqd,
         tracked: stockRes.tracked,
-        pricing_snapshot: JSON.stringify(offerSnapshot ? { ...pricingSnapshot, offer: offerSnapshot } : pricingSnapshot),
+        pricing_snapshot: JSON.stringify({
+          ...pricingSnapshot,
+          ...(offerSnapshot ? { offer: offerSnapshot } : {}),
+          // Phase 4: the owner's printer discount this unit price already holds — report-only, never subtracted again.
+          ...(printerDiscount ? { printer_discount: printerDiscount } : {}),
+        }),
         warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
         services_snapshot: servicesFrozen ? JSON.stringify(servicesFrozen) : null,
         transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
@@ -3313,7 +3399,8 @@ export async function computeCheckout(
         benefit: {
           category_id: (row.category_id as string | null) ?? null,
           sub_category_id: (row.sub_category_id as string | null) ?? null,
-          regular_unit_iqd: resolved.regular_iqd,
+          // A printer-discounted line is read like an offer-priced one (D10): a rule sees the price before.
+          regular_unit_iqd: benefitRegularUnit(resolved, printerDiscount),
           applied_rule_id: tierStatus.tier === 'pro' ? resolved.member_rule.pro : resolved.member_rule.prime,
           offer_before_unit_iqd: typeof resolved.offer_before_iqd === 'number' ? resolved.offer_before_iqd : null,
         },
@@ -3326,7 +3413,11 @@ export async function computeCheckout(
         ...(estimated && estimateChannel ? { price_estimate: { combo_key: estimateKey, channel: estimateChannel } } : {}),
         ...(isEstimateRow(row) ? { estimate_label: true as const } : {}),
         // 0235: a filament-kit line names its printer's CART line; the order links it to the printer's order line.
-        ...(row.kit_parent_id ? { kit: { parent_cart_item_id: String(row.kit_parent_id), kit_id: String(row.kit_id ?? ''), unit_qty: Number(row.kit_unit_qty) || 0 } } : {}),
+        ...(attached?.kind === 'kit' ? { kit: { parent_cart_item_id: attached.parentId, kit_id: attached.id, unit_qty: attached.unitQty } } : {}),
+        // 0242: an add-on line, who picked an attached line's colour, and the discount inside its unit price.
+        ...(attached?.kind === 'addon' ? { addon: { parent_cart_item_id: attached.parentId, addon_id: attached.id, unit_qty: attached.unitQty } } : {}),
+        ...(attached && attached.colorMode !== 'fixed' ? { kit_color_mode: attached.colorMode } : {}),
+        ...(printerDiscount ? { printer_discount: printerDiscount } : {}),
         order_type: orderType,
       });
     }
@@ -3792,6 +3883,8 @@ export async function computeCheckout(
           member_line_discount_iqd: member && member.applied_at === 'line' ? member.total_iqd : 0,
           already_discounted:
             !!offer ||
+            // Phase 4: the owner's printer discount is an offer price (owner default 6).
+            !!l.printer_discount ||
             (!!l.benefit && l.applied_iqd < l.benefit.regular_unit_iqd) ||
             (member?.total_iqd ?? 0) > 0 ||
             (parentLineIds.has(l.id) && Number(l.composition_saving_percent ?? 0) > 0),
@@ -4704,7 +4797,9 @@ function quoteLines(lines: ComputedLine[]) {
         // A gift (0175): 0 IQD, with what it is worth and which gift it is.
         ...(l.gift ? { kind: 'gift' as const, is_gift: true, gift: { id: l.gift.gift_id, level: l.gift.level, value_iqd: l.gift.value_iqd } } : {}),
         // 0235: a filament-kit line of the printer line `printer_cart_item_id`.
-        ...(l.kit ? { kit_line: { printer_cart_item_id: l.kit.parent_cart_item_id, kit_id: l.kit.kit_id, qty_per_printer: l.kit.unit_qty } } : {}),
+        ...(l.kit ? { kit_line: { printer_cart_item_id: l.kit.parent_cart_item_id, kit_id: l.kit.kit_id, qty_per_printer: l.kit.unit_qty, color_mode: l.kit_color_mode ?? 'fixed', ...printerDiscountView(l.printer_discount ?? null) } } : {}),
+        // 0242: a printer add-on line of the printer line `printer_cart_item_id`.
+        ...(l.addon ? { addon_line: { printer_cart_item_id: l.addon.parent_cart_item_id, addon_id: l.addon.addon_id, qty_per_printer: l.addon.unit_qty, color_mode: l.kit_color_mode ?? 'fixed', ...printerDiscountView(l.printer_discount ?? null) } } : {}),
         ...(kids.length
           ? {
               // The two figures the disclosure struck through and badged. On
@@ -4787,6 +4882,9 @@ function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
       lines: quoteLines(comp.lines),
       merchandise_iqd: comp.merchandise,
       subtotal_iqd: comp.subtotal,
+      // Phase 4: the owner's printer discounts this order's unit prices already hold (Σ per unit × qty).
+      // Report-only — it is inside `subtotal_iqd`, never subtracted again.
+      printer_discount_iqd: comp.lines.reduce((s, l) => s + (l.printer_discount ? l.printer_discount.discount_unit_iqd * l.qty : 0), 0),
       /**
        * 0235: the membership bought with this order — its own line, inside
        * `subtotal_iqd` and `total_iqd`, outside every coupon, points, benefit
@@ -5523,17 +5621,18 @@ export async function placeOrder(
   );
 
   // 0235: each printer's ORDER line by its cart line, so its kit lines link to it.
-  const orderItemByCart = new Map(comp.lines.filter((l) => !l.kit).map((l) => [l.cart_item_id, l.id]));
+  const orderItemByCart = new Map(comp.lines.filter((l) => !l.kit && !l.addon).map((l) => [l.cart_item_id, l.id]));
   for (const it of comp.lines) {
     const basis = engineBasis.get(it.id);
     const estimate = estimates.get(it.id);
-    const kitParent = it.kit ? orderItemByCart.get(it.kit.parent_cart_item_id) ?? null : null;
+    const attachedTo = it.kit?.parent_cart_item_id ?? it.addon?.parent_cart_item_id ?? null;
+    const kitParent = attachedTo ? orderItemByCart.get(attachedTo) ?? null : null;
     stmts.push(
       orderItemInsertStatement(c.env.DB, orderId, {
         ...it,
         // A kit line's cart discriminator ('kit:<cart line>') is not an order fact: the order line links to its
         // printer through kit_parent_item_id (review S13).
-        ...(it.kit ? { shipping_method_id: '' } : {}),
+        ...(it.kit || it.addon ? { shipping_method_id: '' } : {}),
         // §7.7: a MYSTERY SPOOL binds NULL here on purpose — see OrderItemRow.
         // `ComputedLine.product_id` still carries the real product, which is
         // what `planInventory` reserves against below.
@@ -5556,14 +5655,18 @@ export async function placeOrder(
         coupon_discount_iqd: comp.couponLineDiscounts.get(it.id) ?? 0,
       // The two 0175 columns, on a gift line only — and the six 0181 columns on an
       // engine-priced line only; every other line's INSERT is the statement it always was.
-      }, withKitLink(withServicesSnapshot(it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq, ...(estimate ?? {}) } : basis || estimate ? { ...(basis ?? {}), ...(estimate ?? {}) } : undefined, it.services_snapshot ?? null), kitParent, it.kit?.kit_id ?? null))
+      }, withAttachedLink(withServicesSnapshot(it.gift ? { gift_entitlement_id: it.gift.gift_id, gift_order_seq: it.gift.order_seq, ...(estimate ?? {}) } : basis || estimate ? { ...(basis ?? {}), ...(estimate ?? {}) } : undefined, it.services_snapshot ?? null), kitParent, {
+        // 0242 (phase 4): the add-on, who picked the colour, and the discount inside the unit price (report-only:
+        // discount per unit × qty). A line carrying none of them writes the INSERT it always did.
+        kitId: it.kit?.kit_id ?? null,
+        addonId: it.addon?.addon_id ?? null,
+        colorMode: it.kit_color_mode ?? null,
+        discountIqd: it.printer_discount ? it.printer_discount.discount_unit_iqd * it.qty : 0,
+      }))
     );
     // The warehouse's work for an enrolled printer, in the order's own batch (0234) —
     // its packing note names the filament kit packed with it (0235).
-    const kitNote = it.services_snapshot
-      ? comp.lines.filter((l) => l.kit?.parent_cart_item_id === it.cart_item_id).map((l) => `${l.name_ar || l.name}${l.variant ? ` (${l.variant})` : ''} ×${l.qty}`).join('، ')
-      : '';
-    stmts.push(...serviceTaskStatements(c.env.DB, orderId, it.id, it.services_snapshot ?? null, now, it.qty, kitNote ? `يُغلَّف معها باقة الفيلامنت: ${kitNote}` : ''));
+    stmts.push(...serviceTaskStatements(c.env.DB, orderId, it.id, it.services_snapshot ?? null, now, it.qty, it.services_snapshot ? printerPackingNote(comp.lines, it.cart_item_id) : ''));
     /**
      * THE GIFT IS CONSUMED HERE, IN THE ORDER'S OWN BATCH (0175, D4).
      *

@@ -771,6 +771,8 @@ export default function ProductForm({
     setOpen(4);
     requestAnimationFrame(() => {
       const block = document.querySelector<HTMLElement>('[data-package-measures]');
+      // Section ٤ folds its blocks (phase 4 redesign): «الأبعاد والوزن» is opened before the scroll.
+      block?.closest('details')?.setAttribute('open', '');
       block?.scrollIntoView({ block: 'start', behavior: 'smooth' });
       block?.querySelector<HTMLInputElement>('input')?.focus({ preventScroll: true });
     });
@@ -1685,106 +1687,163 @@ export default function ProductForm({
         }
         {...section(4)}
       >
-        {/* «قاعدة التوصيل»: read-only. Delivery is priced centrally in
-            «إدارة التوصيل» (owner, 2026-10-18); the line re-resolves when the
-            sections change, and works for an unsaved product too. */}
-        <DeliveryRuleLine productId={doc.id || null} categoryId={doc.category_id ?? null} subCategoryId={doc.sub_category_id ?? null} />
+        {/* Section ٤, redesigned (printer phase 4, owner 2026-11-18; DECISIONS row 355): one folded
+            block per subject, each with its own visible Arabic-first heading, one column on a phone.
+            On a printer, ① the delivery rule and ② «خدمات الطابعة» open first; the rest stay folded. */}
+        {(() => {
+          const s4Second = (en: string, ckb: string) => (lang === 'ckb' ? ckb : en);
+          let s4N = 0;
+          const s4Block = (key: string, ar: string, en: string, ckb: string, open: boolean, body: React.ReactNode, note?: React.ReactNode) => {
+            s4N += 1;
+            return (
+              <details className="group min-w-0 border-t border-border-subtle first:border-t-0" open={open || undefined} data-s4-block={key}>
+                <summary className="flex min-h-[44px] cursor-pointer list-none items-center gap-2 py-2 [&::-webkit-details-marker]:hidden">
+                  <span className="shrink-0 w-5 h-5 rounded-md grid place-items-center text-[10px] font-black bg-surface-selected text-text-secondary">{s4N}</span>
+                  <h3 className="min-w-0 flex-1 text-sm font-bold text-text-primary">
+                    {ar} <span className="text-text-muted font-medium">/ {s4Second(en, ckb)}</span>
+                  </h3>
+                  <svg aria-hidden viewBox="0 0 24 24" className="h-4 w-4 shrink-0 text-text-muted transition-transform group-open:rotate-180 motion-reduce:transition-none" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m6 9 6 6 6-6" />
+                  </svg>
+                </summary>
+                {note ? <p className="mb-2 text-[11px] text-text-secondary">{note}</p> : null}
+                <div className="min-w-0 pb-4">{body}</div>
+              </details>
+            );
+          };
+          const warrantyShown = showErrors && Object.keys(errors).some((k) => k.startsWith('warranty') || k === 'serialized');
+          return (
+            <>
+              {/* ① «قاعدة التوصيل»: read-only. Delivery is priced centrally in
+                  «إدارة التوصيل» (owner, 2026-10-18); the line re-resolves when the
+                  sections change, and works for an unsaved product too. */}
+              {s4Block('delivery', 'التوصيل', 'Delivery', 'گەیاندن', true,
+                <DeliveryRuleLine productId={doc.id || null} categoryId={doc.category_id ?? null} subCategoryId={doc.sub_category_id ?? null} />)}
 
-        {/* Extended warranty — printers only (owner mandate). Two switches
-            (+12 → 24, +24 → 36), a percent of the printer price each, and the
-            device coverage they rest on. Hidden for anything that is not
-            filed under a printer catalog; a non-printer that still carries
-            plans is told the save will be refused and offered a clear. */}
-        {warrantyHiddenValues && (
-          <p className="text-[11px] text-text-secondary mb-3" data-form="warranty-preserved">
-            محفوظ من الملف: {`ضمان أساسي ${doc.warranty_base_months} شهرًا`} — محرره يظهر لأقسام الطابعات فقط.
-          </p>
-        )}
-        {doc.payment_options.length > 0 && (
-          <p className="text-[11px] text-text-secondary mb-3" data-form="payment-options-preserved">
-            خيارات الدفع المحفوظة: <span dir="ltr">{doc.payment_options.join(', ')}</span> — تُعدَّل عبر القالب النصي.
-          </p>
-        )}
+              {/* ② «خدمات الطابعة» (owner, 2026-11-17: on the printer's own edit page; DECISIONS row 339):
+                  this printer's warranty family and delivery class, its kits and add-ons, and the shared
+                  price list. A saved printer only — the mapping is keyed by its id. Lazy: the panel is
+                  its own chunk, loaded when this block renders. */}
+              {isPrinterCatalog
+                ? s4Block('printer-services', 'خدمات الطابعة', 'Printer services', 'خزمەتگوزارییەکانی پرینتەر', true,
+                  doc.id || productId ? (
+                    <React.Suspense fallback={null}>
+                      <AdminPrinterServices productId={String(doc.id || productId)} onDirtyChange={setPrinterServicesDirty} />
+                    </React.Suspense>
+                  ) : (
+                    <p className="text-[12px] text-text-secondary" data-form="printer-services-unsaved">
+                      {lang === 'en'
+                        ? 'Save the printer first: its services are tied to its id.'
+                        : lang === 'ckb'
+                          ? 'سەرەتا پرینتەرەکە پاشەکەوت بکە: خزمەتگوزارییەکانی بە ناسنامەکەیەوە بەستراون.'
+                          : 'احفظ الطابعة أولاً: خدماتها مربوطة بمعرّفها.'}
+                    </p>
+                  ))
+                : null}
 
-        {/* «تريدها أقساط؟» — the ONE switch that turns the instalments note on
-            for this product. Until this field existed the column could only be
-            written from the TXT template, so a feature that shipped enabled had
-            no way to appear on any product from the admin at all.
+              {/* ③ Extended warranty — printers only (owner mandate). Two switches
+                  (+12 → 24, +24 → 36), a percent of the printer price each, and the
+                  device coverage they rest on. Hidden for anything that is not
+                  filed under a printer catalog; a non-printer that still carries
+                  plans is told the save will be refused and offered a clear. On a
+                  printer it is the OLD extension: not shown while «خدمات الطابعة» is published. */}
+              {s4Block(
+                'warranty',
+                isPrinterCatalog ? 'الضمان الممدد القديم' : 'الضمان',
+                isPrinterCatalog ? 'Old extended warranty' : 'Warranty',
+                isPrinterCatalog ? 'گەرەنتی درێژکراوەی کۆن' : 'گەرەنتی',
+                !isPrinterCatalog || warrantyShown,
+                <>
+                  {warrantyHiddenValues && (
+                    <p className="text-[11px] text-text-secondary mb-3" data-form="warranty-preserved">
+                      محفوظ من الملف: {`ضمان أساسي ${doc.warranty_base_months} شهرًا`} — محرره يظهر لأقسام الطابعات فقط.
+                    </p>
+                  )}
+                  <WarrantySection
+                    isPrinter={isPrinterCatalog}
+                    plans={doc.warranty_plans}
+                    serialized={doc.serialized ?? null}
+                    baseMonths={doc.warranty_base_months ?? null}
+                    // The example is the V2 direct price (the lowest sold), never an old dinar price of the document.
+                    priceIqd={v2.answer && !v2.answer.needs_pricing ? lowestPrice((v2.answer.table ?? []).filter((r) => r.channel === 'direct_sale')) : null}
+                    errors={showErrors ? errors : {}}
+                    onPlansChange={(next) => setDoc((d) => ({ ...d, warranty_plans: next }))}
+                    onSerializedChange={(v) => setDoc((d) => ({ ...d, serialized: v }))}
+                    canEditSerial={!!user?.is_owner}
+                    sectionSerial={sectionSerial}
+                    onBaseMonthsChange={(v) => setDoc((d) => ({ ...d, warranty_base_months: v }))}
+                  />
+                </>,
+                isPrinterCatalog
+                  ? (lang === 'en'
+                    ? 'Not shown to customers while printer services are published for this printer.'
+                    : lang === 'ckb'
+                      ? 'تا خزمەتگوزارییەکانی پرینتەر بۆ ئەم پرینتەرە بڵاوکراوە بن، بۆ کڕیار پیشان نادرێت.'
+                      : 'لا يظهر للزبون ما دامت خدمات الطابعة منشورة لهذه الطابعة.')
+                  : undefined
+              )}
 
-            EMPTY IS THE OFF POSITION and it is the default: the storefront
-            draws nothing without a link, because a note under an offer the
-            shop cannot open is worse than no note. The value is stored through
-            `safeLink` (worker/lib/productModel.ts) and the product page refuses
-            anything that is not http(s), so a pasted `javascript:` or a
-            relative path is dropped rather than rendered — which is also why
-            the hint asks for the full link and not a path. */}
-        <div className="mb-4 max-w-xl">
-          <Field
-            ar="رابط المنتج في تطبيق جني (التقسيط)"
-            en="This product's page in the Gini instalments app"
-            hint="اتركه فارغًا إذا لم يكن المنتج معروضًا في جني — عندها لا تظهر ملاحظة «تريدها أقساط؟». الرابط الكامل فقط (https://…)."
-          >
-            <TextInput
-              type="url"
-              inputMode="url"
-              placeholder="https://"
-              data-form="gini-url"
-              value={doc.gini_url}
-              onChange={(e) => setDoc((d) => ({ ...d, gini_url: e.target.value }))}
-            />
-          </Field>
-        </div>
-        <WarrantySection
-          isPrinter={isPrinterCatalog}
-          plans={doc.warranty_plans}
-          serialized={doc.serialized ?? null}
-          baseMonths={doc.warranty_base_months ?? null}
-          // The example is the V2 direct price (the lowest sold), never an old dinar price of the document.
-          priceIqd={v2.answer && !v2.answer.needs_pricing ? lowestPrice((v2.answer.table ?? []).filter((r) => r.channel === 'direct_sale')) : null}
-          errors={showErrors ? errors : {}}
-          onPlansChange={(next) => setDoc((d) => ({ ...d, warranty_plans: next }))}
-          onSerializedChange={(v) => setDoc((d) => ({ ...d, serialized: v }))}
-          canEditSerial={!!user?.is_owner}
-          sectionSerial={sectionSerial}
-          onBaseMonthsChange={(v) => setDoc((d) => ({ ...d, warranty_base_months: v }))}
-        />
+              {/* ④ Open box / used / refurbished. Beside the warranty because a graded
+                  listing's coverage IS one of its condition facts — the server
+                  refuses to sell extensions on top of it. Collapsed to a single
+                  select for a new product, which is nearly every product. */}
+              {s4Block('condition', 'الحالة', 'Condition', 'دۆخ', !isPrinterCatalog,
+                <ConditionSection
+                  condition={doc.condition ?? null}
+                  onChange={(next) => setDoc((d) => ({ ...d, condition: next }))}
+                  inUsedSection={inUsedSection}
+                  serialTracking={{ own: doc.serialized ?? null, isPrinter: isPrinterCatalog, section: sectionSerial }}
+                />)}
 
-        {/* «خدمات الطابعة» (owner, 2026-11-17: on the printer's own edit page; DECISIONS row 339):
-            this printer's warranty family and delivery class, and the shared price list. A saved
-            printer only — the mapping is keyed by its id. Loaded with the section. */}
-        {isPrinterCatalog && (doc.id || productId) ? (
-          <React.Suspense fallback={null}>
-            <AdminPrinterServices productId={String(doc.id || productId)} onDirtyChange={setPrinterServicesDirty} />
-          </React.Suspense>
-        ) : null}
+              {/* ⑤ «الأبعاد والوزن». Facts about the physical thing rather than about its
+                  price — a courier quote and a «هل يدخل على الطاولة؟» are the two
+                  questions this block answers. `showPackageMeasures` opens it. */}
+              {s4Block('dimensions', 'الأبعاد والوزن', 'Dimensions & weight', 'ڕووبەر و کێش', !isPrinterCatalog || initialSection === 4 || sectionMissing(4) > 0,
+                <DimensionsSection
+                  dimensions={doc.dimensions ?? emptyDimensions()}
+                  onChange={(next) => setDoc((d) => ({ ...d, dimensions: next }))}
+                  flags
+                />)}
 
-        {/* Open box / used / refurbished. Beside the warranty because a graded
-            listing's coverage IS one of its condition facts — the server
-            refuses to sell extensions on top of it. Collapsed to a single
-            select for a new product, which is nearly every product. */}
-        <div className="mt-5 pt-5 border-t border-border-subtle">
-          <ConditionSection
-            condition={doc.condition ?? null}
-            onChange={(next) => setDoc((d) => ({ ...d, condition: next }))}
-            inUsedSection={inUsedSection}
-            serialTracking={{ own: doc.serialized ?? null, isPrinter: isPrinterCatalog, section: sectionSerial }}
-          />
-        </div>
+              {/* ⑥ «تريدها أقساط؟» — the ONE switch that turns the instalments note on
+                  for this product. Until this field existed the column could only be
+                  written from the TXT template, so a feature that shipped enabled had
+                  no way to appear on any product from the admin at all.
 
-        {/* «الأبعاد والوزن». Beside the warranty and the grade because all
-            three are facts about the physical thing rather than about its
-            price — and because a courier quote and a «هل يدخل على الطاولة؟»
-            are the two questions this block answers. */}
-        <div className="mt-5 pt-5 border-t border-border-subtle">
-          <h3 className="mb-3 text-sm font-bold text-white">
-            الأبعاد والوزن <span className="text-text-muted font-medium">/ Dimensions & weight</span>
-          </h3>
-          <DimensionsSection
-            dimensions={doc.dimensions ?? emptyDimensions()}
-            onChange={(next) => setDoc((d) => ({ ...d, dimensions: next }))}
-            flags
-          />
-        </div>
+                  EMPTY IS THE OFF POSITION and it is the default: the storefront
+                  draws nothing without a link, because a note under an offer the
+                  shop cannot open is worse than no note. The value is stored through
+                  `safeLink` (worker/lib/productModel.ts) and the product page refuses
+                  anything that is not http(s), so a pasted `javascript:` or a
+                  relative path is dropped rather than rendered — which is also why
+                  the hint asks for the full link and not a path. */}
+              {s4Block('instalments', 'التقسيط (جني)', 'Instalments (Gini)', 'قیست (جینی)', !isPrinterCatalog || !!doc.gini_url,
+                <>
+                  {doc.payment_options.length > 0 && (
+                    <p className="text-[11px] text-text-secondary mb-3" data-form="payment-options-preserved">
+                      خيارات الدفع المحفوظة: <span dir="ltr">{doc.payment_options.join(', ')}</span> — تُعدَّل عبر القالب النصي.
+                    </p>
+                  )}
+                  <div className="max-w-xl">
+                    <Field
+                      ar="رابط المنتج في تطبيق جني (التقسيط)"
+                      en="This product's page in the Gini instalments app"
+                      hint="اتركه فارغًا إذا لم يكن المنتج معروضًا في جني — عندها لا تظهر ملاحظة «تريدها أقساط؟». الرابط الكامل فقط (https://…)."
+                    >
+                      <TextInput
+                        type="url"
+                        inputMode="url"
+                        placeholder="https://"
+                        data-form="gini-url"
+                        value={doc.gini_url}
+                        onChange={(e) => setDoc((d) => ({ ...d, gini_url: e.target.value }))}
+                      />
+                    </Field>
+                  </div>
+                </>)}
+            </>
+          );
+        })()}
 
       </SectionCard>
 

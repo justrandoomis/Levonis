@@ -33,6 +33,15 @@
  * live prices, no discount). Both are optional in a stored config: a config
  * saved before phase 2 reads as «memberships off, no kits»
  * (`withPhase2Defaults`), so a published phase 1 list never becomes invalid.
+ *
+ * PHASE 4 (owner rulings 2026-11-18, DECISIONS row 355) SUPERSEDES «kits: no discount»: the owner
+ * may set ONE discount per kit and per add-on (`PrinterDiscount`: a percent, or fixed dinars per
+ * printer unit), applied inside the unit price (`unitDiscount`, capped at 90% of the unit). A kit
+ * item's colour is fixed or chosen by the customer (`color_mode`). New: add-ons (`addons`: store
+ * products sold with a printer at the owner's price, qty fixed per printer) and the store bundles
+ * linked per printer product (`ProductMapping.store_bundle_ids`, at most 8, the bundle's own
+ * price). A config stored before phase 4 reads as fixed colours, no discounts, no add-ons, no
+ * bundles (`withPhase4Defaults`). PACKAGES still carry no discount.
  */
 
 export const WARRANTY_FAMILIES = ['a1', 'xpa2', 'h2', 'h3c'] as const;
@@ -66,6 +75,12 @@ export interface ProductMapping {
   delivery_class?: DeliveryClass | null;
   /** Per version (option value id) — wins over the product's own answer. */
   by_option_value?: Record<string, { warranty_family?: WarrantyFamily | null; delivery_class?: DeliveryClass | null }>;
+  /**
+   * Phase 4 (DECISIONS row 355): the store bundles (products with composition 'bundle') offered
+   * with this printer, in the owner's order, at most MAX_STORE_BUNDLES. Absent = none. Each keeps
+   * its own bundle price (no extra discount).
+   */
+  store_bundle_ids?: string[];
 }
 
 /** The membership_plans tier ids (`prime` is PREMIUM's storage id, never renamed). */
@@ -89,27 +104,80 @@ export interface PackagePreset {
   membership_tier?: MembershipTier | null;
 }
 
+/**
+ * Phase 4 (DECISIONS row 355): ONE owner discount on a kit or an add-on.
+ *  - percent:   1..90 % off each unit's price (the customer's own tier price).
+ *  - fixed_iqd: 1..10,000,000 dinars off PER PRINTER UNIT, split evenly over the units that printer
+ *               gets (floor(value / units) per unit).
+ * Either way a unit never loses more than 90% of its price (`unitDiscount`).
+ */
+export type PrinterDiscount = { mode: 'percent'; value: number } | { mode: 'fixed_iqd'; value: number };
+export const PRINTER_DISCOUNT_MODES = ['percent', 'fixed_iqd'] as const;
+export type PrinterDiscountMode = (typeof PRINTER_DISCOUNT_MODES)[number];
+export const MAX_DISCOUNT_PERCENT = 90;
+export const MAX_DISCOUNT_FIXED_IQD = 10_000_000;
+
+/**
+ * Phase 4: who picks a kit item's (or an add-on's) colour. 'fixed' = the owner's `color_id`
+ * (absent = 'fixed', every kit made before phase 4); 'customer' = the customer picks any active
+ * in-stock colour or «random» (the system picks); `color_id` is then null and the product (with
+ * its selection) appears once in the kit.
+ */
+export const KIT_COLOR_MODES = ['fixed', 'customer'] as const;
+export type KitColorMode = (typeof KIT_COLOR_MODES)[number];
+
 /** One product (or one exact variant) inside an owner-made filament kit, per printer unit. */
 export interface KitItem {
   product_id: string;
   /** The exact selection (option value ids); [] for a product without options. */
   option_value_ids: string[];
-  /** The colour id, or null for a product without colours. */
+  /** The colour id, or null for a product without colours (always null when color_mode = 'customer'). */
   color_id: string | null;
   /** Units of this item per printer unit (the kit follows the printer's quantity). */
   qty: number;
+  /** Phase 4: absent = 'fixed'. */
+  color_mode?: KitColorMode;
 }
 
 /** Which printer a kit belongs to: a mapped product, optionally one version of it. */
 export interface KitPrinterRef { product_id: string; option_value_id: string | null }
 
-/** An owner-made filament kit (brief §H; owner ruling: the sum of real live prices, no discount). */
+/**
+ * An owner-made filament kit (brief §H): the sum of the items' real live prices, less the owner's
+ * kit discount when one is set (phase 4, DECISIONS row 355 — supersedes phase 2's «no discount»).
+ */
 export interface FilamentKit {
   id: string;
   active: boolean;
   sort: number;
   title: Text3;
   items: KitItem[];
+  /** null = every enrolled printer; otherwise these printers (or versions) only. */
+  printers: KitPrinterRef[] | null;
+  /** Phase 4: the owner's discount on every unit of the kit; absent / null = none. */
+  discount?: PrinterDiscount | null;
+}
+
+/**
+ * Phase 4 (DECISIONS row 355): a store product sold WITH a printer at the owner's price (a nozzle,
+ * a plate …), `qty` units per printer unit (it follows the printer's quantity). Its own order line,
+ * which the customer may remove; a printer or a composition is never an add-on.
+ */
+export interface PrinterAddon {
+  id: string;
+  active: boolean;
+  sort: number;
+  /** The customer-facing name; null = the product's own name. */
+  title: Text3 | null;
+  product_id: string;
+  option_value_ids: string[];
+  /** The fixed colour id, or null (no colours, or color_mode = 'customer'). */
+  color_id: string | null;
+  /** Absent = 'fixed'. */
+  color_mode?: KitColorMode;
+  /** 1..MAX_ADDON_QTY units per printer unit. */
+  qty: number;
+  discount: PrinterDiscount | null;
   /** null = every enrolled printer; otherwise these printers (or versions) only. */
   printers: KitPrinterRef[] | null;
 }
@@ -203,6 +271,8 @@ export interface PrinterServicesConfig {
   membership?: MembershipOffer;
   /** Phase 2; optional in a stored config (`withPhase2Defaults`). */
   kits?: FilamentKit[];
+  /** Phase 4; optional in a stored config (`withPhase4Defaults`: absent = none). */
+  addons?: PrinterAddon[];
 }
 
 /**
@@ -240,6 +310,7 @@ export const DEFAULT_PRINTER_SERVICES: PrinterServicesConfig = {
   },
   membership: { active: true, tiers: ['plus', 'prime', 'pro'] },
   kits: [],
+  addons: [],
 };
 
 /** A config stored before phase 2 has neither field: memberships off, no kits. */
@@ -252,6 +323,19 @@ export function membershipOf(c: PrinterServicesConfig): MembershipOffer {
 /** The kits of a config (absent = none). */
 export function kitsOf(c: PrinterServicesConfig): FilamentKit[] {
   return c.kits ?? [];
+}
+/** The add-ons of a config (absent = none; phase 4). */
+export function addonsOf(c: PrinterServicesConfig): PrinterAddon[] {
+  return c.addons ?? [];
+}
+/** A kit item's or an add-on's colour mode (absent = 'fixed'). */
+export function colorModeOf(i: { color_mode?: KitColorMode | null }): KitColorMode {
+  return i.color_mode === 'customer' ? 'customer' : 'fixed';
+}
+/** The store bundles linked to a printer product, in the owner's order (phase 4; absent = none). */
+export function storeBundleIdsFor(config: PrinterServicesConfig, productId: string): string[] {
+  const m = Object.hasOwn(config.products, productId) ? config.products[productId] : undefined;
+  return m?.store_bundle_ids ? [...m.store_bundle_ids] : [];
 }
 
 /**
@@ -277,10 +361,29 @@ export function withPhase2Defaults(c: PrinterServicesConfig): PrinterServicesCon
  * published and frozen as v1 by accident (publishIssues asks for them instead).
  */
 export function withPhase3Defaults(c: PrinterServicesConfig): PrinterServicesConfig {
-  return {
+  return withPhase4Defaults({
     ...c,
     care: { ...c.care, terms: c.care.terms ?? null },
     inspection: { ...c.inspection, labor_iqd: c.inspection.labor_iqd ?? null },
+  });
+}
+
+/**
+ * Phase 4 (DECISIONS row 355): a config stored before it reads as fixed kit colours, no kit
+ * discounts, no add-ons and no store bundles — exactly what it sold before.
+ */
+export function withPhase4Defaults(c: PrinterServicesConfig): PrinterServicesConfig {
+  const products: Record<string, ProductMapping> = {};
+  for (const [pid, m] of Object.entries(c.products)) products[pid] = { ...m, store_bundle_ids: m.store_bundle_ids ? [...m.store_bundle_ids] : [] };
+  return {
+    ...c,
+    products,
+    kits: (c.kits ?? []).map((k) => ({
+      ...k,
+      discount: k.discount ?? null,
+      items: k.items.map((i) => ({ ...i, color_mode: colorModeOf(i) })),
+    })),
+    addons: (c.addons ?? []).map((a) => ({ ...a, discount: a.discount ?? null, color_mode: colorModeOf(a) })),
   };
 }
 
@@ -329,6 +432,12 @@ export function configIssues(raw: unknown): string[] {
         if (o.warranty_family != null && !oneOf(WARRANTY_FAMILIES, o.warranty_family)) out.push(`products.${pid}.by_option_value.${ov}.warranty_family: unknown`);
         if (o.delivery_class != null && !oneOf(DELIVERY_CLASSES, o.delivery_class)) out.push(`products.${pid}.by_option_value.${ov}.delivery_class: unknown`);
       }
+    }
+    if (m.store_bundle_ids !== undefined) {
+      const b = m.store_bundle_ids;
+      if (!Array.isArray(b) || b.length > MAX_STORE_BUNDLES || !b.every((x) => typeof x === 'string' && !badId(x))) {
+        out.push(`products.${pid}.store_bundle_ids: at most ${MAX_STORE_BUNDLES} bundle ids`);
+      } else if (new Set(b).size !== b.length) out.push(`products.${pid}.store_bundle_ids: each bundle once`);
     }
   }
 
@@ -400,6 +509,7 @@ export function configIssues(raw: unknown): string[] {
     }
   }
   if (c.kits !== undefined) out.push(...kitIssues(c.kits));
+  if (c.addons !== undefined) out.push(...addonIssues(c.addons));
   return out;
 }
 
@@ -458,6 +568,10 @@ export const MAX_KITS = 30;
 export const MAX_KIT_ITEMS = 12;
 export const MAX_KIT_ITEM_QTY = 20;
 export const MAX_KIT_PRINTERS = 100;
+/** Phase 4 caps: add-ons in the list, units of an add-on per printer, store bundles per printer. */
+export const MAX_ADDONS = 40;
+export const MAX_ADDON_QTY = 20;
+export const MAX_STORE_BUNDLES = 8;
 const KIT_ID = /^[a-z0-9][a-z0-9_-]{0,31}$/;
 const isText3 = (v: unknown): v is Text3 =>
   isObj(v) && (['ar', 'en', 'ckb'] as const).every((k) => typeof v[k] === 'string' && (v[k] as string).length <= 80);
@@ -466,6 +580,36 @@ const isText3 = (v: unknown): v is Text3 =>
 export function kitItemKey(i: Pick<KitItem, 'product_id' | 'option_value_ids' | 'color_id'>): string {
   return `${i.product_id}|${[...i.option_value_ids].sort().join(',')}|${i.color_id ?? ''}`;
 }
+
+/** Every problem in one kit's or add-on's discount (phase 4); `undefined` and null are «none». */
+export function discountIssues(raw: unknown, at: string): string[] {
+  if (raw === undefined || raw === null) return [];
+  if (!isObj(raw) || !oneOf(PRINTER_DISCOUNT_MODES, raw.mode)) return [`${at}: {mode: percent | fixed_iqd, value} or null`];
+  const v = raw.value;
+  if (raw.mode === 'percent') {
+    if (!(Number.isInteger(v) && (v as number) >= 1 && (v as number) <= MAX_DISCOUNT_PERCENT)) return [`${at}.value: whole percent 1..${MAX_DISCOUNT_PERCENT}`];
+  } else if (!(Number.isInteger(v) && (v as number) >= 1 && (v as number) <= MAX_DISCOUNT_FIXED_IQD)) {
+    return [`${at}.value: whole IQD 1..${MAX_DISCOUNT_FIXED_IQD} per printer`];
+  }
+  const extra = Object.keys(raw).filter((k) => k !== 'mode' && k !== 'value');
+  return extra.length ? [`${at}: only mode and value`] : [];
+}
+
+/** A kit's or an add-on's printers: null, or at most MAX_KIT_PRINTERS {product_id, option_value_id | null}. */
+function printerRefIssues(raw: unknown, at: string): string[] {
+  if (raw === null) return [];
+  if (!Array.isArray(raw) || raw.length > MAX_KIT_PRINTERS) return [`${at}.printers: null or at most ${MAX_KIT_PRINTERS} printers`];
+  const out: string[] = [];
+  raw.forEach((pr: unknown, j) => {
+    if (!isObj(pr) || typeof pr.product_id !== 'string' || badId(pr.product_id)
+      || !(pr.option_value_id === null || (typeof pr.option_value_id === 'string' && !badId(pr.option_value_id)))) {
+      out.push(`${at}.printers[${j}]: {product_id, option_value_id | null}`);
+    }
+  });
+  return out;
+}
+
+const selectionKey = (pid: string, ovs: string[]) => `${pid}|${[...ovs].sort().join(',')}`;
 
 function kitIssues(raw: unknown): string[] {
   const out: string[] = [];
@@ -485,6 +629,9 @@ function kitIssues(raw: unknown): string[] {
     else if (k.items.length > MAX_KIT_ITEMS) out.push(`${at}.items: at most ${MAX_KIT_ITEMS}`);
     else {
       const keys = new Set<string>();
+      // Phase 4: a customer-colour item's product (with its selection) appears once in the kit.
+      const selections = new Set<string>();
+      const customerSelections = new Set<string>();
       (k.items as unknown[]).forEach((it, j) => {
         const ia = `${at}.items[${j}]`;
         if (!isObj(it)) { out.push(`${ia}: object`); return; }
@@ -495,25 +642,85 @@ function kitIssues(raw: unknown): string[] {
         if (!ovsOk) out.push(`${ia}.option_value_ids: at most 12 ids`);
         if (!(it.color_id === null || (typeof it.color_id === 'string' && !badId(it.color_id)))) out.push(`${ia}.color_id: id or null`);
         if (!(Number.isInteger(it.qty) && (it.qty as number) >= 1 && (it.qty as number) <= MAX_KIT_ITEM_QTY)) out.push(`${ia}.qty: 1..${MAX_KIT_ITEM_QTY}`);
+        if (it.color_mode !== undefined && !oneOf(KIT_COLOR_MODES, it.color_mode)) out.push(`${ia}.color_mode: fixed or customer`);
+        const customer = it.color_mode === 'customer';
+        if (customer && it.color_id !== null) out.push(`${ia}.color_id: null when the customer picks the colour`);
+        for (const key of Object.keys(it)) if (/discount/i.test(key)) out.push(`${ia}.${idLabel(key)}: a discount belongs to the kit (discount), not to an item`);
         if (pidOk && ovsOk) {
           const key = kitItemKey({ product_id: it.product_id as string, option_value_ids: ovs as string[], color_id: typeof it.color_id === 'string' ? it.color_id : null });
           if (keys.has(key)) out.push(`${ia}: the same product and selection twice — raise its qty instead`);
           keys.add(key);
+          const sel = selectionKey(it.product_id as string, ovs as string[]);
+          if (customerSelections.has(sel) || (customer && selections.has(sel))) {
+            out.push(`${ia}: a product whose colour the customer picks appears once in the kit — raise its qty instead`);
+          }
+          selections.add(sel);
+          if (customer) customerSelections.add(sel);
         }
       });
     }
-    if (k.printers !== null) {
-      if (!Array.isArray(k.printers) || k.printers.length > MAX_KIT_PRINTERS) out.push(`${at}.printers: null or at most ${MAX_KIT_PRINTERS} printers`);
-      else (k.printers as unknown[]).forEach((pr, j) => {
-        if (!isObj(pr) || typeof pr.product_id !== 'string' || badId(pr.product_id)
-          || !(pr.option_value_id === null || (typeof pr.option_value_id === 'string' && !badId(pr.option_value_id)))) {
-          out.push(`${at}.printers[${j}]: {product_id, option_value_id | null}`);
-        }
-      });
+    out.push(...printerRefIssues(k.printers, at));
+    // Phase 4 (DECISIONS row 355, supersedes «kits: no discount»): exactly ONE discount field, `discount`.
+    out.push(...discountIssues(k.discount, `${at}.discount`));
+    for (const key of Object.keys(k)) {
+      if (key !== 'discount' && /discount/i.test(key)) out.push(`${at}.${idLabel(key)}: a kit's only discount field is discount`);
     }
-    for (const key of Object.keys(k)) if (/discount/i.test(key)) out.push(`${at}.${idLabel(key)}: kits carry no discount`);
   });
   return out;
+}
+
+/** Every problem in the add-ons (phase 4), as `addons[n]...: message` strings. */
+function addonIssues(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return ['addons: array'];
+  if (raw.length > MAX_ADDONS) return [`addons: at most ${MAX_ADDONS}`];
+  const out: string[] = [];
+  const ids = new Set<string>();
+  raw.forEach((a: unknown, n) => {
+    const at = `addons[${n}]`;
+    if (!isObj(a)) { out.push(`${at}: object`); return; }
+    if (typeof a.id !== 'string' || !KIT_ID.test(a.id)) out.push(`${at}.id: a-z, 0-9, _ or -, at most 32`);
+    else if (ids.has(a.id)) out.push(`${at}.id: used twice`);
+    else ids.add(a.id);
+    if (typeof a.active !== 'boolean') out.push(`${at}.active: boolean`);
+    if (!(Number.isInteger(a.sort) && (a.sort as number) >= 0 && (a.sort as number) <= 999)) out.push(`${at}.sort: 0..999`);
+    if (!(a.title === null || isText3(a.title))) out.push(`${at}.title: null or {ar, en, ckb}, at most 80 characters each`);
+    if (!(typeof a.product_id === 'string' && !badId(a.product_id))) out.push(`${at}.product_id: bad id`);
+    const ovs = a.option_value_ids;
+    if (!(Array.isArray(ovs) && ovs.length <= 12 && ovs.every((v) => typeof v === 'string' && !badId(v)))) out.push(`${at}.option_value_ids: at most 12 ids`);
+    if (!(a.color_id === null || (typeof a.color_id === 'string' && !badId(a.color_id)))) out.push(`${at}.color_id: id or null`);
+    if (a.color_mode !== undefined && !oneOf(KIT_COLOR_MODES, a.color_mode)) out.push(`${at}.color_mode: fixed or customer`);
+    if (a.color_mode === 'customer' && a.color_id !== null) out.push(`${at}.color_id: null when the customer picks the colour`);
+    if (!(Number.isInteger(a.qty) && (a.qty as number) >= 1 && (a.qty as number) <= MAX_ADDON_QTY)) out.push(`${at}.qty: 1..${MAX_ADDON_QTY} per printer`);
+    out.push(...discountIssues(a.discount, `${at}.discount`));
+    for (const key of Object.keys(a)) {
+      if (key !== 'discount' && /discount/i.test(key)) out.push(`${at}.${idLabel(key)}: an add-on's only discount field is discount`);
+    }
+    out.push(...printerRefIssues(a.printers, at));
+  });
+  return out;
+}
+
+/**
+ * Phase 4 (DECISIONS row 355): the dinars ONE unit loses to the owner's discount — what the cart,
+ * the quote and the order take off the unit price (money rule D1: inside the unit price).
+ *  - null / undefined discount → 0.
+ *  - percent  → floor(appliedUnitIqd × value / 100).
+ *  - fixed_iqd → floor(value / unitsPerPrinter): the per-printer amount split evenly over the units
+ *    that ONE printer gets (the kit's or add-on's total units per printer unit).
+ * Never more than floor(appliedUnitIqd × 90 / 100) (rule D5); always a non-negative integer.
+ * `appliedUnitIqd` is the customer's own unit price before the discount (their tier price).
+ */
+export function unitDiscount(d: PrinterDiscount | null | undefined, appliedUnitIqd: number, unitsPerPrinter: number): number {
+  if (!d) return 0;
+  const applied = Number.isFinite(appliedUnitIqd) ? Math.max(0, Math.trunc(appliedUnitIqd)) : 0;
+  if (applied <= 0) return 0;
+  const value = Number.isFinite(d.value) ? Math.max(0, Math.trunc(d.value)) : 0;
+  const units = Number.isFinite(unitsPerPrinter) ? Math.max(1, Math.trunc(unitsPerPrinter)) : 1;
+  const cap = Math.floor((applied * MAX_DISCOUNT_PERCENT) / 100);
+  const raw = d.mode === 'percent' ? Math.floor((applied * Math.min(value, MAX_DISCOUNT_PERCENT)) / 100)
+    : d.mode === 'fixed_iqd' ? Math.floor(value / units)
+      : 0;
+  return Math.max(0, Math.min(raw, cap));
 }
 
 /**
@@ -533,6 +740,7 @@ export function canonicalConfig(c: PrinterServicesConfig): PrinterServicesConfig
       }
       row.by_option_value = by;
     }
+    row.store_bundle_ids = m.store_bundle_ids ? [...m.store_bundle_ids] : [];
     products[pid] = row;
   }
   const tier = (t: Record<WarrantyFamily, number | null>) =>
@@ -542,11 +750,26 @@ export function canonicalConfig(c: PrinterServicesConfig): PrinterServicesConfig
     membership_tier: p.membership_tier ?? null,
   });
   const m = membershipOf(c);
+  const tx = (t: Text3): Text3 => ({ ar: t.ar.trim(), en: t.en.trim(), ckb: t.ckb.trim() });
+  const refs = (r: KitPrinterRef[] | null): KitPrinterRef[] | null =>
+    r === null ? null : r.map((p) => ({ product_id: p.product_id, option_value_id: p.option_value_id ?? null }));
+  const disc = (d: PrinterDiscount | null | undefined): PrinterDiscount | null => (d ? { mode: d.mode, value: d.value } as PrinterDiscount : null);
   const kits: FilamentKit[] = kitsOf(c).map((k) => ({
     id: k.id, active: k.active, sort: k.sort,
-    title: { ar: k.title.ar.trim(), en: k.title.en.trim(), ckb: k.title.ckb.trim() },
-    items: k.items.map((i) => ({ product_id: i.product_id, option_value_ids: [...i.option_value_ids].sort(), color_id: i.color_id ?? null, qty: i.qty })),
-    printers: k.printers === null ? null : k.printers.map((p) => ({ product_id: p.product_id, option_value_id: p.option_value_id ?? null })),
+    title: tx(k.title),
+    items: k.items.map((i) => ({
+      product_id: i.product_id, option_value_ids: [...i.option_value_ids].sort(), color_id: i.color_id ?? null, qty: i.qty,
+      color_mode: colorModeOf(i),
+    })),
+    printers: refs(k.printers),
+    discount: disc(k.discount),
+  }));
+  const addons: PrinterAddon[] = addonsOf(c).map((a) => ({
+    id: a.id, active: a.active, sort: a.sort,
+    title: a.title ? tx(a.title) : null,
+    product_id: a.product_id, option_value_ids: [...a.option_value_ids].sort(), color_id: a.color_id ?? null,
+    color_mode: colorModeOf(a), qty: a.qty, discount: disc(a.discount),
+    printers: refs(a.printers),
   }));
   return {
     version: 1,
@@ -571,6 +794,7 @@ export function canonicalConfig(c: PrinterServicesConfig): PrinterServicesConfig
     packages: { smart: pkg(c.packages.smart), complete: pkg(c.packages.complete) },
     membership: { active: m.active, tiers: MEMBERSHIP_TIERS.filter((t) => m.tiers.includes(t)) },
     kits,
+    addons,
   };
 }
 
@@ -614,6 +838,19 @@ export function publishIssues(c: PrinterServicesConfig): string[] {
     for (const it of k.items) if (Object.hasOwn(c.products, it.product_id)) out.push(`kits.${k.id}: a printer cannot be a kit item`);
     for (const pr of k.printers ?? []) if (!Object.hasOwn(c.products, pr.product_id)) out.push(`kits.${k.id}: printer ${idLabel(pr.product_id)} is not mapped`);
   }
+  // Phase 4: an active add-on names three titles when it overrides the product's name, belongs to
+  // mapped printers only and is never a mapped printer itself. Catalogue checks (exists, not a
+  // composition, a customer colour exists) are worker/lib/printerServices.ts printerExtrasCatalogIssues.
+  for (const a of addonsOf(c)) {
+    if (!a.active) continue;
+    if (a.title && (!a.title.ar.trim() || !a.title.en.trim() || !a.title.ckb.trim())) out.push(`addons.${a.id}: a title needs Arabic, English and Kurdish (or none: the product's name)`);
+    if (Object.hasOwn(c.products, a.product_id)) out.push(`addons.${a.id}: a printer cannot be an add-on`);
+    for (const pr of a.printers ?? []) if (!Object.hasOwn(c.products, pr.product_id)) out.push(`addons.${a.id}: printer ${idLabel(pr.product_id)} is not mapped`);
+  }
+  // Phase 4: a store bundle linked to a printer is never a mapped printer.
+  for (const [pid, m] of mapped) {
+    for (const b of m.store_bundle_ids ?? []) if (Object.hasOwn(c.products, b)) out.push(`products.${pid}: store bundle ${idLabel(b)} is a printer`);
+  }
   return out;
 }
 
@@ -627,6 +864,18 @@ export function kitsForPrinter(config: PrinterServicesConfig, productId: string,
     .filter((k) => k.active && k.items.length > 0)
     .filter((k) => k.printers === null
       || k.printers.some((p) => p.product_id === productId && (p.option_value_id === null || optionValueIds.includes(p.option_value_id))))
+    .sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
+/**
+ * Phase 4: the active add-ons offered with THIS printer selection, in the owner's order — the same
+ * rule as kitsForPrinter (printers = null = every enrolled printer; a named version must be chosen).
+ */
+export function addonsForPrinter(config: PrinterServicesConfig, productId: string, optionValueIds: readonly string[]): PrinterAddon[] {
+  return addonsOf(config)
+    .filter((a) => a.active)
+    .filter((a) => a.printers === null
+      || a.printers.some((p) => p.product_id === productId && (p.option_value_id === null || optionValueIds.includes(p.option_value_id))))
     .sort((a, b) => a.sort - b.sort || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
@@ -815,6 +1064,23 @@ export const PHASE2_CODES: ReadonlySet<string> = new Set<string>([
   MEMBERSHIP_NOT_WITH_BNPL,
 ]);
 
+// ---- phase 4 refusal codes (kit colours, add-ons; DECISIONS row 355)
+/** The colour chosen for a kit item (or an add-on) is not an active in-stock colour of it now — or none is left for «random». */
+export const KIT_COLOR_UNAVAILABLE = 'KIT_COLOR_UNAVAILABLE';
+/** The add-on is not offered with this printer (off, unknown or another printer's). */
+export const ADDON_NOT_OFFERED = 'ADDON_NOT_OFFERED';
+/** The add-on cannot be sold now (stock, price, selection or the printer's shipping type). */
+export const ADDON_UNAVAILABLE = 'ADDON_UNAVAILABLE';
+/** The owner changed the add-on since it was put in the cart: choose it again. */
+export const ADDON_CHANGED = 'ADDON_CHANGED';
+/** An add-on line is bought only together with its printer. */
+export const ADDON_WITHOUT_PRINTER = 'ADDON_WITHOUT_PRINTER';
+
+/** The phase 4 codes the page words (src/lib/refusalStrings.ts carries each). */
+export const PHASE4_CODES: ReadonlySet<string> = new Set<string>([
+  KIT_COLOR_UNAVAILABLE, ADDON_NOT_OFFERED, ADDON_UNAVAILABLE, ADDON_CHANGED, ADDON_WITHOUT_PRINTER,
+]);
+
 /** Every services refusal, each answered with its own code so the page can name the fix. */
 export const SERVICES_CODES: ReadonlySet<string> = new Set<string>([
   SERVICES_REQUIRED, SERVICES_NOT_OFFERED, SERVICES_WITH_LEGACY_WARRANTY,
@@ -938,6 +1204,10 @@ export interface ServicesOffer {
   membership: { tiers: MembershipTier[] } | null;
   /** Phase 2: the owner's kits for this selection (ids and titles; priced by GET /api/products/:slug/kits). */
   kits: Array<{ id: string; title: Text3 }>;
+  /** Phase 4: the add-ons for this selection (ids and title overrides — null = the product's name; priced by GET /api/products/:slug/kits). */
+  addons: Array<{ id: string; title: Text3 | null }>;
+  /** Phase 4: the store bundle product ids linked to this printer, in the owner's order (priced by GET /api/products/:slug/kits). */
+  store_bundles: string[];
 }
 
 export function servicesOffer(config: PrinterServicesConfig, classes: PrinterClasses): ServicesOffer {
@@ -973,10 +1243,17 @@ export function servicesOffer(config: PrinterServicesConfig, classes: PrinterCla
     packages: { just: { price_iqd: 0 }, smart: pkg('smart'), complete: pkg('complete') },
     membership: tiers.length ? { tiers } : null,
     kits: [],
+    addons: [],
+    store_bundles: [],
   };
 }
 
-/** The offer with THIS selection's kits (a kit may belong to one version only). */
+/** The offer with THIS selection's kits, add-ons and store bundles (a kit or add-on may belong to one version only). */
 export function servicesOfferFor(config: PrinterServicesConfig, classes: PrinterClasses, productId: string, optionValueIds: readonly string[]): ServicesOffer {
-  return { ...servicesOffer(config, classes), kits: kitsForPrinter(config, productId, optionValueIds).map((k) => ({ id: k.id, title: k.title })) };
+  return {
+    ...servicesOffer(config, classes),
+    kits: kitsForPrinter(config, productId, optionValueIds).map((k) => ({ id: k.id, title: k.title })),
+    addons: addonsForPrinter(config, productId, optionValueIds).map((a) => ({ id: a.id, title: a.title })),
+    store_bundles: storeBundleIdsFor(config, productId),
+  };
 }

@@ -18,6 +18,12 @@
  * travel as `extras` (membershipPlanId / kitId), never as services, and both
  * are their own cart lines: the footer lists their server figures beside the
  * printer's total, it never adds them in.
+ * Phase 4 (0242; DECISIONS row 355): the kit's customer-colour filaments take
+ * a colour each (an in-stock one, or «لون عشوائي», preselected), the owner's
+ * discounted add-ons are their own row of check cards, and the store bundles
+ * linked to the printer are a row of cards added straight to the cart — all
+ * from the same kits endpoint, drawn by PrinterOffersRows (this chunk only),
+ * and travelling as `extras.kitColors` / `extras.addonIds` / `extras.addonColors`.
  * Motion is transform and opacity only, from the shared animate-in utilities (no stylesheet of its own: the public CSS budget).
  *
  * Loaded lazily from the product page: its code is paid for only on open.
@@ -28,6 +34,8 @@ import { useAuth } from '../../AuthContext';
 import { authPathWithSupportRef } from '../../lib/supportRef';
 import { TIER_ORDER, tierLabel, type AnyTier } from '../subscription/tierMeta';
 import { CirclePlay, Check, ChevronDown, ClipboardCheck, Crown, Heart, Package, Shield, ShoppingCart, SlidersHorizontal, Spool, Truck, X } from 'lucide-react';
+import { AddonsBody, BeforeAfter, BundlesBody, KitColours, OffersLoading, RANDOM, colourProblem, loadOffers, type OfferExtras, type PrinterOffers } from './PrinterOffersRows';
+import { OFFER_STRINGS, offerErrorText } from './printerOfferStrings';
 import { Sheet } from '../ui/Sheet';
 import VariantImg from '../ui/VariantImg';
 import { PS_STRINGS, servicesErrorText, type PsLang } from './printerServicesStrings';
@@ -36,7 +44,6 @@ import {
   asCustom,
   deliveryFee,
   firstBlocker,
-  loadKits,
   loadMembershipOptions,
   moveRadioFocus,
   readyToBuy,
@@ -46,7 +53,6 @@ import {
   type MembershipOption,
   type MembershipOptions,
   type PricedKit,
-  type SelectionExtras,
   type AcademyChoice,
   type QuotedSelection,
   type DeliveryChoice,
@@ -58,7 +64,7 @@ import {
 const FILAMENT_LISTING = '/products?category=cat_materials_fdm';
 
 /** What the card says about the chosen membership and kit (their names; the figures stay the server's). */
-export interface ExtrasLabels { membership?: string | null; kit?: string | null }
+export interface ExtrasLabels { membership?: string | null; kit?: string | null; addons?: string | null }
 
 export interface CustomizeSheetProps {
   open: boolean;
@@ -95,10 +101,11 @@ type Loaded<T> = { state: 'loading' } | { state: 'failed' } | { state: 'ready'; 
 
 type DraftQuote = { key: string; state: 'fresh' | 'failed'; unit: number | null; sel: QuotedSelection | null };
 
-type RowKey = 'warranty' | 'care' | 'membership' | 'packaging' | 'delivery' | 'inspection' | 'academy' | 'filament';
+type RowKey = 'warranty' | 'care' | 'membership' | 'packaging' | 'delivery' | 'inspection' | 'academy' | 'filament' | 'addons' | 'bundles';
 
 export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, adding = false, offer, current, printer, lang, money, quote, busy = false, error = null, kitsFor = null }: CustomizeSheetProps) {
   const s = PS_STRINGS[lang];
+  const o4 = OFFER_STRINGS[lang];
   const titleId = useId();
   const keyDir = lang === 'en' ? 'ltr' : 'rtl';
   const [draft, setDraft] = useState<ServiceSelection>(() => start(current, offer));
@@ -137,7 +144,22 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   }, [open]);
 
   const set = (patch: Partial<ServiceSelection>) => setDraft((d) => ({ ...d, ...patch }));
-  const setExtra = (patch: SelectionExtras) => setDraft((d) => ({ ...d, extras: { ...d.extras, ...patch } }));
+  const setExtra = (patch: OfferExtras) => setDraft((d) => ({ ...d, extras: { ...d.extras, ...patch } }));
+  /** Phase 4: a customer-colour kit item's colour (by product id) or an add-on's (by add-on id). */
+  const pickColour = (field: 'kitColors' | 'addonColors') => (key: string, v: string) =>
+    setDraft((d) => {
+      const x = (d.extras ?? {}) as OfferExtras;
+      const next: OfferExtras = { ...x, [field]: { ...(x[field] ?? {}), [key]: v } };
+      return { ...d, extras: next };
+    });
+  const toggleAddon = (id: string) =>
+    setDraft((d) => {
+      const x = (d.extras ?? {}) as OfferExtras;
+      const held = x.addonIds ?? [];
+      const ids = held.includes(id) ? held.filter((a) => a !== id) : [...held, id];
+      const next: OfferExtras = { ...x, addonIds: ids.length ? ids : null };
+      return { ...d, extras: next };
+    });
 
   // ---- phase 2: the membership and the kit, each read from its own endpoint when its row opens
   // (or at once when the confirmed choice already holds one, so its figure is the server's).
@@ -145,17 +167,30 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const location = useLocation();
   const memberOffered = !!offer.membership && offer.membership.tiers.length > 0;
   const kitsOffered = offer.kits.length > 0 && !!kitsFor;
+  // Phase 4: an older cached offer has neither list.
+  const offerAddons = offer.addons ?? [];
+  const offerBundles = offer.store_bundles ?? [];
+  const addonsOffered = offerAddons.length > 0 && !!kitsFor;
+  const bundlesOffered = offerBundles.length > 0 && !!kitsFor;
+  const x4 = (draft.extras ?? {}) as OfferExtras;
+  const addonIds = x4.addonIds ?? [];
   const [members, setMembers] = useState<Loaded<MembershipOptions> | null>(null);
-  const [kits, setKits] = useState<Loaded<PricedKit[]> | null>(null);
+  // The kits endpoint answers the kits, the add-ons and the store bundles together (phase 4).
+  const [kits, setKits] = useState<Loaded<PrinterOffers> | null>(null);
   const [memberTry, setMemberTry] = useState(0);
   const [kitTry, setKitTry] = useState(0);
   const wantMembers = open && memberOffered && !!user && (openRow === 'membership' || !!draft.extras?.membershipPlanId);
-  const wantKits = open && kitsOffered && (openRow === 'filament' || !!draft.extras?.kitId);
+  const wantKits = open && !!kitsFor && (kitsOffered || addonsOffered || bundlesOffered)
+    && (openRow === 'filament' || openRow === 'addons' || openRow === 'bundles' || !!draft.extras?.kitId || addonIds.length > 0);
+  // The colours picked so far: the server prices exactly those (a colour may carry its own price).
+  // (Kit items are keyed by product id and add-ons by their own id: one `colors` query carries both.)
+  const coloursKey = JSON.stringify(Object.entries({ ...(x4.kitColors ?? {}), ...(x4.addonColors ?? {}) }).sort(([a], [b]) => a.localeCompare(b)));
   const kitsKey = kitsFor ? JSON.stringify(kitsFor) : '';
   // The printer itself (product and version): another one = other kits, so a chosen kit is dropped.
   const versionKey = kitsFor ? JSON.stringify([kitsFor.slug, [...kitsFor.optionValueIds].sort()]) : '';
   const offerMemberKey = JSON.stringify(offer.membership ?? null);
   const offerKitsKey = offer.kits.map((k) => k.id).join(',');
+  const offerAddonsKey = offerAddons.map((a) => a.id).join(',');
   /*
    * A version switch, or an offer that no longer carries the membership row or
    * this kit, clears the choice (never kept as a hidden extra the add would
@@ -166,15 +201,27 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
     const switched = lastVersion.current !== versionKey;
     lastVersion.current = versionKey;
     setDraft((d) => {
-      const x = d.extras;
+      const x = d.extras as OfferExtras | undefined;
       if (!x) return d;
       const dropKit = !!x.kitId && (switched || !offer.kits.some((k) => k.id === x.kitId));
       const dropPlan = !!x.membershipPlanId && !offer.membership;
-      if (!dropKit && !dropPlan) return d;
-      return { ...d, extras: { ...x, ...(dropKit ? { kitId: null } : {}), ...(dropPlan ? { membershipPlanId: null } : {}) } };
+      // Phase 4: another printer = other add-ons and colours; an add-on the offer no longer lists is dropped.
+      const held = x.addonIds ?? [];
+      const keptAddons = switched ? [] : held.filter((id) => offerAddons.some((a) => a.id === id));
+      const dropAddons = keptAddons.length !== held.length;
+      const dropColours = switched && (!!x.kitColors || !!x.addonColors);
+      if (!dropKit && !dropPlan && !dropAddons && !dropColours) return d;
+      const next: OfferExtras = {
+        ...x,
+        ...(dropKit ? { kitId: null } : {}),
+        ...(dropPlan ? { membershipPlanId: null } : {}),
+        ...(dropAddons ? { addonIds: keptAddons.length ? keptAddons : null } : {}),
+        ...(dropColours ? { kitColors: null, addonColors: null } : {}),
+      };
+      return { ...d, extras: next };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [versionKey, offerKitsKey, offerMemberKey, open]);
+  }, [versionKey, offerKitsKey, offerAddonsKey, offerMemberKey, open]);
   useEffect(() => { setKits(null); }, [kitsKey]);
   useEffect(() => { setMembers(null); }, [offerMemberKey]);
   useEffect(() => {
@@ -187,16 +234,22 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
     );
     return () => ac.abort();
   }, [wantMembers, memberTry, user?.id, offerMemberKey]);
+  // A colour tap re-reads the figures (a colour may carry its own price): the last answer stays on screen
+  // meanwhile, and the apply waits for the answer of exactly these colours (`coloursFresh`).
+  const [pricedColours, setPricedColours] = useState('');
   useEffect(() => {
     if (!wantKits || !kitsKey) return;
     const ac = new AbortController();
-    setKits({ state: 'loading' });
-    loadKits(JSON.parse(kitsKey) as KitsFor, ac.signal).then(
-      (data) => { if (!ac.signal.aborted) setKits({ state: 'ready', data }); },
-      () => { if (!ac.signal.aborted) setKits({ state: 'failed' }); }
-    );
-    return () => ac.abort();
-  }, [wantKits, kitsKey, kitTry]);
+    setKits((k) => (k?.state === 'ready' ? k : { state: 'loading' }));
+    const colours = Object.fromEntries(JSON.parse(coloursKey) as Array<[string, string]>);
+    const timer = setTimeout(() => {
+      loadOffers(JSON.parse(kitsKey) as KitsFor, colours, lang, ac.signal).then(
+        (data) => { if (!ac.signal.aborted) { setKits({ state: 'ready', data }); setPricedColours(coloursKey); } },
+        () => { if (!ac.signal.aborted) setKits({ state: 'failed' }); }
+      );
+    }, 150);
+    return () => { clearTimeout(timer); ac.abort(); };
+  }, [wantKits, kitsKey, kitTry, coloursKey, lang]);
   const blockedWords = (code: string) => s.memberBlocked[code] || servicesErrorText(code, lang) || s.unavailable;
   const blockedSentence = (code: string) => servicesErrorText(code, lang) || s.memberBlocked[code] || s.unavailable;
   const memberList = members?.state === 'ready' ? members.data : null;
@@ -210,8 +263,15 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const upward = (o: MembershipOption) => !memberList?.current || rank(o.plan.tier) > rank(memberList.current.tier);
   const chosenPlan = planId ? memberList?.options.find((o) => o.plan.id === planId) ?? null : null;
   const kitId = draft.extras?.kitId ?? null;
-  const kitList = kitsOffered && kits?.state === 'ready' ? kits.data : null;
+  const offers = kits?.state === 'ready' ? kits.data : null;
+  const kitList = kitsOffered && offers ? offers.kits : null;
   const chosenKit = kitId ? kitList?.find((k) => k.id === kitId) ?? null : null;
+  // Phase 4: the server's add-ons and store bundles, in the offer's order (only those the offer lists).
+  const addonList = addonsOffered && offers ? offerAddons.map((a) => offers.addons.find((x) => x.id === a.id)).filter((a): a is NonNullable<typeof a> => !!a) : null;
+  const bundleList = bundlesOffered && offers ? offerBundles.map((id) => offers.store_bundles.find((b) => b.id === id)).filter((b): b is NonNullable<typeof b> => !!b) : null;
+  const chosenAddons = addonList ? addonList.filter((a) => addonIds.includes(a.id)) : [];
+  const coloursFresh = pricedColours === coloursKey;
+  const addonColourChoices = chosenAddons.flatMap((a) => (a.colour ? [a.colour] : []));
   // A chosen plan or kit the server no longer sells holds the apply, with its reason — and so does one
   // whose options are still loading or could not be read (its figure is not the server's yet).
   const extrasBlock =
@@ -222,16 +282,40 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
     : planId && memberList && !chosenPlan ? servicesErrorText('MEMBERSHIP_NOT_OFFERED', lang)
     : kitId && !kitsOffered ? servicesErrorText('KIT_NOT_OFFERED', lang)
     : kitId && !kitList ? (kits?.state === 'failed' ? s.kitsFailed : s.kitsLoading)
-    : chosenKit && !chosenKit.available ? servicesErrorText('KIT_UNAVAILABLE', lang)
+    // Phase 4: a kit refused because of the colour picked in it says so (its fix is a chip below the kit).
+    : chosenKit && !chosenKit.available ? (colourProblem(chosenKit.colours, x4.kitColors) ? offerErrorText('KIT_COLOR_UNAVAILABLE', lang) : servicesErrorText('KIT_UNAVAILABLE', lang))
     : kitId && kitList && !chosenKit ? servicesErrorText('KIT_NOT_OFFERED', lang)
+    : addonIds.length && !addonsOffered ? offerErrorText('ADDON_NOT_OFFERED', lang)
+    : addonIds.length && !addonList ? (kits?.state === 'failed' ? o4.failed : o4.loading)
+    : addonList && addonIds.some((id) => !addonList.some((a) => a.id === id)) ? offerErrorText('ADDON_NOT_OFFERED', lang)
+    : chosenAddons.some((a) => !a.available) ? offerErrorText('ADDON_UNAVAILABLE', lang)
+    : colourProblem(addonColourChoices, x4.addonColors) ? offerErrorText('ADDON_UNAVAILABLE', lang)
+    : (chosenKit || chosenAddons.length) && !coloursFresh ? o4.loading
     : '';
   const memberCharge = chosenPlan?.ok ? chosenPlan.charge_iqd : null;
   const kitTotal = chosenKit?.available ? chosenKit.total_iqd : null;
-  const applied: ServiceSelection = { ...asCustom(draft), confirmed: true };
+  // Phase 4: the chosen add-ons' totals and what the discounts save — each the server's figure, listed.
+  const addonTotals = chosenAddons.map((a) => a.money.after_total).filter((n): n is number => n !== null);
+  const addonsTotal = addonTotals.length ? addonTotals.reduce((a, b) => a + b, 0) : null;
+  const savedTotal = (chosenKit?.available ? chosenKit.money.saving_total : 0) + chosenAddons.reduce((n, a) => n + (a.available ? a.money.saving_total : 0), 0);
+  // Only the colours of what is chosen travel (a colour for a product no longer chosen is not sent).
+  const only = (held: Record<string, string> | null | undefined, keys: readonly string[]) => {
+    const kept = Object.fromEntries(Object.entries(held ?? {}).filter(([k]) => keys.includes(k)));
+    return Object.keys(kept).length ? kept : held === undefined ? undefined : null;
+  };
+  const extras4: OfferExtras | undefined = draft.extras
+    ? {
+        ...x4,
+        kitColors: only(x4.kitColors, (chosenKit?.colours ?? []).map((c) => c.key)),
+        addonColors: only(x4.addonColors, addonColourChoices.map((c) => c.key)),
+      }
+    : undefined;
+  const applied: ServiceSelection = { ...asCustom(draft), ...(extras4 ? { extras: extras4 } : {}), confirmed: true };
   // The names the card shows for the chosen extras (a name only: the figures stay the server's, in the cart).
   const labels: ExtrasLabels = {
     membership: chosenPlan ? `${tierLabel(chosenPlan.plan.tier)} · ${s.months(chosenPlan.plan.duration_months)}` : null,
     kit: kitId ? offer.kits.find((k) => k.id === kitId)?.title[lang] || chosenKit?.title[lang] || null : null,
+    addons: chosenAddons.length ? chosenAddons.map((a) => a.title).join(lang === 'en' ? ', ' : '، ') : null,
   };
   // The server prices the services only; the extras are priced by their own endpoints below.
   const draftKey = JSON.stringify(servicesOnly(applied));
@@ -279,6 +363,8 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const stale = !shownQuote && !!figures;
   const unit = figures?.unit ?? null;
   const dFee = figures ? figures.sel.delivery_fee_iqd : null;
+  /** Anything the folded «تفاصيل السعر» would list. */
+  const breakdown = (!!figures && figures.sel.fee_iqd > 0) || dFee !== null || memberCharge !== null || kitTotal !== null || addonsTotal !== null;
 
   const row = (key: RowKey, icon: React.ReactNode, title: string, sub: string, value: string, body: React.ReactNode, hidden = false) => {
     if (hidden) return null;
@@ -347,7 +433,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const actionBusy = busy || adding;
 
   /** One column of choices whose right side and lines are the server's words and figures. */
-  const list = (name: string, options: Array<{ id: string; label: string; right: string; lines: string[]; disabled: boolean; suggested?: boolean }>, value: string, onPick: (id: string) => void) => {
+  const list = (name: string, options: Array<{ id: string; label: string; right: React.ReactNode; lines: string[]; disabled: boolean; suggested?: boolean }>, value: string, onPick: (id: string) => void) => {
     const stop = tabStop(options.map((o) => o.id), value, (id) => !options.find((o) => o.id === id)?.disabled);
     return (
       <div className="space-y-2" role="radiogroup" aria-label={name} onKeyDown={(e) => moveRadioFocus(e, keyDir)}>
@@ -445,22 +531,38 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   function kitsBody() {
     const note = <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary">{s.kitNote}</p>;
     if (!kits || kits.state !== 'ready') return <>{loadingLine(kits?.state === 'failed' ? 'failed' : 'loading', s.kitsLoading, s.kitsFailed, () => setKitTry((n) => n + 1))}{note}</>;
-    const name = (i: PricedKit['items'][number]) => `${lang === 'en' ? i.name : i.name_ar || i.name}${i.variant ? ` (${i.variant})` : ''} ×${i.qty_per_printer}${i.available ? '' : ` — ${s.kitItemOut}`}`;
+    // A customer-colour item names its picked colour (or «لون عشوائي») instead of a fixed variant.
+    const picked = (pid: string) => {
+      const v = x4.kitColors?.[pid] ?? RANDOM;
+      if (v === RANDOM) return o4.randomColour;
+      return kits.data.kits.flatMap((k) => k.colours).find((c) => c.product_id === pid)?.colors.find((c) => c.id === v)?.name ?? o4.randomColour;
+    };
+    const name = (k: (typeof kits.data.kits)[number], i: PricedKit['items'][number]) => {
+      const custom = k.colours.some((c) => c.product_id === i.product_id);
+      const variant = custom ? picked(i.product_id) : i.variant;
+      return `${lang === 'en' ? i.name : i.name_ar || i.name}${variant ? ` (${variant})` : ''} ×${i.qty_per_printer}${i.available ? '' : ` — ${s.kitItemOut}`}`;
+    };
     return (
       <>
         {list(s.filament, [
           { id: '', label: s.kitSkip, right: '', lines: [], disabled: false },
-          ...kits.data.map((k) => ({
+          ...kits.data.kits.map((k) => ({
             id: k.id,
             label: k.title[lang] || k.title.ar,
-            right: k.available && k.total_iqd !== null ? `+${money(k.total_iqd)}` : s.unavailable,
+            right: k.available && k.money.after_total !== null
+              ? <BeforeAfter before={k.money.before_total} after={k.money.after_total} money={money} s={o4} plus />
+              : s.unavailable,
             lines: [
-              k.items.map(name).join(' · '),
-              k.available && k.price_per_printer_iqd !== null && k.total_iqd !== k.price_per_printer_iqd ? `${money(k.price_per_printer_iqd)} ${s.kitPerPrinter}` : '',
+              k.items.map((i) => name(k, i)).join(' · '),
+              k.available && k.money.after_per !== null && (k.money.after_total !== k.money.after_per || k.money.saving_total > 0)
+                ? `${k.money.before_per !== null && k.money.before_per > k.money.after_per ? `${o4.priceBefore} ${money(k.money.before_per)} · ` : ''}${money(k.money.after_per)} ${s.kitPerPrinter}`
+                : '',
+              k.available && k.money.saving_percent > 0 ? o4.save(k.money.saving_percent) : '',
             ],
             disabled: !k.available,
           })),
         ], kitId ?? '', (id) => setExtra({ kitId: id || null }))}
+        {chosenKit ? <KitColours kit={chosenKit} picked={x4.kitColors} onPick={pickColour('kitColors')} lang={lang} dir={keyDir} money={money} /> : null}
         {note}
       </>
     );
@@ -498,21 +600,29 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
         // The Sheet's footer already draws the top rule and the side padding.
         <div>
           <div className="mb-2 flex items-end justify-between gap-3">
-            {/* The server's figures for this exact draft — listed, never summed here. */}
-            <div className={`min-w-0 text-[11.5px] text-text-secondary ${stale ? 'opacity-50 transition-opacity' : ''}`}>
-              {figures && figures.sel.fee_iqd > 0 ? <span className="block tabular-nums" dir="auto">{s.services}: + {money(figures.sel.fee_iqd)}</span> : null}
-              {dFee !== null ? <span className="block tabular-nums" dir="auto">{s.deliveryLine}: + {money(dFee)}</span> : null}
-              {dFee !== null ? <span className="block">{s.deliveryApart}</span> : null}
-              {/* Phase 2: their own cart lines — each figure from its own endpoint, never added to the total. */}
-              {memberCharge !== null ? <span className="block tabular-nums" dir="auto" data-sheet-membership-charge>{s.membership}: + {money(memberCharge)}</span> : null}
-              {kitTotal !== null ? <span className="block tabular-nums" dir="auto" data-sheet-kit-total>{s.filament}: + {money(kitTotal)}</span> : null}
-              {memberCharge !== null || kitTotal !== null ? <span className="block">{s.extrasApart}</span> : null}
+            {/* The server's figures for this exact draft — listed, never summed here. Folded at 390px so the footer stays
+                two lines: «تفاصيل السعر» and «وفّرت X»; the total beside them never wraps. */}
+            <div className={`min-w-0 flex-1 text-[11.5px] text-text-secondary ${stale ? 'opacity-50 transition-opacity' : ''}`}>
+              {breakdown ? (
+                <details data-sheet-breakdown>
+                  <summary className="cursor-pointer font-semibold text-text-primary">{o4.priceDetails}</summary>
+                  {figures && figures.sel.fee_iqd > 0 ? <span className="block tabular-nums" dir="auto">{s.services}: + {money(figures.sel.fee_iqd)}</span> : null}
+                  {dFee !== null ? <span className="block tabular-nums" dir="auto">{s.deliveryLine}: + {money(dFee)}</span> : null}
+                  {dFee !== null ? <span className="block">{s.deliveryApart}</span> : null}
+                  {/* Phase 2: their own cart lines — each figure from its own endpoint, never added to the total. */}
+                  {memberCharge !== null ? <span className="block tabular-nums" dir="auto" data-sheet-membership-charge>{s.membership}: + {money(memberCharge)}</span> : null}
+                  {kitTotal !== null ? <span className="block tabular-nums" dir="auto" data-sheet-kit-total>{s.filament}: + {money(kitTotal)}</span> : null}
+                  {addonsTotal !== null ? <span className="block tabular-nums" dir="auto" data-sheet-addons-total>{o4.addonsLine}: + {money(addonsTotal)}</span> : null}
+                  {memberCharge !== null || kitTotal !== null || addonsTotal !== null ? <span className="block">{addonsTotal !== null ? o4.extrasApart : s.extrasApart}</span> : null}
+                </details>
+              ) : null}
+              {savedTotal > 0 ? <span className="block font-semibold tabular-nums text-success" dir="auto" data-sheet-saved>{o4.saved(money(savedTotal))}</span> : null}
             </div>
-            <div className="text-end" aria-live="polite" aria-atomic="true">
+            <div className="shrink-0 text-end" aria-live="polite" aria-atomic="true">
               <span className="block text-[11.5px] text-text-secondary">{s.total}</span>
               <span
                 key={stale ? 'stale' : String(unit)}
-                className={`block text-[20px] font-bold tabular-nums text-text-primary ${stale ? 'opacity-50 transition-opacity' : 'animate-in fade-in duration-200 motion-reduce:animate-none'}`}
+                className={`block whitespace-nowrap text-[20px] font-bold tabular-nums text-text-primary ${stale ? 'opacity-50 transition-opacity' : 'animate-in fade-in duration-200 motion-reduce:animate-none'}`}
                 dir="auto"
                 data-sheet-total
               >
@@ -637,6 +747,23 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               <Link to={FILAMENT_LISTING} className="mt-1 inline-flex min-h-11 items-center text-[12.5px] font-semibold text-text-primary underline">{s.filamentShop}</Link>
             </>
           ))}
+
+        {/* Phase 4: the owner's add-ons at a special price — check cards, each its own cart line under the printer. */}
+        {row('addons', <Package className="w-5 h-5" aria-hidden="true" />, o4.addonsRow, o4.addonsSub,
+          addonsTotal !== null ? `+${money(addonsTotal)}` : addonIds.length ? o4.addonsChosen(addonIds.length) : '',
+          addonList ? (
+            <AddonsBody addons={addonList} chosen={addonIds} onToggle={toggleAddon} picked={x4.addonColors} onPick={pickColour('addonColors')} lang={lang} dir={keyDir} money={money} />
+          ) : (
+            <OffersLoading state={kits?.state === 'failed' ? 'failed' : 'loading'} lang={lang} again={() => setKitTry((n) => n + 1)} />
+          ), !addonsOffered)}
+
+        {/* Phase 4: the store bundles linked to this printer — added to the cart on their own, at their own price. */}
+        {row('bundles', <ShoppingCart className="w-5 h-5" aria-hidden="true" />, o4.bundlesRow, o4.bundlesSub, '',
+          bundleList ? (
+            <BundlesBody bundles={bundleList} lang={lang} money={money} signedIn={!!user} signInPath={authPathWithSupportRef(`${location.pathname}${location.search}`)} />
+          ) : (
+            <OffersLoading state={kits?.state === 'failed' ? 'failed' : 'loading'} lang={lang} again={() => setKitTry((n) => n + 1)} />
+          ), !bundlesOffered)}
       </div>
     </Sheet>
   );

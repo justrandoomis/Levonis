@@ -50,6 +50,8 @@ const KIT: FilamentKit = {
   items: [{ product_id: 'p_pla', option_value_ids: [], color_id: null, qty: 2 }],
   printers: [{ product_id: 'p_a1', option_value_id: null }],
 };
+/** KIT as the canonical store writes it since phase 4 (DECISIONS row 355): fixed colours, no discount. */
+const CANON_KIT: FilamentKit = { ...KIT, items: KIT.items.map((i) => ({ ...i, color_mode: 'fixed' as const })), discount: null };
 
 function liveConfig(over: Partial<PrinterServicesConfig> = {}): PrinterServicesConfig {
   return { ...DEFAULT_PRINTER_SERVICES, revision: 1, products: { p_a1: { warranty_family: 'a1', delivery_class: 'd1' } }, kits: [KIT], ...over };
@@ -193,7 +195,7 @@ test('config: a list stored before phase 2 reads as memberships off, no kits; ki
     membership: { active: true, tiers: ['plus', 'gold' as never] },
   });
   const issues = configIssues(bad);
-  for (const needle of ['the same product and selection twice', 'kits[1].id: used twice', 'kits[2].id', 'kits[2].items[0].qty', 'kits carry no discount', 'membership.tiers']) {
+  for (const needle of ['the same product and selection twice', 'kits[1].id: used twice', 'kits[2].id', 'kits[2].items[0].qty', "kits[3].discount_iqd: a kit's only discount field is discount", 'membership.tiers']) {
     assert.ok(issues.some((i) => i.includes(needle)), `${needle}: ${issues.join(' | ')}`);
   }
   const unpublishable = liveConfig({
@@ -207,7 +209,7 @@ test('config: a list stored before phase 2 reads as memberships off, no kits; ki
   }
   // Complete includes NO membership by default (owner ruling); the field exists.
   assert.equal(DEFAULT_PRINTER_SERVICES.packages.complete.membership_tier, null);
-  assert.deepEqual(canonicalConfig(liveConfig()).kits, [KIT]);
+  assert.deepEqual(canonicalConfig(liveConfig()).kits, [CANON_KIT]);
   assert.deepEqual(kitsForPrinter(liveConfig(), 'p_a1', []).map((k) => k.id), ['a1-starter']);
   assert.deepEqual(kitsForPrinter(liveConfig(), 'p_other', []), []);
   // Every phase 2 code has words in ar / en / ckb (the sheet's copy, where it carries one, the same).
@@ -243,7 +245,7 @@ test('config: a draft saved by a page that does not know the phase 2 fields keep
   const saved = await put(owner, '/api/admin/printer-services/draft', { draft: posted, base_revision: before.revision });
   assert.equal(saved.status, 200, JSON.stringify(await json(saved.clone())));
   const after = JSON.parse(String((raw.prepare("SELECT value FROM admin_settings WHERE key = 'printerServices'").get() as { value: string }).value)).draft;
-  assert.deepEqual(after.kits, [KIT]);
+  assert.deepEqual(after.kits, [CANON_KIT]);
   assert.deepEqual(after.membership, before.membership);
   // A kit naming a product that does not exist blocks publishing.
   const broken = { ...after, kits: [{ ...KIT, items: [{ ...KIT.items[0], product_id: 'p_none' }] }] };
@@ -493,12 +495,14 @@ test('cancelled before activation it never starts; once active it is final: no c
 
 // -------------------------------------------------------------- the kits
 
-test('kits: priced from the live items with no discount, one kit per printer unit, following the printer; locked lines; stock and conflicts refused', async () => {
+test('kits: priced from the live items (no discount set → discount_iqd 0, phase 4), one kit per printer unit, following the printer; locked lines; stock and conflicts refused', async () => {
   const { db, raw } = setup({ plaStock: 5 });
   const guest = await json(await get(appAs(db, null), '/api/products/a1-printer/kits?qty=2&fulfillmentType=direct_sale'));
   assert.equal(guest.kits.length, 1, JSON.stringify(guest));
   const k = guest.kits[0];
   assert.deepEqual([k.id, k.available, k.price_per_printer_iqd, k.total_iqd, k.discount_iqd, k.items[0].qty], ['a1-starter', true, 50_000, 100_000, 0, 4]);
+  // Phase 4 (row 355): kitPublic's discount is real now — none set, so before = after and the discount is 0.
+  assert.deepEqual([k.before_per_printer_iqd, k.discount_per_printer_iqd, k.discount, k.items[0].before_unit_price_iqd, k.items[0].unit_price_iqd], [50_000, 0, null, 25_000, 25_000]);
   const tooMany = await json(await get(appAs(db, null), '/api/products/a1-printer/kits?qty=3&fulfillmentType=direct_sale'));
   assert.equal(tooMany.kits[0].available, false, 'six spools on a shelf of five');
   assert.equal((await json(await get(appAs(db, null), '/api/products/pla-basic/kits'))).kits.length, 0);

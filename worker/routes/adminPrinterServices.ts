@@ -18,7 +18,7 @@ import { requireMoneyAuthority } from '../lib/moneyAuthority';
 import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
 import { configIssues, publishIssues, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
 import {
-  kitCatalogIssues,
+  printerExtrasCatalogIssues,
   loadPrinterServices,
   orderServiceTasks,
   printerCatalogForMapping,
@@ -44,7 +44,7 @@ adminPrinterServiceRoutes.get('/', async (c) => {
     success: true,
     ...state,
     draft_issues: configIssues(state.draft),
-    publish_issues: [...publishIssues(state.draft), ...(await kitCatalogIssues(db, state.draft))],
+    publish_issues: [...publishIssues(state.draft), ...(await printerExtrasCatalogIssues(db, state.draft))],
     printers,
   });
 });
@@ -68,7 +68,7 @@ adminPrinterServiceRoutes.put('/draft', requireMoneyAuthority('printer_services'
     }
   }
   const state = await saveDraft(c.env.DB, c.get('user')!.id, draft, revisionOf((body as { base_revision?: unknown }).base_revision));
-  return c.json({ success: true, ...state, draft_issues: [], publish_issues: [...publishIssues(state.draft), ...(await kitCatalogIssues(c.env.DB, state.draft))] });
+  return c.json({ success: true, ...state, draft_issues: [], publish_issues: [...publishIssues(state.draft), ...(await printerExtrasCatalogIssues(c.env.DB, state.draft))] });
 });
 
 adminPrinterServiceRoutes.post('/publish', requireMoneyAuthority('printer_services_publish'), async (c) => {
@@ -79,7 +79,7 @@ adminPrinterServiceRoutes.post('/publish', requireMoneyAuthority('printer_servic
 
 adminPrinterServiceRoutes.post('/unpublish', requireMoneyAuthority('printer_services_publish'), async (c) => {
   const state = await unpublish(c.env.DB, c.get('user')!.id);
-  return c.json({ success: true, ...state, draft_issues: configIssues(state.draft), publish_issues: publishIssues(state.draft) });
+  return c.json({ success: true, ...state, draft_issues: configIssues(state.draft), publish_issues: [...publishIssues(state.draft), ...(await printerExtrasCatalogIssues(c.env.DB, state.draft))] });
 });
 
 /**

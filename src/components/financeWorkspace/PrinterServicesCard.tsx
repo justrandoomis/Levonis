@@ -6,7 +6,9 @@ import type { FinanceSummary } from './types';
 /**
  * «خدمات الطابعات والمطالبات» (printer phase 3, DECISIONS row 347) — the period's
  * serviced printer lines split into the printer and its services, the kits,
- * memberships and courier around them, and the warranty / Levo Care claim money.
+ * add-ons (phase 4, row 355), memberships and courier around them, the owner's
+ * kit / add-on discounts given (inside the prices, shown only), and the
+ * warranty / Levo Care claim money.
  *
  * Information only: the claim costs are general expenses of their day and are
  * already in «المصاريف العامة» above (never subtracted twice); the co-pays are
@@ -25,6 +27,7 @@ const S: Record<Lang, Record<string, string>> = {
     inspectionsDone: 'فحص منجز', warrantyCost: 'تكاليف مطالبات الضمان', careCost: 'تكاليف مطالبات ليفو كير',
     inGeneral: 'ضمن المصاريف العامة', benefit: 'خصم ليفو كير الممنوح', copay: 'ما دفعه الزبائن (إيراد خدمات)',
     claimsCount: 'مطالبة عليها تكلفة',
+    addons: 'إضافات الطابعة', discounts: 'خصومات الطابعة الممنوحة', insidePrices: 'داخل الأسعار، لا تُطرح مرة أخرى',
   },
   en: {
     title: 'Printer services and claims', note: 'For information: already inside the figures above, never subtracted again.',
@@ -35,6 +38,7 @@ const S: Record<Lang, Record<string, string>> = {
     inspectionsDone: 'inspection(s) done', warrantyCost: 'Warranty claim costs', careCost: 'Levo Care claim costs',
     inGeneral: 'in general expenses', benefit: 'Levo Care discount given', copay: 'Co-pays collected (service income)',
     claimsCount: 'claim(s) with a cost',
+    addons: 'Printer add-ons', discounts: 'Printer discounts given', insidePrices: 'inside the prices, never subtracted again',
   },
   ckb: {
     title: 'خزمەتگوزارییەکانی پرینتەر و داواکارییەکان', note: 'بۆ زانیاری: لەناو ژمارەکانی سەرەوەدایە، دووبارە دەرناکرێت.',
@@ -45,6 +49,7 @@ const S: Record<Lang, Record<string, string>> = {
     inspectionsDone: 'پشکنینی تەواوکراو', warrantyCost: 'تێچووی داواکارییەکانی گەرەنتی', careCost: 'تێچووی داواکارییەکانی لیڤۆ کێر',
     inGeneral: 'لەناو خەرجییە گشتییەکاندا', benefit: 'داشکاندنی لیڤۆ کێری دراو', copay: 'ئەوەی کڕیاران دایان (داهاتی خزمەتگوزاری)',
     claimsCount: 'داواکاری کە تێچووی هەیە',
+    addons: 'زیادکراوەکانی پرینتەر', discounts: 'داشکاندنە دراوەکانی پرینتەر', insidePrices: 'لەناو نرخەکاندایە، دووبارە دەرناکرێت',
   },
 };
 const SERVICES = ['warranty', 'care', 'packaging', 'inspection', 'academy'] as const;
@@ -56,7 +61,7 @@ export function PrinterServicesCard({ data }: { data: FinanceSummary }) {
   const b = data.printer_breakdown ?? null;
   const c = data.service_claims ?? null;
   const income = data.service_income_iqd ?? data.totals.service_income_iqd ?? c?.copay_iqd ?? 0;
-  const anything = (b && (n(b.printer_lines) > 0 || n(b.kits_net_iqd) > 0 || n(b.membership_iqd) > 0 || n(b.courier_fee_iqd) > 0))
+  const anything = (b && (n(b.printer_lines) > 0 || n(b.kits_net_iqd) > 0 || n(b.addons_net_iqd) > 0 || n(b.printer_discounts_iqd) > 0 || n(b.membership_iqd) > 0 || n(b.courier_fee_iqd) > 0))
     || (c && (n(c.count) > 0 || n(c.inspections_done) > 0 || n(c.care_benefit_given_iqd) > 0 || n(c.copay_iqd) > 0 || n(c.warranty_cost_iqd) > 0 || n(c.care_cost_iqd) > 0))
     || n(income) > 0;
   if (!anything) return null;
@@ -71,6 +76,8 @@ export function PrinterServicesCard({ data }: { data: FinanceSummary }) {
             <Fragment key={k}><dt><small>{s[k]}</small></dt><dd><Money value={n(b.services?.[k])} compact /></dd></Fragment>
           ))}
           {n(b.kits_net_iqd) > 0 && <><dt>{s.kits}</dt><dd><Money value={n(b.kits_net_iqd)} /></dd></>}
+          {n(b.addons_net_iqd) > 0 && <><dt>{s.addons}</dt><dd><Money value={n(b.addons_net_iqd)} /></dd></>}
+          {n(b.printer_discounts_iqd) > 0 && <><dt>{s.discounts}<small>{s.insidePrices}</small></dt><dd data-finance-printer-discounts><Money value={n(b.printer_discounts_iqd)} /></dd></>}
           {n(b.membership_iqd) > 0 && <><dt>{s.membership}</dt><dd><Money value={n(b.membership_iqd)} /></dd></>}
           {n(b.courier_fee_iqd) > 0 && <><dt>{s.courier}</dt><dd><Money value={n(b.courier_fee_iqd)} /></dd></>}
         </>}

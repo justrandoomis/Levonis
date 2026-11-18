@@ -51,6 +51,9 @@ export const CART_LINE_COLUMNS: ReadonlyArray<{ name: string; sqlDefault: string
   { name: 'kit_parent_id', sqlDefault: 'NULL' }, // 0235
   { name: 'kit_id', sqlDefault: 'NULL' }, // 0235
   { name: 'kit_unit_qty', sqlDefault: '0' }, // 0235
+  // 0242: an add-on line (attached like a kit line) and who picked an attached line's colour.
+  { name: 'addon_id', sqlDefault: 'NULL' }, // 0242
+  { name: 'kit_color_mode', sqlDefault: "''" }, // 0242
 ];
 
 /** `ci.<col>, …` — the projection when the database is up to date. */

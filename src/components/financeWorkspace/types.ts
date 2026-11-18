@@ -225,6 +225,10 @@ export interface PrinterBreakdown {
   services_net_iqd?: number;
   services?: Partial<Record<'warranty' | 'care' | 'packaging' | 'inspection' | 'academy', number>>;
   kits_net_iqd?: number;
+  /** Phase 4 (DECISIONS row 355): add-on lines sold with printers, net. */
+  addons_net_iqd?: number;
+  /** Phase 4: the owner's kit / add-on discounts given — already inside the prices, information only. */
+  printer_discounts_iqd?: number;
   membership_iqd?: number;
   courier_fee_iqd?: number;
 }

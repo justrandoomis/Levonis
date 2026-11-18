@@ -72,3 +72,36 @@ test('the period: serviced printers, kits, the membership and the courier — pa
   for (const k of PRINTER_SERVICE_KEYS) assert.ok(Number.isInteger(b.services[k]), k);
   assert.ok(!JSON.stringify(b).includes('null') && !Number.isNaN(b.printer_net_iqd));
 });
+
+test('phase 4 (DECISIONS row 355): add-on lines are their own net; the discounts given are summed, never taken off again; absent columns read 0', () => {
+  const lines = [
+    { qty: 1, line_total_iqd: 944_000, net_goods_iqd: 944_000, services_snapshot: snap({ warranty: 25_000 }) },
+    // A kit line at 22,500 a unit after a 2,500 discount (×2) and an add-on at 10,000 after 5,000 off.
+    { qty: 2, line_total_iqd: 45_000, net_goods_iqd: 45_000, kit_id: 'a1-starter', printer_discount_iqd: 5_000, services_snapshot: null },
+    { qty: 1, line_total_iqd: 10_000, net_goods_iqd: 9_000, addon_id: 'nozzle-04', printer_discount_iqd: 5_000, services_snapshot: null },
+    { qty: 1, line_total_iqd: 3_000, net_goods_iqd: 3_000, addon_id: 'plate', printer_discount_iqd: 'junk', services_snapshot: null },
+  ];
+  const b = printerBreakdown([{ totals: { courier_fee_iqd: 0 }, lines }] as never);
+  assert.deepEqual([b.kits_net_iqd, b.addons_net_iqd, b.printer_discounts_iqd], [45_000, 12_000, 10_000]);
+  // The parts still add up to the net they came from: the discount is inside the prices, not a further part.
+  assert.equal(b.printer_net_iqd + b.services_net_iqd + b.kits_net_iqd + b.addons_net_iqd, 944_000 + 45_000 + 12_000);
+  // A database before 0242: no addon_id / printer_discount_iqd on any line — zeros, the phase 3 figures unchanged.
+  const old = printerBreakdown([{ totals: { courier_fee_iqd: 0 }, lines: [lines[0], { qty: 1, line_total_iqd: 50_000, net_goods_iqd: 50_000, kit_id: 'k', services_snapshot: null }] }] as never);
+  assert.deepEqual([old.addons_net_iqd, old.printer_discounts_iqd, old.kits_net_iqd], [0, 0, 50_000]);
+  assert.ok(!JSON.stringify(b).includes('null'));
+});
+
+test('phase 4: the printer discounts given are net of returns, like the lines they sit on (floor of discount × kept / qty)', () => {
+  const lines = [
+    // 3 kit spools, 1,000 off in all; one returned → floor(1,000 × 2 / 3) = 666.
+    { qty: 3, returned_qty: 1, line_total_iqd: 66_000, net_goods_iqd: 44_000, kit_id: 'k', printer_discount_iqd: 1_000, services_snapshot: null },
+    // An add-on returned whole → nothing given.
+    { qty: 2, returned_qty: 2, line_total_iqd: 16_000, net_goods_iqd: 0, addon_id: 'nozzle', printer_discount_iqd: 4_000, services_snapshot: null },
+    // No returns (or junk) → the whole discount; returns above qty are clamped.
+    { qty: 1, returned_qty: 'junk', line_total_iqd: 8_000, net_goods_iqd: 8_000, addon_id: 'plate', printer_discount_iqd: 2_000, services_snapshot: null },
+    { qty: 1, returned_qty: 5, line_total_iqd: 8_000, net_goods_iqd: 0, addon_id: 'brush', printer_discount_iqd: 2_000, services_snapshot: null },
+  ];
+  const b = printerBreakdown([{ totals: { courier_fee_iqd: 0 }, lines }] as never);
+  assert.equal(b.printer_discounts_iqd, 666 + 0 + 2_000 + 0);
+  assert.ok(Number.isInteger(b.printer_discounts_iqd));
+});

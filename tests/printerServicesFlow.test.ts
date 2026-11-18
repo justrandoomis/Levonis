@@ -514,7 +514,7 @@ test('fix 2/3: the draft refuses a package discount and stores only known fields
   assert.equal(ok.success, true, JSON.stringify(ok));
   const stored = JSON.parse(String((raw.prepare("SELECT value FROM admin_settings WHERE key = 'printerServices'").get() as { value: string }).value));
   assert.equal('junk' in stored.draft, false);
-  assert.deepEqual(stored.draft.products, { p_a1: { warranty_family: 'a1', delivery_class: 'd1' } });
+  assert.deepEqual(stored.draft.products, { p_a1: { warranty_family: 'a1', delivery_class: 'd1', store_bundle_ids: [] } });
 });
 
 test('fix 4/5: a version-only mapping is quoted on the stand-in with no version chosen, never with the legacy plans', async () => {

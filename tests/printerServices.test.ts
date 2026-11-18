@@ -169,7 +169,7 @@ test('canonicalConfig keeps only the known fields', () => {
   assert.deepEqual(configIssues(c), []);
   const out = canonicalConfig(c as PrinterServicesConfig) as unknown as Record<string, any>;
   assert.equal(out.extra, undefined);
-  assert.deepEqual(out.products, { p1: { warranty_family: 'a1', delivery_class: 'd1', by_option_value: { v1: { warranty_family: null, delivery_class: 'd2' } } } });
+  assert.deepEqual(out.products, { p1: { warranty_family: 'a1', delivery_class: 'd1', by_option_value: { v1: { warranty_family: null, delivery_class: 'd2' } }, store_bundle_ids: [] } });
   assert.equal(out.warranty.w12.zz, undefined);
   assert.equal(out.delivery.classes.d9, undefined);
   assert.equal(out.packages.smart.note, undefined);

@@ -42,12 +42,12 @@ import { pairedUsd, scaleUsdLine, shownSavingPercent, unitUsdBase, useMoney, typ
 import OfferBadge, { StruckMoney, offerPercentSr, offerPercentText } from '../components/ui/OfferBadge';
 import VariantImg from '../components/ui/VariantImg';
 import { cartEmptyText } from '../lib/cartEmptyText';
-import { groupCartLines, groupPictures } from '../lib/cartGroups';
+import { attachedPrinterOf, groupCartLines, groupPictures } from '../lib/cartGroups';
 import { colourLang, colourStrings, groupSummaryText, isolate } from '../lib/colourQuantities';
 import { ColourSwatch, ColourTag } from '../components/product/ColourTag';
 import VariantChoices from '../components/cart/VariantChoices';
 import { PS_STRINGS, servicesErrorText, servicesRefusalText } from '../components/product/printerServicesStrings';
-import PrinterExtrasLines from '../components/cart/PrinterExtrasLines';
+import PrinterExtrasLines, { type AttachedColourMode } from '../components/cart/PrinterExtrasLines';
 /** «تخصيص بنفسي» from the cart (DECISIONS row 339): loaded only when opened. */
 const CustomizeSheet = React.lazy(() => import('../components/product/CustomizeSheet'));
 import { ESTIMATE_TEXT } from '../lib/priceStatus';
@@ -67,6 +67,19 @@ type EstimateWords = Awaited<ReturnType<typeof loadEstimateWords>>;
 /** An estimate refusal (PRICE_ESTIMATE_*, PRICE_ESTIMATES_*, PRICE_PROTECTION_ESTIMATE_*): said from the contract first. */
 const ESTIMATE_REFUSAL_CODE = /^PRICE_(?:ESTIMATE|PROTECTION_ESTIMATE)/;
 /** A line at an estimated price: the line says so, or its price block does (worker/routes/cart.ts). Never a figure. */
+/**
+ * Phase 4 (0242; DECISIONS row 355): what the cart reads beside api.ts's CartItem —
+ * an add-on line's link to its printer, how a kit/add-on line's colour was
+ * decided, and the printer line's add-ons with the server's before/after.
+ */
+type OfferLineFields = {
+  kit_line?: { color_mode?: AttachedColourMode } | null;
+  addon_line?: { printer_cart_item_id: string; addon_id: string; qty_per_printer: number; color_mode?: AttachedColourMode } | null;
+  kit?: { before_iqd?: number | null } | null;
+  addons?: Array<{ addon_id: string; title: { ar: string; en: string; ckb: string } | null; line_ids: string[]; total_iqd: number | null; before_iqd?: number | null; current: boolean }>;
+};
+const offerFields = (item: CartItem) => item as CartItem & OfferLineFields;
+
 const lineEstimated = (item: Pick<CartItem, 'price_estimate' | 'breakdown'>): boolean =>
   item.price_estimate === true || item.breakdown?.price_estimate === true;
 
@@ -1085,7 +1098,8 @@ export default function Cart() {
 
   const toggleSelect = (itemId: string) => {
     // A printer's kit lines (phase 2) are ticked and unticked with it: the checkout refuses a kit without its printer.
-    const kitIds = items.filter((i) => i.kit_line?.printer_cart_item_id === itemId).map((i) => i.id);
+    // Phase 4: and so are its add-on lines (attachedPrinterOf reads kit_line / addon_line).
+    const kitIds = items.filter((i) => attachedPrinterOf(i) === itemId).map((i) => i.id);
     setSelectedIds((prev) => {
       const next = new Set(prev);
       const on = !next.has(itemId);
@@ -1106,7 +1120,7 @@ export default function Cart() {
   /** A colour group's header selects or clears every colour of the product at once (§5.2). */
   const toggleGroup = (ids: string[], on: boolean) => {
     // A printer's kit lines (phase 2) go with it, as in toggleSelect.
-    const withKits = [...ids, ...items.filter((i) => i.kit_line && ids.includes(i.kit_line.printer_cart_item_id)).map((i) => i.id)];
+    const withKits = [...ids, ...items.filter((i) => { const p = attachedPrinterOf(i); return !!p && ids.includes(p); }).map((i) => i.id)];
     setSelectedIds((prev) => {
       const next = new Set(prev);
       for (const id of withKits) {
@@ -1180,7 +1194,7 @@ export default function Cart() {
   // ------------------------------------------------- printer services (0234)
   // One save at a time (a ref, so two taps in one tick cannot both PATCH). A
   // refusal is said INSIDE the open sheet, which stays open to fix the choice.
-  const chooseServices = async (item: CartItem, next: object & { extras?: { membershipPlanId?: string | null; kitId?: string | null } }) => {
+  const chooseServices = async (item: CartItem, next: object & { extras?: { membershipPlanId?: string | null; kitId?: string | null; kitColors?: Record<string, string> | null; addonIds?: string[] | null; addonColors?: Record<string, string> | null } }) => {
     if (servicesSavingRef.current) return;
     const { extras, ...services } = next;
     servicesSavingRef.current = true;
@@ -1192,9 +1206,20 @@ export default function Cart() {
       applyCartWrite(data);
       // Phase 2: the membership and the kit are saved on the printer line by their own door, only when they changed.
       const held = extrasOf(item);
-      const changed: Record<string, string | null> = {};
+      const changed: Record<string, string | null | string[] | Record<string, string>> = {};
       if (extras?.membershipPlanId !== undefined && (extras.membershipPlanId ?? null) !== held.membershipPlanId) changed.membershipPlanId = extras.membershipPlanId ?? null;
       if (extras?.kitId !== undefined && (extras.kitId ?? null) !== held.kitId) changed.kitId = extras.kitId ?? null;
+      // Phase 4: the add-ons (exactly these; null = none) and the kit's colours, only when they changed.
+      const sameSet = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((x) => b.includes(x));
+      if (extras?.addonIds !== undefined && !sameSet(extras.addonIds ?? [], held.addonIds ?? [])) changed.addonIds = extras.addonIds?.length ? extras.addonIds : null;
+      // A colour map travels with a kit / add-on that is (still) chosen, when it differs from what the lines hold.
+      const differs = (want: Record<string, string>, have: Record<string, string> | null) => Object.entries(want).some(([k, v]) => (have?.[k] ?? 'random') !== v);
+      const kitAfter = extras?.kitId !== undefined ? extras.kitId ?? null : held.kitId;
+      const kitColours = extras?.kitColors ?? null;
+      if (kitAfter && kitColours && Object.keys(kitColours).length && (changed.kitId !== undefined || differs(kitColours, held.kitColors))) changed.kitColors = kitColours;
+      const addonsAfter = extras?.addonIds !== undefined ? extras.addonIds ?? [] : held.addonIds ?? [];
+      const addonColours = extras?.addonColors ?? null;
+      if (addonsAfter.length && addonColours && Object.keys(addonColours).length && (changed.addonIds !== undefined || differs(addonColours, held.addonColors))) changed.addonColors = addonColours;
       if (Object.keys(changed).length && (data.items || []).some((i) => i.id === item.id)) {
         applyCartWrite(await api.put<CartWriteResponse>(`/api/cart/items/${item.id}/extras`, changed));
       }
@@ -1208,21 +1233,54 @@ export default function Cart() {
       setServicesSavingId(null);
     }
   };
-  /** What the printer line holds now: its membership plan (printer_extras) and its kit. */
-  const extrasOf = (item: CartItem) => ({
-    membershipPlanId: printerExtras?.membership?.printer_cart_item_id === item.id ? printerExtras.membership.plan_id : null,
-    kitId: item.kit?.kit_id ?? null,
-  });
+  /** What the printer line holds now: its membership plan (printer_extras), its kit, and (phase 4) its add-ons and colours. */
+  const extrasOf = (item: CartItem) => {
+    const attached = items.filter((i) => attachedPrinterOf(i) === item.id).map(offerFields);
+    // The colours the lines hold: a kit item by its product, an add-on by its own id.
+    const kitColors: Record<string, string> = {};
+    const addonColors: Record<string, string> = {};
+    for (const l of attached) {
+      const into = l.addon_line ? addonColors : kitColors;
+      const key = l.addon_line ? l.addon_line.addon_id : l.productId;
+      const mode = l.addon_line ? l.addon_line.color_mode : l.kit_line?.color_mode;
+      if (mode === 'chosen' && l.color_id) into[key] = l.color_id;
+      else if (mode === 'random') into[key] = 'random';
+    }
+    const addonIds = (offerFields(item).addons ?? []).map((a) => a.addon_id);
+    return {
+      membershipPlanId: printerExtras?.membership?.printer_cart_item_id === item.id ? printerExtras.membership.plan_id : null,
+      kitId: item.kit?.kit_id ?? null,
+      kitColors: Object.keys(kitColors).length ? kitColors : null,
+      addonIds: addonIds.length ? addonIds : null,
+      addonColors: Object.keys(addonColors).length ? addonColors : null,
+    };
+  };
   /** Removes the printer line's membership or kit (PUT extras null); a refusal is said on the line. */
   const [extrasBusyId, setExtrasBusyId] = useState<string | null>(null);
   const [extrasError, setExtrasError] = useState<Record<string, string>>({});
-  const removeExtra = async (item: CartItem, patch: { membershipPlanId?: null; kitId?: null }) => {
+  const removeExtra = async (item: CartItem, patch: { membershipPlanId?: null; kitId?: null; addonIds?: string[] | null; kitColors?: Record<string, string>; addonColors?: Record<string, string> }) => {
     if (extrasBusyId) return;
     setExtrasBusyId(item.id);
     setExtrasError((prev) => { const next = { ...prev }; delete next[item.id]; return next; });
     actionBusyRef.current += 1;
     try {
       applyCartWrite(await api.put<CartWriteResponse>(`/api/cart/items/${item.id}/extras`, patch));
+    } catch (err) {
+      const said = cartRefusal(err, loc('تعذّر حفظ التغيير', 'Could not save the change', 'گۆڕانکارییەکە پاشەکەوت نەکرا'));
+      setExtrasError((prev) => ({ ...prev, [item.id]: said }));
+    } finally {
+      actionBusyRef.current -= 1;
+      setExtrasBusyId(null);
+    }
+  };
+  /** Phase 4: removes one add-on of a printer by deleting its own lines (the server allows it for add-on lines only). */
+  const removeAddonLines = async (item: CartItem, lineIds: string[]) => {
+    if (extrasBusyId || !lineIds.length) return;
+    setExtrasBusyId(item.id);
+    setExtrasError((prev) => { const next = { ...prev }; delete next[item.id]; return next; });
+    actionBusyRef.current += 1;
+    try {
+      for (const id of lineIds) applyCartWrite(await api.delete<CartWriteResponse>(`/api/cart/items/${id}`));
     } catch (err) {
       const said = cartRefusal(err, loc('تعذّر حفظ التغيير', 'Could not save the change', 'گۆڕانکارییەکە پاشەکەوت نەکرا'));
       setExtrasError((prev) => ({ ...prev, [item.id]: said }));
@@ -1745,7 +1803,8 @@ export default function Cart() {
     // The server alone marks a gift line (`kind: 'gift'`, locked, priced 0).
     if (item.kind === 'gift') return giftRow(item, item.gift ?? { level: 0, value_iqd: 0 });
     // Phase 2 (0235): a filament-kit line is drawn under its printer (PrinterExtrasLines), locked.
-    if (item.kit_line) return null;
+    // Phase 4 (0242): so is an add-on line (its remove is on the add-on, under the printer).
+    if (item.kit_line || offerFields(item).addon_line) return null;
     const hasVariants = (item.options ?? []).length > 0 || (item.colors ?? []).length > 0;
     const hasShippingOptions = (item.shipping_methods ?? []).length > 0;
     // A LIVE OFFER strikes the published price it replaced (docs/ux/PRODUCT-DISCOUNT.md §8.4) — the
@@ -2086,15 +2145,33 @@ export default function Cart() {
                     lang={lang === 'en' || lang === 'ckb' ? lang : 'ar'}
                     money={(v) => money(v)}
                     membership={printerExtras?.membership?.printer_cart_item_id === item.id ? printerExtras.membership.quote : null}
-                    kit={item.kit ?? null}
+                    kit={item.kit ? { ...item.kit, before_iqd: offerFields(item).kit?.before_iqd ?? null } : null}
                     kitLines={[
-                      ...items.filter((k) => k.kit_line?.printer_cart_item_id === item.id).map((k) => ({ id: k.id, name: k.name, name_ar: k.name_ar, variant: k.options_label ?? k.variantLabel, qty: k.qty, blocked: lineBlocked(k) })),
+                      ...items.filter((k) => k.kit_line?.printer_cart_item_id === item.id).map((k) => ({
+                        id: k.id, name: k.name, name_ar: k.name_ar, variant: k.options_label ?? k.variantLabel, qty: k.qty, blocked: lineBlocked(k),
+                        productId: k.productId, colorMode: offerFields(k).kit_line?.color_mode ?? null, colour: k.color_tag ? { name: k.color_tag.name, hex: k.color_tag.hex } : null,
+                      })),
                       // A kit line whose product is not for sale now is listed apart by the server (unavailable_lines):
                       // the printer's kit says it is blocked, and its fix is on the kit (re-choose or remove), never on the line.
                       ...unavailableLines.filter((u) => kitLineOf(u) === item.id).map((u) => ({ id: u.cart_item_id, name: u.name.en, name_ar: lang === 'ckb' ? u.name.ckb : u.name.ar, qty: 0, blocked: true })),
                     ]}
                     onRemoveMembership={() => void removeExtra(item, { membershipPlanId: null })}
                     onRemoveKit={() => void removeExtra(item, { kitId: null })}
+                    // Phase 4: the add-ons under the printer (each removable), and a sold-out chosen colour made random.
+                    addons={(offerFields(item).addons ?? []).map((a) => ({
+                      ...a,
+                      lines: items.filter((l) => offerFields(l).addon_line?.printer_cart_item_id === item.id && offerFields(l).addon_line?.addon_id === a.addon_id).map((l) => ({
+                        id: l.id, name: l.name, name_ar: l.name_ar, variant: l.options_label ?? l.variantLabel, qty: l.qty, blocked: lineBlocked(l),
+                        productId: l.productId, colorMode: offerFields(l).addon_line?.color_mode ?? null, colour: l.color_tag ? { name: l.color_tag.name, hex: l.color_tag.hex } : null,
+                      })),
+                    }))}
+                    // An add-on goes by deleting its own lines: the printer's other add-ons are never re-planned.
+                    onRemoveAddon={(addonId) => void removeAddonLines(item, (offerFields(item).addons ?? []).find((a) => a.addon_id === addonId)?.line_ids ?? [])}
+                    onRandomColour={(productId) => void removeExtra(item, { kitColors: { [productId]: 'random' } })}
+                    onRandomAddonColour={(addonId) => void removeExtra(item, {
+                      addonIds: (offerFields(item).addons ?? []).map((a) => a.addon_id),
+                      addonColors: { [addonId]: 'random' },
+                    })}
                     onRechoose={() => setServicesLineId(item.id)}
                     busy={extrasBusyId === item.id}
                   />

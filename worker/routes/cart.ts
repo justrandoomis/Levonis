@@ -182,9 +182,10 @@ import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 import { auditStatements } from '../lib/audit';
 import { enrolledClasses, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
 import { parseConditionDoc } from '../lib/condition';
-import { kitLinesMatch, kitNotOffered, kitUnavailable, offeredKit, resolveKit, type ResolvedKit } from '../lib/printerKits';
+import { addonLinesMatch, addonUnavailableOf, kitLinesMatch, kitNotOffered, kitPricing, kitUnavailable, offeredAddon, offeredKit, resolveAddon, resolveKit, RANDOM_COLOUR, type ColourWishes, type ResolvedAddon, type ResolvedKit } from '../lib/printerKits';
+import { addonNotOffered, addonUnavailable, applyPrinterDiscount, attachedLineOf, benefitRegularUnit, printerDiscountView, printerLineDiscount, repickRandomColour, type AppliedPrinterDiscount } from '../lib/printerOffers';
 import { membershipPlanById, orderMembershipQuotePayload, quoteOrderMembership } from './memberships';
-import { parseSelection, servicesOfferFor, kitsForPrinter, offeredMembershipTiers, CART_MEMBERSHIP_CONFLICT, EXTRAS_NOT_PRINTER, KIT_LINE_LOCKED, KIT_UNAVAILABLE, MEMBERSHIP_NOT_OFFERED, type FilamentKit, SERVICES_CODES, SERVICES_NOT_OFFERED, SERVICES_REQUIRED, type PrinterClasses, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
+import { addonsOf, parseSelection, servicesOfferFor, kitsForPrinter, offeredMembershipTiers, CART_MEMBERSHIP_CONFLICT, EXTRAS_NOT_PRINTER, KIT_LINE_LOCKED, KIT_UNAVAILABLE, MEMBERSHIP_NOT_OFFERED, type FilamentKit, SERVICES_CODES, SERVICES_NOT_OFFERED, SERVICES_REQUIRED, type PrinterClasses, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
 
 /** The cart line's printer-services block (absent for every other line). */
 function cartServicesView(
@@ -963,6 +964,8 @@ export interface UnavailableCartLine {
   slug: string | null;
   /** 0235: an unavailable filament-kit line names its printer line and kit (it is removed with the kit, never alone). */
   kit_line?: { printer_cart_item_id: string; kit_id: string; qty_per_printer: number };
+  /** 0242: an unavailable add-on line names its printer line and add-on (it can be removed alone). */
+  addon_line?: { printer_cart_item_id: string; addon_id: string; qty_per_printer: number };
 }
 
 function unavailableCartLine(row: Record<string, unknown>, catalogOnly = false): UnavailableCartLine {
@@ -983,7 +986,9 @@ function unavailableCartLine(row: Record<string, unknown>, catalogOnly = false):
     code: catalogOnly ? 'PRICE_NOT_AVAILABLE' : 'PRODUCT_CURRENTLY_UNAVAILABLE',
     slug: catalogOnly ? text(row.slug) || null : null,
     ...(row.kit_parent_id
-      ? { kit_line: { printer_cart_item_id: String(row.kit_parent_id), kit_id: String(row.kit_id ?? ''), qty_per_printer: Number(row.kit_unit_qty) || 0 } }
+      ? row.addon_id
+        ? { addon_line: { printer_cart_item_id: String(row.kit_parent_id), addon_id: String(row.addon_id), qty_per_printer: Number(row.kit_unit_qty) || 0 } }
+        : { kit_line: { printer_cart_item_id: String(row.kit_parent_id), kit_id: String(row.kit_id ?? ''), qty_per_printer: Number(row.kit_unit_qty) || 0 } }
       : {}),
   };
 }
@@ -1248,13 +1253,15 @@ async function loadCart(c: Context<AppContext>) {
       continue;
     }
     const view = views.get(String(row.id));
-    const sel = selectionFromCartRow(row);
     const isPrinter = printerIds.has(String(row.id ?? ''));
     const coarseStock = poolMemberIds.has(String(row.id ?? ''));
     const offerView = lineOffers.get(offerKey(subjectOf(String(row.id)))) ?? null;
     const offerCheck = offerEligible(status, offerView, nowMs);
     const offerInput = { view: offerView, eligible: offerCheck.ok, nowMs };
-    const { doc, resolved, variantLabel, selectionErrors, offerId, colorTag, optionsLabel, servicesClasses } = resolveCartLine(
+    // Phase 4: a «random» colour that can no longer serve this line is re-picked IN MEMORY by the same rule the
+    // add used (nothing is written; the checkout picks again for the order).
+    const sel = selectionFromCartRow(randomColourRow(row, view, ctx, (r) => resolveCartLine(r, selectionFromCartRow(r), tier, tierActive, ctx, view, 'prepaid', isPrinter, offerInput)));
+    const priced = resolveCartLine(
       row,
       sel,
       tier,
@@ -1265,6 +1272,10 @@ async function loadCart(c: Context<AppContext>) {
       isPrinter,
       offerInput
     );
+    const { doc, variantLabel, selectionErrors, offerId, colorTag, optionsLabel, servicesClasses } = priced;
+    // THE OWNER'S PRINTER DISCOUNT, INSIDE THE UNIT PRICE (phase 4) — the cart's one call point, right after the
+    // line is priced, so the coupon facts, the benefits, the unit and every total below read the after price.
+    const { resolved, applied: printerDiscount } = applyPrinterDiscount(priced.resolved, printerLineDiscount(ctx.printerServices ?? null, row));
     // PER SKU (DECISIONS row 240): a line whose own SKU has no live V2 price — a colour added after publication,
     // a line saved while its SKU was priced — is never priced from the ladder, which is another SKU's figure.
     // It is listed apart with no number and kept out of every total; the checkout refuses it as well
@@ -1281,7 +1292,7 @@ async function loadCart(c: Context<AppContext>) {
     // An offer window priced it, or a membership rule set this price below regular.
     // The saving a rule applies at the line joins it below, once the rules have answered.
     couponLineFacts.set(String(row.cart_item_id), {
-      already_discounted: (!!offerId && !!offerView?.window) || resolved.applied_iqd < resolved.regular_iqd,
+      already_discounted: (!!offerId && !!offerView?.window) || resolved.applied_iqd < resolved.regular_iqd || !!printerDiscount,
       member_line_discount_iqd: 0,
     });
     benefitLineIds.push(String(row.cart_item_id));
@@ -1290,7 +1301,8 @@ async function loadCart(c: Context<AppContext>) {
       category_id: doc.category_id ?? null,
       sub_category_id: doc.sub_category_id ?? null,
       ancestry: ancestryFor(ctx.catalogAncestry, doc.category_id ?? null, doc.sub_category_id ?? null),
-      regular_unit_iqd: resolved.regular_iqd,
+      // A printer-discounted line is read like an offer-priced one (D10): the rule sees the price before.
+      regular_unit_iqd: benefitRegularUnit(resolved, printerDiscount),
       applied_unit_iqd: resolved.applied_iqd,
       // Which rule the resolver actually credited — a typed member price or a
       // live offer beats one, and a rule that did not set this price must not
@@ -1306,7 +1318,7 @@ async function loadCart(c: Context<AppContext>) {
     // applies — so the cart explains the cash rule only where it bites.
     const codReprices = sel.transportMethod
       ? resolveCartLine(row, sel, tier, tierActive, ctx, view, 'cod', isPrinter, offerInput).resolved.unit_subtotal_iqd !==
-        resolved.unit_subtotal_iqd
+        priced.resolved.unit_subtotal_iqd
       : false;
     // What this exact line can actually be sold as, from the authoritative
     // stock level — not from products.stock when the product tracks elsewhere.
@@ -1362,7 +1374,7 @@ async function loadCart(c: Context<AppContext>) {
       product_image: productImageForSelection(doc, { optionValueIds: [], colorId: null }, view),
       qty: row.qty,
       option_id: row.option_id,
-      color_id: row.color_id,
+      color_id: sel.colorId || row.color_id,
       transport_method: row.transport_method,
       // The order type the row states ('' = a legacy row / a product that sells one way), so the page reads it
       // instead of guessing a pre-order from the route (0235 review). Additive.
@@ -1384,10 +1396,9 @@ async function loadCart(c: Context<AppContext>) {
       // «خصص طابعتك» (0234): an enrolled printer's offer, its chosen package and
       // what that adds — or `needs_choice` when the line has none yet.
       ...cartServicesView(String(row.id), ctx.printerServices ?? null, servicesClasses, sel, resolved),
-      // 0235: a filament-kit line names its printer line and kit (its quantity follows the printer).
-      ...(row.kit_parent_id
-        ? { kit_line: { printer_cart_item_id: String(row.kit_parent_id), kit_id: String(row.kit_id ?? ''), qty_per_printer: Number(row.kit_unit_qty) || 0 } }
-        : {}),
+      // 0235: a filament-kit line names its printer line and kit (its quantity follows the printer); 0242: an
+      // add-on line its add-on; both say who picked the colour and the owner's discount inside the unit price.
+      ...attachedLineView(row, printerDiscount),
       /** Cash on delivery would change this pre-order line's price (it carries
        *  a direct premium this customer pays). False on a direct line and on a
        *  pre-order line with no premium — the cart says nothing there. */
@@ -2775,9 +2786,61 @@ function extrasChoice(v: unknown, field: string): string | null | undefined {
   return str(v, field, { min: 1, max: 60 });
 }
 
+/**
+ * Phase 4: `addonIds` as posted — undefined = leave the add-ons as they are, null or [] = remove them all, an array
+ * (≤ 12, unique) = exactly these add-ons.
+ */
+function addonIdsChoice(v: unknown): string[] | null | undefined {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  if (!Array.isArray(v) || v.length > MAX_ADDONS_PER_PRINTER) throw badRequest(`addonIds: a list of at most ${MAX_ADDONS_PER_PRINTER} add-on ids`, 'VALIDATION');
+  const ids = v.map((x, n) => str(x, `addonIds[${n}]`, { min: 1, max: 60 }));
+  if (new Set(ids).size !== ids.length) throw badRequest('addonIds: an add-on is listed twice', 'VALIDATION');
+  return ids;
+}
+
+/** Phase 4: `kitColors` / `addonColors` as posted — { productId | addonId: colourId | 'random' } (≤ 40 entries). */
+function colourWishes(v: unknown, field: string): ColourWishes | undefined {
+  if (v === undefined || v === null) return undefined;
+  if (typeof v !== 'object' || Array.isArray(v)) throw badRequest(`${field}: { id: colour id | "random" }`, 'VALIDATION');
+  const entries = Object.entries(v as Record<string, unknown>);
+  if (entries.length > 40) throw badRequest(`${field}: at most 40 entries`, 'VALIDATION');
+  const out: ColourWishes = {};
+  for (const [k, raw] of entries) {
+    if (!k || k.length > 60) throw badRequest(`${field}: a key is not an id`, 'VALIDATION');
+    out[k] = str(raw, `${field}.${k}`, { min: 1, max: 60 });
+  }
+  return out;
+}
+
+const MAX_ADDONS_PER_PRINTER = 12;
+
+/** What a body may say about one printer line's extras (POST /items, PUT extras). */
+interface ExtrasChoice {
+  membershipPlanId?: string | null;
+  kitId?: string | null;
+  kitColors?: ColourWishes;
+  addonIds?: string[] | null;
+  addonColors?: ColourWishes;
+}
+
+function extrasChoiceOf(body: Record<string, unknown>): ExtrasChoice {
+  return {
+    membershipPlanId: extrasChoice(body.membershipPlanId, 'membershipPlanId'),
+    kitId: extrasChoice(body.kitId, 'kitId'),
+    kitColors: colourWishes(body.kitColors, 'kitColors'),
+    addonIds: addonIdsChoice(body.addonIds),
+    addonColors: colourWishes(body.addonColors, 'addonColors'),
+  };
+}
+
 interface PlannedExtras {
   membership?: { planId: string } | null;
   kit?: { kit: FilamentKit; resolved: ResolvedKit } | null;
+  /** Phase 4: undefined = leave; [] = none; else exactly these add-ons, resolved (plus `keepAddonIds`). */
+  addons?: ResolvedAddon[];
+  /** Phase 4: add-ons already on the printer and left untouched (their lines are neither deleted nor re-written). */
+  keepAddonIds?: string[];
 }
 
 /** The most units of one kit item a line may hold (the cart's storage ceiling). */
@@ -2820,13 +2883,23 @@ async function assertKitFollowsQty(c: Context<AppContext>, printerCartItemId: st
 async function planPrinterExtras(
   c: Context<AppContext>,
   printer: { productId: string; optionValueIds: string[]; fulfillmentType: string; transportMethod: string; qty: number; services: string; cartItemId: string | null },
-  choice: { membershipPlanId?: string | null; kitId?: string | null },
+  choice: ExtrasChoice,
   /** The add empties the cart first (`replaceCart`): no other line holds the membership after it (review S16). */
   opts: { cartEmptied?: boolean } = {}
 ): Promise<PlannedExtras> {
   const out: PlannedExtras = {};
-  if (choice.membershipPlanId === undefined && choice.kitId === undefined) return out;
-  const choosing = (choice.membershipPlanId ?? null) !== null || (choice.kitId ?? null) !== null;
+  // Phase 4: colours alone re-choose the printer's CURRENT kit (a sold-out chosen colour → «random», E4); the items
+  // not named keep the colour (and who chose it) stored on their line.
+  let kitColors: ColourWishes = choice.kitColors ?? {};
+  let kitId = choice.kitId;
+  if (kitId === undefined && choice.kitColors && printer.cartItemId) {
+    const stored = await storedKitColours(c, printer.cartItemId);
+    if (!stored.kitId) throw badRequest('kitColors: this printer carries no filament kit', 'VALIDATION');
+    kitId = stored.kitId;
+    kitColors = { ...stored.colours, ...choice.kitColors };
+  }
+  if (choice.membershipPlanId === undefined && kitId === undefined && choice.addonIds === undefined) return out;
+  const choosing = (choice.membershipPlanId ?? null) !== null || (kitId ?? null) !== null || (choice.addonIds?.length ?? 0) > 0;
   const config = choosing ? await publishedPrinterServices(c.env.DB) : null;
   if (choosing) {
     const product = await c.env.DB.prepare('SELECT id, condition_doc FROM products WHERE id = ?').bind(printer.productId).first<{ id: string; condition_doc: string | null }>()
@@ -2855,19 +2928,95 @@ async function planPrinterExtras(
       out.membership = { planId: plan.id };
     }
   }
-  if (choice.kitId !== undefined) {
-    if (choice.kitId === null) out.kit = null;
+  const pricing = (kitId ?? null) !== null || (choice.addonIds?.length ?? 0) > 0 ? kitPricing(c) : null;
+  if (kitId !== undefined) {
+    if (kitId === null) out.kit = null;
     else {
-      const kit = offeredKit(config, printer, choice.kitId);
-      if (!kit) throw kitNotOffered(choice.kitId);
+      const kit = offeredKit(config, printer, kitId);
+      if (!kit) throw kitNotOffered(kitId);
       const perUnit = Math.max(0, ...kit.items.map((i) => i.qty));
       if (perUnit * Math.max(1, printer.qty) > KIT_LINE_QTY_CEILING) throw kitQtyRefusal(kit.id, perUnit);
-      const resolved = await resolveKit(c, kit, printer);
+      const resolved = await resolveKit(c, kit, printer, pricing!, kitColors);
       if (!resolved.available) throw kitUnavailable(resolved);
       out.kit = { kit, resolved };
     }
   }
+  // Phase 4: the add-ons, each judged and priced like a kit item, at the printer's quantity, type and route.
+  if (choice.addonIds !== undefined) {
+    out.addons = [];
+    out.keepAddonIds = [];
+    // An add-on already on this printer that the body does not re-colour is LEFT AS IT IS (its lines, its colour and
+    // who chose it): removing or adding another add-on never re-plans it, and one of them selling out since never
+    // blocks the change. When its stored line no longer matches (the owner changed it, or the printer quantity
+    // moves), it is re-planned with the colour wish its line holds ('chosen' → that colour, 'random' → random).
+    const stored = (choice.addonIds?.length ?? 0) > 0 && printer.cartItemId ? await storedAddonLines(c, printer.cartItemId) : new Map<string, StoredAddonLine[]>();
+    for (const addonId of choice.addonIds ?? []) {
+      const addon = offeredAddon(config, printer, addonId);
+      if (!addon) throw addonNotOffered(addonId);
+      if (addon.qty * Math.max(1, printer.qty) > KIT_LINE_QTY_CEILING) {
+        throw addonUnavailable(addon.id, addon.product_id, 'ADDON_QTY_LIMIT', { max_printer_qty: Math.max(1, Math.floor(KIT_LINE_QTY_CEILING / Math.max(1, addon.qty))) });
+      }
+      const held = stored.get(addon.id);
+      const explicit = choice.addonColors?.[addon.id];
+      if (held && explicit === undefined && addonLinesMatch(addon, Math.max(1, printer.qty), held)) {
+        out.keepAddonIds.push(addon.id);
+        continue;
+      }
+      const wish = explicit ?? (held?.length === 1 ? storedColourWish(held[0]) : undefined);
+      const resolved = await resolveAddon(c, addon, printer, pricing!, wish);
+      if (!resolved.available) throw addonUnavailableOf(resolved);
+      out.addons.push(resolved);
+    }
+  }
   return out;
+}
+
+type StoredAddonLine = { product_id: string; option_value_ids: string[]; color_id: string; qty: number; mode: string };
+
+/** The colour wish a stored attached line carries: 'chosen' → its colour, 'random' → random, else none. */
+function storedColourWish(l: { color_id: string; mode: string }): string | undefined {
+  if (l.mode === 'chosen' && l.color_id) return l.color_id;
+  if (l.mode === 'random') return RANDOM_COLOUR;
+  return undefined;
+}
+
+/** The add-on lines a printer line holds now, by add-on id (nothing on a database without 0242). */
+async function storedAddonLines(c: Context<AppContext>, printerCartItemId: string): Promise<Map<string, StoredAddonLine[]>> {
+  let rows: Array<Record<string, unknown>> = [];
+  try {
+    rows = (await c.env.DB.prepare('SELECT product_id, option_value_ids, color_id, qty, addon_id, kit_color_mode FROM cart_items WHERE user_id = ? AND kit_parent_id = ? AND addon_id IS NOT NULL')
+      .bind(c.get('user')!.id, printerCartItemId).all<Record<string, unknown>>()).results ?? [];
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  const out = new Map<string, StoredAddonLine[]>();
+  for (const r of rows) {
+    const ids = safeParse<unknown[]>(String(r.option_value_ids ?? '[]'), []);
+    const line: StoredAddonLine = {
+      product_id: String(r.product_id), option_value_ids: Array.isArray(ids) ? ids.map(String) : [],
+      color_id: String(r.color_id ?? ''), qty: Number(r.qty) || 0, mode: String(r.kit_color_mode ?? ''),
+    };
+    const id = String(r.addon_id);
+    out.set(id, [...(out.get(id) ?? []), line]);
+  }
+  return out;
+}
+
+/** The kit on a printer line and the colour each customer-colour item holds ('random' when the system picked it). */
+async function storedKitColours(c: Context<AppContext>, printerCartItemId: string): Promise<{ kitId: string | null; colours: ColourWishes }> {
+  let rows: Array<Record<string, unknown>> = [];
+  try {
+    rows = (await c.env.DB.prepare('SELECT product_id, color_id, kit_id, kit_color_mode FROM cart_items WHERE user_id = ? AND kit_parent_id = ? AND kit_id IS NOT NULL')
+      .bind(c.get('user')!.id, printerCartItemId).all<Record<string, unknown>>()).results ?? [];
+  } catch (e) {
+    if (!isSchemaMissing(e)) throw e;
+  }
+  const colours: ColourWishes = {};
+  for (const r of rows) {
+    if (r.kit_color_mode === 'chosen' && r.color_id) colours[String(r.product_id)] = String(r.color_id);
+    else if (r.kit_color_mode === 'random') colours[String(r.product_id)] = RANDOM_COLOUR;
+  }
+  return { kitId: rows.length ? String(rows[0].kit_id ?? '') || null : null, colours };
 }
 
 /**
@@ -2896,19 +3045,48 @@ function printerExtrasStatements(db: D1Database, userId: string, printer: Printe
     out.push(...changedExactlyOne(db));
   }
   if (planned.kit !== undefined) {
-    out.push(db.prepare(`DELETE FROM cart_items WHERE user_id = ? AND kit_parent_id = (${printer.sql})`).bind(userId, ...printer.binds));
+    // Only the kit's own lines: the printer's add-on lines are another choice (phase 4).
+    out.push(db.prepare(`DELETE FROM cart_items WHERE user_id = ? AND kit_parent_id = (${printer.sql}) AND kit_id IS NOT NULL`).bind(userId, ...printer.binds));
     for (const it of planned.kit?.resolved.items ?? []) {
       const judged = it.judged!;
       // The kit line's quantity is the printer line's AS WRITTEN × the per-unit count (the 0235 trigger
-      // keeps it so); its type and route are the printer's resolved ones (review S11).
+      // keeps it so); its type and route are the printer's resolved ones (review S11). A customer-colour item
+      // records who picked its colour (0242); a fixed one writes nothing new, as before phase 4.
+      const mode = it.color_mode === 'customer' ? it.chosen : null;
       out.push(db.prepare(
         `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id, shipping_method_id,
-                                 transport_method, fulfillment_type, warranty_plan_id, qty, kit_parent_id, kit_id, kit_unit_qty)
-         SELECT ?, ?, ?, ?, ?, ?, 'kit:' || p.id, ?, ?, '', MIN(${KIT_LINE_QTY_CEILING}, p.qty * ?), p.id, ?, ?
+                                 transport_method, fulfillment_type, warranty_plan_id, qty, kit_parent_id, kit_id, kit_unit_qty${mode ? ', kit_color_mode' : ''})
+         SELECT ?, ?, ?, ?, ?, ?, 'kit:' || p.id, ?, ?, '', MIN(${KIT_LINE_QTY_CEILING}, p.qty * ?), p.id, ?, ?${mode ? ', ?' : ''}
            FROM cart_items p WHERE p.id = (${printer.sql}) AND p.user_id = ? AND p.kit_parent_id IS NULL`
       ).bind(
         newId('ci'), userId, it.item.product_id, judged.primaryOption, judged.canonicalJson, it.line.colorId,
         it.shared.transportMethod, it.shared.fulfillmentType, it.item.qty, planned.kit!.kit.id, it.item.qty,
+        ...(mode ? [mode] : []),
+        ...printer.binds, userId
+      ));
+      out.push(...changedExactlyOne(db));
+    }
+  }
+  if (planned.addons !== undefined) {
+    // Only the add-ons that go or are re-planned: a kept add-on's line stays exactly as it is.
+    const keep = planned.keepAddonIds ?? [];
+    out.push(db.prepare(
+      `DELETE FROM cart_items WHERE user_id = ? AND kit_parent_id = (${printer.sql}) AND addon_id IS NOT NULL${keep.length ? ` AND addon_id NOT IN (${keep.map(() => '?').join(', ')})` : ''}`
+    ).bind(userId, ...printer.binds, ...keep));
+    for (const a of planned.addons) {
+      const it = a.resolved;
+      const judged = it.judged!;
+      const mode = it.color_mode === 'customer' ? it.chosen : '';
+      // An add-on line is attached like a kit line (0235 triggers: it follows the printer's quantity, type and
+      // removal) and carries its own discriminator, so it never merges with the same product bought otherwise.
+      out.push(db.prepare(
+        `INSERT INTO cart_items (id, user_id, product_id, option_id, option_value_ids, color_id, shipping_method_id,
+                                 transport_method, fulfillment_type, warranty_plan_id, qty, kit_parent_id, addon_id, kit_unit_qty, kit_color_mode)
+         SELECT ?, ?, ?, ?, ?, ?, 'addon:' || p.id || ':' || ?, ?, ?, '', MIN(${KIT_LINE_QTY_CEILING}, p.qty * ?), p.id, ?, ?, ?
+           FROM cart_items p WHERE p.id = (${printer.sql}) AND p.user_id = ? AND p.kit_parent_id IS NULL`
+      ).bind(
+        newId('ci'), userId, it.item.product_id, judged.primaryOption, judged.canonicalJson, it.line.colorId, a.addon.id,
+        it.shared.transportMethod, it.shared.fulfillmentType, a.addon.qty, a.addon.id, a.addon.qty, mode,
         ...printer.binds, userId
       ));
       out.push(...changedExactlyOne(db));
@@ -2952,6 +3130,62 @@ async function printerResolvedShipping(
   return { fulfillmentType: printer.fulfillmentType || (printer.transportMethod ? 'pre_order' : 'direct_sale'), transportMethod: printer.transportMethod };
 }
 
+/**
+ * PHASE 4 — A «RANDOM» COLOUR THAT CAN NO LONGER SERVE ITS LINE (owner ruling 2026-11-18, default 1). The system
+ * picked the colour when the line was added; when that colour can no longer cover the line's quantity on its
+ * counter, the same rule picks again (`repickRandomColour`: cheapest, most free stock, colour order, id). The row
+ * is returned with the new colour — never written here: GET /api/cart shows it, the checkout orders it. A colour
+ * the customer CHOSE is never touched (its line is refused like any short line), and so is every other row.
+ */
+export function randomColourRow(
+  row: Record<string, unknown>,
+  view: ProductRelationsView | undefined,
+  ctx: PricingContext,
+  price: (r: Record<string, unknown>) => { doc: ProductDoc; resolved: ResolvedPrice; selectionErrors: string[] }
+): Record<string, unknown> {
+  if (!row.kit_parent_id || row.kit_color_mode !== 'random') return row;
+  const sel = selectionFromCartRow(row);
+  const qty = Math.max(1, Number(row.qty) || 1);
+  const { doc } = price(row);
+  const serves = (colorId: string) => {
+    const a = statedAvailability(
+      saleAvailability(doc, {
+        optionValueIds: sel.optionValueIds ?? [],
+        colorId,
+        qty,
+        transportDefaults: ctx.transportDefaults,
+        inventory: view
+          ? snapshotFrom(view, { stock: doc.stock, reserved: Number(row.stock_reserved ?? 0), low_stock_threshold: (row.low_stock_threshold as number | null) ?? null })
+          : undefined,
+        links: view?.links,
+        preferredType: sel.fulfillmentType || (sel.transportMethod ? 'pre_order' : null),
+        capacity: view ? capacityFrom(view, sel.optionValueIds ?? []) : null,
+        transportMethod: sel.transportMethod,
+      }),
+      sel.fulfillmentType,
+      sel.transportMethod
+    );
+    const left = a.mode === 'preorder' ? a.preorder.capacity.available : a.stock.available;
+    return { ok: a.mode !== 'unavailable' && a.qty_ok, free: typeof left === 'number' ? left : Number.POSITIVE_INFINITY };
+  };
+  const priceOf = (colorId: string) => {
+    const p = price({ ...row, color_id: colorId });
+    return p.resolved.errors.length || p.selectionErrors.length ? null : p.resolved.unit_subtotal_iqd;
+  };
+  const pick = repickRandomColour({ colours: doc.colors, optionValueIds: sel.optionValueIds ?? [], storedColorId: sel.colorId, serves, priceOf });
+  return pick === sel.colorId ? row : { ...row, color_id: pick };
+}
+
+/** The cart / quote view of an attached line: `kit_line` or `addon_line` (0235, 0242), with who picked its colour
+ *  and the owner's discount inside its unit price. {} for every other line. */
+export function attachedLineView(row: Record<string, unknown>, applied: AppliedPrinterDiscount | null) {
+  const a = attachedLineOf(row);
+  if (!a) return {};
+  return a.kind === 'addon'
+    ? { addon_line: { printer_cart_item_id: a.parentId, addon_id: a.id, qty_per_printer: a.unitQty, color_mode: a.colorMode, ...printerDiscountView(applied) } }
+    : { kit_line: { printer_cart_item_id: a.parentId, kit_id: a.id, qty_per_printer: a.unitQty, color_mode: a.colorMode, ...printerDiscountView(applied) } };
+}
+
 /** The printer line's extras as GET /api/cart shows them (0235); {} on a database without them. */
 async function cartPrinterExtras(c: Context<AppContext>, items: Array<Record<string, unknown>>, config: PrinterServicesConfig | null) {
   const user = c.get('user')!;
@@ -2975,27 +3209,63 @@ async function cartPrinterExtras(c: Context<AppContext>, items: Array<Record<str
     }
     membership = { plan_id: choice.plan_id, printer_cart_item_id: choice.printer_cart_item_id, quote };
   }
-  // Each printer line's kit: which kit, its lines, and whether they still match the owner's kit.
+  // Each printer line's kit (its kit lines only) and its add-ons: which, their lines, and whether they still
+  // match the owner's list. Totals are AFTER the owner's discount (it is inside the unit prices); before = the
+  // same lines at their price before it.
   const byParent = new Map<string, Array<Record<string, unknown>>>();
+  const addonsByParent = new Map<string, Array<Record<string, unknown>>>();
   for (const it of items) {
     const parent = (it.kit_line as { printer_cart_item_id?: string } | undefined)?.printer_cart_item_id;
     if (parent) byParent.set(parent, [...(byParent.get(parent) ?? []), it]);
+    const addonParent = (it.addon_line as { printer_cart_item_id?: string } | undefined)?.printer_cart_item_id;
+    if (addonParent) addonsByParent.set(addonParent, [...(addonsByParent.get(addonParent) ?? []), it]);
   }
+  const money = (lines: Array<Record<string, unknown>>, key: 'kit_line' | 'addon_line') => {
+    const total = lines.reduce((s, l) => s + (Number(l.unit_price_iqd) || 0) * (Number(l.qty) || 0), 0);
+    const off = lines.reduce((s, l) => s + (Number((l[key] as { printer_discount?: { discount_unit_iqd?: number } }).printer_discount?.discount_unit_iqd) || 0) * (Number(l.qty) || 0), 0);
+    return { total_iqd: total, before_iqd: total + off, discount_iqd: off };
+  };
+  const asAttached = (l: Record<string, unknown>) => ({
+    product_id: String(l.productId), option_value_ids: (l.option_value_ids as string[]) ?? [], color_id: String(l.color_id ?? ''), qty: Number(l.qty) || 0,
+  });
   for (const it of items) {
     const lines = byParent.get(String(it.id));
-    if (!lines?.length) continue;
-    const kitId = String((lines[0].kit_line as { kit_id?: string }).kit_id ?? '');
-    const kit = config ? kitsForPrinter(config, String(it.productId), (it.option_value_ids as string[]) ?? []).find((k) => k.id === kitId) ?? null : null;
-    it.kit = {
-      kit_id: kitId,
-      title: kit?.title ?? null,
-      line_ids: lines.map((l) => l.id),
-      total_iqd: lines.reduce((s, l) => s + (Number(l.unit_price_iqd) || 0) * (Number(l.qty) || 0), 0),
-      // false = the owner changed or withdrew this kit: the checkout refuses (KIT_CHANGED) until it is chosen again.
-      current: !!kit && kitLinesMatch(kit, Number(it.qty) || 1, lines.map((l) => ({
-        product_id: String(l.productId), option_value_ids: (l.option_value_ids as string[]) ?? [], color_id: String(l.color_id ?? ''), qty: Number(l.qty) || 0,
-      }))),
-    };
+    if (lines?.length) {
+      const kitId = String((lines[0].kit_line as { kit_id?: string }).kit_id ?? '');
+      const kit = config ? kitsForPrinter(config, String(it.productId), (it.option_value_ids as string[]) ?? []).find((k) => k.id === kitId) ?? null : null;
+      it.kit = {
+        kit_id: kitId,
+        title: kit?.title ?? null,
+        line_ids: lines.map((l) => l.id),
+        ...money(lines, 'kit_line'),
+        // false = the owner changed or withdrew this kit: the checkout refuses (KIT_CHANGED) until it is chosen again.
+        current: !!kit && kitLinesMatch(kit, Number(it.qty) || 1, lines.map(asAttached)),
+      };
+    }
+    const addonLines = addonsByParent.get(String(it.id));
+    if (addonLines?.length) {
+      const byAddon = new Map<string, Array<Record<string, unknown>>>();
+      for (const l of addonLines) {
+        const id = String((l.addon_line as { addon_id?: string }).addon_id ?? '');
+        byAddon.set(id, [...(byAddon.get(id) ?? []), l]);
+      }
+      // In the owner's add-on order (sort, then id), whatever order the lines were read in.
+      const rank = (id: string) => {
+        const a = config ? addonsOf(config).find((x) => x.id === id) : undefined;
+        return a ? a.sort : Number.MAX_SAFE_INTEGER;
+      };
+      it.addons = [...byAddon].sort(([x], [y]) => rank(x) - rank(y) || (x < y ? -1 : x > y ? 1 : 0)).map(([addonId, ls]) => {
+        const addon = config ? offeredAddon(config, { productId: String(it.productId), optionValueIds: (it.option_value_ids as string[]) ?? [] }, addonId) : null;
+        return {
+          addon_id: addonId,
+          title: addon?.title ?? (config ? addonsOf(config).find((a) => a.id === addonId)?.title ?? null : null),
+          line_ids: ls.map((l) => l.id),
+          ...money(ls, 'addon_line'),
+          // false = the owner changed or withdrew this add-on: the checkout refuses (ADDON_CHANGED).
+          current: !!addon && addonLinesMatch(addon, Number(it.qty) || 1, ls.map(asAttached)),
+        };
+      });
+    }
   }
   return { membership };
 }
@@ -3096,10 +3366,10 @@ cartRoutes.post('/items', async (c) => {
   }
   // THE PRINTER'S MEMBERSHIP AND KIT (0235), judged before anything is written,
   // at the quantity the line will hold after this add.
-  const extrasWanted = { membershipPlanId: extrasChoice(body.membershipPlanId, 'membershipPlanId'), kitId: extrasChoice(body.kitId, 'kitId') };
+  const extrasWanted = extrasChoiceOf(body);
   const lineQtyAfter = Math.min(judged.ceiling, (existingLine ? Number(existingLine.qty) || 0 : 0) + qty);
-  // A kit already on this line must be able to follow the new quantity (review S14).
-  if (existingLine && extrasWanted.kitId === undefined) await assertKitFollowsQty(c, String(existingLine.id), lineQtyAfter);
+  // A kit (or add-on) already on this line must be able to follow the new quantity (review S14).
+  if (existingLine && extrasWanted.kitId === undefined && extrasWanted.addonIds === undefined) await assertKitFollowsQty(c, String(existingLine.id), lineQtyAfter);
   const plannedExtras = await planPrinterExtras(c, {
     productId, optionValueIds: canonical,
     // The kit is judged against the type this printer row RESOLVES to (review S11).
@@ -3704,7 +3974,8 @@ cartRoutes.patch('/items/:id', async (c) => {
   if (giftEntitlementIdOf(existing)) {
     throw conflict('A gift line is fixed: its quantity and options cannot change. You can only remove it.', 'GIFT_LINE_LOCKED');
   }
-  // A FILAMENT-KIT LINE FOLLOWS ITS PRINTER (0235): its quantity is the printer's × the kit's count.
+  // A FILAMENT-KIT LINE FOLLOWS ITS PRINTER (0235): its quantity is the printer's × the kit's count. So does
+  // an add-on line (phase 4): remove it, or change it on the printer.
   if (existing.kit_parent_id) {
     throw conflict('A filament-kit line follows its printer — change the printer or its kit.', KIT_LINE_LOCKED);
   }
@@ -3930,9 +4201,12 @@ cartRoutes.patch('/items/:id', async (c) => {
  */
 /**
  * THE PRINTER'S MEMBERSHIP AND KIT, CHANGED FROM THE CART (0235):
- *   PUT /api/cart/items/:id/extras   { membershipPlanId?: string | null, kitId?: string | null }
+ *   PUT /api/cart/items/:id/extras   { membershipPlanId?: string | null, kitId?: string | null,
+ *                                     kitColors?: { productId: colourId | 'random' },
+ *                                     addonIds?: string[] | null, addonColors?: { addonId: colourId | 'random' } }
  * An omitted field is left as it is; null removes it. Only an enrolled
- * printer line that holds a package may carry either.
+ * printer line that holds a package may carry any. `kitColors` without
+ * `kitId` re-chooses the printer's current kit with those colours (phase 4).
  */
 cartRoutes.put('/items/:id/extras', async (c) => {
   // Each call re-prices a kit item by item through the cart's own door (review S10).
@@ -3943,12 +4217,12 @@ cartRoutes.put('/items/:id/extras', async (c) => {
   if (!row) throw notFound('Cart item not found');
   if (row.kit_parent_id) throw conflict('A filament-kit line follows its printer — change the kit on the printer.', KIT_LINE_LOCKED);
   const sel = selectionFromCartRow(row);
-  const choice = { membershipPlanId: extrasChoice(body.membershipPlanId, 'membershipPlanId'), kitId: extrasChoice(body.kitId, 'kitId') };
+  const choice = extrasChoiceOf(body);
   const optionValueIds = canonicalOptionValueIds(sel.optionValueIds ?? []);
   const services = String(row.services ?? '');
   const qty = Number(row.qty) || 1;
   // The kit is judged against the type this printer row RESOLVES to (review S11).
-  const shipping = choice.kitId
+  const shipping = choice.kitId || choice.kitColors || choice.addonIds?.length
     ? await printerResolvedShipping(c, { productId: String(row.product_id), optionValueIds, colorId: sel.colorId, fulfillmentType: sel.fulfillmentType, transportMethod: sel.transportMethod, qty, services })
     : { fulfillmentType: sel.fulfillmentType, transportMethod: sel.transportMethod };
   const planned = await planPrinterExtras(c, {
@@ -3968,8 +4242,9 @@ cartRoutes.delete('/', async (c) => {
 cartRoutes.delete('/items/:id', async (c) => {
   const user = c.get('user')!;
   // A filament-kit line follows its printer (0235): the kit is removed from the printer, never one item of it.
+  // An add-on line (phase 4) is the customer's own tick: it may be removed alone.
   const line = await c.env.DB.prepare('SELECT * FROM cart_items WHERE id = ? AND user_id = ?').bind(c.req.param('id'), user.id).first<Record<string, unknown>>();
-  if (line?.kit_parent_id) throw conflict('A filament-kit line follows its printer — remove the kit from the printer.', KIT_LINE_LOCKED);
+  if (line?.kit_parent_id && !line.addon_id) throw conflict('A filament-kit line follows its printer — remove the kit from the printer.', KIT_LINE_LOCKED);
   await c.env.DB.prepare('DELETE FROM cart_items WHERE id = ? AND user_id = ?')
     .bind(c.req.param('id'), user.id)
     .run();

@@ -36,6 +36,15 @@ import OrderMembershipSection, { type OrderMembershipPurchase } from './OrderMem
 /** 0235: a filament-kit line names the printer line it is packed with; the membership line is its own kind. */
 type PhaseTwoLine = { id: string; kit?: { printer_item_id: string; kit_id: string | null } | null; kind?: string; line_kind?: string };
 const kitParentOf = (it: unknown): string | null => (it as PhaseTwoLine).kit?.printer_item_id ?? null;
+/**
+ * 0242 (phase 4; DECISIONS row 355): how a kit or add-on line's colour was decided, the add-on's
+ * printer, and the owner's printer discount already inside its unit price (report-only figures).
+ */
+type PhaseFourLine = {
+  kit?: { color_mode?: 'chosen' | 'random' | null } | null;
+  addon?: { printer_item_id: string; addon_id: string; color_mode?: 'chosen' | 'random' | null } | null;
+  printer_discount?: { before_unit_iqd: number; discount_unit_iqd: number; total_iqd?: number } | null;
+};
 const isMembershipLine = (it: unknown): boolean => (it as PhaseTwoLine).kind === 'membership' || (it as PhaseTwoLine).line_kind === 'membership';
 
 // The §16 serial / warranty page, opened from a linked slot's serial.
@@ -156,6 +165,30 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
     setSerialPageMounted(true);
     setSerialPage(serial);
   }, []);
+  /**
+   * 0242: the line's phase-4 badges — an add-on packed with its printer, how its colour was
+   * decided (the customer's own, or picked by the system from stock), and the price before the
+   * owner's printer discount (already inside the unit price; never subtracted again).
+   */
+  const offerBadges = (it: unknown) => {
+    const x = it as PhaseFourLine;
+    const mode = x.kit?.color_mode ?? x.addon?.color_mode ?? null;
+    const d = x.printer_discount && x.printer_discount.discount_unit_iqd > 0 ? x.printer_discount : null;
+    if (!x.addon && !mode && !d) return null;
+    const chip = 'lv-chip [--chip:var(--color-info)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold';
+    return (
+      <span className="mt-1 flex flex-wrap gap-1.5" data-order-item-offer>
+        {x.addon ? <span className={chip}>{loc('إضافة مع الطابعة — تُغلَّف معها', 'Add-on — packed with the printer', 'زیادکراو — لەگەڵ پرینتەرەکە دەپێچرێتەوە')}</span> : null}
+        {mode === 'chosen' ? <span className={chip} data-order-item-colour-mode="chosen">{loc('لون اختاره الزبون', 'Colour chosen by the customer', 'ڕەنگێک کە کڕیار هەڵیبژاردووە')}</span> : null}
+        {mode === 'random' ? <span className={chip} data-order-item-colour-mode="random">{loc('لون عشوائي — اختاره النظام من المخزون', 'Random colour — picked by the system from stock', 'ڕەنگی هەڕەمەکی — سیستەمەکە لە کۆگا هەڵیبژاردووە')}</span> : null}
+        {d ? (
+          <span className={`${chip} tabular-nums`} data-order-item-price-before>
+            {loc('السعر قبل الخصم', 'Price before discount', 'نرخ پێش داشکاندن')}: {formatIqd(d.before_unit_iqd)}
+          </span>
+        ) : null}
+      </span>
+    );
+  };
   /** The line's serial progress, for the chip on its card (before delivery only). */
   const serialChip = (itemId: string) => {
     if (!serials?.installed || detail?.status === 'delivered') return null;
@@ -675,6 +708,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           {' · '}
                           <span className="text-text-secondary">{formatIqd(it.line_total_iqd)}</span>
                         </p>
+                        {offerBadges(it)}
                         {/* Sold at an estimated price (0218): where its final price stands. */}
                         {it.price_estimate && (
                           <span className="mt-2 flex" data-order-item-estimate={it.id}>
@@ -750,6 +784,7 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                                 <span className="min-w-0 flex-1 break-words">
                                   {k.name}
                                   {k.variant && <PackingSelection value={k.variant} />}
+                                  {offerBadges(k)}
                                   {serialChip(k.id)}
                                 </span>
                                 <span className="shrink-0 tabular-nums">{formatIqd(k.line_total_iqd)}</span>

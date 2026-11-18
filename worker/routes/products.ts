@@ -154,8 +154,9 @@ import { conditionSaving, parseConditionDoc } from '../lib/condition';
 import { salesBadgeFor } from '../lib/salesBadge';
 import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
 import { enrolledClasses, productEnrolled, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
-import { kitPricing, kitPublic, resolveKit } from '../lib/printerKits';
-import { kitsForPrinter, parseSelection, servicesOfferFor, SERVICES_WITH_LEGACY_WARRANTY } from '@levonis/pricing/printerServices';
+import { addonPublic, kitPricing, kitPublic, resolveAddon, resolveKit, type ColourWishes } from '../lib/printerKits';
+import { storeBundlesFor } from '../lib/printerOffers';
+import { addonsForPrinter, kitsForPrinter, parseSelection, servicesOfferFor, SERVICES_WITH_LEGACY_WARRANTY } from '@levonis/pricing/printerServices';
 import {
   canonicalOptionValueIds as canonicalSelectionOptionValueIds,
   optionValueIdsInRelationOrder,
@@ -5811,11 +5812,17 @@ async function catalogOnlyQuoteRefusal(db: D1Database, row: Record<string, unkno
  * owner's kits for this printer selection, each item judged and priced by the
  * cart's own door for THIS viewer (a guest: the guest price) at the printer's
  * quantity, shipping type and route — the kit's price is the sum of the live
- * item prices (no discount), and an unavailable kit says which item and why.
+ * item prices less the owner's printer discount (phase 4: before / after per
+ * item and per printer), and an unavailable kit says which item and why.
+ * Phase 4 (DECISIONS row 355) adds, additively, the printer's add-ons (same
+ * pricing, per printer unit) and the store bundles linked to the printer
+ * (their own price, read through the bundle page's door).
  *
  *   GET /api/products/:slug/kits?optionValueIds=a,b&fulfillmentType=direct_sale&transportMethod=&qty=1
+ *       &colors=<productId|addonId>:<colorId|random>,…   (customer-colour items; absent = random)
  *
- * Nothing is written; never cached (the prices are the viewer's).
+ * Answer: { kits, addons, store_bundles } — always three arrays. Nothing is
+ * written; never cached (the prices are the viewer's).
  */
 productRoutes.get('/:slug/kits', async (c) => {
   await rateLimit(c, 'product_kits', 60, 60);
@@ -5828,14 +5835,23 @@ productRoutes.get('/:slug/kits', async (c) => {
   const config = await publishedPrinterServices(c.env.DB);
   const classes = enrolledClasses(config, { id: String(row.id), condition: parseConditionDoc(String(row.condition_doc ?? '')) }, ids);
   c.header('Cache-Control', 'private, no-store');
-  if (!config || !classes) return c.json({ success: true, kits: [] });
+  if (!config || !classes) return c.json({ success: true, kits: [], addons: [], store_bundles: [] });
+  const colours: ColourWishes = {};
+  for (const pair of (c.req.query('colors') ?? '').split(',').slice(0, 40)) {
+    const [k, v] = pair.split(':').map((x) => x.trim());
+    if (k && v && k.length <= 60 && v.length <= 60) colours[k] = v;
+  }
   const printer = { productId: String(row.id), optionValueIds: ids, fulfillmentType, transportMethod, qty };
-  // One pricing context for every item of every kit (review S15).
+  // One pricing context for every item of every kit and add-on (review S15).
   const offered = kitsForPrinter(config, printer.productId, ids);
-  const pricing = offered.length ? kitPricing(c) : null;
+  const offeredAddons = addonsForPrinter(config, printer.productId, ids);
+  const pricing = offered.length || offeredAddons.length ? kitPricing(c) : null;
   const kits = [];
-  for (const kit of offered) kits.push(kitPublic(await resolveKit(c, kit, printer, pricing!)));
-  return c.json({ success: true, kits });
+  for (const kit of offered) kits.push(kitPublic(await resolveKit(c, kit, printer, pricing!, colours)));
+  const addons = [];
+  for (const addon of offeredAddons) addons.push(addonPublic(await resolveAddon(c, addon, printer, pricing!, colours[addon.id])));
+  const store_bundles = await storeBundlesFor(c, config, printer.productId);
+  return c.json({ success: true, kits, addons, store_bundles });
 });
 
 productRoutes.post('/:slug/quote', async (c) => {

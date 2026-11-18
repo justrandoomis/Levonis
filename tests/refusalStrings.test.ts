@@ -287,6 +287,8 @@ test('every code the table translates is one the server can actually emit', () =
     'packages/pricing/src/printerServices.ts',
     'worker/lib/printerKits.ts',
     'worker/lib/orderMembershipSale.ts',
+    // Phase 4 (DECISIONS row 355): the kit-colour and add-on refusals of the buying path.
+    'worker/lib/printerOffers.ts',
   ]
     .map((p) => readFileSync(join(ROOT, p), 'utf8'))
     .join('\n');
