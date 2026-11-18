@@ -231,13 +231,19 @@ export default function Home() {
           </Suspense>
         </DeferredHomeSection>
       ) : null,
+    // «متوفر الآن» mounts right after the first paint, NOT when scrolled to
+    // (owner, 2026-11-18: «delayed very slow»): mounting is what sends its
+    // per-catalog lists (src/lib/inStockShelf.ts), so they are back by the
+    // time the visitor reaches it. Its card photos still load lazily.
     in_stock: () =>
-      !initialLoading && loadError == null ? (
-        <DeferredHomeSection ready={secondaryReady} fallback={<div aria-hidden="true" className="h-[330px]" />}>
+      !initialLoading && loadError == null && categories.length > 0 ? (
+        secondaryReady ? (
           <Suspense fallback={<div aria-hidden="true" className="h-[330px]" />}>
             <InStockNow tree={categories} />
           </Suspense>
-        </DeferredHomeSection>
+        ) : (
+          <div aria-hidden="true" className="h-[330px]" />
+        )
       ) : null,
     services: () =>
       !initialLoading ? (

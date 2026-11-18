@@ -1,9 +1,8 @@
 import React from 'react';
 import { Check } from 'lucide-react';
 import { useLanguage } from '../../../LanguageContext';
-import { api, type ApiProduct, type HomeTaxon } from '../../../lib/api';
-import { inSections } from '../../../lib/homeLayout';
-import { IN_STOCK_PATH, inStockCatalogPath, inStockCatalogs, inStockOnly, inStockSeeAll } from '../../../lib/inStockShelf';
+import type { HomeTaxon } from '../../../lib/api';
+import { inStockResults, inStockSeeAll, interleave, startInStock, subscribeInStock } from '../../../lib/inStockShelf';
 import { useRail } from '../../../lib/useRail';
 import ProductCard from '../ProductCard';
 import { ProductCardSkeleton } from '../../ui/Skeleton';
@@ -14,17 +13,17 @@ import SectionHead from './SectionHead';
  * one chip per catalog that holds them (src/lib/inStockShelf.ts). Drawn just
  * below the two editorial banners (owner, 2026-11-18).
  *
- * ONE REQUEST to open (`avail=1`, the server's in-stock filter); a catalog
- * chip then asks for that catalog's own in-stock list once, cached for the
- * visit — the rail first shows what the opening list already holds for it.
- * Nothing in stock, or the request failed: the section is not drawn at all,
- * so the home never shows an empty «متوفر الآن».
+ * The lists are asked for catalog by catalog, in parallel, when this section
+ * mounts — right after the home page's first paint, not when scrolled to —
+ * and it fills in as each answer lands. Its title and placeholder cards show at once; only
+ * when EVERY catalog has answered with nothing is the section not drawn.
  *
  * The rail and the card are «أحدث المنتجات»'s (LatestProducts.tsx): 148 px
- * cards that scroll on a phone, a five/six-column grid from 1024 px.
+ * cards that scroll on a phone, a grid from 1024 px — up to three rows here
+ * (15 cards at five across, 18 at six).
  */
-const LIMIT = 12;
-const ROWS_OF_FIVE = 10;
+const LIMIT = 18;
+const ROWS_OF_FIVE = 15;
 
 export default function InStockNow({ tree }: { tree: HomeTaxon[] }) {
   const { loc } = useLanguage();
@@ -38,53 +37,30 @@ export default function InStockNow({ tree }: { tree: HomeTaxon[] }) {
     },
     [railRef]
   );
-  const [opening, setOpening] = React.useState<ApiProduct[] | null>(null);
   const [active, setActive] = React.useState<string>('all');
-  const [fetched, setFetched] = React.useState<Record<string, ApiProduct[]>>({});
-  const inflight = React.useRef(new Set<string>());
+  const [, rerender] = React.useReducer((n: number) => n + 1, 0);
 
-  React.useEffect(() => {
-    let live = true;
-    api
-      .get<{ products: ApiProduct[] }>(IN_STOCK_PATH)
-      .then((r) => live && setOpening(inStockOnly(r.products ?? [])))
-      .catch(() => live && setOpening([]));
-    return () => {
-      live = false;
-    };
-  }, []);
+  React.useEffect(() => subscribeInStock(rerender), []);
+  React.useEffect(() => startInStock(tree), [tree]);
 
-  const catalogs = React.useMemo(() => inStockCatalogs(tree, opening ?? []), [tree, opening]);
+  const results = inStockResults(tree);
+  const answered = tree.filter((n) => results[n.id] !== undefined).length;
+  const done = tree.length > 0 && answered === tree.length;
+  const catalogs = tree.filter((n) => (results[n.id]?.length ?? 0) > 0);
   const catalog = catalogs.find((c) => c.id === active);
 
-  React.useEffect(() => {
-    if (!catalog || fetched[catalog.id] || inflight.current.has(catalog.id)) return;
-    const id = catalog.id;
-    inflight.current.add(id);
-    api
-      .get<{ products: ApiProduct[] }>(inStockCatalogPath(id))
-      .then((r) => setFetched((prev) => ({ ...prev, [id]: r.products ?? [] })))
-      // The opening list still holds this catalog's products; a failed widen just keeps them.
-      .catch(() => setFetched((prev) => ({ ...prev, [id]: [] })))
-      .finally(() => inflight.current.delete(id));
-  }, [catalog, fetched]);
-
-  const products = React.useMemo(() => {
-    const base = opening ?? [];
-    if (!catalog) return base.slice(0, LIMIT);
-    return inStockOnly([...base.filter((p) => inSections(p, catalog.memberIds)), ...(fetched[catalog.id] ?? [])]).slice(0, LIMIT);
-  }, [opening, catalog, fetched]);
+  const products = (catalog ? results[catalog.id] ?? [] : interleave(catalogs.map((c) => results[c.id] ?? []))).slice(0, LIMIT);
 
   React.useEffect(() => {
     railEl.current?.scrollTo({ left: 0 });
   }, [active]);
 
-  if (opening === null) return <div aria-hidden="true" className="h-[330px]" />;
-  if (opening.length === 0) return null;
+  if (done && catalogs.length === 0) return null;
+  const waiting = products.length === 0;
 
   const chips = [
-    { id: 'all', label: loc('الكل', 'All', 'هەموو') },
-    ...catalogs.map((c) => ({ id: c.id, label: loc(c.node.name_ar, c.node.name_en, c.node.name_ckb) })),
+    { id: 'all', label: loc('الكل', 'All', 'هەموو'), count: 0 },
+    ...catalogs.map((c) => ({ id: c.id, label: loc(c.name_ar, c.name_en, c.name_ckb), count: results[c.id]?.length ?? 0 })),
   ];
 
   return (
@@ -121,6 +97,7 @@ export default function InStockNow({ tree }: { tree: HomeTaxon[] }) {
                 >
                   {on ? <Check aria-hidden="true" className="size-3.5" strokeWidth={2.6} /> : null}
                   {c.label}
+                  {c.count > 0 ? <span className="tabular-nums text-text-tertiary">{c.count}</span> : null}
                 </span>
               </button>
             );
@@ -131,11 +108,12 @@ export default function InStockNow({ tree }: { tree: HomeTaxon[] }) {
       <div
         ref={setRail}
         aria-live="polite"
+        aria-busy={waiting || undefined}
         className="-mx-4 -my-2 flex snap-x gap-2.5 overflow-x-auto overscroll-x-contain px-4 pt-2 pb-3 hide-scrollbar sm:-mx-6 sm:px-6 lg:mx-0 lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible lg:px-0 2xl:grid-cols-6 2xl:gap-5"
       >
-        {products.length === 0
-          ? Array.from({ length: 4 }, (_, i) => (
-              <ProductCardSkeleton key={i} density="compact" className="w-[148px] shrink-0 lg:w-auto" />
+        {waiting
+          ? Array.from({ length: 5 }, (_, i) => (
+              <ProductCardSkeleton key={i} density="compact" className={`w-[148px] shrink-0 lg:w-auto ${i === 4 ? 'hidden lg:block' : ''}`} />
             ))
           : products.map((p, i) => (
               <div key={p.id} className={`flex shrink-0 snap-start ${i >= ROWS_OF_FIVE ? 'lg:hidden 2xl:flex' : ''}`}>
