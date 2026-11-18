@@ -22,7 +22,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { get, json, post, put, stubApp } from './fixtures/app';
+import { ctx, get, json, pending, post, put, stubApp } from './fixtures/app';
 import { countingD1 } from './fixtures/d1RoundTrips';
 import { discountWorld } from './fixtures/productDiscount';
 import { productMediaFixtureEnv } from './fixtures/productMedia';
@@ -36,7 +36,7 @@ import { docWithoutLegacyMoney, withoutLegacyMoney } from '../src/components/adm
 import { statsRecompute } from '../worker/lib/priceRequests';
 
 /** The ceilings (sequential waits, every kind of I/O), measured 2026-10-17 with a little room. */
-const CEILING = { reviewSheet: 36, publish: 46, apply: 23 } as const;
+const CEILING = { reviewSheet: 36, publish: 46, apply: 23, deleteAnswer: 16 } as const;
 const PICTURES = 6;
 const ID = 'p_esun';
 
@@ -148,4 +148,27 @@ test('the prices-only apply waits a bounded number of times', async () => {
   const res = await put(app, `/api/admin/products-v2/${ID}/pricing`, { seq, pricing, preview_hash: bare.details.preview.review_hash, confirm_large_change: true });
   assert.equal(res.status, 200, JSON.stringify(await json(res.clone())).slice(0, 300));
   assert.ok(counter.waves <= CEILING.apply, `the apply waited ${counter.waves} times (ceiling ${CEILING.apply}):\n${named(counter.log)}`);
+});
+
+/**
+ * THE PERMANENT DELETE ANSWERS AFTER A BOUNDED NUMBER OF WAITS (the owner's report of 2026-11-18: «sometimes
+ * delete answers server error»). It waited 441 times in sequence: every registry table asked its schema on its
+ * own, every picture key was probed table by table, and the global media scan ran twice before the answer.
+ * Now the schema is read once, the lookups go together, and the bucket half runs after the answer
+ * (`waitUntil`; its jobs are durable and the quarter-hour drain runs them too).
+ */
+test('the permanent delete of the owner’s filament answers after a bounded number of waits', async () => {
+  const { w, app, counter } = await filamentWorld();
+  counter.reset();
+  const res = await app.request(`/api/admin/products-v2/${ID}?permanent=true`, { method: 'DELETE', headers: { 'CF-Connecting-IP': '1.2.3.4' } }, undefined, ctx);
+  const body = await json(res);
+  assert.equal(res.status, 200, JSON.stringify(body).slice(0, 300));
+  assert.equal(body.product_deleted, true);
+  assert.equal(body.r2_cleanup, 'background');
+  assert.equal(body.r2_cleanup_pending, PICTURES, 'the pictures are queued, not forgotten');
+  const auditWave = counter.log.map((l) => l.split('\t')).find(([, sql]) => /INSERT INTO audit_log/.test(sql ?? ''))?.[0];
+  assert.ok(auditWave && Number(auditWave) <= CEILING.deleteAnswer, `the delete's own work waited ${auditWave} times (ceiling ${CEILING.deleteAnswer}):\n${named(counter.log)}`);
+  assert.equal((w.raw.prepare('SELECT COUNT(*) AS n FROM products WHERE id = ?').get(ID) as { n: number }).n, 0);
+  assert.equal((w.raw.prepare("SELECT COUNT(*) AS n FROM media_cleanup_jobs WHERE source_product_id = ?").get(ID) as { n: number }).n, PICTURES);
+  await Promise.all(pending.splice(0));
 });

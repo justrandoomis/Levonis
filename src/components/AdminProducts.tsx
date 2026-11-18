@@ -37,6 +37,7 @@ import type { ListingItem, ListingResponse, DeleteResponse } from './adminProduc
 import { Modal, ErrorBanner, fmtDate } from './adminProducts/ui';
 import { Spark } from './ui/statCards';
 import { downloadAdminFile, DownloadError } from './adminProducts/download';
+import { PRODUCT_WRITE_TIMEOUT_MS } from './adminProducts/saveOutcome';
 import * as T from './adminProducts/theme';
 import './adminProducts/theme.css';
 import { useAuth } from '../AuthContext';
@@ -472,8 +473,11 @@ export default function AdminProducts() {
     setDeletingId(p.id);
     setNotice(null);
     try {
+      // A product write's own deadline (saveOutcome.ts), not the 20-second default: from Iraq a delete on a
+      // busy day can outlast it, and a deadline that fires reads like a failure for a delete that landed.
       const res = await api.delete<DeleteResponse>(
-        `/api/admin/products-v2/${p.id}${permanent ? '?permanent=true' : ''}`
+        `/api/admin/products-v2/${p.id}${permanent ? '?permanent=true' : ''}`,
+        { timeoutMs: PRODUCT_WRITE_TIMEOUT_MS }
       );
       if (res.deleted === false && res.archived) {
         setNotice(
@@ -488,7 +492,8 @@ export default function AdminProducts() {
       // background refresh still runs, so anything else that moved catches up.
       setItems((list) => list.filter((x) => x.id !== p.id));
       const rows = Object.values(res.rows_deleted_by_table ?? {}).reduce((n, v) => n + Number(v || 0), 0);
-      const files = res.r2_objects_deleted?.length ?? 0;
+      // Files the server removes in the background (r2_cleanup_pending) are this delete's files too.
+      const files = (res.r2_objects_deleted?.length ?? 0) + (res.r2_cleanup === 'background' ? Number(res.r2_cleanup_pending ?? 0) : 0);
       const kept = Object.values(res.rows_unlinked_by_table ?? {}).reduce((n, v) => n + Number(v || 0), 0);
       setNotice(
         dir === 'rtl'

@@ -809,6 +809,21 @@ async function columnsOf(db: DeletionDb, table: string): Promise<Set<string>> {
   // PRAGMA syntax so deletion does not silently see an empty schema and then
   // collide with a foreign-key reference at the final DELETE.
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(table)) return new Set();
+  const scope = schemaScopes.get(db);
+  if (scope) {
+    const known = scope.tables.get(table);
+    if (known) return known;
+    // The whole schema was read at the start of this delete: a table it did not
+    // list does not exist, and asking again would be one more round trip.
+    if (scope.complete) return new Set();
+    const asked = readColumns(db, table);
+    scope.tables.set(table, asked);
+    return asked;
+  }
+  return readColumns(db, table);
+}
+
+async function readColumns(db: DeletionDb, table: string): Promise<Set<string>> {
   try {
     const rows = await db.prepare(`PRAGMA table_info("${table}")`).all<{ name: string }>();
     return new Set((rows.results ?? []).map((r) => String(r.name)));
@@ -819,6 +834,53 @@ async function columnsOf(db: DeletionDb, table: string): Promise<Set<string>> {
 
 async function tableExists(db: DeletionDb, table: string): Promise<boolean> {
   return (await columnsOf(db, table)).size > 0;
+}
+
+/**
+ * ONE READ OF THE SCHEMA PER DELETE (owner's report 2026-11-18: «sometimes
+ * delete answers server error»).
+ *
+ * Every registry entry asked `PRAGMA table_info` on its own, one awaited round
+ * trip after another: a delete waited on the D1 primary 441 times in sequence
+ * (about 180 of them schema questions), which from Iraq is minutes. Inside a
+ * delete the schema is read ONCE, with the same joined query the media
+ * manifest uses (worker/lib/mediaRefs.ts), and every `columnsOf` answers from
+ * it. The scope lives for one `deleteProductPermanently` call only, so a
+ * migration is never hidden behind a stale answer. If the joined read fails,
+ * the per-table PRAGMA path answers as before, each table asked once.
+ */
+interface SchemaScope {
+  complete: boolean;
+  tables: Map<string, Promise<Set<string>>>;
+}
+const schemaScopes = new WeakMap<object, SchemaScope>();
+
+async function openSchemaScope(db: DeletionDb): Promise<SchemaScope> {
+  const scope: SchemaScope = { complete: false, tables: new Map() };
+  try {
+    const rows = await db
+      .prepare(
+        `SELECT m.name AS tbl, p.name AS col
+           FROM sqlite_master m
+           JOIN pragma_table_info(m.name) p
+          WHERE m.type = 'table' AND m.name NOT LIKE 'sqlite_%'`
+      )
+      .all<{ tbl: string; col: string }>();
+    const byTable = new Map<string, Set<string>>();
+    for (const r of rows.results ?? []) {
+      const t = String(r.tbl);
+      let cols = byTable.get(t);
+      if (!cols) byTable.set(t, (cols = new Set()));
+      cols.add(String(r.col));
+    }
+    if (byTable.size) {
+      for (const [t, cols] of byTable) scope.tables.set(t, Promise.resolve(cols));
+      scope.complete = true;
+    }
+  } catch {
+    // Fall back to asking each table once (memoised in this scope).
+  }
+  return scope;
 }
 
 // ---------------------------------------------------------------------------
@@ -846,14 +908,25 @@ export interface ProductMedia {
 export async function collectProductMediaKeys(db: DeletionDb, productId: string): Promise<Set<string>> {
   const keys = new Set<string>();
 
-  for (const source of MEDIA_COLUMNS) {
+  // Every source is read at once and merged in registry order: the same keys,
+  // in the same order, in one wait instead of one per column.
+  const readSource = async (source: { table: string; column: string; by: string }) => {
     const cols = await columnsOf(db, source.table);
-    if (!cols.has(source.column) || !cols.has(source.by)) continue;
+    if (!cols.has(source.column) || !cols.has(source.by)) return [] as Array<{ v: unknown }>;
     const rows = await db
       .prepare(`SELECT "${source.column}" AS v FROM "${source.table}" WHERE "${source.by}" = ?`)
       .bind(productId)
       .all<{ v: unknown }>();
-    for (const row of rows.results ?? []) {
+    return rows.results ?? [];
+  };
+  const [plainRows, jsonRowRows, productCols] = await Promise.all([
+    Promise.all(MEDIA_COLUMNS.map(readSource)),
+    Promise.all(MEDIA_JSON_ROW_COLUMNS.map(readSource)),
+    columnsOf(db, 'products'),
+  ]);
+
+  for (const rows of plainRows) {
+    for (const row of rows) {
       const key = mediaKeyFromRef(row.v);
       // `isSafeMediaKey` OR NOTHING. These strings become R2 deletions, and
       // `mediaKeyFromRef` hands back whatever it was given when the value is
@@ -865,14 +938,8 @@ export async function collectProductMediaKeys(db: DeletionDb, productId: string)
     }
   }
 
-  for (const source of MEDIA_JSON_ROW_COLUMNS) {
-    const cols = await columnsOf(db, source.table);
-    if (!cols.has(source.column) || !cols.has(source.by)) continue;
-    const rows = await db
-      .prepare(`SELECT "${source.column}" AS v FROM "${source.table}" WHERE "${source.by}" = ?`)
-      .bind(productId)
-      .all<{ v: unknown }>();
-    for (const row of rows.results ?? []) {
+  for (const rows of jsonRowRows) {
+    for (const row of rows) {
       if (typeof row.v !== 'string' || !row.v.trim()) continue;
       let parsed: unknown;
       try {
@@ -884,7 +951,6 @@ export async function collectProductMediaKeys(db: DeletionDb, productId: string)
     }
   }
 
-  const productCols = await columnsOf(db, 'products');
   const jsonCols = MEDIA_JSON_COLUMNS.filter((c) => productCols.has(c));
   if (jsonCols.length) {
     const row = await db
@@ -958,6 +1024,9 @@ export async function collectProductMediaKeys(db: DeletionDb, productId: string)
  * LIKE's own case-folding covers, so this restores the old behaviour precisely
  * and keeps only the fix.
  */
+/** Statements per read-only batch of `partitionSharedMedia`. */
+const PARTITION_BATCH_STATEMENTS = 90;
+
 export async function partitionSharedMedia(
   db: DeletionDb,
   productId: string,
@@ -1003,17 +1072,29 @@ export async function partitionSharedMedia(
     });
   }
 
-  for (const key of keys) {
-    let isShared = false;
-    for (const probe of probes) {
-      const hit = await db.prepare(probe.sql).bind(productId, key).first<{ hit: number }>();
-      if (hit) {
-        isShared = true;
-        break;
-      }
-    }
-    (isShared ? shared : owned).push(key);
+  // Every (key, probe) question at once, in read-only batches: the same
+  // questions as the one-by-one loop this replaced (a key is shared when ANY
+  // probe answers), without one round trip per question; a product with
+  // forty pictures asked hundreds of them in sequence.
+  const list = [...keys];
+  if (!list.length || !probes.length) {
+    for (const key of list) owned.push(key);
+    return { shared, owned };
   }
+  const keysPerBatch = Math.max(1, Math.floor(PARTITION_BATCH_STATEMENTS / probes.length));
+  const chunks: string[][] = [];
+  for (let i = 0; i < list.length; i += keysPerBatch) chunks.push(list.slice(i, i + keysPerBatch));
+  // One batch after another (a batch is a transaction; one rarely holds fewer than every key).
+  const answers: boolean[] = [];
+  for (const chunk of chunks) {
+    const results = await db.batch<{ hit: number }>(
+      chunk.flatMap((key) => probes.map((probe) => db.prepare(probe.sql).bind(productId, key)))
+    );
+    chunk.forEach((_, k) =>
+      answers.push(results.slice(k * probes.length, (k + 1) * probes.length).some((r) => (r.results ?? []).length > 0))
+    );
+  }
+  answers.forEach((isShared, i) => (isShared ? shared : owned).push(list[i]!));
   return { shared, owned };
 }
 
@@ -1047,16 +1128,23 @@ export interface DeletionResult {
 
 /** Why a blocked delete is a refusal and not an error the admin has to decode. */
 export async function blockingReferences(db: DeletionDb, productId: string): Promise<BlockedDeletion | null> {
-  for (const ref of BLOCKING_REFS) {
-    const cols = await columnsOf(db, ref.table);
-    if (!cols.has(ref.column)) continue;
-    const predicate = ref.match ?? `"${ref.column}" = ?1`;
-    const guard = ref.where ? ` AND (${ref.where})` : '';
-    const row = await db
-      .prepare(`SELECT COUNT(*) AS n FROM "${ref.table}" WHERE ${predicate}${guard}`)
-      .bind(productId)
-      .first<{ n: number }>();
-    const count = Number(row?.n ?? 0);
+  // Asked together; the FIRST blocking reference in registry order still decides the answer.
+  const counts = await Promise.all(
+    BLOCKING_REFS.map(async (ref) => {
+      const cols = await columnsOf(db, ref.table);
+      if (!cols.has(ref.column)) return 0;
+      const predicate = ref.match ?? `"${ref.column}" = ?1`;
+      const guard = ref.where ? ` AND (${ref.where})` : '';
+      const row = await db
+        .prepare(`SELECT COUNT(*) AS n FROM "${ref.table}" WHERE ${predicate}${guard}`)
+        .bind(productId)
+        .first<{ n: number }>();
+      return Number(row?.n ?? 0);
+    })
+  );
+  for (let i = 0; i < BLOCKING_REFS.length; i++) {
+    const ref = BLOCKING_REFS[i]!;
+    const count = counts[i]!;
     if (count > 0) return { code: ref.code, table: ref.table, count, remedy: ref.remedy };
   }
   return null;
@@ -1114,6 +1202,20 @@ export async function deleteProductPermanently(
   db: DeletionDb,
   productId: string,
   options: { newId: () => string } = { newId: () => crypto.randomUUID() }
+): Promise<DeletionResult> {
+  const scope = await openSchemaScope(db);
+  schemaScopes.set(db, scope);
+  try {
+    return await deleteWithin(db, productId, options);
+  } finally {
+    if (schemaScopes.get(db) === scope) schemaScopes.delete(db);
+  }
+}
+
+async function deleteWithin(
+  db: DeletionDb,
+  productId: string,
+  options: { newId: () => string }
 ): Promise<DeletionResult> {
   const empty: DeletionResult = {
     product_deleted: false,

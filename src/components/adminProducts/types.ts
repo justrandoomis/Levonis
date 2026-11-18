@@ -384,6 +384,8 @@ export interface DeleteResponse {
   r2_objects_deleted?: string[];
   r2_objects_shared_skipped?: string[];
   r2_cleanup_pending?: number;
+  /** 'background': the files are removed after the answer (`r2_cleanup_pending` of them). */
+  r2_cleanup?: 'background';
   cache_keys_invalidated?: string[];
 }
 

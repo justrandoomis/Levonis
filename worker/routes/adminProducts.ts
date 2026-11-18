@@ -2202,6 +2202,8 @@ async function afterCommit(
   failed: Array<{ key: string; error: string }>;
   invalidated: string[];
   warnings: string[];
+  /** The bucket half was handed to `waitUntil`: `failed` lists the queued keys, not errors. */
+  background?: boolean;
 }> {
   const warnings: string[] = [];
   let cleanup: { deleted: string[]; shared: string[]; failed: Array<{ key: string; error: string }> } = {
@@ -2209,6 +2211,56 @@ async function afterCommit(
     shared: [],
     failed: [],
   };
+
+  // THE BUCKET HALF RUNS AFTER THE ANSWER (owner's report 2026-11-18: «sometimes
+  // save or delete answers server error»). The guarded cleanup rebuilds the
+  // GLOBAL reference set — every media column of every table, twice (before and
+  // after its claims) — which measured 260 of a delete's 441 sequential D1
+  // waits and parses every product's JSON. Inline, from Iraq, that put the
+  // answer past the client's deadline, Cloudflare's 100-second proxy limit or
+  // the Worker's CPU budget on a busy day: the rows were gone, the owner read
+  // «server error», and the database stayed busy under every save beside it.
+  // The jobs are already durable (`media_cleanup_jobs`, written in the delete's
+  // own batch) and the quarter-hour drain runs the same guarded cleanup, so the
+  // answer reports them as pending and the work continues in `waitUntil`; a run
+  // that is cut off leaves its jobs pending (claims expire), never a lost file.
+  let background: { waitUntil(promise: Promise<unknown>): void } | null = null;
+  try {
+    background = c.executionCtx;
+  } catch {
+    background = null;
+  }
+  if (background && result.media_jobs.length) {
+    const origin = new URL(c.req.url).origin;
+    const jobs = result.media_jobs;
+    const queued = jobs.map((job) => ({ key: job.key, error: 'queued: removed in the background' }));
+    try {
+      await audit(c.env.DB, adminId, action, id, {
+        rows_deleted_by_table: result.rows_deleted_by_table,
+        rows_unlinked_by_table: result.rows_unlinked_by_table,
+        r2_objects_deleted: 0,
+        r2_objects_shared_skipped: result.r2_objects_shared_skipped.length,
+        r2_cleanup_pending: jobs.length,
+        r2_cleanup: 'background',
+      });
+    } catch (e) {
+      console.error('audit row failed after a committed delete:', e instanceof Error ? e.message : String(e));
+      warnings.push('audit row not written');
+    }
+    // Started only once this request's own rows are written, so nothing the answer needs waits behind it.
+    background.waitUntil(
+      (async () => {
+        try {
+          const done = await runGuardedMediaCleanupJobs(c.env, jobs);
+          await invalidateMediaCache(origin, done.deleted);
+        } catch (e) {
+          console.error('background media cleanup after a committed delete:', e instanceof Error ? e.message : String(e));
+        }
+      })()
+    );
+    return { deleted: [], shared: [], failed: queued, invalidated: [], warnings, background: true };
+  }
+
   try {
     cleanup = await runGuardedMediaCleanupJobs(c.env, result.media_jobs);
   } catch (e) {
@@ -2321,7 +2373,7 @@ adminProductsRoutes.delete('/:id', async (c) => {
       r2_objects_deleted: after.deleted,
       r2_objects_shared_skipped: shared,
       r2_cleanup_pending: after.failed.length,
-      ...(after.failed.length ? { r2_cleanup_errors: after.failed } : {}),
+      ...(after.background ? { r2_cleanup: 'background' } : after.failed.length ? { r2_cleanup_errors: after.failed } : {}),
       cache_keys_invalidated: invalidated,
     });
   }
@@ -2370,7 +2422,7 @@ adminProductsRoutes.delete('/:id', async (c) => {
     r2_objects_deleted: after.deleted,
     r2_objects_shared_skipped: shared,
     r2_cleanup_pending: after.failed.length,
-    ...(after.failed.length ? { r2_cleanup_errors: after.failed } : {}),
+    ...(after.background ? { r2_cleanup: 'background' } : after.failed.length ? { r2_cleanup_errors: after.failed } : {}),
     cache_keys_invalidated: invalidated,
   });
 });
