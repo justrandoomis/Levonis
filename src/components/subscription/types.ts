@@ -59,6 +59,23 @@ export interface PlansResponse {
   };
   /** Daily check-in points multiplier per tier, in hundredths (150 = ×1.5). */
   points_multiplier_x100?: Record<PaidTier, number>;
+  /** PRO's services discount and the return windows (owner, 2026-11-19); null while PRO is paused, absent on an older server. */
+  pro_extras?: ProExtras | null;
+  /** The filament purchase limit per plan, as the checkout enforces it (absent on an older server). */
+  filament_limits?: FilamentLimits;
+}
+
+/** Pieces of ONE filament product per `window_days`, per plan; null = unlimited. */
+export interface FilamentLimits {
+  enabled: boolean;
+  window_days: number;
+  per_tier: { none: number | null; plus: number | null; prime: number | null; pro: number | null };
+}
+
+/** The figures behind PRO's `proServicesDiscount` and `proFreeReturn14` entitlements, from the server. */
+export interface ProExtras {
+  services_discount_pct: number;
+  return_window_days: { default: number; pro: number };
 }
 
 export interface ApiMembership {

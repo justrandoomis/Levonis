@@ -91,6 +91,13 @@ import { OfferSaving, SALE_PRICE, occasionOnPage } from '../components/ui/OfferB
 import Countdown from '../components/ui/Countdown';
 import ConditionPanel from '../components/product/ConditionPanel';
 const StockAlertPanel = React.lazy(() => import('../components/product/StockAlertPanel'));
+// «حد الفلامنت الشهري» (0245): the account's limit and what is left, on a filament page only.
+const FilamentLimitNote = React.lazy(() => import('../components/product/FilamentLimitNote'));
+/** Filed under the materials sections — the server decides whether it is filament (`applies`). */
+const filamentSection = (p: object): boolean => {
+  const r = p as { category_id?: unknown; sub_category_id?: unknown };
+  return [r.category_id, r.sub_category_id].some((v) => typeof v === 'string' && v.startsWith('cat_materials'));
+};
 import { ESTIMATE_TEXT, UNPRICED_TEXT } from '../lib/priceStatus';
 import {
   addressWithout,
@@ -5145,6 +5152,13 @@ export default function Product() {
         <div className="pt-1">
           <ErrorState error={quoteError} onRetry={refreshQuote} compact />
         </div>
+      ) : null}
+      {isAuthenticated && product && filamentSection(product) ? (
+        <ChunkBoundary compact>
+          <React.Suspense fallback={null}>
+            <FilamentLimitNote key={String(product.id)} productId={String(product.id)} />
+          </React.Suspense>
+        </ChunkBoundary>
       ) : null}
       {actionError ? (
         <p role="alert" className="lv-alert lv-alert-danger text-red-200 text-[13px]">

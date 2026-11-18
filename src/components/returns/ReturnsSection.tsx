@@ -15,9 +15,12 @@ import VariantImg from '../ui/VariantImg';
  *  - Case list with the full state timeline (requested → assessment →
  *    approved/rejected → collection → received → inspected → resolved),
  *    decision reasons and resolution.
- *  - Honest states everywhere: loading, error, empty, closed 7-day window
+ *  - Honest states everywhere: loading, error, empty, closed window
  *    (the SERVER judges timeliness by the request time — this UI only
  *    mirrors it). No success UI before the server confirms.
+ *  - The window's length is the server's: GET /api/returns?orderId= sends the
+ *    order's `terms` (7 days, or 14 and fee-free for an order bought under
+ *    PRO — owner, 2026-11-19); 7 is only the figure shown before it answers.
  */
 
 const STATES = ['requested', 'assessment', 'approved', 'collection', 'received', 'inspected', 'resolved'] as const;
@@ -58,11 +61,15 @@ export interface ReturnsUnitLike {
   delivered_at: string | null;
 }
 
+/** Arabic counts its days: 3–10 أيام, otherwise يومًا («7 أيام»، «14 يومًا»). */
+const arDays = (n: number): string => `${n} ${n >= 3 && n <= 10 ? 'أيام' : 'يومًا'}`;
+
 const STRINGS = {
   ar: {
     title: 'الإرجاع والاستبدال',
-    intro: 'يمكن طلب الإرجاع خلال 7 أيام من الاستلام الفعلي للمنتج المتأثر.',
-    windowClosed: 'انتهت نافذة الإرجاع (7 أيام من الاستلام) لهذا الطلب.',
+    intro: (n: number) => `يمكن طلب الإرجاع خلال ${arDays(n)} من الاستلام الفعلي للمنتج المتأثر.`,
+    windowClosed: (n: number) => `انتهت نافذة الإرجاع (${arDays(n)} من الاستلام) لهذا الطلب.`,
+    freeReturn: 'طلب PRO: الإرجاع بلا أجرة إعادة شحن وبلا رسوم إعادة تخزين، ما دام المنتج بحالة قابلة للإرجاع.',
     windowUnknown: 'لم نتمكن من تحديد تاريخ الاستلام الفعلي لهذا الطلب، لذا لا نستطيع حساب الأيام المتبقية هنا. يمكنك إرسال الطلب وسيحكم النظام على المدة عند الاستلام.',
     itemClosed: 'انتهت نافذة الإرجاع لهذا المنتج.',
     daysLeft: (n: number) => `${daysLeftLabel(n, 'ar')} لطلب الإرجاع`,
@@ -115,8 +122,9 @@ const STRINGS = {
   },
   en: {
     title: 'Returns & Replacement',
-    intro: 'A return can be requested within 7 days of the actual delivery of the affected item.',
-    windowClosed: 'The 7-day return window (from delivery) for this order has closed.',
+    intro: (n: number) => `A return can be requested within ${n} days of the actual delivery of the affected item.`,
+    windowClosed: (n: number) => `The ${n}-day return window (from delivery) for this order has closed.`,
+    freeReturn: 'PRO order: the return carries no return-delivery charge and no restocking fee, as long as the item is in returnable condition.',
     windowUnknown: 'We could not determine the actual delivery date of this order, so the days left cannot be shown here. You can still submit a request — the server judges the window when it is filed.',
     itemClosed: 'The return window for this item has closed.',
     daysLeft: (n: number) => `${daysLeftLabel(n, 'en')} to request a return`,
@@ -169,8 +177,9 @@ const STRINGS = {
   },
   ckb: {
     title: 'گەڕاندنەوە و گۆڕینەوە',
-    intro: 'داوای گەڕاندنەوە لە ماوەی 7 ڕۆژ لە وەرگرتنی ڕاستەقینەی کاڵاکە دەکرێت.',
-    windowClosed: 'ماوەی گەڕاندنەوە (7 ڕۆژ لە وەرگرتن) بۆ ئەم داواکارییە تەواو بووە.',
+    intro: (n: number) => `داوای گەڕاندنەوە لە ماوەی ${n} ڕۆژ لە وەرگرتنی ڕاستەقینەی کاڵاکە دەکرێت.`,
+    windowClosed: (n: number) => `ماوەی گەڕاندنەوە (${n} ڕۆژ لە وەرگرتن) بۆ ئەم داواکارییە تەواو بووە.`,
+    freeReturn: 'داواکاری PRO: گەڕاندنەوە بێ کرێی گەڕاندنەوەی بار و بێ کرێی دووبارە کۆگاکردنە، بە مەرجێک کاڵاکە لە دۆخێکی گەڕاندنەوەپێکراودا بێت.',
     windowUnknown: 'نەمانتوانی بەرواری ڕاستەقینەی وەرگرتنی ئەم داواکارییە دیاری بکەین، بۆیە ڕۆژە ماوەکان لێرە نیشان نادرێن. هێشتا دەتوانیت داواکە بنێریت — ڕاژەکار ماوەکە لە کاتی ناردن هەڵدەسەنگێنێت.',
     itemClosed: 'ماوەی گەڕاندنەوە بۆ ئەم کاڵایە تەواو بووە.',
     daysLeft: (n: number) => `${daysLeftLabel(n, 'ckb')} بۆ داوای گەڕاندنەوە`,
@@ -223,7 +232,11 @@ const STRINGS = {
   },
 };
 
-const WINDOW_MS = 7 * 86_400_000;
+/** The policy's ordinary window, shown only until the server sends this order's own (`terms`). */
+const DEFAULT_WINDOW_DAYS = 7;
+
+/** What GET /api/returns?orderId= says about this order's returns (worker/lib/returnWindow.ts). */
+interface ReturnTermsDto { window_days: number; free_return: boolean }
 
 interface FormState {
   itemId: string;
@@ -235,12 +248,12 @@ interface FormState {
   component: boolean;
 }
 
-/** Days left in the 7-day window from a delivery time; null when unknown. */
-function daysLeftFrom(deliveredIso: string | null | undefined): number | null {
+/** Days left in the order's window from a delivery time; null when unknown. */
+function daysLeftFrom(deliveredIso: string | null | undefined, windowDays: number): number | null {
   if (!deliveredIso) return null;
   const ms = Date.parse(deliveredIso);
   if (!Number.isFinite(ms)) return null;
-  return Math.max(0, Math.ceil((ms + WINDOW_MS - Date.now()) / 86_400_000));
+  return Math.max(0, Math.ceil((ms + windowDays * 86_400_000 - Date.now()) / 86_400_000));
 }
 
 export default function ReturnsSection({ order, units }: { order: OrderLike; units?: ReturnsUnitLike[] }) {
@@ -249,6 +262,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
   const S = STRINGS[lang as keyof typeof STRINGS] ?? STRINGS.ar;
 
   const [cases, setCases] = useState<ReturnCaseDto[]>([]);
+  const [terms, setTerms] = useState<ReturnTermsDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState(false);
@@ -263,8 +277,9 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
     setLoading(true);
     setLoadError(false);
     try {
-      const data = await api.get<{ cases: ReturnCaseDto[] }>(`/api/returns?orderId=${encodeURIComponent(order.id)}`);
+      const data = await api.get<{ cases: ReturnCaseDto[]; terms?: ReturnTermsDto }>(`/api/returns?orderId=${encodeURIComponent(order.id)}`);
       setCases(data.cases || []);
+      if (data.terms && Number.isInteger(data.terms.window_days) && data.terms.window_days > 0) setTerms(data.terms);
     } catch {
       setLoadError(true);
     } finally {
@@ -290,13 +305,14 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
     }
     return order.delivered_at ?? null;
   };
-  const orderDaysLeft = daysLeftFrom(order.delivered_at);
+  const windowDays = terms?.window_days ?? DEFAULT_WINDOW_DAYS;
+  const orderDaysLeft = daysLeftFrom(order.delivered_at, windowDays);
   // Three honest states for the order as a whole: open, closed, or unknown.
   // Unknown is NOT closed — the buttons stay, and the server decides.
   const orderWindow: 'open' | 'closed' | 'unknown' =
     orderDaysLeft === null ? 'unknown' : orderDaysLeft > 0 ? 'open' : 'closed';
   const itemWindow = (itemId: string): { state: 'open' | 'closed' | 'unknown'; days: number | null } => {
-    const d = daysLeftFrom(itemDeliveredAt(itemId));
+    const d = daysLeftFrom(itemDeliveredAt(itemId), windowDays);
     return { state: d === null ? 'unknown' : d > 0 ? 'open' : 'closed', days: d };
   };
   const anyRequestable = order.items.some((it) => itemWindow(it.id).state !== 'closed');
@@ -385,7 +401,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
           ) : orderWindow === 'closed' ? (
             <p className="text-xs text-text-muted flex items-center gap-2" data-return-window="closed">
               <AlertCircle className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-              {S.windowClosed}
+              {S.windowClosed(windowDays)}
             </p>
           ) : (
             <p className="text-xs text-warning flex items-start gap-2" data-return-window="unknown">
@@ -393,7 +409,10 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
               {S.windowUnknown}
             </p>
           )}
-          <p className="text-xs text-text-muted">{S.intro}</p>
+          <p className="text-xs text-text-muted">{S.intro(windowDays)}</p>
+          {terms?.free_return ? (
+            <p className="text-xs text-success" data-return-free>{S.freeReturn}</p>
+          ) : null}
 
           {/* Existing cases */}
           {loading ? (

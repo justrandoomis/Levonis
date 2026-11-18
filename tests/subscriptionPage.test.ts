@@ -631,9 +631,16 @@ test('each card says three things it is for, from the same data — BNPL only on
   const input = { contract, benefits: null, points: { plus: 100, prime: 150, pro: 200 }, loc: ar, money: iqd };
   for (const tier of ['plus', 'prime', 'pro'] as const) {
     const lines = tierHighlights(tier, input);
-    assert.ok(lines.length > 0 && lines.length <= 3, `${tier}: ${lines.length} highlights`);
+    // PRO, returned (owner, 2026-11-19): its card names its new benefits too — four lines.
+    assert.ok(lines.length > 0 && lines.length <= (tier === 'pro' ? 4 : 3), `${tier}: ${lines.length} highlights`);
     assert.equal(lines.some((l) => l.includes('BNPL')), tier === 'pro', `${tier} BNPL line`);
   }
+  // With the server's figures the PRO card leads with the services discount and the 14-day return.
+  const pro = tierHighlights('pro', { ...input, proExtras: { services_discount_pct: 50, return_window_days: { default: 7, pro: 14 } } });
+  assert.equal(pro.length, 4);
+  assert.match(pro[0], /50%/);
+  assert.match(pro[1], /14/);
+  assert.ok(pro.some((l) => l.includes('BNPL')));
   // No rule, no figure: without benefits PREMIUM states no discount and no threshold.
   assert.equal(tierHighlights('prime', input).some((l) => /خصم|توصيل/.test(l)), false);
 });

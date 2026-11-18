@@ -36,7 +36,9 @@ import { SubscriptionChangedV1 } from '@levonis/contracts/events/v1/Subscription
 import { rateLimit } from '../lib/ratelimit';
 import { afterSettingsWrite } from '../lib/edgePolicy';
 import { publishedPrinterServices } from '../lib/printerServices';
-import { offeredMembershipTiers } from '@levonis/pricing/printerServices';
+import { offeredMembershipTiers, proServicesDiscountPct } from '@levonis/pricing/printerServices';
+import { PRO_RETURN_WINDOW_DAYS, RETURN_WINDOW_DAYS } from '../lib/returnWindow';
+import { normalizeFilamentLimits } from '../lib/filamentLimits';
 import { activateOrderMembership, orderMembershipPublic, type OrderMembershipPurchaseRow } from '../lib/orderMembershipSale';
 import {
   PRO_PAUSE_KEY,
@@ -1066,7 +1068,7 @@ function entitlementsForTier(tier: PaidTier) {
  */
 membershipsRoutes.get('/plans', async (c) => {
   const db = c.env.DB;
-  const [{ results }, launch, preorderGift, shippingPolicy, benefits, proPause] = await Promise.all([
+  const [{ results }, launch, preorderGift, shippingPolicy, benefits, proPause, servicesConfig, filamentLimits] = await Promise.all([
     db.prepare(
       'SELECT id, tier, duration_months, price_iqd, active, sort FROM membership_plans WHERE active = 1 ORDER BY sort, duration_months'
     ).all<PlanRow>(),
@@ -1075,6 +1077,8 @@ membershipsRoutes.get('/plans', async (c) => {
     getSetting(db, 'shippingPolicy'),
     publicBenefitSummary(db, new Date().toISOString()),
     getProPause(db),
+    publishedPrinterServices(db).catch(() => null),
+    getSetting(db, 'filamentMonthlyLimits'),
   ]);
 
   const policy = (shippingPolicy && typeof shippingPolicy === 'object' ? shippingPolicy : {}) as Record<string, unknown>;
@@ -1115,6 +1119,21 @@ membershipsRoutes.get('/plans', async (c) => {
      * PRO's are withheld while PRO is paused: «إخفاء المميزات وكتابة فقط قريبًا».
      */
     benefits: proPause.paused ? { ...benefits, pro: null } : benefits,
+    /**
+     * PRO, RETURNED (owner, 2026-11-19) — the figures behind its two new
+     * entitlements, from the code that applies them: the printer price list's
+     * services discount (`proServicesDiscountPct`, 50 unless the owner changed
+     * it) and the return windows (worker/lib/returnWindow.ts). Withheld while
+     * PRO is paused, like its other benefits.
+     */
+    pro_extras: proPause.paused
+      ? null
+      : {
+          services_discount_pct: proServicesDiscountPct(servicesConfig),
+          return_window_days: { default: RETURN_WINDOW_DAYS, pro: PRO_RETURN_WINDOW_DAYS },
+        },
+    /** The filament limit per plan the checkout enforces (worker/lib/filamentLimits.ts), for the comparison. */
+    filament_limits: normalizeFilamentLimits(filamentLimits),
     entitlement_contract: {
       minimum_tier: ENTITLEMENT_MINIMUM_TIER,
       tiers: {

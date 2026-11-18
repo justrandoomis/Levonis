@@ -139,6 +139,18 @@ export const ENTITLEMENT_MINIMUM_TIER = {
   priorityDelivery12h: 'pro',
   bnpl: 'pro',
   proExclusive: 'pro',
+  /**
+   * PRO, RETURNED (owner, 2026-11-19). `proServicesDiscount`: the printer
+   * services (warranty, Levo Care, extra packaging, inspection, academy) and
+   * Personal delivery at the price list's `pro_discount_pct` off (50% unless
+   * the owner changes it) — applied by the price resolver for a line priced in
+   * the PRO context (packages/pricing/src/printerServices.ts `priceServices`).
+   * `proFreeReturn14`: 14 days to request a return instead of 7, and no return
+   * delivery or restocking fee — judged by the tier the order was bought under
+   * (worker/lib/returnWindow.ts).
+   */
+  proServicesDiscount: 'pro',
+  proFreeReturn14: 'pro',
 } as const satisfies Record<string, Exclude<Tier, 'free'>>;
 
 export type MembershipEntitlement = keyof typeof ENTITLEMENT_MINIMUM_TIER;
@@ -600,6 +612,8 @@ export const benefits = {
   priorityDelivery12h: (t: TierStatus) => hasEntitlement(t, 'priorityDelivery12h'),
   bnpl: (t: TierStatus) => hasEntitlement(t, 'bnpl'),
   proExclusive: (t: TierStatus) => hasEntitlement(t, 'proExclusive'),
+  proServicesDiscount: (t: TierStatus) => hasEntitlement(t, 'proServicesDiscount'),
+  proFreeReturn14: (t: TierStatus) => hasEntitlement(t, 'proFreeReturn14'),
   primeDeliveryEligible: (t: TierStatus) => hasEntitlement(t, 'premiumDelivery'),
 };
 

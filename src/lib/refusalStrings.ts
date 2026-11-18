@@ -707,6 +707,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The same colour appears twice in this add.',
     ckb: 'هەمان ڕەنگ دوو جار لەم زیادکردنەدا هاتووە.',
   },
+  // «حد الفلامنت الشهري» (0245): the sentence without numbers — `filamentLimitRefusal` names them when the server sends them.
+  FILAMENT_LIMIT: {
+    ar: 'وصلت إلى الحد الأقصى لهذا النوع من الفلامنت خلال 30 يومًا — قلّل الكمية أو اشترك في باقة أعلى.',
+    en: 'You have reached the limit for this filament kind in 30 days — lower the quantity or join a higher plan.',
+    ckb: 'گەیشتوویتە سنووری ئەم جۆرە فیلامێنتە لە ماوەی 30 ڕۆژدا — بڕەکە کەم بکەرەوە یان بەشداری پلانێکی بەرزتر بکە.',
+  },
   BATCH_TOO_MANY_LINES: {
     ar: 'يمكن إضافة 40 لونًا على الأكثر في المرة الواحدة.',
     en: 'At most 40 colours can be added at once.',
@@ -3222,6 +3228,52 @@ export function contractRefusal(err: unknown, lang: Lang, shown?: string, fieldL
   return said;
 }
 
+/**
+ * «حد الفلامنت الشهري» (owner 2026-11-19; migration 0245) — FILAMENT_LIMIT
+ * with its numbers: «الحد الأقصى لـ«PLA Matte» 50 قطعة كل 30 يومًا — بقي لك 12.
+ * اشترك في PLUS لترفعه إلى 100.» The server sends the numbers as data
+ * (`details.products[]`, `details.next_tier`), never baked into a sentence.
+ */
+const FILAMENT_TIER_NAME: Record<string, string> = { plus: 'PLUS', prime: 'PREMIUM', pro: 'PRO' };
+export const FILAMENT_LIMIT_WORDS: Record<Lang, { line: string; left0: string; up: string; upUnlimited: string }> = {
+  ar: {
+    line: 'الحد الأقصى لـ«{name}» {limit} قطعة كل {days} يومًا — بقي لك {left}.',
+    left0: 'الحد الأقصى لـ«{name}» {limit} قطعة كل {days} يومًا — استنفدته لهذه المدة.',
+    up: 'اشترك في {tier} لترفعه إلى {next}.',
+    upUnlimited: 'اشترك في {tier} لتشتري بلا حد.',
+  },
+  en: {
+    line: '«{name}» is limited to {limit} pieces every {days} days — you have {left} left.',
+    left0: '«{name}» is limited to {limit} pieces every {days} days — you have used it all for now.',
+    up: 'Join {tier} to raise it to {next}.',
+    upUnlimited: 'Join {tier} to buy without a limit.',
+  },
+  ckb: {
+    line: 'زۆرترین بڕی «{name}» {limit} پارچەیە بۆ هەر {days} ڕۆژێک — {left} پارچەت ماوە.',
+    left0: 'زۆرترین بڕی «{name}» {limit} پارچەیە بۆ هەر {days} ڕۆژێک — بۆ ئەم ماوەیە هەمووت بەکارهێناوە.',
+    up: 'بەشداری {tier} بکە بۆ ئەوەی بیگەیەنیتە {next}.',
+    upUnlimited: 'بەشداری {tier} بکە بۆ کڕینی بێسنوور.',
+  },
+};
+
+/** The FILAMENT_LIMIT sentence with its numbers, or null for any other refusal (or details it cannot read). */
+export function filamentLimitRefusal(err: unknown, lang: Lang): string | null {
+  const e = err as { code?: unknown; details?: unknown } | null;
+  if (!e || e.code !== 'FILAMENT_LIMIT' || typeof e.details !== 'object' || e.details === null) return null;
+  const d = e.details as { window_days?: unknown; products?: unknown; next_tier?: unknown };
+  const p = Array.isArray(d.products) ? (d.products[0] as Record<string, unknown> | undefined) : undefined;
+  if (!p || typeof p.limit !== 'number' || typeof p.remaining !== 'number' || typeof d.window_days !== 'number') return null;
+  const names = (p.name && typeof p.name === 'object' ? p.name : {}) as Record<string, unknown>;
+  const name = String(names[lang] || names.en || names.ar || '');
+  const w = FILAMENT_LIMIT_WORDS[lang];
+  const fill = (t: string, v: Record<string, string | number>) => t.replace(/\{(\w+)\}/g, (m, k: string) => (k in v ? String(v[k]) : m));
+  let text = fill(p.remaining > 0 ? w.line : w.left0, { name, limit: p.limit, days: d.window_days, left: p.remaining });
+  const next = d.next_tier && typeof d.next_tier === 'object' ? (d.next_tier as { tier?: unknown; limit?: unknown }) : null;
+  const tier = next && typeof next.tier === 'string' ? FILAMENT_TIER_NAME[next.tier] : undefined;
+  if (tier) text += ' ' + (typeof next!.limit === 'number' ? fill(w.up, { tier, next: next!.limit }) : fill(w.upUnlimited, { tier }));
+  return text;
+}
+
 /** The codes whose refusal can carry a remainder worth naming. `QTY_UNAVAILABLE`
  *  is the cart door's "not that many" and carries `details.available` for the
  *  same reason the order door's `OUT_OF_STOCK` does — see the table entry. */
@@ -3271,6 +3323,9 @@ export function kitQtyLimitRefusal(err: unknown, lang: Lang): string | null {
 export function stockRefusal(err: unknown, lang: Lang): string | null {
   const e = err as { code?: unknown; details?: unknown } | null;
   const code = e && typeof e.code === 'string' ? e.code : '';
+  // «حد الفلامنت الشهري» (0245): a counted refusal too — the limit, what is left and the plan that raises it.
+  const filament = filamentLimitRefusal(err, lang);
+  if (filament) return filament;
   // A counted refusal of another kind: the kit cannot follow this many printers (the product page's add reads it here).
   const kitLimit = kitQtyLimitRefusal(err, lang);
   if (kitLimit) return kitLimit;

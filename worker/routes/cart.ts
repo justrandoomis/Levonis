@@ -103,7 +103,8 @@ import {
   type ResolvedPrice,
   type Tier,
 } from '../lib/pricing';
-import { pricingTierContext, shippingEntitlementContext, type TierStatus } from '../lib/entitlements';
+import { getTierStatus, pricingTierContext, shippingEntitlementContext, type TierStatus } from '../lib/entitlements';
+import { evaluateFilamentLimits, filamentLimitError, filamentTierKey, readFilamentUsage } from '../lib/filamentLimits';
 import { applyOfferToResolved, loadOffers, offerEligible, offerKey, offerPriceRefusal, subjectOf, type OfferView } from '../lib/offers';
 import {
   activeBenefitRules,
@@ -3346,6 +3347,72 @@ async function cartPrinterExtras(c: Context<AppContext>, items: Array<Record<str
   return { membership };
 }
 
+/**
+ * «حد الفلامنت الشهري» AT THE CART (owner 2026-11-19; migration 0245).
+ *
+ * The checkout is the authority (worker/routes/orders.ts) — it also pools by
+ * the DELIVERY phone, which the cart does not know yet. Here the same rule is
+ * judged on what is known: this account's orders of the window and the
+ * account's verified phone, plus what the cart will hold of the product after
+ * this change (`after(held)`: `held` = the product's ordinary lines now, every
+ * colour). Over the limit → 409 FILAMENT_LIMIT, nothing written. Nothing is
+ * read for an admin, an unlimited plan or a rule switched off; a product that
+ * is not filament costs one query.
+ */
+async function assertCartFilamentLimit(c: Context<AppContext>, productId: string, after: number | ((held: number) => number)): Promise<void> {
+  const user = c.get('user')!;
+  if (user.role === 'admin') return;
+  const db = c.env.DB;
+  const [config, tierStatus, heldRow] = await Promise.all([
+    getSetting(db, 'filamentMonthlyLimits'),
+    getTierStatus(db, user.id),
+    typeof after === 'number'
+      ? Promise.resolve(null)
+      : db.prepare(`SELECT COALESCE(SUM(qty), 0) AS qty FROM cart_items WHERE user_id = ? AND product_id = ? AND shipping_method_id = ''`)
+          .bind(user.id, productId)
+          .first<{ qty: number }>(),
+  ]);
+  const tier = filamentTierKey(tierStatus);
+  if (!config.enabled || config.per_tier[tier] === null) return;
+  const wanted = typeof after === 'number' ? after : after(Number(heldRow?.qty) || 0);
+  if (wanted <= 0) return;
+  const sinceIso = new Date(Date.now() - config.window_days * 86_400_000).toISOString();
+  const { filament, used } = await readFilamentUsage(db, { userId: user.id, productIds: [productId], phoneKeys: [], sinceIso });
+  if (filament.size === 0) return;
+  const verdict = evaluateFilamentLimits({ config, tier, requested: new Map([[productId, wanted]]), filament, used });
+  if (verdict.over.length > 0) throw filamentLimitError(verdict);
+}
+
+/**
+ * «حدّك الشهري من هذا النوع» — the product page's note (0245): the limit this
+ * account has on a filament product, what the window holds and what is left.
+ * `{ applies: false }` for a product that is not filament, a rule that is off,
+ * or an admin; `limit: null` for an unlimited plan (PRO).
+ */
+cartRoutes.get('/filament-limit', async (c) => {
+  const user = c.get('user')!;
+  const productId = str(c.req.query('productId'), 'productId', { min: 1, max: 60 });
+  const db = c.env.DB;
+  const [config, tierStatus] = await Promise.all([getSetting(db, 'filamentMonthlyLimits'), getTierStatus(db, user.id)]);
+  if (!config.enabled || user.role === 'admin') return c.json({ success: true, applies: false });
+  const tier = filamentTierKey(tierStatus);
+  const sinceIso = new Date(Date.now() - config.window_days * 86_400_000).toISOString();
+  const { filament, used } = await readFilamentUsage(db, { userId: user.id, productIds: [productId], phoneKeys: [], sinceIso });
+  if (filament.size === 0) return c.json({ success: true, applies: false });
+  const verdict = evaluateFilamentLimits({ config, tier, requested: new Map([[productId, 0]]), filament, used });
+  const p = verdict.products[0];
+  return c.json({
+    success: true,
+    applies: true,
+    tier,
+    window_days: config.window_days,
+    limit: verdict.limit,
+    used: p?.used ?? 0,
+    remaining: p?.remaining ?? null,
+    next_tier: verdict.next_tier,
+  });
+});
+
 cartRoutes.post('/items', async (c) => {
   const user = c.get('user')!;
   const body = await c.req.json().catch(() => ({}));
@@ -3458,6 +3525,8 @@ cartRoutes.post('/items', async (c) => {
     sql: `SELECT id FROM cart_items WHERE user_id = ? AND product_id = ? AND option_id = ? AND option_value_ids = ? AND color_id = ? AND shipping_method_id = ''`,
     binds: [user.id, productId, primaryOption, canonicalJson, colorId],
   }, plannedExtras);
+  // «حد الفلامنت الشهري» (0245): every colour of this kind in the cart after this add, plus the window's orders.
+  await assertCartFilamentLimit(c, productId, (held) => (replacing.length ? 0 : held) + qty);
 
   try {
     const written = await c.env.DB.batch([
@@ -3827,6 +3896,13 @@ cartRoutes.post('/items/batch', async (c) => {
     }
   }
 
+  // 6c. «حد الفلامنت الشهري» (0245): the whole product after this add — every colour — plus the window's orders.
+  await assertCartFilamentLimit(
+    c,
+    productId,
+    (replacing.length ? 0 : held.reduce((sum, row) => sum + (Number(row.qty) || 0), 0)) + lines.reduce((sum, l) => sum + l.qty, 0)
+  );
+
   // 7. Every write in ONE batch: the confirmed emptying and every line, or none.
   try {
     const written = await c.env.DB.batch([
@@ -4077,6 +4153,9 @@ cartRoutes.patch('/items/:id', async (c) => {
   const qty = body.qty !== undefined ? int(body.qty, 'qty', { min: 1, max: QTY_INPUT_MAX }) : (existing.qty as number);
   // A printer's kit follows its quantity (0235): refused up front when it could not (review S14).
   if (body.qty !== undefined) await assertKitFollowsQty(c, id, qty);
+  // «حد الفلامنت الشهري» (0245): judged only when the line grows — lowering a quantity is never refused.
+  const qtyBefore = Number(existing.qty) || 0;
+  if (qty > qtyBefore) await assertCartFilamentLimit(c, lineProductId, (held) => held - qtyBefore + qty);
   const submittedOptionId =
     body.optionId !== undefined ? str(body.optionId, 'optionId', { max: 60, required: false }) : null;
   const patchRawIds: unknown[] = Array.isArray(body.optionValueIds) ? body.optionValueIds : [];

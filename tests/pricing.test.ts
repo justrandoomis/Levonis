@@ -355,7 +355,7 @@ test('preorder requires a transport; commission ADDED for non-PRO', () => {
   assert.equal(r.transport?.waived, false);
 });
 
-test('PRO waives the preorder commission but NEVER the warranty fee', () => {
+test('PRO waives the preorder commission and pays the warranty fee at the PRO services discount (owner, 2026-11-19)', () => {
   const p = product({
     selling_type: 'pre_order',
     preorder_transports: [{ method: 'air', commission_iqd: 25_000, active: true }],
@@ -367,16 +367,22 @@ test('PRO waives the preorder commission but NEVER the warranty fee', () => {
   const r = resolveUnitPrice({ product: p, transportMethod: 'air', warrantyPlanId: 'w2', ...pro });
   assert.equal(r.transport?.waived, true);
   assert.equal(r.transport?.waived_by, 'pro');
-  assert.equal(r.warranty?.fee_iqd, 20_000);
-  assert.equal(r.unit_subtotal_iqd, 100_000 + 0 + 20_000); // no PRO price → regular + waived commission + warranty
+  // «Never waived by tier» ended on 2026-11-19: PRO pays half of every service, the warranty included.
+  assert.equal(r.warranty?.fee_iqd, 10_000);
+  assert.equal(r.warranty?.fee_before_discount_iqd, 20_000);
+  assert.equal(r.warranty?.pro_discount_iqd, 10_000);
+  assert.equal(r.unit_subtotal_iqd, 100_000 + 0 + 10_000); // no PRO price → regular + waived commission + discounted warranty
+  const guest = resolveUnitPrice({ product: p, transportMethod: 'air', warrantyPlanId: 'w2', ...free });
+  assert.equal(guest.warranty?.fee_iqd, 20_000);
+  assert.equal(guest.warranty?.fee_before_discount_iqd, undefined, 'no discount, no before figure');
 });
 
 // ------------------------------------------- extended warranty (printers)
 //
 // The owner's model: a printer's extension is priced as a PERCENT of the
 // printer price. The basis is the line's REGULAR price — never the member
-// price — so the fee is the same dinar for a guest, a PRIME and a PRO, which
-// is the "never waived by membership" rule above, kept under percent pricing.
+// price — so the LIST fee is the same dinar for a guest, a PRIME and a PRO;
+// since 2026-11-19 an active PRO then pays it less the PRO services discount.
 
 const EXT12 = {
   id: 'wp_ext12', title_ar: 'ضمان ممدد +12', title_en: 'Extended warranty +12 months', title_ckb: '',
@@ -385,19 +391,22 @@ const EXT12 = {
 };
 const EXT24 = { ...EXT12, id: 'wp_ext24', title_en: 'Extended warranty +24 months', duration_months: 24, fee_percent: 10, order: 1 };
 
-test('a percent warranty fee is round(regular × pct) and identical for free, PRIME and PRO', () => {
+test('a percent warranty fee is round(regular × pct) for everyone; PRO pays it at the services discount', () => {
   const p = product({
     price_iqd: 899_000, prime_price_iqd: 885_000, pro_price_iqd: 799_000,
     warranty_plans: [EXT12, EXT24], warranty_base_months: 12,
   });
   for (const who of [free, prime, pro]) {
     const r = resolveUnitPrice({ product: p, warrantyPlanId: 'wp_ext12', ...who });
-    assert.equal(r.warranty?.fee_iqd, 67_425, `7.5% of the REGULAR 899,000 for ${who.tier}`);
+    // 67,425 list; PRO's 50% discount floors to 33,712 off → 33,713 paid.
+    const fee = who.tier === 'pro' ? 33_713 : 67_425;
+    assert.equal(r.warranty?.fee_iqd, fee, `7.5% of the REGULAR 899,000 for ${who.tier}`);
     assert.equal(r.warranty?.basis_iqd, 899_000);
     assert.equal(r.warranty?.fee_percent, 7.5);
-    assert.equal(r.unit_subtotal_iqd, r.applied_iqd + 67_425, 'the fee sits on top of whatever the tier pays');
+    assert.equal(r.unit_subtotal_iqd, r.applied_iqd + fee, 'the fee sits on top of whatever the tier pays');
   }
-  assert.equal(resolveUnitPrice({ product: p, warrantyPlanId: 'wp_ext24', ...pro }).warranty?.fee_iqd, 89_900);
+  assert.equal(resolveUnitPrice({ product: p, warrantyPlanId: 'wp_ext24', ...pro }).warranty?.fee_iqd, 44_950);
+  assert.equal(resolveUnitPrice({ product: p, warrantyPlanId: 'wp_ext24', ...pro, proServicesDiscountPct: 0 }).warranty?.fee_iqd, 89_900);
 });
 
 test("the percent follows the SELECTION's regular price — an option surcharge moves the fee", () => {
@@ -426,7 +435,8 @@ test('+12 → 24 total and +24 → 36 total ride in the resolved warranty, so th
 test('a plan without a percent charges its fixed fee verbatim; an unknown plan is still refused', () => {
   const fixed = { ...EXT12, id: 'wp_fixed', fee_percent: null, fee_iqd: 45_000 };
   const p = product({ warranty_plans: [fixed] });
-  assert.equal(resolveUnitPrice({ product: p, warrantyPlanId: 'wp_fixed', ...pro }).warranty?.fee_iqd, 45_000);
+  assert.equal(resolveUnitPrice({ product: p, warrantyPlanId: 'wp_fixed', ...free }).warranty?.fee_iqd, 45_000);
+  assert.equal(resolveUnitPrice({ product: p, warrantyPlanId: 'wp_fixed', ...pro }).warranty?.fee_iqd, 22_500);
   assert.ok(resolveUnitPrice({ product: p, warrantyPlanId: 'nope', ...free }).errors.includes('WARRANTY_PLAN_NOT_FOUND'));
 });
 

@@ -60,7 +60,7 @@ import { safeParse } from './json';
 import { effectiveAvailability } from './availability';
 import { unitDiscountIqd, type BenefitRule } from './membershipBenefits';
 import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlanMath';
-import { anchorDefaultSelection, anchorFeeFor, anchorFeeOf, priceServices, SERVICES_NOT_CONFIRMED, SERVICES_NO_WARRANTY_ACK, SERVICES_WITH_LEGACY_WARRANTY, type PricedServices, type PrinterClasses, type PrinterServicesConfig, type ServiceSelection } from './printerServices';
+import { anchorDefaultSelection, anchorFeeFor, anchorFeeOf, priceServices, proDiscountedFee, proServicesDiscountPct, SERVICES_NOT_CONFIRMED, SERVICES_NO_WARRANTY_ACK, SERVICES_WITH_LEGACY_WARRANTY, type PricedServices, type PrinterClasses, type PrinterServicesConfig, type ServiceSelection } from './printerServices';
 import type { PhysicalDimensionOverrides } from './physicalDimensions';
 import { skuComboKey, type SkuChannel } from './skuChannel';
 
@@ -496,6 +496,10 @@ export interface ResolvedWarranty {
   basis_iqd: number;
   base_months: number | null;
   total_months: number | null;
+  /** PRO services discount (owner, 2026-11-19): the plan's fee before it. Present only when it applied. */
+  fee_before_discount_iqd?: number;
+  /** PRO services discount: what it took off the plan's fee. */
+  pro_discount_iqd?: number;
 }
 
 export interface ResolvedPrice {
@@ -1070,6 +1074,13 @@ export function resolveUnitPrice(input: {
    * Absent = not a printer: nothing is assumed.
    */
   isPrinter?: boolean;
+  /**
+   * The PRO services discount in percent for a LEGACY warranty plan (the
+   * enrolled-printer services read theirs from `printerServices.config`).
+   * Absent = PRO_SERVICES_DISCOUNT_DEFAULT_PCT (50). Applied only when the
+   * line is priced for an active PRO (`isPro`).
+   */
+  proServicesDiscountPct?: number;
 }): ResolvedPrice {
   const { product } = input;
   const proPolicy = input.proPolicy ?? DEFAULT_PRO_POLICY;
@@ -1467,11 +1478,16 @@ export function resolveUnitPrice(input: {
   // 'preorder' only while the commission is the fee actually in force.
   const pricingBasis: ResolvedPrice['pricing_basis'] = transport !== null && !codDirectPricing ? 'preorder' : 'direct';
 
-  // Warranty fee — added on top of the resolved price; never waived by tier.
-  // A percent plan is priced on the REGULAR price of this exact selection
-  // (option and colour surcharges included), so a PRO and a guest pay the
-  // same dinar for the same extension; the rounding happens once, here, and
-  // the product page, the cart and the checkout all read this number.
+  // Warranty fee — added on top of the resolved price. A percent plan is
+  // priced on the REGULAR price of this exact selection (option and colour
+  // surcharges included); the rounding happens once, here, and the product
+  // page, the cart and the checkout all read this number.
+  //
+  // «NEVER WAIVED BY TIER» ENDED ON 2026-11-19: the owner's PRO pays half on
+  // every service, the extended warranty included. The plan's own fee is
+  // still worked out on the regular price (the same basis for everyone), and
+  // an active PRO then pays it less the PRO services discount — the snapshot
+  // keeps the list fee beside what was charged.
   let warranty: ResolvedPrice['warranty'] = null;
   // An enrolled printer (printerServices given) never prices a legacy plan: a
   // plan sent with it is refused below (SERVICES_WITH_LEGACY_WARRANTY).
@@ -1484,17 +1500,23 @@ export function resolveUnitPrice(input: {
       // (worker/lib/warrantyPlans.ts) — the same answer the delivered unit
       // will record, so the snapshot's 24/36 promise is one the store keeps.
       const baseMonths = effectiveBaseMonths(product.warranty_base_months ?? null, input.isPrinter === true);
+      const listFee = planFee(plan, regularIqd);
+      const proPct = isPro
+        ? proServicesDiscountPct({ pro_discount_pct: input.proServicesDiscountPct })
+        : 0;
+      const chargedFee = proDiscountedFee(listFee, proPct);
       warranty = {
         plan_id: plan.id,
         title_ar: plan.title_ar,
         title_en: plan.title_en,
-        fee_iqd: planFee(plan, regularIqd),
+        fee_iqd: chargedFee,
         duration_months: plan.duration_months,
         duration_kind: plan.duration_kind,
         fee_percent: plan.fee_percent ?? null,
         basis_iqd: regularIqd,
         base_months: baseMonths,
         total_months: planTotalMonths(plan, baseMonths),
+        ...(chargedFee !== listFee ? { fee_before_discount_iqd: listFee, pro_discount_iqd: listFee - chargedFee } : {}),
       };
     }
   }
@@ -1525,7 +1547,7 @@ export function resolveUnitPrice(input: {
     const selection = ps.selection ?? (anchored ? anchorDefaultSelection(ps.config) : null);
     if (selection) {
       if (input.warrantyPlanId && !errors.includes(SERVICES_WITH_LEGACY_WARRANTY)) errors.push(SERVICES_WITH_LEGACY_WARRANTY);
-      const priced = priceServices(ps.config, ps.classes, selection);
+      const priced = priceServices(ps.config, ps.classes, selection, { pro: isPro });
       services = anchored ? { ...priced, anchor_fee_iqd: anchorFee, ...(defaulted ? { defaulted: true as const } : {}) } : priced;
       for (const b of services.blockers) {
         if (ps.preview && (b === SERVICES_NOT_CONFIRMED || b === SERVICES_NO_WARRANTY_ACK)) continue;

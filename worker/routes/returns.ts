@@ -113,7 +113,13 @@ import { notifyCustomer } from '../lib/customerNotify';
 import { revokeRewardsForReturn } from '../lib/rewards/coupons';
 import { voidReviewGiftsOfLine } from '../lib/gifts/reviewCode';
 import type { EmailLang } from '../lib/emailTemplates';
+import { returnTermsFor, returnWindowMs, type ReturnTerms } from '../lib/returnWindow';
 
+/**
+ * PRICE PROTECTION's seven days. The RETURN window is no longer this constant:
+ * it follows the tier the order was bought under (`returnTermsFor`,
+ * worker/lib/returnWindow.ts — 14 days and fee-free for PRO, owner 2026-11-19).
+ */
 const WINDOW_MS = 7 * 86_400_000;
 
 // The DB CHECK constraint (0003) uses 'wrong_item'; the public API accepts
@@ -318,6 +324,7 @@ returnRoutes.post('/', async (c) => {
   const itemSql = (conditionExpr: string) =>
     `SELECT oi.id, oi.order_id, oi.qty AS item_qty, oi.name_snapshot, oi.bundle_parent_item_id,
             o.user_id, o.status, o.delivered_at, o.stage, o.shipping_type, o.seller_type,
+            o.membership_tier_snapshot,
             ${conditionExpr} AS product_condition_doc
        FROM order_items oi
        JOIN orders o ON o.id = oi.order_id
@@ -338,6 +345,7 @@ returnRoutes.post('/', async (c) => {
       stage: string | null;
       shipping_type: string | null;
       seller_type: string | null;
+      membership_tier_snapshot: string | null;
       product_condition_doc: string | null;
     }>();
   let item: Awaited<ReturnType<typeof readItem>>;
@@ -498,9 +506,15 @@ returnRoutes.post('/', async (c) => {
   const now = Date.now();
   const deliveredMs = Date.parse(deliveredAt);
   if (!Number.isFinite(deliveredMs)) throw badRequest('Delivery time for this item could not be read — contact support');
-  const withinWindow = now <= deliveredMs + WINDOW_MS;
+  // 7 days, or 14 for an order bought under an active PRO (owner, 2026-11-19).
+  const terms = returnTermsFor(item.membership_tier_snapshot);
+  const withinWindow = now <= deliveredMs + returnWindowMs(terms);
   if (!withinWindow) {
-    throw badRequest('The 7-day return window for this item has closed (counted from its delivery)', 'RETURN_WINDOW_CLOSED');
+    throw badRequest(
+      `The ${terms.window_days}-day return window for this item has closed (counted from its delivery)`,
+      'RETURN_WINDOW_CLOSED',
+      { window_days: terms.window_days }
+    );
   }
 
   if (qty > Number(item.item_qty)) throw badRequest(`qty exceeds the ordered quantity (${item.item_qty})`);
@@ -768,8 +782,19 @@ returnRoutes.get('/', async (c) => {
   }
   sql += ' ORDER BY rc.requested_at DESC LIMIT 100';
   const { results } = await c.env.DB.prepare(sql).bind(...params).all<ReturnCaseRow>();
+  // THE ORDER'S RETURN TERMS (owner, 2026-11-19): the window and whether the
+  // return is fee-free, from the tier it was bought under — so the page counts
+  // the days left with the server's figure, never a copy of the rule.
+  let terms: ReturnTerms | null = null;
+  if (orderId) {
+    const order = await c.env.DB.prepare('SELECT membership_tier_snapshot FROM orders WHERE id = ? AND user_id = ?')
+      .bind(orderId, user.id)
+      .first<{ membership_tier_snapshot: string | null }>();
+    if (order) terms = returnTermsFor(order.membership_tier_snapshot);
+  }
   return c.json({
     success: true,
+    ...(terms ? { terms } : {}),
     cases: results.map((r) =>
       casePublic(r, {
         item: { name: r.name_snapshot, image: r.image_snapshot, variant: r.option_snapshot },
@@ -782,9 +807,11 @@ returnRoutes.get('/', async (c) => {
 
 returnRoutes.get('/admin/queue', requireAdmin, async (c) => {
   const state = str(c.req.query('state'), 'state', { max: 20, required: false });
-  let sql = `SELECT rc.*, oi.name_snapshot, oi.image_snapshot, oi.option_snapshot, u.email, u.username
+  let sql = `SELECT rc.*, oi.name_snapshot, oi.image_snapshot, oi.option_snapshot, u.email, u.username,
+                    o.membership_tier_snapshot
                FROM return_cases rc
                JOIN order_items oi ON oi.id = rc.order_item_id
+               LEFT JOIN orders o ON o.id = rc.order_id
                LEFT JOIN users u ON u.id = rc.user_id`;
   const params: unknown[] = [];
   if (state && (RETURN_STATES as readonly string[]).includes(state)) {
@@ -792,7 +819,7 @@ returnRoutes.get('/admin/queue', requireAdmin, async (c) => {
     params.push(state);
   }
   sql += ' ORDER BY rc.requested_at DESC LIMIT 200';
-  const { results } = await c.env.DB.prepare(sql).bind(...params).all<ReturnCaseRow>();
+  const { results } = await c.env.DB.prepare(sql).bind(...params).all<ReturnCaseRow & { membership_tier_snapshot?: string | null }>();
   return c.json({
     success: true,
     cases: results.map((r) =>
@@ -801,6 +828,8 @@ returnRoutes.get('/admin/queue', requireAdmin, async (c) => {
         email: r.email,
         username: r.username,
         user_id: r.user_id,
+        // Bought under PRO (owner, 2026-11-19): no return delivery and no restocking fee is charged to this customer.
+        free_return: returnTermsFor(r.membership_tier_snapshot).free_return,
       })
     ),
   });

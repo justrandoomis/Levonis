@@ -253,7 +253,7 @@ test('the admin form runs the SAME arithmetic and constants as the server', () =
   }
 });
 
-test('resolver: the percent fee is identical for free, PRIME and PRO; the totals ride in the resolved warranty', () => {
+test('resolver: the percent fee is the same list dinar for every tier (PRO pays it at the services discount); the totals ride in the resolved warranty', () => {
   const doc = parseProductRow({
     id: 'p_x1', slug: 'x1', name: 'X1', name_ar: 'X1', price_iqd: 899_000, prime_price_iqd: 885_000, pro_price_iqd: 799_000,
     options: '[]', colors: '[]', selling_type: 'direct_sale', warranty_plans: PRINTER_PLANS, ops_policy: OPS,
@@ -269,12 +269,15 @@ test('resolver: the percent fee is identical for free, PRIME and PRO; the totals
     const r = resolveUnitPrice({ product: doc, warrantyPlanId: 'wp_ext12', tier: t.tier, tierActive: t.tierActive });
     assert.deepEqual(r.errors, []);
     assert.equal(r.applied_iqd, t.applied);
-    assert.equal(r.warranty?.fee_iqd, 67_425, `${t.tier} pays the same warranty dinar`);
+    // Owner, 2026-11-19: an active PRO pays every service at the PRO services discount (50%).
+    const fee = t.tier === 'pro' ? 33_713 : 67_425;
+    assert.equal(r.warranty?.fee_iqd, fee, `${t.tier} pays ${fee}`);
+    assert.equal(r.warranty?.fee_before_discount_iqd, t.tier === 'pro' ? 67_425 : undefined);
     assert.equal(r.warranty?.basis_iqd, 899_000);
     assert.equal(r.warranty?.base_months, 12);
     assert.equal(r.warranty?.total_months, 24);
     assert.equal(r.warranty?.title_en, 'Extended warranty +12 months');
-    assert.equal(r.unit_subtotal_iqd, t.applied + 67_425);
+    assert.equal(r.unit_subtotal_iqd, t.applied + fee);
   }
   const b = resolveUnitPrice({ product: doc, warrantyPlanId: 'wp_ext24', tier: 'free', tierActive: false });
   assert.deepEqual([b.warranty?.fee_iqd, b.warranty?.duration_months, b.warranty?.total_months], [89_900, 24, 36]);

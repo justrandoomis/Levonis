@@ -65,6 +65,7 @@ import {
   netFee,
   optionDelta,
   pickupOf,
+  proSavingOf,
   readyToBuy,
   servicesOnly,
   signedMoney,
@@ -140,6 +141,12 @@ export function warmSheet(offer: ServicesOffer, kitsFor: KitsFor | null, lang: P
     void warmed(membersKey(userId), () => loadMembershipOptions()).catch(() => undefined);
   }
 }
+/** «PRO −50%» on the services (owner, 2026-11-19): the saving the server reported for this draft. */
+const PRO_SAVING: Record<PsLang, (pct: number, amount: string) => string> = {
+  ar: (pct, amount) => `خصم PRO ${pct}% على الخدمات: وفّرت ${amount}`,
+  en: (pct, amount) => `PRO ${pct}% off services: you save ${amount}`,
+  ckb: (pct, amount) => `داشکاندنی PRO ${pct}% بۆ خزمەتگوزارییەکان: ${amount} پاشەکەوت دەکەیت`,
+};
 
 type DraftQuote = { key: string; state: 'fresh' | 'failed'; unit: number | null; sel: QuotedSelection | null };
 
@@ -424,6 +431,8 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const stale = !shownQuote && !!figures;
   const unit = figures?.unit ?? null;
   const dFee = figures ? figures.sel.delivery_fee_iqd : null;
+  /** The PRO services discount on this draft (owner, 2026-11-19): a server figure, only shown. */
+  const proSaved = figures ? proSavingOf(figures.sel, draft.delivery) : 0;
   /** Anything the folded «تفاصيل السعر» would list. */
   // Under an anchor the services line is what the draft does to the PRICE (the server's net figure).
   const net = figures && anchor ? netFee(figures.sel) : null;
@@ -702,6 +711,11 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
                   {servicesSaid !== null ? <span className="block tabular-nums" data-sheet-services>{s.services}: <bdi>{servicesSaid}</bdi></span> : null}
                   {dFee !== null ? <span className="block tabular-nums" dir="auto">{s.deliveryLine}: {dFee === 0 ? s.free : `+ ${money(dFee)}`}</span> : null}
                   {dFee !== null && dFee > 0 ? <span className="block">{s.deliveryApart}</span> : null}
+                  {proSaved > 0 && figures?.sel.pro_discount ? (
+                    <span className="block font-semibold tabular-nums text-success" dir="auto" data-sheet-pro-saving>
+                      {PRO_SAVING[lang](figures.sel.pro_discount.pct, money(proSaved))}
+                    </span>
+                  ) : null}
                   {/* Phase 2: their own cart lines — each figure from its own endpoint, never added to the total. */}
                   {memberCharge !== null ? <span className="block tabular-nums" dir="auto" data-sheet-membership-charge>{s.membership}: + {money(memberCharge)}</span> : null}
                   {kitTotal !== null ? <span className="block tabular-nums" dir="auto" data-sheet-kit-total>{s.filament}: + {money(kitTotal)}</span> : null}

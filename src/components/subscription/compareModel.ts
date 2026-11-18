@@ -10,8 +10,8 @@
  * lists had nothing left to explain.
  */
 import type { PaidTier } from './tierMeta';
-import { ENTITLEMENT_LABELS } from './tierMeta';
-import type { PlanFeatures } from './types';
+import { ENTITLEMENT_LABELS, FILAMENT_LIMITS_PER_30_DAYS } from './tierMeta';
+import type { FilamentLimits, PlanFeatures, ProExtras } from './types';
 import {
   codTaxLine,
   discountSections,
@@ -50,8 +50,44 @@ export interface CompareInput {
   benefits: PlanBenefits | null;
   features: PlanFeatures | null;
   points: Partial<Record<PaidTier, number>> | null;
+  /** PRO's services discount and return windows from GET /plans (null while paused or on an older server). */
+  proExtras?: ProExtras | null;
+  /** The filament limits the checkout enforces (GET /plans); absent = the launch figures. */
+  filamentLimits?: FilamentLimits | null;
   loc: Loc;
   money: Money;
+}
+
+/** The limits to state: the server's, else the launch figures; null when the limit is switched off. */
+function filamentTable(limits: FilamentLimits | null | undefined): { days: number; free: number | null; byTier: Record<PaidTier, number | null> } | null {
+  if (limits && !limits.enabled) return null;
+  if (limits) return { days: limits.window_days, free: limits.per_tier.none, byTier: { plus: limits.per_tier.plus, prime: limits.per_tier.prime, pro: limits.per_tier.pro } };
+  const f = FILAMENT_LIMITS_PER_30_DAYS;
+  return { days: 30, free: f.free, byTier: { plus: f.plus, prime: f.prime, pro: f.pro } };
+}
+
+/** «حتى 100 بكرة» / «بلا حد» — one tier's filament limit. */
+export function filamentLimitLine(limit: number | null, loc: Loc): string {
+  if (limit === null) return loc('بلا حد', 'Unlimited', 'بێ سنوور');
+  return loc(`حتى ${limit} بكرة`, `Up to ${limit} spools`, `تا ${limit} لوولە`);
+}
+
+/** The PRO services discount line, with the server's percent. */
+export function servicesDiscountLine(pct: number, loc: Loc): string {
+  return loc(
+    `خصم ${pct}% على الضمان وليفو كير والتغليف الإضافي والتوصيل الشخصي وخدمات الطابعات`,
+    `${pct}% off the warranty, Levo Care, extra packaging, Personal delivery and printer services`,
+    `${pct}% داشکاندن بۆ گەرەنتی، لیڤۆ کێر، پێچانەوەی زیادە، گەیاندنی تایبەت و خزمەتگوزارییەکانی چاپکەر`
+  );
+}
+
+/** The PRO return line, with the server's window. */
+export function freeReturnLine(days: number, loc: Loc): string {
+  return loc(
+    `إرجاع خلال ${days} يومًا بلا أجرة شحن ولا رسوم`,
+    `${days}-day returns with no return delivery or restocking fee`,
+    `گەڕاندنەوە لە ماوەی ${days} ڕۆژدا بێ کرێی گەیاندن و بێ کرێی تر`
+  );
 }
 
 const YES: CompareCell = { kind: 'yes' };
@@ -63,7 +99,7 @@ export function rowIsUniform(row: CompareRow, tiers: PaidTier[]): boolean {
   return new Set(tiers.map((t) => sig(row.cells[t]))).size <= 1;
 }
 
-export function buildCompare({ tiers, contract, benefits, features, points, loc, money }: CompareInput): CompareModel {
+export function buildCompare({ tiers, contract, benefits, features, points, proExtras, filamentLimits, loc, money }: CompareInput): CompareModel {
   const notes: string[] = [];
   const note = (text: string): number => {
     const at = notes.indexOf(text);
@@ -116,6 +152,46 @@ export function buildCompare({ tiers, contract, benefits, features, points, loc,
   for (const key of ['exclusiveSections', 'exclusiveCoupons', 'memberOffers']) {
     const row = tick(key);
     if (row) shopping.push(row);
+  }
+  // PRO, RETURNED (owner, 2026-11-19): the services discount — the tick from
+  // the contract, the percent from the server's price list.
+  const services = tick('proServicesDiscount');
+  if (services) {
+    const pct = proExtras?.services_discount_pct ?? null;
+    shopping.push({
+      ...services,
+      cells: Object.fromEntries(
+        tiers.map((t) => [t, has(t, 'proServicesDiscount') ? (pct !== null && pct > 0 ? ({ kind: 'text', lines: [`${pct}%`] } as CompareCell) : YES) : NO])
+      ) as Record<PaidTier, CompareCell>,
+      note: note(
+        loc(
+          'يشمل الضمان الممتد وليفو كير والتغليف الإضافي والفحص قبل الشحن والأكاديمية والتوصيل الشخصي للطابعة، على عنوانك الافتراضي المعتمد.',
+          'Covers the extended warranty, Levo Care, extra packaging, the pre-dispatch inspection, the academy and the printer’s Personal delivery, at your approved default address.',
+          'گەرەنتی درێژکراوە، لیڤۆ کێر، پێچانەوەی زیادە، پشکنین پێش ناردن، ئەکادیمیا و گەیاندنی تایبەتی چاپکەر دەگرێتەوە، لە ناونیشانی بنەڕەتیی پەسەندکراوت.'
+        )
+      ),
+    });
+  }
+  // Filament: pieces of one product per window, per tier (owner, 2026-11-19).
+  const filament = filamentTable(filamentLimits);
+  if (filament && tiers.length > 0) {
+    const { days, free } = filament;
+    shopping.push({
+      key: 'filament_limit',
+      label: loc(`كمية الفلمنت من المنتج نفسه كل ${days} يومًا`, `Filament of one product per ${days} days`, `فیلامێنتی هەمان بەرهەم لە هەر ${days} ڕۆژێکدا`),
+      cells: Object.fromEntries(
+        tiers.map((t) => [t, { kind: 'text', lines: [filamentLimitLine(filament.byTier[t], loc)] } as CompareCell])
+      ) as Record<PaidTier, CompareCell>,
+      note: note(
+        free === null
+          ? loc('بلا اشتراك: بلا حد.', 'Without a membership: unlimited.', 'بێ بەشداریکردن: بێ سنوور.')
+          : loc(
+              `بلا اشتراك: حتى ${free} بكرة من المنتج نفسه كل ${days} يومًا.`,
+              `Without a membership: up to ${free} spools of one product per ${days} days.`,
+              `بێ بەشداریکردن: تا ${free} لوولە لە هەمان بەرهەم لە هەر ${days} ڕۆژێکدا.`
+            )
+      ),
+    });
   }
 
   // ------------------------------------------------- delivery and payment
@@ -176,6 +252,33 @@ export function buildCompare({ tiers, contract, benefits, features, points, loc,
   const service: CompareRow[] = [];
   const priority = tick('priorityService');
   if (priority) service.push(priority);
+  // Returns (owner, 2026-11-19): every column states its window; PRO's is
+  // longer and fee-free. The tick decides who holds it, the days are the server's.
+  if (tick('proFreeReturn14')) {
+    const days = proExtras?.return_window_days ?? { default: 7, pro: 14 };
+    service.push({
+      key: 'proFreeReturn14',
+      label: loc('مدة الإرجاع', 'Return window', 'ماوەی گەڕاندنەوە'),
+      cells: Object.fromEntries(
+        tiers.map((t) => [
+          t,
+          {
+            kind: 'text',
+            lines: has(t, 'proFreeReturn14')
+              ? [loc(`${days.pro} يومًا`, `${days.pro} days`, `${days.pro} ڕۆژ`), loc('بلا أجرة إرجاع ولا رسوم', 'No return fees', 'بێ کرێی گەڕاندنەوە')]
+              : [loc(`${days.default} أيام`, `${days.default} days`, `${days.default} ڕۆژ`)],
+          } as CompareCell,
+        ])
+      ) as Record<PaidTier, CompareCell>,
+      note: note(
+        loc(
+          'تُحتسب من تاريخ الاستلام، بحسب الاشتراك وقت الشراء، ويجب أن يكون المنتج بحالة قابلة للإرجاع.',
+          'Counted from delivery, by the membership held at purchase; the item must be in returnable condition.',
+          'لە بەرواری وەرگرتنەوە دەژمێردرێت، بەپێی بەشداریکردن لە کاتی کڕین؛ کاڵاکە دەبێت لە دۆخێکی گەڕاندنەوەپێکراودا بێت.'
+        )
+      ),
+    });
+  }
   const twelve = tick('priorityDelivery12h');
   if (twelve) {
     service.push({
@@ -224,9 +327,9 @@ export function buildCompare({ tiers, contract, benefits, features, points, loc,
  */
 export function tierHighlights(
   tier: PaidTier,
-  input: Pick<CompareInput, 'contract' | 'benefits' | 'points' | 'loc' | 'money'>
+  input: Pick<CompareInput, 'contract' | 'benefits' | 'points' | 'loc' | 'money' | 'proExtras' | 'filamentLimits'>
 ): string[] {
-  const { contract, benefits, points, loc, money } = input;
+  const { contract, benefits, points, proExtras, filamentLimits, loc, money } = input;
   const has = (key: string) => contract?.[tier]?.[key] === true;
   const out: string[] = [];
   if (tier === 'plus') {
@@ -243,6 +346,23 @@ export function tierHighlights(
     }
     return out.slice(0, 3);
   }
+  // PRO, RETURNED (owner, 2026-11-19): what the card is chiefly for now comes
+  // first — the services discount, the 14-day fee-free return and unlimited
+  // filament — each only where the contract grants it.
+  // BNPL stays among them; the product discounts and free delivery are in the comparison below the card.
+  if (tier === 'pro') {
+    const pct = proExtras?.services_discount_pct ?? null;
+    if (has('proServicesDiscount') && pct !== null && pct > 0) out.push(servicesDiscountLine(pct, loc));
+    if (has('proFreeReturn14')) out.push(freeReturnLine(proExtras?.return_window_days.pro ?? 14, loc));
+    const filament = filamentTable(filamentLimits);
+    if (filament && filament.byTier.pro === null && filament.free !== null) {
+      out.push(loc('شراء الفلمنت بلا حد للكمية', 'Unlimited filament quantity', 'کڕینی فیلامێنت بێ سنووری بڕ'));
+    }
+    if (has('bnpl')) {
+      out.push(loc('اشترِ الآن وادفع لاحقًا (BNPL) — حصريًا لـ PRO المؤهل', 'Buy Now, Pay Later (BNPL) — exclusively for eligible PRO members', 'ئێستا بکڕە و دواتر بدە (BNPL) — تەنها بۆ PRO ی گونجاو'));
+    }
+    if (out.length >= 3) return out.slice(0, 4);
+  }
   const b = benefits?.[tier] ?? null;
   const first = discountSections(b, loc)[0];
   if (first) out.push(...sectionLines(first, loc, money).slice(0, 1));
@@ -254,7 +374,7 @@ export function tierHighlights(
   if (tier === 'prime' && has('premiumBadge')) {
     out.push(loc('شارة PREMIUM مميزة في مجتمع ليفو', 'A distinctive PREMIUM badge in the Levo community', 'نیشانەیەکی تایبەتی PREMIUM لە کۆمەڵگەی لیڤۆ'));
   }
-  if (tier === 'pro' && has('bnpl')) {
+  if (tier === 'pro' && has('bnpl') && !out.some((l) => l.includes('BNPL'))) {
     out.push(loc('اشترِ الآن وادفع لاحقًا (BNPL) — حصريًا لـ PRO المؤهل', 'Buy Now, Pay Later (BNPL) — exclusively for eligible PRO members', 'ئێستا بکڕە و دواتر بدە (BNPL) — تەنها بۆ PRO ی گونجاو'));
   }
   const x = points?.[tier];
@@ -265,5 +385,6 @@ export function tierHighlights(
   // PREMIUM members only (`selectRule` matches the tier exactly), so the PRO
   // card must not promise one the checkout will not give.
   out.push(loc('يشمل جميع مزايا PLUS', 'Includes all PLUS benefits', 'هەموو سوودەکانی PLUS دەگرێتەوە'));
-  return out.slice(0, 3);
+  // PRO carries the three new lines and its own discount: four, the rest in the comparison.
+  return out.slice(0, tier === 'pro' ? 4 : 3);
 }

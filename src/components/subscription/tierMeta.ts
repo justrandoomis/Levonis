@@ -183,7 +183,18 @@ export const ENTITLEMENT_LABELS: Record<string, { ar: string; en: string; ckb: s
   premiumDelivery: { ar: 'توصيل PREMIUM المجاني', en: 'PREMIUM free delivery', ckb: 'گەیاندنی بێبەرامبەری PREMIUM' },
   bnpl: { ar: 'اشترِ الآن وادفع لاحقًا', en: 'Buy now, pay later', ckb: 'ئێستا بکڕە و دواتر بدە' },
   priorityDelivery12h: { ar: 'تجهيز وتوصيل خلال 12 ساعة', en: '12-hour preparation and delivery', ckb: 'خزمەتی ١٢ کاتژمێر' },
+  proServicesDiscount: { ar: 'خصم على خدمات الطابعات والتوصيل الشخصي', en: 'Discount on printer services and Personal delivery', ckb: 'داشکاندن بۆ خزمەتگوزارییەکانی چاپکەر و گەیاندنی تایبەت' },
+  proFreeReturn14: { ar: 'إرجاع خلال 14 يومًا بلا رسوم', en: '14-day return with no fees', ckb: 'گەڕاندنەوە لە ماوەی 14 ڕۆژدا بێ کرێ' },
 };
+
+/**
+ * FILAMENT PURCHASE LIMITS PER TIER (owner, 2026-11-19): pieces of ONE
+ * filament product a customer may buy in any 30 days; null = unlimited (PRO).
+ * The comparison states what GET /plans sends (`filament_limits`, the
+ * configuration the checkout enforces); these launch figures stand in only
+ * for an older server that sends none.
+ */
+export const FILAMENT_LIMITS_PER_30_DAYS: Record<AnyTier, number | null> = { free: 50, plus: 100, prime: 250, pro: null };
 
 /**
  * What stands between a figure and its duration. A middle dot beside

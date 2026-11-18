@@ -130,6 +130,8 @@ export async function saveDraft(db: D1Database, actorId: string, draft: unknown,
     if (ins && typeof ins === 'object' && ins.labor_iqd === undefined) ins.labor_iqd = state.draft.inspection.labor_iqd ?? null;
     keepPhase4Fields(d as unknown as Record<string, unknown>, state.draft);
     keepPhase6Fields(d as unknown as Record<string, unknown>, state.draft);
+    // The PRO services discount (2026-11-19): a page that does not send it keeps the stored percent.
+    if (d.pro_discount_pct === undefined && state.draft.pro_discount_pct !== undefined) d.pro_discount_pct = state.draft.pro_discount_pct;
   }
   const issues = configIssues(draft);
   if (issues.length) throw badRequest(`Invalid printer services: ${issues.slice(0, 5).join('; ')}`, 'PRINTER_SERVICES_INVALID');
@@ -556,12 +558,15 @@ export function offerForLine(offer: ServicesOffer, resolved: { applied_iqd: numb
 export function pricedServicesView(p: PricedServices): {
   fee_iqd: number; lines: PricedServices['lines']; warranty_months: number; delivery_fee_iqd: number | null; blockers: string[];
   anchor_fee_iqd?: number; net_fee_iqd?: number;
+  /** PRO services discount (owner, 2026-11-19): what this PRO saves per unit, services and Personal delivery. */
+  pro_discount?: PricedServices['pro_discount'];
 } {
   const anchored = typeof p.anchor_fee_iqd === 'number';
   const anchor = anchorFeeOf(p);
   return {
     fee_iqd: p.fee_iqd, lines: p.lines, warranty_months: p.warranty_months, delivery_fee_iqd: p.delivery_fee_iqd, blockers: p.blockers,
     ...(anchored ? { anchor_fee_iqd: anchor, net_fee_iqd: p.fee_iqd - anchor } : {}),
+    ...(p.pro_discount ? { pro_discount: p.pro_discount } : {}),
   };
 }
 
@@ -679,7 +684,7 @@ export function serviceTaskStatements(
  */
 export function orderServicesView(snapshot: string): {
   selection: Record<string, unknown> | null;
-  lines: Array<{ service: string; choice: string; fee_iqd: number; policy_version?: number }>;
+  lines: Array<{ service: string; choice: string; fee_iqd: number; policy_version?: number; fee_before_discount_iqd?: number; pro_discount_iqd?: number }>;
   fee_iqd: number;
   package_discount_iqd: number;
   warranty_months: number;
@@ -709,6 +714,10 @@ export function orderServicesView(snapshot: string): {
           choice: String(l.choice ?? ''),
           fee_iqd: num(l.fee_iqd),
           ...(typeof l.policy_version === 'number' ? { policy_version: l.policy_version } : {}),
+          // PRO services discount (2026-11-19): the list fee and the saving, when the line had one.
+          ...(typeof l.fee_before_discount_iqd === 'number' && typeof l.pro_discount_iqd === 'number'
+            ? { fee_before_discount_iqd: l.fee_before_discount_iqd, pro_discount_iqd: l.pro_discount_iqd }
+            : {}),
         }))
       : [],
     fee_iqd: num(v.fee_iqd),

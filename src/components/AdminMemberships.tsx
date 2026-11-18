@@ -30,6 +30,7 @@ import { STRINGS, shortDate, type S } from './adminMemberships/strings';
  * maintains two consoles.
  */
 import SupportQueue from './adminSupport/SupportQueue';
+import FilamentLimitsCard from './adminMemberships/FilamentLimitsCard';
 import type { MemberRow } from './adminMemberships/types';
 
 /**
@@ -917,7 +918,10 @@ export default function AdminMemberships() {
       ) : tab === 'queue' ? (
         <SupportQueue />
       ) : (
-        <PlansSection lang={lang} />
+        <>
+          <PlansSection lang={lang} />
+          <FilamentLimitsCard />
+        </>
       )}
     </div>
   );

@@ -155,8 +155,11 @@ export function signedMoney(iqd: number, money: (v: number) => string): string {
 /** The gold edge of a chosen row — one inline rule beside the house's pressed fill (no stylesheet of its own). */
 export const CHOSEN_EDGE = { borderColor: 'color-mix(in oklab, var(--color-gold) 55%, transparent)' } as const;
 
-/** One priced service of a selection, as the server sent it. */
-export interface QuotedLine { service: string; choice: string; fee_iqd: number }
+/** One priced service of a selection, as the server sent it (with the PRO list fee and saving when the discount applied). */
+export interface QuotedLine { service: string; choice: string; fee_iqd: number; fee_before_discount_iqd?: number; pro_discount_iqd?: number }
+
+/** What the PRO services discount took off one unit (owner, 2026-11-19), as the server sent it. */
+export interface QuotedProDiscount { pct: number; services_iqd: number; personal_before_iqd: number | null; personal_iqd: number }
 
 /** A selection priced by the server (the quote's, or the cart line's `priced`). */
 export interface QuotedSelection {
@@ -169,6 +172,15 @@ export interface QuotedSelection {
   anchor_fee_iqd?: number;
   /** Phase 6: `fee_iqd − anchor_fee_iqd` — what the choice adds to (or takes from) the price. */
   net_fee_iqd?: number;
+  /** Present only for an active PRO whose services were discounted. */
+  pro_discount?: QuotedProDiscount;
+}
+
+/** The PRO saving on this draft per unit: the service lines, plus Personal delivery when it is the chosen one. */
+export function proSavingOf(q: QuotedSelection | null | undefined, delivery: DeliveryChoice | null): number {
+  const d = q?.pro_discount;
+  if (!d) return 0;
+  return d.services_iqd + (delivery === 'personal' && q?.delivery_fee_iqd != null ? d.personal_iqd : 0);
 }
 
 /** The quote's `printer_services` block. */

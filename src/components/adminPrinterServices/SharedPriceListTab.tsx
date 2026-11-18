@@ -13,12 +13,14 @@ import { useState, type ReactNode } from 'react';
 import { formatIqd } from '../../lib/api';
 import {
   DELIVERY_CLASSES,
+  PRO_SERVICES_DISCOUNT_MAX_PCT,
   WARRANTY_FAMILIES,
   classesFor,
   deliveryRow,
   pickupOf,
   presetPrices,
   priceAnchorOf,
+  proServicesDiscountPct,
   type DeliveryClass,
   type PrinterServicesConfig,
   type WarrantyFamily,
@@ -219,6 +221,18 @@ export default function SharedPriceListTab({ draft, upd, loc, published, product
             <InspectionLaborField draft={draft} upd={upd} loc={loc} />
             {num(draft.academy.recorded_iqd, (n) => upd((d) => { d.academy.recorded_iqd = n; }), loc('فيديوهات مسجلة', 'Recorded videos', 'ڤیدیۆی تۆمارکراو'))}
             {num(draft.academy.live_iqd, (n) => upd((d) => { d.academy.live_iqd = n; }), loc('دورة مباشرة', 'Live course', 'خولی ڕاستەوخۆ'))}
+            {/* The PRO services discount (owner, 2026-11-19): absent in a stored list = 50%. */}
+            <div data-pro-services-discount>
+              {num(proServicesDiscountPct(draft), (n) => upd((d) => { d.pro_discount_pct = Math.min(PRO_SERVICES_DISCOUNT_MAX_PCT, n ?? 0); }),
+                loc('خصم PRO على الخدمات والتوصيل الشخصي %', 'PRO discount on services and Personal delivery %', 'داشکاندنی PRO بۆ خزمەتگوزارییەکان و گەیاندنی تایبەت %'))}
+              <p className="mt-1 text-[11px] text-text-muted">
+                {loc(
+                  'يسري على الضمان وليفو كير والتغليف الإضافي والفحص والأكاديمية والتوصيل الشخصي لمشترك PRO الفعّال. 0 = بلا خصم.',
+                  'Applies to the warranty, Levo Care, extra packaging, inspection, academy and Personal delivery for an active PRO member. 0 = no discount.',
+                  'بۆ گەرەنتی، لیڤۆ کێر، پێچانەوەی زیادە، پشکنین، ئەکادیمیا و گەیاندنی تایبەت بۆ ئەندامی چالاکی PRO جێبەجێ دەبێت. 0 = بێ داشکاندن.',
+                )}
+              </p>
+            </div>
           </div>)}
 
         {group('packages', say(loc, S.grpPackages), (['smart', 'complete'] as const).filter((id) => draft.packages[id].active).map((id) => say(loc, pkgName(id))).join(' · '),

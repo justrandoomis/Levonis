@@ -195,6 +195,8 @@ table and nothing else.
 | `priorityService` — priority on warranty and support | PRO | devices.ts, support.ts |
 | `priorityDelivery12h` — 12-hour preparation and delivery, where the method, shipping type, area and address qualify | PRO | priorityDelivery.ts |
 | `bnpl` — buy now, pay later (approved account, verified identity, approved address, credit limit) | PRO | bnpl.ts, `/api/memberships/bnpl*` |
+| `proServicesDiscount` — the printer services (warranty, Levo Care, extra packaging, inspection, academy), Personal delivery and a legacy warranty plan at the price list's `pro_discount_pct` off (absent = 50; owner 2026-11-19, DECISIONS row 358). Follows the PRO pricing context (approved default address; a restriction on `proPricing` pauses it too) | PRO | `priceServices` / `resolveUnitPrice` (packages/pricing) |
+| `proFreeReturn14` — 14 days to request a return instead of 7, with no return delivery or restocking fee, for an order bought under PRO (`orders.membership_tier_snapshot`) | PRO | worker/lib/returnWindow.ts, returns.ts; returns policy v5 |
 | `proExclusive` | PRO | defined; nothing reads it, so the page does not list it |
 
 Conditional perks the page lists only when switched on: the pre-order

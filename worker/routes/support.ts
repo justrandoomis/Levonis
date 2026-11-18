@@ -797,7 +797,7 @@ const T: Record<Locale, Record<string, string>> = {
     member_pending_launch: 'عضوية {tier} مدفوعة ومحجوزة بالكامل؛ تبدأ مدتها عند الإطلاق المعلن.',
     member_link: 'صفحة العضوية',
     returns_help:
-      'يمكنك طلب الإرجاع خلال 7 أيام من التسليم الفعلي في حالات: عيب مصنعي، خلل في التصنيع، اختلاف عن الوصف، منتج خاطئ، أو ضرر أثناء الشحن. تُحسب المدة من تسليم البند المتأثر نفسه، والطلب المقدَّم ضمن المدة يبقى ضمنها حتى لو تأخرت المراجعة. افتح الطلب لبدء الإرجاع.',
+      'يمكنك طلب الإرجاع خلال 7 أيام من التسليم الفعلي (14 يومًا بلا رسوم إرجاع للطلب المشترى باشتراك PRO) في حالات: عيب مصنعي، خلل في التصنيع، اختلاف عن الوصف، منتج خاطئ، أو ضرر أثناء الشحن. تُحسب المدة من تسليم البند المتأثر نفسه، والطلب المقدَّم ضمن المدة يبقى ضمنها حتى لو تأخرت المراجعة. افتح الطلب لبدء الإرجاع.',
     password_signed_in:
       'لتغيير كلمة المرور: الإعدادات ← الأمان، مع إدخال كلمة المرور الحالية. إن نسيتها، سجّل الخروج ثم استخدم "نسيت كلمة المرور" في صفحة الدخول.',
     password_anon:
@@ -968,7 +968,7 @@ const T: Record<Locale, Record<string, string>> = {
     member_pending_launch: 'Your {tier} membership is paid and fully reserved; its term starts at the announced launch.',
     member_link: 'Membership page',
     returns_help:
-      'You can request a return within 7 days of actual delivery for: defective items, manufacturing faults, not-as-described goods, wrong items, or shipping damage. The window is measured from the delivery of the affected item — a timely request stays timely even if review happens later. Open the order to start a return.',
+      'You can request a return within 7 days of actual delivery (14 days, with no return fees, for an order bought under PRO) for: defective items, manufacturing faults, not-as-described goods, wrong items, or shipping damage. The window is measured from the delivery of the affected item — a timely request stays timely even if review happens later. Open the order to start a return.',
     password_signed_in:
       'To change your password: Settings → Security, entering your current password. If you forgot it, sign out and use "Forgot password" on the sign-in page.',
     password_anon:
@@ -1136,7 +1136,7 @@ const T: Record<Locale, Record<string, string>> = {
     member_pending_launch: 'ئەندامێتی {tier} پارەی دراوە و بە تەواوی حجزکراوە؛ ماوەکەی لە کاتی دەستپێکی ڕاگەیەنراودا دەست پێدەکات.',
     member_link: 'پەڕەی ئەندامێتی',
     returns_help:
-      'دەتوانیت لە ماوەی 7 ڕۆژ لە گەیاندنی ڕاستەقینەوە داوای گەڕاندنەوە بکەیت بۆ: کەموکوڕی، هەڵەی دروستکردن، جیاوازی لە وەسف، بەرهەمی هەڵە، یان زیانی گواستنەوە. ماوەکە لە گەیاندنی بڕگە کاریگەرەکەوە دەژمێردرێت — داواکاری لە کاتی خۆیدا لە کاتی خۆیدا دەمێنێتەوە تەنانەت ئەگەر پێداچوونەوە دواکەوت. داواکارییەکە بکەرەوە بۆ دەستپێکردنی گەڕاندنەوە.',
+      'دەتوانیت لە ماوەی 7 ڕۆژ لە گەیاندنی ڕاستەقینەوە داوای گەڕاندنەوە بکەیت (14 ڕۆژ و بێ کرێی گەڕاندنەوە بۆ داواکارییەک کە بە بەشداریکردنی PRO کڕدراوە) بۆ: کەموکوڕی، هەڵەی دروستکردن، جیاوازی لە وەسف، بەرهەمی هەڵە، یان زیانی گواستنەوە. ماوەکە لە گەیاندنی بڕگە کاریگەرەکەوە دەژمێردرێت — داواکاری لە کاتی خۆیدا لە کاتی خۆیدا دەمێنێتەوە تەنانەت ئەگەر پێداچوونەوە دواکەوت. داواکارییەکە بکەرەوە بۆ دەستپێکردنی گەڕاندنەوە.',
     password_signed_in:
       'بۆ گۆڕینی وشەی نهێنی: ڕێکخستنەکان ← ئاسایش، بە نووسینی وشەی نهێنی ئێستات. ئەگەر لەبیرت چووە، بچۆ دەرەوە و "وشەی نهێنیم لەبیرچووە" لە پەڕەی چوونەژوورەوە بەکاربهێنە.',
     password_anon:

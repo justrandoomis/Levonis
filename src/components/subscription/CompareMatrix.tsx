@@ -19,7 +19,7 @@ import { useLanguage } from '../../LanguageContext';
 import { useMoney } from '../../CurrencyContext';
 import { Segmented } from '../ui/Segmented';
 import { TIER_META, type AnyTier, type PaidTier } from './tierMeta';
-import type { ApiPlan, PlanFeatures } from './types';
+import type { ApiPlan, FilamentLimits, PlanFeatures, ProExtras } from './types';
 import { isolatedMoney, type PlanBenefits } from './benefitLines';
 import { buildCompare, rowIsUniform, type CompareCell } from './compareModel';
 
@@ -30,6 +30,10 @@ export interface CompareMatrixProps {
   benefits: PlanBenefits | null;
   features: PlanFeatures | null;
   points: Partial<Record<PaidTier, number>> | null;
+  /** PRO's services discount and return windows (GET /plans `pro_extras`). */
+  proExtras?: ProExtras | null;
+  /** The filament limits the checkout enforces (GET /plans `filament_limits`). */
+  filamentLimits?: FilamentLimits | null;
   currentTier: AnyTier;
   /** The tier chosen above, which the phone column follows until changed here. */
   selectedTier: PaidTier;
@@ -73,6 +77,8 @@ export function CompareMatrix({
   benefits,
   features,
   points,
+  proExtras = null,
+  filamentLimits = null,
   currentTier,
   selectedTier,
   loading,
@@ -88,8 +94,8 @@ export function CompareMatrix({
   useEffect(() => setColumn(selectedTier), [selectedTier]);
 
   const model = useMemo(
-    () => buildCompare({ tiers, contract, benefits, features, points, loc, money }),
-    [tiers, contract, benefits, features, points, loc, money]
+    () => buildCompare({ tiers, contract, benefits, features, points, proExtras, filamentLimits, loc, money }),
+    [tiers, contract, benefits, features, points, proExtras, filamentLimits, loc, money]
   );
 
   const priceOf = (tier: PaidTier) => {

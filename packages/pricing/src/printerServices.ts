@@ -316,6 +316,33 @@ export interface PrinterServicesConfig {
   kits?: FilamentKit[];
   /** Phase 4; optional in a stored config (`withPhase4Defaults`: absent = none). */
   addons?: PrinterAddon[];
+  /**
+   * THE PRO SERVICES DISCOUNT (owner, 2026-11-19): the percent an active PRO
+   * member saves on every paid service of a printer (warranty, Levo Care, extra
+   * packaging, inspection, academy) and on its Personal delivery. 0..90;
+   * absent = PRO_SERVICES_DISCOUNT_DEFAULT_PCT (50). `proServicesDiscountPct`.
+   */
+  pro_discount_pct?: number;
+}
+
+/** The owner's figure when the price list does not say: «خصم 50% على الخدمات» for PRO. */
+export const PRO_SERVICES_DISCOUNT_DEFAULT_PCT = 50;
+export const PRO_SERVICES_DISCOUNT_MAX_PCT = 90;
+
+/** The PRO services discount of a config, in percent (absent = 50). */
+export function proServicesDiscountPct(c: Pick<PrinterServicesConfig, 'pro_discount_pct'> | null | undefined): number {
+  const v = c?.pro_discount_pct;
+  return typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= PRO_SERVICES_DISCOUNT_MAX_PCT ? v : PRO_SERVICES_DISCOUNT_DEFAULT_PCT;
+}
+
+/**
+ * A fee after the PRO services discount. The discount is floored to a whole
+ * dinar, so the member never pays a fraction and the figure is the same on
+ * the product page, the cart, the order and the invoice.
+ */
+export function proDiscountedFee(fee: number, pct: number): number {
+  if (!(fee > 0) || !(pct > 0)) return fee;
+  return fee - Math.floor((fee * Math.min(pct, 100)) / 100);
 }
 
 /**
@@ -598,6 +625,12 @@ export function configIssues(raw: unknown): string[] {
   }
   if (c.kits !== undefined) out.push(...kitIssues(c.kits));
   if (c.addons !== undefined) out.push(...addonIssues(c.addons));
+  if (c.pro_discount_pct !== undefined) {
+    const v = c.pro_discount_pct as unknown;
+    if (!(typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= PRO_SERVICES_DISCOUNT_MAX_PCT)) {
+      out.push(`pro_discount_pct: whole percent 0..${PRO_SERVICES_DISCOUNT_MAX_PCT}`);
+    }
+  }
   return out;
 }
 
@@ -887,6 +920,7 @@ export function canonicalConfig(c: PrinterServicesConfig): PrinterServicesConfig
     membership: { active: m.active, tiers: MEMBERSHIP_TIERS.filter((t) => m.tiers.includes(t)) },
     kits,
     addons,
+    ...(c.pro_discount_pct !== undefined ? { pro_discount_pct: c.pro_discount_pct } : {}),
   };
 }
 
@@ -1103,8 +1137,24 @@ export type ServiceKey = 'warranty' | 'care' | 'packaging' | 'inspection' | 'aca
 export interface PricedServiceLine {
   service: ServiceKey;
   choice: string;
+  /** What the customer pays for this service, per unit (after the PRO discount when one applied). */
   fee_iqd: number;
   policy_version?: number;
+  /** PRO services discount: the list fee before it. Present only when the discount took something off. */
+  fee_before_discount_iqd?: number;
+  /** PRO services discount: what it took off this line, per unit. */
+  pro_discount_iqd?: number;
+}
+
+/** What the PRO services discount did to one printer unit's selection. */
+export interface PricedProDiscount {
+  pct: number;
+  /** Taken off the service lines, per unit (the sum of the lines' `pro_discount_iqd`). */
+  services_iqd: number;
+  /** Personal delivery before the discount, per unit (null = Personal not priced). */
+  personal_before_iqd: number | null;
+  /** Taken off Personal delivery, per unit (0 when not priced). */
+  personal_iqd: number;
 }
 
 export interface PricedServices {
@@ -1140,6 +1190,12 @@ export interface PricedServices {
   net_fee_iqd?: number;
   /** Phase 6: true when the line came with NO choice and the anchor priced it as the Smart package. */
   defaulted?: true;
+  /**
+   * PRO services discount (owner, 2026-11-19). Present only when the caller
+   * priced for an active PRO member and the discount is above zero; `lines`
+   * and `delivery_options.personal_iqd` are then already discounted.
+   */
+  pro_discount?: PricedProDiscount;
 }
 
 /** The anchor inside a priced / frozen services object (absent or malformed = 0). */
@@ -1237,7 +1293,17 @@ export const SERVICES_CODES: ReadonlySet<string> = new Set<string>([
  * only PREVIEW (the product page, the admin) ignore `SERVICES_NOT_CONFIRMED`;
  * the cart and the order refuse on any blocker.
  */
-export function priceServices(config: PrinterServicesConfig, classes: PrinterClasses, s: ServiceSelection): PricedServices {
+export function priceServices(
+  config: PrinterServicesConfig,
+  classes: PrinterClasses,
+  s: ServiceSelection,
+  /**
+   * `pro`: the line is priced for an active, unpaused PRO member inside the
+   * PRO pricing context (the resolver's `isPro`). Every paid service line and
+   * Personal delivery then cost `pro_discount_pct` less (owner, 2026-11-19).
+   */
+  opts?: { pro?: boolean }
+): PricedServices {
   const blockers = new Set<string>();
   const lines: PricedServiceLine[] = [];
   const fam = classes.warranty_family;
@@ -1288,10 +1354,28 @@ export function priceServices(config: PrinterServicesConfig, classes: PrinterCla
   }
   if (!s.confirmed) blockers.add(SERVICES_NOT_CONFIRMED);
 
+  // PRO SERVICES DISCOUNT (owner, 2026-11-19): every paid service line shows
+  // its list fee and what PRO took off; the line's fee_iqd is what is charged.
+  const proPct = opts?.pro === true ? proServicesDiscountPct(config) : 0;
+  let proServicesSaved = 0;
+  if (proPct > 0) {
+    for (let i = 0; i < lines.length; i++) {
+      const l = lines[i];
+      const after = proDiscountedFee(l.fee_iqd, proPct);
+      if (after === l.fee_iqd) continue;
+      lines[i] = { ...l, fee_iqd: after, fee_before_discount_iqd: l.fee_iqd, pro_discount_iqd: l.fee_iqd - after };
+      proServicesSaved += l.fee_iqd - after;
+    }
+  }
+
   const gross = lines.reduce((sum, l) => sum + l.fee_iqd, 0);
 
   const dRow = config.delivery.active ? deliveryRow(config, classes.delivery_class) : null;
-  const delivery_options = { economy_iqd: dRow?.economy_iqd ?? null, personal_iqd: dRow?.personal_iqd ?? null };
+  // Personal delivery is a paid service too: PRO pays it discounted. Economy is
+  // the ordinary delivery, waived (or not) by the free-delivery rules instead.
+  const personalList = dRow?.personal_iqd ?? null;
+  const personalAfter = personalList === null ? null : proDiscountedFee(personalList, proPct);
+  const delivery_options = { economy_iqd: dRow?.economy_iqd ?? null, personal_iqd: personalAfter };
   let delivery_fee_iqd: number | null = null;
   if (s.delivery) {
     // Phase 6: the warehouse pickup is free, and offered only while the owner's switch is on.
@@ -1314,6 +1398,16 @@ export function priceServices(config: PrinterServicesConfig, classes: PrinterCla
     revision: config.revision,
     selection: s,
     blockers: [...blockers],
+    ...(proPct > 0 && (proServicesSaved > 0 || (personalList !== null && personalAfter !== personalList))
+      ? {
+          pro_discount: {
+            pct: proPct,
+            services_iqd: proServicesSaved,
+            personal_before_iqd: personalList,
+            personal_iqd: personalList === null || personalAfter === null ? 0 : personalList - personalAfter,
+          },
+        }
+      : {}),
   };
 }
 
@@ -1377,6 +1471,8 @@ export interface ServicesOffer {
   addons: Array<{ id: string; title: Text3 | null }>;
   /** Phase 4: the store bundle product ids linked to this printer, in the owner's order (priced by GET /api/products/:slug/kits). */
   store_bundles: string[];
+  /** The PRO services discount in percent (owner, 2026-11-19): the prices above are list prices; an active PRO pays this much less. */
+  pro_discount_pct: number;
 }
 
 export function servicesOffer(config: PrinterServicesConfig, classes: PrinterClasses): ServicesOffer {
@@ -1419,6 +1515,7 @@ export function servicesOffer(config: PrinterServicesConfig, classes: PrinterCla
     kits: [],
     addons: [],
     store_bundles: [],
+    pro_discount_pct: proServicesDiscountPct(config),
   };
 }
 

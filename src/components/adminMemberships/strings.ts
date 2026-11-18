@@ -372,6 +372,8 @@ export const BENEFIT_LABELS: Record<string, { ar: string; en: string; ckb: strin
   verifiedMerchant: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
   proMerchantBadge: { ar: 'شارة التاجر PRO', en: 'PRO merchant badge', ckb: 'نیشانەی بازرگانی PRO' },
   exclusiveCoupons: { ar: 'كوبونات الأعضاء', en: 'Member coupons', ckb: 'کۆپۆنی ئەندامان' },
+  proServicesDiscount: { ar: 'خصم على خدمات الطابعات والتوصيل الشخصي', en: 'Discount on printer services and Personal delivery', ckb: 'داشکاندن بۆ خزمەتگوزارییەکانی چاپکەر و گەیاندنی تایبەت' },
+  proFreeReturn14: { ar: 'إرجاع خلال 14 يومًا بلا رسوم', en: '14-day return with no fees', ckb: 'گەڕاندنەوە لە ماوەی 14 ڕۆژدا بێ کرێ' },
 };
 
 export const CASE_TYPES = ['dropshipping_suspected', 'repeated_refusal', 'abuse', 'debt'] as const;

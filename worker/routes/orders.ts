@@ -27,6 +27,8 @@ import type { DeliveryMethod, CheckoutPaymentMethod, ProPriorityDeliveryConfig, 
 import { addDays, baghdadDay, baghdadDayOf, isDay } from '../lib/baghdadTime';
 import { COMPOSED_SNAPSHOT, costSnapshot, type CostBasis } from '../lib/financeLedger';
 import { orderInsertStatement, orderItemInsertStatement } from '../lib/orderRows';
+import { checkFilamentLimits, filamentLimitDetails, filamentLimitError, phoneKey, type FilamentLimitVerdict, type FilamentLimitsConfig } from '../lib/filamentLimits';
+import { tableColumns } from '../lib/schemaColumns';
 import { engineBasisOf, v2EstimateOf } from '../lib/pricingEngine/orderBasis';
 import { cleanStartInstalled } from '../lib/engineInstalled';
 import {
@@ -2068,6 +2070,8 @@ interface CheckoutBenefits {
 }
 
 export interface CheckoutComputation {
+  /** «حد الفلامنت الشهري» (0245): set only when a filament kind would pass its limit — a blocker. */
+  filamentLimit: FilamentLimitVerdict | null;
   address: Record<string, unknown>;
   delivery: DeliveryMethod;
   payment: CheckoutPaymentMethod | null;
@@ -2519,6 +2523,8 @@ export async function computeCheckout(
     // «إدارة التوصيل»: the standard tariff itself (default, governorates,
     // rule groups). A missing row reads as the pre-policy tariff.
     'deliveryPolicy',
+    // «حد الفلامنت الشهري» (0245): pieces of one filament kind per window, per plan.
+    'filamentMonthlyLimits',
   ]);
   const delivery = (settings.checkoutDeliveryMethods as DeliveryMethod[]).find((m) => m.id === input.deliveryMethodId);
   if (!delivery) throw badRequest('Please choose a valid delivery method');
@@ -3322,6 +3328,8 @@ export async function computeCheckout(
                 delivery_class: resolved.services.classes.delivery_class,
                 economy_iqd: resolved.services.delivery_options.economy_iqd,
                 personal_iqd: resolved.services.delivery_options.personal_iqd,
+                // PRO services discount (subscriptions session, 2026-11-19): Personal's list price, for the before/after.
+                ...(resolved.services.pro_discount ? { personal_before_discount_iqd: resolved.services.pro_discount.personal_before_iqd } : {}),
               },
             }
           : {}),
@@ -4589,9 +4597,29 @@ export async function computeCheckout(
     nowIso: new Date().toISOString(),
   });
 
+  /**
+   * «حد الفلامنت الشهري» (owner 2026-11-19; migration 0245): the units of each
+   * filament kind this order adds to what the window already holds — by this
+   * account, its verified phone, or THIS delivery phone. A printer's kit or
+   * add-on line, a gift line and a mystery spool do not count; a bundle's
+   * filament component does. The quote reports it as a blocker; the order door
+   * refuses it (placeOrder). Nothing is read when the rule is off, the plan is
+   * unlimited or the account is an admin.
+   */
+  const filamentVerdict = await checkFilamentLimits(c.env.DB, {
+    config: settings.filamentMonthlyLimits as FilamentLimitsConfig,
+    user,
+    tierStatus,
+    lines: priced.lines
+      .filter((l) => l.product_id && !l.kit && !l.addon && !l.gift && !l.mystery_spool)
+      .map((l) => ({ product_id: String(l.product_id), qty: l.qty })),
+    phones: [(address as { phone?: unknown }).phone],
+  });
+
   const policies = await getRequiredCheckoutPolicies(c.env);
 
   return {
+    filamentLimit: filamentVerdict && filamentVerdict.over.length > 0 ? filamentVerdict : null,
     address,
     delivery,
     payment,
@@ -4973,6 +5001,8 @@ function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
   if (comp.requiredAdvance > comp.walletApplied) blockers.push('ADVANCE_NOT_COVERED');
   // «سعر تقديري» (0218): the owner paused ordering at estimated prices — the order door refuses it too.
   if (comp.estimate?.ordering_paused) blockers.push('PRICE_ESTIMATE_ORDERING_PAUSED');
+  // «حد الفلامنت الشهري» (0245): the order door refuses it too (FILAMENT_LIMIT).
+  if (comp.filamentLimit) blockers.push('FILAMENT_LIMIT');
 
   return {
       /**
@@ -5216,6 +5246,8 @@ function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
           }
         : {}),
       blockers,
+      /** «حد الفلامنت الشهري» (0245): each filament kind over its limit, with the plan that raises it; null when none. */
+      filament_limit: comp.filamentLimit ? filamentLimitDetails(comp.filamentLimit) : null,
       can_checkout: blockers.length === 0,
   };
 }
@@ -5302,6 +5334,8 @@ export async function placeOrder(
 
   const comp = await computeCheckout(c, user, input, { allocate: true, source: quickBuy?.source });
   quickBuy?.guard?.(comp);
+  // «حد الفلامنت الشهري» (0245), before anything is written: authoritative here, whatever the page showed.
+  if (comp.filamentLimit) throw filamentLimitError(comp.filamentLimit);
 
   // Phase 6 (DECISIONS row 362): a printer the customer chose to COLLECT FROM THE WAREHOUSE is ordered with the
   // store's pickup method — refused with its own code on any other, before the «never chosen» refusal below
@@ -5560,6 +5594,8 @@ export async function placeOrder(
 
   const giftLines = comp.lines.filter((l) => l.gift);
   const giftOnly = giftLines.length > 0 && comp.lines.every((l) => l.gift);
+  // 0245: a database before the migration has no `delivery_phone_key` — the order is written without it.
+  const ordersHavePhoneKey = (await tableColumns(c.env.DB, 'orders', ['delivery_phone_key']))?.has('delivery_phone_key') === true;
   const stmts = [
     // Quick Buy frees the session's hold and stock FIRST, so the spend and the
     // reservation below see the money and the units it was holding.
@@ -5623,11 +5659,15 @@ export async function placeOrder(
     // D15: a Quick Buy session's order is 'quick_buy' (it carries no gift
     // line); an order whose EVERY line is a gift is a gift order; a mixed one
     // stays 'normal' (the column's default, so nothing is written for it).
-    }, quickBuy
-      ? { order_kind: 'quick_buy', quick_buy_session_id: quickBuy.sessionId }
-      : giftOnly
-        ? { order_kind: 'gift' }
-        : undefined),
+    }, {
+      ...(quickBuy
+        ? { order_kind: 'quick_buy', quick_buy_session_id: quickBuy.sessionId }
+        : giftOnly
+          ? { order_kind: 'gift' }
+          : {}),
+      // 0245: the delivery phone's pooling key (the filament limit) — written only where the column exists.
+      ...(ordersHavePhoneKey ? { delivery_phone_key: phoneKey((comp.address as { phone?: unknown }).phone) } : {}),
+    }),
   ];
 
   // Foreign-key order association and consent commit or roll back together.

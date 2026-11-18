@@ -12,7 +12,7 @@ import type { PolicyDocument } from './types';
  * 4.19 state it in full and name the Delivery document as its source.
  *
  * WHAT THE CODE FIXES, AND THE ARTICLE THAT SAYS SO (worker/routes/returns.ts):
- *  - SEVEN DAYS, from the delivered_at of the affected UNIT when one is named,
+ *  - SEVEN DAYS (FOURTEEN for an order bought under PRO, version 5), from the delivered_at of the affected UNIT when one is named,
  *    else the item, judged at REQUEST time (`within_window` is snapshotted at
  *    creation, so slow staff review never closes a timely case) — article 4.2.
  *  - The reason list is closed: defective, manufacturing_fault,
@@ -59,11 +59,24 @@ import type { PolicyDocument } from './types';
  * of every article that states the PREMIUM threshold changed, and a changed
  * text is a new version. PRO's own articles stand; while PRO is paused they
  * apply to nobody (membership 6.15).
+ *
+ * VERSION 5 — WHY IT MOVED (owner, 2026-11-19: PRO returns). The archive keeps
+ * version 4 byte for byte. «PRO can return within 14 days and pays no return
+ * delivery or restocking fee; item must still be in returnable condition.»
+ *   * 4.2: an order bought under an active PRO membership has FOURTEEN days,
+ *     every other order keeps seven; the membership that counts is the one
+ *     recorded on the order at purchase (`orders.membership_tier_snapshot`,
+ *     worker/lib/returnWindow.ts), not the one held when the return is asked.
+ *   * 4.4: such a return carries no return-delivery charge and no restocking
+ *     fee — the store carries the carriage — provided the item meets 4.3.
+ *   * 4.23 names the window of 4.2 instead of «seven days».
+ * The accepted reasons (4.5) are unchanged: a PRO order gets more time and a
+ * free return, not a change-of-mind return.
  */
 export const returns: PolicyDocument = {
   key: 'returns',
-  version: 4,
-  effective_at: '2026-09-27',
+  version: 5,
+  effective_at: '2026-11-19',
   title: {
     ar: 'سياسة الاسترجاع والاستبدال',
     en: 'Returns and Exchange Policy',
@@ -86,9 +99,10 @@ export const returns: PolicyDocument = {
 
 ### 4.2 مدة تقديم طلب الإرجاع
 - تُقدَّم طلبات الإرجاع خلال سبعة أيام من تاريخ التسليم المسجل، لا من تاريخ الطلب ولا من تاريخ الدفع.
+- الطلب الذي اشتُري باشتراك PRO فعّال تكون مدته أربعة عشر يومًا بدل السبعة. والعبرة بالاشتراك المسجل على الطلب لحظة الشراء، لا بالاشتراك وقت تقديم طلب الإرجاع.
 - إذا كان الطلب يخص وحدة بعينها فالمدة تُحسب من تسليم تلك الوحدة، وإلا فمن تسليم سطر الطلب.
 - العبرة بوقت تقديم الطلب في نظام المتجر. الطلب المقدم داخل المدة يبقى صالحًا ولو تأخرت مراجعة المتجر له إلى ما بعد انقضائها.
-- بعد انقضاء السبعة أيام يُغلق باب الإرجاع نهائيًا، ويبقى الطريق الوحيد أمام الزبون هو الضمان وفق المادة 5 إن كان العطل عيب تصنيع.
+- بعد انقضاء مدة الإرجاع يُغلق باب الإرجاع نهائيًا، ويبقى الطريق الوحيد أمام الزبون هو الضمان وفق المادة 5 إن كان العطل عيب تصنيع.
 - لا يُقبل طلب إرجاع على طلب لم يُسجَّل تسليمه بعد.
 
 ### 4.3 الإرجاع المجاني: الحالة الوحيدة وشروطها
@@ -110,6 +124,7 @@ export const returns: PolicyDocument = {
 - جميع كلف التوصيل على الزبون، إلا لعضو PRO فوق قيمة الطلب البالغة {{PRO_FREE_DELIVERY_MIN_IQD}} دينار، ولعضو PREMIUM في أجرة التوصيل الاعتيادية وحدها فوق قيمة الطلب البالغة {{PREMIUM_FREE_DELIVERY_MIN_IQD}} دينار، حيث يتحملها المتجر وفق ما هو مبيّن في وثيقة التوصيل.
 - إذا اتفق الطرفان على استلام المنتج من عنوان الزبون، فكلفة الاستلام على الزبون ما لم ينص المتجر كتابةً على غير ذلك.
 - تسليم المنتج المرتجع باليد إلى {{RETURN_DROP_OFF_LOCATION}} يُسقط كلفة النقل عن الطرفين.
+- استثناء طلب PRO: الطلب الذي اشتُري باشتراك PRO فعّال يُرجع خلال مدته في المادة 4.2 بلا أجرة إعادة شحن وبلا رسوم إعادة تخزين، ويتحمل المتجر كلفة النقل، بشرط أن يكون المنتج بحالة قابلة للإرجاع وفق المادة 4.3. وما سوى ذلك من هذه المادة يبقى كما هو.
 
 ### 4.5 الأسباب المقبولة للإرجاع
 لا يقبل النظام إلا الأسباب الآتية، ويجب اختيار السبب الصحيح لأنه يحدد مسار المعالجة:
@@ -234,7 +249,7 @@ export const returns: PolicyDocument = {
 - للمتجر في هذه الحالات رفض الطلب، ومطالبة الزبون بفرق القيمة، وتقييد مزايا الحساب وفق سياسة الاستعمال السيئ في وثيقة الشروط، مع بيان السبب وإتاحة الاعتراض.
 
 ### 4.23 ما لا تشمله هذه الوثيقة
-- أعطال ما بعد السبعة أيام: مرجعها وثيقة الضمان، المادة 5.
+- أعطال ما بعد مدة الإرجاع في المادة 4.2: مرجعها وثيقة الضمان، المادة 5.
 - الإصلاح المدفوع خارج الضمان والخدمات الأخرى: مرجعها وثيقة خدمات ما بعد البيع.
 - إلغاء الطلب قبل التسليم وتغيّر السعر قبل الدفع: مرجعها وثيقة الشراء.
 - المنتجات الرقمية والخدمات: لا يسري عليها الإرجاع المادي المنصوص عليه هنا.
@@ -261,9 +276,10 @@ This document sets out when a product bought from Levonis may be returned, on wh
 
 ### 4.2 The window for filing a return request
 - Return requests are filed within seven days of the recorded delivery date, not of the order date and not of the payment date.
+- An order bought under an active PRO membership has fourteen days instead of seven. What counts is the membership recorded on the order at the moment of purchase, not the membership held when the return is requested.
 - Where the request concerns a particular unit, the period runs from the delivery of that unit; otherwise from the delivery of the order line.
 - What counts is the time the request is filed in the store system. A request filed within the window remains valid even if the store review of it runs past the window.
-- After the seven days the return route is closed for good, and the only remaining route for the customer is the warranty under Article 5 where the failure is a manufacturing fault.
+- After the return period the return route is closed for good, and the only remaining route for the customer is the warranty under Article 5 where the failure is a manufacturing fault.
 - No return request is accepted on an order whose delivery has not been recorded.
 
 ### 4.3 The free return: the only case, and its conditions
@@ -285,6 +301,7 @@ The absence of any one of these takes the case out of the free return, and it is
 - All delivery costs are on the customer, except for a PRO member above an order value of {{PRO_FREE_DELIVERY_MIN_IQD}} IQD, and for a PREMIUM member, as to the standard delivery fee alone, above an order value of {{PREMIUM_FREE_DELIVERY_MIN_IQD}} IQD, where the store carries them, as set out in the Delivery document.
 - Where the parties agree that the product is collected from the customer address, the cost of collection is on the customer unless the store states otherwise in writing.
 - Handing the returned product in person at {{RETURN_DROP_OFF_LOCATION}} removes the carriage cost for both parties.
+- The PRO exception: an order bought under an active PRO membership is returned within its period under Article 4.2 with no return-delivery charge and no restocking fee, and the store carries the carriage, provided the product is in returnable condition under Article 4.3. The rest of this article is unchanged.
 
 ### 4.5 Accepted reasons for a return
 The system accepts only the following reasons, and the correct reason must be chosen because it determines the processing route:
@@ -409,7 +426,7 @@ These steps are a condition of any transport-damage claim, and omitting them for
 - In such cases the store may refuse the request, claim the difference in value from the customer, and restrict account benefits under the abuse policy in the Terms document, stating the reason and allowing an objection.
 
 ### 4.23 What this document does not cover
-- Failures after the seven days: the reference is the Warranty document, Article 5.
+- Failures after the return period in Article 4.2: the reference is the Warranty document, Article 5.
 - Paid repair outside warranty and other services: the reference is the After-Sale Services document.
 - Cancelling an order before delivery and a price change before payment: the reference is the Purchase document.
 - Digital products and services: the physical return set out here does not apply to them.
@@ -436,9 +453,10 @@ These steps are a condition of any transport-damage claim, and omitting them for
 
 ### 4.2 ماوەی پێشکەشکردنی داواکاری گەڕاندنەوە
 - داواکاری گەڕاندنەوە لە ماوەی حەوت ڕۆژ لە بەرواری تۆمارکراوی گەیاندنەوە پێشکەش دەکرێت، نەک لە بەرواری داواکاری و نەک لە بەرواری پارەدانەوە.
+- ئەو داواکارییەی بە بەشداریکردنی چالاکی PRO کڕدراوە، ماوەکەی چواردە ڕۆژە لە جیاتی حەوت. بنەما ئەو بەشداریکردنەیە کە لە کاتی کڕیندا لەسەر داواکارییەکە تۆمار کراوە، نەک ئەوەی لە کاتی داواکردنی گەڕاندنەوەدا هەیە.
 - ئەگەر داواکارییەکە تایبەت بێت بە یەکەیەکی دیاریکراو، ماوەکە لە گەیاندنی ئەو یەکەیەوە دەژمێردرێت، ئەگەرنا لە گەیاندنی دێڕەکەی داواکارییەوە.
 - بنەما کاتی پێشکەشکردنی داواکارییە لە سیستەمی فرۆشگا. ئەو داواکارییەی لەناو ماوەکەدا پێشکەش کراوە بەردەوام دەبێت لە هێزدا، تەنانەت ئەگەر پێداچوونەوەی فرۆشگا دوای کۆتایی ماوەکە بێت.
-- دوای حەوت ڕۆژ دەرگای گەڕاندنەوە بە تەواوی دادەخرێت، و تەنها ڕێگای ماوە بۆ کڕیار گەرەنتییە بەپێی ماددەی 5 ئەگەر تێکچوونەکە کەموکووڕی بەرهەمهێنان بێت.
+- دوای تەواوبوونی ماوەی گەڕاندنەوە دەرگای گەڕاندنەوە بە تەواوی دادەخرێت، و تەنها ڕێگای ماوە بۆ کڕیار گەرەنتییە بەپێی ماددەی 5 ئەگەر تێکچوونەکە کەموکووڕی بەرهەمهێنان بێت.
 - هیچ داواکارییەکی گەڕاندنەوە لەسەر داواکارییەک وەرناگیرێت کە گەیاندنەکەی هێشتا تۆمار نەکراوە.
 
 ### 4.3 گەڕاندنەوەی بێبەرامبەر: تەنها حاڵەتەکە و مەرجەکانی
@@ -460,6 +478,7 @@ These steps are a condition of any transport-damage claim, and omitting them for
 - هەموو تێچووەکانی گەیاندن لەسەر کڕیارن، جگە لە ئەندامی PRO لە سەرووی بەهای داواکاری {{PRO_FREE_DELIVERY_MIN_IQD}} دینار، و ئەندامی PREMIUM تەنها بۆ کرێی گەیاندنی ئاسایی لە سەرووی بەهای داواکاری {{PREMIUM_FREE_DELIVERY_MIN_IQD}} دینار، کە فرۆشگا هەڵیدەگرێت، بەپێی ئەوەی لە بەڵگەنامەی گەیاندن هاتووە.
 - ئەگەر هەردوو لا ڕێک کەوتن کە بەرهەمەکە لە ناونیشانی کڕیارەوە وەربگیرێت، تێچووی وەرگرتن لەسەر کڕیارە مەگەر فرۆشگا بە نووسراوی پێچەوانەی بڵێت.
 - پێدانی بەرهەمە گەڕێنراوەکە بە دەست لە {{RETURN_DROP_OFF_LOCATION}} تێچووی گواستنەوە لەسەر هەردوو لا لادەبات.
+- ئاوارتەی داواکاری PRO: ئەو داواکارییەی بە بەشداریکردنی چالاکی PRO کڕدراوە، لە ماوەکەی خۆیدا بەپێی ماددەی 4.2 بێ کرێی گەڕاندنەوەی بار و بێ کرێی دووبارە کۆگاکردن دەگەڕێندرێتەوە، و فرۆشگا تێچووی گواستنەوە هەڵدەگرێت، بە مەرجێک بەرهەمەکە بەپێی ماددەی 4.3 لە دۆخێکی گەڕاندنەوەپێکراودا بێت. ئەوانی تری ئەم ماددەیە وەک خۆیان دەمێننەوە.
 
 ### 4.5 هۆکارە پەسەندکراوەکانی گەڕاندنەوە
 سیستەمەکە تەنها ئەم هۆکارانە وەردەگرێت، و دەبێت هۆکاری ڕاست هەڵبژێردرێت چونکە ڕێچکەی کارکردن دیاری دەکات:
@@ -584,7 +603,7 @@ These steps are a condition of any transport-damage claim, and omitting them for
 - لەم حاڵەتانەدا فرۆشگا دەتوانێت داواکارییەکە ڕەت بکاتەوە، جیاوازی بەهاکە لە کڕیار داوا بکات، و سوودەکانی هەژمارەکە سنووردار بکات بەپێی سیاسەتی خراپ بەکارهێنان لە بەڵگەنامەی مەرجەکاندا، لەگەڵ ڕوونکردنەوەی هۆکارەکە و ڕێگەدان بە ناڕەزایی.
 
 ### 4.23 ئەوەی ئەم بەڵگەنامەیە ناگرێتەوە
-- تێکچوونەکانی دوای حەوت ڕۆژ: سەرچاوەکەیان بەڵگەنامەی گەرەنتییە، ماددەی 5.
+- تێکچوونەکانی دوای ماوەی گەڕاندنەوەی ماددەی 4.2: سەرچاوەکەیان بەڵگەنامەی گەرەنتییە، ماددەی 5.
 - چاککردنی پارەدراوی دەرەوەی گەرەنتی و خزمەتگوزارییەکانی تر: سەرچاوەکەیان بەڵگەنامەی خزمەتگوزاری دوای فرۆشتنە.
 - هەڵوەشاندنەوەی داواکاری پێش گەیاندن و گۆڕانی نرخ پێش پارەدان: سەرچاوەکەیان بەڵگەنامەی کڕینە.
 - بەرهەمە دیجیتاڵییەکان و خزمەتگوزارییەکان: ئەو گەڕاندنەوە فیزیکییەی لێرە هاتووە لەسەریان جێبەجێ نابێت.

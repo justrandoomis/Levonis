@@ -111,7 +111,7 @@ import AddressForm from '../components/address/AddressForm';
  * asks nothing before the payment and interrupts nothing after it.
  */
 import ChannelNudge from '../components/notify/ChannelNudge';
-import { apiRefusal } from '../lib/refusalStrings';
+import { apiRefusal, filamentLimitRefusal } from '../lib/refusalStrings';
 import { PS_STRINGS, servicesErrorText } from '../components/product/printerServicesStrings';
 import type { CartMembershipQuote, CartMembershipRefusal } from '../lib/api';
 import { CELEBRATION_MOTION_MS, mascot } from '../lib/mascot';
@@ -463,6 +463,8 @@ interface CheckoutQuoteDto {
    */
   estimate?: CheckoutEstimateBlock & { ordering_paused?: boolean };
   blockers: string[];
+  /** «حد الفلامنت الشهري» (0245): the FILAMENT_LIMIT details when a filament kind is over its limit. */
+  filament_limit?: Record<string, unknown> | null;
   can_checkout: boolean;
 }
 
@@ -2004,6 +2006,11 @@ export default function Checkout() {
       );
     }
     if (!isBalanceSufficient) return S.blockAdvance;
+    // «حد الفلامنت الشهري» (0245): the limit, what is left and the plan that raises it — before the generic refusal.
+    if (quote?.filament_limit) {
+      return filamentLimitRefusal({ code: 'FILAMENT_LIMIT', details: quote.filament_limit }, lang as 'ar' | 'en' | 'ckb')
+        ?? apiRefusal({ code: 'FILAMENT_LIMIT' }, lang as 'ar' | 'en' | 'ckb');
+    }
     if (!serverAllows) return S.blockQuote;
     /**
      * A QUOTE THAT NEVER ARRIVED IS A REFUSAL, NOT A PERMISSION.

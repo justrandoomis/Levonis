@@ -90,6 +90,8 @@ export default function Subscription() {
   const [features, setFeatures] = useState<PlanFeatures | null>(null);
   const [contract, setContract] = useState<PlansResponse['entitlement_contract'] | null>(null);
   const [points, setPoints] = useState<PlansResponse['points_multiplier_x100'] | null>(null);
+  const [proExtras, setProExtras] = useState<PlansResponse['pro_extras'] | null>(null);
+  const [filamentLimits, setFilamentLimits] = useState<PlansResponse['filament_limits'] | null>(null);
   /**
    * §22 — what the store promises PREMIUM and PRO shoppers RIGHT NOW, read
    * from `membership_benefit_rules` by the same server that applies them at
@@ -114,6 +116,8 @@ export default function Subscription() {
         setBenefits(data.benefits ?? null);
         setContract(data.entitlement_contract ?? null);
         setPoints(data.points_multiplier_x100 ?? null);
+        setProExtras(data.pro_extras ?? null);
+        setFilamentLimits(data.filament_limits ?? null);
         setProPauseFlag(!!data.pro_pause?.paused);
       })
       .catch((e: unknown) => {
@@ -249,10 +253,10 @@ export default function Subscription() {
   const highlights = useMemo(() => {
     const out = {} as Record<PaidTier, string[]>;
     for (const tier of ['plus', 'prime', 'pro'] as const) {
-      out[tier] = tierHighlights(tier, { contract: contract?.tiers ?? null, benefits, points: points ?? null, loc, money: isolatedMoney(money, dir) });
+      out[tier] = tierHighlights(tier, { contract: contract?.tiers ?? null, benefits, points: points ?? null, proExtras, filamentLimits, loc, money: isolatedMoney(money, dir) });
     }
     return out;
-  }, [contract, benefits, points, loc, money, dir]);
+  }, [contract, benefits, points, proExtras, filamentLimits, loc, money, dir]);
 
   // --------------------------------------------------------------- quote
   const [quote, setQuote] = useState<PurchaseQuote | null>(null);
@@ -453,6 +457,8 @@ export default function Subscription() {
                 benefits={benefits}
                 features={features}
                 points={points ?? null}
+                proExtras={proExtras}
+                filamentLimits={filamentLimits}
                 currentTier={currentTier}
                 selectedTier={compareTiers.includes(activeTier) ? activeTier : compareTiers[compareTiers.length - 1] ?? activeTier}
                 loading={false}

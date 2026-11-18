@@ -1,5 +1,6 @@
 import { normalizeHomeBento, type HomeBento } from './homeBento';
 import { WALLET_FREE_DELIVERY_DEFAULT, normalizeWalletFreeDelivery, type WalletFreeDeliveryConfig } from './walletFreeDelivery';
+import { FILAMENT_LIMITS_DEFAULT, normalizeFilamentLimits, type FilamentLimitsConfig } from './filamentLimits';
 import { safeParse } from './types';
 import { DELIVERY_POLICY_FALLBACK, normalizeDeliveryPolicy, type DeliveryPolicy } from './storeDelivery';
 import { DEFAULT_WARRANTY_CONFIG, type WarrantyConfig } from './warrantyConfig';
@@ -424,6 +425,15 @@ export const SETTING_DEFAULTS = {
    * worker/lib/walletFreeDelivery.ts.
    */
   walletFreeDelivery: WALLET_FREE_DELIVERY_DEFAULT as WalletFreeDeliveryConfig,
+  /**
+   * «حد الفلامنت الشهري» (owner 2026-11-19; migration 0245): pieces of ONE
+   * filament product per rolling `window_days`, per plan (null = unlimited) —
+   * pooled by account and delivery phone. Read through
+   * `normalizeFilamentLimits`, written through `validateFilamentLimits` in
+   * `PUT /api/admin/settings/filamentMonthlyLimits`; the rule is
+   * worker/lib/filamentLimits.ts.
+   */
+  filamentMonthlyLimits: FILAMENT_LIMITS_DEFAULT as FilamentLimitsConfig,
   /**
    * «إدارة التوصيل» (owner, 2026-10-18): the store's standard-delivery
    * policy — default price, governorate exceptions and the rule groups by
@@ -1052,6 +1062,9 @@ function normalizedSetting<K extends SettingKey>(key: K, value: unknown): (typeo
   }
   if (key === 'walletFreeDelivery') {
     return normalizeWalletFreeDelivery(value) as (typeof SETTING_DEFAULTS)[K];
+  }
+  if (key === 'filamentMonthlyLimits') {
+    return normalizeFilamentLimits(value) as (typeof SETTING_DEFAULTS)[K];
   }
   /**
    * Merged like `bnplPolicy`, and then once more one level down. The stored

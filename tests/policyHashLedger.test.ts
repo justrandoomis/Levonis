@@ -28,7 +28,8 @@
  *     row 280) with ordering at an estimated price, rewards 8 and faq 8
  *     (owner, 2026-11-05; DECISIONS row 301) with the review road, and
  *     payment 5 (owner, 2026-11-11; DECISIONS row 312) with cash at
- *     warehouse pickup.
+ *     warehouse pickup, and returns 5 (owner, 2026-11-19) with PRO's
+ *     fourteen-day, fee-free return.
  *
  * Adding a version: bump it in its module, run this file, and copy the
  * `key@version:lang → hash` lines the failure prints into the fixture.

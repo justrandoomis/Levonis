@@ -58,6 +58,7 @@ import { resolveOrderExpiry } from '../lib/orderExpiry';
 import { getSetting, getSettings, normalizePayoutMethods, normalizeSerialPrepGate, setSetting, SETTING_KEYS, type SettingKey } from '../lib/settings';
 import { getOfficialUsdRate } from '../lib/fx/officialRate';
 import { validateWalletFreeDelivery } from '../lib/walletFreeDelivery';
+import { validateFilamentLimits } from '../lib/filamentLimits';
 import { printerProductIds, productCatalogPlacements } from '../lib/printerIdentity';
 import { deliveryGroupSummary, deliveryPolicyTargets, resolveDeliveryGroup, validateDeliveryPolicy } from '../lib/storeDelivery';
 import { afterCatalogueWrite, afterSettingsWrite } from '../lib/edgePolicy';
@@ -4952,6 +4953,17 @@ adminRoutes.put('/settings/:key', async (c) => {
       }
     }
     value = { ...checked.policy, updated_at: new Date().toISOString(), updated_by: adminUser.id };
+  } else if (key === 'filamentMonthlyLimits') {
+    // «حد الفلامنت الشهري» (owner 2026-11-19): the owner's alone, like the courier tax; strict — junk is
+    // refused in three languages, never stored.
+    if (!isOwner(c.env, adminUser)) throw ownerOnly();
+    if (isUnverifiedOwner(c.env, adminUser)) throw ownerEmailUnverified();
+    const checked = validateFilamentLimits(value);
+    if (!checked.ok) {
+      const m = checked.error;
+      throw badRequest(`${m.ar} / ${m.en} / ${m.ckb}`, 'FILAMENT_LIMITS_INVALID', { message: m });
+    }
+    value = checked.value;
   } else if (key === 'deliveryHandover') {
     // «تُسلَّم كل الطلبات لمندوب شركة التوصيل الساعة ٧ مساءً» (owner,
     // 2026-11-11; DECISIONS row 324), edited in «إدارة التوصيل». Strict like
@@ -4970,7 +4982,7 @@ adminRoutes.put('/settings/:key', async (c) => {
   // A delivery fee the shop stops charging is money, and so is the courier
   // tax: the audit keeps the whole value as saved, not just the key.
   await audit(c.env.DB, adminUser.id, 'settings.update', key,
-    key === 'walletFreeDelivery' || key === 'deliveryPolicy' || key === 'deliveryHandover' || key === 'serialPrepGate' || key === 'codTaxPerBlockIqd' || key === 'codTaxBlockIqd' ? { value } : {});
+    key === 'walletFreeDelivery' || key === 'filamentMonthlyLimits' || key === 'deliveryPolicy' || key === 'deliveryHandover' || key === 'serialPrepGate' || key === 'codTaxPerBlockIqd' || key === 'codTaxBlockIqd' ? { value } : {});
   // P2a: the cached public answers this key feeds, and the isolate's pricing inputs.
   await afterSettingsWrite(c, key);
   return c.json({ success: true });

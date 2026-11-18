@@ -90,7 +90,14 @@ export interface ShippingItem {
     delivery: 'economy' | 'personal' | null;
     delivery_class: string;
     economy_iqd: number | null;
+    /** What Personal costs THIS customer per unit (after the PRO services discount, when it applied). */
     personal_iqd: number | null;
+    /**
+     * Personal's list price per unit, sent only when the PRO services discount
+     * lowered `personal_iqd` (owner, 2026-11-19), so the component can show
+     * the before and the after. Absent = no discount.
+     */
+    personal_before_discount_iqd?: number | null;
   };
 }
 
@@ -117,6 +124,13 @@ export interface ShippingComponent {
   delivery_class?: string;
   /** A printer_service component: the customer's choice. */
   printer_delivery?: 'economy' | 'personal';
+  /**
+   * A printer's Personal delivery bought by an active PRO (owner, 2026-11-19):
+   * the list fee for these units, and what the PRO services discount took off.
+   * `fee_iqd` is already the discounted figure. Absent when no discount applied.
+   */
+  fee_before_discount_iqd?: number;
+  pro_discount_iqd?: number;
   fee_iqd: number;
   waived: boolean;
   units: number;
@@ -448,9 +462,15 @@ export function quoteShipping(input: {
         reasons.push('This delivery option is not priced for the printer.');
         continue;
       }
+      // PRO services discount on Personal (owner, 2026-11-19): the price came
+      // discounted from the services pricing; the list price rides along so
+      // the bill shows both. Never on Economy, which the free-delivery rules own.
+      const before = ps.delivery === 'personal' ? ps.personal_before_discount_iqd ?? null : null;
+      const discounted = before !== null && Number.isInteger(before) && before > per;
       components.push({
         kind: 'printer_service',
         fee_iqd: per * units,
+        ...(discounted ? { fee_before_discount_iqd: before * units, pro_discount_iqd: (before - per) * units } : {}),
         waived: ps.delivery === 'economy' ? ruleFeeWaived : false,
         units,
         method: 'standard',

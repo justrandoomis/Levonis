@@ -23,6 +23,7 @@
  * The hold always equals the session total (D11): a change replaces it, so a
  * smaller total is a partial release and a larger one is a larger hold.
  */
+import { filamentLimitError } from '../filamentLimits';
 import { listing, refuseIfOnlyCatalog } from '../listing';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../types';
@@ -478,6 +479,8 @@ async function quoteCandidates(
   for (const l of comp.lines) {
     if (l.pricing_basis !== 'direct' || l.bundle_parent_item_id || l.mystery_spool) throw directOnly();
   }
+  // «حد الفلامنت الشهري» (0245): refused when the session opens, as the order door would refuse it at the end.
+  if (comp.filamentLimit) throw filamentLimitError(comp.filamentLimit);
   if (comp.shipping.needs_config.length > 0) {
     throw conflict(
       'أجور التوصيل لجزء من الطلب غير مضبوطة بعد / Delivery fees for part of this order are not configured yet',
