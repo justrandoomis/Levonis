@@ -54,6 +54,7 @@ import { QuantityInput } from '../components/ui/QuantityInput';
 import { LINE_QTY_MAX } from '../../packages/pricing/src/quantity';
 import { productDescription, productName } from '../lib/productText';
 import { storefrontFilesApi, type ProductFilePublic } from '../components/community/files/api';
+import { StoreDockSpacer } from '../components/storeDock/route';
 
 /** «يوم واحد», «يومين», «3 أيام», «12 يومًا», «100 يوم» — the count rule of components/community/hub/copy.ts. */
 function arDays(n: number): string {
@@ -86,6 +87,17 @@ const ProductFacts = lazy(() => loadProductFacts().then((m) => ({ default: m.Pro
  * store's own vocabulary — see the block's header).
  */
 const ProductFiles = lazy(() => import('../components/storefront/ProductFiles'));
+/**
+ * The store's bottom dock — the bubble with «أضف إلى السلة» joined to it — is
+ * its own chunk (shared with the store's other pages), outside the storefront's
+ * 47 KB (tests/bundleBudget.test.ts). Its download starts with this module, in
+ * parallel with the product read, so it is in hand before the page leaves its
+ * skeleton (whose own bar holds the place).
+ */
+const loadStoreDock = () => import('../components/storeDock/StoreDock');
+const storeDockReady = loadStoreDock();
+storeDockReady.catch(() => undefined);
+const StoreDock = lazy(() => storeDockReady.catch(loadStoreDock));
 
 export default function StorefrontProduct() {
   const { slug: routeSlug, productSlug } = useParams<{ slug: string; productSlug: string }>();
@@ -297,7 +309,7 @@ export default function StorefrontProduct() {
   const description = productDescription(product, lang);
 
   return (
-    <StoreTheme tokens={themeTokens ?? null} storeAccent={store.accent} className="min-h-screen text-zinc-300 pb-32">
+    <StoreTheme tokens={themeTokens ?? null} storeAccent={store.accent} className="min-h-screen text-zinc-300">
       <div className="max-w-2xl mx-auto">
         <div className="px-4 sm:px-6 pt-4 mb-2 flex items-center justify-between gap-3">
           <Link to={storeHome} className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-lg text-zinc-400 text-[13px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus">
@@ -416,55 +428,65 @@ export default function StorefrontProduct() {
         </div>
       </div>
 
-      {/* Buy bar */}
-      <div className="fixed bottom-0 inset-x-0 z-40 border-t border-white/10 bg-black shadow-dock px-4 sm:px-6 py-3">
-        {/* The refusal sits beside the button that caused it: in the page body
-            it could be scrolled away under this fixed bar and never seen. */}
-        <p
-          role="alert"
-          aria-live="assertive"
-          className={error ? 'max-w-2xl mx-auto mb-2 text-red-300 text-[12.5px] leading-snug' : 'sr-only'}
-        >
-          {error}
-        </p>
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
-          <QuantityInput
-            className="shrink-0"
-            size="sm"
-            hintPlacement="above"
-            value={qty}
-            max={knownMax ?? LINE_QTY_MAX}
-            limitKind={knownMax === null ? 'per_order' : 'stock'}
-            autoClamp
-            onChange={(next) => setQty(next)}
-          />
-
-          <motion.button
-            whileTap={sellable ? { scale: 0.98 } : undefined}
-            onClick={() => addToCart(false)}
-            disabled={!sellable || adding}
-            className="flex-1 min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+      {/* THE BUY BAR IS THE STORE'S DOCK (owner, 2026-11-18): the bubble under the
+          thumb — one tap to the store's home, three to report it — with the
+          quantity and «أضف إلى السلة» joined to it. There is no other buy bar
+          and no bubble at the top. */}
+      <StoreDockSpacer />
+      <Suspense fallback={null}>
+      <StoreDock
+        storeId={store.id}
+        homePath={storeHome}
+        above={
+          // The refusal sits beside the button that caused it: in the page body
+          // it could be scrolled away under this fixed bar and never seen.
+          <p
+            role="alert"
+            aria-live="assertive"
+            className={error ? 'rounded-xl bg-black px-3 py-2 text-red-300 text-[12.5px] leading-snug' : 'sr-only'}
           >
-            {adding ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : added ? (
-              <>
-                <Check className="w-4 h-4" />
-                {loc('أُضيف', 'Added', 'زیادکرا')}
-              </>
-            ) : choiceMissing ? (
-              loc('اختر من الخيارات', 'Choose an option') /* OWNER: Sorani to be written by hand. */
-            ) : !sellable ? (
-              loc('غير متوفر', 'Unavailable', 'بەردەست نییە')
-            ) : (
-              <>
-                <ShoppingBag className="w-4 h-4" />
-                {loc('أضف إلى السلة', 'Add to cart', 'زیادکردن بۆ سەبەتە')}
-              </>
-            )}
-          </motion.button>
-        </div>
-      </div>
+            {error}
+          </p>
+        }
+      >
+        <QuantityInput
+          className="shrink-0"
+          size="sm"
+          hintPlacement="above"
+          value={qty}
+          max={knownMax ?? LINE_QTY_MAX}
+          limitKind={knownMax === null ? 'per_order' : 'stock'}
+          autoClamp
+          onChange={(next) => setQty(next)}
+        />
+
+        <motion.button
+          whileTap={sellable ? { scale: 0.98 } : undefined}
+          onClick={() => addToCart(false)}
+          disabled={!sellable || adding}
+          data-store-dock-add
+          className="flex-1 min-w-0 min-h-[48px] rounded-2xl bg-olive text-snow font-bold text-[14px] flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {adding ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : added ? (
+            <>
+              <Check className="w-4 h-4" />
+              {loc('أُضيف', 'Added', 'زیادکرا')}
+            </>
+          ) : choiceMissing ? (
+            loc('اختر من الخيارات', 'Choose an option') /* OWNER: Sorani to be written by hand. */
+          ) : !sellable ? (
+            loc('غير متوفر', 'Unavailable', 'بەردەست نییە')
+          ) : (
+            <>
+              <ShoppingBag className="w-4 h-4 shrink-0" />
+              <span className="truncate">{loc('أضف إلى السلة', 'Add to cart', 'زیادکردن بۆ سەبەتە')}</span>
+            </>
+          )}
+        </motion.button>
+      </StoreDock>
+      </Suspense>
 
       <SellerConflictDialog
         conflict={conflict}

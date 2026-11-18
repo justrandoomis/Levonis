@@ -437,6 +437,9 @@ import CompareTrayGate from './components/compare/CompareTrayGate';
 // The customer shell's Toaster, downloaded the first time a toast is raised
 // (src/components/ui/ToasterGate.tsx); /admin and /merchant mount their own.
 import ToasterGate from './components/ui/ToasterGate';
+import { StoreDockSpacer, storeDockRoute } from './components/storeDock/route';
+// The store's bottom dock (bubble + report): a chunk of its own, only on a store's address.
+const StoreDock = React.lazy(() => import('./components/storeDock/StoreDock'));
 const Policies = React.lazy(() => import('./pages/Policies'));
 const Support = React.lazy(() => import('./pages/Support'));
 /**
@@ -646,8 +649,14 @@ function StoreHostAuthHandoff() {
  */
 function StorefrontApp() {
   const { store } = useStore();
+  const { pathname } = useLocation();
+  // The bubble lives in the store's bottom dock (owner, 2026-11-18), not in a
+  // top strip. A product page draws its own dock with «أضف إلى السلة» joined to
+  // the bubble; the platform's pages (cart, checkout, orders, sign-in, the
+  // workspace) keep the shell's top strip as before.
+  const dock = !!store && storeDockRoute(pathname);
   return (
-    <div className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-y-auto">
+    <div id="store-host-scroll" className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-y-auto">
       {/* iOS reads `apple-touch-icon` and `<title>` out of the live document
           instead of the per-host manifest, and index.html is one shared file —
           so without this a merchant's shop installed on an iPhone as "LEVONIS"
@@ -695,6 +704,16 @@ function StorefrontApp() {
       </Routes>
       </Suspense>
       </ChunkBoundary>
+      {dock && (
+        <>
+          <StoreDockSpacer />
+          <Suspense fallback={null}>
+            <StoreDock storeId={store.id} homePath="/" />
+          </Suspense>
+        </>
+      )}
+      {/* The report sheet's «تم الإرسال» needs a toast host on a store's address too. */}
+      <ToasterGate aboveNav={dock} />
     </div>
   );
 }
