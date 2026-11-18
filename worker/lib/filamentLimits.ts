@@ -56,6 +56,8 @@ export const FILAMENT_LIMITS_DEFAULT: FilamentLimitsConfig = {
 
 export const FILAMENT_LIMIT_MAX = 100_000;
 export const FILAMENT_WINDOW_MAX_DAYS = 365;
+/** How long another account's still-unconfirmed order to the same phone counts toward the pool (security review, 2026-11-19). */
+export const PENDING_POOL_DAYS = 3;
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isCount = (v: unknown, lo: number, hi: number): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v >= lo && v <= hi;
@@ -260,7 +262,7 @@ export interface FilamentUsageRow {
  */
 export async function readFilamentUsage(
   db: D1Database,
-  input: { userId: string; productIds: readonly string[]; phoneKeys: readonly string[]; sinceIso: string }
+  input: { userId: string; productIds: readonly string[]; phoneKeys: readonly string[]; sinceIso: string; pendingSinceIso?: string }
 ): Promise<{ filament: Map<string, Trilingual>; used: Map<string, number> }> {
   const filament = new Map<string, Trilingual>();
   const used = new Map<string, number>();
@@ -275,14 +277,18 @@ export async function readFilamentUsage(
     .filter((col) => itemCols?.has(col))
     .map((col) => ` AND oi.${col} IS NULL`)
     .join('');
+  const pendingSince = input.pendingSinceIso ?? new Date(Date.now() - PENDING_POOL_DAYS * 86_400_000).toISOString();
   const keys = [...new Set(input.phoneKeys.filter((k) => typeof k === 'string' && k.length > 0))];
-  // Another account's order joins this pool through a phone only once staff
-  // have confirmed it (confirmed / processing / shipped / delivered). A merely
-  // placed 'pending' order does not, so nobody can use up a stranger's limit by
-  // placing unconfirmed orders to that stranger's number; the account's own
-  // orders still count from the moment they are placed.
+  // Another account's order joins this pool through a phone. A confirmed one
+  // (confirmed / processing / shipped / delivered) counts for the whole window;
+  // a still-'pending' one counts only while it is under PENDING_POOL_DAYS old.
+  // So two accounts racing unconfirmed orders to one number still pool (the
+  // reseller case), while unconfirmed orders someone aims at a stranger's number
+  // stop counting by themselves (and at once when staff cancel them). The
+  // account's own orders count from the moment they are placed.
   const phoneClause = byPhone
-    ? ` OR (o.status IN ('confirmed', 'processing', 'shipped', 'delivered') AND (
+    ? ` OR ((o.status IN ('confirmed', 'processing', 'shipped', 'delivered')
+             OR (o.status = 'pending' AND o.created_at >= ?6)) AND (
           o.delivery_phone_key IN (SELECT value FROM json_each(?4))
           OR o.delivery_phone_key = (SELECT substr(replace(u.phone_e164, '+', ''), -10) FROM users u WHERE u.id = ?3 AND u.phone_e164 IS NOT NULL)))`
     : '';
@@ -308,7 +314,7 @@ export async function readFilamentUsage(
        FROM fil LEFT JOIN usage ON usage.product_id = fil.id`;
   const { results } = await db
     .prepare(sql)
-    .bind(FILAMENT_SECTION_ID, JSON.stringify(ids), input.userId, JSON.stringify(keys), input.sinceIso)
+    .bind(FILAMENT_SECTION_ID, JSON.stringify(ids), input.userId, JSON.stringify(keys), input.sinceIso, pendingSince)
     .all<FilamentUsageRow>();
   for (const r of results ?? []) {
     const en = String(r.name ?? '');
@@ -342,7 +348,13 @@ export async function checkFilamentLimits(
   if (requested.size === 0) return null;
   const sinceIso = new Date((input.now ?? Date.now()) - config.window_days * 86_400_000).toISOString();
   const phoneKeys = (input.phones ?? []).map(phoneKey).filter((k): k is string => k !== null);
-  const { filament, used } = await readFilamentUsage(db, { userId: input.user.id, productIds: [...requested.keys()], phoneKeys, sinceIso });
+  const { filament, used } = await readFilamentUsage(db, {
+    userId: input.user.id,
+    productIds: [...requested.keys()],
+    phoneKeys,
+    sinceIso,
+    pendingSinceIso: new Date((input.now ?? Date.now()) - PENDING_POOL_DAYS * 86_400_000).toISOString(),
+  });
   if (filament.size === 0) return null;
   return evaluateFilamentLimits({ config, tier, requested, filament, used });
 }

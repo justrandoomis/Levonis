@@ -229,12 +229,17 @@ test('a second account with the same delivery phone pools; another phone does no
   assert.equal((await place(raw, 'buyer')).success, true);
 
   cart(raw, 'twin', 'p_pla', 3);
-  const unconfirmed = await json(await post(appFor(raw, 'twin'), '/api/orders/quote', body('twin')));
-  assert.equal(unconfirmed.quote.filament_limit, null, "another account's PENDING order to the phone does not pool (nobody can use up a stranger's limit)");
+  const fresh = await json(await post(appFor(raw, 'twin'), '/api/orders/quote', body('twin')));
+  assert.ok(fresh.quote.blockers.includes('FILAMENT_LIMIT'), "a fresh PENDING order of another account to the same phone pools (two accounts racing unconfirmed orders)");
+
+  const stale = new Date(Date.now() - 4 * 86_400_000).toISOString();
+  raw.exec(`UPDATE orders SET created_at = '${stale}' WHERE user_id = 'buyer'`);
+  const old = await json(await post(appFor(raw, 'twin'), '/api/orders/quote', body('twin')));
+  assert.equal(old.quote.filament_limit, null, "another account's pending order older than 3 days no longer pools (nobody can use up a stranger's limit for long)");
 
   raw.exec(`UPDATE orders SET status = 'confirmed' WHERE user_id = 'buyer'`);
   const twin = await place(raw, 'twin');
-  assert.equal(twin.code ?? twin.error?.code, 'FILAMENT_LIMIT', 'once confirmed, the same phone in another format pools with the first account');
+  assert.equal(twin.code ?? twin.error?.code, 'FILAMENT_LIMIT', 'once confirmed, the same phone in another format pools with the first account for the whole window');
 
   cart(raw, 'other', 'p_pla', 50);
   assert.equal((await place(raw, 'other')).success, true, 'another phone has its own 50');
