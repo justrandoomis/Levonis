@@ -276,9 +276,15 @@ export async function readFilamentUsage(
     .map((col) => ` AND oi.${col} IS NULL`)
     .join('');
   const keys = [...new Set(input.phoneKeys.filter((k) => typeof k === 'string' && k.length > 0))];
+  // Another account's order joins this pool through a phone only once staff
+  // have confirmed it (confirmed / processing / shipped / delivered). A merely
+  // placed 'pending' order does not, so nobody can use up a stranger's limit by
+  // placing unconfirmed orders to that stranger's number; the account's own
+  // orders still count from the moment they are placed.
   const phoneClause = byPhone
-    ? ` OR o.delivery_phone_key IN (SELECT value FROM json_each(?4))
-        OR o.delivery_phone_key = (SELECT substr(replace(u.phone_e164, '+', ''), -10) FROM users u WHERE u.id = ?3 AND u.phone_e164 IS NOT NULL)`
+    ? ` OR (o.status IN ('confirmed', 'processing', 'shipped', 'delivered') AND (
+          o.delivery_phone_key IN (SELECT value FROM json_each(?4))
+          OR o.delivery_phone_key = (SELECT substr(replace(u.phone_e164, '+', ''), -10) FROM users u WHERE u.id = ?3 AND u.phone_e164 IS NOT NULL)))`
     : '';
   const sql = `WITH RECURSIVE branch(id) AS (
        SELECT ?1 UNION SELECT c.id FROM catalogs c JOIN branch b ON c.parent_id = b.id
