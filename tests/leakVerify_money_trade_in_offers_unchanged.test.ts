@@ -91,6 +91,10 @@ async function fingerprint() {
  * paid-price formula, so the figures the guard holds were re-produced by `fingerprint()` on
  * feat/services-p2 — ONE figure, no part value. Every one is at or below what 10c6541a offered
  * (`V1_FIGURES`, kept below): the decision only ever lowers an offer the store could not resell.
+ *
+ * Re-baselined by the smart trade-in value (owner, 2026-11-18; DECISIONS row 353): «combo» 550,000 →
+ * 570,000 — its 900 hours over 12 months are 420 beyond the 480 a normal owner prints (40 a month),
+ * so the hours line falls a band. Still at or below 10c6541a's 762,000; the four others are unchanged.
  */
 const BASE_FIGURES: Record<string, unknown> | null = {
   "resin-blank": {
@@ -125,11 +129,11 @@ const BASE_FIGURES: Record<string, unknown> | null = {
   },
   "combo": {
     "estimate": {
-      "total": 550000,
+      "total": 570000,
       "parts": [],
       "settlement": null
     },
-    "estimated_iqd": 550000
+    "estimated_iqd": 570000
   },
   "combo-p1s": {
     "estimate": {

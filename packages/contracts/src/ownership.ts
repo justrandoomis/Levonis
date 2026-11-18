@@ -187,6 +187,9 @@ export const TABLE_OWNER_ENTRIES: ReadonlyArray<readonly [string, Owner]> = [
     // references (private), the provenance of the lot a received device became, and the
     // credit given back after a cancel or a return (both append-only).
     'trade_in_valuations', 'trade_in_component_refs', 'trade_in_stock', 'trade_in_credit_reissues',
+    // 0238 — smart trade-in value (DECISIONS row 353): the owner's per-model resale profile and each
+    // family's smart-value knobs (private, owner-written).
+    'trade_in_model_profiles', 'trade_in_smart_params',
     // The buyer's choices behind one bundle cart line, and the fence that makes a
     // partial inventory movement impossible inside the order's own batch (§1.5, §1.7).
     'cart_bundle_choices', 'order_reservation_fence',

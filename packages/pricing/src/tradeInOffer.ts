@@ -32,6 +32,18 @@
  *
  *   raw    = Σ offer_c   (a whole Combo also ≤ combo_now × max_offer_bp)
  *   offer  = raw rounded DOWN to `offer_rounding_iqd`; below `min_offer_iqd` → no offer.
+ *
+ * ─── SMART VALUE (owner, 2026-11-18; DECISIONS row 353) ──────────────────────
+ *
+ *   resale_bp   per MODEL: the owner's figure for the model, else the family's
+ *               blended with what traded-in units of the model really resold for
+ *               (`learnedResaleBp`: k phantom sales at the family's share, so a
+ *               few sales move it a little); a newer generation on sale lowers it
+ *               by `superseded_bp`.
+ *   age         the age line is reduced by the share today's new price already
+ *               fell below what was paid — the fall IS the age, not twice.
+ *   hours       only the hours beyond `hours_allowance_per_month × months` count.
+ * The margin (15%, at least 50,000 for a printer) and every cap are unchanged.
  */
 import {
   blankInputs,
@@ -160,6 +172,144 @@ const floorTo = (n: number, step: number) => {
 
 // ============================================================ one component
 
+/**
+ * THE FAMILY'S SMART-VALUE KNOBS (owner-only; 0238 `trade_in_smart_params`, NULL = this default).
+ *   hours_allowance_per_month  hours a normal owner prints a month (only the hours beyond count)
+ *   last_price_decay_bp        a model off sale today: what was paid, less this per month since delivery …
+ *   last_price_max_decay_bp    … at most this much
+ *   superseded_bp              a newer generation of the model is on sale: the resale share less this
+ *   learn_weight               phantom sales at the family's share (how gently real resales move a model)
+ */
+export interface SmartParams {
+  hours_allowance_per_month: number;
+  last_price_decay_bp: number;
+  last_price_max_decay_bp: number;
+  superseded_bp: number;
+  learn_weight: number;
+}
+export const SMART_PARAM_COLUMNS = ['hours_allowance_per_month', 'last_price_decay_bp', 'last_price_max_decay_bp', 'superseded_bp', 'learn_weight'] as const;
+export type SmartParamColumn = (typeof SMART_PARAM_COLUMNS)[number];
+export const SMART_PARAM_RANGES: Readonly<Record<SmartParamColumn, readonly [number, number]>> = {
+  hours_allowance_per_month: [0, 720],
+  last_price_decay_bp: [0, 1_000],
+  last_price_max_decay_bp: [0, 9_000],
+  superseded_bp: [0, 5_000],
+  learn_weight: [1, 50],
+};
+const S = (hours_allowance_per_month: number, last_price_decay_bp: number): SmartParams => ({
+  hours_allowance_per_month,
+  last_price_decay_bp,
+  last_price_max_decay_bp: 6_000,
+  superseded_bp: 1_000,
+  learn_weight: 3,
+});
+export const DEFAULT_SMART_PARAMS: Readonly<Record<TradeInFamily, SmartParams>> = {
+  fdm: S(40, 200),
+  resin: S(30, 250),
+  laser: S(20, 200),
+  ams: S(0, 200),
+  accessory: S(0, 300),
+};
+
+export function smartParamsOf(family: TradeInFamily, stored?: Partial<Record<SmartParamColumn, number | null>> | null): SmartParams {
+  const out = { ...DEFAULT_SMART_PARAMS[family] };
+  for (const k of SMART_PARAM_COLUMNS) {
+    const v = stored?.[k];
+    const [lo, hi] = SMART_PARAM_RANGES[k];
+    if (isInt(v) && v >= lo && v <= hi) out[k] = v;
+  }
+  return out;
+}
+
+export function validateSmartParams(raw: unknown): { ok: true; value: Partial<Record<SmartParamColumn, number | null>> } | { ok: false; errors: string[] } {
+  const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const errors: string[] = [];
+  const value: Partial<Record<SmartParamColumn, number | null>> = {};
+  for (const k of SMART_PARAM_COLUMNS) {
+    if (!(k in o)) continue;
+    const v = o[k];
+    if (v === null) {
+      value[k] = null;
+      continue;
+    }
+    const [lo, hi] = SMART_PARAM_RANGES[k];
+    if (!isInt(v) || v < lo || v > hi) errors.push(`smart.${k}`);
+    else value[k] = v;
+  }
+  return errors.length ? { ok: false, errors } : { ok: true, value };
+}
+
+/** A model's own resale share, as the owner may set it (0238 CHECK). */
+export const MODEL_RESALE_RANGE = [1_000, 9_500] as const;
+/** One real resale is read as at most / at least this share of new (an outlier moves nothing past it). */
+export const LEARN_SAMPLE_RANGE = [3_000, 9_500] as const;
+/** Only a model's newest resales teach; from this many on, the highest and the lowest are dropped. */
+export const LEARN_MAX_SAMPLES = 20;
+export const LEARN_TRIM_FROM = 5;
+
+/** The samples that teach, newest first in: at most LEARN_MAX_SAMPLES, the extremes trimmed from LEARN_TRIM_FROM on. */
+export function teachingSamples(newestFirst: readonly number[]): number[] {
+  const kept = newestFirst.filter((x) => Number.isSafeInteger(x) && x > 0).slice(0, LEARN_MAX_SAMPLES);
+  if (kept.length < LEARN_TRIM_FROM) return kept;
+  const sorted = [...kept].sort((a, b) => a - b);
+  return sorted.slice(1, -1);
+}
+
+/**
+ * WHAT ONE TRADED-IN UNIT REALLY RESOLD FOR, as a resale share at a perfect condition:
+ * sold ÷ (today's new price at intake × the condition share). null when it cannot be read.
+ */
+export function resaleSampleBp(soldIqd: number, nowAtIntakeIqd: number, qBp: number): number | null {
+  const sold = Math.trunc(soldIqd);
+  const now = Math.trunc(nowAtIntakeIqd);
+  const q = Math.trunc(qBp);
+  if (!(sold > 0) || !(now > 0) || !(q > 0)) return null;
+  const bp = Number((big(sold) * 100_000_000n) / (big(now) * big(q)));
+  return Math.min(LEARN_SAMPLE_RANGE[1], Math.max(LEARN_SAMPLE_RANGE[0], bp));
+}
+
+/**
+ * THE MODEL'S LEARNED SHARE — gently: `weight` phantom sales at the family's share plus the real
+ * ones, averaged (rounded DOWN). No sale → the family's share exactly.
+ */
+export function learnedResaleBp(familyBp: number, samples: readonly number[], weight: number): number {
+  const k = Math.max(1, Math.trunc(weight));
+  const fam = Math.max(0, Math.trunc(familyBp));
+  const ok = samples.filter((x) => Number.isSafeInteger(x) && x > 0);
+  if (ok.length === 0) return fam;
+  return Math.floor((fam * k + ok.reduce((n, x) => n + x, 0)) / (k + ok.length));
+}
+
+export type ResaleSource = 'family' | 'learned' | 'owner';
+
+/** The resale share in force for a model, and where it came from. */
+export function modelResaleBp(
+  familyBp: number,
+  o: { ownerBp: number | null; samples: readonly number[]; weight: number; superseded: boolean; supersededBp: number }
+): { resale_bp: number; source: ResaleSource; learned_bp: number; samples: number } {
+  const valid = o.samples.filter((x) => Number.isSafeInteger(x) && x > 0);
+  const learned = learnedResaleBp(familyBp, valid, o.weight);
+  const owner = isInt(o.ownerBp) && o.ownerBp >= MODEL_RESALE_RANGE[0] && o.ownerBp <= MODEL_RESALE_RANGE[1] ? o.ownerBp : null;
+  const source: ResaleSource = owner !== null ? 'owner' : valid.length > 0 ? 'learned' : 'family';
+  const base = owner ?? learned;
+  // A newer model on sale lowers the owner's or the type's share. A LEARNED share already carries it
+  // (the old model's real resales sell lower once the new one is out) — not taken twice.
+  const less = o.superseded && source !== 'learned' ? Math.max(0, Math.min(5_000, Math.trunc(o.supersededBp))) : 0;
+  return {
+    resale_bp: Math.max(0, base - Math.floor((base * less) / 10_000)),
+    source,
+    learned_bp: learned,
+    samples: valid.length,
+  };
+}
+
+/** A model with no price today: what was paid, less `decay_bp` per month since delivery, at most `max_bp`. */
+export function lastPaidNowIqd(paidIqd: number, months: number, p: Pick<SmartParams, 'last_price_decay_bp' | 'last_price_max_decay_bp'>): number {
+  const paid = Math.max(0, Math.trunc(paidIqd));
+  const off = Math.min(Math.max(0, p.last_price_max_decay_bp), Math.max(0, Math.trunc(months)) * Math.max(0, p.last_price_decay_bp));
+  return paid - mulDiv(paid, Math.min(10_000, off), 1, 10_000);
+}
+
 export interface ComponentFacts {
   role: ComponentRole;
   family: TradeInFamily;
@@ -171,6 +321,10 @@ export interface ComponentFacts {
   warranty_left_months: number;
   product_id: string;
   inputs: ComponentInputs;
+  /** Smart value: the model's resale share in force (`modelResaleBp`); absent → the family's `resale_bp`. */
+  resale_bp?: number;
+  /** Smart value: the family's knobs; absent → no age credit and no hours allowance (the 0192 formula). */
+  smart?: Pick<SmartParams, 'hours_allowance_per_month'>;
 }
 
 export interface ComponentOffer {
@@ -187,6 +341,10 @@ export interface ComponentOffer {
   store_cap_iqd: number;
   max_offer_iqd: number;
   offer_iqd: number;
+  /** Smart value (owner only): the resale share used, the age already priced, the hours allowed. */
+  resale_bp: number;
+  age_credit_bp: number;
+  hours_allowance: number;
 }
 
 /** The condition engine with no floor and no «market» factor (the resale view is E's own business now). */
@@ -204,15 +362,27 @@ export function componentOffer(rules: TradeInRuleSet, p: OfferParams, f: Compone
   const paid = Math.max(0, Math.trunc(f.paid_iqd));
   const base = Math.min(paid, now);
   const months = Math.max(0, Math.trunc(f.warranty_left_months));
+  const used = Math.max(0, Math.trunc(f.usage_months));
+  // The fall of today's new price below what was paid, as a share of WHAT WAS PAID (not of the base:
+  // the smaller credit of the two, for the store) — the age deduction already taken by the market.
+  const ageCredit = f.smart && paid > now && paid > 0 ? Number((big(paid - now) * 10_000n) / big(paid)) : 0;
+  const allowance = f.smart ? used * Math.max(0, Math.trunc(f.smart.hours_allowance_per_month)) : 0;
   const v = valuateComponent(
     conditionRules(rules, p),
-    { base_iqd: base, usage_months: Math.max(0, Math.trunc(f.usage_months)), warranty_remaining_months: months, product_id: f.product_id },
+    {
+      base_iqd: base,
+      usage_months: used,
+      warranty_remaining_months: months,
+      product_id: f.product_id,
+      ...(f.smart ? { age_credit_bp: ageCredit, hours_allowance: allowance } : {}),
+    },
     f.inputs ?? blankInputs(f.family)
   );
   const raw = v.lines.filter((l) => l.factor !== 'clamp' && l.factor !== 'rounding').reduce((n, l) => n + l.amount_iqd, 0);
   const q_bp = base > 0 ? Math.max(0, Math.min(10_000, raw <= 0 ? 0 : Number((big(raw) * 10_000n) / big(base)))) : 0;
   const cond = Math.max(0, v.value_iqd);
-  const E = mulDiv(now, p.resale_bp, q_bp, 100_000_000);
+  const resaleBp = isInt(f.resale_bp) && f.resale_bp >= 0 && f.resale_bp <= 10_000 ? f.resale_bp : p.resale_bp;
+  const E = mulDiv(now, resaleBp, q_bp, 100_000_000);
   const K = p.handling_iqd + mulDiv(now, p.warranty_reserve_bp, months, 10_000);
   const M = Math.max(mulDiv(E, p.margin_bp, 1, 10_000), p.margin_min_iqd);
   const cap = E - K - M;
@@ -232,6 +402,9 @@ export function componentOffer(rules: TradeInRuleSet, p: OfferParams, f: Compone
     store_cap_iqd: cap,
     max_offer_iqd: maxo,
     offer_iqd: offer,
+    resale_bp: resaleBp,
+    age_credit_bp: ageCredit,
+    hours_allowance: allowance,
   };
 }
 

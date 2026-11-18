@@ -354,6 +354,14 @@ export interface ValuationContext {
   warranty_remaining_months: number;
   /** For the market factor's per-product override. */
   product_id: string;
+  /**
+   * Smart value (DECISIONS row 353). The part of the age deduction that today's new price has
+   * ALREADY taken (the price fell since it was bought), basis points of what was paid: the age line is
+   * reduced by it, never above 0 — age is not counted twice. Absent → 0 (the v1 engine unchanged).
+   */
+  age_credit_bp?: number;
+  /** Smart value: hours the owner expects for the months owned — only the hours beyond them count. Absent → 0. */
+  hours_allowance?: number;
 }
 
 // ============================================================ the engine
@@ -388,7 +396,9 @@ function rawEffect(rule: FactorRule, ctx: ValuationContext, input: ComponentInpu
   switch (c.kind) {
     case 'age': {
       const months = Math.max(0, ctx.usage_months - c.grace_months);
-      return { bp: Math.max(-c.max_bp, -months * c.per_month_bp), detail: { months: ctx.usage_months } };
+      const age = Math.max(-c.max_bp, -months * c.per_month_bp);
+      const credit = Math.max(0, Math.trunc(ctx.age_credit_bp ?? 0));
+      return { bp: Math.min(0, age + credit), detail: credit > 0 ? { months: ctx.usage_months, priced_bp: Math.min(credit, -age) } : { months: ctx.usage_months } };
     }
     case 'warranty': {
       const m = Math.max(0, ctx.warranty_remaining_months);
@@ -396,9 +406,9 @@ function rawEffect(rule: FactorRule, ctx: ValuationContext, input: ComponentInpu
     }
     case 'hours': {
       if (input.hours === null) return { bp: 0 };
-      const h = input.hours;
+      const h = Math.max(0, input.hours - Math.max(0, Math.trunc(ctx.hours_allowance ?? 0)));
       const band = c.bands.find((b) => b.up_to === null || h <= b.up_to) ?? c.bands[c.bands.length - 1];
-      return { bp: band ? band.effect_bp : 0, detail: { hours: h } };
+      return { bp: band ? band.effect_bp : 0, detail: h === input.hours ? { hours: h } : { hours: input.hours, beyond_expected: h } };
     }
     case 'scale': {
       const score = scoreFor(rule.factor, input);

@@ -86,6 +86,7 @@ import { requireCostRead } from '../lib/costAccess';
 import { deviceReturned, intakeRequest } from '../lib/tradeInIntake';
 import { bookTradeInStock } from '../lib/tradeInStock';
 import { overrideRecord, valuationsOf } from '../lib/tradeInOffer';
+import { saveModelProfile, saveSmartParams, valueTable } from '../lib/tradeInSmart';
 import { QUEUE_CHIPS, adminQueue, isUsdText, listComponentRefs, tradeInPnl, type QueueChip } from '../lib/tradeInAdminQueue';
 import { getSetting, normalizeTradeInPolicy, setSetting, TRADE_IN_POLICY_DEFAULTS, TRADE_IN_POLICY_RANGES } from '../lib/settings';
 import { auditStatements } from '../lib/audit';
@@ -901,6 +902,35 @@ function familyOf(c: Context<AppContext>): TradeInFamily {
   if (!(TRADE_IN_FAMILIES as readonly string[]).includes(f)) throw notFound('Unknown family');
   return f as TradeInFamily;
 }
+
+/**
+ * SMART TRADE-IN VALUE (owner, 2026-11-18; DECISIONS row 353): the value table — every printer
+ * model, today's price, its resale share and where it came from, the offer at 3–24 months — read
+ * with the costs; a model's profile and a family's knobs written by the owner.
+ */
+adminTradeInRoutes.get('/value-table', requireCostRead, async (c) => {
+  c.header('Cache-Control', 'private, no-store');
+  await requireTradeInV2(c.env.DB);
+  return c.json({ success: true, ...(await valueTable(c.env)) });
+});
+
+adminTradeInRoutes.put('/model-profiles/:productId', requireMoneyAuthority('trade_in_rules'), async (c) => {
+  await requireTradeInV2(c.env.DB);
+  const admin = c.get('user')!;
+  await rateLimit(c, 'admin-trade-in-model', 120, 3600);
+  const productId = str(c.req.param('productId'), 'productId', { min: 1, max: 80 });
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  return c.json({ success: true, profile: await saveModelProfile(c.env, productId, body, admin.id) });
+});
+
+adminTradeInRoutes.put('/smart-params/:family', requireMoneyAuthority('trade_in_rules'), async (c) => {
+  await requireTradeInV2(c.env.DB);
+  const admin = c.get('user')!;
+  await rateLimit(c, 'admin-trade-in-smart', 60, 3600);
+  const family = familyOf(c);
+  const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
+  return c.json({ success: true, smart: await saveSmartParams(c.env, family, body, admin.id) });
+});
 
 adminTradeInRoutes.put('/rules/:family', requireMoneyAuthority('trade_in_rules'), async (c) => {
   const admin = c.get('user')!;

@@ -1804,6 +1804,7 @@ export async function previewDraft(
       inputsOf: (c) => storedInputs(answered.find((x) => x.role === c.role)?.inputs_json ?? '{}', book[c.family]),
       slotUnitIds: slot.unitIds,
       nowIso,
+      lastPaidFallback: true,
     });
     if (o.no_offer_reason === 'scope_unavailable') throw refuse('TRADE_IN_SCOPE_UNAVAILABLE');
     const s = targetPrice && o.offer_iqd !== null ? tradeInSettlement(targetPrice, o.offer_iqd) : null;
@@ -2057,6 +2058,7 @@ async function submitV2(env: Env, req: RequestRow, comps: ComponentRow[], book: 
     inputsOf: (c) => storedInputs(comps.find((x) => x.role === c.role)?.inputs_json ?? '{}', book[c.family]),
     slotUnitIds: slot.unitIds,
     nowIso,
+    lastPaidFallback: true,
   });
   if (o.no_offer_reason === 'scope_unavailable') throw refuse('TRADE_IN_SCOPE_UNAVAILABLE');
   if (await heldInShopElsewhere(db, req.id, req.order_item_id, req.unit_index, req.scope)) throw refuse('TRADE_IN_DEVICE_IN_SHOP');

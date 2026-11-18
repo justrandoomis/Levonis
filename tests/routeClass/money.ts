@@ -75,6 +75,10 @@ export default {
         'GET /component-refs': 'cost_read',
         'PUT /component-refs': 'owner',
         'DELETE /component-refs': 'owner',
+        // Smart trade-in value (row 353): the value table with the resale shares; the model profiles and family knobs.
+        'GET /value-table': 'cost_read',
+        'PUT /model-profiles/:productId': 'owner',
+        'PUT /smart-params/:family': 'owner',
         // The trade-in P&L: credits, stock at cost, resale margin, write-offs, overrides, re-issues.
         'GET /pnl': 'cost_read',
       },

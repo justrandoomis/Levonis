@@ -33,9 +33,10 @@ import {
   type ComponentRole,
   type TradeInFamily,
 } from '@levonis/pricing/tradeIn';
-import { componentOffer, paramsOf, requestOffer, splitPaid, type ComponentOffer, type OfferParams } from '@levonis/pricing/tradeInOffer';
+import { componentOffer, lastPaidNowIqd, paramsOf, requestOffer, splitPaid, type ComponentOffer, type OfferParams } from '@levonis/pricing/tradeInOffer';
+import { loadSmartBook, modelProfiles, modelResaleFor, type ModelResale } from './tradeInSmart';
 
-export type NowSource = 'own_sku' | 'combo_gap' | 'standalone_cap' | 'standalone' | 'owner_usd' | 'ams_reference' | 'successor' | 'combo_whole';
+export type NowSource = 'own_sku' | 'combo_gap' | 'standalone_cap' | 'standalone' | 'owner_usd' | 'ams_reference' | 'successor' | 'combo_whole' | 'last_paid';
 
 export interface PartNow {
   now_iqd: number;
@@ -237,6 +238,12 @@ export async function offerFor(
     slotUnitIds: readonly string[];
     nowIso: string;
     reader?: TodayReader;
+    /**
+     * Smart value (row 353): a model with no price on sale today is valued from what was paid —
+     * for a NEW offer (preview, submit), and at intake only when that request's offer was itself
+     * made that way. Off: the 0192 rule (no price today → no offer; review F-14 at intake).
+     */
+    lastPaidFallback?: boolean;
   }
 ): Promise<OfferOutcome> {
   const { req, unit, comps, book, nowIso } = args;
@@ -246,16 +253,40 @@ export async function offerFor(
   const left = warrantyMonthsLeft(snap.warranty_end_at ?? null, nowIso);
   const versions: Partial<Record<TradeInFamily, number>> = {};
   for (const c of comps) versions[c.family] = book[c.family].version;
-  const [nows, repairs] = await Promise.all([
+  const modelId = req.source_product_id ?? unit.product_id;
+  const [found, repairs, smart, profiles] = await Promise.all([
     componentNows(env, reader, unit, { amsReferenceIqd: book.ams.ams_reference_iqd }),
     systemRepairs(env.DB, req.order_item_id, args.slotUnitIds),
+    loadSmartBook(env.DB),
+    modelProfiles(env.DB, [modelId]),
   ]);
+  const profile = profiles.get(modelId) ?? null;
   const roles = new Set(comps.map((c) => c.role));
   const primary = comps.find((c) => c.role === 'device') ?? comps[0];
+  // SMART VALUE (row 353): a model with no price on sale today is valued from what THIS customer
+  // paid for it, less the family's decay per month since delivery — a private figure (never shown
+  // as «today's price»), and a Combo stays one machine. Only for a model the OWNER switched on
+  // (a model hidden for a day to be re-priced is not «off sale»), and only with a known delivery date.
+  const nows: UnitNows =
+    found.missing && args.lastPaidFallback === true && profile?.value_off_sale === 1 && !!snap.delivered_at && unit.paid_iqd > 0
+      ? (() => {
+          const now = lastPaidNowIqd(unit.paid_iqd, usage, smart[primary?.family ?? 'fdm']);
+          return unit.is_combo
+            ? { missing: false, combo_now: now, device: { now_iqd: now, source: 'last_paid', channel: null }, ams: { now_iqd: 0, source: 'combo_whole', channel: null }, split_unavailable: true }
+            : { missing: false, combo_now: null, device: { now_iqd: now, source: 'last_paid', channel: null }, ams: null, split_unavailable: false };
+        })()
+      : found;
   const primaryParams = offerParamsOf(book[primary?.family ?? 'fdm']);
+  // The model's own resale share (its owner figure, else learned from real resales, less a newer
+  // generation on sale) — the printer / whole device only; an AMS part keeps its family's share.
+  const modelResale: ModelResale | null = primary
+    ? await modelResaleFor(env.DB, reader, modelId, offerParamsOf(book[primary.family]).resale_bp, smart[primary.family], { profile })
+    : null;
   const paramsJson = JSON.stringify({
     rule_versions: versions,
     params: Object.fromEntries([...new Set(comps.map((c) => c.family))].map((f) => [f, offerParamsOf(book[f])])),
+    smart: Object.fromEntries([...new Set(comps.map((c) => c.family))].map((f) => [f, smart[f]])),
+    ...(modelResale ? { model_resale: modelResale } : {}),
   });
   const none = (reason: NonNullable<OfferOutcome['no_offer_reason']>): OfferOutcome => ({
     offer_iqd: null,
@@ -293,6 +324,8 @@ export async function offerFor(
         warranty_left_months: left,
         product_id: req.source_product_id ?? unit.product_id,
         inputs,
+        smart: smart[c.family],
+        ...(c.role === 'device' && modelResale ? { resale_bp: modelResale.resale_bp } : {}),
       })
     );
   }
@@ -332,6 +365,17 @@ export async function offerFor(
     },
     parts,
   };
+}
+
+/** Was this request's submitted offer valued from what was paid (no price on sale that day)? Owner record, named columns. */
+export async function offeredOnLastPaid(db: D1Database, requestId: string): Promise<boolean> {
+  const row = await db
+    .prepare(`SELECT components_json FROM trade_in_valuations WHERE request_id = ? AND phase = 'submit' ORDER BY created_at DESC, rowid DESC LIMIT 1`)
+    .bind(requestId)
+    .first<{ components_json: string }>()
+    .catch(() => null);
+  const parts = safeParse<unknown>(row?.components_json ?? '[]', []);
+  return Array.isArray(parts) && parts.some((p) => (p as { now_source?: unknown })?.now_source === 'last_paid');
 }
 
 /** The validated answers stored on a component (or blank), for `inputsOf`. */

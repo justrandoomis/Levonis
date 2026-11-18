@@ -37,7 +37,7 @@ import { auditStatements } from './audit';
 import { sanitizeUserText } from './walletNotify';
 import { getSetting } from './settings';
 import { liveUnitOfSlot } from './deviceCustody';
-import { offerFor, valuationStatement } from './tradeInOffer';
+import { offerFor, offeredOnLastPaid, valuationStatement } from './tradeInOffer';
 import { tradeInV2Installed } from './tradeInSchema';
 import {
   creditOrders,
@@ -166,6 +166,8 @@ export async function intakeRequest(env: Env, req: RequestRow, admin: { id: stri
     inputsOf: (c) => inputs.get(c.role)!,
     slotUnitIds: slot.unitIds,
     nowIso,
+    // The same basis as the offer sent (row 353): valued from what was paid only if the offer was.
+    lastPaidFallback: await offeredOnLastPaid(env.DB, req.id),
   });
   const reference = referenceOf(req);
   // NO OFFER TODAY IS NOT AN OFFER OF ZERO (review F-14): when the formula cannot price the device

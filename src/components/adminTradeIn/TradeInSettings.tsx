@@ -2,7 +2,8 @@
  * «إعدادات الاستبدال» — THE OWNER'S SIDE OF THE DESK (spec §4.4, §6.11, §6.13, §10.3): how long
  * an offer and a credit hold, the collection fee, the hours tolerance and the serial rule (GET/PUT
  * /policy); the trade-in P&L of the last 30 days (GET /pnl); the component reference prices; and
- * the condition rules with the offer parameters of each family (RulesEditor).
+ * the condition rules with the offer parameters of each family (RulesEditor); and the smart value
+ * table — every printer's value at 3–24 months, its resale share, its newer model (ValueTable, row 353).
  *
  * Every read here is a cost read — the server answers the verified owner only (COST_ACCESS_DENIED
  * for everyone else) — and the tab is not offered to anyone else. Nothing here is cached.
@@ -14,6 +15,7 @@ import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useA } from './useA';
 import ComponentRefs from './ComponentRefs';
 import RulesEditor from './RulesEditor';
+import ValueTable from './ValueTable';
 import { PNL_COUNT, type AdminKey } from './copy';
 import { countedText } from '../tradeIn/copy';
 
@@ -124,6 +126,8 @@ export default function TradeInSettings() {
           <p className={`text-[12.5px] ${T.text3}`}>{a('loading')}</p>
         )}
       </section>
+
+      <ValueTable />
 
       <section className={`${T.surface} space-y-3 p-4`} data-trade-in-policy>
         <h3 className="text-[15px] font-bold">{a('policy.title')}</h3>
