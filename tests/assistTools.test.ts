@@ -92,8 +92,15 @@ function filesUnder(dir: string): string[] {
   });
 }
 
+/**
+ * The rules core stays model-free. Claude-written replies (DECISIONS row 348,
+ * the owner's override of I1) live in worker/lib/assist/ai/ alone, and are
+ * pinned by the next test instead.
+ */
+const AI_DIR = join(ROOT, 'worker/lib/assist/ai');
+
 test('nothing in worker/lib/assist calls out of the process or reaches for a model', () => {
-  const files = filesUnder(join(ROOT, 'worker/lib/assist'));
+  const files = filesUnder(join(ROOT, 'worker/lib/assist')).filter((f) => !f.startsWith(AI_DIR));
   assert.ok(files.length >= 10);
   for (const file of files) {
     const code = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
@@ -103,6 +110,20 @@ test('nothing in worker/lib/assist calls out of the process or reaches for a mod
     // The only addresses are the reviewed official guide pages.
     for (const m of code.matchAll(/https:\/\/[^\s'"`]+/g)) assert.ok(m[0].startsWith('https://wiki.bambulab.com/'), `${file}: ${m[0]}`);
   }
+});
+
+test('the Claude replies (row 348) go out through the Creative Studio client only, never a fetch of their own', () => {
+  const files = filesUnder(AI_DIR);
+  assert.ok(files.length >= 4);
+  let viaClient = 0;
+  for (const file of files) {
+    const code = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
+    for (const forbidden of ['fetch(', 'XMLHttpRequest', 'env.AI', 'openai', 'gemini', 'http://', 'api.anthropic']) {
+      assert.ok(!code.toLowerCase().includes(forbidden.toLowerCase()), `${file} reaches for ${forbidden}`);
+    }
+    if (code.includes("from '../../creative/anthropic'")) viaClient += 1;
+  }
+  assert.equal(viaClient, 1, 'one module calls the provider, through the shared client');
 });
 
 test('support.ts reaches the card builders through the seam, and the reply text comes from the dictionaries', () => {
