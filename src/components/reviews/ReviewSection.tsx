@@ -28,6 +28,7 @@ const STRINGS = {
     edit: 'تعديل مراجعتك',
     incentivized: 'مراجعة ضمن برنامج المكافآت',
     systemGenerated: 'تم التقييم تلقائياً بواسطة النظام',
+    boughtTimes: (n: number) => (n === 2 ? 'تم الشراء مرتين' : `تم الشراء ${n.toLocaleString()} ${n <= 10 ? 'مرات' : 'مرة'}`),
     verified: 'شراء مؤكد',
     notEligible: 'المراجعات متاحة لمن استلم المنتج ضمن طلب مُسلَّم.',
     signInToReview: 'سجّل الدخول لكتابة مراجعة بعد استلام طلبك.',
@@ -82,6 +83,7 @@ const STRINGS = {
     edit: 'Edit your review',
     incentivized: 'Rewards-program review',
     systemGenerated: 'Automatically rated by the system',
+    boughtTimes: (n: number) => `Bought ${n.toLocaleString()} times`,
     verified: 'Verified purchase',
     notEligible: 'Reviews are open to customers with a delivered order containing this product.',
     signInToReview: 'Sign in to review after your order is delivered.',
@@ -136,6 +138,7 @@ const STRINGS = {
     edit: 'دەستکاری پێداچوونەوەکەت بکە',
     incentivized: 'پێداچوونەوەی بەرنامەی خەڵات',
     systemGenerated: 'خۆکارانە لەلایەن سیستەمەوە هەڵسەنگێنراوە',
+    boughtTimes: (n: number) => `${n.toLocaleString()} جار کڕدراوە`,
     verified: 'کڕینی پشتڕاستکراو',
     notEligible: 'پێداچوونەوە بۆ ئەو کڕیارانەیە کە داواکارییەکی گەیشتوویان هەیە لەگەڵ ئەم بەرهەمە.',
     signInToReview: 'بچۆ ژوورەوە بۆ نووسینی پێداچوونەوە دوای گەیشتنی داواکارییەکەت.',
@@ -194,6 +197,34 @@ interface PublicReview {
   verified_purchase: boolean;
   source: 'user' | 'system';
   system_generated: boolean;
+}
+/**
+ * System auto-ratings carry no text, so N of them read as N identical cards.
+ * Collapse them into one card per star value, placed where the newest one
+ * sits, with the count of orders it covers. Each one is still a real
+ * delivered order, so the header total stays the server's count.
+ */
+type ReviewRow = PublicReview & { count: number; firstAt: string };
+function groupSystemReviews(list: PublicReview[]): ReviewRow[] {
+  const out: ReviewRow[] = [];
+  const bucket = new Map<number, ReviewRow>();
+  for (const r of list) {
+    if (!r.system_generated) {
+      out.push({ ...r, count: 1, firstAt: r.created_at });
+      continue;
+    }
+    const g = bucket.get(r.stars);
+    if (g) {
+      g.count += 1;
+      if (r.created_at < g.firstAt) g.firstAt = r.created_at;
+      if (r.created_at > g.created_at) g.created_at = r.created_at;
+    } else {
+      const row = { ...r, count: 1, firstAt: r.created_at };
+      bucket.set(r.stars, row);
+      out.push(row);
+    }
+  }
+  return out;
 }
 interface MyReview {
   id: string;
@@ -681,11 +712,16 @@ export default function ReviewSection({ productId }: { productId: string }) {
         <EmptyState compact icon={<Star aria-hidden="true" className="w-6 h-6" />} title={S.empty} />
       )}
       <div className="space-y-3">
-        {reviews.map((r) => (
+        {groupSystemReviews(reviews).map((r) => (
           <article key={r.id} className="lv-surface p-4 space-y-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-text-primary">{r.reviewer}</span>
+                {r.count > 1 && (
+                  <span className="text-[11px] font-bold text-text-secondary bg-surface-raised border border-border-subtle rounded-full px-2 py-0.5">
+                    ×{r.count.toLocaleString()}
+                  </span>
+                )}
                 {r.verified_purchase && (
                   <StatusChip tone="success" icon={<BadgeCheck className="w-3 h-3" />}>
                     {S.verified}
@@ -697,12 +733,19 @@ export default function ReviewSection({ productId }: { productId: string }) {
                   </StatusChip>
                 )}
               </div>
-              <span className="text-[11px] text-text-muted">{new Date(r.created_at).toLocaleDateString()}</span>
+              <span className="text-[11px] text-text-muted">
+                {r.count > 1 && r.firstAt.slice(0, 10) !== r.created_at.slice(0, 10)
+                  ? `${new Date(r.firstAt).toLocaleDateString()} – ${new Date(r.created_at).toLocaleDateString()}`
+                  : new Date(r.created_at).toLocaleDateString()}
+              </span>
             </div>
             <Stars value={r.stars} size="w-4 h-4" />
             <p className="text-[13px] text-text-secondary whitespace-pre-wrap break-words">
               {r.system_generated ? S.systemGenerated : r.body}
             </p>
+            {r.count > 1 && (
+              <p className="text-[12px] font-bold text-text-primary">{S.boughtTimes(r.count)}</p>
+            )}
             {r.media.length > 0 && (
               <div className="flex gap-2 overflow-x-auto pb-1">
                 {r.media.map((m) =>
