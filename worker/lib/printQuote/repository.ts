@@ -430,12 +430,37 @@ export function productMaterialType(specFields: unknown, known: ReadonlySet<stri
   } catch {
     return '';
   }
-  const normalised = stated.trim().toUpperCase();
+  const normalised = stated.trim().toUpperCase().replace(/\s+/g, ' ');
   if (!normalised) return '';
   if (known.has(normalised)) return normalised;
-  const first = normalised.split(/\s+/)[0] ?? '';
-  return first && known.has(first) ? first : '';
+  // «لا يمكن تسعير هذه المادة» on PLA (owner, 2026-11-18): the one filament the
+  // shop prices is labelled «PLA+», so PLA — the calculator's default — had no
+  // rung at all. Only a short list of spellings is read, each naming the SAME
+  // polymer: «PLA+» / «PLA Plus» is PLA toughened, and the chemical names are
+  // what the product page states instead of the code.
+  //
+  // A carbon-filled filament never falls back to its base resin: «ASA, carbon
+  // fiber» is ASA-CF or nothing, because a real number for the wrong material is
+  // worse than no number (the PLA-CF rule in tests/materialPricedFromShopFilament).
+  // A whole word: «POLYCARBONATE» contains CARBON and is not carbon-filled.
+  const carbon = /\bCARBON\b|(^|[\s,/-])CF\b/.test(normalised);
+  const head = (normalised.split(/[,/]/)[0] ?? '').trim();
+  const firstWord = head.split(' ')[0] ?? '';
+  const candidates = [head, firstWord].flatMap((t) => [t, t.replace(/\s*(\+|PLUS)$/, ''), TYPE_NAMES[t] ?? '']);
+  for (const c of candidates) {
+    if (!c) continue;
+    const typed = carbon && !c.endsWith('-CF') ? `${c}-CF` : c;
+    if (known.has(typed)) return typed;
+  }
+  return '';
 }
+
+/** Product pages name the polymer; the engine holds the code. Same material only. */
+const TYPE_NAMES: Record<string, string> = {
+  'POLYLACTIC ACID': 'PLA',
+  'THERMOPLASTIC POLYURETHANE': 'TPU',
+  POLYCARBONATE: 'PC',
+};
 
 /** The materials template stores net weight as a string: "1000", "1000 g",
  *  "1,000g". Anything that is not a positive number is refused rather than

@@ -189,10 +189,45 @@ test('PLA-CF is not PLA, and a marketing suffix does not turn one into the other
     'PLA-CF',
     'the first word decides, so a carbon-filled filament stays carbon-filled'
   );
-  assert.equal(productMaterialType(spec('PLA+'), known), '', 'unrecognised is unpriced, never assumed');
+  // «لا يمكن تسعير هذه المادة» on PLA (owner, 2026-11-18): the shop's priced
+  // spool says «PLA+», which is PLA toughened — the same polymer.
+  assert.equal(productMaterialType(spec('PLA+'), known), 'PLA');
+  assert.equal(productMaterialType(spec('PLA Plus'), known), 'PLA');
+  assert.equal(productMaterialType(spec('PLA-CF+'), known), 'PLA-CF', 'the suffix never strips the carbon');
+  assert.equal(productMaterialType(spec('PLA, carbon fiber'), known), 'PLA-CF', 'spelled out, carbon is still carbon');
+  assert.equal(productMaterialType(spec('Glow PLA+'), known), '', 'a different first word is not read as PLA');
   assert.equal(productMaterialType(spec(''), known), '');
   assert.equal(productMaterialType('not json at all', known), '');
   assert.equal(productMaterialType(spec('ABS'), known), '', 'a type the engine does not hold is not matched');
+});
+
+test('the polymer names product pages use are the same material as the code', () => {
+  const known = new Set(['PLA', 'TPU', 'PC', 'ASA', 'PETG']);
+  const spec = (type: string) => JSON.stringify({ material_type: type, net_weight: '1000' });
+  assert.equal(productMaterialType(spec('Thermoplastic polyurethane'), known), 'TPU');
+  assert.equal(productMaterialType(spec('Polycarbonate'), known), 'PC');
+  assert.equal(productMaterialType(spec('Polylactic acid'), known), 'PLA');
+  // ASA-CF is not held here, and carbon-filled ASA is not ASA.
+  assert.equal(productMaterialType(spec('ASA, carbon fiber'), known), '');
+  assert.equal(productMaterialType(spec('ASA-CF'), known), '');
+  assert.equal(productMaterialType(spec('PETG, PET'), known), 'PETG');
+});
+
+test('the live shelf: one «PLA+» spool prices PLA, and only PLA', async () => {
+  // levonis-iq.com on 2026-11-18: eSUN PLA+ 1 kg at 27,250 is the one filament
+  // with a confirmed price and a net weight, and the calculator said «لا يمكن
+  // تسعير هذه المادة» for PLA, its own default.
+  const { raw } = shopThatSellsFilament();
+  sellFilament(raw, { id: 'fil_esun', type: 'PLA+', priceIqd: 27250, netWeight: '1,000 g' });
+
+  const sources = await pricesOf(raw, null, ['pla', 'pla-cf', 'petg']);
+  const pla = resolveMaterialPrice({ materialId: 'pla', materialType: 'PLA' }, sources);
+  // The fixture re-publishes the shelf through the dollar base, which rounds the
+  // dinar figure; the point is that PLA now HAS a rung, read off that spool.
+  assert.ok(pla && pla.iqdPerKg >= 27000 && pla.iqdPerKg <= 28000, `PLA priced from the PLA+ spool (got ${pla?.iqdPerKg})`);
+  assert.equal(pla?.from, 'platform', 'a type match is an estimate, never «exact»');
+  assert.equal(resolveMaterialPrice({ materialId: 'pla-cf', materialType: 'PLA-CF' }, sources), null);
+  assert.equal(resolveMaterialPrice({ materialId: 'petg', materialType: 'PETG' }, sources), null);
 });
 
 test('a PLA on the shelf does not put a price on PLA-CF', async () => {
