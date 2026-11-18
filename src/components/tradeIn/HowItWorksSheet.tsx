@@ -16,6 +16,30 @@ const STEPS: Array<[CopyKey, CopyKey]> = [
   ['how.5', 'how.5d'],
 ];
 
+/**
+ * The five steps as a list: in the sheet, and on the page itself where the page has nothing else
+ * to show yet (signed out, or no LEVONIS device delivered). `compact` lays them in two columns on
+ * a wide screen and sets them a size smaller.
+ */
+export function TradeInSteps({ compact = false }: { compact?: boolean }) {
+  const { t } = useT();
+  return (
+    <ol className={compact ? 'grid gap-2.5 sm:grid-flow-col sm:grid-cols-2 sm:grid-rows-3' : 'space-y-3'} data-trade-in-steps>
+      {STEPS.map(([title, detail], i) => (
+        <li key={title} className="flex items-start gap-3">
+          <span className={`lv-well flex shrink-0 items-center justify-center rounded-full font-black tabular-nums text-text-primary ${compact ? 'h-7 w-7 text-[12px]' : 'h-8 w-8 text-[13px]'}`} aria-hidden>
+            {i + 1}
+          </span>
+          <span className="min-w-0">
+            <span className={`block font-bold leading-5 text-text-primary ${compact ? 'text-[13px]' : 'text-[14px]'}`}>{t(title)}</span>
+            <span className={`block leading-5 text-text-secondary ${compact ? 'text-[12px]' : 'text-[12.5px]'}`}>{t(detail)}</span>
+          </span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 export default function HowItWorksSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { t } = useT();
   const titleId = useId();
@@ -40,19 +64,9 @@ export default function HowItWorksSheet({ open, onClose }: { open: boolean; onCl
         </div>
       }
     >
-      <ol className="space-y-3 px-4 py-2">
-        {STEPS.map(([title, detail], i) => (
-          <li key={title} className="flex items-start gap-3">
-            <span className="lv-well flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[13px] font-black tabular-nums text-text-primary" aria-hidden>
-              {i + 1}
-            </span>
-            <span className="min-w-0">
-              <span className="block text-[14px] font-bold leading-5 text-text-primary">{t(title)}</span>
-              <span className="block text-[12.5px] leading-5 text-text-secondary">{t(detail)}</span>
-            </span>
-          </li>
-        ))}
-      </ol>
+      <div className="px-4 py-2">
+        <TradeInSteps />
+      </div>
       <p className="px-4 pb-3 text-[12.5px] font-semibold text-gold">{t('promise')}</p>
     </Sheet>
   );

@@ -374,3 +374,25 @@ export function nameOf(t: { name: string; name_ar: string; name_ckb?: string }, 
 export function labelOf(v: { label_ar: string; label_en: string; label_ckb?: string }, loc: Loc): string {
   return loc(v.label_ar || v.label_en, v.label_en, v.label_ckb || v.label_en);
 }
+
+/** The stages that wait on the customer, not the shop: the home page puts these first. */
+export const YOUR_TURN_STAGES: readonly TradeInStage[] = ['decision', 'credit_ready', 'draft', 'device_to_collect', 'credit_reissued'];
+
+/** A request that still needs the customer or the shop. An older server sends no stage: its status decides. */
+export function isOpenRequest(r: Pick<RequestSummary, 'status' | 'stage'>): boolean {
+  if (r.stage) return OPEN_STAGES.includes(r.stage);
+  return !['completed', 'cancelled', 'customer_rejected'].includes(r.status);
+}
+
+/** The open requests, those waiting on the customer first, then the latest moved. */
+export function activeRequests(requests: readonly RequestSummary[] | null): RequestSummary[] {
+  const turn = (r: RequestSummary) => (r.stage && YOUR_TURN_STAGES.includes(r.stage) ? 0 : 1);
+  return (requests ?? []).filter(isOpenRequest).sort((a, b) => turn(a) - turn(b) || (b.updated_at || b.created_at).localeCompare(a.updated_at || a.created_at));
+}
+
+/** Where a device sits on the home list: tradable now, in a trade-in, or not available. */
+export type UnitGroup = 'ready' | 'open' | 'other';
+export function unitGroup(u: Pick<EligibleUnit, 'available' | 'open_request_id'>): UnitGroup {
+  if (u.open_request_id) return 'open';
+  return u.available ? 'ready' : 'other';
+}

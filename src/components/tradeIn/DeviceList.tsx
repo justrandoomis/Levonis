@@ -6,7 +6,8 @@
  * the year it arrived.
  */
 import React, { useMemo } from 'react';
-import { ChevronLeft, ChevronRight, PackageSearch, Search, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, MessageCircle, PackageSearch, Printer, Search, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { TabStrip } from '../ui/Tabs';
 import { Badge, StatusChip } from '../ui/Badge';
@@ -18,7 +19,8 @@ import { timeLeftWords, warrantyTimeLeft } from '../../../packages/pricing/src/w
 import { STAGE_LABELS } from '../../../packages/pricing/src/tradeIn';
 import { useT } from './useT';
 import { ErrorLine } from './parts';
-import { dateText, stageTone, triText, type EligibleUnit, type RequestSummary } from './model';
+import { TradeInSteps } from './HowItWorksSheet';
+import { dateText, isOpenRequest, stageTone, triText, unitGroup, type EligibleUnit, type RequestSummary, type UnitGroup } from './model';
 import type { CopyKey } from './copy';
 
 export type DeviceTab = 'devices' | 'requests';
@@ -50,6 +52,9 @@ export function reasonKey(u: Pick<EligibleUnit, 'reason' | 'open_request_id' | '
   }
 }
 
+const GROUP_ORDER: UnitGroup[] = ['ready', 'open', 'other'];
+const GROUP_LABEL: Record<UnitGroup, CopyKey> = { ready: 'group.ready', open: 'group.open', other: 'group.other' };
+
 const norm = (s: string) => s.toLocaleLowerCase().replace(/[ً-ٟ]/g, '').trim();
 
 export default function DeviceList({
@@ -78,9 +83,8 @@ export default function DeviceList({
   const { t, tx } = useT();
   const { loc, lang, dir } = useLanguage();
   const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
-  const openCount = (requests ?? []).filter(
-    (r) => !['completed', 'cancelled', 'customer_rejected'].includes(r.status) || r.stage === 'device_to_collect' || r.stage === 'credit_reissued'
-  ).length;
+  const navigate = useNavigate();
+  const openCount = (requests ?? []).filter(isOpenRequest).length;
 
   const shown = useMemo(() => {
     const q = norm(query);
@@ -90,6 +94,12 @@ export default function DeviceList({
       return [u.name, u.variant, u.order_id, year].some((f) => norm(f || '').includes(q));
     });
   }, [units, query]);
+
+  /** Tradable devices first, then those already in a trade-in, then the rest with their reasons. */
+  const groups = useMemo(
+    () => GROUP_ORDER.map((g) => ({ g, list: (shown ?? []).filter((u) => unitGroup(u) === g) })).filter((x) => x.list.length > 0),
+    [shown]
+  );
 
   const warranty = (u: EligibleUnit) => {
     const left = warrantyTimeLeft(u.warranty_end_at, new Date().toISOString());
@@ -127,30 +137,33 @@ export default function DeviceList({
         </div>
       ) : tab === 'devices' ? (
         <div className="p-3 sm:p-4" role="tabpanel" aria-label={t('tab.devices')}>
-          <div className="relative">
-            <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto h-4 w-4 text-text-muted" aria-hidden />
-            <input
-              type="text"
-              inputMode="search"
-              className="lv-input ps-9 pe-11 text-[14px]"
-              value={query}
-              onChange={(e) => onQuery(e.target.value)}
-              placeholder={t('search')}
-              aria-label={t('search')}
-              enterKeyHint="search"
-              data-trade-in-search
-            />
-            {query ? (
-              <button
-                type="button"
-                onClick={() => onQuery('')}
-                aria-label={t('clearSearch')}
-                className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-md text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-              >
-                <X className="h-4 w-4" aria-hidden />
-              </button>
-            ) : null}
-          </div>
+          {/* Nothing to search until there is a device: the empty state speaks alone. */}
+          {units && units.length === 0 ? null : (
+            <div className="relative">
+              <Search className="pointer-events-none absolute inset-y-0 start-3 my-auto h-4 w-4 text-text-muted" aria-hidden />
+              <input
+                type="text"
+                inputMode="search"
+                className="lv-input ps-9 pe-11 text-[14px]"
+                value={query}
+                onChange={(e) => onQuery(e.target.value)}
+                placeholder={t('search')}
+                aria-label={t('search')}
+                enterKeyHint="search"
+                data-trade-in-search
+              />
+              {query ? (
+                <button
+                  type="button"
+                  onClick={() => onQuery('')}
+                  aria-label={t('clearSearch')}
+                  className="absolute inset-y-0 end-0 flex w-11 items-center justify-center rounded-md text-text-muted hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                >
+                  <X className="h-4 w-4" aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          )}
 
           {shown === null ? (
             <div className="flex justify-center py-10">
@@ -163,59 +176,82 @@ export default function DeviceList({
               </span>
               <p className="mt-3 text-[15px] font-bold text-text-primary">{t('empty')}</p>
               <p className="mx-auto mt-1 max-w-sm text-[13px] leading-6 text-text-secondary">{t('emptyHint')}</p>
+              <div className="mx-auto mt-4 grid max-w-sm gap-2 sm:grid-cols-2">
+                <Button variant="primary" block icon={<Printer className="h-4 w-4" aria-hidden />} onClick={() => navigate('/printer-finder')} data-trade-in-find>
+                  {t('empty.find')}
+                </Button>
+                <Button variant="secondary" block icon={<MessageCircle className="h-4 w-4" aria-hidden />} onClick={() => navigate('/support')} data-trade-in-ask>
+                  {t('empty.ask')}
+                </Button>
+              </div>
+              <div className="mt-6 border-t border-border-subtle pt-4 text-start">
+                <p className="mb-3 px-1 text-[12px] font-bold text-text-muted">{t('empty.next')}</p>
+                <TradeInSteps compact />
+              </div>
             </div>
           ) : shown.length === 0 ? (
             <p className="px-2 py-8 text-center text-[13.5px] text-text-secondary" role="status">
               {t('noResults', { q: query.trim() })}
             </p>
           ) : (
-            <ul className="mt-3 space-y-2">
-              {shown.map((u) => {
-                const opens = !!u.open_request_id;
-                const actionable = u.available || opens;
-                return (
-                  <li key={u.key}>
-                    <button
-                      type="button"
-                      onClick={() => (opens ? onOpenRequest(u.open_request_id!) : onPick(u))}
-                      disabled={!actionable}
-                      data-unit={u.key}
-                      className={`lv-choice flex w-full items-center gap-3 p-3 text-start ${actionable ? '' : 'opacity-60'}`}
-                    >
-                      <SafeImage sizes="56px" src={u.image} alt="" aspect="square" className="h-14 w-14 shrink-0 rounded-md" bgClassName="bg-surface" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block text-[14px] font-bold leading-5 text-text-primary line-clamp-2">{u.name}</span>
-                        {u.variant ? <span className="block truncate text-[12px] text-text-muted">{u.variant}</span> : null}
-                        <span className="flex flex-wrap gap-x-1.5 text-[12px] text-text-secondary tabular-nums">
-                          {/* The label reads in the reader's direction; only the order number is isolated
-                              left-to-right (review F-18). The «·» belongs to the date, so it never ends a line. */}
-                          <span className="whitespace-nowrap" data-order-no>
-                            {tx('orderNo', { id: <bdi dir="ltr">{u.order_id}</bdi> })}
-                          </span>
-                          <span className="whitespace-nowrap">
-                            <span aria-hidden className="pe-1.5">
-                              ·
+            <div className="mt-3 space-y-4">
+              {groups.map(({ g, list }) => (
+                <section key={g} aria-label={t(GROUP_LABEL[g])} data-trade-in-group={g}>
+                  {groups.length > 1 ? (
+                    <h2 className="mb-2 px-1 text-[12px] font-bold text-text-muted">
+                      {t(GROUP_LABEL[g])} <span className="tabular-nums">· {list.length}</span>
+                    </h2>
+                  ) : null}
+                  <ul className="space-y-2">
+                    {list.map((u) => {
+                      const opens = !!u.open_request_id;
+                      const actionable = u.available || opens;
+                      return (
+                        <li key={u.key}>
+                          <button
+                            type="button"
+                            onClick={() => (opens ? onOpenRequest(u.open_request_id!) : onPick(u))}
+                            disabled={!actionable}
+                            data-unit={u.key}
+                            className={`lv-choice flex w-full items-center gap-3 p-3 text-start ${actionable ? '' : 'opacity-60'}`}
+                          >
+                            <SafeImage sizes="56px" src={u.image} alt="" aspect="square" className="h-14 w-14 shrink-0 rounded-md" bgClassName="bg-surface" />
+                            <span className="min-w-0 flex-1">
+                              <span className="block text-[14px] font-bold leading-5 text-text-primary line-clamp-2">{u.name}</span>
+                              {u.variant ? <span className="block truncate text-[12px] text-text-muted">{u.variant}</span> : null}
+                              <span className="flex flex-wrap gap-x-1.5 text-[12px] text-text-secondary tabular-nums">
+                                {/* The label reads in the reader's direction; only the order number is isolated
+                                    left-to-right (review F-18). The «·» belongs to the date, so it never ends a line. */}
+                                <span className="whitespace-nowrap" data-order-no>
+                                  {tx('orderNo', { id: <bdi dir="ltr">{u.order_id}</bdi> })}
+                                </span>
+                                <span className="whitespace-nowrap">
+                                  <span aria-hidden className="pe-1.5">
+                                    ·
+                                  </span>
+                                  {t('delivered', { date: dateText(u.delivered_at, lang) })}
+                                </span>
+                              </span>
+                              <span className="block text-[12px] text-text-secondary">{warranty(u)}</span>
+                              {opens && u.stage ? (
+                                <StatusChip tone={stageTone(u.stage)} className="mt-1.5">
+                                  {triText(STAGE_LABELS[u.stage], loc)}
+                                </StatusChip>
+                              ) : !u.available ? (
+                                <StatusChip tone="neutral" className="mt-1.5">
+                                  {t(reasonKey(u))}
+                                </StatusChip>
+                              ) : null}
                             </span>
-                            {t('delivered', { date: dateText(u.delivered_at, lang) })}
-                          </span>
-                        </span>
-                        <span className="block text-[12px] text-text-secondary">{warranty(u)}</span>
-                        {opens && u.stage ? (
-                          <StatusChip tone={stageTone(u.stage)} className="mt-1.5">
-                            {triText(STAGE_LABELS[u.stage], loc)}
-                          </StatusChip>
-                        ) : !u.available ? (
-                          <StatusChip tone="neutral" className="mt-1.5">
-                            {t(reasonKey(u))}
-                          </StatusChip>
-                        ) : null}
-                      </span>
-                      {actionable ? <Chevron className="h-5 w-5 shrink-0 text-text-muted" aria-hidden /> : null}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                            {actionable ? <Chevron className="h-5 w-5 shrink-0 text-text-muted" aria-hidden /> : null}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
           )}
         </div>
       ) : (

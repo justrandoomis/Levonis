@@ -23,23 +23,25 @@
  *
  * Every string is in Arabic, English and Sorani (src/components/tradeIn/copy.ts; DECISIONS row 183).
  */
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, HelpCircle, Repeat } from 'lucide-react';
+import { ArrowLeft, ArrowRight, HelpCircle, Printer, Repeat } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { useAuth } from '../AuthContext';
 import { useSignInPrompt } from '../lib/guest';
 import { api } from '../lib/api';
 import { Button, IconButton } from '../components/ui/Button';
 import Note from '../components/ui/Note';
+import { tabId } from '../components/ui/Tabs';
 import { useT } from '../components/tradeIn/useT';
 import { useErrText } from '../components/tradeIn/parts';
 import DeviceList, { type DeviceTab } from '../components/tradeIn/DeviceList';
 import ScopeSheet from '../components/tradeIn/ScopeSheet';
-import HowItWorksSheet from '../components/tradeIn/HowItWorksSheet';
+import HowItWorksSheet, { TradeInSteps } from '../components/tradeIn/HowItWorksSheet';
+import ActiveTradeInCard from '../components/tradeIn/ActiveTradeInCard';
 import TradeInFlow, { FLOW_STEPS, type FlowStep } from '../components/tradeIn/TradeInFlow';
 import RequestTimeline from '../components/tradeIn/RequestTimeline';
-import type { EligibleUnit, RequestSummary, RequestView, TradeInScope } from '../components/tradeIn/model';
+import { activeRequests, type EligibleUnit, type RequestSummary, type RequestView, type TradeInScope } from '../components/tradeIn/model';
 
 const REQ_ID = /^tin_[0-9a-f]{20}$/;
 const PRODUCT_ID = /^[A-Za-z0-9_-]{1,80}$/;
@@ -85,6 +87,7 @@ export default function TradeIn() {
   const [how, setHow] = useState(false);
 
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
+  const active = useMemo(() => activeRequests(requests), [requests]);
 
   const load = useCallback(async () => {
     setLoadError('');
@@ -214,10 +217,15 @@ export default function TradeIn() {
               <Button variant="primary" block onClick={signIn} data-trade-in-start>
                 {t('signIn')}
               </Button>
-              <Button variant="secondary" block onClick={() => setHow(true)}>
-                {t('howItWorks')}
+              <Button variant="secondary" block icon={<Printer className="h-4 w-4" aria-hidden />} onClick={() => navigate('/printer-finder')}>
+                {t('empty.find')}
               </Button>
             </div>
+            <div className="border-t border-border-subtle pt-4">
+              <h3 className="mb-3 text-[14px] font-extrabold text-text-primary">{t('how.title')}</h3>
+              <TradeInSteps compact />
+            </div>
+            <p className="text-[12.5px] leading-5 text-text-muted">{t('credit.note')}</p>
           </section>
         ) : mode.kind === 'flow' ? (
           <TradeInFlow
@@ -247,6 +255,21 @@ export default function TradeIn() {
                 {t('intro.line')} · <span className="font-semibold text-gold">{t('promise')}</span>
               </p>
             </div>
+            {tab === 'devices' && active.length > 0 ? (
+              <ActiveTradeInCard
+                active={active}
+                total={requests?.length ?? 0}
+                onOpen={openRequest}
+                onAll={() => {
+                  setTab('requests');
+                  const p = new URLSearchParams(params);
+                  p.set('tab', 'requests');
+                  setParams(p, { replace: true });
+                  // The card leaves with the devices tab: focus goes to the tab it opened, not to <body>.
+                  requestAnimationFrame(() => document.getElementById(tabId('trade-in-home', 'requests'))?.focus());
+                }}
+              />
+            ) : null}
             {openError && !scopeFor ? (
               <p role="alert" className="lv-alert lv-alert-danger text-[13px] font-medium text-text-primary">
                 {openError}
