@@ -81,6 +81,8 @@ import {
   type PublicQuoteView,
   type QuoteMaterial,
   type QuotePrinter,
+  defaultMaterial,
+  pricedFirst,
 } from '../lib/printQuote';
 import GramsQuotePanel from '../components/tools/GramsQuotePanel';
 import { providerName, quoteByLink, type LinkQuoteResponse } from '../components/tools/linkQuoteApi';
@@ -154,6 +156,7 @@ const STRINGS = {
     estimateBadge: 'تقدير — ليس عرض سعر نهائيًا',
     exactBadge: 'محسوب من تقطيع حقيقي',
     why: 'هذا تقدير لأن حساب المادة والزمن مبني على نموذج للطباعة، لا على تقطيع فعلي للملف. التاجر الذي سيطبع القطعة يعطيك السعر النهائي.',
+    noPrice: 'بلا سعر بعد',
     insufficient: 'لا يمكن حساب سعر لهذه المادة بعد: لم يُسجَّل سعرها في المتجر. جرّب مادة أخرى أو أرسل طلبًا وسيسعّره التاجر.',
     unmeasured: 'ما لا يستطيع هذا التقدير قياسه',
     SUPPORT_PLACEMENT: 'موضع الدعامات الفعلي',
@@ -247,6 +250,7 @@ const STRINGS = {
     estimateBadge: 'Estimate — not a final quote',
     exactBadge: 'From a real slice',
     why: 'This is an estimate because the material and time come from a printing model, not from slicing your file. The merchant who prints it gives you the final price.',
+    noPrice: 'no price yet',
     insufficient: 'This material has no price in the shop yet, so it cannot be costed. Try another material, or send a request and a merchant will price it.',
     unmeasured: 'What this estimate cannot measure',
     SUPPORT_PLACEMENT: 'Where supports actually land',
@@ -340,6 +344,7 @@ const STRINGS = {
     estimateBadge: 'خەمڵاندن — نرخی کۆتایی نییە',
     exactBadge: 'لە پارچەکردنی ڕاستەقینەوە',
     why: 'ئەمە خەمڵاندنە چونکە ماددە و کات لە مۆدێلێکی چاپەوە دێن، نەک لە پارچەکردنی ڕاستەقینەی فایلەکەت. ئەو بازرگانەی دەیچاپێت نرخی کۆتاییت پێدەدات.',
+    noPrice: 'هێشتا بێ نرخ',
     insufficient: 'ئەم ماددەیە هێشتا نرخی لە فرۆشگادا نییە، بۆیە ناژمێردرێت. ماددەیەکی تر تاقی بکەرەوە، یان داواکاری بنێرە و بازرگان نرخی دەکات.',
     unmeasured: 'ئەوەی ئەم خەمڵاندنە ناتوانێت بیپێوێت',
     SUPPORT_PLACEMENT: 'شوێنی ڕاستەقینەی پاڵپشتەکان',
@@ -455,7 +460,7 @@ export default function Tools() {
         setPrinters(p);
         setMaterials(m);
         if (p.length && !printerId) setPrinterId(p[0].id);
-        if (m.length && !materialId) setMaterialId(m.find((x) => x.material_type === 'PLA')?.id ?? m[0].id);
+        if (m.length && !materialId) setMaterialId(defaultMaterial(m)?.id ?? m[0].id);
       })
       .catch((e) => !ac.signal.aborted && setCatalogError(failureText(e, s.back)));
     return () => ac.abort();
@@ -474,10 +479,12 @@ export default function Tools() {
    * so the customer never picks a combination that will be refused.
    */
   const usableMaterials = useMemo(() => {
-    if (!printer) return materials;
+    if (!printer) return pricedFirst(materials);
     const allowed = new Set(printer.materials.map((t) => t.toUpperCase()));
-    return materials.filter((m) => allowed.has(m.material_type.toUpperCase()));
+    return pricedFirst(materials.filter((m) => allowed.has(m.material_type.toUpperCase())));
   }, [materials, printer]);
+  /** The name as the spool says it, and «no price yet» beside one the shop cannot cost today. */
+  const materialLabel = (m: QuoteMaterial) => (m.priced === false ? `${m.name || m.material_type} — ${s.noPrice}` : m.name || m.material_type);
 
   useEffect(() => {
     if (!usableMaterials.length) {
@@ -486,7 +493,7 @@ export default function Tools() {
       setAutoRecalc(false);
       return;
     }
-    if (!usableMaterials.some((m) => m.id === materialId)) setMaterialId(usableMaterials[0].id);
+    if (!usableMaterials.some((m) => m.id === materialId)) setMaterialId(defaultMaterial(usableMaterials)?.id ?? usableMaterials[0].id);
   }, [usableMaterials, materialId]);
 
   /** A settings change invalidates the answer — it must not sit there looking
@@ -983,7 +990,7 @@ export default function Tools() {
                     value={materialId}
                     onChange={setMaterialId}
                     disabled={linkBusy}
-                    options={usableMaterials.map((m) => ({ value: m.id, label: m.name || m.material_type }))}
+                    options={usableMaterials.map((m) => ({ value: m.id, label: materialLabel(m) }))}
                   />
                 </Field>
                 </div>
@@ -1071,7 +1078,7 @@ export default function Tools() {
                  */
                 options={usableMaterials.map((m) => ({
                   value: m.id,
-                  label: m.name || m.material_type,
+                  label: materialLabel(m),
                 }))}
               />
             </Field>

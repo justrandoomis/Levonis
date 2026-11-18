@@ -86,6 +86,21 @@ export interface QuoteMaterial {
   density_g_cm3: number;
   needs_enclosure: number;
   abrasive: number;
+  /** The shop can price it today (GET /print-quote/materials). Absent on an
+   *  older cached answer, which reads as priced: the quote still says if not. */
+  priced?: boolean;
+}
+
+/** Priced materials first, the order otherwise kept: the picker should lead
+ *  with what can be costed, not with PETG that answers «no price». */
+export function pricedFirst<T extends { priced?: boolean }>(list: T[]): T[] {
+  return [...list.filter((m) => m.priced !== false), ...list.filter((m) => m.priced === false)];
+}
+
+/** PLA when the shop can price it, else the first priced one, else the first. */
+export function defaultMaterial<T extends { material_type: string; priced?: boolean }>(list: T[]): T | undefined {
+  const ok = (m: T) => m.priced !== false;
+  return list.find((m) => ok(m) && m.material_type.toUpperCase() === 'PLA') ?? list.find(ok) ?? list[0];
 }
 
 /** Grams NAMED by where they go (§8), never one "filament" figure. */

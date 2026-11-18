@@ -30,7 +30,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { DatabaseSync } from 'node:sqlite';
-import { approveMerchants, asD1, freshDb, json, post, stubApp, type App } from './fixtures/app';
+import { approveMerchants, asD1, freshDb, get, json, post, stubApp, type App } from './fixtures/app';
 import { printQuoteRoutes } from '../worker/routes/printQuote';
 import { loadMaterialPrices, productMaterialType } from '../worker/lib/printQuote/repository';
 import { resolveMaterialPrice } from '../worker/lib/printQuote/cost';
@@ -280,4 +280,35 @@ test('a hand-linked product still outranks the type match', async () => {
   const price = resolveMaterialPrice({ materialId: 'pla', materialType: 'PLA' }, sources)!;
   assert.equal(price.iqdPerKg, 31000, 'the link is a decision, and a decision outranks a match');
   assert.equal(price.from, 'profile');
+});
+
+test('the public material list says which materials the shop can price, and never the figure', async () => {
+  // The picker used to offer PETG and only then answer «no price». The list now
+  // carries a yes/no from the same ladder the quote runs, so the page can lead
+  // with what prices and mark the rest.
+  const { raw, app } = shopThatSellsFilament();
+  sellFilament(raw, { id: 'fil_esun', type: 'PLA+', priceIqd: 27250, netWeight: '1,000 g' });
+  await publishSeededV2(raw);
+
+  const body = await json(await get(app, '/api/print-quote/materials'));
+  const byId = Object.fromEntries((body.materials as Array<Record<string, unknown>>).map((m) => [m.id, m]));
+  assert.equal(byId.pla?.priced, true, 'PLA prices from the PLA+ spool');
+  assert.equal(byId.petg?.priced, false, 'no PETG on the shelf, so no price');
+  assert.equal(byId['pla-cf']?.priced, false, 'a PLA spool is not a PLA-CF price');
+  const text = JSON.stringify(body);
+  assert.ok(!/iqd|per_kg|27250|27,250/i.test(text), 'a flag only: no price or rate in the public list');
+});
+
+test('the picker leads with priced materials and defaults to a priced PLA', async () => {
+  const { pricedFirst, defaultMaterial } = await import('../src/lib/printQuote');
+  const list = [
+    { id: 'abs', material_type: 'ABS', priced: false },
+    { id: 'petg', material_type: 'PETG', priced: true },
+    { id: 'pla', material_type: 'PLA', priced: false },
+    { id: 'asa', material_type: 'ASA' },
+  ];
+  assert.deepEqual(pricedFirst(list).map((m) => m.id), ['petg', 'asa', 'abs', 'pla']);
+  assert.equal(defaultMaterial(list)?.id, 'petg', 'an unpriced PLA is not the default when something prices');
+  assert.equal(defaultMaterial([{ id: 'pla', material_type: 'PLA', priced: true }, ...list])?.id, 'pla');
+  assert.equal(defaultMaterial([{ id: 'x', material_type: 'ABS', priced: false }])?.id, 'x', 'nothing priced: still a choice');
 });

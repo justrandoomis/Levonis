@@ -45,6 +45,7 @@ import AccessoryPicker, {
 } from './AccessoryPicker';
 import { api } from '../../lib/api';
 import { useMoney } from '../../CurrencyContext';
+import { defaultMaterial, pricedFirst } from '../../lib/printQuote';
 
 /** Only what this panel reads. Structural, so the page's richer catalogue
  *  objects pass straight in without this file importing their module. */
@@ -62,6 +63,8 @@ export interface GramsFilamentOption {
   material_type: string;
   name: string;
   name_ar: string | null;
+  /** The shop can price it today; see QuoteMaterial.priced. */
+  priced?: boolean;
 }
 
 interface FormRow {
@@ -168,13 +171,13 @@ export default function GramsQuotePanel({
    * nobody can deliver, which the Worker would refuse anyway.
    */
   const usable = useMemo(() => {
-    if (!printer) return materials;
+    if (!printer) return pricedFirst(materials);
     const allowed = new Set(printer.materials.map((t) => t.toUpperCase()));
     const fits = materials.filter((m) => allowed.has(m.material_type.toUpperCase()));
-    return fits.length ? fits : materials;
+    return pricedFirst(fits.length ? fits : materials);
   }, [materials, printer]);
 
-  const defaultMaterialId = usable.find((m) => m.material_type.toUpperCase() === 'PLA')?.id ?? usable[0]?.id ?? '';
+  const defaultMaterialId = defaultMaterial(usable)?.id ?? '';
 
   /**
    * The form always shows one row, even before anything is in state.
@@ -382,6 +385,7 @@ export default function GramsQuotePanel({
       'دەزانیت چەند گرامت پێویستە؟ کێش و ڕەنگ بنووسە — یان زیاتر لە ڕەنگێک — بێ فایل خەمڵاندنت بۆ دەکەین.'
     ),
     printer: loc('الطابعة', 'Printer', 'چاپکەر'),
+    noPrice: loc('بلا سعر بعد', 'no price yet', 'هێشتا بێ نرخ'),
     filaments: loc('الفلامنت والغرامات', 'Filament and grams', 'فیلامێنت و گرامەکان'),
     material: loc('المادة', 'Material', 'ماددە'),
     colour: loc('اللون', 'Colour', 'ڕەنگ'),
@@ -522,6 +526,7 @@ export default function GramsQuotePanel({
                             the shop. See the note on the same list in
                             src/pages/Tools.tsx. */}
                         {m.name || m.material_type}
+                        {m.priced === false ? ` — ${t.noPrice}` : ''}
                       </option>
                     ))}
                   </select>

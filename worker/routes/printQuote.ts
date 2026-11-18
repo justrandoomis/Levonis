@@ -41,7 +41,7 @@ import { requireCostRead, requireCostWrite } from '../lib/costAccess';
 import { classifyAttachment } from '../lib/attachments';
 import { buildMediaKey, getMediaObject, putMediaObject } from '../lib/mediaStorage';
 import { storeForUser } from '../lib/merchantAuth';
-import { priceJob, type LaborTask, type PricingInputs } from '../lib/printQuote/cost';
+import { priceJob, resolveMaterialPrice, type LaborTask, type PricingInputs } from '../lib/printQuote/cost';
 import {
   PRICING_ENGINE_VERSION,
   materialTotalGrams,
@@ -390,7 +390,18 @@ printQuoteRoutes.get('/materials', (c) => anonymousCached(c, {}, async () => {
             needs_enclosure, abrasive, nozzle_temp_c, bed_temp_c
        FROM print_materials WHERE active = 1 ORDER BY material_type`
   ).all<Record<string, unknown>>();
-  return c.json({ success: true, materials: results ?? [] });
+  const rows = results ?? [];
+  // WHICH OF THEM THE SHOP CAN PRICE TODAY — a yes/no, never the figure. A
+  // picker that offers PETG and then answers «لا يوجد سعر لهذه المادة» wastes
+  // the customer's upload; knowing up front lets the page list the priced ones
+  // first and say so beside the rest. The same ladder the quote runs, for a
+  // guest (no merchant), so the flag and the answer cannot disagree.
+  const sources = await loadMaterialPrices(c.env.DB, null, rows.map((r) => String(r.id)));
+  const materials = rows.map((r) => ({
+    ...r,
+    priced: resolveMaterialPrice({ materialId: String(r.id), materialType: String(r.material_type ?? '') }, sources) !== null,
+  }));
+  return c.json({ success: true, materials });
 }));
 
 // ------------------------------------------------------------------- the upload

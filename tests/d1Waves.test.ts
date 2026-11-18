@@ -102,7 +102,8 @@ const CEILINGS: Array<{ path: string; host?: string; waves: [warm: number, cold:
   { path: `/api/storefront/${SLUG}`, waves: [3, 3, 3], prepares: 20 },
   { path: `/api/storefront/${SLUG}/products`, waves: [2, 2, 2], prepares: 2 },
   { path: `/api/storefront/${SLUG}/reviews`, waves: [2, 2, 2], prepares: 3 },
-  { path: '/api/print-quote/materials', waves: [1, 1, 1], prepares: 1 },
+  // + the price ladder (2 reads) for the «priced» flag; the answer is edge-cached, so a miss pays it.
+  { path: '/api/print-quote/materials', waves: [3, 3, 3], prepares: 3 },
   { path: '/api/print-quote/printers', waves: [2, 2, 3], prepares: 3 },
   { path: '/api/print-quote/accessories', waves: [1, 1, 1], prepares: 1 },
   { path: '/api/marketplace/print/catalog', waves: [1, 1, 1], prepares: 3 },
