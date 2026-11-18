@@ -106,6 +106,9 @@ export function MotionCharacterRouteHeader({ busy, reloadDocument }: {
 export function isMascotHiddenRoute(pathname: string): boolean {
   const path = pathname.toLowerCase();
   if (path === '/admin' || path.startsWith('/admin/')) return true;
+  // A store's product page on the main site wears the store's dock (a cart icon),
+  // not the character (owner, 2026-11-18: «remove the bubble from the store»).
+  if (/^\/community\/store\/[^/]+\/p\/[^/]+/.test(path)) return true;
   // The merchant workspace (W3-A) is a work tool like the admin; its onboarding is not.
   return (path === '/merchant' || path.startsWith('/merchant/')) && !path.startsWith('/merchant/start');
 }

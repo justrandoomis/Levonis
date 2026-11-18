@@ -54,7 +54,7 @@ import { QuantityInput } from '../components/ui/QuantityInput';
 import { LINE_QTY_MAX } from '../../packages/pricing/src/quantity';
 import { productDescription, productName } from '../lib/productText';
 import { storefrontFilesApi, type ProductFilePublic } from '../components/community/files/api';
-import { StoreDockSpacer } from '../components/storeDock/route';
+import { StoreDockSpacer, announceStoreCartChanged } from '../components/storeDock/route';
 
 /** «يوم واحد», «يومين», «3 أيام», «12 يومًا», «100 يوم» — the count rule of components/community/hub/copy.ts. */
 function arDays(n: number): string {
@@ -232,6 +232,8 @@ export default function StorefrontProduct() {
       });
       setConflict(null);
       setAdded(true);
+      // The dock's cart icon reads this store's count again.
+      announceStoreCartChanged();
       trackStoreEvent(store?.id, 'add_to_cart', product.id); // W2-E analytics beacon
       setTimeout(() => setAdded(false), 2500);
     } catch (e) {
@@ -428,15 +430,13 @@ export default function StorefrontProduct() {
         </div>
       </div>
 
-      {/* THE BUY BAR IS THE STORE'S DOCK (owner, 2026-11-18): the bubble under the
-          thumb — one tap to the store's home, three to report it — with the
-          quantity and «أضف إلى السلة» joined to it. There is no other buy bar
-          and no bubble at the top. */}
+      {/* THE BUY BAR IS THE STORE'S DOCK (owner, 2026-11-18): the store's cart
+          icon — it slides up this store's cart — with the quantity and
+          «أضف إلى السلة» joined to it. There is no other buy bar and no bloub. */}
       <StoreDockSpacer />
       <Suspense fallback={null}>
       <StoreDock
         storeId={store.id}
-        homePath={storeHome}
         above={
           // The refusal sits beside the button that caused it: in the page body
           // it could be scrolled away under this fixed bar and never seen.

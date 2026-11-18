@@ -650,10 +650,10 @@ function StoreHostAuthHandoff() {
 function StorefrontApp() {
   const { store } = useStore();
   const { pathname } = useLocation();
-  // The bubble lives in the store's bottom dock (owner, 2026-11-18), not in a
-  // top strip. A product page draws its own dock with «أضف إلى السلة» joined to
-  // the bubble; the platform's pages (cart, checkout, orders, sign-in, the
-  // workspace) keep the shell's top strip as before.
+  // No bloub on a store's address (owner, 2026-11-18): the character layer is
+  // not mounted here (AppBootstrapLayer) and there is no top strip. The shop's
+  // pages wear the bottom dock — a cart icon that slides up this store's cart;
+  // a product page draws its own, with «أضف إلى السلة» joined to the icon.
   const dock = !!store && storeDockRoute(pathname);
   return (
     <div id="store-host-scroll" className="h-[100dvh] flex flex-col bg-black text-white font-sans overflow-y-auto">
@@ -663,7 +663,7 @@ function StorefrontApp() {
           with the platform mark. It draws nothing and undoes itself on the way
           out; the whole argument is in the component. */}
       <HostAppleIdentity />
-      <MotionCharacterFallbackHeader />
+      
       <ChunkBoundary>
       <Suspense fallback={<RouteFallback />}>
       <Routes>
@@ -708,7 +708,7 @@ function StorefrontApp() {
         <>
           <StoreDockSpacer />
           <Suspense fallback={null}>
-            <StoreDock storeId={store.id} homePath="/" />
+            <StoreDock storeId={store.id} />
           </Suspense>
         </>
       )}
@@ -744,6 +744,10 @@ function AppBootstrapLayer() {
   // Print Cloud is a work tool with its own header and no dock for the
   // character, as the admin console and the merchant workspace are.
   if (system === 'cloud') return null;
+  // A STORE'S OWN ADDRESS HAS NO CHARACTER (owner, 2026-11-18: «remove the
+  // bubble from the store»). The shop is the merchant's, not Levonis's: its
+  // bottom dock is a cart icon. Unmounted once the host resolves to a store.
+  if (store || unknownStore || unavailableStore) return null;
 
   /**
    * ITS OWN BOUNDARY, BECAUSE IT IS A SIBLING OF THE ROUTES AND NOT A CHILD.
