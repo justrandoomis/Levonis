@@ -398,6 +398,39 @@ export async function createMessage(env: KeyEnv, req: MessagesRequest, transport
   return parsed;
 }
 
+/**
+ * THE SUPPORT ASSISTANT'S DOOR (DECISIONS row 348). Same key, same host check,
+ * same retry and timeout rules as `createMessage`, but the body is built by the
+ * caller (worker/lib/assist/ai/claude.ts) because the assistant needs what the
+ * studio never sends: a conversation, read-only `tools`, and `tool_result`
+ * turns. The 200's body comes back parsed and otherwise untouched; the caller
+ * reads `content`, `stop_reason` and `usage` itself.
+ */
+export async function createRawMessage(
+  env: KeyEnv,
+  body: Record<string, unknown>,
+  timeoutMs: number,
+  transport: Transport = {}
+): Promise<{ ok: true; body: Record<string, unknown> } | { ok: false; code: ProviderErrorCode }> {
+  const key = await resolveKey(env);
+  if (!key) return { ok: false, code: 'KEY_NOT_CONFIGURED' };
+  const out = await send(
+    endpoint('/v1/messages'),
+    { method: 'POST', headers: headers(key.key, true), body: JSON.stringify(body) },
+    transport.timeoutMs ?? timeoutMs,
+    transport,
+    'support_assistant'
+  );
+  if (!out.ok) return { ok: false, code: out.code };
+  try {
+    const v: unknown = JSON.parse(out.text);
+    if (!v || typeof v !== 'object' || Array.isArray(v)) return { ok: false, code: 'PROVIDER_ERROR' };
+    return { ok: true, body: v as Record<string, unknown> };
+  } catch {
+    return { ok: false, code: 'PROVIDER_ERROR' };
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------

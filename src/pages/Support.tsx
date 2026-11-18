@@ -112,6 +112,16 @@ interface AsstReply {
   ticket_draft?: { subject: string; body: string; unit_id?: string; handoff?: unknown };
   /** The conversation context: opaque here, stored and returned unchanged (src/lib/assistSession.ts). */
   context?: unknown;
+  /** Present only on a reply Claude wrote (DECISIONS row 348): the bubble says so. */
+  mode?: 'ai';
+}
+
+/** The chat as the server's Claude consult reads it: the last 10 lines, each capped (worker/lib/assist/ai/claude.ts readHistory). */
+function chatHistory(messages: ChatMsg[]): Array<{ role: 'user' | 'assistant'; text: string }> {
+  return messages
+    .filter((m) => !m.error && m.text.trim() && (m.role === 'assistant' || m.typed))
+    .slice(-10)
+    .map((m) => ({ role: m.role, text: m.text.trim().slice(0, 600) }));
 }
 
 interface ChatMsg {
@@ -178,6 +188,7 @@ const STRINGS = {
     send: 'إرسال',
     thinking: 'جارٍ البحث...',
     netError: 'تعذر الاتصال بالخادم — حاول مرة أخرى.',
+    aiNote: 'رد آلي ذكي — قد يخطئ أحيانًا. للتأكد تحدث مع الفريق.',
     openTicketCta: 'إنشاء تذكرة دعم',
     bestCell: 'الأفضل في هذا الصف:',
     ticketFormTitle: 'تذكرة دعم جديدة',
@@ -278,6 +289,7 @@ const STRINGS = {
     send: 'Send',
     thinking: 'Looking that up...',
     netError: 'Could not reach the server — please try again.',
+    aiNote: 'Automatic smart reply — it can make mistakes. Talk to the team to be sure.',
     openTicketCta: 'Create a support ticket',
     bestCell: 'Best on this row:',
     ticketFormTitle: 'New support ticket',
@@ -365,6 +377,7 @@ const STRINGS = {
     send: 'ناردن',
     thinking: 'گەڕان بەردەوامە...',
     netError: 'پەیوەندی بە ڕاژەکار نەکرا — دووبارە هەوڵ بدەرەوە.',
+    aiNote: 'وەڵامی خۆکاری زیرەک — لەوانەیە هەڵە بکات. بۆ دڵنیابوون لەگەڵ تیمەکە قسە بکە.',
     openTicketCta: 'دروستکردنی تیکێتی پشتگیری',
     bestCell: 'باشترین لەم ڕیزەدا:',
     ticketFormTitle: 'تیکێتی پشتگیری نوێ',
@@ -1756,6 +1769,13 @@ export default function Support() {
           expects,
           context: contextRef.current,
           locale: lang,
+          /**
+           * The last lines of this chat, for the Claude reply the server may
+           * write when its rules do not understand (DECISIONS row 348). Only
+           * what is on the screen: typed lines and the assistant's own words,
+           * never an error bubble. Nothing is stored server-side.
+           */
+          ...(payload.text !== undefined ? { history: chatHistory(messagesRef.current) } : {}),
         });
         pendingRef.current = d.reply.expects;
         if (d.reply.context !== undefined) {
@@ -2004,6 +2024,11 @@ export default function Support() {
                     {m.error && <AlertTriangle className="w-3.5 h-3.5 inline-block me-1 -mt-0.5" />}
                     {m.text}
                   </div>
+                  )}
+                  {m.reply?.mode === 'ai' && (
+                    <p className="mt-1 text-xs text-text-muted" data-assist-ai-note>
+                      {s.aiNote}
+                    </p>
                   )}
 
                   {m.reply?.steps && m.reply.steps.length > 0 && (

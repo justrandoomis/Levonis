@@ -58,6 +58,9 @@ import { handleTurn, ownedPrinterNamed } from '../lib/assist/orchestrator';
 import { readContext, SHOWN_MAX } from '../lib/assist/context';
 import { viewerFor } from '../lib/assist/viewer';
 import { callTool } from '../lib/assist/registry';
+import { readHistory, runAiTurn, SORANI_ONLY, type AiRoute, type ProductFact } from '../lib/assist/ai/claude';
+import { readAssistAi } from '../lib/assist/ai/settings';
+import { reserveTurn } from '../lib/assist/ai/budget';
 import { ownDevices, type DeviceLite } from '../lib/assist/tools/devices';
 import { rewriteSpokenModels } from '../lib/assist/understand/models';
 import { splitGluedNegation, understand } from '../lib/assist/understand';
@@ -1412,6 +1415,8 @@ interface AssistantReply {
   table?: AssistantTable;
   auth_required?: boolean;
   handoff?: boolean;
+  /** Present only on a reply Claude wrote (DECISIONS row 348); the chat labels it. Rule replies carry no new field. */
+  mode?: 'ai';
   /**
    * THE ASSISTANT REMEMBERS THAT IT ASKED A QUESTION.
    *
@@ -2808,6 +2813,64 @@ function readPending(raw: unknown): Pending | null {
 
 // ------------------------------------------------------------------- route
 
+/**
+ * THE CLAUDE CONSULT (worker/lib/assist/ai/claude.ts; DECISIONS row 348).
+ * Null — the menu — unless every gate holds, cheapest first: the owner's
+ * switch and model, guests allowed, the language (Sorani only when the owner
+ * turned it on), then one slot of every cap. Never throws.
+ */
+async function consultClaude(
+  c: Context<AppContext>,
+  text: string,
+  loc: Locale,
+  user: SessionUser | null,
+  rawHistory: unknown
+): Promise<{ kind: 'reply'; reply: AssistantReply } | { kind: 'route'; route: AiRoute } | null> {
+  try {
+    if (text.trim().length < 2) return null;
+    const settings = await readAssistAi(c.env.DB);
+    if (!settings.enabled || !settings.model) return null;
+    if (!user && !settings.guests) return null;
+    if (!settings.ckb && (loc === 'ckb' || SORANI_ONLY.test(text))) return null;
+    const ip = c.req.header('CF-Connecting-IP') || 'unknown';
+    const caps = { daily: settings.daily_turns, guestSharePct: settings.guest_share_pct };
+    if (!(await reserveTurn(c.env.DB, { userId: user?.id ?? null, ip }, caps))) return null;
+    const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
+    const cardsById = new Map<string, AssistantCard>();
+    const out = await runAiTurn(c.env, {
+      model: settings.model,
+      text,
+      loc,
+      history: readHistory(rawHistory),
+      signedIn: !!user,
+      search: async (query) => {
+        const r = await callTool('catalog.search', c.env.DB, viewer, { text: query, limit: 8 }).catch(() => null);
+        if (!r?.ok) return [];
+        return r.data.items.map((it): ProductFact => {
+          const card = assistantProductCard(loc, it.card, it.row);
+          cardsById.set(it.id, card);
+          return { id: it.id, name: card.title, price: card.subtitle ?? '', availability: card.badge ?? '', link: card.link?.to ?? '' };
+        });
+      },
+    });
+    if (!out) return null;
+    if (out.kind === 'route') return out;
+    const cards = out.productIds.map((id) => cardsById.get(id)).filter((x): x is AssistantCard => !!x);
+    return {
+      kind: 'reply',
+      reply: {
+        intent: 'ai_answer',
+        text: out.text,
+        mode: 'ai',
+        ...(cards.length ? { cards } : {}),
+        choices: menuChoices(loc, ['human_handoff']),
+      },
+    };
+  } catch {
+    return null;
+  }
+}
+
 supportRoutes.post('/assistant', async (c) => {
   await rateLimit(c, 'support-assistant', 40, 300);
   const user = c.get('user'); // may be null — public intents work anonymously
@@ -2971,12 +3034,27 @@ supportRoutes.post('/assistant', async (c) => {
           return send(withFollowups(asked ? { ...found, intent: asked } : found, loc));
         }
       }
-      const subset = decision.shortlist.length ? decision.shortlist : undefined;
-      return send({
-        intent: 'clarify',
-        text: tr(loc, subset ? 'clarify_multi' : 'clarify'),
-        choices: menuChoices(loc, subset),
-      } satisfies AssistantReply);
+      /**
+       * CLAUDE, BEFORE THE MENU (owner, 2026-11-18; DECISIONS row 348). Only
+       * here — after the rules, the pending slot and the strong catalogue
+       * lookup all came back empty — and only when the owner's switch, the
+       * caps and the language allow (`consultClaude`). It either answers in
+       * its own words (with cards only for products its search returned) or
+       * hands the turn to one of the handlers below, which keep their own
+       * sign-in and ownership checks. Anything else is the menu, as before.
+       */
+      const ai = await consultClaude(c, freeText, loc, user ?? null, body.history);
+      if (ai?.kind === 'reply') return send(ai.reply);
+      if (ai?.kind === 'route') {
+        intent = ai.route;
+      } else {
+        const subset = decision.shortlist.length ? decision.shortlist : undefined;
+        return send({
+          intent: 'clarify',
+          text: tr(loc, subset ? 'clarify_multi' : 'clarify'),
+          choices: menuChoices(loc, subset),
+        } satisfies AssistantReply);
+      }
     }
   } else {
     return send({ intent: 'clarify', text: tr(loc, 'clarify'), choices: menuChoices(loc) } satisfies AssistantReply);

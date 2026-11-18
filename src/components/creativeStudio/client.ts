@@ -75,6 +75,18 @@ export function idempotencyKey(): string {
 // Provider (owner)
 // ---------------------------------------------------------------------------
 
+/** The support chat's Claude switch (worker/lib/assist/ai/settings.ts; DECISIONS row 348). */
+export interface SupportAssistantDto {
+  enabled: boolean;
+  model: string | null;
+  guests: boolean;
+  ckb: boolean;
+  daily_turns: number;
+  guest_share_pct: number;
+  key_source: 'stored' | 'worker_secret' | 'none';
+  today: { turns: number; guest_turns: number };
+}
+
 export const provider = {
   status: async (): Promise<ProviderStatusDto> => one<ProviderStatusDto>(await api.get<Body>(`${BASE}/provider`), 'provider_status', 'can_manage'),
   /** The key goes to the server in the request body and nowhere else; the answer carries only a hint. */
@@ -84,6 +96,9 @@ export const provider = {
   models: async (): Promise<ModelDto[]> => list<ModelDto>(await api.get<Body>(`${BASE}/provider/models`, { timeoutMs: 45000 }), 'models'),
   /** Every field optional, absent = unchanged (screensModel.settingsPayload sends the model and the priorities only when they changed). */
   saveSettings: (s: ProviderSettingsRequest) => api.put<Body>(`${BASE}/provider/settings`, s),
+  supportAssistant: async (): Promise<SupportAssistantDto> => one<SupportAssistantDto>(await api.get<Body>(`${BASE}/provider/support-assistant`), 'support_assistant', 'enabled'),
+  saveSupportAssistant: async (s: Partial<Omit<SupportAssistantDto, 'key_source' | 'today'>>): Promise<SupportAssistantDto> =>
+    one<SupportAssistantDto>(await api.put<Body>(`${BASE}/provider/support-assistant`, s, { timeoutMs: 45000 }), 'support_assistant', 'enabled'),
   /** The ledger (codes and counts, never text): GET /usage answers `{ records, days, today, month }`. */
   usage: async (): Promise<UsageRecordDto[]> => list<UsageRecordDto>(await api.get<Body>(`${BASE}/usage`), 'records'),
 };

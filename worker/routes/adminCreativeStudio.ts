@@ -63,6 +63,8 @@ import {
 import { MAX_FILE_BYTES, MAX_PROJECT_JSON_BYTES, assertDeclaredSize, putStudioFile, sha256OfBytes, sniffStudioImage, streamStudioFile, tooLarge, unsupported } from '../lib/creative/files';
 import { IDEMPOTENCY_KEY, cancelJob, jobById, jobDto, markApplied } from '../lib/creative/jobs';
 import { encryptionReady, sealProviderKey } from '../lib/creative/keyVault';
+import { DAILY_TURNS_MAX, MODEL_ID_SHAPE, readAssistAi, writeAssistAi } from '../lib/assist/ai/settings';
+import { DAY_KEY_ALL, DAY_KEY_GUEST, slotsUsed } from '../lib/assist/ai/budget';
 import { collectOpportunities, syncCatalogWatch } from '../lib/creative/opportunities';
 import { carouselContent, chatContent, composeContent, editContent, ideasContent, reviewContent, testContent, type FeedbackMemory } from '../lib/creative/prompts';
 import {
@@ -368,6 +370,58 @@ R.put('/provider/settings', requireOwner, async (c) => {
     await audit(db, actorOf(c), 'creative.provider.settings', 'anthropic', { fields: Object.keys(body).filter((k) => ['model', 'effort', 'budget', 'rates', 'vision_review', 'priorities'].includes(k)) });
   }
   return ok(c, await providerStatus(c));
+});
+
+/**
+ * THE SUPPORT ASSISTANT'S CLAUDE SWITCH (owner, 2026-11-18; DECISIONS row 348;
+ * worker/lib/assist/ai/settings.ts). It lives on this page because the key is
+ * here: one key serves the studio and the support chat. Owner only. Turning it
+ * on needs a key in force and a model from the provider's LIVE list.
+ */
+async function supportAssistantStatus(c: Context<AppContext>) {
+  const settings = await readAssistAi(c.env.DB);
+  const key = await keyState(c.env);
+  return {
+    support_assistant: {
+      ...settings,
+      key_source: key.source,
+      today: { turns: await slotsUsed(c.env.DB, DAY_KEY_ALL, 86_400), guest_turns: await slotsUsed(c.env.DB, DAY_KEY_GUEST, 86_400) },
+    },
+  };
+}
+
+R.get('/provider/support-assistant', requireOwner, async (c) => ok(c, await supportAssistantStatus(c)));
+
+R.put('/provider/support-assistant', requireOwner, async (c) => {
+  const env = c.env;
+  const body = await bodyOf(c);
+  const next = { ...(await readAssistAi(env.DB)) };
+  if ('model' in body) {
+    if (body.model === null) next.model = null;
+    else {
+      const id = str(body.model, 'model', { min: 1, max: 100 });
+      if (!MODEL_ID_SHAPE.test(id)) throw badRequest('model is not a model id', 'INVALID_INPUT');
+      const list = await listModels(env, creativeTransport);
+      if (!list.ok) throw aiError(list.code);
+      if (!list.models.some((m) => m.id === id)) throw badRequest('model is not in the live model list', 'INVALID_INPUT');
+      next.model = id;
+    }
+  }
+  if ('guests' in body) next.guests = boolOf(body.guests);
+  if ('ckb' in body) next.ckb = boolOf(body.ckb);
+  if ('daily_turns' in body) next.daily_turns = int(body.daily_turns, 'daily_turns', { min: 1, max: DAILY_TURNS_MAX });
+  if ('guest_share_pct' in body) next.guest_share_pct = int(body.guest_share_pct, 'guest_share_pct', { min: 0, max: 100 });
+  if ('enabled' in body) next.enabled = boolOf(body.enabled);
+  if (next.enabled) {
+    if (!next.model) throw badRequest('choose a model before turning the assistant on', 'INVALID_INPUT');
+    if ((await keyState(env)).source === 'none') throw aiError('KEY_NOT_CONFIGURED');
+  }
+  await writeAssistAi(env.DB, next);
+  await audit(env.DB, actorOf(c), 'support.assistant_ai.settings', 'supportAssistantAi', {
+    fields: Object.keys(body).filter((k) => ['enabled', 'model', 'guests', 'ckb', 'daily_turns', 'guest_share_pct'].includes(k)),
+    enabled: next.enabled,
+  });
+  return ok(c, await supportAssistantStatus(c));
 });
 
 R.get('/usage', studio, async (c) => {

@@ -47,6 +47,8 @@ export default {
         'POST /provider/test': OWNER,
         'GET /provider/models': OWNER,
         'PUT /provider/settings': OWNER,
+        'GET /provider/support-assistant': OWNER,
+        'PUT /provider/support-assistant': OWNER,
         'GET /usage': 'op',
         // Store (read-only)
         'GET /products': 'op',

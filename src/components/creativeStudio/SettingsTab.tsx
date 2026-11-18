@@ -30,6 +30,7 @@ import { provider as providerApi } from './client';
 import { EFFORT_TEXT, ERROR_TEXT, JOB_TEXT, S, TASK_TEXT, fill } from './strings';
 import { RemoteView, failText, shortTime, useRemote, useStudio, useText } from './shared';
 import { settingsPayload } from './screensModel';
+import SupportAssistantCard from './SupportAssistantCard';
 
 export default function SettingsTab() {
   const studio = useStudio();
@@ -184,6 +185,8 @@ function SettingsBody({ s, owner, lang, w, onChanged }: { s: ProviderStatusDto; 
           </div>
         ) : null}
       </Card>
+
+      {owner ? <SupportAssistantCard models={models} onLoadModels={loadModels} /> : null}
 
       <Card title={w(S.setBudget)}>
         <div className="grid gap-3 sm:grid-cols-3">

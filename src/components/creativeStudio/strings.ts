@@ -530,6 +530,22 @@ export const S = {
   setVision: t('المراجعة البصرية للتصاميم', 'Visual review of designs', 'پێداچوونەوەی بینراوی دیزاینەکان'),
   setVisionHint: t('يرسل صورة مصغرة للتصميم إلى Claude عند طلبك فقط.', 'Sends a small image of the design to Claude only when you ask.', 'وێنەیەکی بچووکی دیزاینەکە دەنێرێت بۆ Claude تەنها کاتێک داوا دەکەیت.'),
   setSaveSettings: t('احفظ الإعدادات', 'Save the settings', 'ڕێکخستنەکان پاشەکەوت بکە'),
+  // The support chat's Claude replies (DECISIONS row 348)
+  saTitle: t('مساعد الدعم في الموقع (Claude)', 'Website support assistant (Claude)', 'یاریدەدەری پشتگیری ماڵپەڕ (Claude)'),
+  saNote: t(
+    'حين لا يفهم المساعد رسالة العميل بقواعده، يكتب Claude الرد: يبحث في المنتجات بأسعار العميل نفسه، ويحوّل أسئلة الطلبات والضمان والحساب إلى أنظمة المتجر. يستخدم نفس المفتاح أعلاه.',
+    "When the assistant's rules do not understand a customer's message, Claude writes the reply: it searches the products at the customer's own prices and hands order, warranty and account questions to the shop's own system. It uses the same key as above.",
+    'کاتێک یاسا ئامادەکراوەکانی یاریدەدەر لە نامەی کڕیار تێناگەن، Claude وەڵامەکە دەنووسێت: بەدوای بەرهەمەکاندا دەگەڕێت بە نرخی خودی کڕیار، و پرسیارەکانی داواکاری و گەرەنتی و هەژمار دەداتە سیستەمی فرۆشگاکە. هەمان کلیلی سەرەوە بەکاردەهێنێت.'
+  ),
+  saEnabled: t('شغّل ردود Claude في الدردشة', 'Turn on Claude replies in the chat', 'وەڵامەکانی Claude لە چاتدا چالاک بکە'),
+  saGuests: t('للزوار غير المسجلين أيضًا', 'For signed-out visitors too', 'بۆ سەردانکەرانی چوونەژوورنەکردووش'),
+  saCkb: t('الرد بالكردية السورانية', 'Reply in Sorani Kurdish', 'وەڵامدانەوە بە کوردیی سۆرانی'),
+  saCkbHint: t('مطفأ: عملاء السورانية يبقون على المساعد العادي.', 'Off: Sorani customers keep the rule-based assistant.', 'کوژاوە: کڕیارانی سۆرانی لەسەر یاریدەدەری ئاسایی دەمێننەوە.'),
+  saDaily: t('حد الردود اليومي للمتجر كله', 'Daily reply limit, whole shop', 'سنووری ڕۆژانەی وەڵامەکان، بۆ هەموو فرۆشگاکە'),
+  saGuestShare: t('حصة الزوار من الحد (%)', "Visitors' share of the limit (%)", 'بەشی سەردانکەران لە سنوورەکە (%)'),
+  saToday: t('اليوم: {n} رد ({g} للزوار)', 'Today: {n} replies ({g} to visitors)', 'ئەمڕۆ: {n} وەڵام ({g} بۆ سەردانکەران)'),
+  saModel: t('النموذج', 'Model', 'مۆدێل'),
+  saSave: t('احفظ إعدادات المساعد', 'Save the assistant settings', 'ڕێکخستنەکانی یاریدەدەر پاشەکەوت بکە'),
   setSaved: t('حُفظت الإعدادات.', 'The settings were saved.', 'ڕێکخستنەکان پاشەکەوت کران.'),
   setUsage: t('سجل الاستهلاك', 'Usage log', 'تۆماری بەکارهێنان'),
   setUsageEmpty: t('لا استهلاك مسجل.', 'No usage recorded.', 'هیچ بەکارهێنانێک تۆمار نەکراوە.'),
