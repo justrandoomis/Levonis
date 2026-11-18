@@ -60,6 +60,10 @@ test('the cap is 1 MB unless a class raises it, and multipart gets its envelope 
   assert.equal(maxBodyBytes('/api/admin/template/apply', 'POST'), 6 * MB, 'a JSON class gets no multipart allowance');
   assert.equal(maxBodyBytes('/api/uploads', 'GET'), DEFAULT_MAX_BODY_BYTES, 'a class is scoped to its methods');
   assert.equal(maxBodyBytes('/api/kyc/submit', 'POST'), DEFAULT_MAX_BODY_BYTES, 'a sibling path is not the upload route');
+  // Photo search: the route's own cap (base64 of IMAGE_MAX_BYTES + 4 KB) must fit under the class.
+  const photo = constantValue('worker/lib/search/imageSearch.ts', 'IMAGE_MAX_BYTES');
+  assert.ok(photo && maxBodyBytes('/api/search/image', 'POST') >= Math.ceil((photo * 4) / 3) + 4096, 'a legitimate photo passes the edge');
+  assert.equal(maxBodyBytes('/api/search/popular', 'GET'), DEFAULT_MAX_BODY_BYTES);
 });
 
 test('the admin JSON allowance covers the template body the core actually accepts', () => {

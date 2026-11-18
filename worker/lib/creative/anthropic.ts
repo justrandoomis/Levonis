@@ -59,6 +59,8 @@ export const TIMEOUTS_MS: Readonly<Record<AiTask | 'models', number>> = Object.f
   carousel: 110_000,
   chat: 60_000,
   invoice: 110_000,
+  // A shopper is waiting on the page (search by photo, worker/routes/searchImage.ts): two short calls.
+  search_image: 25_000,
 });
 
 export const MAX_TOKENS: Readonly<Record<AiTask, number>> = Object.freeze({
@@ -71,6 +73,7 @@ export const MAX_TOKENS: Readonly<Record<AiTask, number>> = Object.freeze({
   chat: 4_000,
   // A purchase invoice: one compact row per colour/option line (a 60-line 1688 order is ~6k tokens).
   invoice: 16_000,
+  search_image: 2_000,
 });
 
 /** How long a 429's retry-after may ask for and still get the one retry. */

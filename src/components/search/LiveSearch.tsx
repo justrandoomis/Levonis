@@ -1,7 +1,7 @@
 import { afterCriticalPaint } from '../../lib/afterCriticalPaint';
 import React, { Suspense, useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, PackageSearch, RotateCcw, Search, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Search, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError, type ApiProduct, type ProductsListResponse } from '../../lib/api';
 import { productMainImage } from '../../lib/productImage';
@@ -93,6 +93,8 @@ function remember(query: string, answer: Answer) {
  */
 const LiveSearchPanel = React.lazy(() => import('./LiveSearchPanel'));
 const TrendingSearches = React.lazy(() => import('./TrendingSearches').catch(() => ({ default: () => <></> })));
+/** The typed placeholder, the camera button and scan / photo search (2026-11-18), after the first paint. */
+const FieldExtras = React.lazy(() => import('./FieldExtras').catch(() => ({ default: () => <></> })));
 
 /** Where a result opens — the same rule as the results grid. A composition row is bought at /bundles. */
 export const productHref = (p: ApiProduct): string =>
@@ -148,8 +150,9 @@ export default function LiveSearch({
   // The panel chunk is requested on the first touch or focus, before there is
   // anything to show, so it is in memory by the time the first answer lands.
   const [armed, setArmed] = useState(false);
+  // After the first paint: the trending ticker (regular size only) and ./FieldExtras.tsx.
   const [trendsReady, setTrendsReady] = useState(false);
-  useEffect(() => size === 'regular' ? afterCriticalPaint(() => setTrendsReady(true)) : undefined, [size]);
+  useEffect(() => afterCriticalPaint(() => setTrendsReady(true)), []);
   const arm = () => {
     if (armed) return;
     setArmed(true);
@@ -334,7 +337,8 @@ export default function LiveSearch({
   // a Latin name is typed on an Arabic page, so the padding is physical.
   const compact = size === 'compact';
   const iconPad = compact ? 44 : 48;
-  const endPad = value ? 44 : 16;
+  // The clear button while there is text; the camera button (scan / photo) while there is none.
+  const endPad = 44;
   // ONE LINE BOX FOR BOTH, the full height inside the 1px border. Centring the
   // grey line with flexbox and letting the input centre its own text put the
   // two baselines a pixel or two apart; with the same line-height on the same
@@ -432,6 +436,17 @@ export default function LiveSearch({
         >
           <Search className={compact ? 'h-4 w-4' : 'h-5 w-5'} strokeWidth={2.5} aria-hidden="true" />
         </button>
+        {trendsReady && (
+          <Suspense fallback={null}>
+            <FieldExtras
+              empty={!value}
+              focused={focused}
+              mirrorStyle={mirrorStyle}
+              textClass={textClass}
+              eventTarget={formRef}
+            />
+          </Suspense>
+        )}
         {value && (
           <button
             type="button"
@@ -500,6 +515,7 @@ export default function LiveSearch({
                     </Link>
                   ))}
               </div>
+              {view === 'rows' && fresh && <kit.Sections rows={rows} query={query} />}
               {view === 'skeleton' && (
                 <div aria-hidden="true">
                   {[0, 1, 2].map((i) => (
@@ -513,27 +529,8 @@ export default function LiveSearch({
                   ))}
                 </div>
               )}
-              {view === 'empty' && (
-                <div className="flex min-h-[60px] items-center gap-3 px-3 text-text-secondary">
-                  <PackageSearch className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
-                  <span className="text-[14px]">{loc('لا توجد نتائج', 'No results', 'هیچ ئەنجامێک نییە')}</span>
-                </div>
-              )}
-              {view === 'error' && (
-                <div className="flex min-h-[60px] items-center justify-between gap-3 px-3">
-                  <span className="text-[14px] text-text-secondary">
-                    {loc('تعذر التحميل', 'Failed to load', 'بارکردن سەرکەوتوو نەبوو')}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setAttempt((n) => n + 1)}
-                    className="lv-button lv-button-ghost lv-button-sm text-text-primary"
-                  >
-                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                    {t('retry')}
-                  </button>
-                </div>
-              )}
+              {view === 'empty' && <kit.Empty />}
+              {view === 'error' && <kit.Failed onRetry={() => setAttempt((n) => n + 1)} />}
             </div>
             {view === 'rows' && (
               <button

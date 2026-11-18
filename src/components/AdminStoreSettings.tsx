@@ -4,6 +4,8 @@ import { api, ApiError } from '../lib/api';
 import { useLanguage } from '../LanguageContext';
 import { Plus, Trash2, Check, AlertTriangle, Lock } from 'lucide-react';
 import WalletFreeDeliveryPanel from './adminStoreSettings/WalletFreeDeliveryPanel';
+/** The shop's one Anthropic key, its model and photo search (owner, 2026-11-18). */
+const AnthropicKeyPanel = React.lazy(() => import('./adminStoreSettings/AnthropicKeyPanel'));
 
 /**
  * THE GLOBAL SHIPPING RULES — one place, for the whole store.
@@ -386,6 +388,9 @@ export default function AdminStoreSettings() {
 
   return (
     <div className="space-y-8">
+      <React.Suspense fallback={null}>
+        <AnthropicKeyPanel />
+      </React.Suspense>
       {/* Checkout Delivery Methods */}
       <div className="lv-surface p-6">
         <div className="flex justify-between items-center mb-4">

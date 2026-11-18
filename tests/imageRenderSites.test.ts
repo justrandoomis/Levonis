@@ -44,6 +44,7 @@ const ALLOWED_RAW: Record<string, Record<string, string>> = {
   'src/components/adminSupport/TicketsDesk.tsx': { 'a.file_url': 'a private support-assistant attachment handed to the ticket (0209)' },
   'src/components/adminTradeIn/TradeInDetail.tsx': { 'p.url': 'private trade-in photographs (inspection evidence)', photo: 'the trade-in photo viewer: the original, for inspection' },
   'src/components/adminTradeIn/IntakeSheet.tsx': { 'p.url': 'private intake photographs, admins only' },
+  'src/components/search/VisualSearch.tsx': { previewSrc: 'the shopper’s own photo for search by photo: a data URL in memory, never stored media' },
   'src/components/adminOperations/PurchaseInvoiceImport.tsx': { 'p.url': 'a blob preview of an invoice picture still on the device, before the owner sends it to be read (DECISIONS row 345)' },
   'src/components/chat/ChatAttachment.tsx': { url: 'a private chat attachment' },
   'src/components/chat/cards/DealCards.tsx': { 'fileUrl(f)': 'a print request file through the authorised marketplace route' },

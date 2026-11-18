@@ -92,6 +92,13 @@ export interface BarcodeScannerProps {
   waitForCompanions?: boolean;
   /** The typed fallback's input, for a caller that focuses it (a Bluetooth reader on a tablet). */
   manualInputRef?: React.Ref<HTMLInputElement>;
+  /**
+   * Single mode: what counts as a read. `device` (default) waits for a device
+   * serial or a receipt, as above. `any` takes the first code of any kind — a
+   * product EAN, a model code, a QR — for the shop search (search by scan,
+   * owner 2026-11-18), where a barcode on a box IS the answer.
+   */
+  accept?: 'device' | 'any';
 }
 
 type CameraState = 'starting' | 'slow' | 'on' | 'paused' | 'denied' | 'unavailable' | 'insecure' | 'failed' | 'stopped';
@@ -131,6 +138,7 @@ export default function BarcodeScanner({
   deferFeedback = false,
   waitForCompanions = false,
   manualInputRef,
+  accept = 'device',
 }: BarcodeScannerProps) {
   const { lang } = useLanguage();
   const s = SCANNER_STRINGS[lang] ?? SCANNER_STRINGS.ar;
@@ -203,6 +211,7 @@ export default function BarcodeScanner({
       const raw = win.recent(now);
       const read = classifyLabel(raw);
       if (mode === 'single') {
+        if (accept === 'any') return raw.length ? finish({ ...read, raw }) : undefined;
         if (read.receipt) return finish({ ...read, raw });
         if (read.productSn) {
           if (waitForCompanions && !fromPhoto && !(read.ean && read.boxSn)) {
@@ -259,7 +268,7 @@ export default function BarcodeScanner({
         deliver(answer as ScanFeedback | void);
       }
     },
-    [finish, mode, showFlash, waitForCompanions]
+    [accept, finish, mode, showFlash, waitForCompanions]
   );
 
   const loop = useCallback(() => {
@@ -413,7 +422,7 @@ export default function BarcodeScanner({
       }
       const codes = await eng.decode(bitmap, { sx: 0, sy: 0, sw: bitmap.width, sh: bitmap.height }, true);
       const read = classifyLabel(codes);
-      if (read.productSn || read.receipt || read.boxSn) {
+      if (read.productSn || read.receipt || read.boxSn || (accept === 'any' && codes.length > 0)) {
         setPhoto('idle');
         consider(codes, true);
       } else setPhoto('nothing');

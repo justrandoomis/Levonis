@@ -337,7 +337,7 @@ export interface ExportDto {
  * screenshots / invoice PDF, and choosing catalogue selections for its lines. STORED under `review` (a reading
  * of pictures) for the same reason `chat` is stored under `ideas`.
  */
-export type AiTask = 'test' | 'ideas' | 'compose' | 'edit' | 'review' | 'carousel' | 'chat' | 'invoice';
+export type AiTask = 'test' | 'ideas' | 'compose' | 'edit' | 'review' | 'carousel' | 'chat' | 'invoice' | 'search_image';
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface JobDto {

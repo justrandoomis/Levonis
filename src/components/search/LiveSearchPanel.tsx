@@ -19,10 +19,10 @@ import * as Motion from 'motion/react-m';
 import { CROSS_FADE, useMotion } from '../../lib/motion';
 import { MotionFeatures, useMotionFeaturesFailed } from '../../lib/motionFeatures';
 import CardPrice from '../CardPrice';
-import { RowNote, SearchHead, resultHref } from './searchKit';
+import { RowNote, SearchEmpty, SearchFailed, SearchHead, SearchSections, resultHref } from './searchKit';
 
 /** What the panel hands the field: everything a row says beyond its name and photo. */
-const KIT = { CardPrice, Head: SearchHead, Note: RowNote, href: resultHref };
+const KIT = { CardPrice, Head: SearchHead, Note: RowNote, href: resultHref, Sections: SearchSections, Empty: SearchEmpty, Failed: SearchFailed };
 export type SearchKit = typeof KIT;
 
 export interface LiveSearchPanelProps {

@@ -38,6 +38,7 @@ import { sellableSql, visibleSql } from '../worker/lib/listing';
 const CUSTOMER_FILES = [
   'worker/routes/products.ts',
   'worker/routes/searchTrending.ts',
+  'worker/routes/searchImage.ts',
   'worker/lib/homeShelves.ts',
   'worker/lib/catalogMembership.ts',
   'worker/lib/catalogPresentation.ts',
@@ -259,7 +260,9 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/routes/seo.ts': { visible: 1, sellable: 0, states: 0 },
   // Search selections and daily ranks expose catalogue identity only, including
   // unpriced products; recording and reading both recheck VISIBLE (PRICING-V2 §9).
-  'worker/routes/searchTrending.ts': { visible: 2, sellable: 0, states: 0 },
+  'worker/routes/searchTrending.ts': { visible: 4, sellable: 0, states: 0 },
+  // Search by photo: candidates read under the listing's own scope (as catalogByIds), priced by resolveListingCards.
+  'worker/routes/searchImage.ts': { visible: 1, sellable: 2, states: 0 },
   'worker/routes/stockAlerts.ts': { visible: 2, sellable: 0, states: 0 },
   // The assistant's product search is now the storefront's own (`catalog.search` → `listCatalogProducts`, the
   // predicates counted under products.ts: VISIBLE, and `composition = '' OR sellable`, default D6), so it left

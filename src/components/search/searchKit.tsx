@@ -1,5 +1,6 @@
 import React from 'react';
-import { X } from 'lucide-react';
+import { Camera, PackageSearch, RotateCcw, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useLanguage } from '../../LanguageContext';
 import { useMoney } from '../../CurrencyContext';
 import type { ApiProduct, ProductsListResponse, SearchChip } from '../../lib/api';
@@ -220,3 +221,95 @@ export function RowNote({ p, a }: { p: ApiProduct; a: SearchExtras }) {
 /** Where a result opens: its page, on the selection its codes matched. */
 export const resultHref = (href: string, p: ApiProduct, a: SearchExtras | null | undefined): string =>
   linkWithSelection(href, a?.matched?.[p.id]);
+
+type SectionName = { ar?: string; en?: string; ckb?: string };
+
+/**
+ * «في قسم الفلامنت»: the sections the rows come from, as one-tap narrowed
+ * searches (`/products?search=…&category=…`), when the answer spans more than
+ * one section or most of it sits in one — the shopper said «PLA» and the shop
+ * says where PLA lives. At most two; nothing for a single row. Built from the
+ * cards' own `category_id` and `section_name`, so no request is added.
+ */
+export function sectionShortcuts(rows: readonly ApiProduct[], max = 2): Array<{ id: string; name: SectionName; count: number }> {
+  if (rows.length < 2) return [];
+  const by = new Map<string, { id: string; name: SectionName; count: number }>();
+  for (const p of rows) {
+    const id = p.category_id;
+    const name = (p as ApiProduct & { section_name?: SectionName }).section_name;
+    if (!id || !name || !(name.ar || name.en)) continue;
+    const hit = by.get(id) ?? { id, name, count: 0 };
+    hit.count++;
+    by.set(id, hit);
+  }
+  return [...by.values()].sort((a, b) => b.count - a.count).slice(0, max);
+}
+
+export function SearchSections({ rows, query }: { rows: readonly ApiProduct[]; query: string }) {
+  const { loc } = useLanguage();
+  const list = sectionShortcuts(rows);
+  if (!list.length || !query.trim()) return null;
+  return (
+    <div data-search-sections className="flex flex-wrap gap-1.5 px-1.5 pb-1 pt-1.5">
+      {list.map((s) => {
+        const name = loc(s.name.ar || s.name.en || '', s.name.en || s.name.ar || '', s.name.ckb || s.name.ar || s.name.en || '');
+        return (
+          <Link
+            key={s.id}
+            to={`/products?search=${encodeURIComponent(query.trim())}&category=${encodeURIComponent(s.id)}`}
+            tabIndex={-1}
+            className="lv-button lv-button-ghost lv-button-sm whitespace-nowrap text-text-secondary"
+          >
+            {loc('في قسم', 'In', 'لە بەشی')} <bdi>{name}</bdi>
+          </Link>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * «لا توجد نتائج» → «ابحث بصورة»: the words did not find it, a photo may. Opens
+ * the field's scan / photo window (./FieldExtras.tsx listens on the form).
+ */
+export function PhotoHint() {
+  const { loc } = useLanguage();
+  return (
+    <button
+      type="button"
+      data-search-photo-hint
+      // The field's own form hears it (./FieldExtras.tsx), which closes this panel and opens the window.
+      onClick={(e) => e.currentTarget.closest('form')?.dispatchEvent(new Event('lv:visual-search'))}
+      className="lv-button lv-button-ghost lv-button-sm shrink-0 text-text-primary"
+    >
+      <Camera className="h-4 w-4" aria-hidden="true" />
+      {loc('ابحث بصورة', 'Search by photo', 'بە وێنە بگەڕێ')}
+    </button>
+  );
+}
+
+/** The panel's «لا توجد نتائج» row, with «ابحث بصورة» beside it (here in the panel's chunk, not the field's). */
+export function SearchEmpty() {
+  const { loc } = useLanguage();
+  return (
+    <div className="flex min-h-[60px] items-center gap-3 px-3 text-text-secondary">
+      <PackageSearch className="h-5 w-5 shrink-0 text-text-muted" aria-hidden="true" />
+      <span className="flex-1 text-[14px]">{loc('لا توجد نتائج', 'No results', 'هیچ ئەنجامێک نییە')}</span>
+      <PhotoHint />
+    </div>
+  );
+}
+
+/** The panel's «تعذر التحميل» row and its retry (moved out of the field's first-paint code, 2026-11-18). */
+export function SearchFailed({ onRetry }: { onRetry: () => void }) {
+  const { loc, t } = useLanguage();
+  return (
+    <div className="flex min-h-[60px] items-center justify-between gap-3 px-3">
+      <span className="text-[14px] text-text-secondary">{loc('تعذر التحميل', 'Failed to load', 'بارکردن سەرکەوتوو نەبوو')}</span>
+      <button type="button" onClick={onRetry} className="lv-button lv-button-ghost lv-button-sm text-text-primary">
+        <RotateCcw className="h-4 w-4" aria-hidden="true" />
+        {t('retry')}
+      </button>
+    </div>
+  );
+}

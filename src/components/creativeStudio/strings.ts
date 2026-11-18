@@ -1012,6 +1012,7 @@ export const TASK_TEXT: Readonly<Record<AiTask, Tri>> = {
   carousel: t('كاروسيل', 'Carousel', 'کارۆسێل'),
   chat: t('محادثة', 'Chat', 'گفتوگۆ'),
   invoice: t('قراءة فاتورة شراء', 'Purchase invoice reading', 'خوێندنەوەی پسوولەی کڕین'),
+  search_image: t('البحث بالصورة', 'Search by photo', 'گەڕان بە وێنە'),
 };
 
 export const JOB_TEXT: Readonly<Record<JobStatus | 'ok' | 'error' | 'refused', Tri>> = {

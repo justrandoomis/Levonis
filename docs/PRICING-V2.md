@@ -833,8 +833,13 @@ IQD, with a pre-order discount of $50 = 75,000.
   own question the same way, with the SELLABLE flag the card builder prices from.
   Search-selection trends (`worker/routes/searchTrending.ts`, migration 0212) also ask VISIBLE:
   the selection door validates the chosen product, and the daily-rank query rechecks visibility
-  before returning its identity. These two calls expose no price or purchase action, so a
+  before returning its identity. The placeholder list (`/popular`, 2026-11-18: the week's search
+  selections, then the best sellers) asks VISIBLE twice, once per source, and returns names only.
+  These calls expose no price or purchase action, so a
   catalog-only product remains eligible while hidden or catalogue-held products do not.
+  Search by photo (`worker/routes/searchImage.ts`) reads its candidates through the listing's own
+  scope (VISIBLE, and a composition only while SELLABLE, as `catalogByIds`) and prices them through
+  `resolveListingCards`, so a photo can only answer what the grid would list, at the grid's price.
   The Creative Studio's store connector (`worker/lib/creative/store.ts`, its opportunities in
   `worker/lib/creative/opportunities.ts`; DECISIONS row 270) is an owner screen whose output — an
   advert — is a customer surface by another road, so it asks the listing's own scope (VISIBLE, and

@@ -49,6 +49,8 @@ export default {
         'PUT /provider/settings': OWNER,
         'GET /provider/support-assistant': OWNER,
         'PUT /provider/support-assistant': OWNER,
+        'GET /provider/search-image': OWNER,
+        'PUT /provider/search-image': OWNER,
         'GET /usage': 'op',
         // Store (read-only)
         'GET /products': 'op',

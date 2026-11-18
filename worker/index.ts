@@ -1,4 +1,5 @@
 import { searchTrendingRoutes } from './routes/searchTrending';
+import { searchImageRoutes } from './routes/searchImage';
 import { Hono } from 'hono';
 import type { Context } from 'hono';
 import type { AppContext, Env } from './lib/types';
@@ -458,6 +459,7 @@ app.route('/api/admin/offers', adminOffersRoutes);
 app.route('/api/admin/analytics', adminCompositionAnalyticsRoutes);
 app.route('/api/home', homeRoutes);
 app.route('/api/search', searchTrendingRoutes);
+app.route('/api/search', searchImageRoutes);
 app.route('/api/cart', cartRoutes);
 app.route('/api/orders', orderRoutes);
 app.route('/api/quick-buy', quickBuyRoutes);

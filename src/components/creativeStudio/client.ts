@@ -89,6 +89,12 @@ export interface SupportAssistantDto {
   today: { turns: number; guest_turns: number };
 }
 
+export interface SearchImageSettings {
+  enabled: boolean;
+  daily: number;
+  today: number;
+}
+
 export const provider = {
   status: async (): Promise<ProviderStatusDto> => one<ProviderStatusDto>(await api.get<Body>(`${BASE}/provider`), 'provider_status', 'can_manage'),
   /** The key goes to the server in the request body and nowhere else; the answer carries only a hint. */
@@ -101,6 +107,10 @@ export const provider = {
   supportAssistant: async (): Promise<SupportAssistantDto> => one<SupportAssistantDto>(await api.get<Body>(`${BASE}/provider/support-assistant`), 'support_assistant', 'enabled'),
   saveSupportAssistant: async (s: Partial<Omit<SupportAssistantDto, 'key_source' | 'today'>>): Promise<SupportAssistantDto> =>
     one<SupportAssistantDto>(await api.put<Body>(`${BASE}/provider/support-assistant`, s, { timeoutMs: 45000 }), 'support_assistant', 'enabled'),
+  /** Search by photo's switch and daily total (store settings card; worker/routes/adminCreativeStudio.ts). */
+  searchImage: () => api.get<{ search_image: SearchImageSettings }>(`${BASE}/provider/search-image`),
+  saveSearchImage: (s: Partial<Pick<SearchImageSettings, 'enabled' | 'daily'>>) =>
+    api.put<{ search_image: SearchImageSettings }>(`${BASE}/provider/search-image`, s),
   /** The ledger (codes and counts, never text): GET /usage answers `{ records, days, today, month }`. */
   usage: async (): Promise<UsageRecordDto[]> => list<UsageRecordDto>(await api.get<Body>(`${BASE}/usage`), 'records'),
 };

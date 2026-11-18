@@ -63,6 +63,10 @@ export const UPLOAD_CLASSES: readonly BodyClass[] = [
   // Trade-in photos: one image per POST to /api/trade-in/requests/:id/photos,
   // converted to WebP by the route; its own 8 MB cap is the ceiling.
   { prefix: '/api/trade-in/requests', methods: ['POST'], kind: 'multipart', maxBytes: 8 * MB, source: 'worker/routes/tradeIn.ts#PHOTO_MAX_BYTES', routeFile: 'tradeIn.ts' },
+  // Photo search (DECISIONS row 350): ONE JSON body carrying the shopper's photo as a data URL,
+  // at most IMAGE_MAX_BYTES of picture, i.e. ~4/3 of that in base64 plus the envelope (~2.0 MB).
+  // The route re-checks the real byte length itself; this only lets a legitimate photo past the edge.
+  { prefix: '/api/search/image', methods: ['POST'], kind: 'json', maxBytes: 2 * MB, source: 'worker/lib/search/imageSearch.ts#IMAGE_MAX_BYTES', routeFile: 'searchImage.ts' },
   { prefix: '/api/print-quote/uploads', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/routes/printQuote.ts#MODEL_MAX_BYTES', routeFile: 'printQuote.ts' },
   // Levonis Print Cloud (0215): a customer's model, STL/3MF/OBJ; the owner may lower the limit in settings, never raise it past this.
   { prefix: '/api/print-cloud/v1/files', methods: ['POST'], kind: 'multipart', maxBytes: 40 * MB, source: 'worker/lib/printCloud/settings.ts#MODEL_UPLOAD_CEILING_BYTES', routeFile: 'printCloud.ts' },

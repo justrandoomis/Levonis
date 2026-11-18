@@ -43,6 +43,7 @@ import { baseUsdOf } from '../../worker/lib/pricingEngine/orderBasis';
 
 import { productRoutes, homeRoutes } from '../../worker/routes/products';
 import { searchDay, searchTrendingRoutes } from '../../worker/routes/searchTrending';
+import { searchImageRoutes } from '../../worker/routes/searchImage';
 import { bundlesRoutes, adminCompositionAnalyticsRoutes } from '../../worker/routes/bundles';
 import { cartRoutes } from '../../worker/routes/cart';
 import { orderRoutes } from '../../worker/routes/orders';
@@ -179,6 +180,7 @@ export type MountSpec = readonly [prefix: string, router: Router];
 export const BASE_MOUNTS: readonly MountSpec[] = [
   ['/api/products', productRoutes as Router],
   ['/api/search', searchTrendingRoutes as Router],
+  ['/api/search', searchImageRoutes as Router],
   ['/api/bundles', bundlesRoutes as Router],
   ['/api/admin/bundles', adminBundlesRoutes as Router],
   ['/api/admin/mystery', adminMysteryRoutes as Router],

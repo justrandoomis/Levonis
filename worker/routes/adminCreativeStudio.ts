@@ -65,6 +65,8 @@ import { IDEMPOTENCY_KEY, cancelJob, jobById, jobDto, markApplied } from '../lib
 import { encryptionReady, sealProviderKey } from '../lib/creative/keyVault';
 import { DAILY_TURNS_MAX, MODEL_ID_SHAPE, readAssistAi, writeAssistAi } from '../lib/assist/ai/settings';
 import { DAY_KEY_ALL, DAY_KEY_GUEST, slotsUsed } from '../lib/assist/ai/budget';
+import { IMAGE_DAILY_MAX, IMAGE_SEARCH_SETTING_KEY, imageSearchFromSetting } from '../lib/search/imageSearch';
+import { imageDayUsed } from './searchImage';
 import { collectOpportunities, syncCatalogWatch } from '../lib/creative/opportunities';
 import { carouselContent, chatContent, composeContent, editContent, ideasContent, reviewContent, testContent, type FeedbackMemory } from '../lib/creative/prompts';
 import {
@@ -237,6 +239,41 @@ R.delete('/provider/key', requireOwner, async (c) => {
   );
   await audit(db, actorOf(c), 'creative.provider.key_deleted', 'anthropic', {});
   return ok(c, await providerStatus(c));
+});
+
+/**
+ * SEARCH BY PHOTO'S SWITCH (owner, 2026-11-18; DECISIONS row 350). Shown in
+ * «إعدادات المتجر» beside the key (owner: «Anthropic key make it on
+ * store_settings»), served here because the key is here: one sealed key and
+ * one chosen model serve the studio, the support chat and the search. Owner
+ * only. `admin_settings.searchImageAi` = `{ enabled, daily }`.
+ */
+async function searchImageStatus(c: Context<AppContext>) {
+  let value: string | null = null;
+  try {
+    value = (await c.env.DB.prepare('SELECT value FROM admin_settings WHERE key = ?').bind(IMAGE_SEARCH_SETTING_KEY).first<{ value: string }>())?.value ?? null;
+  } catch {
+    value = null;
+  }
+  return { search_image: { ...imageSearchFromSetting(value), today: await imageDayUsed(c.env.DB) } };
+}
+
+R.get('/provider/search-image', requireOwner, async (c) => ok(c, await searchImageStatus(c)));
+
+R.put('/provider/search-image', requireOwner, async (c) => {
+  const body = await bodyOf(c);
+  const db = c.env.DB;
+  const current = (await searchImageStatus(c)).search_image;
+  const next = {
+    enabled: 'enabled' in body ? body.enabled === true : current.enabled,
+    daily: 'daily' in body ? int(body.daily, 'daily', { min: 0, max: IMAGE_DAILY_MAX }) : current.daily,
+  };
+  await db
+    .prepare('INSERT INTO admin_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value')
+    .bind(IMAGE_SEARCH_SETTING_KEY, JSON.stringify(next))
+    .run();
+  await audit(db, actorOf(c), 'search.image.settings', IMAGE_SEARCH_SETTING_KEY, next);
+  return ok(c, await searchImageStatus(c));
 });
 
 function capabilitiesFor(model: { id: string; structured_outputs: boolean | null; vision: boolean | null; effort: boolean | null; effort_levels: Capabilities['effort_levels'] }): Capabilities {

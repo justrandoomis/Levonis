@@ -160,7 +160,7 @@ test('the panel says what the words became: removable chips, the exact line, the
   assert.doesNotMatch(src, /^import (?!type\b)[^;]*from '\.\/searchKit';/m, 'the search kit is a static import of the field — the entry');
   assert.doesNotMatch(src, /^import (?!type\b)[^;]*AvailabilityLine/m);
   const panel = read('src/components/search/LiveSearchPanel.tsx');
-  assert.match(panel, /import \{ RowNote, SearchHead, resultHref \} from '\.\/searchKit';/);
+  assert.match(panel, /import \{ RowNote, SearchEmpty, SearchFailed, SearchHead, SearchSections, resultHref \} from '\.\/searchKit';/);
   assert.match(panel, /children\(KIT\)/);
 });
 

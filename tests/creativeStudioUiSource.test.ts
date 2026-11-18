@@ -67,9 +67,12 @@ test('the route is lazy, full-screen and admin-guarded; nothing eager imports th
     const c = codeOf(f);
     const hits = [...c.matchAll(/(?:from|import\()\s*'([^']*(?:creativeStudio|pages\/CreativeStudio)[^']*)'/g)].map((m) => m[0]);
     if (f === 'src/App.tsx') { assert.deepEqual(hits, ["import('./pages/CreativeStudio'"]); continue; }
+    // The store-settings key card (DECISIONS row 350) is itself a lazy chunk and reaches only the API client.
+    if (f === 'src/components/adminStoreSettings/AnthropicKeyPanel.tsx') { assert.deepEqual(hits, ["from '../creativeStudio/client'"], 'the key card reaches only the studio API client'); continue; }
     if (f === 'src/pages/Admin.tsx') { assert.deepEqual(hits, ["import('../components/creativeStudio/StudioLauncher'"], 'Admin reaches only the launcher, lazily'); continue; }
     assert.deepEqual(hits, [], `${f} imports the studio`);
   }
+  assert.match(codeOf('src/components/AdminStoreSettings.tsx'), /React\.lazy\(\(\) => import\('\.\/adminStoreSettings\/AnthropicKeyPanel'\)\)/, 'the key card is fetched lazily');
 });
 
 test('Konva is pinned exactly and imported only as its core plus the shapes the studio draws, only by the studio', () => {
