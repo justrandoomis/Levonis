@@ -2089,7 +2089,10 @@ export default function Cart() {
                 key: k.component_id,
                 name: k.product.name,
                 name_ar: k.product.name_ar,
-                variant: k.variant,
+                // «لون عشوائي» (0241): the store picks this colour.
+                variant: [k.variant, k.editable?.random_color ? loc('لون عشوائي', 'Random colour', 'ڕەنگی هەڕەمەکی') : '']
+                  .filter(Boolean)
+                  .join(' · '),
                 qty: k.qty_per_bundle,
                 value_iqd: k.value_iqd,
                 optional: k.optional,

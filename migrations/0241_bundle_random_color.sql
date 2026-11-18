@@ -1,0 +1,12 @@
+-- BUNDLE COLOURS — «لون عشوائي» on a bundle line (owner 2026-11-18; migration 0241, DECISIONS row 357).
+--
+-- A bundle may hold the same product several times (the surrogate `bundle_components.id`, 0058, exists for
+-- exactly that: "two spools of PLA, one black one white"). This adds the third way a line's colour is decided:
+--   color_id                pinned by the admin («أسود»);
+--   customer_picks_color    the customer chooses;
+--   random_color = 1        the STORE chooses: at every read the system takes the in-stock colour with the most
+--                           free stock (tie: colour sort, then id) — the same rule as the printer kits' random
+--                           colour (PRINTER-P4). The order line keeps the colour actually reserved, so the packer
+--                           sees «أحمر»; the customer sees «لون عشوائي» until the order is placed.
+-- The three are exclusive (refused at save, worker/lib/bundleComposition.ts). Existing rows default to 0.
+ALTER TABLE bundle_components ADD COLUMN random_color INTEGER NOT NULL DEFAULT 0;

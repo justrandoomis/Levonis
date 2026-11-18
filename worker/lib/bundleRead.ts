@@ -58,6 +58,7 @@ import {
   type MemberRow,
   type ResolvedComponent,
   type SaleModeName,
+  pickRandomColour,
 } from './bundleComposition';
 import { offerEligible, windowFromRow, type OfferCheck, type OfferWindow } from './offers';
 import { resolveForOrderType, resolveStock } from './inventory';
@@ -240,8 +241,9 @@ export interface ResolvedComponentView extends ResolvedComponent {
   /** The same authoritative relation view used to resolve this member's
    * selection. Images and physical dimensions must resolve against it too. */
   view: ProductRelationsView | null;
-  /** Whether the buyer picks this component's option / colour (§1.4). */
-  editable: { option: boolean; color: boolean };
+  /** Whether the buyer picks this component's option / colour (§1.4). `random_color` (0241): the store
+   *  picks the colour — the buyer sees «لون عشوائي», never a picker. */
+  editable: { option: boolean; color: boolean; random_color?: boolean };
   /** The allow-list a customer-selectable component may be chosen from, with
    *  the ids resolved to their real names. Empty for a pinned component. */
   choices: Array<{ dim: 'option_value' | 'color'; id: string; name: string; state: CompositionState }>;
@@ -502,8 +504,20 @@ function resolveOne(
   const offer = offerEligible(viewer.status, { window, limits: null }, viewer.nowMs);
 
   // ---- every component, at the viewer's tier, against real stock ----------
+  // «لون عشوائي»: what the OTHER lines of this bundle already take of each colour (a pin, or the buyer's
+  // own pick on a line), so the store's random pick is judged on what is left — 2 black pinned + 1 random
+  // with black 2 / red 1 picks red, not a black the pinned line needs.
+  const taken = new Map<string, number>();
+  for (const c of componentRows) {
+    if (c.random_color) continue;
+    const col = chosen?.get(c.id)?.color_id || c.color_id;
+    if (!col) continue;
+    const k = `${c.member_product_id}|${col}`;
+    taken.set(k, (taken.get(k) ?? 0) + c.qty);
+  }
+  const takenOf = (memberId: string) => (colorId: string) => taken.get(`${memberId}|${colorId}`) ?? 0;
   const partial = componentRows.map((c) =>
-    resolveComponent(c, choicesByComponent.get(c.id) ?? [], members, viewer, chosen?.get(c.id), lineRoute)
+    resolveComponent(c, choicesByComponent.get(c.id) ?? [], members, viewer, chosen?.get(c.id), lineRoute, takenOf(c.member_product_id))
   );
   const shipping = shippingPlan(partial);
   const components: ResolvedComponentView[] = partial.map((p, i) => ({
@@ -570,7 +584,7 @@ interface PartialComponent {
   component: ResolvedComponent;
   doc: ProductDoc;
   view: ProductRelationsView | null;
-  editable: { option: boolean; color: boolean };
+  editable: { option: boolean; color: boolean; random_color?: boolean };
   choices: ResolvedComponentView['choices'];
   unavailable: boolean;
   /** The member's own transport offers, for the shared-method rule (§17.12). */
@@ -588,7 +602,8 @@ function resolveComponent(
   viewer: CompositionViewer,
   chosen?: ComponentChoice,
   /** The line's real route, or undefined for a card. See CompositionLineInput. */
-  lineRoute?: string
+  lineRoute?: string,
+  takenElsewhere?: (colorId: string) => number
 ): PartialComponent {
   const member = members.get(c.member_product_id) ?? null;
   const doc = member ? member.doc : parseProductRow({ id: c.member_product_id });
@@ -621,7 +636,10 @@ function resolveComponent(
   // bought at ONE of its choices and the card must say whether ANY of them can
   // be. A pinned component has exactly one candidate, so this is a no-op there.
   const optionCandidates = candidateIds(c.option_value_ids, c.customer_picks_option, allowList, 'option_value', doc.options);
-  const colorCandidates = candidateIds(c.color_id ? [c.color_id] : [], c.customer_picks_color, allowList, 'color', doc.colors);
+  // «لون عشوائي» (0241): every active colour is a candidate, and the STORE picks — never the customer.
+  const colorCandidates = c.random_color
+    ? candidateIds([], true, [], 'color', doc.colors)
+    : candidateIds(c.color_id ? [c.color_id] : [], c.customer_picks_color, allowList, 'color', doc.colors);
 
   // A LINE THE BUYER OWNS IS RESOLVED ON THE BUYER'S OWN CHOICE, never on the
   // best one still available: dropping to a different colour because theirs
@@ -635,8 +653,20 @@ function resolveComponent(
     const col = chosen.color_id || null;
     for (const id of opts) if (!optionCandidates.includes(id)) choiceErrors.push('BUNDLE_CHOICE_INVALID');
     if (col && !colorCandidates.includes(col)) choiceErrors.push('BUNDLE_CHOICE_INVALID');
-    const sel = { option_value_ids: opts, color_id: col };
-    best = { sel, res: resolveStock(snapshot, sel) };
+    if (c.random_color) {
+      // The buyer owns the model; the colour is the store's, re-picked on this read from what is in stock
+      // (the same rule as the card below, so the line and the card agree on what can be bought).
+      const picked = pickRandomColour(
+        doc.colors.filter((x) => colorCandidates.includes(x.id)),
+        (color_id) => resolveStock(snapshot, { option_value_ids: opts, color_id }),
+        takenElsewhere
+      );
+      const sel = { option_value_ids: opts, color_id: picked?.color_id ?? null };
+      best = { sel, res: picked ? picked.resolution : resolveStock(snapshot, sel) };
+    } else {
+      const sel = { option_value_ids: opts, color_id: col };
+      best = { sel, res: resolveStock(snapshot, sel) };
+    }
   } else {
     let tried = 0;
     for (const optId of optionCandidates.length ? optionCandidates : [null]) {
@@ -748,7 +778,7 @@ function resolveComponent(
     },
     doc,
     view: member?.view ?? null,
-    editable: { option: c.customer_picks_option, color: c.customer_picks_color },
+    editable: { option: c.customer_picks_option, color: c.customer_picks_color, ...(c.random_color ? { random_color: true } : {}) },
     choices: choiceViews(c, allowList, doc),
     unavailable,
     transports,
@@ -1166,7 +1196,8 @@ function mainItems(b: ResolvedBundle) {
  * `needed`: `blocking[]` stays on the server.
  */
 export function componentViews(b: ResolvedBundle) {
-  return b.components.map((c) => ({
+  // «لون عشوائي»: the page shows the store's pick as random — not the colour this read happened to take.
+  return b.components.map((c) => (c.editable.random_color ? { ...c, selection: { ...c.selection, color_id: null } } : c)).map((c) => ({
     component_id: c.component_id,
     product_id: c.member_product_id,
     slug: c.doc.slug,

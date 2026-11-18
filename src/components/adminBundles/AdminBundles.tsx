@@ -65,7 +65,7 @@ import { TriText } from '../adminProducts/ui';
 import ProductPicker from '../adminProducts/form/ProductPicker';
 import VariantImg from '../ui/VariantImg';
 import CompositionPricing from './CompositionPricing';
-import { bundleCover, bundleText, loadMember, type MemberInfo } from './bundleAutofill';
+import { bundleCover, bundleText, loadMember, type CoverTile, type LineColour, type MemberInfo } from './bundleAutofill';
 import type { PickerProduct } from '../adminProducts/form/ProductPicker';
 
 // ------------------------------------------------------------------- types
@@ -91,6 +91,8 @@ interface ComponentInput {
   color_id: string;
   customer_picks_option: boolean;
   customer_picks_color: boolean;
+  /** «لون عشوائي» (0241): the store picks the colour from stock. */
+  random_color: boolean;
   sort: number;
   choice_option_value_ids: string[];
   choice_color_ids: string[];
@@ -196,9 +198,12 @@ interface EditorDoc {
 }
 
 interface RelationsRow {
-  values: Array<{ id: string; name_en: string; group_id: string; active: number | boolean }>;
-  colors: Array<{ id: string; name_en: string; active: number | boolean }>;
+  values: Array<{ id: string; name_en: string; name_ar?: string; group_id: string; active: number | boolean }>;
+  colors: Array<{ id: string; name_en: string; name_ar?: string; name_ckb?: string; hex?: string; image?: string; active: number | boolean }>;
 }
+
+/** «لون عشوائي» drawn as a rainbow, the same as on the cover. */
+const RAINBOW = 'conic-gradient(#FF3B30, #FF9500, #FFCC00, #34C759, #00C7BE, #007AFF, #AF52DE, #FF2D55, #FF3B30)';
 
 // ------------------------------------------------------------------ helpers
 
@@ -253,6 +258,7 @@ const blankComponent = (sort: number): ComponentInput => ({
   color_id: '',
   customer_picks_option: false,
   customer_picks_color: false,
+  random_color: false,
   sort,
   choice_option_value_ids: [],
   choice_color_ids: [],
@@ -489,7 +495,7 @@ export default function AdminBundles() {
           updated_at: res.updated_at ?? '',
         },
         config: res.config,
-        components: res.components,
+        components: res.components.map((c) => ({ ...c, random_color: !!c.random_color })),
         offer: res.offer,
       });
       setPreview(res.preview);
@@ -509,12 +515,41 @@ export default function AdminBundles() {
     }
   };
 
-  /** Builds the cover from the products' pictures and uploads it; the URL, or null. */
-  const makeCover = async (urls: string[]): Promise<string | null> => {
+  const colourOf = (c: ComponentInput) => relations[c.member_product_id]?.colors.find((x) => x.id === c.color_id);
+  /** Each line as the text needs it: its product, count and colour (a name, «random», or none). */
+  const textLines = (list: ComponentInput[]) =>
+    list
+      .filter((c) => members[c.member_product_id])
+      .map((c) => {
+        const col = colourOf(c);
+        const colour: LineColour = c.random_color
+          ? 'random'
+          : col && !c.customer_picks_color
+            ? { ar: col.name_ar || '', en: col.name_en, ckb: col.name_ckb || '' }
+            : null;
+        return { m: members[c.member_product_id], qty: c.qty, colour };
+      });
+  /** Each line as a cover tile: the colour's own picture when it has one, else the product's with a swatch. */
+  const coverTiles = (list: ComponentInput[]): CoverTile[] =>
+    list
+      .filter((c) => c.member_product_id)
+      .map((c) => {
+        const col = c.customer_picks_color || c.random_color ? undefined : colourOf(c);
+        const own = col ? col.image || members[c.member_product_id]?.colour_images[col.id] || '' : '';
+        return {
+          url: own || members[c.member_product_id]?.image || '',
+          hex: !own && col?.hex ? col.hex : undefined,
+          random: c.random_color,
+          qty: c.qty,
+        };
+      });
+
+  /** Builds the cover from the lines (colour pictures, counts, a rainbow for «random») and uploads it. */
+  const makeCover = async (tiles: CoverTile[]): Promise<string | null> => {
     setImageBusy(loc('جارٍ صنع صورة الحزمة من صور المنتجات…', 'Making the bundle picture from the product pictures…', 'دروستکردنی وێنەی پاکێج لە وێنەی بەرهەمەکان…'));
     setImageErr(null);
     try {
-      const file = await bundleCover(urls);
+      const file = await bundleCover(tiles);
       if (!file) {
         setImageErr(loc('تعذّر قراءة صور المنتجات — ارفع صورة بنفسك.', 'Could not read the product pictures — upload one yourself.', 'وێنەی بەرهەمەکان نەخوێنرانەوە — خۆت وێنەیەک باربکە.'));
         return null;
@@ -539,14 +574,14 @@ export default function AdminBundles() {
       let doc = editing.doc;
       // No name typed and none generated yet: take it from the products now.
       if (!doc.name_ar.trim() && !doc.name_en.trim() && !doc.name_ckb.trim()) {
-        const lines = chosen.filter((c) => members[c.member_product_id]).map((c) => ({ m: members[c.member_product_id], qty: c.qty }));
+        const lines = textLines(chosen);
         if (lines.length) doc = { ...doc, ...bundleText(lines) };
       }
       // No picture: make the cover from the products' pictures before saving.
       if (doc.images.length === 0) {
-        const urls = chosen.map((c) => members[c.member_product_id]?.image ?? '').filter(Boolean);
-        if (urls.length) {
-          const url = await makeCover(urls);
+        const tiles = coverTiles(chosen);
+        if (tiles.some((t) => t.url || t.random)) {
+          const url = await makeCover(tiles);
           if (url) doc = { ...doc, images: [url] };
         }
       }
@@ -613,15 +648,15 @@ export default function AdminBundles() {
   // While the text follows the products, every change of products or quantities rewrites it.
   useEffect(() => {
     if (!editing || !autoText) return;
-    const lines = editing.components
-      .filter((c) => members[c.member_product_id])
-      .map((c) => ({ m: members[c.member_product_id], qty: c.qty }));
+    const lines = textLines(editing.components);
     if (!lines.length) return;
     const next = bundleText(lines);
     const d = editing.doc;
     if ((Object.keys(next) as Array<keyof typeof next>).every((k) => d[k] === next[k])) return;
     setEditing({ ...editing, doc: { ...d, ...next } });
-  }, [editing, autoText, members]);
+    // `textLines` reads `members` and `relations`, both listed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editing, autoText, members, relations]);
 
   const totalWarnings = useMemo(() => rows.reduce((n, b) => n + (b.warnings?.length ?? 0), 0), [rows]);
 
@@ -896,7 +931,49 @@ export default function AdminBundles() {
   const priceBefore = required.length && required.every((c) => unitOf(c.member_product_id) !== null)
     ? required.reduce((n, c) => n + (unitOf(c.member_product_id) ?? 0) * c.qty, 0)
     : null;
-  const memberImages = components.map((c) => members[c.member_product_id]?.image ?? '').filter(Boolean);
+  const tilesNow = coverTiles(components);
+  const colourName = (v: RelationsRow['colors'][number]) =>
+    lang === 'en' ? v.name_en : lang === 'ckb' ? v.name_ckb || v.name_ar || v.name_en : v.name_ar || v.name_en;
+  /** The colour menu: «customer picks», «random», or one colour pinned. */
+  const setColour = (i: number, value: string) =>
+    setComponent(
+      i,
+      value === '__pick'
+        ? { customer_picks_color: true, random_color: false, color_id: '' }
+        : value === '__random'
+          ? { customer_picks_color: false, random_color: true, color_id: '', choice_color_ids: [] }
+          : { customer_picks_color: false, random_color: false, color_id: value, choice_color_ids: [] }
+    );
+  /** «لون آخر»: the same product again, same model, the next colour no line has pinned yet (else random). */
+  const addSibling = (i: number) => {
+    const src = components[i];
+    const rel = relations[src.member_product_id];
+    const used = new Set(components.filter((c) => c.member_product_id === src.member_product_id).map((c) => c.color_id));
+    const next = (rel?.colors ?? []).find((x) => !!x.active && !used.has(x.id));
+    const line: ComponentInput = {
+      ...blankComponent(components.length),
+      member_product_id: src.member_product_id,
+      option_value_ids: [...src.option_value_ids],
+      customer_picks_option: src.customer_picks_option,
+      color_id: next ? next.id : '',
+      random_color: !next,
+    };
+    // A first line still on «customer picks» becomes its own first colour, so the two lines differ.
+    const first = !src.color_id && !src.random_color && src.customer_picks_color && next
+      ? (rel?.colors ?? []).find((x) => !!x.active && x.id !== next.id && !used.has(x.id))
+      : undefined;
+    const list = components.map((c, k) =>
+      k === i && first ? { ...c, customer_picks_color: false, color_id: first.id } : c
+    );
+    if (first) {
+      const after = (rel?.colors ?? []).find((x) => !!x.active && x.id !== first.id && !used.has(x.id));
+      line.color_id = after ? after.id : '';
+      line.random_color = !after;
+    }
+    list.splice(i + 1, 0, line);
+    setEditing({ ...editing, components: list });
+    setMoreOpen({});
+  };
   const shownName = lang === 'en' ? doc.name_en || doc.name_ar : lang === 'ckb' ? doc.name_ckb || doc.name_ar || doc.name_en : doc.name_ar || doc.name_en;
   const shownDescription =
     lang === 'en' ? doc.description_en || doc.description_ar : lang === 'ckb' ? doc.description_ckb || doc.description_ar || doc.description_en : doc.description_ar || doc.description_en;
@@ -931,6 +1008,12 @@ export default function AdminBundles() {
   const addProduct = async (id: string, p: PickerProduct | null) => {
     if (!id) return;
     const at = components.findIndex((c) => c.member_product_id === id);
+    const known = relations[id];
+    if (at >= 0 && known && (known.colors.some((v) => !!v.active) || known.values.some((v) => !!v.active))) {
+      // Another line of the same product: its own colour, the same model.
+      addSibling(at);
+      return;
+    }
     if (at >= 0) {
       setComponent(at, { qty: Math.min(99, components[at].qty + 1) });
       return;
@@ -1060,6 +1143,13 @@ export default function AdminBundles() {
                 const rowIssues = issuesFor(c.id, i);
                 const m = members[c.member_product_id];
                 const unit = unitOf(c.member_product_id);
+                const activeValues = (rel?.values ?? []).filter((v) => !!v.active);
+                const activeColours = (rel?.colors ?? []).filter((v) => !!v.active);
+                const pinnedColour = activeColours.find((x) => x.id === c.color_id);
+                const colourPicture = pinnedColour ? pinnedColour.image || m?.colour_images[pinnedColour.id] || '' : '';
+                const thumb = colourPicture || m?.image || '';
+                const colourValue = c.random_color ? '__random' : c.customer_picks_color ? '__pick' : c.color_id;
+                const modelValue = c.customer_picks_option ? '__pick' : c.option_value_ids[0] ?? '';
                 return (
                   <li
                     key={c.id ?? `new_${c.member_product_id}_${i}`}
@@ -1067,19 +1157,36 @@ export default function AdminBundles() {
                     data-bundle-line={c.member_product_id}
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      {m?.image ? (
-                        <VariantImg sizes="48px" src={m.image} alt="" className={`${T.thumb} shrink-0`} loading="lazy" />
-                      ) : (
-                        <span className={`${T.thumb} shrink-0 grid place-items-center text-[var(--ap-text-3)]`} aria-hidden>
-                          <Boxes className="w-4 h-4" />
+                      <span className="relative shrink-0">
+                        {c.random_color ? (
+                          <span className={`${T.thumb} grid place-items-center text-white font-bold`} style={{ background: RAINBOW, fontSize: 18 }} aria-hidden>
+                            ?
+                          </span>
+                        ) : thumb ? (
+                          <VariantImg sizes="48px" src={thumb} alt="" className={T.thumb} loading="lazy" />
+                        ) : (
+                          <span className={`${T.thumb} grid place-items-center text-[var(--ap-text-3)]`} aria-hidden>
+                            <Boxes className="w-4 h-4" />
+                          </span>
+                        )}
+                        {pinnedColour && !colourPicture && pinnedColour.hex && (
+                          <span
+                            className="absolute rounded-full"
+                            style={{ background: pinnedColour.hex, width: 16, height: 16, bottom: -4, insetInlineStart: -4, border: '2px solid #fff' }}
+                            aria-hidden
+                          />
+                        )}
+                        <span
+                          className="absolute rounded-full text-white font-bold grid place-items-center"
+                          style={{ top: -6, insetInlineEnd: -6, minWidth: 20, height: 20, padding: '0 4px', fontSize: 11, background: '#111', border: '1px solid #fff' }}
+                        >
+                          {c.qty}
                         </span>
-                      )}
+                      </span>
                       <div className="min-w-0 flex-1">
                         <p className="text-[13px] font-bold truncate text-[var(--ap-text-1)]">{nameOf(c.member_product_id)}</p>
                         <p className="mt-0.5 text-[11.5px] text-[var(--ap-text-3)] flex flex-wrap gap-x-2 gap-y-0.5">
                           <span>{unit === null ? loc('بلا سعر بعد', 'not priced yet', 'هێشتا نرخی نییە') : formatIqd(unit)}</span>
-                          {c.customer_picks_option && <span>· {loc('الزبون يختار الموديل', 'customer picks the model', 'کڕیار مۆدێل هەڵدەبژێرێت')}</span>}
-                          {c.customer_picks_color && <span>· {loc('الزبون يختار اللون', 'customer picks the colour', 'کڕیار ڕەنگ هەڵدەبژێرێت')}</span>}
                           {c.optional && <span>· {loc('اختياري', 'optional', 'ئارەزوومەندانە')}</span>}
                         </p>
                       </div>
@@ -1108,7 +1215,7 @@ export default function AdminBundles() {
                         className={T.btnIcon}
                         aria-expanded={!!moreOpen[i]}
                         onClick={() => setMoreOpen((prev) => ({ ...prev, [i]: !prev[i] }))}
-                        aria-label={loc('خيارات المنتج', 'Product choices', 'هەڵبژاردنەکانی بەرهەم')}
+                        aria-label={loc('المزيد', 'More settings', 'زیاتر')}
                       >
                         <ChevronDown className={`w-4 h-4 transition-transform ${moreOpen[i] ? 'rotate-180' : ''}`} aria-hidden />
                       </button>
@@ -1125,66 +1232,65 @@ export default function AdminBundles() {
                       </button>
                     </div>
 
+                    {(activeValues.length > 0 || activeColours.length > 0) && (
+                      <div className="mt-2.5 flex flex-wrap items-end gap-2 min-w-0">
+                        {activeValues.length > 0 && (
+                          <label className="flex-1" style={{ minWidth: 150 }}>
+                            <span className="block text-[11px] text-[var(--ap-text-3)] mb-1">{loc('الموديل', 'Model', 'مۆدێل')}</span>
+                            <Select
+                              value={modelValue}
+                              onChange={(e) =>
+                                setComponent(
+                                  i,
+                                  e.target.value === '__pick'
+                                    ? { customer_picks_option: true, option_value_ids: [] }
+                                    : { customer_picks_option: false, option_value_ids: e.target.value ? [e.target.value] : [], choice_option_value_ids: [] }
+                                )
+                              }
+                              data-bundle-model
+                            >
+                              <option value="__pick">{loc('الزبون يختار', 'Customer picks', 'کڕیار هەڵدەبژێرێت')}</option>
+                              {activeValues.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {lang === 'en' ? v.name_en : v.name_ar || v.name_en}
+                                </option>
+                              ))}
+                            </Select>
+                          </label>
+                        )}
+                        {activeColours.length > 0 && (
+                          <label className="flex-1" style={{ minWidth: 150 }}>
+                            <span className="block text-[11px] text-[var(--ap-text-3)] mb-1">{loc('اللون', 'Colour', 'ڕەنگ')}</span>
+                            <Select
+                              value={colourValue}
+                              onChange={(e) => setColour(i, e.target.value)}
+                              data-bundle-colour
+                            >
+                              <option value="__pick">{loc('الزبون يختار', 'Customer picks', 'کڕیار هەڵدەبژێرێت')}</option>
+                              <option value="__random">{loc('🌈 لون عشوائي (المتجر يختار)', '🌈 Random colour (store picks)', '🌈 ڕەنگی هەڕەمەکی (فرۆشگا هەڵدەبژێرێت)')}</option>
+                              {activeColours.map((v) => (
+                                <option key={v.id} value={v.id}>
+                                  {colourName(v)}
+                                </option>
+                              ))}
+                            </Select>
+                          </label>
+                        )}
+                        {activeColours.length > 0 && (
+                          <button type="button" className={btnGhost} onClick={() => addSibling(i)} data-bundle-add-colour>
+                            <Plus className="w-4 h-4" aria-hidden /> {loc('لون آخر', 'Another colour', 'ڕەنگێکی تر')}
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     {moreOpen[i] && (
                       <div className="mt-2.5 pt-2.5 border-t border-[var(--ap-border)]">
-                        <Grid cols={3}>
-                          <Field ar="اختياري" en="Optional">
-                            <Toggle
-                              checked={c.optional}
-                              onChange={(v) => setComponent(i, { optional: v })}
-                              label={loc('يمكن للمشتري استبعاده', 'the buyer may decline it', 'کڕیار دەتوانێت لایبنێت')}
-                            />
-                          </Field>
-                          <Field
-                            ar="الموديل"
-                            en="Model"
-                            hint={loc('الزبون يختار، أو ثبّت واحدًا', 'the customer picks, or pin one', 'کڕیار هەڵدەبژێرێت، یان یەکێک دابمەزرێنە')}
-                          >
-                            <div className="space-y-2 min-w-0">
-                              <Toggle
-                                checked={c.customer_picks_option}
-                                onChange={(v) => setComponent(i, { customer_picks_option: v, option_value_ids: v ? [] : c.option_value_ids, choice_option_value_ids: v ? c.choice_option_value_ids : [] })}
-                                label={loc('الزبون يختار', 'customer picks', 'کڕیار هەڵدەبژێرێت')}
-                              />
-                              {!c.customer_picks_option && (
-                                <Select
-                                  value={c.option_value_ids[0] ?? ''}
-                                  onChange={(e) => setComponent(i, { option_value_ids: e.target.value ? [e.target.value] : [] })}
-                                >
-                                  <option value="">{loc('بدون تثبيت', 'not pinned', 'دیارینەکراو')}</option>
-                                  {(rel?.values ?? [])
-                                    .filter((v) => !!v.active)
-                                    .map((v) => (
-                                      <option key={v.id} value={v.id}>
-                                        {v.name_en}
-                                      </option>
-                                    ))}
-                                </Select>
-                              )}
-                            </div>
-                          </Field>
-                          <Field ar="اللون" en="Colour">
-                            <div className="space-y-2 min-w-0">
-                              <Toggle
-                                checked={c.customer_picks_color}
-                                onChange={(v) => setComponent(i, { customer_picks_color: v, color_id: v ? '' : c.color_id, choice_color_ids: v ? c.choice_color_ids : [] })}
-                                label={loc('الزبون يختار', 'customer picks', 'کڕیار هەڵدەبژێرێت')}
-                              />
-                              {!c.customer_picks_color && (
-                                <Select value={c.color_id} onChange={(e) => setComponent(i, { color_id: e.target.value })}>
-                                  <option value="">{loc('بدون تثبيت', 'not pinned', 'دیارینەکراو')}</option>
-                                  {(rel?.colors ?? [])
-                                    .filter((v) => !!v.active)
-                                    .map((v) => (
-                                      <option key={v.id} value={v.id}>
-                                        {v.name_en}
-                                      </option>
-                                    ))}
-                                </Select>
-                              )}
-                            </div>
-                          </Field>
-                        </Grid>
+                        <Toggle
+                          checked={c.optional}
+                          onChange={(v) => setComponent(i, { optional: v })}
+                          label={loc('اختياري: يمكن للمشتري استبعاده', 'Optional: the buyer may decline it', 'ئارەزوومەندانە: کڕیار دەتوانێت لایبنێت')}
+                        />
                       </div>
                     )}
 
@@ -1199,6 +1305,12 @@ export default function AdminBundles() {
                 );
               })}
             </ul>
+          )}
+
+          {components.length > 0 && (
+            <p className="text-[12px] text-[var(--ap-text-2)]" data-bundle-pieces>
+              {loc('عدد القطع في الحزمة', 'Pieces in the bundle', 'ژمارەی پارچەکان لە پاکێجدا')}: <b>{components.reduce((n, c) => n + c.qty, 0)}</b>
+            </p>
           )}
 
           {components.length > 0 && (
@@ -1333,9 +1445,9 @@ export default function AdminBundles() {
                 <button
                   type="button"
                   className={btnGhost}
-                  disabled={!!imageBusy || memberImages.length === 0}
+                  disabled={!!imageBusy || !tilesNow.some((t) => t.url || t.random)}
                   onClick={() =>
-                    void makeCover(memberImages).then((url) => {
+                    void makeCover(tilesNow).then((url) => {
                       if (url) pushImages([url], true);
                     })
                   }

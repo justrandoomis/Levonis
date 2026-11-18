@@ -644,7 +644,11 @@ export function cartCompositionBlock(b: ResolvedBundle, mystery?: MysteryContext
             component_id: c.component_id,
             product_id: c.member_product_id,
             product: { slug: c.doc.slug, name: c.doc.name_en, name_ar: c.doc.name_ar, image: primaryMedia(c.doc.media)?.url ?? '' },
-            variant: componentVariantLabel(c),
+            // «لون عشوائي»: the cart shows the store's pick as random, not as the colour this read happened to
+            // take — the order line (orders.ts) keeps the real colour for the packer.
+            variant: c.editable.random_color
+              ? componentVariantLabel({ ...c, selection: { ...c.selection, color_id: null } })
+              : componentVariantLabel(c),
             qty_per_bundle: c.qty_per_bundle,
             optional: c.optional,
             included: c.included,

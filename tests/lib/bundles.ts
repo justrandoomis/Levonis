@@ -95,6 +95,8 @@ export interface ComponentSpec {
   colorId?: string;
   picksOption?: boolean;
   picksColor?: boolean;
+  /** «لون عشوائي» (0241): the store picks the colour. */
+  randomColor?: boolean;
   choices?: Array<{ dim: 'option_value' | 'color'; ref: string }>;
 }
 
@@ -212,8 +214,8 @@ export function addBundle(raw: DatabaseSync, o: BundleSpec): void {
     raw
       .prepare(
         `INSERT INTO bundle_components (id,bundle_product_id,member_product_id,qty,optional,option_value_ids,color_id,
-                                        customer_picks_option,customer_picks_color,sort)
-         VALUES (?,?,?,?,?,?,?,?,?,?)`
+                                        customer_picks_option,customer_picks_color,random_color,sort)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?)`
       )
       .run(
         k.id,
@@ -225,6 +227,7 @@ export function addBundle(raw: DatabaseSync, o: BundleSpec): void {
         k.colorId ?? '',
         k.picksOption ? 1 : 0,
         k.picksColor ? 1 : 0,
+        k.randomColor ? 1 : 0,
         i
       );
     for (const [j, ch] of (k.choices ?? []).entries()) {

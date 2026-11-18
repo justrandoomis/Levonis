@@ -225,6 +225,40 @@ const modeOf = componentOrderType;
  * pre-order in the catalogue behaved before 0075 — never `COALESCE(capacity, 0)`,
  * which would have closed all of them on the day it shipped.
  */
+/**
+ * «لون عشوائي» (0241): THE STORE'S PICK — the active colour whose resolution ranks best (an untracked
+ * counter, then the most free units), ties by the colour's sort and then its id, so two reads of one stock
+ * picture pick the same colour. `resolveAt` is the caller's own question for one colour, so the admin
+ * preview, the card, the cart and the checkout each pick against the counter they really read.
+ * Null when the product has no active colour (refused at save).
+ */
+export function pickRandomColour<R extends { error?: string | null; available: number | null }>(
+  colours: Array<{ id: string; active?: boolean | number; sort?: number }>,
+  resolveAt: (colorId: string) => R,
+  /** Units of a colour the bundle's OTHER lines already take (2 black pinned): judged on what is left. */
+  takenElsewhere: (colorId: string) => number = () => 0
+): { color_id: string; resolution: R } | null {
+  let current = '';
+  const score = (r: R) =>
+    r.error ? -1 : r.available === null ? Number.MAX_SAFE_INTEGER : r.available - takenElsewhere(current);
+  const ordered = colours
+    .filter((c) => c.active !== false && c.active !== 0)
+    .slice()
+    .sort((a, b) => (Number(a.sort) || 0) - (Number(b.sort) || 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  let best: { color_id: string; resolution: R } | null = null;
+  let bestScore = -Infinity;
+  for (const c of ordered) {
+    const resolution = resolveAt(c.id);
+    current = c.id;
+    const s = score(resolution);
+    if (!best || s > bestScore) {
+      best = { color_id: c.id, resolution };
+      bestScore = s;
+    }
+  }
+  return best;
+}
+
 export function resolveComponentCounter(
   c: Pick<ResolvedComponent, 'sale_types' | 'shipping_type' | 'selection'>,
   snapshot: InventorySnapshot,
@@ -616,6 +650,8 @@ export interface BundleComponentRow {
   color_id: string;
   customer_picks_option: boolean;
   customer_picks_color: boolean;
+  /** «لون عشوائي» (0241): the store picks the colour from stock. */
+  random_color: boolean;
   sort: number;
 }
 
@@ -658,7 +694,7 @@ export async function loadBundleComponents(db: D1Database, bundleProductIds: str
     const { results } = await db
       .prepare(
         `SELECT bc.id, bc.bundle_product_id, bc.member_product_id, bc.qty, bc.optional,
-                bc.option_value_ids, bc.color_id, bc.customer_picks_option, bc.customer_picks_color, bc.sort,
+                bc.option_value_ids, bc.color_id, bc.customer_picks_option, bc.customer_picks_color, bc.random_color, bc.sort,
                 group_concat(ch.dim || char(31) || ch.ref_id || char(31) || ch.sort, char(30)) AS choices
            FROM bundle_components bc
            LEFT JOIN bundle_component_choices ch ON ch.component_id = bc.id
@@ -680,6 +716,7 @@ export async function loadBundleComponents(db: D1Database, bundleProductIds: str
         color_id: String(r.color_id ?? ''),
         customer_picks_option: !!r.customer_picks_option,
         customer_picks_color: !!r.customer_picks_color,
+        random_color: !!r.random_color,
         sort: Number(r.sort) || 0,
       });
       const choices = parseChoiceBlob(id, r.choices);
@@ -901,6 +938,8 @@ export interface BundleComponentInput {
   color_id: string;
   customer_picks_option: boolean;
   customer_picks_color: boolean;
+  /** «لون عشوائي» (0241): the store picks the colour from stock; excludes a pin and a customer pick. */
+  random_color?: boolean;
   sort: number;
   /** The allow-list a customer-selectable dimension may be chosen from. Empty
    *  = "any active value of that dimension". */
@@ -951,6 +990,7 @@ export interface ComponentPreview {
   optional: boolean;
   customer_picks_option: boolean;
   customer_picks_color: boolean;
+  random_color: boolean;
   option_value_ids: string[];
   color_id: string;
   unit_iqd: number;
@@ -1193,6 +1233,12 @@ export async function resolveComposition(
     if (c.customer_picks_color && c.color_id) {
       why.push('a colour is either pinned by the admin or chosen by the customer, never both');
     }
+    if (c.random_color) {
+      if (c.color_id || c.customer_picks_color || c.choice_color_ids.length) {
+        why.push('a random colour is picked by the store: it cannot also be pinned or chosen by the customer');
+      }
+      if (!colors.some((x) => !!x.active)) why.push('a random colour needs a product with at least one active colour');
+    }
     for (const vid of c.choice_option_value_ids) {
       if (!c.customer_picks_option) why.push('an option allow-list needs the customer-picks switch on');
       else if (!values.some((x) => x.id === vid && x.active)) why.push(`option value ${vid} is not an active value of this product`);
@@ -1204,7 +1250,7 @@ export async function resolveComposition(
     // A COLOR-mode member with neither a pinned colour nor a customer choice
     // resolves to SELECTION_INCOMPLETE for ever — neither sellable nor
     // wordable, so it is refused here rather than sold and then refused.
-    if (view.inventory_mode === 'COLOR' && !c.color_id && !c.customer_picks_color) {
+    if (view.inventory_mode === 'COLOR' && !c.color_id && !c.customer_picks_color && !c.random_color) {
       why.push('this product tracks stock per colour, so the bundle must pin a colour or let the customer pick one');
     }
     if (view.inventory_mode === 'OPTION' && c.option_value_ids.length === 0 && !c.customer_picks_option) {
@@ -1215,7 +1261,10 @@ export async function resolveComposition(
       return;
     }
 
-    const sel = { option_value_ids: [...c.option_value_ids].sort(), color_id: c.color_id || null };
+    const sel: { option_value_ids: string[]; color_id: string | null } = {
+      option_value_ids: [...c.option_value_ids].sort(),
+      color_id: c.color_id || null,
+    };
     const snapshot = memberSnapshot(m);
     // The journey FIRST, because it is an input to which counter this component
     // spends — not only to what it costs.
@@ -1230,12 +1279,21 @@ export async function resolveComposition(
      * uses, so the panel's preview, the storefront card and the door can only
      * ever be judging the same row.
      */
-    const resolution = resolveComponentCounter(
-      { sale_types: m.doc.sale_types, shipping_type: shipping, selection: sel },
-      snapshot,
-      view,
-      method
-    );
+    const counterAt = (selection: typeof sel) =>
+      resolveComponentCounter({ sale_types: m.doc.sale_types, shipping_type: shipping, selection }, snapshot, view, method);
+    // «لون عشوائي»: the preview judges the colour the store would pick right now.
+    const picked = c.random_color
+      ? pickRandomColour(
+          colors,
+          (color_id) => counterAt({ ...sel, color_id }),
+          (color_id) =>
+            input.components
+              .filter((o) => o !== c && !o.random_color && o.member_product_id === c.member_product_id && o.color_id === color_id)
+              .reduce((n, o) => n + o.qty, 0)
+        )
+      : null;
+    if (picked) sel.color_id = picked.color_id;
+    const resolution = picked ? picked.resolution : counterAt(sel);
     // A fully pinned VARIANT_COMBINATION member whose combination has no row
     // can never be sold; the customer-selectable case is decided at the door,
     // when the choice actually exists. A PRE-ORDER component never reaches this
@@ -1245,7 +1303,8 @@ export async function resolveComposition(
     if (
       resolution.error === 'VARIANT_NOT_MODELLED' &&
       !c.customer_picks_option &&
-      !c.customer_picks_color
+      !c.customer_picks_color &&
+      !c.random_color
     ) {
       errors.push(bundleIssue('VARIANT_NOT_MODELLED', { name }, { line, component_id: c.id }));
       return;
@@ -1293,6 +1352,7 @@ export async function resolveComposition(
       optional: c.optional,
       customer_picks_option: c.customer_picks_option,
       customer_picks_color: c.customer_picks_color,
+      random_color: !!c.random_color,
       option_value_ids: sel.option_value_ids,
       color_id: c.color_id,
       unit_iqd: unit.applied_iqd,
@@ -1517,8 +1577,8 @@ export async function planBundleComposition(
         .prepare(
           `INSERT INTO bundle_components
              (id, bundle_product_id, member_product_id, qty, optional, option_value_ids, color_id,
-              customer_picks_option, customer_picks_color, sort)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+              customer_picks_option, customer_picks_color, random_color, sort)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         )
         .bind(
           id,
@@ -1530,6 +1590,7 @@ export async function planBundleComposition(
           c.color_id,
           c.customer_picks_option ? 1 : 0,
           c.customer_picks_color ? 1 : 0,
+          c.random_color ? 1 : 0,
           Number.isFinite(c.sort) ? c.sort : i
         )
     );

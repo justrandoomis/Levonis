@@ -867,7 +867,7 @@ export interface CartComponentView {
   qty_per_bundle: number;
   optional: boolean;
   included: boolean;
-  editable: { option: boolean; color: boolean };
+  editable: { option: boolean; color: boolean; random_color?: boolean };
   /** The component's STANDALONE value — never a discounted share. */
   value_iqd: number;
   availability: { state: string };

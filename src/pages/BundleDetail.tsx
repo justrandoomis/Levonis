@@ -59,6 +59,7 @@ const STRINGS = {
   ar: {
     inside: 'ما داخل الباقة',
     optional: 'اختياري',
+    randomColour: 'لون عشوائي',
     editable: 'تختاره أنت',
     locked: 'هذا العرض حصري للمشتركين',
     lockedBody: 'اشترك للوصول إلى هذا العرض وسعره.',
@@ -91,6 +92,7 @@ const STRINGS = {
   en: {
     inside: 'Inside the bundle',
     optional: 'Optional',
+    randomColour: 'Random colour',
     editable: 'You choose',
     locked: 'This offer is members only',
     lockedBody: 'Subscribe to see this offer and its price.',
@@ -123,6 +125,7 @@ const STRINGS = {
   ckb: {
     inside: 'ناوەڕۆکی پاکێج',
     optional: 'ئارەزوومەندانە',
+    randomColour: 'ڕەنگی هەڕەمەکی',
     editable: 'خۆت هەڵیدەبژێریت',
     locked: 'ئەم پێشنیارە تەنها بۆ ئەندامانە',
     lockedBody: 'بەشداری بکە بۆ بینینی ئەم پێشنیارە و نرخەکەی.',
@@ -163,7 +166,7 @@ interface ComponentView {
   qty_per_bundle: number;
   optional: boolean;
   included: boolean;
-  editable: { option: boolean; color: boolean };
+  editable: { option: boolean; color: boolean; random_color?: boolean };
   state: string;
   variant_label: string;
   choices: Array<{ dim: string; id: string; name: string }>;
@@ -601,6 +604,19 @@ export default function BundleDetail() {
                       {(c.editable.option || c.editable.color) && (
                         <span className="inline-flex items-center rounded-md border border-sky-500/30 bg-sky-500/15 px-2 py-0.5 text-[10px] font-bold text-sky-300">
                           {s.editable}
+                        </span>
+                      )}
+                      {c.editable.random_color && (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-md border border-border-subtle bg-surface-raised px-2 py-0.5 text-[10px] font-bold text-text-secondary"
+                          data-bundle-random-colour
+                        >
+                          <span
+                            className="w-3 h-3 rounded-full"
+                            style={{ background: 'conic-gradient(#FF3B30, #FF9500, #FFCC00, #34C759, #00C7BE, #007AFF, #AF52DE, #FF2D55, #FF3B30)' }}
+                            aria-hidden
+                          />
+                          {s.randomColour}
                         </span>
                       )}
                     </div>
