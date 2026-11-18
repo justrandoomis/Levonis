@@ -243,7 +243,8 @@ export default function TradeIn() {
             id={mode.id}
             onBack={home}
             onResume={(r) =>
-              setParams(withTarget({ draft: r.id, step: 'condition' }), {
+              // A saved new device means the condition was saved too (F-23): back to the offer.
+              setParams(withTarget({ draft: r.id, step: r.target ? 'offer' : 'condition' }), {
                 state: { from: 'request' },
               })
             }

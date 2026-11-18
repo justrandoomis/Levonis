@@ -283,6 +283,7 @@ export const COPY = {
     'داواکارییەکە دادەخرێت و ئامێرەکەت لە فرۆشگا دەدەینەوە.',
   ],
   'act.buy': ['أكمل الشراء', 'Complete the purchase', 'کڕینەکە تەواو بکە'],
+  'act.newRequest': ['ابدأ طلب استبدال جديد', 'Start a new trade-in', 'گۆڕینەوەیەکی نوێ دەست پێبکە'],
   'act.chooseDevice': ['اختر الجهاز الجديد', 'Choose the new device', 'ئامێرە نوێیەکە هەڵبژێرە'],
   'tl.yourOrder': ['طلب الشراء', 'Your order', 'داواکاریی کڕینەکەت'],
   'tl.credit': ['الرصيد', 'Credit', 'باڵانس'],

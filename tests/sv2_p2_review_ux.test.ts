@@ -101,7 +101,10 @@ test('F-22: no offer is not a dead end — contact us, or cancel the draft (whic
   assert.match(src, /to="\/support"[^>]*data-no-offer-contact/);
   assert.match(src, /data-no-offer-cancel/);
   assert.match(src, /\/cancel`, \{\}\)/);
-  assert.match(read('src/components/tradeIn/TradeInFlow.tsx'), /onCancelled=\{onExit\}/);
+  // A cancel leaves the flow (and drops the answers this tab kept for the draft).
+  const flow = read('src/components/tradeIn/TradeInFlow.tsx');
+  assert.match(flow, /onCancelled=\{cancelled\}/);
+  assert.match(flow, /const cancelled = useCallback\(\(\) => \{\s*clearDraftCache\(draftId\);\s*onExit\(\);/);
   assert.equal(copyText('offer.contact', 'ckb'), 'پەیوەندیمان پێوە بکە');
 });
 

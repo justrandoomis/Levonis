@@ -21,6 +21,7 @@ import { CheckCircle2, CircleDashed } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { api } from '../../lib/api';
 import { Segmented } from '../ui/Segmented';
+import { Button } from '../ui/Button';
 import {
   FAMILY_LABELS,
   HOURS_PHOTO,
@@ -150,6 +151,7 @@ export default function ConditionScreen({
   setAnswered,
   onPhoto,
   onPhotoRemoved,
+  doneRoles = [],
 }: {
   req: RequestView;
   role: ComponentRole;
@@ -162,12 +164,16 @@ export default function ConditionScreen({
   setAnswered: React.Dispatch<React.SetStateAction<Partial<Record<ComponentRole, Answered>>>>;
   onPhoto: (p: PhotoView) => void;
   onPhotoRemoved: (id: string) => void;
+  /** The parts with nothing left to answer — a tick on their tab (a Combo). */
+  doneRoles?: ComponentRole[];
 }) {
   const { t } = useT();
   const { loc } = useLanguage();
   const errText = useErrText();
   const [uploads, setUploads] = useState<Record<string, number>>({});
   const [error, setError] = useState('');
+  // A failed upload stays on its own row with the file, so «أعد المحاولة» sends it again.
+  const [failed, setFailed] = useState<Record<string, { file: File; angle: string; proves?: string; msg: string }>>({});
 
   const comp = req.components.find((c) => c.role === role) ?? req.components[0];
   const value = comp ? inputs[comp.role] : undefined;
@@ -199,7 +205,13 @@ export default function ConditionScreen({
 
   const upload = async (slot: string, file: File, angle: string, proves?: string) => {
     const key = `${comp.role}:${slot}:${file.name}:${file.size}`;
+    const row = `${comp.role}:${slot}`;
     setError('');
+    setFailed((f) => {
+      const next = { ...f };
+      delete next[row];
+      return next;
+    });
     setUploads((u) => ({ ...u, [key]: 0 }));
     try {
       const photo = await uploadTradeInPhoto(`/api/trade-in/requests/${encodeURIComponent(req.id)}/photos`, file, { component: comp.role, angle, proves }, (f) =>
@@ -207,7 +219,7 @@ export default function ConditionScreen({
       );
       onPhoto(photo);
     } catch (e) {
-      setError(errText(e, t('photo.failed')));
+      setFailed((f) => ({ ...f, [row]: { file, angle, proves, msg: errText(e, t('photo.failed')) } }));
     } finally {
       setUploads((u) => {
         const next = { ...u };
@@ -231,6 +243,7 @@ export default function ConditionScreen({
   const proofRow = (slot: string, title: string, photos: PhotoView[], max: number, angle: string, proves: string | undefined, required: boolean) => {
     const busy = busyFor(slot);
     const ok = photos.length > 0;
+    const fail = failed[`${comp.role}:${slot}`];
     return (
       <div className="lv-well rounded-md p-3" data-proof={slot}>
         <div className="flex items-center gap-2">
@@ -254,6 +267,16 @@ export default function ConditionScreen({
             ))}
           </div>
         ) : null}
+        {fail && busy.length === 0 ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2" data-photo-failed={slot}>
+            <div className="min-w-0 flex-1">
+              <ErrorLine>{fail.msg}</ErrorLine>
+            </div>
+            <Button variant="secondary" size="sm" onClick={() => void upload(slot, fail.file, fail.angle, fail.proves)}>
+              {t('retry')}
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   };
@@ -272,7 +295,7 @@ export default function ConditionScreen({
           onChange={(id) => onRole(id as ComponentRole)}
           items={req.components.map((c) => ({
             id: c.role,
-            label: t(c.role === 'ams' ? 'part.ams' : 'part.device'),
+            label: `${t(c.role === 'ams' ? 'part.ams' : 'part.device')}${doneRoles.includes(c.role) ? ' ✓' : ''}`,
           }))}
           dataAttr="data-part"
         />

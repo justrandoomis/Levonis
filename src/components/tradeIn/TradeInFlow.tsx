@@ -42,6 +42,42 @@ function inputsOf(req: RequestView | null): Inputs {
   return out;
 }
 
+/**
+ * THE ANSWERS KEPT IN THIS TAB until «متابعة» saves them: a refresh, the phone's back gesture or a
+ * killed tab does not wipe the hours, the overall, the damage and the notes. `saved` remembers that
+ * the condition was saved once (the draft may have no target yet), so its answers are not shown as
+ * blank. sessionStorage only — a convenience; the server's draft stays the truth.
+ */
+type DraftCache = {
+  inputs: Inputs;
+  damage: Partial<Record<ComponentRole, boolean>>;
+  answered: Partial<Record<ComponentRole, Answered>>;
+  saved: boolean;
+};
+const cacheKey = (id: string) => `ti-draft:${id}`;
+function readCache(id: string): DraftCache | null {
+  try {
+    const raw = window.sessionStorage.getItem(cacheKey(id));
+    return raw ? (JSON.parse(raw) as DraftCache) : null;
+  } catch {
+    return null;
+  }
+}
+function writeCache(id: string, c: DraftCache) {
+  try {
+    window.sessionStorage.setItem(cacheKey(id), JSON.stringify(c));
+  } catch {
+    /* private mode, full storage */
+  }
+}
+export function clearDraftCache(id: string) {
+  try {
+    window.sessionStorage.removeItem(cacheKey(id));
+  } catch {
+    /* nothing kept */
+  }
+}
+
 const TITLES: Record<FlowStep, CopyKey> = {
   condition: 'cond.title',
   target: 'target.q',
@@ -84,6 +120,12 @@ export default function TradeInFlow({
   const [sheet, setSheet] = useState(false);
   const [initial, setInitial] = useState<TargetOption | null>(null);
   const hinted = useRef(false);
+  const saved = useRef(false);
+  // «متابعة» on an incomplete condition: the list of what is left shows, and takes the focus.
+  const [tried, setTried] = useState(false);
+  const missingRef = useRef<HTMLDivElement>(null);
+  const headRef = useRef<HTMLHeadingElement>(null);
+  const firstStep = useRef(true);
 
   const load = useCallback(async () => {
     setLoadError('');
@@ -94,10 +136,25 @@ export default function TradeInFlow({
         return;
       }
       setReq(d.request);
-      setInputs(inputsOf(d.request));
+      const cached = readCache(d.request.id);
+      saved.current = !!cached?.saved;
       // Review F-23: a draft whose condition was already saved (it went on to the new device) was
       // answered; a new one starts with nothing chosen — the blanks are not the customer's answers.
-      const seen = !!d.request.target;
+      const seen = !!d.request.target || saved.current;
+      const roles = new Set(d.request.components.map((c) => c.role));
+      const own = <T,>(o: Partial<Record<ComponentRole, T>> | undefined) =>
+        Object.fromEntries(Object.entries(o ?? {}).filter(([r]) => roles.has(r as ComponentRole))) as Partial<Record<ComponentRole, T>>;
+      if (cached) {
+        // This tab's answers, over the server's (only for the parts the draft still has).
+        const server = inputsOf(d.request);
+        const mine = own(cached.inputs as Partial<Record<ComponentRole, Inputs[ComponentRole]>>);
+        setInputs(Object.fromEntries(Object.entries(server).map(([r, v]) => [r, mine[r as ComponentRole] ? { ...v, ...mine[r as ComponentRole] } : v])) as Inputs);
+        setDamage(own(cached.damage));
+        setAnswered(seen ? Object.fromEntries(d.request.components.map((c) => [c.role, { overall: true, accessories: true, hours: true }])) : own(cached.answered));
+        setRole(d.request.components[0]?.role ?? 'device');
+        return;
+      }
+      setInputs(inputsOf(d.request));
       setDamage(
         Object.fromEntries(
           d.request.components.flatMap((c): Array<[ComponentRole, boolean]> => {
@@ -118,12 +175,40 @@ export default function TradeInFlow({
   }, [load]);
 
   useEffect(() => {
+    if (!req) return;
+    const h = window.setTimeout(() => writeCache(req.id, { inputs, damage, answered, saved: saved.current }), 250);
+    return () => window.clearTimeout(h);
+  }, [req, inputs, damage, answered]);
+
+  useEffect(() => {
     try {
       window.scrollTo({ top: 0 });
     } catch {
       /* no layout (tests) */
     }
+    setTried(false);
+    // A new screen: the focus goes to its title, so a screen reader says where the customer is.
+    if (firstStep.current) firstStep.current = false;
+    else headRef.current?.focus({ preventScroll: true });
   }, [step]);
+
+  // An offer with no new device chosen (an old link, a refresh after the target was cleared): back
+  // to the new device — no preview is spent on it.
+  useEffect(() => {
+    if (req && step === 'offer' && !req.target) onStep('target', 'back');
+  }, [req, step, onStep]);
+
+  const sent = useCallback(
+    (id: string) => {
+      clearDraftCache(draftId);
+      onSent(id);
+    },
+    [draftId, onSent]
+  );
+  const cancelled = useCallback(() => {
+    clearDraftCache(draftId);
+    onExit();
+  }, [draftId, onExit]);
 
   const saveTarget = useCallback(
     async (quote: TargetView) => {
@@ -220,6 +305,19 @@ export default function TradeInFlow({
   const index = (req.is_combo ? 3 : 2) + FLOW_STEPS.indexOf(step);
 
   const saveCondition = async () => {
+    if (missing.length > 0) {
+      setTried(true);
+      setRole(missing[0].role);
+      requestAnimationFrame(() => {
+        try {
+          missingRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        } catch {
+          /* no layout (tests) */
+        }
+        missingRef.current?.focus({ preventScroll: true });
+      });
+      return;
+    }
     setBusy(true);
     setError('');
     try {
@@ -231,6 +329,8 @@ export default function TradeInFlow({
         setError(`${t('missing.title')} ${left.join(' · ')}`);
         return;
       }
+      saved.current = true;
+      writeCache(req.id, { inputs, damage, answered, saved: true });
       onStep('target', 'forward');
     } catch (e) {
       setError(errText(e, t('saveError')));
@@ -251,8 +351,12 @@ export default function TradeInFlow({
             <span key={i} className={`h-1 flex-1 rounded-full ${i < index ? 'bg-gold' : 'bg-border-subtle'}`} />
           ))}
         </div>
-        <p className="mt-2 text-[12px] text-text-muted tabular-nums">{t('stepOf', { n: index, total })}</p>
-        <h2 className="mt-0.5 text-[22px] font-black leading-8 text-text-primary">{t(TITLES[step])}</h2>
+        <p id="ti-step-of" className="mt-2 text-[12px] text-text-muted tabular-nums">
+          {t('stepOf', { n: index, total })}
+        </p>
+        <h2 ref={headRef} tabIndex={-1} aria-describedby="ti-step-of" className="mt-0.5 text-[22px] font-black leading-8 text-text-primary focus:outline-none">
+          {t(TITLES[step])}
+        </h2>
         <div className="mt-2 flex items-center gap-2 text-[12.5px] text-text-secondary">
           <SafeImage sizes="28px" src={req.source.image ?? ''} alt="" aspect="square" className="h-7 w-7 shrink-0 rounded-sm" bgClassName="bg-surface" />
           <span className="min-w-0 truncate">{req.source.name}</span>
@@ -270,6 +374,7 @@ export default function TradeInFlow({
           setDamage={setDamage}
           answered={answered}
           setAnswered={setAnswered}
+          doneRoles={req.components.map((c) => c.role).filter((r) => !missing.some((m) => m.role === r))}
           onPhoto={(p) =>
             setReq((cur) =>
               cur
@@ -327,12 +432,14 @@ export default function TradeInFlow({
         </div>
       ) : null}
 
-      {step === 'offer' ? <OfferScreen req={req} onReq={setReq} onSent={onSent} onBackToCondition={() => onStep('condition', 'back')} onCancelled={onExit} /> : null}
+      {step === 'offer' && req.target ? (
+        <OfferScreen req={req} onReq={setReq} onSent={sent} onBackToCondition={() => onStep('condition', 'back')} onCancelled={cancelled} />
+      ) : null}
 
       {step !== 'offer' ? (
         <>
-          {step === 'condition' && missing.length > 0 ? (
-            <div className="lv-alert lv-alert-warning text-[12.5px] text-text-primary" data-trade-in-missing>
+          {step === 'condition' && tried && missing.length > 0 ? (
+            <div ref={missingRef} tabIndex={-1} role="alert" className="lv-alert lv-alert-warning text-[12.5px] text-text-primary focus:outline-none" data-trade-in-missing>
               <p className="font-bold">{t('missing.title')}</p>
               <ul className="mt-1 list-disc space-y-0.5 ps-5">
                 {missing.flatMap((m) =>
@@ -362,7 +469,7 @@ export default function TradeInFlow({
               <Button
                 variant="primary"
                 onClick={step === 'condition' ? saveCondition : () => onStep('offer', 'forward')}
-                disabled={busy || (step === 'condition' ? missing.length > 0 : !target)}
+                disabled={busy || (step === 'condition' ? false : !target)}
                 loading={busy}
                 iconEnd={<Next className="h-4 w-4" aria-hidden />}
                 data-trade-in-next
@@ -373,7 +480,6 @@ export default function TradeInFlow({
           </div>
         </>
       ) : null}
-      {step === 'offer' && !req.target ? <p className="text-[13px] text-text-secondary">{t('target.empty')}</p> : null}
     </div>
   );
 }

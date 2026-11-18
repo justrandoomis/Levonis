@@ -139,7 +139,7 @@ export default function OfferScreen({
     <div className="space-y-4" data-trade-in-offer>
       {/* THE FIGURE */}
       <section className="lv-surface p-5 text-center" aria-live="polite" data-offer-figure>
-        <h3 className="text-[14px] font-semibold text-text-secondary">{t('offer.title')}</h3>
+        <h3 className="sr-only">{t('offer.title')}</h3>
         {asking && !offer ? (
           <div className="flex flex-col items-center gap-2 py-4">
             <Spinner />

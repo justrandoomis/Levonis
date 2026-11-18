@@ -281,7 +281,8 @@ export default function RequestTimeline({ id, onResume, onBack }: { id: string; 
     },
     {
       key: 'received',
-      title: t('st.received'),
+      // While it is being inspected the step says so — not «…وفحصناه» before the inspection ends.
+      title: stage === 'inspecting' ? triText(req.stage_label, loc) : t('st.received'),
       date: req.intake?.received_at ?? null,
       state: received ? (stage === 'inspecting' ? 'now' : 'done') : 'later',
       body: req.intake?.serial_matched ? <p className="text-[12.5px] text-success">{t('tl.serialOk')}</p> : null,
@@ -402,12 +403,25 @@ export default function RequestTimeline({ id, onResume, onBack }: { id: string; 
         title: t(ending),
         date: req.cancelled_at,
         state: 'now',
-        body:
-          stage === 'offer_expired' ? (
-            <p className="text-[12.5px] text-text-secondary">{t('st.expiredHint')}</p>
-          ) : stage === 'cancelled' && req.cancel_reason ? (
-            <p className="text-[12.5px] text-text-secondary">{t('cancel.reason', { x: req.cancel_reason })}</p>
-          ) : null,
+        body: (
+          <div className="space-y-3">
+            {stage === 'offer_expired' ? (
+              <p className="text-[12.5px] text-text-secondary">{t('st.expiredHint')}</p>
+            ) : stage === 'cancelled' && req.cancel_reason ? (
+              <p className="text-[12.5px] text-text-secondary">{t('cancel.reason', { x: req.cancel_reason })}</p>
+            ) : null}
+            {/* Not a dead end: the next thing to do. */}
+            {stage === 'device_to_collect' ? (
+              <Link to="/support" className="lv-button lv-button-secondary w-full" data-trade-in-end-action="support">
+                {t('offer.contact')}
+              </Link>
+            ) : (
+              <Button variant="primary" block onClick={onBack} data-trade-in-end-action="new">
+                {t('act.newRequest')}
+              </Button>
+            )}
+          </div>
+        ),
       },
     ];
   }
