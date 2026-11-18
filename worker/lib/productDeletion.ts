@@ -227,6 +227,10 @@ export const OWNED_TABLES: OwnedTable[] = [
   // 0192: the owner's private component reference for a Combo / device (trade-in B.4 rules 2–4) —
   // worthless without the product it values.
   { table: 'trade_in_component_refs', by: { column: 'product_id' } },
+  // 0238 (DECISIONS row 353): the owner's smart-value profile of a printer model — worthless without
+  // the model. A profile that names a deleted product as its SUCCESSOR keeps its own tuning; a successor
+  // that is not on sale simply lowers nothing (worker/lib/tradeInSmart.ts).
+  { table: 'trade_in_model_profiles', by: { column: 'product_id' } },
   // A competitor-price report (0093) is OWNED and not HISTORY, and the choice
   // is forced twice over. `product_id` is NOT NULL, so there is nothing to
   // clear — and clearing it would be wrong even if it were possible: the row's

@@ -56,6 +56,8 @@ export const DESIGNED_ON_OLDER_DB: readonly DesignedRefusal[] = [
   // 403 on both databases (the cost door comes first) and stays strict; every
   // other S-P2 door answers an older database as it answers the migrated one.
   { path: '/api/admin/trade-in/component-refs', who: ['owner'], status: 503, code: 'TRADE_IN_V2_NOT_INSTALLED', migration: '0192_trade_in_v2.sql' },
+  // Smart trade-in value (DECISIONS row 353): the owner's value table sits behind the same 0192 door.
+  { path: '/api/admin/trade-in/value-table', who: ['owner'], status: 503, code: 'TRADE_IN_V2_NOT_INSTALLED', migration: '0192_trade_in_v2.sql' },
   // Smart pricing (docs/SMART_PRICING.md §2.4, §3.4, §4): the owner's supplier catalogue and the estimator read
   // only 0218's tables, so an older database hears 503 PRICE_ESTIMATES_NOT_INSTALLED — the shape of
   // PRICING_NOT_INSTALLED. Non-owners (403 on both, the cost door comes first) and the two supplier-link reads
