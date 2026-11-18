@@ -27,7 +27,8 @@ export interface Picked {
 }
 
 /** A selection is complete when every group with a choice and the colour (if any) are chosen. */
-const complete = (t: TargetOption, p: Picked) => t.groups.every((g) => !!p.values[g.id]) && (t.colors.length === 0 || !!p.color_id);
+// A group with no value cannot be answered and is not asked (it never blocks «اعتمد هذا الجهاز»).
+const complete = (t: TargetOption, p: Picked) => t.groups.every((g) => g.values.length === 0 || !!p.values[g.id]) && (t.colors.length === 0 || !!p.color_id);
 /** The answers a device needs from the customer (a single-value group or colour needs none). */
 export const needsChoice = (t: TargetOption) => t.groups.some((g) => g.values.length > 1) || t.colors.length > 1;
 export const firstPick = (t: TargetOption): Picked => ({

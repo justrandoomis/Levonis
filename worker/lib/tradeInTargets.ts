@@ -151,7 +151,6 @@ export async function searchTargets(env: Env, userId: string, q: { q: string; fa
     const doc = view ? applyRelations(parseProductRow(row), view) : parseProductRow(row);
     const from = lowestDirect(doc, view, ctx, printers.has(pid));
     if (from === null) continue;
-    const g = (groups.results ?? []).filter((x) => x.product_id === pid);
     targets.push({
       product_id: pid,
       slug: doc.slug,
@@ -161,19 +160,57 @@ export async function searchTargets(env: Env, userId: string, q: { q: string; fa
       image: coverOf(doc),
       family,
       from_price_iqd: from,
-      groups: g.map((grp) => ({
-        id: grp.id,
-        name: grp.name_en,
-        values: (values.results ?? [])
-          .filter((v) => v.group_id === grp.id)
-          .map((v) => ({ id: v.id, label_ar: v.name_ar || v.name_en, label_en: v.name_en, ...(v.name_ckb ? { label_ckb: v.name_ckb } : {}) })),
-      })),
-      colors: (colors.results ?? [])
-        .filter((c) => c.product_id === pid)
-        .map((c) => ({ id: c.id, label_ar: c.name_ar || c.name_en, label_en: c.name_en, ...(c.name_ckb ? { label_ckb: c.name_ckb } : {}), hex: c.hex })),
+      ...choicesOf(doc, (groups.results ?? []).filter((x) => x.product_id === pid), values.results ?? [], colors.results ?? []),
     });
   }
   return { targets, next_cursor: nextCursor };
+}
+
+type GroupRow = { id: string; product_id: string; name_en: string; sort: number };
+type ValueRow = { id: string; product_id: string; group_id: string; name_en: string; name_ar: string | null; name_ckb: string | null; sort: number };
+type ColorRow = { id: string; product_id: string; name_en: string; name_ar: string | null; name_ckb: string | null; hex: string; sort: number };
+
+/**
+ * THE CHOICES OF A TARGET, from the product AS IT IS SOLD (`doc.options` / `doc.colors` — the ids
+ * the target's price is checked against, `priceTarget`), never from the relational tables alone:
+ * a product whose models live in its own option list (the A1's «A1 / A1 Combo», no group row) has
+ * no `product_option_values` rows, and a group sent with no value could never be chosen — the
+ * sheet showed «اختر الخيارات» with nothing to pick (owner, 2026-11-18). Options are grouped by
+ * their group name; a group row of the same name lends its id, else a stable one is made.
+ * Every group sent has at least one value.
+ */
+export function choicesOf(doc: ReturnType<typeof parseProductRow>, groupRows: GroupRow[], valueRows: ValueRow[], colorRows: ColorRow[]) {
+  const live = doc.options.filter((o) => o.active !== false && !o.merged_into);
+  const rowOf = new Map(valueRows.map((v) => [v.id, v]));
+  const groupIdOfValue = new Map(valueRows.map((v) => [v.id, v.group_id]));
+  const groupById = new Map(groupRows.map((g) => [g.id, g]));
+  const byKey = new Map<string, { id: string; name: string; sort: number; values: Array<{ id: string; label_ar: string; label_en: string; label_ckb?: string }> }>();
+  live.forEach((o, i) => {
+    const rowGroup = groupIdOfValue.get(o.id);
+    const named = (o as { group_en?: string }).group_en?.trim() ?? '';
+    const match = rowGroup ? groupById.get(rowGroup) : groupRows.find((g) => named !== '' && g.name_en === named);
+    const key = match ? match.id : `grp:${named || 'main'}`;
+    let g = byKey.get(key);
+    if (!g) {
+      g = { id: key, name: match?.name_en ?? named, sort: match?.sort ?? 1_000 + i, values: [] };
+      byKey.set(key, g);
+    }
+    const r = rowOf.get(o.id);
+    const ar = o.name_ar || r?.name_ar || o.name_en;
+    const en = o.name_en || r?.name_en || o.name_ar;
+    const ckb = o.name_ckb || r?.name_ckb || '';
+    g.values.push({ id: o.id, label_ar: ar, label_en: en, ...(ckb ? { label_ckb: ckb } : {}) });
+  });
+  const groups = [...byKey.values()].filter((g) => g.values.length > 0).sort((a, b) => a.sort - b.sort).map(({ id, name, values }) => ({ id, name, values }));
+  const colorRow = new Map(colorRows.map((c) => [c.id, c]));
+  const colors = doc.colors
+    .filter((c) => c.active !== false)
+    .map((c) => {
+      const r = colorRow.get(c.id);
+      const ckb = c.name_ckb || r?.name_ckb || '';
+      return { id: c.id, label_ar: c.name_ar || r?.name_ar || c.name_en, label_en: c.name_en || r?.name_en || c.name_ar, ...(ckb ? { label_ckb: ckb } : {}), hex: c.hex || r?.hex || '' };
+    });
+  return { groups, colors };
 }
 
 /** Is this product a SELLABLE device a trade-in can buy (the product-page entry)? One read. */
