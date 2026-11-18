@@ -1,18 +1,22 @@
 import { allocateExact } from './operations';
 import { badRequest } from './http';
-import { addOwnerPromotions, getOrderProfitBases, workspaceInstalled } from './orderProfit';
+import { addOwnerPromotions, getOrderProfitBases } from './orderProfit';
+import { emptyBreakdown, printerBreakdown, serviceClaimsSummary } from './printerFinance';
 export async function operationsReport(db: D1Database, from: string, to: string) {
   const days = (Date.parse(to) - Date.parse(from)) / 86400000;
   if (days < 0 || days > 365) throw badRequest('اختر فترة لا تتجاوز سنة');
-  const workspace=await workspaceInstalled(db);
   // Keep one schema read while preserving the pre-0168 report. Supplier
   // invoices round the complete quantity once; the display unit is not a
   // reversible representation of that exact total.
   const schema = await db.prepare(`SELECT
     EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_cost_adjustments') AS cost_adjustments,
     EXISTS(SELECT 1 FROM pragma_table_info('incoming_inventory') WHERE name='purchase_total_iqd') AS exact_purchase_total,
-    EXISTS(SELECT 1 FROM pragma_table_info('order_items') WHERE name='line_kind') AS line_kind`)
-    .first<{ cost_adjustments: number; exact_purchase_total: number; line_kind: number }>();
+    EXISTS(SELECT 1 FROM pragma_table_info('order_items') WHERE name='line_kind') AS line_kind,
+    EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='finance_order_adjustments') AS workspace,
+    EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='service_claim_costs') AS service_claims`)
+    .first<{ cost_adjustments: number; exact_purchase_total: number; line_kind: number; workspace: number; service_claims: number }>();
+  // workspaceInstalled's question, asked in this one probe (the report's statement budget, tests/financialIntegrationInventory).
+  const workspace = !!schema?.workspace;
   // 0235: a membership bought with a printer is its own order line — not goods (no units, no COGS, not
   // net goods sales); it is reported apart as memberships sold. A database without the column has none.
   const goods = schema?.line_kind ? "COALESCE(i.line_kind,'product')<>'membership'" : '1';
@@ -107,7 +111,9 @@ export async function operationsReport(db: D1Database, from: string, to: string)
       net_goods_iqd:base.totals.net_goods_iqd===null?null:Number(base.totals.net_goods_iqd)-Number(o.membership_iqd??0),
       units:Number(base.totals.units)-Number(o.membership_units??0),
       estimated_lines:base.lines.filter((l)=>l.cost_confidence==='snapshot').length,
-      warnings:base.warnings,version:base.version};
+      warnings:base.warnings,version:base.version,
+      // Printer services phase 3 (DECISIONS row 347): the order's printer / services / kits / membership split, report-only.
+      printer_breakdown:printerBreakdown([base])};
   }),
     truncated = list.length > 5000;
   const overhead = list.map(() => 0);
@@ -194,6 +200,13 @@ export async function operationsReport(db: D1Database, from: string, to: string)
     general_expenses_iqd: (expenses.results ?? []).reduce((s, e) => s + e.amount_iqd, 0),
     /** Memberships sold with delivered orders in the range (0235) — outside net goods. */
     memberships_sold_iqd: rows.reduce((s, r) => s + (Number(r.membership_iqd) || 0), 0),
+    /**
+     * Printer services phase 3 (DECISIONS row 347): the period's serviced printer lines split into the printer and its
+     * services (sums of each order's `printer_breakdown`; empty without the profit workspace), and the claims' money —
+     * costs already inside general_expenses_iqd, the Care discount given, the co-pay collected (service income).
+     */
+    services_breakdown: bases.length ? printerBreakdown(bases) : emptyBreakdown(),
+    service_claims: await serviceClaimsSummary(db, { from, to }, { installed: !!schema?.service_claims }),
     allocated_overhead_iqd: truncated ? null : overhead.reduce((a, b) => a + b, 0),
     note: 'ربح الطلبات المستلمة خلال الفترة، وتعرض المرتجعات في تاريخها منفصلة. الربح الإداري بعد توزيع المصروفات للمعاينة. التوزيع لا ينشئ مصروفًا ثانيًا. أرصدة المحافظ بعملتها الأصلية.',
   };

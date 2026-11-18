@@ -632,3 +632,161 @@ const ckb: WarrantyStrings = {
 };
 
 export const WARRANTY_STRINGS: Record<Language, WarrantyStrings> = { ar, en, ckb };
+
+/**
+ * LEVO CARE ON THE WARRANTY PAGE (printer phase 3, DECISIONS row 347): the line
+ * on a device and the quote on a claim. Its own table so the three big ones above
+ * stay as they were; the same rule holds — a key missing from a language is a
+ * type error, and the Sorani is Sorani, never the Arabic (row 183).
+ */
+export interface CareStrings {
+  title: string;
+  state: Record<'not_delivered' | 'active' | 'expired' | 'closed' | 'terms_missing', string>;
+  activeUntil: (date: string) => string;
+  expiredOn: (date: string) => string;
+  claimsLeft: (n: string) => string;
+  benefitLeft: (amount: string) => string;
+  noMoneyCap: string;
+  discount: (pct: string) => string;
+  laborCovered: string;
+  shippingCovered: string;
+  parts: string;
+  exclusions: string;
+  showTerms: string;
+  hideTerms: string;
+  claimBadge: string;
+  quoteTitle: string;
+  quoteIntro: string;
+  labor: string;
+  shipping: string;
+  other: string;
+  list: string;
+  discountLine: (pct: string) => string;
+  youPay: string;
+  accept: string;
+  accepting: string;
+  accepted: string;
+  approved: string;
+  voided: string;
+  copayPaid: string;
+  changed: string;
+}
+
+const careAr: CareStrings = {
+  title: 'ليفو كير',
+  state: {
+    not_delivered: 'يبدأ عند استلام الطابعة',
+    active: 'ساري',
+    expired: 'انتهى',
+    closed: 'مُغلق — أُعيدت الطابعة',
+    terms_missing: 'الشروط قيد الإعداد — تواصل معنا',
+  },
+  activeUntil: (d) => `ساري حتى ${d}`,
+  expiredOn: (d) => `انتهى في ${d}`,
+  claimsLeft: (n) => `${n} مطالبة متبقية`,
+  benefitLeft: (a) => `خصم متبقٍ ${a}`,
+  noMoneyCap: 'بلا سقف للخصم',
+  discount: (p) => `خصم ${p}% على القطع المشمولة`,
+  laborCovered: 'أجرة العمل مشمولة بالخصم',
+  shippingCovered: 'الشحن مشمول بالخصم',
+  parts: 'القطع المشمولة',
+  exclusions: 'لا يشمل',
+  showTerms: 'الشروط',
+  hideTerms: 'إخفاء الشروط',
+  claimBadge: 'ليفو كير',
+  quoteTitle: 'عرض ليفو كير',
+  quoteIntro: 'هذا ما سيكلفه الإصلاح بعد خصم ليفو كير. وافق عليه ليبدأ الفريق.',
+  labor: 'أجرة العمل',
+  shipping: 'الشحن',
+  other: 'أخرى',
+  list: 'السعر الكامل',
+  discountLine: (p) => `خصم ليفو كير (${p}%)`,
+  youPay: 'تدفع',
+  accept: 'أوافق على العرض',
+  accepting: 'جارٍ الإرسال…',
+  accepted: 'وافقت على العرض — بانتظار اعتماد الفريق.',
+  approved: 'اعتُمد الخصم، والإصلاح جارٍ.',
+  voided: 'أُلغي هذا العرض. سيكتب لك الفريق في المحادثة.',
+  copayPaid: 'استُلم المبلغ. شكراً لك.',
+  changed: 'تغيّر العرض منذ فتحته — هذا هو الجديد. راجعه ثم وافق.',
+};
+
+const careEn: CareStrings = {
+  title: 'Levo Care',
+  state: {
+    not_delivered: 'Starts when the printer is delivered',
+    active: 'Active',
+    expired: 'Ended',
+    closed: 'Closed — the printer was returned',
+    terms_missing: 'Terms being prepared — contact us',
+  },
+  activeUntil: (d) => `Active until ${d}`,
+  expiredOn: (d) => `Ended on ${d}`,
+  claimsLeft: (n) => `${n} claim(s) left`,
+  benefitLeft: (a) => `${a} of discount left`,
+  noMoneyCap: 'No discount cap',
+  discount: (p) => `${p}% off covered parts`,
+  laborCovered: 'Labour is discounted',
+  shippingCovered: 'Shipping is discounted',
+  parts: 'Covered parts',
+  exclusions: 'Not covered',
+  showTerms: 'Terms',
+  hideTerms: 'Hide terms',
+  claimBadge: 'Levo Care',
+  quoteTitle: 'Levo Care quote',
+  quoteIntro: 'This is what the repair costs after your Levo Care discount. Accept it so the team can start.',
+  labor: 'Labour',
+  shipping: 'Shipping',
+  other: 'Other',
+  list: 'Full price',
+  discountLine: (p) => `Levo Care discount (${p}%)`,
+  youPay: 'You pay',
+  accept: 'Accept the quote',
+  accepting: 'Sending…',
+  accepted: 'You accepted the quote — waiting for the team to approve it.',
+  approved: 'The discount is approved and the repair is under way.',
+  voided: 'This quote was cancelled. The team will write to you in the conversation.',
+  copayPaid: 'Payment received. Thank you.',
+  changed: 'The quote changed since you opened it — this is the new one. Review it, then accept.',
+};
+
+const careCkb: CareStrings = {
+  title: 'لیڤۆ کێر',
+  state: {
+    not_delivered: 'لە کاتی گەیاندنی پرینتەرەکەدا دەست پێدەکات',
+    active: 'چالاکە',
+    expired: 'کۆتایی هات',
+    closed: 'داخراوە — پرینتەرەکە گەڕێنرایەوە',
+    terms_missing: 'مەرجەکان ئامادە دەکرێن — پەیوەندیمان پێوە بکە',
+  },
+  activeUntil: (d) => `چالاکە تا ${d}`,
+  expiredOn: (d) => `لە ${d} کۆتایی هات`,
+  claimsLeft: (n) => `${n} داواکاری ماوە`,
+  benefitLeft: (a) => `${a} داشکاندن ماوە`,
+  noMoneyCap: 'داشکاندن سنووری نییە',
+  discount: (p) => `${p}% داشکاندن لەسەر پارچە گیراوەکان`,
+  laborCovered: 'کرێی کار داشکاندنی دەگرێتەوە',
+  shippingCovered: 'ناردن داشکاندنی دەگرێتەوە',
+  parts: 'پارچە گیراوەکان',
+  exclusions: 'ناگرێتەوە',
+  showTerms: 'مەرجەکان',
+  hideTerms: 'شاردنەوەی مەرجەکان',
+  claimBadge: 'لیڤۆ کێر',
+  quoteTitle: 'نرخنامەی لیڤۆ کێر',
+  quoteIntro: 'ئەمە تێچووی چاککردنەوەکەیە دوای داشکاندنی لیڤۆ کێر. ڕازی بە تا تیمەکە دەست پێبکات.',
+  labor: 'کرێی کار',
+  shipping: 'ناردن',
+  other: 'هی تر',
+  list: 'نرخی تەواو',
+  discountLine: (p) => `داشکاندنی لیڤۆ کێر (${p}%)`,
+  youPay: 'تۆ دەیدەیت',
+  accept: 'ڕازیم بە نرخنامەکە',
+  accepting: 'دەنێردرێت…',
+  accepted: 'ڕازی بوویت بە نرخنامەکە — چاوەڕێی پەسەندکردنی تیمەکەیە.',
+  approved: 'داشکاندنەکە پەسەند کرا و چاککردنەوەکە بەڕێوەیە.',
+  voided: 'ئەم نرخنامەیە هەڵوەشێنرایەوە. تیمەکە لە گفتوگۆکەدا بۆت دەنووسێت.',
+  copayPaid: 'پارەکە وەرگیرا. سوپاس.',
+  changed: 'نرخنامەکە لەو کاتەوەی کردتەوە گۆڕاوە — ئەمە نوێیەکەیە. پێیدا بچۆرەوە و پاشان ڕازی بە.',
+};
+
+export const CARE_STRINGS: Record<Language, CareStrings> = { ar: careAr, en: careEn, ckb: careCkb };

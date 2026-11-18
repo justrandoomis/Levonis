@@ -12,6 +12,8 @@ import { CoverageBar } from './CoverageBar';
 import type { Device } from './types';
 import { productName, fmtInt, fmtDate } from './types';
 import type { WarrantyStrings } from './strings';
+import { CARE_STRINGS } from './strings';
+import { CareLine } from './CareLine';
 import { BTN_SECONDARY, CARD, FOCUS, LINK_QUIET } from './ui';
 
 /**
@@ -129,6 +131,9 @@ export function DeviceCard({
       </div>
 
       <CoverageBar warranty={device.warranty} deliveredAt={device.delivered_at} lang={lang} s={s} className="mt-5" />
+
+      {/* Printer phase 3: the device's Levo Care — its window, what is left, and the terms it was bought under. */}
+      {device.care && <CareLine care={device.care} lang={lang} c={CARE_STRINGS[lang]} />}
 
       {/* THE DEVICE'S CUSTODY (owner decision 3) — dates only, never who:
           first delivered, traded in or returned to Levonis, resold. Shown

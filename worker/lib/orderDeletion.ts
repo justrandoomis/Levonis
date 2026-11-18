@@ -124,7 +124,7 @@ const allocationEvidenceTables = ['investor_finance_events','investor_allocation
  * fence the final batch, including when SQLite FK enforcement is unavailable. */
 async function deletionSchema(db: OrderDeletionDb): Promise<DeletionSchema> {
   const names = new Set(['orders','order_item_units','ops_guards','warranty_claims','wallet_transactions','wallet_holds','serial_assignments',
-    'product_file_grants','trade_in_requests','trade_in_stock','trade_in_credit_reissues','finance_posting_errors',...financialTables,...itemEvidenceTables,...allocationEvidenceTables,
+    'product_file_grants','trade_in_requests','trade_in_stock','trade_in_credit_reissues','finance_posting_errors','care_claim_benefits','service_claim_costs',...financialTables,...itemEvidenceTables,...allocationEvidenceTables,
     ...ORDER_HISTORY_TABLES,...ORDER_OWNED_TABLES.map(t=>t.table)]);
   const columns = new Map<string, Set<string>>();
   for (const name of names) columns.set(name, await columnsOf(db, name));
@@ -153,6 +153,13 @@ async function deletionSchema(db: OrderDeletionDb): Promise<DeletionSchema> {
   // 0235: a membership that started with this order (even one the owner later corrected) is account history.
   add('order_membership_purchases','membership_id','ORDER_HAS_FINANCIAL_HISTORY','A membership started with this order must be retained.',
     'SELECT 1 FROM order_membership_purchases WHERE order_id=?1 AND membership_id IS NOT NULL');
+  // 0236 (printer services phase 3): a Care benefit sold by this order's line, or a cost recorded on a claim of its
+  // devices, is service history — the claim's money must keep the order it came from.
+  add('care_claim_benefits','order_item_id','ORDER_HAS_SERVICE_CLAIMS','A Levo Care claim or its benefit is linked to this order.',
+    'SELECT 1 FROM care_claim_benefits WHERE order_item_id IN (SELECT id FROM order_items WHERE order_id=?1)');
+  add('service_claim_costs','claim_id','ORDER_HAS_SERVICE_CLAIMS','A warranty or Care claim on the devices of this order recorded a cost.',
+    `SELECT 1 FROM service_claim_costs c JOIN warranty_claims wc ON wc.id=c.claim_id
+      WHERE wc.order_item_id IN (SELECT id FROM order_items WHERE order_id=?1) OR wc.unit_id IN (SELECT id FROM order_item_units WHERE order_id=?1)`);
   add('finance_posting_errors','order_id','ORDER_FINANCIAL_RECONCILIATION_PENDING','A financial posting still requires reconciliation.',
     'SELECT 1 FROM finance_posting_errors WHERE order_id=?1');
   add('order_payment_settlements','order_id','ORDER_HAS_FINANCIAL_HISTORY','A recorded payment settlement must be retained.',

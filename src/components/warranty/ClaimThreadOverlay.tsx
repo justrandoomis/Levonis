@@ -10,6 +10,8 @@ import { ClaimProgress, PriorityBadge } from './ClaimCard';
 import type { ClaimDetail, ClaimMessage } from './types';
 import { claimOpen, filedCoverLine, fmtDate, fmtDateTime, isVideoUrl } from './types';
 import type { WarrantyStrings } from './strings';
+import { CARE_STRINGS } from './strings';
+import { CareQuoteBox } from './CareQuoteBox';
 import { ERROR_BOX, FOCUS } from './ui';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
@@ -262,6 +264,10 @@ export function ClaimThreadOverlay({
               <p className="text-text-secondary text-[12px]">
                 <span className="text-text-secondary font-bold">{s.adminNote}:</span> {detail.claim.admin_note}
               </p>
+            )}
+            {/* Printer phase 3: a Levo Care quote waits for the claimant's «أوافق» (never a cost of the shop). */}
+            {detail.care?.quote && claimId && (
+              <CareQuoteBox claimId={claimId} quote={detail.care.quote} lang={lang} c={CARE_STRINGS[lang]} onChanged={() => refresh().catch(() => undefined)} />
             )}
             {detail.messages.map((msg) => (
               <div

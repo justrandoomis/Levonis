@@ -43,7 +43,17 @@ const ACTS: MoneyAct[] = [
   'gift_grant',
   'review_reward',
   'member_price_rules',
+  'care_claim_decision',
+  'service_claim_cost',
 ];
+
+test('Levo Care decisions and claim costs are a financial admin’s, not the owner’s alone (phase 3, owner ruling D3)', () => {
+  for (const act of ['care_claim_decision', 'service_claim_cost'] as const) {
+    assert.ok(!OWNER_ONLY_ACTS.has(act), act);
+    assert.equal(moneyAuthority(env, FULL as never, { act }).tier, 'financial', act);
+    assert.throws(() => moneyAuthority(env, ASSISTANT as never, { act }), (e: unknown) => (e as { code?: string }).code === 'FINANCIAL_SCOPE_REQUIRED');
+  }
+});
 
 function refusal(fn: () => unknown): { status: number; code: string | undefined; message: string } {
   try {

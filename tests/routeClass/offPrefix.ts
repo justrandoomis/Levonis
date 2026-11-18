@@ -209,6 +209,22 @@ export default {
           cls: 'op',
           why: 'receiving, diagnosing, repairing and closing are any admin’s; a DECISION (approved, rejected, replaced, or a changed decision) needs the financial scope, judged in the handler once the claim is read (owner decision 3)',
         },
+        // Printer services phase 3 (DECISIONS row 347): Levo Care on the claims desk and a claim's money.
+        'POST /claims/:id/care-quote/accept': 'open',
+        'GET /admin/claims/:id/care': {
+          cls: 'op',
+          why: 'the Care panel any admin works from; what the claim cost is a financial admin’s to read (costs null for an assistant)',
+        },
+        'POST /admin/claims/:id/care-quote': {
+          cls: 'op',
+          why: 'writing the quote moves no money: the customer accepts it and a financial admin approves it (care-approve)',
+        },
+        // Owner ruling D3 (2026-11-18): Care decisions and claim costs are the finance scope's, not the owner's alone.
+        'POST /admin/claims/:id/care-approve': 'money',
+        'POST /admin/claims/:id/care-void': 'money',
+        'POST /admin/claims/:id/care-copay': 'money',
+        'POST /admin/claims/:id/costs': 'money',
+        'POST /admin/claims/:id/costs/:costId/void': 'money',
         'POST /admin/products/:id/ops-policy': 'op',
       },
     },

@@ -118,9 +118,9 @@ import { canonicalSerial, judgeFormat, maskedDetail, refuse as serialRefuse, ser
 import { formatAudit, ruleForUnit } from '../lib/serialRules';
 import { lineDevicePolicy, serializationContext, serializedWriteVerdict } from '../lib/serialPolicy';
 import { auditStatements } from '../lib/audit';
-import { isOwner } from '../lib/adminScope';
+import { canViewCost, isOwner } from '../lib/adminScope';
 import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
-import { fence, requireSerialWrite } from '../lib/operations';
+import { fence, isFenceMiss, requireSerialWrite } from '../lib/operations';
 import { custodyHistory, originStartFrom, tradedInSql, unitCoverage, unitIdentity, type CustodyStep } from '../lib/deviceCustody';
 import { inShopSql } from '../lib/services/myDevices';
 import { tradeInV2Installed } from '../lib/tradeInSchema';
@@ -129,6 +129,8 @@ import { serialInventoryRoutes } from './serialInventory';
 import { catalogIndexFor } from '../lib/catalogPresentation';
 import { MAINTENANCE_ROOT_ID, maintenanceFor } from '../lib/printerFits';
 import { warranty as WARRANTY_POLICY } from '../lib/policies/warranty';
+import { careBenefitOf, careClaimsInstalled, careEntitlements, carePublic, careQuotePublic, careRefusal, claimMoneySummaries } from '../lib/careClaims';
+import { careApprovalPending, careVoidOnReject, mountDeviceCareRoutes } from './deviceCare';
 
 export const deviceRoutes = new Hono<AppContext>();
 deviceRoutes.use('*', requireAuth);
@@ -525,6 +527,8 @@ interface ClaimRow extends Record<string, unknown> {
   filed_cover_via?: string | null;
   filed_cover_end_at?: string | null;
   filed_policy_version?: string | null;
+  /** 0236: 'warranty' | 'care' (NULL = filed before phase 3). Absent before 0236. */
+  claim_kind?: string | null;
 }
 
 /**
@@ -584,6 +588,8 @@ function claimPublic(row: ClaimRow, opts: { admin?: boolean } = {}) {
     // thread takes no more messages (W-4).
     open: claimIsOpen(row.stage, row.status),
     legacy_status: row.status,
+    // Phase 3 (0236): 'warranty' or 'care'; a claim filed before it (or a database without it) reads 'warranty'.
+    claim_kind: row.claim_kind === 'care' ? 'care' : 'warranty',
     decision: row.decision ?? null,
     decision_reason: row.decision_reason ?? '',
     admin_note: row.admin_note ?? '',
@@ -648,6 +654,11 @@ deviceRoutes.get('/mine', async (c) => {
     results.map((r) => String(r.product_id ?? '')).filter(Boolean)
   );
   const idx = maintenance.size ? await catalogIndexFor(c.env.DB).catch(() => null) : null;
+  // Phase 3 (DECISIONS row 347): each device's Levo Care — its window, what is left, the terms bought.
+  // null on a device without Care, and on every device of a database without 0236.
+  // A device the user transferred away (still linked, owned by someone else) shows no Care: Care is the holder's.
+  const held = results.filter((r) => r.owner_user_id === user.id);
+  const care = held.length && (await careClaimsInstalled(c.env.DB)) ? await careEntitlements(c.env.DB, held.map((r) => r.id)) : new Map();
   return c.json({
     success: true,
     devices: results.map((r) => {
@@ -656,6 +667,7 @@ deviceRoutes.get('/mine', async (c) => {
         ...devicePublic(r, { viewerId: user.id, history: histories.get(r.id) }),
         transferred: r.owner_user_id !== user.id,
         maintenance: m ? { printer_slug: m.slug, count: m.count } : null,
+        care: r.owner_user_id === user.id ? carePublic(care.get(r.id)) : null,
       };
     }),
     maintenance_path: idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null,
@@ -896,6 +908,18 @@ deviceRoutes.get('/claims/:id', async (c) => {
   ]);
   // Covered while the original warranty OR a used-sale cover is in force (policy v4).
   const cov = unit ? unitCoverage(unit) : null;
+  // Phase 3: the device's Levo Care on the day the claim was filed, and the claim's Care quote
+  // (never what the claim cost the shop). null on a database without 0236.
+  let careBlock: { entitlement: ReturnType<typeof carePublic>; quote: ReturnType<typeof careQuotePublic> } | null = null;
+  if (claim.unit_id && (await careClaimsInstalled(c.env.DB))) {
+    const filedAt = Date.parse(claim.created_at);
+    const [ents, benefit] = await Promise.all([
+      careEntitlements(c.env.DB, [claim.unit_id], Number.isFinite(filedAt) ? filedAt : Date.now()),
+      careBenefitOf(c.env.DB, claim.id),
+    ]);
+    const ent = ents.get(claim.unit_id);
+    careBlock = { entitlement: carePublic(ent), quote: careQuotePublic(benefit, ent?.terms ?? null) };
+  }
   /**
    * THE CLAIMANT HAS NOW SEEN THE THREAD — the read marker behind «رد جديد من
    * الفريق» on the claim card (0111). Only the claimant: an admin opening a
@@ -932,6 +956,7 @@ deviceRoutes.get('/claims/:id', async (c) => {
           cover_end_at: cov!.end_at,
         }
       : null,
+    care: careBlock,
     messages: messages.map((m) => ({
       id: m.id,
       is_staff: !!m.is_staff,
@@ -2320,13 +2345,20 @@ deviceRoutes.get('/admin/claims', async (c) => {
   const maintenance = await maintenanceFor(c.env.DB, [...new Set(unitProduct.values())]);
   const idx = maintenance.size ? await catalogIndexFor(c.env.DB).catch(() => null) : null;
   const maintenancePath = idx?.byId.has(MAINTENANCE_ROOT_ID) ? `${idx.path(MAINTENANCE_ROOT_ID)}/all` : null;
+  // Phase 3: each claim's Care benefit and what it cost (one statement; empty without 0236). The cost
+  // total is a general expense, so cost (owner decision 2): only a cost reader sees it (others read null).
+  const money = await claimMoneySummaries(c.env.DB, rows.map((r) => r.id));
+  const seesMoney = canViewCost(c.env, c.get('user'));
   return c.json({
     success: true,
     claims: rows.map((r) => {
       const m = r.unit_id ? maintenance.get(unitProduct.get(String(r.unit_id)) ?? '') : undefined;
+      const sum = money.get(r.id);
       return {
         ...claimPublic(r, { admin: true }),
         maintenance: m ? { printer_slug: m.slug, count: m.count, path: maintenancePath } : null,
+        care_benefit: sum?.benefit ?? null,
+        costs_total_iqd: seesMoney && sum ? sum.costs_total_iqd : null,
       };
     }),
     page,
@@ -2399,6 +2431,16 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
   }
   const decision: string | null = sent ?? (stored && allowed.includes(stored) ? stored : (DEFAULT_DECISION_AT[nextStage] ?? null));
 
+  // Phase 3 (DECISIONS row 347): a claim with a LIVE Care quote is accepted by approving that quote (POST
+  // /admin/claims/:id/care-approve — a financial admin's, caps re-checked), never by moving the stage. A voided
+  // Care leaves an ordinary warranty claim, decided here as any other.
+  if (nextStage === 'approved' && current !== 'approved' && (await careApprovalPending(c.env.DB, id))) {
+    throw careRefusal('CARE_APPROVAL_REQUIRED');
+  }
+  // A rejected claim keeps no Care: its live benefit is voided in the same batch as the move (never once the
+  // co-pay was collected — CARE_REJECT_COPAY_COLLECTED). [] without 0236 or without a live benefit.
+  const careVoid = nextStage === 'rejected' ? await careVoidOnReject(c.env.DB, id, admin.id, reason || claim.decision_reason || 'rejected') : [];
+
   // G-4: «REPLACED» NEEDS THE REPLACEMENT. The customer is told the device was
   // replaced, so the unit must carry the replacement the owner recorded
   // (POST /admin/units/:unitId/replace) — asked here for the honest refusal,
@@ -2431,7 +2473,7 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
       : null;
   let res: { meta: { changes?: number } };
   try {
-    res = await c.env.DB.prepare(
+    const move = c.env.DB.prepare(
       `UPDATE warranty_claims
           SET stage = ?, status = ?, decision = ?, decision_reason = ?, assigned_staff = ?, admin_note = ?
         WHERE id = ? AND COALESCE(stage, '') = COALESCE(?, '')
@@ -2449,9 +2491,11 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
         claim.stage,
         toReplaced ? 1 : 0,
         reopening ? 1 : 0
-      )
-      .run();
+      );
+    res = careVoid.length ? ((await c.env.DB.batch([move, ...careVoid]))[0] as { meta: { changes?: number } }) : await move.run();
   } catch (e) {
+    // The co-pay was collected between the read and this batch: the claim stays where it was.
+    if (careVoid.length && isFenceMiss(e)) throw careRefusal('CARE_REJECT_COPAY_COLLECTED');
     if (!/CLAIM_ALREADY_OPEN/.test(e instanceof Error ? e.message : String(e))) throw e;
     res = { meta: { changes: 0 } };
   }
@@ -2487,6 +2531,9 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
   }
   return c.json({ success: true, stage: nextStage });
 });
+
+// ------------------------------------------------- Levo Care and the claim's money (phase 3)
+mountDeviceCareRoutes(deviceRoutes);
 
 // ------------------------------------------------- explicit serialization config
 

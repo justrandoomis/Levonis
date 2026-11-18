@@ -3,6 +3,7 @@ import type { Context } from 'hono';
 import type { AppContext, Env } from '../lib/types';
 import { requireAdmin, badRequest, conflict, notFound, str, int } from '../lib/http';
 import { COURIER_HELD_EXPENSE, courierHeldExpense } from '../lib/courierCollections';
+import { careRefusal, claimHeldExpense } from '../lib/careClaims';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { requireCostRead } from '../lib/costAccess';
@@ -110,7 +111,7 @@ const nowIso = () => new Date().toISOString();
  * INSERT is a write (`scripts/check-migrations-additive.mjs` classifies it as
  * non-additive), and re-applying the migration would resurrect a category the
  * owner had deliberately removed. System categories for monthly promotion and
- * payroll can already exist before the owner's first visit. They do not count
+ * payroll, and the warranty / Levo Care claim costs (0236), can already exist before the owner's first visit. They do not count
  * as an initialized owner list. Once seeded, the audit marker also prevents a
  * later removal of all ordinary categories from resurrecting those defaults.
  *
@@ -119,7 +120,7 @@ const nowIso = () => new Date().toISOString();
  */
 async function ensureDefaultCategories(c: Context<AppContext>): Promise<void> {
   const existing = await c.env.DB.prepare(
-    "SELECT COUNT(*) AS n FROM expense_categories WHERE id NOT IN ('exp_owner_marketing','finance_staff_wages')"
+    "SELECT COUNT(*) AS n FROM expense_categories WHERE id NOT IN ('exp_owner_marketing','finance_staff_wages','exp_warranty_claims','exp_care_claims')"
   ).first<{ n: number }>();
   if ((existing?.n ?? 0) > 0) return;
   if (await c.env.DB.prepare("SELECT 1 FROM audit_log WHERE action='finance.expense_category.seed' AND target='expense_categories' LIMIT 1").first()) return;
@@ -472,6 +473,7 @@ adminFinanceRoutes.patch('/expenses/:id', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM operating_expenses WHERE id = ?').bind(id).first<ExpenseRow>();
   if (!row) throw notFound('Expense not found');
   if (await courierHeldExpense(c.env.DB, id)) throw conflict(COURIER_HELD_EXPENSE, 'COURIER_FEE_EXPENSE');
+  if (await claimHeldExpense(c.env.DB, id)) throw careRefusal('CLAIM_HELD_EXPENSE');
   if (row.voided_at) throw badRequest('This expense is voided — restore it before editing', 'EXPENSE_VOIDED');
   const body = await c.req.json().catch(() => ({}));
 
@@ -526,6 +528,7 @@ adminFinanceRoutes.delete('/expenses/:id', async (c) => {
   const row = await c.env.DB.prepare('SELECT * FROM operating_expenses WHERE id = ?').bind(id).first<ExpenseRow>();
   if (!row) throw notFound('Expense not found');
   if (await courierHeldExpense(c.env.DB, id)) throw conflict(COURIER_HELD_EXPENSE, 'COURIER_FEE_EXPENSE');
+  if (await claimHeldExpense(c.env.DB, id)) throw careRefusal('CLAIM_HELD_EXPENSE');
   const reason = str(c.req.query('reason') ?? '', 'reason', { min: 0, max: 300 });
   const ts = nowIso();
   if(row.voided_at)return c.json({success:true,voided:false});
@@ -570,6 +573,7 @@ adminFinanceRoutes.post('/expenses/:id/restore', async (c) => {
   if(!row.voided_at)return c.json({success:true,restored:false});
   // An undone courier transfer's fee stays voided: restored, it would count again once the parcels are recorded anew.
   if (await courierHeldExpense(c.env.DB, id)) throw conflict(COURIER_HELD_EXPENSE, 'COURIER_FEE_EXPENSE');
+  if (await claimHeldExpense(c.env.DB, id)) throw careRefusal('CLAIM_HELD_EXPENSE');
   await periodOpen(c.env.DB, row.expense_day);
   const change=c.env.DB.prepare(
     `UPDATE operating_expenses SET voided_at = NULL, voided_by = NULL, void_reason = '', updated_at = ?

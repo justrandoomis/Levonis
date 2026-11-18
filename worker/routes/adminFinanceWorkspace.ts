@@ -28,6 +28,7 @@ import { staffPaymentStatement, staffStatementHtml, staffStatementSheet, withdra
 import { asDocument } from '../lib/securityPolicy';
 import { courierInstalled, courierOverview, courierRemittance, MAX_REMITTANCE_PARCELS, reconcileRemittance, recordRemittance, undoRemittance } from '../lib/courierCollections';
 import { CLOSED_MONTHS_SQL, EXPENSE_ROW_LIMIT, EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_LIMIT, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
+import { printerBreakdown, serviceClaimsSummary, serviceIncomeDays } from '../lib/printerFinance';
 
 type Row=Record<string,unknown>;
 const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
@@ -173,13 +174,16 @@ async function postingErrorOrders(db:D1Database,bases:OrderProfitBase[]):Promise
   return new Set((rows.results??[]).map((r)=>s(r.order_id)));
 }
 /** The period's figures over the orders whose every amount is known (none: null), and what the rest lack. */
-function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean,postingErrors:ReadonlySet<string>=new Set()){
+function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:number,truncated:boolean,postingErrors:ReadonlySet<string>=new Set(),service=0){
   const {complete,share}=completeOrders(bases);
-  const overhead={general:Math.round(general*share),unallocated:Math.round(unallocated*share)};
+  // Printer phase 3: the period's service income (Levo Care co-pays, account 4300) is shared like the overheads, the other way
+  // round — it comes ON the net — so «محسوبة» + «تنتظر» still make the period on every line of the statement.
+  const overhead={general:Math.round(general*share),unallocated:Math.round(unallocated*share),service:Math.round(service*share)};
   const known=sumRows(complete.map((b)=>b.totals));known.orders_count=complete.length;
-  const amounts=chartAmounts(known,overhead.general,overhead.unallocated,truncated);
+  const charted=chartAmounts(known,overhead.general,overhead.unallocated,truncated);
+  const amounts={...charted,owner_net_iqd:charted.owner_net_iqd===null?null:charted.owner_net_iqd+overhead.service};
   const confirmed=complete.filter(restsOnConfirmedCosts),estimated=complete.filter((b)=>!restsOnConfirmedCosts(b));
-  const overheadTotal=overhead.general+overhead.unallocated,confirmedOverhead=confirmedOverheadOf(complete,overheadTotal);
+  const overheadTotal=overhead.general+overhead.unallocated-overhead.service,confirmedOverhead=confirmedOverheadOf(complete,overheadTotal);
   const part=(rows:OrderProfitBase[],share:number)=>{const t=sumRows(rows.map((b)=>b.totals));
     return {orders_count:rows.length,revenue_iqd:rows.reduce((v,b)=>v+orderRevenue(b),0),
       owner_net_iqd:t.owner_net_iqd===null||truncated?null:n(t.owner_net_iqd)-share,
@@ -194,9 +198,9 @@ function knownAndMissing(bases:OrderProfitBase[],general:number,unallocated:numb
   return {
     known:complete.length?{orders_count:complete.length,incomplete_orders:bases.length-complete.length,revenue_iqd:amounts.revenue_iqd,cost_iqd:amounts.cost_iqd,owner_net_iqd:amounts.owner_net_iqd,
       net_after_report_adjustments_iqd:known.net_after_report_adjustments_iqd===null||truncated?null:n(known.net_after_report_adjustments_iqd)-overheadTotal,
-      overhead_share_iqd:overheadTotal,general_share_iqd:overhead.general,unallocated_share_iqd:overhead.unallocated,
+      overhead_share_iqd:overheadTotal,general_share_iqd:overhead.general,unallocated_share_iqd:overhead.unallocated,service_share_iqd:overhead.service,
       totals:known,confirmed:part(confirmed,confirmedOverhead),estimated:part(estimated,overheadTotal-confirmedOverhead)}:null,
-    waiting:incomplete.length?{orders_count:incomplete.length,totals:sumRows(incomplete.map((b)=>b.totals)),reasons,general_share_iqd:general-overhead.general,unallocated_share_iqd:unallocated-overhead.unallocated}:null,
+    waiting:incomplete.length?{orders_count:incomplete.length,totals:sumRows(incomplete.map((b)=>b.totals)),reasons,general_share_iqd:general-overhead.general,unallocated_share_iqd:unallocated-overhead.unallocated,service_share_iqd:service-overhead.service}:null,
     missing_costs:{lines:lines.length,orders:new Set(lines.map((l)=>l.order_id)).size,unknown_lines:unknown.length,estimated_lines:lines.length-unknown.length,
       unknown_products:[...products.values()].sort((a,b)=>b.qty-a.qty)},
   };
@@ -459,25 +463,28 @@ function groupedCents(lines:ProfitLine[],kind:'product'|'main'|'sub',cents:Reado
   for(const l of lines){const key=groupKey(l,kind),rows=groups.get(key)??[];rows.push(cents.get(l.id)??{});groups.set(key,rows);}
   return Object.fromEntries([...groups].map(([id,rows])=>[id,sumCents(rows)]));
 }
-async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocatedDays:Map<string,number>,truncated:boolean,pendingCosts:boolean,done=completeOrders(bases)){
-  const expenseStarts=expenses.map((e)=>baghdadDayStart(s(e.expense_day))),monthStarts=[...unallocatedDays.keys()].map((d)=>baghdadDayStart(d));
+async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocatedDays:Map<string,number>,truncated:boolean,pendingCosts:boolean,done=completeOrders(bases),serviceIncome=0){
+  // Printer phase 3: the co-pays collected (service income), each at its own day's rate like the general expenses.
+  const serviceDays=serviceIncome?await serviceIncomeDays(db,r):new Map<string,number>();
+  const expenseStarts=expenses.map((e)=>baghdadDayStart(s(e.expense_day))),monthStarts=[...unallocatedDays.keys(),...serviceDays.keys()].map((d)=>baghdadDayStart(d));
   const steps=await usdSteps(db,[...bases.map((b)=>instantOf(b.order.created_at)),...expenseStarts,...monthStarts]);
   const orders=ordersInUsd(bases,steps,await lotRatesOf(db,bases));if(!orders||(!steps?.today&&!steps?.steps.length))return unavailableUsd();
   let approximate=[...orders.values()].some((o)=>o.usd_basis==='today');
   const atDay=(day:string,iqd:number)=>{const hit=usdRateAt(steps,baghdadDayStart(day));if(!hit)return null;if(hit.basis==='today')approximate=true;return iqdToCents(iqd,hit.rate);};
   const generalByDay=new Map<string,number>();for(const e of expenses){const c=atDay(s(e.expense_day),n(e.total));if(c===null)return unavailableUsd();generalByDay.set(s(e.expense_day),c);}
   const unallocatedByDay=new Map<string,number>();for(const [day,amount] of unallocatedDays){const c=atDay(day,amount);if(c===null)return unavailableUsd();unallocatedByDay.set(day,c);}
+  let service=0;for(const [day,amount] of serviceDays){const c=atDay(day,amount);if(c===null)return unavailableUsd();service+=c;}
   const general=[...generalByDay.values()].reduce((v,x)=>v+x,0),unallocated=[...unallocatedByDay.values()].reduce((v,x)=>v+x,0);
   // The sum of no order is 0 in dollars as in dinars (sumRows): a period, or a day, without a delivered order
   // owes only its overheads — never a missing headline, cost tile or chart day beside the dinar figure.
   const sum=(rows:Cents[])=>rows.length?sumCents(rows):centsOf(sumRows([]),'1');
   const totals=sum([...orders.values()].map((o)=>o.cents));
   const ownerNet=totals.owner_net_cents??null;
-  const periodNet=ownerNet===null||truncated?null:ownerNet-general-unallocated;
+  const periodNet=ownerNet===null||truncated?null:ownerNet-general-unallocated+service;
   // As in dinars: the orders after their own deductions (a returned trade-in credit included), minus the period's overheads.
   const afterDeductions=totals.net_after_report_adjustments_cents;
-  Object.assign(totals,{general_expenses_cents:general,unallocated_promotion_cents:unallocated,owner_period_net_cents:periodNet,
-    owner_period_net_after_report_adjustments_cents:periodNet===null||afterDeductions===null||afterDeductions===undefined?null:afterDeductions-general-unallocated});
+  Object.assign(totals,{general_expenses_cents:general,unallocated_promotion_cents:unallocated,service_income_cents:service,owner_period_net_cents:periodNet,
+    owner_period_net_after_report_adjustments_cents:periodNet===null||afterDeductions===null||afterDeductions===undefined?null:afterDeductions-general-unallocated+service});
   const byDay=new Map<string,Cents[]>();for(const b of bases){const day=deliveredDay(b),rows=byDay.get(day)??[];rows.push(orders.get(b.order_id)!.cents);byDay.set(day,rows);}
   const daily:Record<string,ReturnType<typeof chartCents>>={};
   for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10);
@@ -494,7 +501,8 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
     levelRows.push({...rest,net_after_report_adjustments_cents:o.cents.net_after_report_adjustments_cents==null?null:-Object.values(rest).reduce((v,x)=>v+x,0)});}
   // `known` (the complete orders, with their share of the period's overhead) in cents, as /summary's IQD `known`,
   // with its confirmed and estimated parts, so the overview names them in dollars beside a dollar headline.
-  const knownCents=done.complete.length?sumCents(done.complete.map((b)=>orders.get(b.order_id)!.cents)):null,knownOverhead=Math.round(general*done.share)+Math.round(unallocated*done.share);
+  const knownService=Math.round(service*done.share);
+  const knownCents=done.complete.length?sumCents(done.complete.map((b)=>orders.get(b.order_id)!.cents)):null,knownOverhead=Math.round(general*done.share)+Math.round(unallocated*done.share)-knownService;
   const partCents=(rows:OrderProfitBase[],overhead:number)=>{const t=sum(rows.map((b)=>orders.get(b.order_id)!.cents));
     return {orders_count:rows.length,owner_net_cents:truncated||t.owner_net_cents==null?null:t.owner_net_cents-overhead,
       net_after_report_adjustments_cents:truncated||t.net_after_report_adjustments_cents==null?null:t.net_after_report_adjustments_cents-overhead};};
@@ -502,14 +510,15 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   const knownGeneral=Math.round(general*done.share),knownUnallocated=Math.round(unallocated*done.share);
   // The statement's «محسوبة» and «تنتظر» columns in cents (redesign step 3): each the sum of its orders' cents, with
   // the overheads split as above, so in dollars too the two columns add up to the period's.
-  const known=knownCents?{...chartCents(knownCents,knownGeneral,knownUnallocated,truncated),
+  const knownChart=knownCents?chartCents(knownCents,knownGeneral,knownUnallocated,truncated):null;
+  const known=knownCents&&knownChart?{...knownChart,owner_net_cents:knownChart.owner_net_cents===null?null:knownChart.owner_net_cents+knownService,
     net_after_report_adjustments_cents:truncated||knownCents.net_after_report_adjustments_cents==null?null:knownCents.net_after_report_adjustments_cents-knownOverhead,
     confirmed:partCents(done.complete.filter(restsOnConfirmedCosts),confirmedOverhead),
     estimated:partCents(done.complete.filter((b)=>!restsOnConfirmedCosts(b)),knownOverhead-confirmedOverhead),
-    totals:knownCents,general_share_cents:knownGeneral,unallocated_share_cents:knownUnallocated}:null;
+    totals:knownCents,general_share_cents:knownGeneral,unallocated_share_cents:knownUnallocated,service_share_cents:knownService}:null;
   const incomplete=bases.filter((b)=>!done.complete.includes(b));
   const waitingCents=incomplete.length?{orders_count:incomplete.length,totals:sum(incomplete.map((b)=>orders.get(b.order_id)!.cents)),
-    general_share_cents:general-knownGeneral,unallocated_share_cents:unallocated-knownUnallocated}:null;
+    general_share_cents:general-knownGeneral,unallocated_share_cents:unallocated-knownUnallocated,service_share_cents:service-knownService}:null;
   return {available:true as const,today_rate:steps?.today??null,...basisCounts(orders),approximate,known,waiting:waitingCents,
     orders:orderBlock(orders),kinds,products:groupedCents(lines,'product',lineCents),
     categories:{main:groupedCents(lines,'main',lineCents),sub:groupedCents(lines,'sub',lineCents)},order_level:levelRows.length?sumCents(levelRows):null,
@@ -561,26 +570,32 @@ async function periodFigures(db:D1Database,r:{from:string;to:string}){
   let unallocated=0;const unallocatedDays=new Map<string,number>();
   for(const month of new Set((promotions.results??[]).map((p)=>s(p.month))))if(`${month}-01`>=r.from&&`${month}-01`<=r.to){const amount=(await monthlyPromotionShares(db,month)).unallocated_iqd;unallocated+=amount;unallocatedDays.set(`${month}-01`,amount);}
   totals.unallocated_promotion_iqd=unallocated;
-  totals.owner_period_net_iqd=totals.owner_net_iqd===null||truncated?null:n(totals.owner_net_iqd)-n(totals.general_expenses_iqd)-unallocated;
+  // Printer services phase 3 (DECISIONS row 347): the claims' money. Their costs are already general expenses of their
+  // cost day (shown as a line, never subtracted twice); the Care co-pay collected is service income (owner ruling D2),
+  // added to the period's net. null / 0 on a database without 0236.
+  const serviceClaims=await serviceClaimsSummary(db,r);
+  const serviceIncome=serviceClaims?.copay_iqd??0;totals.service_income_iqd=serviceIncome;
+  totals.owner_period_net_iqd=totals.owner_net_iqd===null||truncated?null:n(totals.owner_net_iqd)-n(totals.general_expenses_iqd)-unallocated+serviceIncome;
   // F4/F5 at the period level: «الصافي بعد خصومات التقرير» — the orders after their own
   // deductions (coupon, credited price protection AND a returned trade-in credit, as each
   // order and product already counts it), minus the period's overheads (DECISIONS row 313).
-  totals.owner_period_net_after_report_adjustments_iqd=totals.owner_period_net_iqd===null||totals.net_after_report_adjustments_iqd===null?null:n(totals.net_after_report_adjustments_iqd)-n(totals.general_expenses_iqd)-unallocated;
+  totals.owner_period_net_after_report_adjustments_iqd=totals.owner_period_net_iqd===null||totals.net_after_report_adjustments_iqd===null?null:n(totals.net_after_report_adjustments_iqd)-n(totals.general_expenses_iqd)-unallocated+serviceIncome;
   if(truncated)totals.owner_net_iqd=null;
   const exceptions:Row[]=[...(failures.results??[]).map((e)=>({...e,type:'posting_failed'}))];
   for(const b of bases)for(const warning of b.warnings)exceptions.push({id:`${b.order_id}:${warning}`,order_id:b.order_id,type:warning.split(':')[0],message:warning.startsWith('cost:')?'تكلفة البضاعة تحتاج تثبيت FIFO أو تحققًا ماليًا خاصًا':warning==='investor:pending'?'توزيع المستثمر ينتظر التسوية':'يوجد بند مالي يحتاج مراجعة'});
   for(const b of bases)if(n(b.totals.pending_costs)>0)exceptions.push({id:`${b.order_id}:pending_cost`,order_id:b.order_id,type:'pending_cost',message:'الأجور أو المواد تنتظر تثبيت التكلفة'});
   const lines=bases.flatMap((b)=>b.lines);
   const categories=await withSectionNames(db,[...grouped(lines,'main',postingErrors),...grouped(lines,'sub',postingErrors)]);
-  const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated,postingErrors),orders:bases.map((b)=>orderRow(b,postingErrors)),kinds:byKind(bases),products:grouped(lines,'product',postingErrors),categories,
-    order_level:orderLevelOf(bases),chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sales_value'};
+  const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated,postingErrors,serviceIncome),orders:bases.map((b)=>orderRow(b,postingErrors)),kinds:byKind(bases),products:grouped(lines,'product',postingErrors),categories,
+    order_level:orderLevelOf(bases),chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sales_value',
+    printer_breakdown:printerBreakdown(bases),service_claims:serviceClaims,service_income_iqd:serviceIncome};
   return {answer,bases,truncated,expenseDays,unallocatedDays,totals};
 }
 adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
   const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to')),display=displayOf(c.req.query('display'));
   const {answer,bases,truncated,expenseDays,unallocatedDays,totals}=await periodFigures(db,r);
   if(display==='IQD')return c.json(answer);
-  return c.json({...answer,display_usd:await summaryInUsd(db,bases,r,expenseDays,unallocatedDays,truncated,n(totals.pending_costs)>0)});
+  return c.json({...answer,display_usd:await summaryInUsd(db,bases,r,expenseDays,unallocatedDays,truncated,n(totals.pending_costs)>0,undefined,n(totals.service_income_iqd))});
 });
 adminFinanceWorkspaceRoutes.get('/missing-costs',async(c)=>{
   const db=c.env.DB,r=range(c.req.query('from'),c.req.query('to'));
@@ -611,6 +626,8 @@ async function detail(db:D1Database,id:string,canVerify=true){
   if(base.order.status==='cancelled'&&base.order.delivered_at)Object.assign(reverseLikeAReturn(base),{sale_reversal:await saleReversalOf(db,base.order_id)});
   await enrichOrderCostProjections(db,[base],true);
   await enrichOrderProfitReview(db,base,canVerify);
+  // Printer services phase 3: this order's printer / services / kits / membership split (report-only).
+  (base as unknown as Row).printer_breakdown=printerBreakdown([base]);
   const history=await db.prepare('SELECT a.id,a.order_item_id line_id,a.field,a.old_value_iqd,a.new_value_iqd,a.version,a.actor_id,u.name actor_name,a.created_at,a.reason,a.journal_id FROM finance_order_adjustments a LEFT JOIN users u ON u.id=a.actor_id WHERE a.order_id=? ORDER BY a.version DESC LIMIT 200').bind(id).all<Row>();
   const wages=await db.prepare("SELECT a.id,c.order_item_id line_id,'amount_iqd' field,a.before_iqd old_value_iqd,a.after_iqd new_value_iqd,a.actor_id,u.name actor_name,a.created_at,a.kind,0 version FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id LEFT JOIN users u ON u.id=a.actor_id WHERE c.order_id=? ORDER BY a.created_at DESC LIMIT 200").bind(id).all<Row>();
   return {...base,history:[...(history.results??[]),...(wages.results??[])].sort((a,b)=>s(b.created_at).localeCompare(s(a.created_at))).slice(0,200)};
@@ -1143,11 +1160,12 @@ async function exportOrderRows(db:D1Database,r:{from:string;to:string},f:ExportF
   // The column's share of the overheads, as the statement and the drawer carry it: rent and the like, and a month's promotion with
   // no sales — the period's own for `part=period`. A file filtered by anything else is that page's rows, with no share.
   const totals=answer.totals as Row;
-  const share=filtered||!f.part?null:f.part==='calculated'?answer.known:f.part==='waiting'?answer.waiting:{general_share_iqd:n(totals.general_expenses_iqd),unallocated_share_iqd:n(totals.unallocated_promotion_iqd)};
-  const general=n(share?.general_share_iqd),unallocated=n(share?.unallocated_share_iqd);
+  const share=filtered||!f.part?null:f.part==='calculated'?answer.known:f.part==='waiting'?answer.waiting:{general_share_iqd:n(totals.general_expenses_iqd),unallocated_share_iqd:n(totals.unallocated_promotion_iqd),service_share_iqd:n(totals.service_income_iqd)};
+  // Printer phase 3: the column's share of the service income (Levo Care co-pays) comes ON its net, as the statement carries it.
+  const general=n(share?.general_share_iqd),unallocated=n(share?.unallocated_share_iqd),service=n((share as Row|null)?.service_share_iqd);
   // They come off the calculated column's net, and the period's while every order of it is known; the waiting column has none.
-  const net=f.part==='calculated'||(f.part==='period'&&orders.every((o)=>o.net_after_report_adjustments_iqd!=null))?-general-unallocated:null;
-  if(share&&(general||unallocated))orders.push({...Object.fromEntries(ORDER_COLUMNS.map((k)=>[k,0])),order_id:'',delivered_day:'',customer_name:'',order_kind:'',finance_state:'',wait_reason:'',cash_state:'',
+  const net=f.part==='calculated'||(f.part==='period'&&orders.every((o)=>o.net_after_report_adjustments_iqd!=null))?-general-unallocated+service:null;
+  if(share&&(general||unallocated||service))orders.push({...Object.fromEntries(ORDER_COLUMNS.map((k)=>[k,0])),order_id:'',delivered_day:'',customer_name:'',order_kind:'',finance_state:'',wait_reason:'',cash_state:'',
     promotion_iqd:unallocated,general_expenses_iqd:general,owner_net_iqd:net,net_after_report_adjustments_iqd:net,row_kind:'overhead'});
   return {orders,bases,filtered};
 }

@@ -11,9 +11,12 @@ import { Overlay } from './ui/Overlay';
 import { dateLocale } from './orders/format';
 import UnitHistory from './adminWarranty/UnitHistory';
 import { isVideoUrl } from './warranty/types';
+import { formatMoney } from '../lib/money';
 
 // The §16 serial / warranty page (serial scan, 0178), opened from a unit's serial.
 const SerialDetail = React.lazy(() => import('./adminWarranty/serial/SerialDetail'));
+// Printer phase 3: a claim's Levo Care quote, approval, co-pay and costs — its own chunk, opened per claim.
+const ClaimCarePanel = React.lazy(() => import('./adminWarranty/ClaimCarePanel'));
 
 /**
  * Admin — serialized devices: order-units view with serial entry, per-unit
@@ -123,6 +126,13 @@ const STRINGS = {
     warrantyStart: 'البداية',
     history: 'سجل التعديلات',
     hideHistory: 'إخفاء السجل',
+    // Printer phase 3: the claim's kind, its Levo Care discount and the owner's cost total.
+    kindCare: 'ليفو كير',
+    kindWarranty: 'ضمان',
+    careSummary: (b: string, c: string) => `خصم ${b} · يدفع الزبون ${c}`,
+    costsTotal: (m: string) => `التكاليف ${m}`,
+    careOpen: 'ليفو كير والتكاليف',
+    careHide: 'إخفاء ليفو كير',
     loadMore: 'عرض المزيد',
     awaitingStaff: 'الزبون ينتظر الرد',
     // W-1 (row 237): the cover the claim was filed under, as its INSERT recorded it — with its end on the chip itself.
@@ -257,6 +267,12 @@ const STRINGS = {
     warrantyStart: 'Start',
     history: 'Change history',
     hideHistory: 'Hide history',
+    kindCare: 'Levo Care',
+    kindWarranty: 'Warranty',
+    careSummary: (b: string, c: string) => `Discount ${b} · customer pays ${c}`,
+    costsTotal: (m: string) => `Costs ${m}`,
+    careOpen: 'Levo Care and costs',
+    careHide: 'Hide Levo Care',
     loadMore: 'Load more',
     awaitingStaff: 'Customer waiting for a reply',
     filedInCover: (end: string | null) => (end ? `Filed in warranty (until ${end})` : 'Filed in warranty'),
@@ -397,6 +413,12 @@ const STRINGS = {
     warrantyStart: 'سەرەتا',
     history: 'مێژووی گۆڕانکارییەکان',
     hideHistory: 'شاردنەوەی مێژوو',
+    kindCare: 'لیڤۆ کێر',
+    kindWarranty: 'گەرەنتی',
+    careSummary: (b: string, c: string) => `داشکاندن ${b} · کڕیار دەیدات ${c}`,
+    costsTotal: (m: string) => `تێچوو ${m}`,
+    careOpen: 'لیڤۆ کێر و تێچووەکان',
+    careHide: 'شاردنەوەی لیڤۆ کێر',
     loadMore: 'زیاتر پیشان بدە',
     awaitingStaff: 'کڕیار چاوەڕێی وەڵامە',
     filedInCover: (end: string | null) => (end ? `لە ماوەی گەرەنتیدا پێشکەشکرا (تا ${end})` : 'لە ماوەی گەرەنتیدا پێشکەشکرا'),
@@ -529,6 +551,11 @@ interface AdminClaim {
   maintenance?: { printer_slug: string; count: number; path: string | null } | null;
   /** 0191 (W-1) — the cover the claim was filed under; null for a claim filed before it. */
   coverage_at_filing?: { state: string; via: 'original' | 'used_sale' | null; end_at: string | null; policy_version: string | null } | null;
+  /** Printer phase 3 (0236): a warranty or a Levo Care claim (absent from an older server = warranty). */
+  claim_kind?: 'warranty' | 'care';
+  care_benefit?: { state: string; benefit_iqd: number; copay_iqd: number } | null;
+  /** The claim's live out-of-pocket costs — the owner's only (null for anyone else). */
+  costs_total_iqd?: number | null;
 }
 
 interface AdminClaimsPage {
@@ -921,6 +948,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
   const [claimsHasMore, setClaimsHasMore] = useState(false);
   const [claimCounts, setClaimCounts] = useState<Record<string, number> | null>(null);
   const [openClaim, setOpenClaim] = useState<string | null>(null);
+  const [careOpen, setCareOpen] = useState<string | null>(null);
   const [thread, setThread] = useState<ClaimMessage[]>([]);
   const [threadLoading, setThreadLoading] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -1834,6 +1862,11 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     )}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {cl.claim_kind === 'care' && (
+                      <span className="inline-flex px-2.5 py-1 rounded-full bg-white/[0.06] text-text-primary text-[11px] font-bold whitespace-nowrap" data-claim-kind={cl.id}>
+                        {s.kindCare}
+                      </span>
+                    )}
                     {cl.priority && (
                       <span
                         title={s.priorityHint}
@@ -1886,6 +1919,28 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     ))}
                   </div>
                 )}
+                {(cl.care_benefit || cl.costs_total_iqd != null) && (
+                  <p className="text-[12px] text-text-secondary mt-1 tabular-nums" data-claim-money={cl.id}>
+                    {cl.care_benefit && cl.care_benefit.state !== 'void'
+                      ? s.careSummary(formatMoney(cl.care_benefit.benefit_iqd, lang), formatMoney(cl.care_benefit.copay_iqd, lang))
+                      : null}
+                    {cl.care_benefit && cl.care_benefit.state !== 'void' && cl.costs_total_iqd != null ? ' · ' : null}
+                    {cl.costs_total_iqd != null ? s.costsTotal(formatMoney(cl.costs_total_iqd, lang)) : null}
+                  </p>
+                )}
+                {cl.unit_id && (
+                  <button
+                    type="button"
+                    onClick={() => setCareOpen((c) => (c === cl.id ? null : cl.id))}
+                    aria-expanded={careOpen === cl.id}
+                    data-claim-care-toggle={cl.id}
+                    className="inline-flex items-center gap-1.5 mt-3 me-4 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+                    {careOpen === cl.id ? s.careHide : s.careOpen}
+                    {careOpen === cl.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                )}
                 <button
                   onClick={() => openThread(cl.id)}
                   className="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-text-secondary hover:text-text-primary transition-colors"
@@ -1894,6 +1949,13 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                   {openClaim === cl.id ? s.hideThread : s.viewThread}
                   {openClaim === cl.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                 </button>
+                {careOpen === cl.id && (
+                  <div className="mt-3 border-t border-border-subtle pt-3">
+                    <React.Suspense fallback={<div className="text-text-muted text-xs">{s.loading}</div>}>
+                      <ClaimCarePanel claimId={cl.id} lang={lang} onChanged={() => void loadClaims(null)} />
+                    </React.Suspense>
+                  </div>
+                )}
                 {openClaim === cl.id && (
                   <div className="mt-3 border-t border-border-subtle pt-3 space-y-2">
                     {threadLoading && <div className="text-text-muted text-xs">{s.loading}</div>}

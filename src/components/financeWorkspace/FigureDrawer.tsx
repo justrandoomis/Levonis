@@ -34,7 +34,7 @@ import { cs } from './costsStrings';
 type Lang = 'ar' | 'en' | 'ckb';
 /** The name of each figure, as the statement and the cards write it. */
 export const FIGURE_NAME: Record<FigureKey, FwKey> = { sales: 'netSales', cogs: 'cogs', gross: 'grossProfit', delivery: 'delivery', cod: 'cod', wages: 'wages', materials: 'materials',
-  fees: 'fees', promotion: 'promo', investor: 'investor', general: 'expenses', deductions: 'deductions', net: 'netShare', cashDue: 'cashDue', cashOpen: 'cashOpen' };
+  fees: 'fees', promotion: 'promo', investor: 'investor', general: 'expenses', service: 'serviceIncome', deductions: 'deductions', net: 'netShare', cashDue: 'cashDue', cashOpen: 'cashOpen' };
 
 type Props = { data: FinanceSummary; figure: FigureKey; from: string; to: string; onClose: () => void; openOrder: (id: string, step?: OrderFocus) => void; onNavigate: (section: FinanceSection) => void };
 export default function FigureDrawer(props: Props) {
@@ -81,7 +81,7 @@ export function FigureBody({ data, figure, from, to, onClose, openOrder, onNavig
         {parts.length > 1 ? <div className="fw-seg fw-seg--on" role="group" aria-label={name}>
           {parts.map((p) => <button key={String(p)} type="button" aria-pressed={part === p} onClick={() => { setPick(p); setAll(false); }} data-finance-drawer-tab={String(p)}>{tab(p)}</button>)}</div>
           : <span className="fw-muted" data-finance-drawer-tab={String(part)}>{tab(part)}</span>}
-        {figure !== 'general' && <a className="fw-button fw-button--ghost" href={csv} data-finance-drawer-csv><ArrowDownToLine size={16} aria-hidden /><span>{u ? rs(loc, 'exportIqd') : fw(loc, 'exportCsv')}</span></a>}
+        {figure !== 'general' && figure !== 'service' && <a className="fw-button fw-button--ghost" href={csv} data-finance-drawer-csv><ArrowDownToLine size={16} aria-hidden /><span>{u ? rs(loc, 'exportIqd') : fw(loc, 'exportCsv')}</span></a>}
       </div>
       {d.rows.length ? <ul className="fw-rows fw-drill" data-finance-drill>{shown.map((r) => {
         if (r.kind !== 'order') return null;
@@ -97,10 +97,10 @@ export function FigureBody({ data, figure, from, to, onClose, openOrder, onNavig
       })}
         {orders.length > shown.length && <li className="fw-rows-more"><button type="button" className="fw-button fw-button--ghost" onClick={() => setAll(true)} data-finance-drill-more>{rs(loc, 'showAll', { n: orders.length })}</button></li>}
         {overheads.map((r) => <li key={r.kind} className="fw-drill-overhead" data-finance-drill-row={r.kind}><div>
-          <span className="fw-rows-a">{rs(loc, r.kind === 'general' ? 'generalRow' : r.kind === 'unallocated' ? 'unallocatedRow' : 'overheadRow')}</span>
+          <span className="fw-rows-a">{rs(loc, r.kind === 'general' ? 'generalRow' : r.kind === 'unallocated' ? 'unallocatedRow' : r.kind === 'service' ? 'serviceRow' : 'overheadRow')}</span>
           <span className="fw-rows-b"><Amount v={r.value} usd={u} /></span></div></li>)}
         <li className="fw-rows-total" data-finance-drill-total><span>{rs(loc, 'total')}</span><span><b><Amount v={d.total} usd={u} missing={unknown} /></b>{d.total != null && estimatedTotal(loc, d.estimated)}</span></li>
-      </ul> : figure !== 'general' && <p className="fw-note" role="status">{rs(loc, part === 2 ? 'noneInPeriod' : 'noOrdersHere')}</p>}
+      </ul> : figure !== 'general' && figure !== 'service' && <p className="fw-note" role="status">{rs(loc, part === 2 ? 'noneInPeriod' : 'noOrdersHere')}</p>}
       {/* Redesign step 5 (DECISIONS row 317): the general line lists the period's entries, its total the period's figure. */}
       {figure === 'general' && <DrawerGeneralEntries from={range.from} to={range.to} usdCents={u ? usd?.totals?.general_expenses_cents ?? null : undefined} />}
       {figure === 'promotion' && <Button variant="secondary" onClick={() => { onClose(); onNavigate('monthly'); }}>{rs(loc, 'openPromotion')}</Button>}

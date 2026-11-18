@@ -24,6 +24,7 @@ import { reconcileFinanceOrder } from '../lib/financeReconcile';
 import { COURIER_HELD_EXPENSE, courierHeldExpense, planCollection } from '../lib/courierCollections';
 import { orderGoods, postStoredRefund, runOrderFinancialEffects, type CostRule } from '../lib/orderFinance';
 import { operationsReport } from '../lib/operationsReport';
+import { careClaimsInstalled, careRefusal, claimHeldExpense } from '../lib/careClaims';
 import { wageVersionStatement } from '../lib/financeWageTimeline';
 import { nextEmploymentDay, queueStaffReconciliation, readStaff, updateStaffEmployment } from '../lib/financeEmployment';
 
@@ -511,10 +512,13 @@ adminFinanceOperationsRoutes.get('/expenses', async (c) => {
   const q = text(c.req.query('q'), 120),
     from = dateValue(c.req.query('from'), baghdadDay()),
     to = dateValue(c.req.query('to'), baghdadDay());
+  // A warranty / Levo Care claim's cost is a general expense of its day, changed only from its claim
+  // (printer phase 3, owner ruling): never offered for a link. Only asked once 0236 is on the database.
+  const claimHeld = (await careClaimsInstalled(c.env.DB)) ? ' AND NOT EXISTS(SELECT 1 FROM service_claim_costs sc WHERE sc.expense_id=e.id)' : '';
   const r = await c.env.DB.prepare(
     `SELECT e.id,e.title,e.amount_iqd,e.expense_day,l.center_id,l.allocation_basis,l.target_type,l.target_id FROM operating_expenses e LEFT JOIN finance_expense_links l ON l.expense_id=e.id
     WHERE e.voided_at IS NULL AND e.expense_day BETWEEN ? AND ? AND (?='' OR instr(e.title||' '||e.id,?)>0)
-    AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id) AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id) ORDER BY e.expense_day DESC,e.id LIMIT 200`,
+    AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id) AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)${claimHeld} ORDER BY e.expense_day DESC,e.id LIMIT 200`,
   )
     .bind(from, to, q, q)
     .all();
@@ -531,6 +535,9 @@ adminFinanceOperationsRoutes.post('/expense-links', async (c) => {
     targetId = target === 'all' ? '' : text(b.target_id, 60);
   // A prepaid parcel's fee stays on its order (DECISIONS row 338).
   if (expense && await courierHeldExpense(db, expense)) throw conflict(COURIER_HELD_EXPENSE, 'COURIER_FEE_EXPENSE');
+  // A claim's cost is a general expense of its cost day: linked to an order it would move that order's profit and every
+  // investor / staff share read from it (printer phase 3, owner ruling). It is corrected from its claim only.
+  if (expense && await claimHeldExpense(db, expense)) throw careRefusal('CLAIM_HELD_EXPENSE');
   if (
     !['none', 'revenue', 'units', 'orders'].includes(basis) ||
     !['all', 'catalog', 'product'].includes(target)

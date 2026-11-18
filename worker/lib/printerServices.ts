@@ -24,11 +24,13 @@ import {
   mappingResolves,
   publishIssues,
   withPhase2Defaults,
+  canonicalCareTerms,
+  type CareTerms,
   type PricedServices,
   type PrinterClasses,
   type PrinterServicesConfig,
 } from '@levonis/pricing/printerServices';
-import { conflict, badRequest } from './http';
+import { conflict, badRequest, HttpError } from './http';
 import { parseConditionDoc } from './condition';
 import { newId } from './crypto';
 import { forgetPricingInputs } from './membershipBenefits';
@@ -84,7 +86,9 @@ export async function publishedPrinterServices(db: D1Database): Promise<PrinterS
  */
 async function swap(
   db: D1Database, token: string | null, next: PrinterServicesState,
-  actorId: string, action: string, detail: Record<string, unknown>
+  actorId: string, action: string, detail: Record<string, unknown>,
+  /** Statements that ride the same batch, each guarded on the setting holding `text` (`guardedOnSetting`). */
+  extra: (text: string) => D1PreparedStatement[] = () => []
 ): Promise<void> {
   const text = JSON.stringify(next);
   const write = token === null
@@ -94,7 +98,7 @@ async function swap(
     `INSERT INTO audit_log (actor_id, action, target, detail)
      SELECT ?, ?, ?, ? WHERE changes() = 1 AND EXISTS (SELECT 1 FROM admin_settings WHERE key = ? AND value = ?)`
   ).bind(actorId, action, PRINTER_SERVICES_KEY, JSON.stringify(detail).slice(0, 4000), PRINTER_SERVICES_KEY, text);
-  const [res] = await db.batch([write, audit]);
+  const [res] = await db.batch([write, audit, ...extra(text)]);
   if (!res?.meta?.changes) {
     // Lost the race: nothing was written, the audit row included. Refuse so the admin reloads.
     throw conflict('Someone else changed the printer services. Reload and try again.', 'PRINTER_SERVICES_STALE');
@@ -114,6 +118,12 @@ export async function saveDraft(db: D1Database, actorId: string, draft: unknown,
     if (pk && typeof pk === 'object') for (const id of ['smart', 'complete'] as const) {
       if (pk[id] && typeof pk[id] === 'object' && pk[id].membership_tier === undefined) pk[id].membership_tier = state.draft.packages[id].membership_tier ?? null;
     }
+    // Phase 3 (DECISIONS row 347): a page that does not know the Care terms or the inspection
+    // labour figure keeps what the stored draft holds.
+    const care = d.care as unknown as Record<string, unknown> | undefined;
+    if (care && typeof care === 'object' && care.terms === undefined) care.terms = state.draft.care.terms ?? null;
+    const ins = d.inspection as unknown as Record<string, unknown> | undefined;
+    if (ins && typeof ins === 'object' && ins.labor_iqd === undefined) ins.labor_iqd = state.draft.inspection.labor_iqd ?? null;
   }
   const issues = configIssues(draft);
   if (issues.length) throw badRequest(`Invalid printer services: ${issues.slice(0, 5).join('; ')}`, 'PRINTER_SERVICES_INVALID');
@@ -141,12 +151,84 @@ export async function publishDraft(db: D1Database, actorId: string, baseRevision
   const revision = Math.max(state.draft.revision, (state.published?.revision ?? 0) + 1);
   const live: PrinterServicesConfig = { ...state.draft, revision };
   const next: PrinterServicesState = { draft: live, published: live, published_at: nowIso, published_by: actorId };
+  const freeze = await carePolicyFreeze(db, live, actorId, nowIso);
   await swap(db, token, next, actorId, 'printer_services.published', {
     revision, products: Object.keys(live.products).length,
-  });
+    ...(freeze.versions.length ? { care_policy_frozen: freeze.versions } : {}),
+  }, freeze.statements);
   // The product page's flag reads the shared pricing inputs: this isolate forgets them now.
   forgetPricingInputs(db);
   return next;
+}
+
+/**
+ * THE CARE TERMS ARE FROZEN PER VERSION AT THE PUBLISH (phase 3, owner ruling D1; DECISIONS row 347).
+ * printer_care_policies (0236) keeps one row per Care policy_version, never updated or deleted
+ * (CARE_POLICY_FROZEN). A publish carrying terms:
+ *  - writes the row of its version when there is none (same batch as the publish, guarded on the
+ *    setting holding the published text, so a publish that lost its race freezes nothing);
+ *  - the FIRST terms ever published are v1 for everyone already holding Care: every version from 1
+ *    up to the published one gets them (orders sold before the terms existed carry policy_version 1);
+ *  - changed terms under a version that already has a row are refused, 409 CARE_POLICY_VERSION_REUSED:
+ *    raise care.policy_version (new buyers only) — the customers of that version keep what they bought.
+ * A database without 0236 freezes nothing (CLAUDE.md rule 2): the Care desk is off there anyway.
+ */
+export const CARE_POLICY_VERSION_REUSED_MESSAGE =
+  'شروط ليفو كير لهذا الإصدار نُشرت سابقًا ولا تتغير — ارفع رقم إصدار الشروط لتسري على المشترين الجدد / The Levo Care terms of this version were already published and cannot change — raise the terms version so the new terms apply to new buyers / مەرجەکانی لیڤۆ کێری ئەم وەشانە پێشتر بڵاوکراونەتەوە و ناگۆڕدرێن — ژمارەی وەشانی مەرجەکان بەرز بکەرەوە بۆ ئەوەی بۆ کڕیارە نوێیەکان جێبەجێ بن';
+const MAX_BACKFILLED_CARE_VERSIONS = 50;
+export async function carePolicyFreeze(
+  db: D1Database, live: PrinterServicesConfig, actorId: string, nowIso: string
+): Promise<{ versions: number[]; statements: (text: string) => D1PreparedStatement[] }> {
+  const none = { versions: [] as number[], statements: () => [] as D1PreparedStatement[] };
+  const terms = canonicalCareTerms(live.care.terms ?? null);
+  if (!terms) return none;
+  const version = live.care.policy_version;
+  let rows: Array<{ policy_version: number; terms: string }>;
+  try {
+    rows = (await db.prepare('SELECT policy_version, terms FROM printer_care_policies ORDER BY policy_version').all<{ policy_version: number; terms: string }>()).results ?? [];
+  } catch (e) {
+    if (/no such table/i.test(String((e as Error)?.message ?? e))) return none;
+    throw e;
+  }
+  const text = JSON.stringify(terms);
+  const same = rows.find((r) => Number(r.policy_version) === version);
+  if (same) {
+    let stored: string;
+    try { stored = JSON.stringify(canonicalCareTerms(JSON.parse(same.terms) as CareTerms)); } catch { stored = same.terms; }
+    if (stored !== text) throw new HttpError(409, CARE_POLICY_VERSION_REUSED_MESSAGE, 'CARE_POLICY_VERSION_REUSED', { policy_version: version });
+    return none;
+  }
+  const versions = rows.length === 0
+    ? Array.from({ length: Math.min(version, MAX_BACKFILLED_CARE_VERSIONS) }, (_, i) => version - i).reverse()
+    : [version];
+  return {
+    versions,
+    statements: (settingText: string) => versions.map((v) =>
+      db.prepare(
+        `INSERT OR IGNORE INTO printer_care_policies (policy_version, terms, published_at, published_by)
+         SELECT ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM admin_settings WHERE key = ? AND value = ?)`
+      ).bind(v, text, nowIso, actorId, PRINTER_SERVICES_KEY, settingText)
+    ),
+  };
+}
+
+/** The frozen Care terms of each version asked for (absent table or version = absent from the map). */
+export async function carePolicies(db: D1Database, versions: number[]): Promise<Map<number, CareTerms>> {
+  const out = new Map<number, CareTerms>();
+  const want = [...new Set(versions.filter((v) => Number.isInteger(v) && v >= 1))];
+  if (!want.length) return out;
+  try {
+    const { results } = await db
+      .prepare('SELECT policy_version, terms FROM printer_care_policies WHERE policy_version IN (SELECT value FROM json_each(?))')
+      .bind(JSON.stringify(want))
+      .all<{ policy_version: number; terms: string }>();
+    for (const r of results ?? []) {
+      try { out.set(Number(r.policy_version), JSON.parse(r.terms) as CareTerms); } catch { /* a row that does not parse reads as missing */ }
+    }
+  } catch (e) {
+    if (!/no such table/i.test(String((e as Error)?.message ?? e))) throw e;
+  }
+  return out;
 }
 
 /**

@@ -26,6 +26,7 @@ export const FW = {
   missing: ['التكاليف الناقصة', 'Missing costs', 'تێچووە کەمەکان'],
   promotion: ['ترويج الشهر', 'Monthly promotion', 'بانگەشەی مانگ'],
   expenses: ['المصاريف العامة', 'General expenses', 'خەرجییە گشتییەکان'],
+  serviceIncome: ['إيرادات خدمات الصيانة (مساهمات ليفو كير)', 'Service income (Levo Care co-pays)', 'داهاتی خزمەتگوزارییەکانی چاککردنەوە (بەشی کڕیار لە لیڤۆ کێر)'],
   staff: ['الموظفون', 'Staff', 'کارمەندان'],
   investors: ['المستثمرون', 'Investors', 'وەبەرهێنەران'],
   // The refusals of the wage settlement name this page by these words (personFinanceStrings settle.refusalAction).

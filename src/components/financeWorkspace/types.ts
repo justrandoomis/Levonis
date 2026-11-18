@@ -29,6 +29,8 @@ export interface ProfitTotals {
   owner_net_iqd?: number | null;
   owner_period_net_iqd?: number | null;
   general_expenses_iqd?: number | null;
+  /** Printer phase 3: co-pays collected in the period (account 4300), added to the period net (summary totals only). */
+  service_income_iqd?: number | null;
   allocated_overhead_iqd?: number | null;
   refunded_iqd?: number | null;
   refund_iqd?: number | null;
@@ -153,9 +155,9 @@ export interface DisplayUsdSummary {
     /** Its confirmed and estimated parts, sharing its overhead by revenue as in dinars (absent from a server that predates them). */
     confirmed?: UsdKnownPart; estimated?: UsdKnownPart;
     /** The complete orders' sums in cents and their share of the overheads (the statement's «محسوبة» column in dollars). */
-    totals?: UsdCents; general_share_cents?: number; unallocated_share_cents?: number } | null;
+    totals?: UsdCents; general_share_cents?: number; unallocated_share_cents?: number; service_share_cents?: number } | null;
   /** `waiting` in cents: the incomplete orders' sums and the rest of the overheads (null: every order is complete; absent from an older server). */
-  waiting?: { orders_count: number; totals: UsdCents; general_share_cents: number; unallocated_share_cents: number } | null;
+  waiting?: { orders_count: number; totals: UsdCents; general_share_cents: number; unallocated_share_cents: number; service_share_cents?: number } | null;
   /** The order-level row of the products and the sections in cents (the review of step 4). */
   order_level?: UsdCents | null;
 }
@@ -175,14 +177,16 @@ export type FinanceKnown = { orders_count: number; incomplete_orders: number; re
   /** After the order coupons and credits, as the headline (absent from a server that predates it). */
   net_after_report_adjustments_iqd?: number | null; confirmed?: FinanceKnownPart; estimated?: FinanceKnownPart;
   /** The complete orders' sums, and their revenue share of the period's overheads (the statement's «محسوبة» column). */
-  totals?: ProfitTotals; general_share_iqd?: number; unallocated_share_iqd?: number };
+  totals?: ProfitTotals; general_share_iqd?: number; unallocated_share_iqd?: number;
+  /** Printer phase 3: its revenue share of the period's service income (Levo Care co-pays), ON its net; absent from an older server. */
+  service_share_iqd?: number };
 /**
  * The one thing an incomplete order waits for, first match in the order the owner fixes them. `return_cost` (the review of
  * step 4): its own price is confirmed, but a piece returned to stock has no known cost — fixed in the order, not on «التكاليف الناقصة».
  */
 export type FinanceWaitReason = 'no_price' | 'return_cost' | 'wage_waits_cost' | 'investor_waits' | 'refund_unknown' | 'other';
 /** The orders that are not complete: their sums (unknown parts null), what each waits for, and the rest of the overheads. */
-export type FinanceWaiting = { orders_count: number; totals: ProfitTotals; reasons: Partial<Record<FinanceWaitReason, string[]>>; general_share_iqd?: number; unallocated_share_iqd?: number };
+export type FinanceWaiting = { orders_count: number; totals: ProfitTotals; reasons: Partial<Record<FinanceWaitReason, string[]>>; general_share_iqd?: number; unallocated_share_iqd?: number; service_share_iqd?: number };
 /** What keeps the period from being complete: lines without a confirmed purchase price. */
 export type FinanceMissingCosts = { lines: number; orders: number; unknown_lines: number; estimated_lines: number; unknown_products: { product_id: string | null; name: string; qty: number; lines: number }[] };
 export interface FinanceSummary {
@@ -206,6 +210,35 @@ export interface FinanceSummary {
   promotions: Promotion[];
   truncated: boolean;
   chart_data?: FinanceCharts;
+  /** Printer phase 3 (DECISIONS row 347): the serviced printer lines' net split into printer and services; absent from an older server. */
+  printer_breakdown?: PrinterBreakdown | null;
+  /** Warranty / Levo Care claim money of the period; null without migration 0236, absent from an older server. */
+  service_claims?: ServiceClaimsSummary | null;
+  /** Co-pays collected in the period (account 4300) — already inside owner_period_net. */
+  service_income_iqd?: number | null;
+}
+
+export interface PrinterBreakdown {
+  printer_lines?: number;
+  printer_net_iqd?: number;
+  services_gross_iqd?: number;
+  services_net_iqd?: number;
+  services?: Partial<Record<'warranty' | 'care' | 'packaging' | 'inspection' | 'academy', number>>;
+  kits_net_iqd?: number;
+  membership_iqd?: number;
+  courier_fee_iqd?: number;
+}
+export interface ServiceClaimsSummary {
+  warranty_cost_iqd?: number;
+  care_cost_iqd?: number;
+  care_benefit_given_iqd?: number;
+  copay_iqd?: number;
+  count?: number;
+  inspections_done?: number;
+  /** Null = «not configured» in the price list. */
+  inspection_labor_iqd?: number | null;
+  inspection_labor_total_iqd?: number | null;
+  included_in_general_expenses?: boolean;
 }
 
 export interface FinanceRange { from: string; to: string }

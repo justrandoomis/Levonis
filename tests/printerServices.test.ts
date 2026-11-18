@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_PRINTER_SERVICES, EMPTY_SELECTION, canonicalConfig, classesFor, configIssues, encodeSelection, mappingResolves, parseSelection,
-  presetPrices, presetSelection, priceServices, publishIssues, sameServices,
+  presetPrices, presetSelection, priceServices, publishIssues, sameServices, withPhase2Defaults,
   SERVICES_NOT_CONFIRMED, SERVICES_NO_WARRANTY_ACK, SERVICES_OPTION_UNAVAILABLE, SERVICES_PACKAGE_MISMATCH,
   type PrinterServicesConfig, type ServiceSelection,
 } from '../packages/pricing/src/printerServices';
@@ -242,4 +242,53 @@ test('the refusal dictionary carries the printer-services refusals word for word
   for (const [code, words] of Object.entries(SERVICES_ERRORS)) {
     assert.deepEqual({ ar: REFUSAL_STRINGS[code]?.ar, en: REFUSAL_STRINGS[code]?.en, ckb: REFUSAL_STRINGS[code]?.ckb }, words, code);
   }
+});
+
+// ---------------------------------------------------------------- phase 3: the Levo Care terms (DECISIONS row 347)
+
+test('phase 3: the seeded draft carries Care terms and no inspection labour figure; a stored config without them reads null', () => {
+  const c = DEFAULT_PRINTER_SERVICES;
+  assert.ok(c.care.terms && c.care.terms.eligible_parts.length > 0);
+  assert.equal(c.inspection.labor_iqd, null);
+  // Every seeded label and exclusion has its own Sorani.
+  for (const t of [...c.care.terms!.eligible_parts.map((p) => p.label), ...c.care.terms!.exclusions]) {
+    assert.ok(t.ar && t.en && t.ckb && t.ckb !== t.ar && t.ckb !== t.en, JSON.stringify(t));
+  }
+  // A config saved before phase 3: no terms, no labour — null, never the seeded defaults.
+  const old = clone() as unknown as Record<string, any>;
+  delete old.care.terms;
+  delete old.inspection.labor_iqd;
+  assert.deepEqual(configIssues(old), []);
+  const read = withPhase2Defaults(old as PrinterServicesConfig);
+  assert.equal(read.care.terms, null);
+  assert.equal(read.inspection.labor_iqd, null);
+  // …and an active, priced Care cannot be published until the terms are written.
+  const mapped = { ...read, products: { p_a1: { ...A1 } } };
+  assert.ok(publishIssues(mapped).some((i) => i.startsWith('care.terms')));
+  assert.ok(!publishIssues({ ...mapped, care: { ...mapped.care, active: false } }).some((i) => i.startsWith('care.terms')));
+});
+
+test('phase 3: configIssues judges the Care terms and the labour figure', () => {
+  const bad = clone() as unknown as Record<string, any>;
+  bad.care.max_discount_pct = 40;
+  bad.care.terms = {
+    eligible_parts: [{ key: 'Nozzle!', label: { ar: 'x', en: 'x', ckb: 'x' } }, { key: 'fan', label: { ar: 'x' } }, { key: 'fan', label: { ar: 'a', en: 'b', ckb: 'c' } }],
+    discount_pct: 50, max_claims: 0, max_benefit_iqd: 1.5, labor: 'free', shipping: 'discounted', exclusions: [{ ar: 'x'.repeat(201), en: '', ckb: '' }],
+  };
+  bad.inspection.labor_iqd = -1;
+  const issues = configIssues(bad);
+  for (const needle of ['eligible_parts[0].key', 'eligible_parts[1].label', 'eligible_parts[2].key: used twice', 'discount_pct: 0..care.max_discount_pct',
+    'max_claims', 'max_benefit_iqd', 'care.terms.labor', 'exclusions[0]', 'inspection.labor_iqd']) {
+    assert.ok(issues.some((i) => i.includes(needle)), `${needle}: ${issues.join(' | ')}`);
+  }
+  // null money cap and a set labour figure are valid; canonicalConfig keeps both and trims the texts.
+  const ok = clone();
+  ok.care.terms = { ...ok.care.terms!, max_benefit_iqd: null, exclusions: [{ ar: ' حريق ', en: ' Fire ', ckb: ' ئاگر ' }] };
+  ok.inspection.labor_iqd = 3_000;
+  assert.deepEqual(configIssues(ok), []);
+  const canon = canonicalConfig({ ...ok, care: { ...ok.care, terms: { ...ok.care.terms!, junk: 1 } as never } });
+  assert.equal(canon.care.terms!.max_benefit_iqd, null);
+  assert.deepEqual(canon.care.terms!.exclusions, [{ ar: 'حريق', en: 'Fire', ckb: 'ئاگر' }]);
+  assert.equal((canon.care.terms as unknown as Record<string, unknown>).junk, undefined);
+  assert.equal(canon.inspection.labor_iqd, 3_000);
 });

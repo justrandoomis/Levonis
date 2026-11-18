@@ -4,6 +4,7 @@ import type { Language } from '../../translations';
 import type { Claim } from './types';
 import { fmtDate, fmtInt, stageStep } from './types';
 import type { WarrantyStrings } from './strings';
+import { CARE_STRINGS } from './strings';
 import { CARD, FOCUS } from './ui';
 
 /**
@@ -127,6 +128,11 @@ export function ClaimCard({
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {claim.claim_kind === 'care' && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full border border-border-subtle text-text-secondary text-[10px] font-bold whitespace-nowrap" data-claim-kind="care">
+              {CARE_STRINGS[lang].claimBadge}
+            </span>
+          )}
           {claim.priority && <PriorityBadge s={s} />}
           <time dateTime={claim.created_at} className="text-text-muted text-[11px] tabular-nums whitespace-nowrap">
             {fmtDate(claim.created_at, lang)}

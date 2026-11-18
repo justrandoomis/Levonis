@@ -2190,6 +2190,128 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'Record the replacement unit first (Replace unit), then set the stage to replaced.',
     ckb: 'سەرەتا ئامێرە جێگرەوەکە لە «گۆڕینی یەکە» تۆمار بکە، پاشان قۆناغی «گۆڕدرا» هەڵبژێرە.',
   },
+  // The accounting period of the day is closed (worker/lib/operations.ts periodOpen): every money door that writes a day.
+  PERIOD_CLOSED: {
+    ar: 'الفترة المحاسبية مغلقة؛ سجّل التصحيح في فترة مفتوحة.',
+    en: 'The accounting period is closed; record the correction in an open period.',
+    ckb: 'ماوەی ژمێریاری داخراوە؛ ڕاستکردنەوەکە لە ماوەیەکی کراوەدا تۆمار بکە.',
+  },
+  // ---- Printer services phase 3: Levo Care claims and a claim’s money (worker/lib/careClaims.ts; DECISIONS row 347) ----
+  CARE_NOT_INSTALLED: {
+    ar: 'مطالبات ليفو كير وتكاليفها غير مفعّلة بعد على قاعدة البيانات.',
+    en: 'Levo Care claims and claim costs are not set up on the database yet.',
+    ckb: 'داواکارییەکانی لیڤۆ کێر و تێچووەکانیان هێشتا لە بنکەدراوەکەدا ئامادە نەکراون.',
+  },
+  CARE_NOT_ACTIVE: {
+    ar: 'هذا الجهاز ليس عليه ليفو كير سارية في تاريخ فتح المطالبة.',
+    en: 'This device had no Levo Care in force on the day the claim was opened.',
+    ckb: 'ئەم ئامێرە لە ڕۆژی کردنەوەی داواکارییەکەدا لیڤۆ کێری کارای نەبوو.',
+  },
+  CARE_TERMS_MISSING: {
+    ar: 'شروط ليفو كير لهذا الجهاز لم تُنشر بعد — انشر الشروط من قائمة أسعار خدمات الطابعات أولاً.',
+    en: 'The Levo Care terms for this device were never published — publish the terms from the printer services price list first.',
+    ckb: 'مەرجەکانی لیڤۆ کێر بۆ ئەم ئامێرە هێشتا بڵاونەکراونەتەوە — سەرەتا مەرجەکان لە لیستی نرخی خزمەتگوزارییەکانی چاپکەرەوە بڵاو بکەرەوە.',
+  },
+  CARE_CLAIM_LIMIT: {
+    ar: 'استُخدم عدد مطالبات ليفو كير المسموح لهذا الجهاز في سنة الخدمة.',
+    en: 'This device has used all the Levo Care claims its Care year allows.',
+    ckb: 'ئەم ئامێرە هەموو ئەو داواکارییانەی لیڤۆ کێری بەکارهێناوە کە ساڵی خزمەتگوزارییەکەی ڕێگەی پێدەدات.',
+  },
+  CARE_PART_NOT_ELIGIBLE: {
+    ar: 'هذه القطعة ليست ضمن قطع ليفو كير — ضع ثمنها في «أعمال أخرى» بسعرها الكامل.',
+    en: 'This part is not one Levo Care covers — put its price under «Other work» at full price.',
+    ckb: 'ئەم پارچەیە لەناو پارچەکانی لیڤۆ کێردا نییە — نرخەکەی لە «کاری تر» بە نرخی تەواو دابنێ.',
+  },
+  CARE_NOT_WARRANTY: {
+    ar: 'الضمان ساري على هذا الجهاز ويغطي العطل — عالجها كمطالبة ضمان. ليفو كير لا تُجمع مع الضمان إلا عند سوء الاستخدام.',
+    en: 'The warranty is in force on this device and covers the fault — handle it as a warranty claim. Levo Care does not stack with the warranty except for misuse.',
+    ckb: 'گەرەنتی لەسەر ئەم ئامێرە کارایە و کێشەکە دەگرێتەوە — وەک داواکاریی گەرەنتی چارەسەری بکە. لیڤۆ کێر لەگەڵ گەرەنتیدا کۆ ناکرێتەوە جگە لە خراپ بەکارهێنان.',
+  },
+  CARE_CLAIM_NOT_OPEN: {
+    ar: 'عرض ليفو كير يُعدّ أو يُعتمد فقط لمطالبة ما زالت قيد الاستلام أو الفحص.',
+    en: 'A Levo Care quote is written or approved only on a claim still being received or diagnosed.',
+    ckb: 'پێشنیاری لیڤۆ کێر تەنها بۆ داواکارییەک دەنووسرێت یان پەسەند دەکرێت کە هێشتا لە وەرگرتن یان پشکنیندایە.',
+  },
+  CARE_ALREADY_APPROVED: {
+    ar: 'اعتُمدت ليفو كير لهذه المطالبة ولا يتغير عرضها. لتغييره يلغي مسؤول مالي اعتماد ليفو كير (ممكن فقط قبل استلام مساهمة الزبون)، فتعود المطالبة إلى الفحص لعرض جديد.',
+    en: 'Levo Care was approved on this claim and its quote no longer changes. To change it, a financial admin voids the Levo Care approval (possible only before the customer’s co-pay is collected); the claim then returns to diagnosis for a new quote.',
+    ckb: 'لیڤۆ کێر بۆ ئەم داواکارییە پەسەندکراوە و پێشنیارەکەی ناگۆڕێت. بۆ گۆڕینی، بەرپرسێکی دارایی پەسەندکردنی لیڤۆ کێر هەڵدەوەشێنێتەوە (تەنها پێش وەرگرتنی بەشداریی کڕیار دەکرێت)، ئینجا داواکارییەکە دەگەڕێتەوە بۆ پشکنین بۆ پێشنیارێکی نوێ.',
+  },
+  CARE_REJECT_COPAY_COLLECTED: {
+    ar: 'استُلمت مساهمة الزبون في ليفو كير لهذه المطالبة، فلا تُرفض الآن — أكمل الإصلاح ثم أغلقها كمحلولة.',
+    en: 'The customer’s Levo Care co-pay on this claim was collected, so it cannot be rejected now — finish the repair, then close it as resolved.',
+    ckb: 'بەشداریی کڕیار لە لیڤۆ کێری ئەم داواکارییەدا وەرگیراوە، بۆیە ئێستا ڕەت ناکرێتەوە — چاککردنەوەکە تەواو بکە، پاشان وەک چارەسەرکراو دایبخە.',
+  },
+  CARE_COPAY_CLAIM_REJECTED: {
+    ar: 'رُفضت هذه المطالبة، فلا تُستلم عليها مساهمة ليفو كير.',
+    en: 'This claim was rejected, so no Levo Care co-pay is collected on it.',
+    ckb: 'ئەم داواکارییە ڕەتکراوەتەوە، بۆیە هیچ بەشدارییەکی لیڤۆ کێر لەسەری وەرناگیرێت.',
+  },
+  CARE_QUOTE_CHANGED: {
+    ar: 'تغيّر عرض ليفو كير منذ فتحته — حدّث الصفحة وراجعه من جديد.',
+    en: 'The Levo Care quote changed since you opened it — reload and review it again.',
+    ckb: 'پێشنیاری لیڤۆ کێر لەو کاتەوەی کردتەوە گۆڕاوە — لاپەڕەکە نوێ بکەرەوە و دووبارە پێیدا بچۆرەوە.',
+  },
+  CARE_QUOTE_NOT_ACCEPTED: {
+    ar: 'لم يوافق الزبون على عرض ليفو كير بعد — يُعتمد بعد موافقته.',
+    en: 'The customer has not accepted the Levo Care quote yet — it is approved after they accept.',
+    ckb: 'کڕیار هێشتا پێشنیاری لیڤۆ کێری قبوڵ نەکردووە — دوای قبوڵکردنی پەسەند دەکرێت.',
+  },
+  CARE_APPROVAL_REQUIRED: {
+    ar: 'هذه مطالبة ليفو كير: تُقبل باعتماد عرضها («اعتماد ليفو كير») من المسؤول المالي، لا بتغيير المرحلة.',
+    en: 'This is a Levo Care claim: it is accepted by approving its quote («Approve Levo Care») by a financial admin, not by changing the stage.',
+    ckb: 'ئەمە داواکاریی لیڤۆ کێرە: بە پەسەندکردنی پێشنیارەکەی («پەسەندکردنی لیڤۆ کێر») لەلایەن بەرپرسی داراییەوە قبوڵ دەکرێت، نەک بە گۆڕینی قۆناغ.',
+  },
+  CARE_COPAY_COLLECTED: {
+    ar: 'استُلمت مساهمة الزبون في ليفو كير لهذه المطالبة، فلا يُلغى اعتمادها ولا تُستلم مرة ثانية.',
+    en: 'The customer’s Levo Care co-pay on this claim was collected, so its approval cannot be voided and it is not collected twice.',
+    ckb: 'بەشداریی کڕیار لە لیڤۆ کێری ئەم داواکارییەدا وەرگیراوە، بۆیە پەسەندکردنەکەی هەڵناوەشێتەوە و دوو جار وەرناگیرێت.',
+  },
+  CARE_NO_COPAY: {
+    ar: 'لا توجد مساهمة على الزبون لاستلامها: اعتمد عرض ليفو كير أولاً، أو المساهمة صفر.',
+    en: 'There is no co-pay to collect: approve the Levo Care quote first, or the co-pay is zero.',
+    ckb: 'هیچ بەشدارییەک نییە بۆ وەرگرتن لە کڕیار: سەرەتا پێشنیاری لیڤۆ کێر پەسەند بکە، یان بەشدارییەکە سفرە.',
+  },
+  CARE_VOID_TOO_LATE: {
+    ar: 'أُغلقت المطالبة (حُلّت أو استُبدل الجهاز)، فلا يُلغى عرض ليفو كير الآن.',
+    en: 'The claim is closed (resolved or replaced), so its Levo Care quote cannot be voided now.',
+    ckb: 'داواکارییەکە داخراوە (چارەسەرکرا یان ئامێرەکە گۆڕدرا)، بۆیە ئێستا پێشنیاری لیڤۆ کێرەکەی هەڵناوەشێتەوە.',
+  },
+  CARE_POLICY_VERSION_REUSED: {
+    ar: 'شروط ليفو كير لهذا الإصدار نُشرت سابقًا ولا تتغير — ارفع رقم إصدار الشروط لتسري على المشترين الجدد.',
+    en: 'The Levo Care terms of this version were already published and cannot change — raise the terms version so the new terms apply to new buyers.',
+    ckb: 'مەرجەکانی لیڤۆ کێری ئەم وەشانە پێشتر بڵاوکراونەتەوە و ناگۆڕدرێن — ژمارەی وەشانی مەرجەکان بەرز بکەرەوە بۆ ئەوەی بۆ کڕیارە نوێیەکان جێبەجێ بن.',
+  },
+  CLAIM_COST_OPERATION_REUSED: {
+    ar: 'رقم العملية هذا استُخدم لتكلفة أخرى — حدّث الصفحة وأعد الإدخال.',
+    en: 'This operation id was used for another cost — reload the page and enter it again.',
+    ckb: 'ئەم ژمارەی کردارە بۆ تێچوویەکی تر بەکارهاتووە — لاپەڕەکە نوێ بکەرەوە و دووبارە تۆماری بکە.',
+  },
+  CLAIM_COST_DAY_FUTURE: {
+    ar: 'يوم التكلفة لا يكون في المستقبل.',
+    en: 'The cost day cannot be in the future.',
+    ckb: 'ڕۆژی تێچوو نابێت لە داهاتوودا بێت.',
+  },
+  CLAIM_HELD_EXPENSE: {
+    ar: 'هذه تكلفة مطالبة ضمان أو ليفو كير؛ تُصحَّح من المطالبة نفسها في مكتب الضمان (ألغِ التكلفة هناك وسجّلها من جديد).',
+    en: 'This is a warranty or Levo Care claim cost; correct it from the claim itself on the warranty desk (void the cost there and record it again).',
+    ckb: 'ئەمە تێچووی داواکارییەکی گەرەنتی یان لیڤۆ کێرە؛ لە خودی داواکارییەکەوە لە مێزی گەرەنتی ڕاست بکرێتەوە (لەوێ تێچووەکە هەڵبوەشێنەوە و دووبارە تۆماری بکە).',
+  },
+  CARE_QUOTE_INVALID: {
+    ar: 'عرض ليفو كير غير صحيح: الكميات والأسعار أعداد صحيحة، وعشرون قطعة على الأكثر.',
+    en: 'The Levo Care quote is not valid: quantities and prices are whole numbers, and at most twenty parts.',
+    ckb: 'پێشنیاری لیڤۆ کێر دروست نییە: بڕ و نرخەکان ژمارەی تەواون، و زۆرترین بیست پارچە.',
+  },
+  CLAIM_COST_INVALID: {
+    ar: 'اختر نوع التكلفة: شراء قطعة، أجرة عمل، توصيل، جهاز بديل أو أخرى.',
+    en: 'Choose the cost kind: part bought, labour, courier, replacement device or other.',
+    ckb: 'جۆری تێچوو هەڵبژێرە: کڕینی پارچە، کرێی کار، گەیاندن، ئامێری جێگرەوە یان هی تر.',
+  },
+  ORDER_HAS_SERVICE_CLAIMS: {
+    ar: 'لأجهزة هذا الطلب مطالبة ضمان أو ليفو كير لها مال مسجّل، فيُحتفظ بالطلب.',
+    en: 'A warranty or Levo Care claim on this order’s devices has money recorded, so the order is kept.',
+    ckb: 'داواکارییەکی گەرەنتی یان لیڤۆ کێر لەسەر ئامێرەکانی ئەم داواکارییە پارەی تۆمارکراوی هەیە، بۆیە داواکارییەکە دەهێڵدرێتەوە.',
+  },
   // ---- Community projects (worker/routes/communityPosts.ts) ----------------
   POST_MEDIA_NOT_OWNED: {
     ar: 'هذه الصورة ليست من صورك. ارفع الصورة من جهازك ثم أضفها.',

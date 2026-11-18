@@ -2544,6 +2544,7 @@ adminRoutes.delete('/orders/:id', async (c) => {
         : error.code === 'ORDER_REFUND_PENDING' ? 'لا يمكن حذف الطلب قبل إكمال إرجاع الرصيد والنقاط وتحرير الحجز.'
         : error.code === 'ORDER_FINANCIAL_RECONCILIATION_PENDING' ? 'لا يمكن حذف الطلب قبل إكمال تسويته المالية المعلقة.'
         : error.code === 'ORDER_HAS_FINANCIAL_HISTORY' ? 'يحتوي الطلب على سجل دفعات أو أجور أو قيود مالية يجب الاحتفاظ به.'
+        : error.code === 'ORDER_HAS_SERVICE_CLAIMS' ? 'لأجهزة هذا الطلب مطالبة ضمان أو ليفو كير لها مال مسجّل، فيُحتفظ بالطلب.'
         : 'لا يمكن حذف هذا الطلب لأنه يحتوي على سجل تسليم أو جهاز أو ضمان.';
       throw new HttpError(409, ar, error.code);
     }

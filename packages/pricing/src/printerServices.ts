@@ -114,6 +114,56 @@ export interface FilamentKit {
   printers: KitPrinterRef[] | null;
 }
 
+/**
+ * LEVO CARE TERMS (phase 3, owner rulings 2026-11-18; DECISIONS row 347). A Care claim's quote
+ * lists eligible parts (each a key of `eligible_parts`), labour, shipping and other work; the
+ * discount applies to the eligible parts, and to labour / shipping only when they are
+ * 'discounted'. Capped per device (its root unit): `max_claims` approved claims and
+ * `max_benefit_iqd` dinars of discount in total (null = no money cap).
+ */
+export const CARE_COVER_MODES = ['discounted', 'full_price'] as const;
+export type CareCoverMode = (typeof CARE_COVER_MODES)[number];
+export interface CareEligiblePart { key: string; label: Text3 }
+export interface CareTerms {
+  eligible_parts: CareEligiblePart[];
+  /** 0..care.max_discount_pct (<= 90). */
+  discount_pct: number;
+  /** >= 1 approved Care claims per device over the Care year. */
+  max_claims: number;
+  /** >= 0 dinars of discount per device over the Care year; null = no money cap. */
+  max_benefit_iqd: number | null;
+  labor: CareCoverMode;
+  shipping: CareCoverMode;
+  /** What Care does not cover, in the customer's words (each <= 200 characters). */
+  exclusions: Text3[];
+}
+export const MAX_CARE_PARTS = 40;
+export const MAX_CARE_EXCLUSIONS = 20;
+const CARE_PART_KEY = /^[a-z0-9][a-z0-9_-]{0,31}$/;
+
+/** The seeded first draft of the Care terms (the owner edits them before the first publish freezes v1). */
+export const DEFAULT_CARE_TERMS: CareTerms = {
+  eligible_parts: [
+    { key: 'nozzle', label: { ar: 'الفوهة', en: 'Nozzle', ckb: 'نۆزڵ' } },
+    { key: 'hotend', label: { ar: 'رأس الطباعة الحراري', en: 'Hotend', ckb: 'سەری گەرمکەرەوەی چاپ' } },
+    { key: 'extruder', label: { ar: 'مجموعة البثق', en: 'Extruder', ckb: 'دەرهێنەری فیلامێنت' } },
+    { key: 'build_plate', label: { ar: 'سطح الطباعة', en: 'Build plate', ckb: 'ڕووی چاپکردن' } },
+    { key: 'ptfe_tube', label: { ar: 'أنبوب PTFE', en: 'PTFE tube', ckb: 'بۆری PTFE' } },
+    { key: 'fan', label: { ar: 'المروحة', en: 'Fan', ckb: 'پانکە' } },
+    { key: 'belt', label: { ar: 'السير', en: 'Belt', ckb: 'قایش' } },
+  ],
+  discount_pct: 50,
+  max_claims: 3,
+  max_benefit_iqd: 150_000,
+  labor: 'discounted',
+  shipping: 'full_price',
+  exclusions: [
+    { ar: 'الأضرار المتعمدة أو الناتجة عن حريق أو سوائل', en: 'Deliberate damage, or damage from fire or liquids', ckb: 'زیانی بە ئەنقەست، یان زیانی ئاگر و شلەمەنی' },
+    { ar: 'الطابعة المعدّلة أو ببرنامج غير رسمي', en: 'A modified printer, or one on unofficial firmware', ckb: 'چاپکەری دەستکاریکراو، یان بە نەرمەکاڵای نافەرمی' },
+    { ar: 'الخدوش والمظهر الخارجي فقط', en: 'Scratches and cosmetic wear only', ckb: 'تەنها خڕاندن و ڕواڵەتی دەرەوە' },
+  ],
+};
+
 export interface MembershipOffer {
   active: boolean;
   /** The tiers a customer may buy with a printer; prices are the live membership_plans rows. */
@@ -131,9 +181,21 @@ export interface PrinterServicesConfig {
     w12: Record<WarrantyFamily, number | null>;
     w24: Record<WarrantyFamily, number | null>;
   };
-  care: { active: boolean; policy_version: number; months: 12; price_iqd: number | null; max_discount_pct: number };
+  care: {
+    active: boolean; policy_version: number; months: 12; price_iqd: number | null; max_discount_pct: number;
+    /**
+     * Phase 3 (DECISIONS row 347): what a Levo Care claim gives, frozen per `policy_version` at the
+     * first publish (printer_care_policies, 0236). Optional in a stored config (`withPhase3Defaults`:
+     * absent = null = not written yet); publishing an active, priced Care needs it.
+     */
+    terms?: CareTerms | null;
+  };
   packaging: { active: boolean; extra_iqd: number | null };
-  inspection: { active: boolean; price_iqd: number | null; lead_business_days_min: number; lead_business_days_max: number };
+  inspection: {
+    active: boolean; price_iqd: number | null; lead_business_days_min: number; lead_business_days_max: number;
+    /** Phase 3: what one completed inspection costs the shop in labour — REPORT ONLY (null = not configured). */
+    labor_iqd?: number | null;
+  };
   academy: { active: boolean; recorded_iqd: number | null; live_iqd: number | null };
   delivery: { active: boolean; classes: Record<DeliveryClass, { economy_iqd: number | null; personal_iqd: number | null }> };
   packages: { smart: PackagePreset; complete: PackagePreset };
@@ -158,9 +220,9 @@ export const DEFAULT_PRINTER_SERVICES: PrinterServicesConfig = {
     w12: { a1: 25_000, xpa2: 29_000, h2: 35_000, h3c: 39_000 },
     w24: { a1: 100_000, xpa2: 150_000, h2: 200_000, h3c: 250_000 },
   },
-  care: { active: true, policy_version: 1, months: 12, price_iqd: 19_000, max_discount_pct: 90 },
+  care: { active: true, policy_version: 1, months: 12, price_iqd: 19_000, max_discount_pct: 90, terms: DEFAULT_CARE_TERMS },
   packaging: { active: true, extra_iqd: 7_000 },
-  inspection: { active: true, price_iqd: 5_000, lead_business_days_min: 2, lead_business_days_max: 3 },
+  inspection: { active: true, price_iqd: 5_000, lead_business_days_min: 2, lead_business_days_max: 3, labor_iqd: null },
   academy: { active: true, recorded_iqd: 0, live_iqd: 50_000 },
   delivery: {
     active: true,
@@ -198,7 +260,7 @@ export function kitsOf(c: PrinterServicesConfig): FilamentKit[] {
  * the new fields) reads as memberships off, no kits, no package tier.
  */
 export function withPhase2Defaults(c: PrinterServicesConfig): PrinterServicesConfig {
-  return {
+  return withPhase3Defaults({
     ...c,
     packages: {
       smart: { ...c.packages.smart, membership_tier: c.packages.smart.membership_tier ?? null },
@@ -206,6 +268,19 @@ export function withPhase2Defaults(c: PrinterServicesConfig): PrinterServicesCon
     },
     membership: c.membership ? { active: c.membership.active, tiers: [...c.membership.tiers] } : { active: false, tiers: [] },
     kits: c.kits ?? [],
+  });
+}
+
+/**
+ * Phase 3 (DECISIONS row 347): a config stored before it has no Care terms and no inspection
+ * labour figure. Both read as null, never the seeded defaults: terms nobody wrote must not be
+ * published and frozen as v1 by accident (publishIssues asks for them instead).
+ */
+export function withPhase3Defaults(c: PrinterServicesConfig): PrinterServicesConfig {
+  return {
+    ...c,
+    care: { ...c.care, terms: c.care.terms ?? null },
+    inspection: { ...c.inspection, labor_iqd: c.inspection.labor_iqd ?? null },
   };
 }
 
@@ -276,6 +351,7 @@ export function configIssues(raw: unknown): string[] {
     if (care.months !== 12) out.push('care.months: 12');
     if (!isMoneyOrNull(care.price_iqd)) out.push('care.price_iqd: whole IQD or null');
     if (!(Number.isInteger(care.max_discount_pct) && (care.max_discount_pct as number) >= 0 && (care.max_discount_pct as number) <= 90)) out.push('care.max_discount_pct: 0..90');
+    if (care.terms !== undefined && care.terms !== null) out.push(...careTermsIssues(care.terms, care.max_discount_pct));
   }
   const pk = c.packaging;
   if (!isObj(pk) || typeof pk.active !== 'boolean' || !isMoneyOrNull(pk.extra_iqd)) out.push('packaging: {active, extra_iqd}');
@@ -284,6 +360,7 @@ export function configIssues(raw: unknown): string[] {
   else {
     const lo = ins.lead_business_days_min, hi = ins.lead_business_days_max;
     if (!(Number.isInteger(lo) && Number.isInteger(hi) && (lo as number) >= 0 && (lo as number) <= (hi as number) && (hi as number) <= 30)) out.push('inspection.lead_business_days: 0 <= min <= max <= 30');
+    if (ins.labor_iqd !== undefined && !isMoneyOrNull(ins.labor_iqd)) out.push('inspection.labor_iqd: whole IQD or null');
   }
   const ac = c.academy;
   if (!isObj(ac) || typeof ac.active !== 'boolean' || !isMoneyOrNull(ac.recorded_iqd) || !isMoneyOrNull(ac.live_iqd)) out.push('academy: {active, recorded_iqd, live_iqd}');
@@ -324,6 +401,56 @@ export function configIssues(raw: unknown): string[] {
   }
   if (c.kits !== undefined) out.push(...kitIssues(c.kits));
   return out;
+}
+
+const isTextOf = (v: unknown, max: number): v is Text3 =>
+  isObj(v) && (['ar', 'en', 'ckb'] as const).every((k) => typeof v[k] === 'string' && (v[k] as string).length <= max);
+
+/** Every problem in the Care terms (phase 3), as `care.terms...: message` strings. */
+export function careTermsIssues(raw: unknown, maxDiscountPct: unknown): string[] {
+  const out: string[] = [];
+  if (!isObj(raw)) return ['care.terms: object or null'];
+  const t = raw as Record<string, unknown>;
+  if (!Array.isArray(t.eligible_parts)) out.push('care.terms.eligible_parts: array');
+  else if (t.eligible_parts.length > MAX_CARE_PARTS) out.push(`care.terms.eligible_parts: at most ${MAX_CARE_PARTS}`);
+  else {
+    const keys = new Set<string>();
+    (t.eligible_parts as unknown[]).forEach((p, i) => {
+      if (!isObj(p) || typeof p.key !== 'string' || !CARE_PART_KEY.test(p.key)) { out.push(`care.terms.eligible_parts[${i}].key: a-z, 0-9, _ or -, at most 32`); return; }
+      if (keys.has(p.key)) out.push(`care.terms.eligible_parts[${i}].key: used twice`);
+      keys.add(p.key);
+      if (!isTextOf(p.label, 80)) out.push(`care.terms.eligible_parts[${i}].label: {ar, en, ckb}, at most 80 characters each`);
+    });
+  }
+  const cap = Number.isInteger(maxDiscountPct) ? (maxDiscountPct as number) : 90;
+  if (!(Number.isInteger(t.discount_pct) && (t.discount_pct as number) >= 0 && (t.discount_pct as number) <= Math.min(90, cap))) {
+    out.push('care.terms.discount_pct: 0..care.max_discount_pct');
+  }
+  if (!(Number.isInteger(t.max_claims) && (t.max_claims as number) >= 1 && (t.max_claims as number) <= 100)) out.push('care.terms.max_claims: 1..100');
+  if (!isMoneyOrNull(t.max_benefit_iqd)) out.push('care.terms.max_benefit_iqd: whole IQD or null');
+  if (!oneOf(CARE_COVER_MODES, t.labor)) out.push('care.terms.labor: discounted or full_price');
+  if (!oneOf(CARE_COVER_MODES, t.shipping)) out.push('care.terms.shipping: discounted or full_price');
+  if (!Array.isArray(t.exclusions)) out.push('care.terms.exclusions: array');
+  else if (t.exclusions.length > MAX_CARE_EXCLUSIONS) out.push(`care.terms.exclusions: at most ${MAX_CARE_EXCLUSIONS}`);
+  else (t.exclusions as unknown[]).forEach((e, i) => {
+    if (!isTextOf(e, 200)) out.push(`care.terms.exclusions[${i}]: {ar, en, ckb}, at most 200 characters each`);
+  });
+  return out;
+}
+
+/** The Care terms rebuilt from their known fields only (texts trimmed); null stays null. */
+export function canonicalCareTerms(t: CareTerms | null | undefined): CareTerms | null {
+  if (!t) return null;
+  const tx = (v: Text3): Text3 => ({ ar: v.ar.trim(), en: v.en.trim(), ckb: v.ckb.trim() });
+  return {
+    eligible_parts: t.eligible_parts.map((p) => ({ key: p.key, label: tx(p.label) })),
+    discount_pct: t.discount_pct,
+    max_claims: t.max_claims,
+    max_benefit_iqd: t.max_benefit_iqd ?? null,
+    labor: t.labor,
+    shipping: t.shipping,
+    exclusions: t.exclusions.map(tx),
+  };
 }
 
 /** Size caps on the kits (owner-made; far above a shop's needs). */
@@ -426,11 +553,15 @@ export function canonicalConfig(c: PrinterServicesConfig): PrinterServicesConfig
     revision: c.revision,
     products,
     warranty: { active: c.warranty.active, policy_version: c.warranty.policy_version, w12: tier(c.warranty.w12), w24: tier(c.warranty.w24) },
-    care: { active: c.care.active, policy_version: c.care.policy_version, months: 12, price_iqd: c.care.price_iqd, max_discount_pct: c.care.max_discount_pct },
+    care: {
+      active: c.care.active, policy_version: c.care.policy_version, months: 12, price_iqd: c.care.price_iqd, max_discount_pct: c.care.max_discount_pct,
+      terms: canonicalCareTerms(c.care.terms),
+    },
     packaging: { active: c.packaging.active, extra_iqd: c.packaging.extra_iqd },
     inspection: {
       active: c.inspection.active, price_iqd: c.inspection.price_iqd,
       lead_business_days_min: c.inspection.lead_business_days_min, lead_business_days_max: c.inspection.lead_business_days_max,
+      labor_iqd: c.inspection.labor_iqd ?? null,
     },
     academy: { active: c.academy.active, recorded_iqd: c.academy.recorded_iqd, live_iqd: c.academy.live_iqd },
     delivery: {
@@ -457,6 +588,9 @@ export function publishIssues(c: PrinterServicesConfig): string[] {
     // A family on one version and a class on another: no selection prices.
     if (anyFamily && anyClass && !mappingResolves(c, pid)) out.push(`products.${pid}: no version has both a warranty family and a delivery class`);
   }
+  // Phase 3: Care sold to customers names what it gives; the terms are frozen with their
+  // policy version at the publish (printer_care_policies, 0236).
+  if (c.care.active && c.care.price_iqd !== null && !c.care.terms) out.push('care.terms: write the Levo Care terms before publishing Care');
   // A package may only be offered when every service it includes is priced.
   for (const id of ['smart', 'complete'] as const) {
     const p = c.packages[id];
@@ -790,7 +924,7 @@ export function presetPrices(config: PrinterServicesConfig, classes: PrinterClas
 export interface ServicesOffer {
   revision: number;
   warranty: { w12: number | null; w24: number | null; policy_version: number } | null;
-  care: { c12: number | null; months: 12; max_discount_pct: number; policy_version: number } | null;
+  care: { c12: number | null; months: 12; max_discount_pct: number; policy_version: number; terms: CareTerms | null } | null;
   packaging: { standard: 0; extra: number | null } | null;
   inspection: { full: number | null; lead_business_days: [number, number] } | null;
   academy: { recorded: number | null; live: number | null } | null;
@@ -828,7 +962,7 @@ export function servicesOffer(config: PrinterServicesConfig, classes: PrinterCla
       ? { w12: config.warranty.w12[fam], w24: config.warranty.w24[fam], policy_version: config.warranty.policy_version }
       : null,
     care: config.care.active
-      ? { c12: config.care.price_iqd, months: 12, max_discount_pct: config.care.max_discount_pct, policy_version: config.care.policy_version }
+      ? { c12: config.care.price_iqd, months: 12, max_discount_pct: config.care.max_discount_pct, policy_version: config.care.policy_version, terms: config.care.terms ?? null }
       : null,
     packaging: config.packaging.active ? { standard: 0, extra: config.packaging.extra_iqd } : null,
     inspection: config.inspection.active

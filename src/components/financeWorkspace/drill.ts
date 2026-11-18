@@ -17,16 +17,16 @@ import type { DisplayUsdSummary, FinanceOrder, FinanceSummary } from './types';
  * column of the statement (rowOnEstimate, columnEstimates; owner decision 3).
  */
 export type FigureKey = StatementKey | 'cashDue' | 'cashOpen';
-export const STATEMENT_FIGURES: readonly StatementKey[] = ['sales', 'cogs', 'gross', 'delivery', 'cod', 'wages', 'materials', 'fees', 'promotion', 'investor', 'general', 'deductions', 'net'];
+export const STATEMENT_FIGURES: readonly StatementKey[] = ['sales', 'cogs', 'gross', 'delivery', 'cod', 'wages', 'materials', 'fees', 'promotion', 'investor', 'general', 'service', 'deductions', 'net'];
 const isStatement = (key: FigureKey): key is StatementKey => (STATEMENT_FIGURES as readonly string[]).includes(key);
 /** The formula of each figure, in words (reportStrings.ts). */
 export const FORMULA: Record<FigureKey, RsKey> = { sales: 'fSales', cogs: 'fCogs', gross: 'fGross', delivery: 'fDelivery', cod: 'fCod', wages: 'fWages', materials: 'fMaterials',
-  fees: 'fFees', promotion: 'fPromotion', investor: 'fInvestor', general: 'fGeneral', deductions: 'fDeductions', net: 'fNet', cashDue: 'fCashDue', cashOpen: 'fCashOpen' };
+  fees: 'fFees', promotion: 'fPromotion', investor: 'fInvestor', general: 'fGeneral', service: 'fService', deductions: 'fDeductions', net: 'fNet', cashDue: 'fCashDue', cashOpen: 'fCashOpen' };
 
 /** A row of the drawer: an order with its value, or an overhead that belongs to the whole period. */
 export type DrillRow =
   | { kind: 'order'; order: FinanceOrder; value: Num; standing: OrderStanding; revenue: Num; promotion: Num; margin: number | null }
-  | { kind: 'general' | 'unallocated' | 'overhead'; value: number };
+  | { kind: 'general' | 'unallocated' | 'overhead' | 'service'; value: number };
 /**
  * 0: the calculated orders («محسوبة»); 1: the orders still waiting («تنتظر»); 2: the whole period, for a period with no
  * delivered order — its overheads alone (the independent review of step 4: rent with no sale opened on «تنتظر (0)» and no
@@ -95,7 +95,8 @@ export function drill(data: FinanceSummary, key: FigureKey, part: DrillPart, usd
     const t = dollars ? byIqdNames(dollars.orders?.[orderId(o)]?.cents ?? {}) : o;
     return termOf(t, key, o.pending_costs ?? 0);
   };
-  const rows: DrillRow[] = key === 'general' ? [] : orders.map((o) => {
+  // No order carries the general expenses or the service income (printer phase 3): their rows are the column's share alone.
+  const rows: DrillRow[] = key === 'general' || key === 'service' ? [] : orders.map((o) => {
     const v = value(o), revenue = revenueOf(o, money, dollars);
     return { kind: 'order' as const, order: o, value: v, standing: standingOf(o, data), revenue, promotion: money(o, 'promotion_iqd'),
       margin: key === 'net' ? share(v, revenue) : key === 'gross' ? share(v, termOf(dollars ? byIqdNames(dollars.orders?.[orderId(o)]?.cents ?? {}) : o, 'sales')) : null };
@@ -107,23 +108,29 @@ export function drill(data: FinanceSummary, key: FigureKey, part: DrillPart, usd
   }
   // The column's overheads, as the statement carries them (statement.ts, from the server's known / waiting shares; the period's own for part 2).
   const col = part === 1 ? 1 : part === 2 ? 2 : 0;
-  const general = cellShare(data, usd, st.currency, col, 'general'), unallocated = cellShare(data, usd, st.currency, col, 'unallocated');
+  const general = cellShare(data, usd, st.currency, col, 'general'), unallocated = cellShare(data, usd, st.currency, col, 'unallocated'),
+    service = cellShare(data, usd, st.currency, col, 'service');
   if (key === 'general' && general) sorted.push({ kind: 'general', value: general });
   if (key === 'promotion' && unallocated) sorted.push({ kind: 'unallocated', value: unallocated });
+  if (key === 'service' && service) sorted.push({ kind: 'service', value: service });
   if (key === 'net' && (general || unallocated)) sorted.push({ kind: 'overhead', value: -general - unallocated });
+  if (key === 'net' && service) sorted.push({ kind: 'service', value: service });
   return { currency: st.currency, part, rows: sorted, total: st.rows.find((r) => r.key === key)!.cells[col], estimated };
 }
 
-/** A column's share of the general expenses or of a month's promotion with no sales, in the statement's currency; the period's whole amounts for column 2. */
-function cellShare(data: FinanceSummary, usd: DisplayUsdSummary | undefined, currency: 'IQD' | 'USD', col: 0 | 1 | 2, which: 'general' | 'unallocated'): number {
+/**
+ * A column's share of the general expenses, of a month's promotion with no sales or of the service income (printer phase 3), in the
+ * statement's currency; the period's whole amounts for column 2.
+ */
+function cellShare(data: FinanceSummary, usd: DisplayUsdSummary | undefined, currency: 'IQD' | 'USD', col: 0 | 1 | 2, which: 'general' | 'unallocated' | 'service'): number {
   if (currency === 'USD') {
-    if (col === 2) return (which === 'general' ? usd?.totals?.general_expenses_cents : usd?.totals?.unallocated_promotion_cents) ?? 0;
+    if (col === 2) return (which === 'general' ? usd?.totals?.general_expenses_cents : which === 'unallocated' ? usd?.totals?.unallocated_promotion_cents : usd?.totals?.service_income_cents) ?? 0;
     const part = col === 0 ? usd?.known : usd?.waiting;
-    return (which === 'general' ? part?.general_share_cents : part?.unallocated_share_cents) ?? 0;
+    return (which === 'general' ? part?.general_share_cents : which === 'unallocated' ? part?.unallocated_share_cents : part?.service_share_cents) ?? 0;
   }
-  if (col === 2) return (which === 'general' ? data.totals.general_expenses_iqd : data.totals.unallocated_promotion_iqd) ?? 0;
+  if (col === 2) return (which === 'general' ? data.totals.general_expenses_iqd : which === 'unallocated' ? data.totals.unallocated_promotion_iqd : data.totals.service_income_iqd) ?? 0;
   const part = col === 0 ? data.known : data.waiting;
-  return (which === 'general' ? part?.general_share_iqd : part?.unallocated_share_iqd) ?? 0;
+  return (which === 'general' ? part?.general_share_iqd : which === 'unallocated' ? part?.unallocated_share_iqd : part?.service_share_iqd) ?? 0;
 }
 
 /** The sum of a drawer's rows — what tests/financeDrill.test.ts holds equal to the cell; null when a row is unknown. */

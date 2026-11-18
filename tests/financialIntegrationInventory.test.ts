@@ -257,7 +257,8 @@ test('supplier reporting falls back to unit times quantity before exact invoice 
   let reads = 0;
   const reportDb = { prepare(sql: string) { reads++; return w.db.prepare(sql); } } as D1Database;
   const report = await operationsReport(reportDb, '2026-10-10', '2026-10-10');
-  assert.equal(reads, 8);
+  // 7 since printer phase 3 (row 347): the workspace probe rides the schema probe, and a database without 0236 reads no claims summary.
+  assert.equal(reads, 7);
   const supplier = (report.suppliers as Array<{ id: string; ordered_total_iqd: number }>).find(row => row.id === 'fi_old_supplier');
   assert.equal(supplier!.ordered_total_iqd, 2100101, 'the existing raw cost and charges still appear once');
 });

@@ -105,7 +105,7 @@ test('a complete period: every term of the server\'s arithmetic in its order, an
   const { rows, currency } = statementRows(summary({ totals: t, known: { orders_count: 2, incomplete_orders: 0, revenue_iqd: 1014000, cost_iqd: null, owner_net_iqd: null, totals: full, general_share_iqd: general, unallocated_share_iqd: unallocated,
     net_after_report_adjustments_iqd: t.owner_period_net_after_report_adjustments_iqd }, waiting: null }));
   assert.equal(currency, 'IQD');
-  assert.deepEqual(rows.map((r) => `${r.sign}${r.key}`), ['sales', '−cogs', '=gross', '+delivery', '+cod', '−wages', '−materials', '−fees', '−promotion', '−investor', '−general', '−deductions', '=net']);
+  assert.deepEqual(rows.map((r) => `${r.sign}${r.key}`), ['sales', '−cogs', '=gross', '+delivery', '+cod', '−wages', '−materials', '−fees', '−promotion', '−investor', '−general', '+service', '−deductions', '=net']);
   assert.equal(cell(rows, 'materials', 2), 3500, 'the materials and the owner\'s manual direct cost');
   assert.equal(cell(rows, 'fees', 2), 4000, 'courier and payment fees');
   assert.equal(cell(rows, 'promotion', 2), 7500, 'the month\'s shares and the promotion no sale carried yet');
@@ -683,4 +683,34 @@ test('«مقارنة جزئية» says why to a keyboard and a screen reader too
   const css = sourceOf('src/components/financeWorkspace/finance-workspace.css');
   assert.match(css, /\.fw-sr\{[^}]*user-select:none\}/, 'what only a screen reader reads is never copied');
   assert.match(css, /\.fw-metric:has\(\.fw-open:focus-visible\) \.fw-delta \.fw-sr\{position:static;width:auto;height:auto;clip:auto\}/, 'the keyboard\'s focus on the card shows the reason');
+});
+
+test('printer phase 3: the statement names the service income (Levo Care co-pays) between the general expenses and the deductions, only in a period that has some; the period still lands on its net, in dinars and in cents', () => {
+  const t: ProfitTotals = { ...full, general_expenses_iqd: 0, orders_count: 1 };
+  t.owner_period_net_after_report_adjustments_iqd = t.net_after_report_adjustments_iqd;
+  const plain = summary({ totals: t, known: null, waiting: null });
+  assert.doesNotMatch(drawStatement(plain), /data-key="service"/, 'no co-pay: no line of 0');
+  const withIncome = summary({ totals: { ...t, service_income_iqd: 25000, owner_period_net_after_report_adjustments_iqd: t.net_after_report_adjustments_iqd! + 25000 }, known: null, waiting: null, service_income_iqd: 25000 });
+  assert.equal(statementAddsUp(statementRows(plain).rows, 2), true);
+  assert.equal(statementAddsUp(statementRows(withIncome).rows, 2), true, 'the co-pay is a term of the net');
+  for (const [lang, name] of [['ar', 'إيرادات خدمات الصيانة'], ['en', 'Service income .Levo Care co-pays.'], ['ckb', 'داهاتی خزمەتگوزارییەکانی چاککردنەوە']] as const) {
+    const html = drawStatement(withIncome, 'IQD', lang);
+    assert.match(statementRow(html, 'service'), new RegExp(name), lang);
+    assert.match(statementRow(html, 'service'), /\+/, `${lang}: it adds`);
+    assert.match(statementRow(html, 'service'), /25,000/);
+    const keys = [...html.matchAll(/<tr[^>]*data-key="(\w+)"/g)].map((m) => m[1]);
+    assert.deepEqual(keys.slice(keys.indexOf('general'), keys.indexOf('general') + 3), ['general', 'service', 'deductions'], lang);
+  }
+  // In dollars: the server's cents for it, or — from a server that predates them — dinars, never a dollar column that misses it.
+  const cents = { retained_revenue_cents: 66667, cogs_cents: 46667, gross_profit_cents: 20000, shipping_income_cents: 667, cod_tax_cents: 267, direct_cost_cents: 633, wages_cents: 500, materials_cents: 133,
+    manual_direct_cents: 100, courier_fee_cents: 200, payment_fee_cents: 67, promotion_cents: 400, investor_cents: 400, coupon_cents: 200, price_protection_cents: 133, trade_in_credit_returned_cents: 467,
+    general_expenses_cents: 0, unallocated_promotion_cents: 0 };
+  const net = 20000 + 667 + 267 - 500 - (633 - 500 + 100) - 267 - 400 - 400 - 0 - 800;
+  const usd = { available: true, totals: { ...cents, service_income_cents: 1667, owner_period_net_after_report_adjustments_cents: net + 1667 } } as DisplayUsdSummary;
+  const st = statementRows({ ...withIncome, display_usd: usd }, usd);
+  assert.equal(st.currency, 'USD');
+  assert.equal(statementAddsUp(st.rows, 2), true, 'to the cent');
+  assert.match(statementRow(drawStatement({ ...withIncome, display_usd: usd }, 'USD'), 'service'), /16\.67/);
+  const older = { available: true, totals: { ...cents, owner_period_net_after_report_adjustments_cents: net } } as DisplayUsdSummary;
+  assert.equal(statementRows({ ...withIncome, display_usd: older }, older).currency, 'IQD', 'an older server without its cents answers in dinars');
 });

@@ -68,7 +68,14 @@ export type MoneyAct =
   /** The printer services price list (owner brief 2026-11-17): saving the draft — the owner's (owner ruling). */
   | 'printer_services'
   /** Publishing it to customers, or switching it off: the owner's. */
-  | 'printer_services_publish';
+  | 'printer_services_publish'
+  /**
+   * Phase 3 (DECISIONS row 347, owner ruling D3): approving or voiding a Levo Care benefit (the
+   * shop's discount on a Care repair). A financial admin's, not the owner's alone; an assistant is refused.
+   */
+  | 'care_claim_decision'
+  /** Recording or voiding what a warranty / Care claim cost the shop, and the Care co-pay collected (finance scope). */
+  | 'service_claim_cost';
 
 /** The acts only the owner performs, whatever the amount (decision 3). */
 export const OWNER_ONLY_ACTS: ReadonlySet<MoneyAct> = new Set<MoneyAct>([

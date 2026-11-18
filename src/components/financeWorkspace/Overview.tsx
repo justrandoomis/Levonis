@@ -13,6 +13,7 @@ import type { OrderFocus } from './OrderProfitSheet';
 import { columnEstimates, type FigureKey } from './drill';
 import { piecesOf } from './reportTable';
 import { rs } from './reportStrings';
+import { PrinterServicesCard } from './PrinterServicesCard';
 
 /**
  * «نظرة عامة» — THE OVERVIEW OF «المال والأرباح» (redesign step 3, owner 2026-11-11).
@@ -148,6 +149,8 @@ export default function Overview({ data, prev, compareFrom, compareTo, revision 
       <TopProducts data={data} usd={u} onNavigate={onNavigate} />
       <div className="fw-body"><Cash data={data} usd={u} onCollections={onCollections} onFigure={onFigure} /><Payouts people={people} onNavigate={onNavigate} /></div>
     </div>
+    {/* Printer phase 3: the services inside the printer lines and the claims' money — information, in dinars. */}
+    <PrinterServicesCard data={data} />
   </div>;
 }
 
@@ -260,7 +263,7 @@ export function Attention({ data, usd, people, openOrder, onNavigate, onMissing,
 }
 
 const ROW: Record<StatementKey, FwKey> = { sales: 'netSales', cogs: 'cogs', gross: 'grossProfit', delivery: 'delivery', cod: 'cod', wages: 'wages', materials: 'materials', fees: 'fees',
-  promotion: 'promo', investor: 'investor', general: 'expenses', deductions: 'deductions', net: 'netShare' };
+  promotion: 'promo', investor: 'investor', general: 'expenses', service: 'serviceIncome', deductions: 'deductions', net: 'netShare' };
 /** «من المبيعات إلى حصتك»: three columns on a wide screen, one at a time on a phone; in dollars the server's cents. */
 export function Statement({ data, usd, onOpen }: { data: FinanceSummary; usd?: DisplayUsdSummary; onOpen?: (key: StatementKey) => void }) {
   const { loc } = useLanguage();
@@ -291,7 +294,8 @@ export function Statement({ data, usd, onOpen }: { data: FinanceSummary; usd?: D
       {visible.map((i) => <button key={i} type="button" aria-pressed={col === i} onClick={() => setCol(i)}>{heads[i]}</button>)}</div>}
     <div className="fw-table-wrap"><table className="fw-table fw-pl" data-finance-statement={currency} data-phone-col={col}>
       <thead><tr><th scope="col"><span className="fw-sr">{fw(loc, 'statement')}</span></th>{visible.map((i) => <th key={i} scope="col" data-col={i}>{heads[i]}</th>)}</tr></thead>
-      <tbody>{rows.map((r) => <tr key={r.key} className={r.sign === '=' ? 'fw-pl-sum' : undefined} data-key={r.key}>
+      {/* Printer phase 3: the service income (Levo Care co-pays) is a line only in a period that has some. */}
+      <tbody>{rows.filter((r) => r.key !== 'service' || r.cells.some((v) => v !== null && v !== 0)).map((r) => <tr key={r.key} className={r.sign === '=' ? 'fw-pl-sum' : undefined} data-key={r.key}>
         <th scope="row"><span className="fw-pl-op" aria-hidden>{r.sign}</span>{onOpen ? <button type="button" className="fw-open" onClick={() => onOpen(r.key)} title={rs(loc, 'drawerOpen', { name: fw(loc, ROW[r.key]) })} data-finance-open={r.key}>{fw(loc, ROW[r.key])}</button> : fw(loc, ROW[r.key])}{hint(r.key) && <small>{hint(r.key)}</small>}</th>
         {visible.map((i) => <td key={i} data-col={i}>{cell(r.cells[i], i, r.key)}</td>)}
       </tr>)}</tbody>

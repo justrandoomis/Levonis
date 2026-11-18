@@ -60,6 +60,50 @@ export interface Device {
    * by. Null when the shop has none for it. GET /api/devices/mine only.
    */
   maintenance?: { printer_slug: string; count: number } | null;
+  /** Printer phase 3: the device's Levo Care (null = none bought, or an older database; absent from an older server). */
+  care?: CarePublic | null;
+}
+
+export interface CareText { ar: string; en: string; ckb: string }
+/** Levo Care as the customer reads it — never a cost of the shop. */
+export interface CarePublic {
+  state: 'not_delivered' | 'active' | 'expired' | 'closed' | 'terms_missing' | (string & {});
+  policy_version?: number | null;
+  start_at: string | null;
+  end_at: string | null;
+  claims_left: number | null;
+  benefit_left_iqd: number | null;
+  discount_pct: number | null;
+  labor?: 'discounted' | 'full_price' | null;
+  shipping?: 'discounted' | 'full_price' | null;
+  eligible_parts?: Array<{ key: string; label: CareText }>;
+  exclusions?: CareText[];
+}
+/** A Levo Care quote on a claim, as the claimant sees it. */
+export interface CareQuotePublic {
+  state: 'quoted' | 'accepted' | 'approved' | 'void' | (string & {});
+  version: number;
+  parts: Array<{ key: string; label: CareText | null; qty: number; unit_iqd: number; total_iqd: number }>;
+  labor_iqd: number;
+  shipping_iqd: number;
+  other_iqd: number;
+  note?: string;
+  list_iqd: number;
+  eligible_iqd?: number;
+  discount_pct: number;
+  benefit_iqd: number;
+  copay_iqd: number;
+  quoted_at?: string;
+  customer_accepted_at: string | null;
+  decided_at?: string | null;
+  copay_collected?: boolean;
+  voided_at?: string | null;
+}
+
+/** A Care text in the reader's language, falling back across the other two. */
+export function careText(t: CareText | null | undefined, lang: Language): string {
+  if (!t) return '';
+  return lang === 'en' ? t.en || t.ar || t.ckb : lang === 'ckb' ? t.ckb || t.ar || t.en : t.ar || t.en || t.ckb;
 }
 
 export interface EligibleUnit extends Device {
@@ -118,6 +162,8 @@ export interface Claim {
     end_at: string | null;
     policy_version: string | null;
   } | null;
+  /** Printer phase 3: a warranty or a Levo Care claim (absent from an older server = warranty). */
+  claim_kind?: 'warranty' | 'care';
 }
 
 /**
@@ -160,6 +206,8 @@ export interface ClaimDetail {
     cover_end_at?: string | null;
   } | null;
   messages: ClaimMessage[];
+  /** Printer phase 3: Care at the filing date and its quote; null without a unit or 0236, absent from an older server. */
+  care?: { entitlement: CarePublic | null; quote: CareQuotePublic | null } | null;
 }
 
 export interface Attachment {

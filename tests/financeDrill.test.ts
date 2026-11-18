@@ -21,7 +21,7 @@ import { everyState, order, period, usd, world } from './fixtures/financeWorld';
 import { baghdadDay } from '../worker/lib/operations';
 import { november } from './fixtures/financeSampleMonth';
 import { cashCard, drill, drillParts, FORMULA, headline, rowsSum, STATEMENT_FIGURES, type FigureKey } from '../src/components/financeWorkspace/drill';
-import { statementRows } from '../src/components/financeWorkspace/statement';
+import { statementAddsUp, statementRows } from '../src/components/financeWorkspace/statement';
 import { overviewNet } from '../src/components/financeWorkspace/overviewFigures';
 import { RS } from '../src/components/financeWorkspace/reportStrings';
 import { FW } from '../src/components/financeWorkspace/overviewStrings';
@@ -307,4 +307,70 @@ test('a known goods cost on a sale-time estimate is named in the drawer and in t
   assert.deepEqual([estimated('cogs', 0), estimated('cogs', 1), estimated('gross', 1), estimated('net', 0), estimated('net', 1), estimated('sales', 1), estimated('investor', 0)],
     [['est'], ['wage'], ['wage'], ['est'], [], [], []]);
   assert.deepEqual([drill(s, 'cogs', 1).estimated, drill(s, 'cogs', 1, s.display_usd).estimated, headline(s, 'cogs').estimated, headline(s, 'net').estimated, headline(s, 'sales').estimated], [1, 1, 2, 1, 0]);
+});
+
+// ------------------------------------------------------------------ printer phase 3: the service income
+/** A Levo Care co-pay collected today (seeded: the Care flow itself is tests/printerCareClaims.test.ts). */
+function copay(raw: ReturnType<typeof world>['raw'], amount: number) {
+  const now = new Date().toISOString(), day = baghdadDay();
+  raw.exec(`INSERT INTO warranty_claims (id,user_id,order_item_id,product_name,description,stage,status,claim_kind) VALUES ('wc_care','buyer','fifo:item','Printer','care claim','resolved','approved','care');`);
+  raw.prepare(`INSERT INTO care_claim_benefits (id,claim_id,entitlement_unit_id,order_item_id,policy_version,quote_json,list_iqd,eligible_iqd,discount_pct,benefit_iqd,copay_iqd,state,quoted_at,decided_at,decided_day,copay_collected_at,copay_collected_day)
+    VALUES ('ccb1','wc_care','u1','fifo:item',1,'{}',?,0,0,0,?,'approved',?,?,?,?,?)`).run(amount, amount, now, now, day, now, day);
+}
+
+test('printer phase 3: a Levo Care co-pay collected (service income, 4300) is a line of the statement, shared between the columns by revenue ON the net — every column and every drawer still adds up, in dinars and in cents', async () => {
+  const w = everyState();
+  copay(w.raw, 25_001);
+  const s = await w.read(`/f/summary?${w.range}&display=USD`) as FinanceSummary;
+  assert.equal(s.totals.service_income_iqd, 25_001);
+  const shares = [s.known?.service_share_iqd ?? 0, s.waiting?.service_share_iqd ?? 0];
+  assert.ok(shares[0] > 0 && shares[1] > 0, `both columns carry a share (${shares})`);
+  assert.equal(shares[0] + shares[1], 25_001, 'the two shares are the whole, to the dinar');
+  const u = s.display_usd!;
+  assert.equal(u.totals?.service_income_cents, Math.round(25_001 / 1500 * 100), 'its cents at the day\'s rate');
+  assert.equal((u.known?.service_share_cents ?? 0) + (u.waiting?.service_share_cents ?? 0), u.totals?.service_income_cents);
+  for (const [block, currency] of [[undefined, 'IQD'], [u, 'USD']] as const) {
+    const st = statementRows(s, block);
+    const row = st.rows.find((r) => r.key === 'service')!;
+    assert.equal(row.sign, '+');
+    assert.equal(row.cells[0]! + row.cells[1]!, row.cells[2], `${currency}: «محسوبة» + «تنتظر» = the period`);
+    assert.equal(statementAddsUp(st.rows, 0), true, `${currency}: the calculated column lands on its net with the co-pay share`);
+  }
+  addsUp(s, undefined, 'IQD');
+  addsUp(s, u, 'USD');
+  assert.deepEqual(drill(s, 'service', 0).rows.map((r) => [r.kind, r.value]), [['service', shares[0]]]);
+  assert.ok(drill(s, 'net', 0).rows.some((r) => r.kind === 'service' && r.value === shares[0]), 'the net\'s drawer names the share it gained');
+});
+
+test('printer phase 3: with nothing waiting the period column — the one the owner sees — sums to the net that includes the co-pay, in dinars and in cents', async () => {
+  const w = world();
+  usd(w.raw);
+  order(w.raw, { id: 'fifo' });
+  w.raw.exec(`INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,created_by) VALUES ('rent1','rent',10001,'${baghdadDay()}','Rent','admin');`);
+  const before = await w.read(`/f/summary?${period()}&display=USD`) as FinanceSummary;
+  copay(w.raw, 25_000);
+  const s = await w.read(`/f/summary?${period()}&display=USD`) as FinanceSummary;
+  assert.equal(s.waiting, null);
+  assert.equal((s.totals.owner_period_net_iqd ?? 0) - (before.totals.owner_period_net_iqd ?? 0), 25_000, 'the net gained the co-pay (DECISIONS row 347, ruling D2)');
+  for (const [block, currency] of [[undefined, 'IQD'], [s.display_usd, 'USD']] as const) {
+    const st = statementRows(s, block);
+    assert.equal(st.currency, currency);
+    const net = st.rows.find((r) => r.key === 'net')!.cells[2];
+    assert.equal(net, currency === 'IQD' ? s.totals.owner_period_net_after_report_adjustments_iqd ?? s.totals.owner_period_net_iqd : s.display_usd!.totals!.owner_period_net_after_report_adjustments_cents);
+    assert.equal(st.rows.find((r) => r.key === 'service')!.cells[2], currency === 'IQD' ? 25_000 : Math.round(25_000 / 1500 * 100));
+    assert.equal(statementAddsUp(st.rows, 2), true, `${currency}: the period's rows add up to its net`);
+    assert.equal(statementAddsUp(st.rows.filter((r) => r.key !== 'service'), 2), false, `${currency}: without the line it would not`);
+    assert.deepEqual(st.rows.map((r) => r.cells[0]), st.rows.map((r) => r.cells[2]), `${currency}: nothing waits: «محسوبة» is the period`);
+    for (const key of STATEMENT_FIGURES) {
+      const d = drill(s, key, 0, block);
+      assert.equal(rowsSum(d.rows), st.rows.find((r) => r.key === key)!.cells[0], `${key} in ${currency}`);
+    }
+  }
+  // Its formula in three languages, the Sorani its own.
+  assert.ok(RS.fService.every(Boolean) && SORANI_ONLY.test(RS.fService[2]));
+  assert.ok(FW.serviceIncome.every(Boolean) && SORANI_ONLY.test(FW.serviceIncome[2]));
+  // The drawer of the line: its share alone, no order list and no order file.
+  const html = await body(s, 'service', { lang: 'en' });
+  assert.match(html, /data-finance-drill-row="service"/);
+  assert.doesNotMatch(html, /data-finance-drawer-csv/);
 });

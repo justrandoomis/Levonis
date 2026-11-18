@@ -18,7 +18,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useOptionalAuth } from '../../AuthContext';
 import { Layers, Save, Send, Power } from 'lucide-react';
-import { KitsPanel, MembershipPanel, issueText, kitsBlocked } from './PrinterExtrasPanels';
+import { KitsPanel, MembershipPanel, issueText as extrasIssueText, kitsBlocked } from './PrinterExtrasPanels';
+import { CareTermsPanel, InspectionLaborField, careIssueText } from './CareTermsPanel';
+import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { useLanguage } from '../../LanguageContext';
 import { api, ApiError, formatIqd } from '../../lib/api';
 import {
@@ -45,6 +47,12 @@ type Loc = (ar: string, en: string, ckb: string) => string;
 const FAMILY_LABEL: Record<WarrantyFamily, string> = { a1: 'A1', xpa2: 'X / P / A2', h2: 'H2', h3c: 'H3C' };
 const CLASS_LABEL: Record<DeliveryClass, string> = {
   d1: 'A1 mini · A1', d2: 'A1 Combo · P1S · P2S · X2D · Snapmaker U1', d3: 'A2L', d4: 'H2', d5: 'H3C',
+};
+
+/** A server issue in the reader's language: the Care terms' own (phase 3) first, then the rest of the list's. */
+const issueText: typeof extrasIssueText = (issue, loc, kits) => {
+  const care = careIssueText(issue, loc);
+  return care ? { text: care, translated: true } : extrasIssueText(issue, loc, kits);
 };
 
 export default function AdminPrinterServices({ productId, onDirtyChange }: { productId: string; onDirtyChange?: (dirty: boolean) => void }) {
@@ -101,6 +109,9 @@ export default function AdminPrinterServices({ productId, onDirtyChange }: { pro
         // The server lists its issues in English (`…: path: message; …`): each is said in the reader's language.
         const list = e.message.replace(/^[^:]*?: /, '').split('; ').map((i) => issueText(i, loc, draft?.kits ?? []).text);
         setMessage(`${e.code === 'PRINTER_SERVICES_NOT_READY' ? loc('غير جاهزة للنشر', 'Not ready to publish', 'ئامادە نییە بۆ بڵاوکردنەوە') : loc('لم تُحفظ', 'Not saved', 'پاشەکەوت نەکرا')}: ${list.join(' · ')}`);
+      } else if (e instanceof ApiError && e.code === 'CARE_POLICY_VERSION_REUSED') {
+        // Phase 3: the published version's Care terms are frozen — said by its code, in the reader's language.
+        setMessage(apiRefusal(e, refusalLang(lang), e.message));
       } else {
         setMessage(e instanceof ApiError ? `${e.message}` : String(e));
       }
@@ -262,6 +273,7 @@ export default function AdminPrinterServices({ productId, onDirtyChange }: { pro
         {num(draft.care.max_discount_pct, (n) => upd((d) => { d.care.max_discount_pct = Math.min(90, n ?? 0); }), loc('أقصى خصم Care %', 'Care max discount %', 'زۆرترین داشکاندنی Care %'))}
         {num(draft.packaging.extra_iqd, (n) => upd((d) => { d.packaging.extra_iqd = n; }), loc('تغليف حماية إضافية', 'Extra packaging', 'پێچانەوەی زیادە'))}
         {num(draft.inspection.price_iqd, (n) => upd((d) => { d.inspection.price_iqd = n; }), loc('الفحص قبل الشحن', 'Pre-dispatch inspection', 'پشکنین پێش ناردن'))}
+        <InspectionLaborField draft={draft} upd={upd} loc={loc} />
         {num(draft.academy.recorded_iqd, (n) => upd((d) => { d.academy.recorded_iqd = n; }), loc('فيديوهات مسجلة', 'Recorded videos', 'ڤیدیۆی تۆمارکراو'))}
         {num(draft.academy.live_iqd, (n) => upd((d) => { d.academy.live_iqd = n; }), loc('دورة مباشرة', 'Live course', 'خولی ڕاستەوخۆ'))}
         {DELIVERY_CLASSES.map((c) => (
@@ -289,6 +301,7 @@ export default function AdminPrinterServices({ productId, onDirtyChange }: { pro
         ))}
       </section>
 
+      <CareTermsPanel draft={draft} upd={upd} loc={loc} published={state.published} />
       <MembershipPanel draft={draft} upd={upd} loc={loc} />
       <KitsPanel draft={draft} upd={upd} loc={loc} lang={lang} printers={state.printers} productId={productId} />
 
