@@ -522,7 +522,6 @@ function PolicyScene() {
           plans={[]}
           serialized={serialized}
           baseMonths={null}
-          priceIqd={399_000}
           errors={{}}
           onPlansChange={() => undefined}
           onSerializedChange={setSerialized}
@@ -538,7 +537,6 @@ function PolicyScene() {
           plans={[]}
           serialized={printerSerialized}
           baseMonths={12}
-          priceIqd={899_000}
           errors={{}}
           onPlansChange={() => undefined}
           onSerializedChange={setPrinterSerialized}

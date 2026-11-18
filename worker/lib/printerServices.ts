@@ -559,6 +559,8 @@ export function orderServicesView(snapshot: string): {
   package_discount_iqd: number;
   warranty_months: number;
   care_months: number;
+  /** The whole Care cover from delivery (warranty months + 12 after it); a line frozen before phase 5 is computed. */
+  care_total_months: number;
   inspection_lead_business_days: [number, number] | null;
   delivery: string | null;
   delivery_fee_iqd: number | null;
@@ -585,6 +587,7 @@ export function orderServicesView(snapshot: string): {
     package_discount_iqd: num(v.package_discount_iqd),
     warranty_months: num(v.warranty_months),
     care_months: num(v.care_months),
+    care_total_months: num(v.care_months) > 0 ? (typeof v.care_total_months === 'number' && v.care_total_months > 0 ? v.care_total_months : num(v.warranty_months) + num(v.care_months)) : 0,
     inspection_lead_business_days: Array.isArray(v.inspection_lead_business_days) ? (v.inspection_lead_business_days as [number, number]) : null,
     delivery: sel && typeof sel.delivery === 'string' ? sel.delivery : null,
     delivery_fee_iqd: typeof v.delivery_fee_iqd === 'number' ? v.delivery_fee_iqd : null,

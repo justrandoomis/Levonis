@@ -695,7 +695,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
           draft.care === 'c12' ? shown(priceOf(offer.care?.c12)) : s.none,
           choice(s.care, [
             { id: 'none' as const, label: s.none, price: 0 },
-            { id: 'c12' as const, label: s.careOption, price: priceOf(offer.care?.c12) },
+            { id: 'c12' as const, label: s.careOption(draft.warranty === 'w24' ? 36 : draft.warranty === 'w12' ? 24 : 12), price: priceOf(offer.care?.c12) },
           ], draft.care, (v) => set({ care: v })), !offer.care)}
 
         {/* Phase 2: the membership bought WITH the printer — its own order line at the live plan price. */}

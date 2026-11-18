@@ -739,7 +739,8 @@ test('«منتج غير مرتبط كطابعة؟» is gone from the UI — and 
   // «يحذف — فالضمان للطابعات فقط»: no control opens a general claim any more.
   const form = srcFile('src/components/warranty/ClaimForms.tsx');
   const page = srcFile('src/pages/Warranty.tsx');
-  const strings = srcFile('src/components/warranty/strings.ts');
+  // Every table of the page's words (split by subject under copy/ in phase 5), not the barrel alone.
+  const strings = ['strings.ts', 'copy/page.ts', 'copy/add.ts', 'copy/claims.ts', 'copy/care.ts'].map((f) => srcFile(`src/components/warranty/${f}`)).join('\n');
   assert.doesNotMatch(form, /export function LegacyClaimOverlay/);
   assert.doesNotMatch(page, /LegacyClaimOverlay|legacyClaimLink|showLegacy/);
   assert.doesNotMatch(strings, /legacyClaimLink/);

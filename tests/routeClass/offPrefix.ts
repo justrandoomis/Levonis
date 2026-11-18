@@ -225,6 +225,10 @@ export default {
         'POST /admin/claims/:id/care-copay': 'money',
         'POST /admin/claims/:id/costs': 'money',
         'POST /admin/claims/:id/costs/:costId/void': 'money',
+        // Phase 5 (DECISIONS row 358): the Care part offer — a discount on a store part is the shop's money (D3).
+        'GET /admin/part-products': 'op',
+        'POST /admin/claims/:id/part-grants': 'money',
+        'POST /admin/claims/:id/part-grants/:grantId/revoke': 'money',
         'POST /admin/products/:id/ops-policy': 'op',
       },
     },

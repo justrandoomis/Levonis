@@ -11,6 +11,11 @@
  * out-of-pocket costs are the owner's to read (`costs` is null for anyone else); any
  * admin who may decide its money (`can_decide`, owner ruling D3) may record one.
  * Every amount is whole IQD; every refusal is said by its code.
+ *
+ * PHASE 5 (DECISIONS row 358): Care is the 12 months AFTER the warranty, so the entitlement says the
+ * whole cover from delivery and the day Care becomes the only cover; and «خصم على قطعة — ليفو كير»
+ * (PartOfferPanel) sends the customer a discount on one store part in the claim's chat. An older
+ * server that sends neither still renders: every new field is read with a fallback.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../lib/api';
@@ -18,6 +23,7 @@ import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { formatMoney } from '../../lib/money';
 import { dateLocale } from '../orders/format';
 import type { Language } from '../../translations';
+import PartOfferPanel, { type PartGrantAdmin, type PartRules } from './PartOfferPanel';
 
 type Text3 = { ar: string; en: string; ckb: string };
 type Cover = 'discounted' | 'full_price';
@@ -78,7 +84,14 @@ interface CarePanelData {
     benefit_left_iqd: number | null;
     terms: CareTerms | null;
     used_excluding_this_claim?: { claims: number; benefit_iqd: number };
+    /** Phase 5: the warranty's months, the whole cover from delivery, and the day Care becomes the only cover. */
+    warranty_months?: number;
+    total_months?: number;
+    care_only_from?: string | null;
   } | null;
+  /** Phase 5: the claim's part offers (newest first) and the rules the offer form works within. */
+  part_grants?: PartGrantAdmin[];
+  part_rules?: PartRules | null;
   quote: CareQuote | null;
   costs: ClaimCost[] | null;
   costs_total_iqd: number | null;
@@ -88,6 +101,8 @@ interface CarePanelData {
 
 const COST_KINDS: readonly CostKind[] = ['part_purchase', 'labor', 'courier', 'replacement', 'other'];
 const OPEN_FOR_QUOTE = new Set(['received', 'diagnosing']);
+/** The stages at which a claim is closed (worker/lib/deviceOps.ts CLOSED_CLAIM_STAGES): no new part offer. */
+const CLOSED_STAGES = new Set(['rejected', 'replaced', 'resolved']);
 
 const S = {
   ar: {
@@ -97,6 +112,8 @@ const S = {
     entitlement: 'الاستحقاق — عند تاريخ تقديم المطالبة',
     careState: { none: 'لم يشترِ ليفو كير', not_delivered: 'الجهاز لم يُسلَّم بعد', active: 'ساري', expired: 'منتهي', closed: 'مُغلق (أُعيد الجهاز)', terms_missing: 'شروط هذا الإصدار غير مكتوبة' } as Record<string, string>,
     until: (d: string) => `حتى ${d}`,
+    cover: 'مدة التغطية', coverLine: (w: number, t: number) => (w > 0 ? `ضمان ${w} شهراً + ليفو كير ${t - w} شهراً = ${t} شهراً من التسليم` : `ليفو كير ${t} شهراً من التسليم`),
+    careOnlyFrom: (d: string) => `ليفو كير وحده من ${d}`,
     claimsLeft: 'المطالبات المتبقية', benefitLeft: 'الخصم المتبقي', noCap: 'بلا سقف', policy: 'إصدار الشروط',
     wState: { active: 'ساري', expired: 'منتهي', needs_config: 'بحاجة إعداد', not_delivered: 'غير مُسلَّم', closed: 'مُغلق' } as Record<string, string>,
     discount: 'نسبة الخصم', warranty: 'الضمان', usedBefore: 'المستخدم قبل هذه المطالبة',
@@ -131,6 +148,8 @@ const S = {
     entitlement: 'Entitlement — on the claim’s filing date',
     careState: { none: 'No Levo Care bought', not_delivered: 'Device not delivered yet', active: 'Active', expired: 'Expired', closed: 'Closed (device returned)', terms_missing: 'Terms of this version are not written' } as Record<string, string>,
     until: (d: string) => `until ${d}`,
+    cover: 'Cover', coverLine: (w: number, t: number) => (w > 0 ? `${w}-month warranty + ${t - w} of Levo Care = ${t} months from delivery` : `${t} months of Levo Care from delivery`),
+    careOnlyFrom: (d: string) => `Levo Care alone from ${d}`,
     claimsLeft: 'Claims left', benefitLeft: 'Discount left', noCap: 'No cap', policy: 'Terms version',
     wState: { active: 'Active', expired: 'Expired', needs_config: 'Needs setup', not_delivered: 'Not delivered', closed: 'Closed' } as Record<string, string>,
     discount: 'Discount', warranty: 'Warranty', usedBefore: 'Used before this claim',
@@ -165,6 +184,8 @@ const S = {
     entitlement: 'مافەکە — لە بەرواری پێشکەشکردنی داواکارییەکەدا',
     careState: { none: 'لیڤۆ کێری نەکڕیوە', not_delivered: 'ئامێرەکە هێشتا نەگەیەنراوە', active: 'چالاکە', expired: 'بەسەرچووە', closed: 'داخراوە (ئامێرەکە گەڕێنراوەتەوە)', terms_missing: 'مەرجەکانی ئەم وەشانە نەنووسراون' } as Record<string, string>,
     until: (d: string) => `تا ${d}`,
+    cover: 'ماوەی داپۆشین', coverLine: (w: number, t: number) => (w > 0 ? `گەرەنتی ${w} مانگ + ${t - w} مانگی لیڤۆ کێر = ${t} مانگ لە گەیاندنەوە` : `${t} مانگی لیڤۆ کێر لە گەیاندنەوە`),
+    careOnlyFrom: (d: string) => `تەنها لیڤۆ کێر لە ${d}ەوە`,
     claimsLeft: 'داواکارییە ماوەکان', benefitLeft: 'داشکاندنی ماوە', noCap: 'بێ سنوور', policy: 'وەشانی مەرجەکان',
     wState: { active: 'چالاکە', expired: 'بەسەرچووە', needs_config: 'پێویستی بە ڕێکخستنە', not_delivered: 'نەگەیەنراوە', closed: 'داخراوە' } as Record<string, string>,
     discount: 'ڕێژەی داشکاندن', warranty: 'گەرەنتی', usedBefore: 'بەکارهاتوو پێش ئەم داواکارییە',
@@ -252,8 +273,9 @@ export default function ClaimCarePanel({ claimId, lang, onChanged }: { claimId: 
     return () => { live = false; };
   }, [claimId, lang, adopt, s.error]);
 
-  const run = async (path: string, body: unknown, after?: () => void) => {
-    if (busy) return;
+  /** One admin write on this claim: the fresh panel is adopted, a refusal is said by its code. True when it went through. */
+  const run = async (path: string, body: unknown, after?: () => void): Promise<boolean> => {
+    if (busy) return false;
     setBusy(true);
     setMessage(null);
     try {
@@ -262,8 +284,10 @@ export default function ClaimCarePanel({ claimId, lang, onChanged }: { claimId: 
       after?.();
       setMessage({ tone: 'ok', text: s.done });
       onChanged?.();
+      return true;
     } catch (e) {
       setMessage({ tone: 'error', text: e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : s.error });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -295,6 +319,11 @@ export default function ClaimCarePanel({ claimId, lang, onChanged }: { claimId: 
   const fig = (label: string, value: string, strong = false) => (
     <><dt className="text-text-muted">{label}</dt><dd className={`tabular-nums ${strong ? 'font-bold text-text-primary' : 'text-text-secondary'}`} dir="ltr">{value}</dd></>
   );
+
+  // Phase 5 — the part offer. An older server sends neither field: no section then.
+  const partGrants = data.part_grants ?? [];
+  const partRules = data.part_rules ?? null;
+  const claimsLeftForThis = terms ? Math.max(0, terms.max_claims - usedBefore.claims) : null;
 
   const sendQuote = () => run('care-quote', {
     parts: draft.parts.filter((p) => p.key).map((p) => ({ key: p.key, qty: p.qty || 1, unit_iqd: p.unit_iqd })),
@@ -341,6 +370,15 @@ export default function ClaimCarePanel({ claimId, lang, onChanged }: { claimId: 
                 {s.careState[care.state] ?? care.state}
                 {care.end_at && (care.state === 'active' || care.state === 'expired') ? ` · ${s.until(dateText(care.end_at, lang))}` : ''}
               </dd>
+              {care.total_months != null && care.total_months > 0 && (
+                <>
+                  <dt className="text-text-muted">{s.cover}</dt>
+                  <dd className="text-text-secondary" data-care-cover-months={care.total_months}>
+                    {s.coverLine(care.warranty_months ?? 0, care.total_months)}
+                    {care.care_only_from && (care.warranty_months ?? 0) > 0 ? ` · ${s.careOnlyFrom(dateText(care.care_only_from, lang))}` : ''}
+                  </dd>
+                </>
+              )}
               {data.warranty && <><dt className="text-text-muted">{s.warranty}</dt><dd className="text-text-secondary">{s.wState[data.warranty.state] ?? data.warranty.state}{data.warranty.end_at ? ` · ${s.until(dateText(data.warranty.end_at, lang))}` : ''}</dd></>}
               {care.policy_version != null && <><dt className="text-text-muted">{s.policy}</dt><dd className="text-text-secondary tabular-nums">v{care.policy_version}</dd></>}
               {terms && <><dt className="text-text-muted">{s.discount}</dt><dd className="text-text-secondary tabular-nums" dir="ltr">{terms.discount_pct}%</dd></>}
@@ -359,6 +397,24 @@ export default function ClaimCarePanel({ claimId, lang, onChanged }: { claimId: 
           </>
         )}
       </section>
+
+      {/* ---------------------------------------------------- part offers (phase 5) */}
+      {care && (partRules || partGrants.length > 0) && (
+        <PartOfferPanel
+          claimId={claimId}
+          lang={lang}
+          grants={partGrants}
+          rules={partRules ?? { default_pct: terms?.discount_pct ?? null, max_pct: 90, valid_days: 14, max_live: 5 }}
+          canDecide={canDecide}
+          careActive={care.state === 'active' && !!terms}
+          claimOpen={!CLOSED_STAGES.has(stage)}
+          claimsLeft={claimsLeftForThis}
+          warrantyActive={data.warranty?.state === 'active'}
+          benefitLeftIqd={terms && terms.max_benefit_iqd == null ? null : care.benefit_left_iqd ?? null}
+          busy={busy}
+          run={run}
+        />
+      )}
 
       {/* ---------------------------------------------------- saved quote */}
       {quote && (

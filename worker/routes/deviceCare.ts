@@ -18,6 +18,11 @@
  *   POST /admin/claims/:id/costs              service_claim_cost: an out-of-pocket cost — a GENERAL expense of
  *                                             its cost day (never written back to an order), idempotent by operation_id
  *   POST /admin/claims/:id/costs/:costId/void service_claim_cost: void it (the expense and its journal reversed)
+ * Phase 5 (DECISIONS row 358; migration 0243) — the Care PART OFFER:
+ *   GET  /admin/part-products?q=&claim_id=     (op) the staff picker: store parts that may be offered
+ *   POST /admin/claims/:id/part-grants         care_claim_decision: a discount on one store part, sent to the
+ *                                             claimant in the claim thread; applies by itself in his cart
+ *   POST /admin/claims/:id/part-grants/:grantId/revoke   care_claim_decision: take a live offer back
  *
  * A database without 0236 answers 503 CARE_NOT_INSTALLED on every door here (CLAUDE.md rule 2).
  */
@@ -31,8 +36,12 @@ import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthori
 import { baghdadDay, dateValue, fence, isFenceMiss, journalPlan, operationsInstalled, periodOpen, whole } from '../lib/operations';
 import { planExpenseAccounting } from '../lib/expenseAccounting';
 import { unitCoverage } from '../lib/deviceCustody';
-import { claimFiledColumnsInstalled, effectiveClaimStage, effectiveClaimStageSql, stageToLegacyStatus } from '../lib/deviceOps';
-import { notifyClaimStage } from '../lib/engagementNotify';
+import { claimFiledColumnsInstalled, claimIsOpen, closedClaimSql, effectiveClaimStage, effectiveClaimStageSql, stageToLegacyStatus } from '../lib/deviceOps';
+import { notifyClaimReply, notifyClaimStage } from '../lib/engagementNotify';
+import { publishedPrinterServices } from '../lib/printerServices';
+import { LIVE_RESERVED_SQL, PART_MAX_LIVE, PART_VALID_DAYS, CARE_COUPON_PREFIX, carePartGrantsInstalled, grantById, grantState, grantsOfClaim, liveReservedOnRoot } from '../lib/carePartGrants';
+import { offerablePart, partGrantViews, searchOfferableParts } from '../lib/carePartGrantViews';
+import { SPENT_SQL } from '../lib/rewards/pool';
 import {
   CLAIM_COST_CATEGORY,
   CLAIM_COST_KINDS,
@@ -47,6 +56,7 @@ import {
   parseCareQuote,
   priceCareQuote,
   type CareBenefitRow,
+  type CareEntitlement,
   type ClaimCostKind,
   type ServiceClaimCostRow,
 } from '../lib/careClaims';
@@ -139,11 +149,14 @@ async function costsOf(db: D1Database, claimId: string): Promise<ServiceClaimCos
 async function carePanel(c: Context<AppContext>, claimId: string) {
   const db = c.env.DB;
   const claim = await claimHead(db, claimId);
-  const [entitlement, benefit, warranty] = await Promise.all([
+  const [entitlement, benefit, warranty, grants, published] = await Promise.all([
     entitlementAtFiling(db, claim),
     careBenefitOf(db, claim.id),
     warrantyAtFiling(db, claim),
+    grantsOfClaim(db, claim.id),
+    publishedPrinterServices(db).catch(() => null),
   ]);
+  const partRules = partRulesOf(published, entitlement?.terms ?? null);
   // What a claim cost the shop is a general expense, and expenses are cost (owner decision 2: the finance pages sit
   // behind requireCostRead): only a cost reader sees the list. A financial admin RECORDS costs (owner ruling D3) and
   // decides Care (`can_decide`); an assistant does neither.
@@ -161,16 +174,10 @@ async function carePanel(c: Context<AppContext>, claimId: string) {
       created_at: claim.created_at,
     },
     warranty,
-    care: entitlement
-      ? {
-          ...entitlement,
-          // The caps the quote is priced against: this claim's own approval is not «used» by itself.
-          used_excluding_this_claim:
-            benefit?.state === 'approved'
-              ? { claims: Math.max(0, entitlement.used_claims - 1), benefit_iqd: Math.max(0, entitlement.used_benefit_iqd - benefit.benefit_iqd) }
-              : { claims: entitlement.used_claims, benefit_iqd: entitlement.used_benefit_iqd },
-        }
-      : null,
+    care: entitlement ? carePanelEntitlement(entitlement, claim.id) : null,
+    // Phase 5: the claim's part offers (newest first) and the rules the offer form works within.
+    part_grants: await partGrantViews(db, grants, claim.user_id, { admin: true }),
+    part_rules: partRules,
     quote: careQuotePublic(benefit, entitlement?.terms ?? null, { admin: true }),
     costs: costs ? costs.map(claimCostPublic) : null,
     costs_total_iqd: costs ? costs.filter((r) => !r.voided_at).reduce((s, r) => s + Number(r.amount_iqd || 0), 0) : null,
@@ -180,6 +187,35 @@ async function carePanel(c: Context<AppContext>, claimId: string) {
 }
 
 const reasonOf = (v: unknown) => str(v, 'reason', { min: 5, max: 1000 });
+
+/** What the OTHER claims of the device used: a claim's own approval or used part offer is not «used» against itself. */
+function usedByOthers(ent: CareEntitlement, claimId: string) {
+  const others = ent.usage.filter((u) => u.claim_id !== claimId);
+  return { claims: others.length, benefit_iqd: others.reduce((s, u) => s + u.benefit_iqd, 0) };
+}
+
+/** The entitlement as the panel shows it: the internal per-claim usage is folded into `used_excluding_this_claim`. */
+function carePanelEntitlement(ent: CareEntitlement, claimId: string) {
+  const { usage: _usage, ...rest } = ent;
+  void _usage;
+  return { ...rest, used_excluding_this_claim: usedByOthers(ent, claimId) };
+}
+
+/** The offer form's rules: the PUBLISHED list's ceiling (≤ 90; 90 when nothing is published), the terms' percent as the default. */
+function partRulesOf(published: { care?: { max_discount_pct?: unknown } } | null, terms: { discount_pct?: unknown } | null) {
+  const cap = Number(published?.care?.max_discount_pct);
+  const maxPct = Number.isInteger(cap) && cap >= 1 ? Math.min(90, cap) : 90;
+  const def = Number(terms?.discount_pct);
+  return {
+    default_pct: Number.isInteger(def) && def >= 1 ? Math.min(def, maxPct) : null,
+    max_pct: maxPct,
+    valid_days: PART_VALID_DAYS,
+    max_live: PART_MAX_LIVE,
+  };
+}
+
+/** A random code nobody is shown: 20 hex digits of a UUID. Typed in the code box it answers «not found» anyway. */
+const careCouponCode = () => `CARE-${crypto.randomUUID().replace(/-/g, '').slice(0, 20).toUpperCase()}`;
 
 async function runFenced(db: D1Database, statements: D1PreparedStatement[], onMiss: () => HttpError, other?: (message: string) => HttpError | null) {
   try {
@@ -223,7 +259,9 @@ export function mountDeviceCareRoutes(r: Hono<AppContext>): void {
     }
     const existing = await careBenefitOf(db, claim.id);
     if (existing?.state === 'approved') throw careRefusal('CARE_ALREADY_APPROVED');
-    const priced = priceCareQuote(ent.terms, input, { claims: ent.used_claims, benefit_iqd: ent.used_benefit_iqd });
+    // The claim cap counts the OTHER claims (this claim's own used part offer is not a second claim); the money
+    // cap counts everything the device already used, this claim's used part offers included.
+    const priced = priceCareQuote(ent.terms, input, { claims: usedByOthers(ent, claim.id).claims, benefit_iqd: ent.used_benefit_iqd });
     const now = new Date().toISOString();
     const quoteJson = JSON.stringify({ ...priced, misuse, terms_policy_version: ent.policy_version });
     const statements: D1PreparedStatement[] = [
@@ -317,6 +355,11 @@ export function mountDeviceCareRoutes(r: Hono<AppContext>): void {
     const authority = assertMoneyAuthority(c, { act: 'care_claim_decision', amountIqd: benefit.benefit_iqd, beneficiaryUserId: claim.user_id, reason });
     const now = new Date().toISOString();
     const cap = ent.terms.max_benefit_iqd ?? null;
+    // Phase 5: the part offers the device already USED count in the caps too (D5). Read here; the approved
+    // benefits are re-checked inside the write below.
+    if (usedByOthers(ent, claim.id).claims >= ent.terms.max_claims || (cap !== null && ent.used_benefit_iqd + benefit.benefit_iqd > cap)) {
+      throw careRefusal('CARE_QUOTE_CHANGED', 409, { claims_left: ent.claims_left, benefit_left_iqd: ent.benefit_left_iqd });
+    }
     const used = (alias: string, what: string) =>
       `(SELECT ${what} FROM care_claim_benefits ${alias} WHERE ${alias}.entitlement_unit_id = ? AND ${alias}.state = 'approved')`;
     // THE CAPS, RE-CHECKED IN THE WRITE: two approvals racing on one device cannot both pass.
@@ -548,6 +591,150 @@ export function mountDeviceCareRoutes(r: Hono<AppContext>): void {
     );
     return c.json(await carePanel(c, claimId));
   });
+
+  // ------------------------------------------------------------ phase 5: the Care part offer
+  r.get('/admin/part-products', async (c) => {
+    const db = c.env.DB;
+    const q = str(c.req.query('q'), 'q', { max: 100, required: false }) ?? '';
+    // Priced for the claimant when the desk names the claim (his tier's price); the plain price otherwise.
+    const claimId = str(c.req.query('claim_id'), 'claim_id', { max: 80, required: false });
+    const claimant = claimId ? await db.prepare('SELECT user_id FROM warranty_claims WHERE id = ?').bind(claimId).first<{ user_id: string }>() : null;
+    return c.json({ success: true, products: await searchOfferableParts(db, q, claimant?.user_id ?? null) });
+  });
+
+  r.post('/admin/claims/:id/part-grants', requireMoneyAuthority('care_claim_decision'), async (c) => {
+    const db = c.env.DB;
+    await requireInstalled(db);
+    if (!(await carePartGrantsInstalled(db))) throw careRefusal('CARE_NOT_INSTALLED', 503);
+    const admin = c.get('user')!;
+    const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+    const productId = str(body.product_id, 'product_id', { min: 1, max: 80 });
+    const note = typeof body.note === 'string' ? body.note.trim() : '';
+    if (note.length > 300) throw badRequest('note: at most 300 characters');
+    const misuse = body.misuse === true;
+    const claim = await claimHead(db, c.req.param('id'));
+    const stage = effectiveClaimStage(claim.stage, claim.status);
+    // An offer is sent on a claim that is still open (any stage before it is closed), about a known device.
+    if (!claimIsOpen(claim.stage, claim.status) || !claim.unit_id) throw careRefusal('CARE_CLAIM_NOT_OPEN');
+    // No stacking, as for a Care quote: while the warranty covered the device at filing, only misuse is Care.
+    const warranty = await warrantyAtFiling(db, claim);
+    if (warranty?.state === 'active' && !misuse) throw careRefusal('CARE_NOT_WARRANTY');
+    const ent = await entitlementAtFiling(db, claim);
+    if (!ent || ent.state !== 'active' || !ent.terms) {
+      throw ent?.state === 'terms_missing' ? careRefusal('CARE_TERMS_MISSING') : careRefusal('CARE_NOT_ACTIVE', 409, { state: ent?.state ?? 'none' });
+    }
+    const rules = partRulesOf(await publishedPrinterServices(db).catch(() => null), ent.terms);
+    const pct = typeof body.discount_pct === 'number' ? body.discount_pct : Number.NaN;
+    if (!Number.isInteger(pct) || pct < 1 || pct > rules.max_pct) throw careRefusal('CARE_PART_PCT_INVALID', 400, { max_pct: rules.max_pct });
+    // D5: no claim left on the device (this claim's own use is not counted against it).
+    if (usedByOthers(ent, claim.id).claims >= ent.terms.max_claims) throw careRefusal('CARE_CLAIM_LIMIT');
+    const product = await offerablePart(db, productId, claim.user_id);
+    if (!product) throw careRefusal('CARE_PART_INVALID', 400);
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const live = (await grantsOfClaim(db, claim.id)).filter((g) => grantState(g, now.getTime()) === 'live');
+    if (live.some((g) => g.product_id === productId)) throw careRefusal('CARE_PART_ALREADY_OFFERED');
+    if (live.length >= PART_MAX_LIVE) throw careRefusal('CARE_PART_LIMIT');
+    // D4, RESERVED (review 2026-11-18): the offer's ceiling is what is left of the device's Care money ceiling
+    // AFTER what its other live offers already hold (every claim of the device) — so the live offers of one
+    // device never promise more than the terms allow. Nothing left to promise: refused. No money ceiling in the
+    // terms: no ceiling on the offer, as before. (The allocation re-checks the device's ceiling at every door.)
+    const reserved = ent.benefit_left_iqd === null ? 0 : await liveReservedOnRoot(db, ent.root_unit_id, nowIso);
+    const free = ent.benefit_left_iqd === null ? null : ent.benefit_left_iqd - reserved;
+    if (free !== null && free <= 0) {
+      throw careRefusal('CARE_CLAIM_LIMIT', 409, { reason: 'money_ceiling', benefit_left_iqd: ent.benefit_left_iqd, reserved_iqd: reserved });
+    }
+    const estimate = product.price_iqd === null ? undefined : Math.min(Math.floor((product.price_iqd * pct) / 100), free ?? Number.MAX_SAFE_INTEGER);
+    // The offer holds only what it is worth at today's price (not the whole remainder), so one device can carry
+    // several offers under one ceiling. A part with no price today holds the remainder.
+    const maxDiscount = free === null ? null : estimate === undefined ? free : Math.max(1, estimate);
+    // The offer gives the claimant the shop's money: an admin who IS the claimant leaves it to the owner.
+    const authority = assertMoneyAuthority(c, { act: 'care_claim_decision', amountIqd: estimate, beneficiaryUserId: claim.user_id, reason: note || undefined });
+    const grantId = newId('cpg');
+    const couponId = newId(CARE_COUPON_PREFIX);
+    const messageId = newId('cm');
+    const expiresAt = new Date(now.getTime() + PART_VALID_DAYS * 86_400_000).toISOString();
+    const messageBody =
+      `عرض ليفو كير: خصم ${pct}% على «${product.name_ar || product.name}» — أضفها إلى السلة ويُطبَّق الخصم تلقائياً. / ` +
+      `Levo Care offer: ${pct}% off «${product.name || product.name_ar}» — add it to your cart and the discount applies by itself. / ` +
+      `پێشنیاری لیڤۆ کێر: ${pct}% داشکاندن لەسەر «${product.name_ku || product.name || product.name_ar}» — بیخە ناو سەبەتەکەت و داشکاندنەکە خۆکارانە جێبەجێ دەبێت.`;
+    const statements: D1PreparedStatement[] = [
+      // The claim closed between the read and this write: nothing is issued.
+      ...fence(db, `EXISTS (SELECT 1 FROM warranty_claims wc WHERE wc.id = ? AND NOT ${closedClaimSql('wc')})`, [claim.id]),
+      // Another offer on the device was issued between the read and this write: the reservation is recomputed.
+      ...(maxDiscount === null ? [] : fence(db, `${LIVE_RESERVED_SQL} = ?`, [ent.root_unit_id, nowIso, reserved])),
+      // D6: the carrier — personal, this product only, one unit, one use, beside any offer price, ends with the offer.
+      db
+        .prepare(
+          `INSERT INTO coupons (id, code, tier_required, kind, value, min_total_iqd, starts_at, ends_at, max_global, max_per_user, active, created_at,
+              assigned_user_id, scope, product_id, applies_to, cap_scope, max_discount_iqd, max_quantity, stacks)
+           VALUES (?, ?, NULL, 'percent', ?, 0, NULL, ?, 1, 1, 1, ?, ?, 'product', ?, 'merchandise', 'per_order', ?, 1, 1)`
+        )
+        .bind(couponId, careCouponCode(), pct, expiresAt, nowIso, claim.user_id, productId, maxDiscount),
+      db
+        .prepare(
+          `INSERT INTO care_part_grants (id, claim_id, user_id, entitlement_unit_id, product_id, coupon_id, discount_pct, max_discount_iqd,
+              misuse, note, expires_at, created_by, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        )
+        .bind(grantId, claim.id, claim.user_id, ent.root_unit_id, productId, couponId, pct, maxDiscount, misuse ? 1 : 0, note, expiresAt, admin.id, nowIso),
+      // D7: the offer reaches the customer in the claim thread, as a staff message carrying the offer.
+      db
+        .prepare('INSERT INTO claim_messages (id, claim_id, sender_id, is_staff, body, file_key, created_at, part_grant_id) VALUES (?, ?, ?, 1, ?, NULL, ?, ?)')
+        .bind(messageId, claim.id, admin.id, messageBody, nowIso, grantId),
+      db.prepare("UPDATE warranty_claims SET claim_kind = 'care' WHERE id = ?").bind(claim.id),
+      ...(await auditStatements(db, admin.id, 'warranty.care_part_offered', claim.id, {
+        grant_id: grantId, coupon_id: couponId, product_id: productId, discount_pct: pct, max_discount_iqd: maxDiscount, misuse,
+        expires_at: expiresAt, entitlement_unit_id: ent.root_unit_id, stage, authority: authority.audit,
+      })).statements,
+    ];
+    try {
+      await runFenced(db, statements, () => careRefusal('CARE_CLAIM_NOT_OPEN'), (m) =>
+        /CARE_PART_ALREADY_OFFERED/.test(m) ? careRefusal('CARE_PART_ALREADY_OFFERED') : /CARE_PART_LIMIT/.test(m) ? careRefusal('CARE_PART_LIMIT') : null
+      );
+    } catch (e) {
+      // Two fences guard this write. The claim still open means the other one missed: the device's reserved
+      // money moved (another offer issued a moment ago) — the desk reloads and offers against the new figure.
+      if (e instanceof HttpError && e.code === 'CARE_CLAIM_NOT_OPEN' && maxDiscount !== null) {
+        const again = await claimHead(db, claim.id);
+        if (claimIsOpen(again.stage, again.status)) throw careRefusal('CARE_CLAIM_LIMIT', 409, { reason: 'money_ceiling_moved' });
+      }
+      throw e;
+    }
+    if (claim.user_id !== admin.id) afterResponse(c, notifyClaimReply(c.env, claim.id, messageId));
+    const panel = await carePanel(c, claim.id);
+    return c.json({ ...panel, grant: panel.part_grants.find((g) => g.id === grantId) ?? null });
+  });
+
+  r.post('/admin/claims/:id/part-grants/:grantId/revoke', requireMoneyAuthority('care_claim_decision'), async (c) => {
+    const db = c.env.DB;
+    await requireInstalled(db);
+    if (!(await carePartGrantsInstalled(db))) throw careRefusal('CARE_NOT_INSTALLED', 503);
+    const admin = c.get('user')!;
+    const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+    const reason = reasonOf(body.reason);
+    const claim = await claimHead(db, c.req.param('id'));
+    const grant = await grantById(db, claim.id, c.req.param('grantId'));
+    if (!grant) throw notFound('Part offer not found');
+    if (grant.revoked_at) return c.json({ ...(await carePanel(c, claim.id)), already: true });
+    if (grant.used_order_id) throw careRefusal('CARE_PART_USED');
+    const authority = assertMoneyAuthority(c, { act: 'care_claim_decision', reason });
+    const now = new Date().toISOString();
+    await runFenced(
+      db,
+      [
+        // An order spent it between the read and this write: it stays the customer's (CARE_PART_USED).
+        ...fence(db, `NOT ${SPENT_SQL('?')}`, [grant.coupon_id, grant.coupon_id]),
+        db.prepare('UPDATE care_part_grants SET revoked_at = ?, revoked_by = ?, revoke_reason = ? WHERE id = ? AND revoked_at IS NULL').bind(now, admin.id, reason, grant.id),
+        db.prepare('UPDATE coupons SET active = 0 WHERE id = ?').bind(grant.coupon_id),
+        ...(await auditStatements(db, admin.id, 'warranty.care_part_revoked', claim.id, {
+          grant_id: grant.id, coupon_id: grant.coupon_id, product_id: grant.product_id, reason, authority: authority.audit,
+        })).statements,
+      ],
+      () => careRefusal('CARE_PART_USED')
+    );
+    return c.json(await carePanel(c, claim.id));
+  });
 }
 
 /**
@@ -597,6 +784,32 @@ export async function careVoidOnReject(
     ...(await auditStatements(db, actor, 'warranty.care_voided', claimId, {
       from_state: benefit.state, benefit_iqd: benefit.benefit_iqd, reason, on: 'claim_rejected',
     })).statements,
+  ];
+}
+
+/**
+ * Phase 5 (0243): a move to `rejected` also takes back the claim's part offers the customer has NOT used — a
+ * rejected claim leaves no discount waiting in his cart. Same batch as the stage move, each statement conditional
+ * on the claim now being rejected. A USED offer stays what it is (the order was placed). [] when the claim has
+ * none to take back, and on a database without 0243.
+ */
+export async function partOffersRevokeOnReject(db: D1Database, claimId: string, actor: string, reason: string): Promise<D1PreparedStatement[]> {
+  if (!(await carePartGrantsInstalled(db))) return [];
+  const open = (await grantsOfClaim(db, claimId)).filter((g) => !g.revoked_at && !g.used_order_id);
+  if (!open.length) return [];
+  const now = new Date().toISOString();
+  const rejected = `EXISTS (SELECT 1 FROM warranty_claims wc WHERE wc.id = ? AND ${effectiveClaimStageSql('wc')} = 'rejected')`;
+  return [
+    db
+      .prepare(
+        `UPDATE care_part_grants SET revoked_at = ?, revoked_by = ?, revoke_reason = ?
+          WHERE claim_id = ? AND revoked_at IS NULL AND NOT ${SPENT_SQL('care_part_grants.coupon_id')} AND ${rejected}`
+      )
+      .bind(now, actor, reason.slice(0, 1000), claimId, claimId),
+    db
+      .prepare(`UPDATE coupons SET active = 0 WHERE id IN (SELECT g.coupon_id FROM care_part_grants g WHERE g.claim_id = ? AND g.revoked_at IS NOT NULL) AND ${rejected}`)
+      .bind(claimId, claimId),
+    ...(await auditStatements(db, actor, 'warranty.care_part_revoked', claimId, { grant_ids: open.map((g) => g.id), reason, on: 'claim_rejected' })).statements,
   ];
 }
 

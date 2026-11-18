@@ -1,3 +1,4 @@
+import { isCareCouponId, notCareCouponSql } from '../lib/carePartGrants';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
 import { announceStoreOrder } from '../lib/chatCards';
 import { Hono } from 'hono';
@@ -4333,8 +4334,10 @@ adminRoutes.get('/coupons', async (c) => {
               (SELECT COUNT(*) FROM coupon_redemptions r WHERE r.coupon_id = c.id AND r.state = 'active') AS redeemed
          FROM coupons c ${filter} ORDER BY c.created_at DESC LIMIT 200`
     ).all<Record<string, unknown>>();
-  const { results } = await list('WHERE c.reward_grant_id IS NULL').catch((e: unknown) => {
-    if (isSchemaMissing(e)) return list('');
+  // A Levo Care part offer's coupon (0243) is not a promo code either: it is issued and revoked from its
+  // claim on the warranty desk (the id prefix names it, so no table is read that may be absent).
+  const { results } = await list(`WHERE c.reward_grant_id IS NULL AND ${notCareCouponSql('c')}`).catch((e: unknown) => {
+    if (isSchemaMissing(e)) return list(`WHERE ${notCareCouponSql('c')}`);
     throw e;
   });
   return c.json({ success: true, coupons: results ?? [] });
@@ -4414,7 +4417,9 @@ adminRoutes.post('/coupons', requireMoneyAuthority('coupon_issue'), async (c) =>
  * (a value above the approval, a new end date, more uses) nor retires it (a
  * request awaiting payment with no live credit).
  */
-function refuseTradeInCoupon(row: { trade_in_id?: string | null; reward_grant_id?: string | null } | null): void {
+function refuseTradeInCoupon(row: { id?: string | null; trade_in_id?: string | null; reward_grant_id?: string | null } | null): void {
+  // A Levo Care part offer's coupon (0243) is issued and revoked from its claim on the warranty desk, never here.
+  if (isCareCouponId(row?.id)) throw new HttpError(409, 'This coupon carries a Levo Care part offer — revoke the offer from its claim on the warranty desk.', 'CARE_PART_COUPON_MANAGED');
   if (row?.trade_in_id) throw new HttpError(409, moneyAuthorityMessage('TRADE_IN_COUPON_MANAGED'), 'TRADE_IN_COUPON_MANAGED');
   // A reward coupon (0220) carries the programme's terms as they were when it
   // was issued; Admin → Rewards withdraws or extends it, never this editor.

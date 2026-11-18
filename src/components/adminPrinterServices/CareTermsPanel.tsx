@@ -66,9 +66,9 @@ export function CareTermsPanel({ draft, upd, loc, published }: { draft: PrinterS
   const keyIssues = (terms?.eligible_parts ?? []).map((p, i, all) => (!PART_KEY.test(p.key) ? 'bad' : all.findIndex((q) => q.key === p.key) !== i ? 'dup' : null));
 
   return (
-    <section className="mt-3 rounded-lg border border-border-subtle p-3 space-y-3" data-care-terms-panel>
+    <section className="space-y-3" data-care-terms-panel>
+      {/* The group that holds this panel already says «شروط ليفو كير»: no second heading here. */}
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-[14px] font-bold text-text-primary">{loc('شروط ليفو كير', 'Levo Care terms', 'مەرجەکانی لیڤۆ کێر')}</h2>
         <label className="flex items-center gap-2 text-[12px] text-text-secondary">
           {loc('إصدار الشروط', 'Terms version', 'وەشانی مەرجەکان')}
           <input

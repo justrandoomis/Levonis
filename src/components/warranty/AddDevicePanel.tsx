@@ -1,6 +1,6 @@
 import React, { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Barcode, Camera, LifeBuoy, Link2, Package, ScanLine } from 'lucide-react';
+import { Barcode, Camera, LifeBuoy, Link2, Package, ScanLine, X } from 'lucide-react';
 import type { Language } from '../../translations';
 import { api, ApiError } from '../../lib/api';
 import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
@@ -10,6 +10,7 @@ import SafeImage from '../ui/SafeImage';
 import { Skeleton, SkeletonGroup } from '../ui/Skeleton';
 import { EmptyState, ErrorState } from '../ui/AsyncStates';
 import Spinner from '../ui/Spinner';
+import { IconButton } from '../ui/Button';
 import { primeScannerAudio } from '../scanner/feedback';
 import type { ScanRead } from '../scanner/BarcodeScanner';
 import type { Device, EligibleUnit, RegisterResponse } from './types';
@@ -71,12 +72,18 @@ export function AddDevicePanel({
   s,
   refreshKey,
   onLinked,
+  onClose,
 }: {
   lang: Language;
   s: WarrantyStrings;
   /** Bump to make the "from my orders" list reload (e.g. after an unlink). */
   refreshKey: number;
   onLinked: (device: Device, alreadyRegistered: boolean) => void;
+  /**
+   * Given once the customer already has printers: the panel is then a secondary
+   * section the page opens from «إضافة طابعة», and this puts it away again.
+   */
+  onClose?: () => void;
 }) {
   const [tab, setTab] = useState<AddTab>('serial');
   const [serial, setSerial] = useState('');
@@ -182,12 +189,18 @@ export function AddDevicePanel({
   );
 
   return (
-    <section className={`${CARD} overflow-hidden`} aria-labelledby="warranty-add-title">
-      <div className="px-4 pt-4">
-        <h2 id="warranty-add-title" className="text-text-primary font-bold text-base">
-          {s.addTitle}
-        </h2>
-        <p className="text-text-muted text-[12px] mt-0.5">{s.addIntro}</p>
+    <section id="warranty-add" className={`${CARD} overflow-hidden`} aria-labelledby="warranty-add-title">
+      <div className="flex items-start justify-between gap-3 px-4 pt-4">
+        <div className="min-w-0">
+          {/* Focusable by script only: opening the section moves focus to its name. */}
+          <h2 id="warranty-add-title" tabIndex={-1} className="text-text-primary font-bold text-base focus:outline-none">
+            {s.addTitle}
+          </h2>
+          <p className="text-text-muted text-[12px] mt-0.5">{s.addIntro}</p>
+        </div>
+        {onClose && (
+          <IconButton onClick={onClose} label={s.close} icon={<X aria-hidden="true" className="w-4 h-4" />} className="-mt-1.5 -me-1 shrink-0" data-warranty-add-close />
+        )}
       </div>
       <TabStrip
         items={[

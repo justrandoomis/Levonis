@@ -9,7 +9,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   DEFAULT_PRINTER_SERVICES, EMPTY_SELECTION, canonicalConfig, classesFor, configIssues, encodeSelection, mappingResolves, parseSelection,
-  presetPrices, presetSelection, priceServices, publishIssues, sameServices, withPhase2Defaults,
+  presetPrices, presetSelection, priceServices, publishIssues, sameServices, servicesOffer, withPhase2Defaults,
   SERVICES_NOT_CONFIRMED, SERVICES_NO_WARRANTY_ACK, SERVICES_OPTION_UNAVAILABLE, SERVICES_PACKAGE_MISMATCH,
   type PrinterServicesConfig, type ServiceSelection,
 } from '../packages/pricing/src/printerServices';
@@ -109,6 +109,18 @@ test('Smart Choice = 12-month warranty + Care, sum of parts, no saving', () => {
   assert.equal(p.fee_iqd, 25_000 + 19_000);
   assert.equal(p.package_discount_iqd, 0);
   assert.equal(p.care_months, 12);
+  // Phase 5 (DECISIONS row 358): Care runs for the warranty and 12 months after it — 12 + 12 here.
+  assert.equal(p.care_total_months, 24);
+});
+
+test('Care total months: Care alone 12, with a 12-month warranty 24, with 24 months 36; none without Care', () => {
+  const c = clone();
+  const total = (warranty: 'none' | 'w12' | 'w24', care: 'none' | 'c12') =>
+    priceServices(c, A1, confirmed({ ...presetSelection(c, 'just'), package: 'custom', warranty, care })).care_total_months;
+  assert.deepEqual([total('none', 'c12'), total('w12', 'c12'), total('w24', 'c12')], [12, 24, 36]);
+  assert.deepEqual([total('none', 'none'), total('w12', 'none'), total('w24', 'none')], [0, 0, 0]);
+  assert.equal(servicesOffer(c, A1).care?.after_warranty, true, 'the offer says Care runs after the warranty');
+  assert.equal(servicesOffer(c, A1).care?.months, 12);
 });
 
 test('Complete = 24 months + Care + extra packaging + inspection with its lead time', () => {

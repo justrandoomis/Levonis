@@ -4,6 +4,7 @@ import { deleteVariantsIn, variantEdgeUrl } from './variantKeys';
 import { IMAGE_VARIANT_WIDTHS } from '../../packages/contracts/src/imageSizing';
 import { membershipDiscountAtLineSql, UNLINKED_MEMBERSHIP_PRODUCTS } from './orderMembership';
 import { DELETED_PRODUCT_FINANCE_SCOPE_ACTION } from './financeDeletedProductScope';
+import { notCareCouponSql } from './carePartGrants';
 
 /**
  * DELETING A PRODUCT, AND LEAVING NOTHING BEHIND.
@@ -579,11 +580,31 @@ export const BLOCKING_REFS: BlockingRef[] = [
     code: 'PRODUCT_IN_COUPON',
     remedy:
       'Deactivate or retarget every active coupon that names this product, one of its models, one of its colours, or a bundle built on it — then delete it.',
-    where: 'active = 1',
+    // A Levo Care part offer's coupon (0243, id `cpc_…`) is not the admin's to switch off and stays active after
+    // it is used or ended: it never blocks here — its OFFER does, below, and only while it is live.
+    where: `active = 1 AND ${notCareCouponSql()}`,
     match: `(product_id = ?1
              OR bundle_product_id = ?1
              OR option_value_id IN (SELECT id FROM product_option_values WHERE product_id = ?1)
              OR color_id IN (SELECT id FROM product_colors WHERE product_id = ?1))`,
+  },
+  /**
+   * A LIVE LEVO CARE PART OFFER NAMES THIS PRODUCT (0243; DECISIONS row 358). A customer was promised a discount
+   * on this part and may be about to order it: the delete waits until the offer is used, ends (14 days) or is
+   * revoked from its claim on the warranty desk. DECIDED DELIBERATELY: an offer that is no longer live (used,
+   * ended, revoked) never blocks and is KEPT as it is — a record of what the claim was given, whose caps
+   * (`careEntitlements`) are counted from the order's redemption, not from the product. Its `product_id` then
+   * names nothing, and every reader shows the offer with `product: null`.
+   */
+  {
+    table: 'care_part_grants',
+    column: 'product_id',
+    code: 'PRODUCT_IN_CARE_PART_OFFER',
+    remedy:
+      'A customer holds a live Levo Care part offer on this product — revoke the offer from its claim on the warranty desk (or wait for it to be used or to end), then delete it.',
+    where: `revoked_at IS NULL AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+            AND NOT EXISTS (SELECT 1 FROM coupon_redemptions r WHERE r.coupon_id = care_part_grants.coupon_id AND r.state = 'active')
+            AND NOT EXISTS (SELECT 1 FROM coupon_redemption_extras x WHERE x.coupon_id = care_part_grants.coupon_id AND x.state = 'active')`,
   },
   /**
    * A CUSTOMER'S OPEN QUICK BUY ORDER HOLDS THIS PRODUCT (0176): money is held

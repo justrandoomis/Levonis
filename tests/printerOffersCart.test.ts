@@ -13,6 +13,7 @@ import {
   type Json,
 } from './fixtures/printerOffers';
 import { pickRandomColour } from '../worker/lib/printerOffers';
+import { careOfferUses, seedCareOffer } from './fixtures/careOffer';
 
 const kitsOf = async (db: D1Database, query = 'qty=1&fulfillmentType=direct_sale') => json(await get(appAs(db, null), `/api/products/a1-printer/kits?${query}`));
 const cartOf = async (a: ReturnType<typeof appAs>) => json(await get(a, '/api/cart'));
@@ -235,4 +236,35 @@ test('add-ons: removing one works while another add-on on the printer has sold o
   const nozzleId = attachedRows(raw).find((r) => r.addon_id === 'nozzle')!.id;
   assert.equal((await put(a, `/api/cart/items/${printerId(raw)}/extras`, { addonIds: ['nozzle'] })).status, 200);
   assert.deepEqual(attachedRows(raw).map((r) => [r.addon_id, r.id]), [['nozzle', nozzleId]]);
+});
+
+// ------------------------------------------------------------------ phase 5: the Levo Care part offer (DECISIONS row 358)
+
+test('a Levo Care part offer never lands on a kit or add-on line attached to a printer — only on an ordinary line of that part', async () => {
+  const { db, raw } = setup();
+  const a = appAs(db, 'buyer');
+  const onKitPart = seedCareOffer(raw, { user: 'buyer', product: 'p_pla' });
+  const onAddonPart = seedCareOffer(raw, { user: 'buyer', product: 'p_nozzle' });
+  await addPrinter(a, { kitId: 'a1-starter', addonIds: ['nozzle'] });
+  // The cart, the quote: the attached lines hold both parts, and neither offer applies.
+  assert.deepEqual((await cartOf(a)).care_offers, []);
+  const q = (await json(await post(a, '/api/orders/quote', orderBody()))).quote;
+  assert.deepEqual([q.care_offers, q.care_offer_discount_iqd], [[], 0]);
+  // An ORDINARY line of the add-on's part beside them: the offer lands there, and only there.
+  assert.equal((await post(a, '/api/cart/items', { productId: 'p_nozzle', qty: 1 })).status, 200);
+  const plain = raw.prepare("SELECT id FROM cart_items WHERE user_id = 'buyer' AND product_id = 'p_nozzle' AND kit_parent_id IS NULL").get() as { id: string };
+  assert.deepEqual((await cartOf(a)).care_offers.map((o: Json) => [o.grant_id, o.cart_item_id, o.discount_iqd]), [[onAddonPart.grantId, plain.id, 5_000]]);
+  const q2 = (await json(await post(a, '/api/orders/quote', orderBody()))).quote;
+  assert.deepEqual(q2.care_offers.map((o: Json) => [o.grant_id, o.cart_item_id, o.discount_iqd]), [[onAddonPart.grantId, plain.id, 5_000]]);
+  assert.equal(q2.total_iqd, q.total_iqd + 10_000 - 5_000 + (q2.shipping.total_iqd - q.shipping.total_iqd));
+  const placed = await json(await post(a, '/api/orders', orderBody()));
+  assert.equal(placed.success, true, JSON.stringify(placed));
+  assert.equal(placed.order.total_iqd ?? placed.order.financial?.total_iqd, q2.total_iqd);
+  const lines = raw.prepare('SELECT product_id, kit_parent_item_id, addon_id, coupon_discount_iqd FROM order_items WHERE order_id = ?').all(placed.order.id) as Array<Record<string, unknown>>;
+  for (const l of lines) {
+    const ordinaryNozzle = l.product_id === 'p_nozzle' && !l.kit_parent_item_id;
+    assert.equal(l.coupon_discount_iqd, ordinaryNozzle ? 5_000 : 0, JSON.stringify(l));
+  }
+  assert.equal(lines.filter((l) => l.kit_parent_item_id).length >= 2, true, 'the kit and the add-on lines are on the order');
+  assert.deepEqual([careOfferUses(raw, onAddonPart.couponId), careOfferUses(raw, onKitPart.couponId)], [1, 0], 'the kit part’s offer is still the customer’s');
 });

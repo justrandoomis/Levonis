@@ -385,7 +385,8 @@ test('the claim card says it opens a conversation, counts it, and shows «رد �
   assert.match(card, /s\.messagesCount\(/);
   assert.match(card, /claim\.unread === true/);
   assert.match(card, /\{s\.newReply\}/);
-  const strings = src('src/components/warranty/strings.ts');
+  // The requests' words are their own table since phase 5 (copy/claims.ts).
+  const strings = src('src/components/warranty/copy/claims.ts');
   assert.match(strings, /openThread: 'فتح المحادثة'/);
   assert.match(strings, /newReply: 'رد جديد من الفريق'/);
 });

@@ -71,7 +71,6 @@ import {
   withStatedPackage,
   type StatedPackage,
 } from './types';
-import DeliveryRuleLine from './DeliveryRuleLine';
 const TranslationsSheet = React.lazy(() => import('./form/TranslationsSheet'));
 // «تحديث البيانات» — the product data file, both ways (owner brief 2026-10-10):
 // its own lazy chunk too; only a saved product opens it. (The older
@@ -127,6 +126,7 @@ import { MainImagesPair } from './form/MainImagesPair';
 import { QuickAddDialog, type QuickAddKind, type QuickAddResult } from './form/QuickAdd';
 import { setLeaveGuard } from '../../lib/leaveGuard';
 import { subSectionOptions } from './subSectionOptions';
+import type { PrinterServicesStatus } from '../adminPrinterServices/AdminPrinterServices';
 const AdminPrinterServices = React.lazy(() => import('../adminPrinterServices/AdminPrinterServices'));
 
 interface TemplateField {
@@ -225,6 +225,8 @@ export default function ProductForm({
   const [baseline, setBaseline] = useState('');
   /** «خدمات الطابعة» holds unsaved price-list edits (its own save, not the product's). */
   const [printerServicesDirty, setPrinterServicesDirty] = useState(false);
+  /** What «خصص طابعتك» read for this printer (the card's summary); null until the panel has loaded. */
+  const [printerServicesStatus, setPrinterServicesStatus] = useState<PrinterServicesStatus | null>(null);
   const [loadedUpdatedAt, setLoadedUpdatedAt] = useState('');
   /** The status the server holds (not the editor's): a content save keeps an active product active (`isContentOnlySave`). */
   const [storedStatus, setStoredStatus] = useState('');
@@ -1127,7 +1129,18 @@ export default function ProductForm({
   const Back = dir === 'rtl' ? ArrowRight : ArrowLeft;
   const section = (n: number) => ({
     open: open === n,
-    onToggle: () => setOpen((o) => (o === n ? 0 : n)),
+    onToggle: () => {
+      // «خصص طابعتك» lives inside section ٤ and is unmounted when the section folds: its unsaved edits
+      // (its own save, not the product's) would be lost without a word. Asked first, like leaving the page.
+      if (open === 4 && printerServicesDirty && !window.confirm(
+        lang === 'en'
+          ? 'Printer services have unsaved changes. Closing this section discards them. Close anyway?'
+          : lang === 'ckb'
+            ? 'خزمەتگوزارییەکانی پرینتەر گۆڕانکاریی پاشەکەوتنەکراویان هەیە. داخستنی ئەم بەشە لەناویان دەبات. هەر دایبخەیت؟'
+            : 'في خدمات الطابعة تعديلات غير محفوظة. إغلاق هذا القسم يُلغيها. هل تغلقه؟'
+      )) return;
+      setOpen((o) => (o === n ? 0 : n));
+    },
   });
 
   const valueCount = rel.groups.reduce((n, g) => n + g.values.length, 0);
@@ -1146,6 +1159,11 @@ export default function ProductForm({
   // Serial tracking has its own control for every product now (§29); only the
   // base months of a non-printer are kept without an editor.
   const warrantyHiddenValues = !isPrinterCatalog && doc.warranty_plans.length === 0 && doc.warranty_base_months !== null;
+  // Section ٤ (DECISIONS row 358). A graded printer takes no services and keeps its own warranty; the red
+  // edge of the card is a warranty / serial field the save refuses, whose block then shows and opens.
+  const usedPrinter = isPrinterCatalog && !!doc.condition;
+  const warrantyFieldError = Object.keys(errors).some((k) => k.startsWith('warranty') || k === 'serialized');
+  const s4Tri = (ar: string, en: string, ckb: string) => (lang === 'en' ? en : lang === 'ckb' ? ckb : ar);
 
   return (
     // min-w-0 on the outer column is what keeps a long value from widening the
@@ -1669,27 +1687,45 @@ export default function ProductForm({
         )}
       </SectionCard>
 
-      {/* 4 ───────────────────────────────────── delivery and warranty only */}
+      {/* 4 ───────── «خدمات الطابعة» on a printer, «الحالة والأبعاد» on anything else (DECISIONS row 358)
+          The card says what it holds. A printer's warranty and delivery are sold through «خصص طابعتك»,
+          so the old delivery line and the old extended-warranty editor are gone from here; the fields
+          they wrote still travel through the save untouched. The summary says what is real: whether
+          customers see this printer's services, or a product's condition and serial tracking. The red
+          edge still means a warranty / serial field the save refuses — its block opens below. */}
       <SectionCard
         n={4}
         missing={sectionMissing(4)}
         missingLabel={sectionMissingLabel(4)}
-        ar="التوصيل والضمان"
-        en="Delivery & warranty"
+        ar={isPrinterCatalog ? 'خدمات الطابعة' : 'الحالة والأبعاد'}
+        en={isPrinterCatalog ? 'Printer services' : 'Condition & size'}
         summary={summarize([
-          isPrinterCatalog && doc.warranty_plans.some((p) => p.active)
-            ? `ضمان ممدد ${doc.warranty_plans.filter((p) => p.active).map((p) => `+${p.duration_months}`).join(' / ')}`
+          isPrinterCatalog
+            ? usedPrinter
+              ? s4Tri('مستعملة — بضمانها الخاص', 'Used — its own warranty', 'بەکارهاتوو — گەرەنتی خۆی')
+              : printerServicesStatus === 'live'
+                ? s4Tri('يراها الزبون الآن', 'Customers see them now', 'کڕیار ئێستا دەیانبینێت')
+                : printerServicesStatus === 'not-live'
+                  ? s4Tri('لا يراها الزبون بعد', 'Customers do not see them yet', 'کڕیار هێشتا نایانبینێت')
+                  : undefined
+            : doc.condition
+              ? doc.condition.kind === 'open_box'
+                ? s4Tri('علبة مفتوحة', 'Open box', 'سندووقی کراوە')
+                : doc.condition.kind === 'refurbished'
+                  ? s4Tri('مجدَّد', 'Refurbished', 'نوێکراوە')
+                  : s4Tri('مستعمل', 'Used', 'بەکارهاتوو')
+              : undefined,
+          !isPrinterCatalog && (doc.serialized ?? sectionSerial.policy === 'required')
+            ? s4Tri('يُطلب رقمه التسلسلي', 'Serial required', 'ژمارەی زنجیرەیی داوا دەکرێت')
             : undefined,
         ])}
-        error={
-          showErrors &&
-          Object.keys(errors).some((k) => k.startsWith('warranty') || k === 'serialized')
-        }
+        error={showErrors && warrantyFieldError}
         {...section(4)}
       >
-        {/* Section ٤, redesigned (printer phase 4, owner 2026-11-18; DECISIONS row 355): one folded
-            block per subject, each with its own visible Arabic-first heading, one column on a phone.
-            On a printer, ① the delivery rule and ② «خدمات الطابعة» open first; the rest stay folded. */}
+        {/* Section ٤, redesigned (printer phase 4, owner 2026-11-18; DECISIONS row 355) and trimmed in
+            phase 5 (row 358): one folded block per subject, each with its own visible Arabic-first
+            heading, one column on a phone. On a printer «خصص طابعتك» opens first and the rest stay
+            folded; on any other product the blocks open as before. */}
         {(() => {
           const s4Second = (en: string, ckb: string) => (lang === 'ckb' ? ckb : en);
           let s4N = 0;
@@ -1711,79 +1747,86 @@ export default function ProductForm({
               </details>
             );
           };
-          const warrantyShown = showErrors && Object.keys(errors).some((k) => k.startsWith('warranty') || k === 'serialized');
+          const warrantyShown = showErrors && warrantyFieldError;
+          const warrantyEditor = (
+            <WarrantySection
+              isPrinter={isPrinterCatalog}
+              plans={doc.warranty_plans}
+              serialized={doc.serialized ?? null}
+              baseMonths={doc.warranty_base_months ?? null}
+              errors={showErrors ? errors : {}}
+              onPlansChange={(next) => setDoc((d) => ({ ...d, warranty_plans: next }))}
+              onSerializedChange={(v) => setDoc((d) => ({ ...d, serialized: v }))}
+              canEditSerial={!!user?.is_owner}
+              sectionSerial={sectionSerial}
+              onBaseMonthsChange={(v) => setDoc((d) => ({ ...d, warranty_base_months: v }))}
+            />
+          );
           return (
             <>
-              {/* ① «قاعدة التوصيل»: read-only. Delivery is priced centrally in
-                  «إدارة التوصيل» (owner, 2026-10-18); the line re-resolves when the
-                  sections change, and works for an unsaved product too. */}
-              {s4Block('delivery', 'التوصيل', 'Delivery', 'گەیاندن', true,
-                <DeliveryRuleLine productId={doc.id || null} categoryId={doc.category_id ?? null} subCategoryId={doc.sub_category_id ?? null} />)}
-
-              {/* ② «خدمات الطابعة» (owner, 2026-11-17: on the printer's own edit page; DECISIONS row 339):
-                  this printer's warranty family and delivery class, its kits and add-ons, and the shared
-                  price list. A saved printer only — the mapping is keyed by its id. Lazy: the panel is
-                  its own chunk, loaded when this block renders. */}
+              {/* ① «خصص طابعتك» (owner, 2026-11-17: on the printer's own edit page; DECISIONS rows 339, 358):
+                  whether customers see this printer's services, its warranty family and delivery class,
+                  what the customer is offered, its kits and add-ons, and the shared price list. A saved
+                  printer only — the mapping is keyed by its id. Lazy: the panel is its own chunk, loaded
+                  when this block renders; `reloadKey` makes it read the printers again after a save. */}
               {isPrinterCatalog
-                ? s4Block('printer-services', 'خدمات الطابعة', 'Printer services', 'خزمەتگوزارییەکانی پرینتەر', true,
+                ? s4Block('printer-services', 'خصص طابعتك', 'Customize your printer', 'پرینتەرەکەت ڕێکبخە', true,
                   doc.id || productId ? (
                     <React.Suspense fallback={null}>
-                      <AdminPrinterServices productId={String(doc.id || productId)} onDirtyChange={setPrinterServicesDirty} />
+                      <AdminPrinterServices productId={String(doc.id || productId)} onDirtyChange={setPrinterServicesDirty} reloadKey={baseline} onStatus={setPrinterServicesStatus} />
                     </React.Suspense>
                   ) : (
-                    <p className="text-[12px] text-text-secondary" data-form="printer-services-unsaved">
-                      {lang === 'en'
-                        ? 'Save the printer first: its services are tied to its id.'
-                        : lang === 'ckb'
-                          ? 'سەرەتا پرینتەرەکە پاشەکەوت بکە: خزمەتگوزارییەکانی بە ناسنامەکەیەوە بەستراون.'
-                          : 'احفظ الطابعة أولاً: خدماتها مربوطة بمعرّفها.'}
+                    <p className="text-[13px] text-text-secondary leading-relaxed" data-form="printer-services-unsaved">
+                      {s4Tri(
+                        'احفظ المنتج أولاً بزر «نشر» أو «مسودة» أسفل الصفحة. بعدها تختار هنا ضمان الطابعة وتوصيلها وترى ما يُعرض على الزبون.',
+                        'Save the product first with the «Publish» or «Draft» button at the bottom of the page. Then you choose this printer\'s warranty and delivery here and see what the customer is offered.',
+                        'سەرەتا بەرهەمەکە بە دوگمەی «بڵاوکردنەوە» یان «ڕەشنووس»ی خوارەوەی پەڕەکە پاشەکەوت بکە. پاشان لێرە گەرەنتی و گەیاندنی پرینتەرەکە هەڵدەبژێریت و دەبینیت چی پێشکەشی کڕیار دەکرێت.'
+                      )}
                     </p>
                   ))
                 : null}
 
-              {/* ③ Extended warranty — printers only (owner mandate). Two switches
-                  (+12 → 24, +24 → 36), a percent of the printer price each, and the
-                  device coverage they rest on. Hidden for anything that is not
-                  filed under a printer catalog; a non-printer that still carries
-                  plans is told the save will be refused and offered a clear. On a
-                  printer it is the OLD extension: not shown while «خدمات الطابعة» is published. */}
-              {s4Block(
-                'warranty',
-                isPrinterCatalog ? 'الضمان الممدد القديم' : 'الضمان',
-                isPrinterCatalog ? 'Old extended warranty' : 'Warranty',
-                isPrinterCatalog ? 'گەرەنتی درێژکراوەی کۆن' : 'گەرەنتی',
-                !isPrinterCatalog || warrantyShown,
-                <>
-                  {warrantyHiddenValues && (
-                    <p className="text-[11px] text-text-secondary mb-3" data-form="warranty-preserved">
-                      محفوظ من الملف: {`ضمان أساسي ${doc.warranty_base_months} شهرًا`} — محرره يظهر لأقسام الطابعات فقط.
-                    </p>
-                  )}
-                  <WarrantySection
-                    isPrinter={isPrinterCatalog}
-                    plans={doc.warranty_plans}
-                    serialized={doc.serialized ?? null}
-                    baseMonths={doc.warranty_base_months ?? null}
-                    // The example is the V2 direct price (the lowest sold), never an old dinar price of the document.
-                    priceIqd={v2.answer && !v2.answer.needs_pricing ? lowestPrice((v2.answer.table ?? []).filter((r) => r.channel === 'direct_sale')) : null}
-                    errors={showErrors ? errors : {}}
-                    onPlansChange={(next) => setDoc((d) => ({ ...d, warranty_plans: next }))}
-                    onSerializedChange={(v) => setDoc((d) => ({ ...d, serialized: v }))}
-                    canEditSerial={!!user?.is_owner}
-                    sectionSerial={sectionSerial}
-                    onBaseMonthsChange={(v) => setDoc((d) => ({ ...d, warranty_base_months: v }))}
-                  />
-                </>,
-                isPrinterCatalog
-                  ? (lang === 'en'
-                    ? 'Not shown to customers while printer services are published for this printer.'
-                    : lang === 'ckb'
-                      ? 'تا خزمەتگوزارییەکانی پرینتەر بۆ ئەم پرینتەرە بڵاوکراوە بن، بۆ کڕیار پیشان نادرێت.'
-                      : 'لا يظهر للزبون ما دامت خدمات الطابعة منشورة لهذه الطابعة.')
-                  : undefined
-              )}
+              {/* ② What is left of the old warranty block (DECISIONS row 358). The old delivery line and the
+                  old extended-warranty editor are gone: a printer's warranty and delivery are «خصص طابعتك».
+                  - NOT a printer: «تتبّع الأرقام التسلسلية» — the serial switch, and the clear banner for a
+                    product that still carries old plans (the server refuses that save).
+                  - A USED / refurbished printer (it takes no services): «ضمان الجهاز المستعمل» — its base
+                    months and serial switch, folded.
+                  - A new printer shows this block ONLY when a stored warranty / serial field fails the
+                    save, so nothing the save validates is left without an editor. */}
+              {!isPrinterCatalog
+                ? s4Block('serial-tracking', 'تتبّع الأرقام التسلسلية', 'Serial tracking', 'بەدواداچوونی ژمارە زنجیرەییەکان', true,
+                  <>
+                    {warrantyHiddenValues && (
+                      <p className="text-[11px] text-text-secondary mb-3" data-form="warranty-preserved">
+                        {s4Tri(
+                          `محفوظ من الملف: ضمان أساسي ${doc.warranty_base_months} شهرًا — يُعدَّل للطابعات فقط.`,
+                          `Kept from the file: a ${doc.warranty_base_months}-month base warranty — edited for printers only.`,
+                          `لە فایلەکەوە پارێزراوە: گەرەنتی بنەڕەتی ${doc.warranty_base_months} مانگ — تەنها بۆ پرینتەرەکان دەستکاری دەکرێت.`
+                        )}
+                      </p>
+                    )}
+                    {warrantyEditor}
+                  </>)
+                : usedPrinter || warrantyFieldError
+                  ? s4Block(
+                    'used-warranty',
+                    usedPrinter ? 'ضمان الجهاز المستعمل' : 'الضمان الأساسي والترقيم',
+                    usedPrinter ? 'Used device warranty' : 'Base warranty & serials',
+                    usedPrinter ? 'گەرەنتی ئامێری بەکارهاتوو' : 'گەرەنتی بنەڕەتی و ژمارەی زنجیرەیی',
+                    warrantyShown,
+                    warrantyEditor,
+                    usedPrinter
+                      ? s4Tri(
+                        'طابعة مستعملة أو مجدَّدة لا تأخذ «خصص طابعتك»: تُباع بهذا الضمان.',
+                        'A used or refurbished printer takes no «Customize your printer»: it sells with this warranty.',
+                        'پرینتەری بەکارهاتوو یان نوێکراوە «پرینتەرەکەت ڕێکبخە» وەرناگرێت: بەم گەرەنتییە دەفرۆشرێت.'
+                      )
+                      : undefined
+                  )
+                  : null}
 
-              {/* ④ Open box / used / refurbished. Beside the warranty because a graded
+              {/* ③ Open box / used / refurbished. Beside the warranty because a graded
                   listing's coverage IS one of its condition facts — the server
                   refuses to sell extensions on top of it. Collapsed to a single
                   select for a new product, which is nearly every product. */}
@@ -1795,7 +1838,7 @@ export default function ProductForm({
                   serialTracking={{ own: doc.serialized ?? null, isPrinter: isPrinterCatalog, section: sectionSerial }}
                 />)}
 
-              {/* ⑤ «الأبعاد والوزن». Facts about the physical thing rather than about its
+              {/* ④ «الأبعاد والوزن». Facts about the physical thing rather than about its
                   price — a courier quote and a «هل يدخل على الطاولة؟» are the two
                   questions this block answers. `showPackageMeasures` opens it. */}
               {s4Block('dimensions', 'الأبعاد والوزن', 'Dimensions & weight', 'ڕووبەر و کێش', !isPrinterCatalog || initialSection === 4 || sectionMissing(4) > 0,
@@ -1805,7 +1848,7 @@ export default function ProductForm({
                   flags
                 />)}
 
-              {/* ⑥ «تريدها أقساط؟» — the ONE switch that turns the instalments note on
+              {/* ⑤ «تريدها أقساط؟» — the ONE switch that turns the instalments note on
                   for this product. Until this field existed the column could only be
                   written from the TXT template, so a feature that shipped enabled had
                   no way to appear on any product from the admin at all.
@@ -1821,7 +1864,7 @@ export default function ProductForm({
                 <>
                   {doc.payment_options.length > 0 && (
                     <p className="text-[11px] text-text-secondary mb-3" data-form="payment-options-preserved">
-                      خيارات الدفع المحفوظة: <span dir="ltr">{doc.payment_options.join(', ')}</span> — تُعدَّل عبر القالب النصي.
+                      {s4Tri('خيارات الدفع المحفوظة:', 'Stored payment options:', 'هەڵبژاردەکانی پارەدانی پاشەکەوتکراو:')} <span dir="ltr">{doc.payment_options.join(', ')}</span> — {s4Tri('تُعدَّل عبر القالب النصي.', 'edited through the text template.', 'لە ڕێگەی داڕێژەی دەقییەوە دەستکاری دەکرێن.')}
                     </p>
                   )}
                   <div className="max-w-xl">

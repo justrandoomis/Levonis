@@ -37,6 +37,7 @@ import { orderRoutes } from '../worker/routes/orders';
 import { ESTIMATE_NOTICE_VERSION, ESTIMATE_STRINGS } from '../packages/contracts/src/priceEstimates';
 import { allowedPaymentMethods, isPaymentMethodAllowed, isFinancedPaymentMethod } from '../packages/pricing/src/paymentPolicy';
 import { giftInCart, giftWorld, apps as giftApps, PLATE_AIR, paidLine } from './fixtures/giftWorld';
+import { careOfferUses, seedCareOffer } from './fixtures/careOffer';
 
 const BUYER: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const PRO: StubUser = { id: 'u_pro', role: 'customer', email: 'r@x.co' };
@@ -407,5 +408,29 @@ test('the words: every estimate sentence the checkout serves exists in three lan
     const t = ESTIMATE_STRINGS[key];
     assert.ok(t.ar && t.en && t.ckb, key);
     assert.notEqual(t.ckb, t.ar, key);
+  }
+});
+
+// ------------------------------------------------------------------ phase 5: the Levo Care part offer (DECISIONS row 358)
+
+test('a Levo Care part offer applies on a pre-order line and on an estimated-price line, on the goods price actually charged; quote = order', async () => {
+  for (const [product, route, ack] of [['p_pre', 'air', {}], ['p_pre2', 'sea', ACK]] as const) {
+    const raw = await world();
+    const offer = seedCareOffer(raw, { user: 'buyer', product, pct: 50 });
+    cartLine(raw, 'ci_part', 'buyer', product, route, 2);
+    const db = asD1(raw);
+    const q = (await quote(db, { paymentMethodId: 'cash' })).body.quote;
+    assert.equal(q.care_offers.length, 1, `${product}: ${JSON.stringify(q.care_offers)}`);
+    const off = q.care_offer_discount_iqd;
+    // Half of ONE unit's goods price — never of the route's commission or a fee, never of both units.
+    assert.ok(off > 0 && off <= Math.floor(q.lines[0].unit_price_iqd / 2), `${product}: ${off} of ${q.lines[0].unit_price_iqd}`);
+    assert.equal(q.coupon.discount_iqd, off);
+    assert.equal(q.total_iqd, q.subtotal_iqd + q.shipping.total_iqd - off, `${product}: the quote adds up`);
+    const placed = await order(db, { paymentMethodId: 'cash', ...ack, careOffersSeen: [offer.grantId], careOfferDiscountSeen: off });
+    assert.equal(placed.status, 200, JSON.stringify(placed.body).slice(0, 400));
+    const stored = row<Record<string, unknown>>(raw, 'SELECT total_iqd, subtotal_iqd, shipping_iqd FROM orders WHERE id = ?', placed.body.order.id)!;
+    assert.equal(stored.total_iqd, q.total_iqd, `${product}: quote = order`);
+    assert.deepEqual(all(raw, 'SELECT qty, coupon_discount_iqd FROM order_items WHERE order_id = ?', placed.body.order.id), [{ qty: 2, coupon_discount_iqd: off }]);
+    assert.equal(careOfferUses(raw, offer.couponId), 1);
   }
 });

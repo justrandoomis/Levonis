@@ -16,11 +16,10 @@ import {
   type PrinterServicesConfig,
   type Text3,
 } from '../../../packages/pricing/src/printerServices';
-import { DiscountRow, ItemRow, KIT_ID, PrinterScope, SharedBadge, onThisPrinter, perPrinterEstimate, pick3, text3, useDocs, useNames, type Printer } from './PrinterExtrasPanels';
+import { AdvancedFold, DiscountRow, Fold, ItemRow, KIT_ID, PrinterScope, SharedBadge, onThisPrinter, perPrinterEstimate, pick3, text3, useDocs, useNames, type Printer, type Upd } from './itemToolkit';
 import { S, discountPreview, say, type Loc } from './adminPrinterStrings';
 import { formatIqd } from '../../lib/api';
 
-type Upd = (fn: (d: PrinterServicesConfig) => void) => void;
 
 /** Invalid and repeated add-on ids, found before the save would refuse them. */
 export function addonIdProblems(addons: readonly PrinterAddon[]): Array<'bad' | 'dup' | null> {
@@ -65,7 +64,7 @@ export default function AddonsPanel({ draft, upd, loc, lang, printers, productId
   });
 
   return (
-    <section className="rounded-lg border border-border-subtle p-3 text-[12px] text-text-secondary space-y-2" data-printer-services-addons>
+    <section className="border-t border-border-subtle pt-3 text-[12px] text-text-secondary space-y-2" data-printer-services-addons>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="text-[14px] font-bold text-text-primary">{say(loc, S.addons)}</h3>
         <button type="button" className="lv-button lv-button-secondary lv-button-sm" disabled={addons.length >= MAX_ADDONS} onClick={add}>
@@ -78,15 +77,16 @@ export default function AddonsPanel({ draft, upd, loc, lang, printers, productId
         {here.map(({ a, n }) => {
           const doc = a.product_id ? docs[a.product_id] : undefined;
           const productName = doc ? pick3(doc, lang) : names.get(a.product_id) ?? a.product_id;
-          const shown = text3(a.title, lang) || productName || a.id;
+          const shown = text3(a.title, lang) || productName || loc('إضافة جديدة — اختر منتجها', 'New add-on — pick its product', 'زیادکراوی نوێ — بەرهەمەکەی هەڵبژێرە');
           const before = a.product_id ? perPrinterEstimate([{ product_id: a.product_id, qty: a.qty }], docs, 'price_iqd') : null;
           const cost = a.product_id ? perPrinterEstimate([{ product_id: a.product_id, qty: a.qty }], docs, 'cost_iqd') : null;
           const view = discountPreview(a.discount, before);
           const problem = idProblems[n];
           return (
-            <details key={n} className="rounded-lg border border-border-subtle p-2" open={picking === n || !a.product_id || !!problem || undefined} data-printer-services-addon={a.id}>
-              <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-2 text-[13px] text-text-primary">
-                <span className="min-w-0 flex-1 font-semibold">{shown}{a.qty > 1 ? ` ×${a.qty}` : ''}</span>
+            <Fold key={n} className="rounded-lg border border-border-subtle p-2" open={picking === n || !a.product_id || !!problem} attrs={{ 'data-printer-services-addon': a.id }}
+              summaryClassName="flex min-h-11 cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 py-1 text-[13px] text-text-primary [&::-webkit-details-marker]:hidden"
+              summary={<>
+                <span className="min-w-0 font-semibold" style={{ flexBasis: '100%' }}>{shown}{a.qty > 1 ? ` ×${a.qty}` : ''}</span>
                 {a.printers === null ? <span className="lv-chip [--chip:var(--color-info)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">{say(loc, S.everyPrinter)}</span> : null}
                 <SharedBadge refs={a.printers} productId={productId} loc={loc} />
                 {!a.active ? <span className="lv-chip [--chip:var(--color-warning)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold">{loc('موقوفة', 'Off', 'ڕاگیراو')}</span> : null}
@@ -96,30 +96,21 @@ export default function AddonsPanel({ draft, upd, loc, lang, printers, productId
                     <span dir="ltr" className="tabular-nums font-bold">{formatIqd(view.after)}</span>
                   </span>
                 ) : before !== null ? <span dir="ltr" className="tabular-nums text-[12px]">{formatIqd(before)}</span> : null}
-              </summary>
+              </>}>
 
               <div className="mt-2 space-y-3">
                 <PrinterScope refs={a.printers} printer={printer} productId={productId} enrolledIds={enrolledIds} loc={loc} onChange={(refs) => onAddon(n, (x) => { x.printers = refs; })} />
 
-                <div className="flex flex-wrap items-end gap-2">
-                  <label className="flex flex-col gap-1">
-                    {say(loc, S.id)}
-                    <input className="lv-input h-9 px-2 text-[12px]" dir="ltr" maxLength={32} aria-invalid={!!problem || undefined} value={a.id} onChange={(e) => onAddon(n, (x) => { x.id = e.target.value.toLowerCase(); })} />
-                  </label>
-                  <label className="flex flex-col gap-1">
-                    {say(loc, S.sort)}
-                    <input className="lv-input h-9 px-2 text-[12px] tabular-nums" inputMode="numeric" dir="ltr" value={String(a.sort)}
-                      onChange={(e) => onAddon(n, (x) => { x.sort = Math.min(999, Number(e.target.value.replace(/[^\d]/g, '') || 0)); })} />
-                  </label>
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-text-primary">
-                    <input type="checkbox" checked={a.active} disabled={!a.product_id} onChange={(e) => onAddon(n, (x) => { x.active = e.target.checked; })} />
+                    <input type="checkbox" role="switch" checked={a.active} disabled={!a.product_id} onChange={(e) => onAddon(n, (x) => { x.active = e.target.checked; })} />
                     {say(loc, S.active)}
                   </label>
-                  <button type="button" className="lv-button lv-button-ghost lv-button-sm" onClick={() => upd((d) => { d.addons = (d.addons ?? []).filter((_, j) => j !== n); })}>
+                  <button type="button" className="lv-button lv-button-ghost lv-button-sm ms-auto" onClick={() => upd((d) => { d.addons = (d.addons ?? []).filter((_, j) => j !== n); })}>
                     {say(loc, S.addonRemove)}
                   </button>
                 </div>
-                {problem ? <p className="text-text-primary" role="alert" data-addon-problem={problem}>{say(loc, problem === 'dup' ? S.idDup : S.idRule)}</p> : null}
+                {!a.product_id ? <p className="text-[11px] text-text-muted">{loc('اختر المنتج أولاً ثم فعّلها.', 'Pick the product first, then switch it on.', 'سەرەتا بەرهەمەکە هەڵبژێرە، پاشان چالاکی بکە.')}</p> : null}
 
                 <div className="space-y-1">
                   <h4 className="font-semibold text-text-primary">{say(loc, S.addonProduct)}</h4>
@@ -171,8 +162,21 @@ export default function AddonsPanel({ draft, upd, loc, lang, printers, productId
                   loc={loc}
                   label={loc('خصم الإضافة', 'Add-on discount', 'داشکاندنی زیادکراو')}
                 />
+
+                <AdvancedFold loc={loc} open={!!problem}>
+                  <label className="flex flex-col gap-1">
+                    {say(loc, S.id)}
+                    <input className="lv-input h-10 px-2 text-[12px]" dir="ltr" maxLength={32} aria-invalid={!!problem || undefined} value={a.id} onChange={(e) => onAddon(n, (x) => { x.id = e.target.value.toLowerCase(); })} />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    {say(loc, S.sort)}
+                    <input className="lv-input h-10 px-2 text-[12px] tabular-nums" inputMode="numeric" dir="ltr" value={String(a.sort)}
+                      onChange={(e) => onAddon(n, (x) => { x.sort = Math.min(999, Number(e.target.value.replace(/[^\d]/g, '') || 0)); })} />
+                  </label>
+                  {problem ? <p className="col-span-full text-text-primary" role="alert" data-addon-problem={problem}>{say(loc, problem === 'dup' ? S.idDup : S.idRule)}</p> : null}
+                </AdvancedFold>
               </div>
-            </details>
+            </Fold>
           );
         })}
       </div>

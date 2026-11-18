@@ -6,8 +6,8 @@
  *   careClaimsInstalled(db)          0236 present? (memoised per database, «present» only — the
  *                                    claimFiledColumnsInstalled pattern); every reader tolerates absence
  *   careEntitlements(db, units, at)  each unit's Levo Care: from the device's ROOT unit (a replacement
- *                                    resolves to the unit first sold) — delivered_at → + care_months of
- *                                    its line's frozen services snapshot; closed when the device came
+ *                                    resolves to the unit first sold) — delivered_at → + (warranty_months + 12) of
+ *                                    its line's frozen services snapshot (phase 5: Care runs after the warranty); closed when the device came
  *                                    back (warranty_closed_at); the terms frozen for the line's
  *                                    policy_version (printer_care_policies); the claims and the discount
  *                                    already approved on that root (the caps)
@@ -26,6 +26,7 @@ import { addMonths } from './membershipOps';
 import { carePolicies } from './printerServices';
 import { MAX_REPLACEMENT_HOPS } from './deviceCustody';
 import { HttpError } from './http';
+import { isSchemaMissing } from './membershipBenefits';
 
 // ------------------------------------------------------------------ refusals
 
@@ -46,9 +47,9 @@ export const CARE_REFUSALS = {
     ckb: 'مەرجەکانی لیڤۆ کێر بۆ ئەم ئامێرە هێشتا بڵاونەکراونەتەوە — سەرەتا مەرجەکان لە لیستی نرخی خزمەتگوزارییەکانی چاپکەرەوە بڵاو بکەرەوە.',
   },
   CARE_CLAIM_LIMIT: {
-    ar: 'استُخدم عدد مطالبات ليفو كير المسموح لهذا الجهاز في سنة الخدمة.',
-    en: 'This device has used all the Levo Care claims its Care year allows.',
-    ckb: 'ئەم ئامێرە هەموو ئەو داواکارییانەی لیڤۆ کێری بەکارهێناوە کە ساڵی خزمەتگوزارییەکەی ڕێگەی پێدەدات.',
+    ar: 'استُخدم عدد مطالبات ليفو كير المسموح لهذا الجهاز خلال فترة ليفو كير.',
+    en: 'This device has used all the Levo Care claims its Care period allows.',
+    ckb: 'ئەم ئامێرە هەموو ئەو داواکارییانەی لیڤۆ کێری بەکارهێناوە کە ماوەی لیڤۆ کێرەکەی ڕێگەی پێدەدات.',
   },
   CARE_PART_NOT_ELIGIBLE: {
     ar: 'هذه القطعة ليست ضمن قطع ليفو كير — ضع ثمنها في «أعمال أخرى» بسعرها الكامل.',
@@ -130,6 +131,37 @@ export const CARE_REFUSALS = {
     en: 'This is a warranty or Levo Care claim cost; correct it from the claim itself on the warranty desk (void the cost there and record it again).',
     ckb: 'ئەمە تێچووی داواکارییەکی گەرەنتی یان لیڤۆ کێرە؛ لە خودی داواکارییەکەوە لە مێزی گەرەنتی ڕاست بکرێتەوە (لەوێ تێچووەکە هەڵبوەشێنەوە و دووبارە تۆماری بکە).',
   },
+  // ---- phase 5: the Care part offer (DECISIONS row 358; migration 0243)
+  CARE_PART_INVALID: {
+    ar: 'هذا المنتج لا يُعرض كقطعة ليفو كير: اختر منتجاً منشوراً في المتجر، ليس طابعة ولا باقة ولا اشتراكاً.',
+    en: 'This product cannot be offered as a Levo Care part: pick a product on sale in the store that is not a printer, a bundle or a membership.',
+    ckb: 'ئەم بەرهەمە وەک پارچەی لیڤۆ کێر پێشکەش ناکرێت: بەرهەمێک هەڵبژێرە کە لە فرۆشگاکەدا بۆ فرۆشتن دانرابێت و چاپکەر، پاکێج یان ئەندامێتی نەبێت.',
+  },
+  CARE_PART_PCT_INVALID: {
+    ar: 'نسبة الخصم يجب أن تكون رقماً صحيحاً من 1 إلى الحد الأقصى المسموح في قائمة أسعار ليفو كير.',
+    en: 'The discount must be a whole percent from 1 up to the maximum the Levo Care price list allows.',
+    ckb: 'ڕێژەی داشکاندن دەبێت ژمارەیەکی تەواو بێت لە 1 تا ئەو زۆرترین ڕێژەیەی لیستی نرخی لیڤۆ کێر ڕێگەی پێدەدات.',
+  },
+  CARE_PART_ALREADY_OFFERED: {
+    ar: 'لهذه المطالبة عرض سارٍ على هذه القطعة — ألغِه أولاً أو انتظر انتهاءه.',
+    en: 'This claim already has a live offer on this part — revoke it first or wait for it to end.',
+    ckb: 'ئەم داواکارییە پێشتر پێشنیارێکی کارای لەسەر ئەم پارچەیە هەیە — سەرەتا هەڵیبوەشێنەوە یان چاوەڕێی کۆتاییهاتنی بکە.',
+  },
+  CARE_PART_LIMIT: {
+    ar: 'بلغت هذه المطالبة الحد الأقصى من عروض القطع السارية (5).',
+    en: 'This claim has reached the maximum of live part offers (5).',
+    ckb: 'ئەم داواکارییە گەیشتووەتە زۆرترین ژمارەی پێشنیاری پارچەی کارا (5).',
+  },
+  CARE_PART_USED: {
+    ar: 'استخدم الزبون هذا العرض في طلب، فلا يُلغى الآن. إذا أُلغي الطلب قبل التسليم يعود العرض ويمكن إلغاؤه.',
+    en: 'The customer used this offer on an order, so it cannot be revoked now. If that order is cancelled before delivery the offer comes back and can be revoked.',
+    ckb: 'کڕیار ئەم پێشنیارەی لە داواکارییەکدا بەکارهێناوە، بۆیە ئێستا هەڵناوەشێتەوە. ئەگەر ئەو داواکارییە پێش گەیاندن هەڵبوەشێتەوە، پێشنیارەکە دەگەڕێتەوە و دەتوانرێت هەڵبوەشێنرێتەوە.',
+  },
+  CARE_OFFER_CHANGED: {
+    ar: 'تغيّر خصم ليفو كير على هذا الطلب منذ عرض المجموع (انتهى العرض أو أُلغي أو استُخدم). لم يُسجَّل شيء — راجع المجموع الجديد ثم أكّد من جديد.',
+    en: 'The Levo Care discount on this order changed since the total was shown (the offer ended, was revoked or was used). Nothing was placed — review the new total and confirm again.',
+    ckb: 'داشکاندنی لیڤۆ کێر لەسەر ئەم داواکارییە لەو کاتەوەی کۆی گشتی پیشان درا گۆڕاوە (پێشنیارەکە کۆتایی هاتووە، هەڵوەشێنراوەتەوە یان بەکارهاتووە). هیچ شتێک تۆمار نەکرا — سەیری کۆی نوێ بکە و دووبارە پشتڕاستی بکەرەوە.',
+  },
 } as const satisfies Record<string, Text3>;
 export type CareRefusalCode = keyof typeof CARE_REFUSALS;
 
@@ -180,11 +212,24 @@ export interface CareEntitlement {
   /** The order line that sold the Care (the root unit's line), or null when none did. */
   order_item_id: string | null;
   policy_version: number | null;
+  /** The Care bought (12), as before. The cover itself is `total_months` from delivery. */
   months: number;
+  /** The warranty months bought with the printer (0 | 12 | 24), from the line's frozen services. */
+  warranty_months: number;
+  /** The whole Care cover from delivery: warranty_months + 12 after it (DECISIONS row 358). 0 without Care. */
+  total_months: number;
   start_at: string | null;
   end_at: string | null;
+  /** The day Care becomes the device's only cover (delivery + warranty_months); null before delivery. */
+  care_only_from: string | null;
+  /**
+   * The caps (D5): a claim counts once when it has an approved benefit or a USED part offer; the money is the
+   * approved benefits plus the discount each used part offer actually gave.
+   */
   used_claims: number;
   used_benefit_iqd: number;
+  /** What each claim used (approved benefit + used part offers): the desk prices a claim against the others. */
+  usage: Array<{ claim_id: string; benefit_iqd: number }>;
   /** null when no terms are known. */
   claims_left: number | null;
   /** null when no terms are known, or the terms set no money cap. */
@@ -247,46 +292,62 @@ export async function careEntitlements(db: D1Database, unitIds: string[], atMs =
       : Promise.resolve({ results: [] as Array<{ id: string; services_snapshot: string }> }),
     db
       .prepare(
-        `SELECT entitlement_unit_id AS id, COUNT(*) AS n, COALESCE(SUM(benefit_iqd), 0) AS s FROM care_claim_benefits
-          WHERE state = 'approved' AND entitlement_unit_id IN (SELECT value FROM json_each(?)) GROUP BY entitlement_unit_id`
+        `SELECT entitlement_unit_id AS id, claim_id, benefit_iqd AS s FROM care_claim_benefits
+          WHERE state = 'approved' AND entitlement_unit_id IN (SELECT value FROM json_each(?))`
       )
       .bind(JSON.stringify(rootIds))
-      .all<{ id: string; n: number; s: number }>(),
+      .all<{ id: string; claim_id: string; s: number }>(),
   ]);
-  const care = new Map<string, { months: number; version: number }>();
+  // D5: a part offer the customer USED (its coupon spent on a live order) counts with the discount it gave.
+  const partUse = await usedPartOffers(db, rootIds);
+  const care = new Map<string, { months: number; version: number; warranty: number; total: number }>();
   for (const l of lines.results ?? []) {
-    let v: { care_months?: unknown; lines?: Array<{ service?: unknown; policy_version?: unknown }> } | null = null;
+    let v: { care_months?: unknown; care_total_months?: unknown; warranty_months?: unknown; lines?: Array<{ service?: unknown; policy_version?: unknown }> } | null = null;
     try { v = JSON.parse(l.services_snapshot); } catch { v = null; }
     const months = num(v?.care_months);
     if (!v || !(months > 0)) continue;
     const line = Array.isArray(v.lines) ? v.lines.find((x) => x?.service === 'care') : undefined;
     const version = Number.isInteger(line?.policy_version) && (line!.policy_version as number) >= 1 ? (line!.policy_version as number) : 1;
-    care.set(l.id, { months: Math.trunc(months), version });
+    // Care runs for the warranty and twelve months after it (owner 2026-11-18). A line frozen before the
+    // snapshot carried `care_total_months` is computed from its own two figures.
+    const warranty = Math.max(0, Math.trunc(num(v.warranty_months)));
+    const total = num(v.care_total_months) > 0 ? Math.trunc(num(v.care_total_months)) : warranty + Math.trunc(months);
+    care.set(l.id, { months: Math.trunc(months), version, warranty, total });
   }
   const policies = await carePolicies(db, [...care.values()].map((c) => c.version));
-  const used = new Map((usage.results ?? []).map((u) => [u.id, { n: num(u.n), s: num(u.s) }]));
+  const byRoot = new Map<string, Map<string, number>>();
+  const addUse = (root: string, claim: string, iqd: number) => {
+    const m = byRoot.get(root) ?? new Map<string, number>();
+    m.set(claim, (m.get(claim) ?? 0) + iqd);
+    byRoot.set(root, m);
+  };
+  for (const u of usage.results ?? []) addUse(u.id, u.claim_id, num(u.s));
+  for (const u of partUse) addUse(u.entitlement_unit_id, u.claim_id, num(u.discount_iqd));
   for (const id of asked) {
     const unit = units.get(id);
     const root = roots.get(id);
     if (!unit || !root) continue;
     const c = root.order_item_id ? care.get(root.order_item_id) : undefined;
-    const u = used.get(root.id) ?? { n: 0, s: 0 };
+    const usageOfRoot = [...(byRoot.get(root.id) ?? new Map<string, number>())].map(([claim_id, benefit_iqd]) => ({ claim_id, benefit_iqd }));
+    const u = { n: usageOfRoot.length, s: usageOfRoot.reduce((sum, x) => sum + x.benefit_iqd, 0) };
     const base: CareEntitlement = {
       state: 'none', unit_id: id, root_unit_id: root.id, order_item_id: c ? root.order_item_id : null,
-      policy_version: c?.version ?? null, months: c?.months ?? 0, start_at: null, end_at: null,
-      used_claims: u.n, used_benefit_iqd: u.s, claims_left: null, benefit_left_iqd: null, terms: null,
+      policy_version: c?.version ?? null, months: c?.months ?? 0, warranty_months: c?.warranty ?? 0, total_months: c?.total ?? 0,
+      start_at: null, end_at: null, care_only_from: null,
+      used_claims: u.n, used_benefit_iqd: u.s, usage: usageOfRoot, claims_left: null, benefit_left_iqd: null, terms: null,
     };
     if (!c) { out.set(id, base); continue; }
     const terms = policies.get(c.version) ?? null;
     const start = root.delivered_at;
-    const end = start ? addMonths(start, c.months) : null;
+    const end = start ? addMonths(start, c.total) : null;
+    const careOnlyFrom = start ? (c.warranty > 0 ? addMonths(start, c.warranty) : start) : null;
     const left = terms
       ? {
           claims_left: Math.max(0, num(terms.max_claims) - u.n),
           benefit_left_iqd: terms.max_benefit_iqd === null || terms.max_benefit_iqd === undefined ? null : Math.max(0, num(terms.max_benefit_iqd) - u.s),
         }
       : { claims_left: null, benefit_left_iqd: null };
-    const filled = { ...base, start_at: start, end_at: end, terms, ...left };
+    const filled = { ...base, start_at: start, end_at: end, care_only_from: careOnlyFrom, terms, ...left };
     let state: CareState;
     // Owner ruling D5: Care follows the device and ends when it comes back (a return closes the unit).
     if (unit.warranty_closed_at && Date.parse(unit.warranty_closed_at) <= atMs) state = 'closed';
@@ -299,6 +360,33 @@ export async function careEntitlements(db: D1Database, unitIds: string[], atMs =
   return out;
 }
 
+/**
+ * The part offers USED on these root units (migration 0243): the offer's coupon is spent on a live order — in the
+ * extras, where an offer always rides, or (never written, read for safety) as an order's own coupon. A cancelled
+ * order released the use, so it no longer counts. [] on a database without 0243.
+ */
+async function usedPartOffers(db: D1Database, rootIds: string[]): Promise<Array<{ entitlement_unit_id: string; claim_id: string; discount_iqd: number }>> {
+  if (!rootIds.length) return [];
+  try {
+    const { results } = await db
+      .prepare(
+        `SELECT g.entitlement_unit_id, g.claim_id,
+                COALESCE((SELECT x.amount_iqd FROM coupon_redemption_extras x WHERE x.coupon_id = g.coupon_id AND x.state = 'active' LIMIT 1),
+                         (SELECT r.amount_iqd FROM coupon_redemptions r WHERE r.coupon_id = g.coupon_id AND r.state = 'active' LIMIT 1)) AS discount_iqd
+           FROM care_part_grants g
+          WHERE g.entitlement_unit_id IN (SELECT value FROM json_each(?))
+            AND (EXISTS (SELECT 1 FROM coupon_redemption_extras x WHERE x.coupon_id = g.coupon_id AND x.state = 'active')
+              OR EXISTS (SELECT 1 FROM coupon_redemptions r WHERE r.coupon_id = g.coupon_id AND r.state = 'active'))`
+      )
+      .bind(JSON.stringify(rootIds))
+      .all<{ entitlement_unit_id: string; claim_id: string; discount_iqd: number | null }>();
+    return (results ?? []).map((r) => ({ entitlement_unit_id: r.entitlement_unit_id, claim_id: r.claim_id, discount_iqd: num(r.discount_iqd) }));
+  } catch (e) {
+    if (isSchemaMissing(e)) return [];
+    throw e;
+  }
+}
+
 /** What the customer reads of a device's Care: the window, what is left, and the terms they bought. */
 export function carePublic(e: CareEntitlement | null | undefined) {
   if (!e || e.state === 'none') return null;
@@ -307,6 +395,10 @@ export function carePublic(e: CareEntitlement | null | undefined) {
     policy_version: e.policy_version,
     start_at: e.start_at,
     end_at: e.end_at,
+    // Phase 5: the cover's length from delivery (warranty + 12), and the day Care becomes the only cover.
+    warranty_months: e.warranty_months,
+    total_months: e.total_months,
+    care_only_from: e.care_only_from,
     claims_left: e.claims_left,
     benefit_left_iqd: e.benefit_left_iqd,
     discount_pct: e.terms?.discount_pct ?? null,

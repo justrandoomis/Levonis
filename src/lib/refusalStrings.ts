@@ -2239,9 +2239,9 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ckb: 'مەرجەکانی لیڤۆ کێر بۆ ئەم ئامێرە هێشتا بڵاونەکراونەتەوە — سەرەتا مەرجەکان لە لیستی نرخی خزمەتگوزارییەکانی چاپکەرەوە بڵاو بکەرەوە.',
   },
   CARE_CLAIM_LIMIT: {
-    ar: 'استُخدم عدد مطالبات ليفو كير المسموح لهذا الجهاز في سنة الخدمة.',
-    en: 'This device has used all the Levo Care claims its Care year allows.',
-    ckb: 'ئەم ئامێرە هەموو ئەو داواکارییانەی لیڤۆ کێری بەکارهێناوە کە ساڵی خزمەتگوزارییەکەی ڕێگەی پێدەدات.',
+    ar: 'استُخدم عدد مطالبات ليفو كير المسموح لهذا الجهاز خلال فترة ليفو كير.',
+    en: 'This device has used all the Levo Care claims its Care period allows.',
+    ckb: 'ئەم ئامێرە هەموو ئەو داواکارییانەی لیڤۆ کێری بەکارهێناوە کە ماوەی لیڤۆ کێرەکەی ڕێگەی پێدەدات.',
   },
   CARE_PART_NOT_ELIGIBLE: {
     ar: 'هذه القطعة ليست ضمن قطع ليفو كير — ضع ثمنها في «أعمال أخرى» بسعرها الكامل.',
@@ -2332,6 +2332,42 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'اختر نوع التكلفة: شراء قطعة، أجرة عمل، توصيل، جهاز بديل أو أخرى.',
     en: 'Choose the cost kind: part bought, labour, courier, replacement device or other.',
     ckb: 'جۆری تێچوو هەڵبژێرە: کڕینی پارچە، کرێی کار، گەیاندن، ئامێری جێگرەوە یان هی تر.',
+  },
+  // ---- Phase 5: the Levo Care part offer (worker/routes/deviceCare.ts; DECISIONS row 358) ----
+  CARE_PART_INVALID: {
+    ar: 'هذا المنتج لا يُعرض كقطعة ليفو كير: اختر منتجاً منشوراً في المتجر، ليس طابعة ولا باقة ولا اشتراكاً.',
+    en: 'This product cannot be offered as a Levo Care part: pick a product on sale in the store that is not a printer, a bundle or a membership.',
+    ckb: 'ئەم بەرهەمە وەک پارچەی لیڤۆ کێر پێشکەش ناکرێت: بەرهەمێک هەڵبژێرە کە لە فرۆشگاکەدا بۆ فرۆشتن دانرابێت و چاپکەر، پاکێج یان ئەندامێتی نەبێت.',
+  },
+  CARE_PART_PCT_INVALID: {
+    ar: 'نسبة الخصم يجب أن تكون رقماً صحيحاً من 1 إلى الحد الأقصى المسموح في قائمة أسعار ليفو كير.',
+    en: 'The discount must be a whole percent from 1 up to the maximum the Levo Care price list allows.',
+    ckb: 'ڕێژەی داشکاندن دەبێت ژمارەیەکی تەواو بێت لە 1 تا ئەو زۆرترین ڕێژەیەی لیستی نرخی لیڤۆ کێر ڕێگەی پێدەدات.',
+  },
+  CARE_PART_ALREADY_OFFERED: {
+    ar: 'لهذه المطالبة عرض سارٍ على هذه القطعة — ألغِه أولاً أو انتظر انتهاءه.',
+    en: 'This claim already has a live offer on this part — revoke it first or wait for it to end.',
+    ckb: 'ئەم داواکارییە پێشتر پێشنیارێکی کارای لەسەر ئەم پارچەیە هەیە — سەرەتا هەڵیبوەشێنەوە یان چاوەڕێی کۆتاییهاتنی بکە.',
+  },
+  CARE_PART_LIMIT: {
+    ar: 'بلغت هذه المطالبة الحد الأقصى من عروض القطع السارية (5).',
+    en: 'This claim has reached the maximum of live part offers (5).',
+    ckb: 'ئەم داواکارییە گەیشتووەتە زۆرترین ژمارەی پێشنیاری پارچەی کارا (5).',
+  },
+  CARE_PART_USED: {
+    ar: 'استخدم الزبون هذا العرض في طلب، فلا يُلغى الآن. إذا أُلغي الطلب قبل التسليم يعود العرض ويمكن إلغاؤه.',
+    en: 'The customer used this offer on an order, so it cannot be revoked now. If that order is cancelled before delivery the offer comes back and can be revoked.',
+    ckb: 'کڕیار ئەم پێشنیارەی لە داواکارییەکدا بەکارهێناوە، بۆیە ئێستا هەڵناوەشێتەوە. ئەگەر ئەو داواکارییە پێش گەیاندن هەڵبوەشێتەوە، پێشنیارەکە دەگەڕێتەوە و دەتوانرێت هەڵبوەشێنرێتەوە.',
+  },
+  CARE_OFFER_CHANGED: {
+    ar: 'تغيّر خصم ليفو كير على هذا الطلب منذ عرض المجموع (انتهى العرض أو أُلغي أو استُخدم). لم يُسجَّل شيء — راجع المجموع الجديد ثم أكّد من جديد.',
+    en: 'The Levo Care discount on this order changed since the total was shown (the offer ended, was revoked or was used). Nothing was placed — review the new total and confirm again.',
+    ckb: 'داشکاندنی لیڤۆ کێر لەسەر ئەم داواکارییە لەو کاتەوەی کۆی گشتی پیشان درا گۆڕاوە (پێشنیارەکە کۆتایی هاتووە، هەڵوەشێنراوەتەوە یان بەکارهاتووە). هیچ شتێک تۆمار نەکرا — سەیری کۆی نوێ بکە و دووبارە پشتڕاستی بکەرەوە.',
+  },
+  CARE_PART_COUPON_MANAGED: {
+    ar: 'هذا الكوبون يحمل عرض قطعة ليفو كير — ألغِ العرض من مطالبته في مكتب الضمان.',
+    en: 'This coupon carries a Levo Care part offer — revoke the offer from its claim on the warranty desk.',
+    ckb: 'ئەم کۆپۆنە پێشنیاری پارچەیەکی لیڤۆ کێری هەڵگرتووە — پێشنیارەکە لە داواکارییەکەیەوە لە مێزی گەرەنتی هەڵبوەشێنەوە.',
   },
   ORDER_HAS_SERVICE_CLAIMS: {
     ar: 'لأجهزة هذا الطلب مطالبة ضمان أو ليفو كير لها مال مسجّل، فيُحتفظ بالطلب.',

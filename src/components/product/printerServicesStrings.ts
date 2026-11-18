@@ -16,17 +16,17 @@ export interface PsStrings {
   custom: string;
   free: string;
   chooseFirst: string;
-  details: string; hideDetails: string;
+  details: string;
   justWarning: string;
   justAck: string;
   delivery: string; deliveryEconomy: string; deliveryPersonal: string;
   deliveryEconomySub: string; deliveryPersonalSub: string;
   deliveryChoose: string;
   sheetTitle: string; sheetSub: string;
-  printerOnly: string;
   warranty: string; warrantySub: string; none: string; months: (n: number) => string;
   warrantyNote: string;
-  care: string; careSub: (pct: number) => string; careOption: string;
+  /** Care = 12 months AFTER the warranty; `careOption` takes the total for the choice on screen (12 / 24 / 36). */
+  care: string; careSub: (pct: number) => string; careOption: (total: number) => string;
   packaging: string; packagingSub: string; packagingStandard: string; packagingExtra: string;
   inspection: string; inspectionSub: string; inspectionOption: string; inspectionLead: (lo: number, hi: number) => string;
   academy: string; academySub: string; academyRecorded: string; academyWhatsapp: string; academyInPerson: string;
@@ -36,7 +36,6 @@ export interface PsStrings {
   unavailable: string;
   includes: string;
   edit: string;
-  noBuyNow: string;
   /** The server is pricing the choice on screen. */
   pending: string;
   /** The prices could not be read: nothing is added until they are. */
@@ -93,17 +92,16 @@ const AR: PsStrings = {
   custom: 'مخصص',
   free: 'مجاناً',
   chooseFirst: 'اختر باقتك وطريقة التوصيل أولاً',
-  details: 'عرض التفاصيل', hideDetails: 'إخفاء التفاصيل',
+  details: 'عرض التفاصيل',
   justWarning: 'ستشتري الطابعة بدون خدمات Levonis الاختيارية وبدون ضمان تجاري إضافي. حقوقك القانونية كمستهلك تبقى قائمة.',
   justAck: 'فهمت وأوافق',
   delivery: 'التوصيل', deliveryEconomy: 'اقتصادي', deliveryPersonal: 'شخصي (الوسيط)',
   deliveryEconomySub: 'توصيل عادي مع الشحنات', deliveryPersonalSub: 'مندوب خاص وعناية أكبر بالطابعة',
   deliveryChoose: 'اختر طريقة التوصيل',
   sheetTitle: 'تخصيص بنفسي', sheetSub: 'اختر الخدمات المناسبة لك',
-  printerOnly: 'الطابعة فقط',
   warranty: 'الضمان', warrantySub: 'اختر مدة الضمان', none: 'بدون', months: (n) => `${n} شهر`,
   warrantyNote: 'المدة كاملة من تاريخ التسليم، تشمل العتاد والبرمجيات والإرجاع المجاني للعيب المؤكد وفق الشروط.',
-  care: 'Levo Care', careSub: (pct) => `خصم حتى ${pct}% على قطع وإصلاحات سوء الاستخدام`, careOption: '12 شهر',
+  care: 'Levo Care', careSub: (pct) => `12 شهر بعد الضمان: خصم حتى ${pct}% على القطع، لا استبدال مجاني`, careOption: (n) => (n > 12 ? `+12 شهر · المجموع ${n} شهر` : '12 شهر'),
   packaging: 'التغليف', packagingSub: 'تغليف المصنع الآمن مشمول دائماً', packagingStandard: 'القياسي', packagingExtra: 'حماية إضافية',
   inspection: 'الفحص قبل الشحن', inspectionSub: 'فحص كامل للطابعة قبل إرسالها', inspectionOption: 'فحص كامل',
   inspectionLead: (lo, hi) => `يضيف ${lo}–${hi} أيام عمل للتجهيز`,
@@ -115,7 +113,6 @@ const AR: PsStrings = {
   unavailable: 'غير متوفر حالياً',
   includes: 'تشمل',
   edit: 'تعديل',
-  noBuyNow: 'الشراء السريع غير متاح لطابعة مع خدمات — أضفها إلى السلة.',
   pending: 'جارٍ التحقق من السعر…',
   quoteFailed: 'تعذّر تحميل أسعار الخدمات — حدّث الصفحة وحاول مجدداً.',
   saving: 'جارٍ الحفظ…',
@@ -166,17 +163,16 @@ const EN: PsStrings = {
   custom: 'Custom',
   free: 'Free',
   chooseFirst: 'Choose your package and delivery first',
-  details: 'View details', hideDetails: 'Hide details',
+  details: 'View details',
   justWarning: 'You are buying the printer without optional Levonis services or additional commercial warranty. Your statutory consumer rights still apply.',
   justAck: 'I understand and agree',
   delivery: 'Delivery', deliveryEconomy: 'Economy', deliveryPersonal: 'Personal (Al-Waseet)',
   deliveryEconomySub: 'Regular delivery with other parcels', deliveryPersonalSub: 'Dedicated courier, extra care',
   deliveryChoose: 'Choose a delivery option',
   sheetTitle: 'Customize myself', sheetSub: 'Choose the services you want',
-  printerOnly: 'Printer only',
   warranty: 'Warranty', warrantySub: 'Choose how long', none: 'None', months: (n) => `${n} months`,
   warrantyNote: 'Total months from delivery: hardware, software and free return of a confirmed defect, under the terms.',
-  care: 'Levo Care', careSub: (pct) => `Up to ${pct}% off misuse parts and repairs`, careOption: '12 months',
+  care: 'Levo Care', careSub: (pct) => `12 months after the warranty: up to ${pct}% off parts, not a free replacement`, careOption: (n) => (n > 12 ? `+12 months · ${n} in total` : '12 months'),
   packaging: 'Packaging', packagingSub: 'Safe factory packaging is always included', packagingStandard: 'Standard', packagingExtra: 'Extra protection',
   inspection: 'Pre-dispatch inspection', inspectionSub: 'A full check before it ships', inspectionOption: 'Full inspection',
   inspectionLead: (lo, hi) => `Adds ${lo}–${hi} business days to preparation`,
@@ -188,7 +184,6 @@ const EN: PsStrings = {
   unavailable: 'Not available right now',
   includes: 'Includes',
   edit: 'Edit',
-  noBuyNow: 'Buy now is not available for a printer with services — add it to the cart.',
   pending: 'Checking the price…',
   quoteFailed: 'The service prices could not be loaded — refresh the page and try again.',
   saving: 'Saving…',
@@ -239,17 +234,16 @@ const CKB: PsStrings = {
   custom: 'دڵخواز',
   free: 'بەخۆڕایی',
   chooseFirst: 'سەرەتا پاکێج و جۆری گەیاندن هەڵبژێرە',
-  details: 'وردەکارییەکان', hideDetails: 'شاردنەوەی وردەکاری',
+  details: 'وردەکارییەکان',
   justWarning: 'پرینتەرەکە بەبێ خزمەتگوزارییە ئارەزوومەندانەکانی Levonis و بەبێ گەرەنتی بازرگانی زیادە دەکڕیت. مافە یاساییەکانت وەک بەکاربەر هەر دەمێننەوە.',
   justAck: 'تێگەیشتم و ڕازیم',
   delivery: 'گەیاندن', deliveryEconomy: 'ئابووری', deliveryPersonal: 'تایبەت (الوسيط)',
   deliveryEconomySub: 'گەیاندنی ئاسایی لەگەڵ بارەکانی تر', deliveryPersonalSub: 'نێردەری تایبەت و چاودێری زیاتر',
   deliveryChoose: 'جۆری گەیاندن هەڵبژێرە',
   sheetTitle: 'خۆم ڕێکی دەخەم', sheetSub: 'ئەو خزمەتگوزارییانە هەڵبژێرە کە دەتەوێت',
-  printerOnly: 'تەنها پرینتەر',
   warranty: 'گەرەنتی', warrantySub: 'ماوەی گەرەنتی هەڵبژێرە', none: 'هیچ', months: (n) => `${n} مانگ`,
   warrantyNote: 'هەموو ماوەکە لە ڕۆژی گەیاندنەوە: ڕەقەکاڵا، نەرمەکاڵا و گەڕاندنەوەی بەخۆڕایی بۆ کەموکوڕی سەلمێنراو، بەپێی مەرجەکان.',
-  care: 'Levo Care', careSub: (pct) => `داشکاندن تا ${pct}% لەسەر پارچە و چاککردنەوەی خراپ بەکارهێنان`, careOption: '12 مانگ',
+  care: 'Levo Care', careSub: (pct) => `12 مانگ دوای گەرەنتی: داشکاندن تا ${pct}% لەسەر پارچە، گۆڕینی بەخۆڕایی نییە`, careOption: (n) => (n > 12 ? `+12 مانگ · کۆی ${n} مانگ` : '12 مانگ'),
   packaging: 'پێچانەوە', packagingSub: 'پێچانەوەی سەلامەتی کارگە هەمیشە لەخۆدەگرێت', packagingStandard: 'ئاسایی', packagingExtra: 'پاراستنی زیادە',
   inspection: 'پشکنین پێش ناردن', inspectionSub: 'پشکنینی تەواوی پرینتەر پێش ناردن', inspectionOption: 'پشکنینی تەواو',
   inspectionLead: (lo, hi) => `${lo}–${hi} ڕۆژی کار بۆ ئامادەکردن زیاد دەکات`,
@@ -261,7 +255,6 @@ const CKB: PsStrings = {
   unavailable: 'ئێستا بەردەست نییە',
   includes: 'لەخۆدەگرێت',
   edit: 'دەستکاری',
-  noBuyNow: 'کڕینی خێرا بۆ پرینتەر لەگەڵ خزمەتگوزاری بەردەست نییە — بیخە ناو سەبەتە.',
   pending: 'نرخەکە دەپشکنرێت…',
   quoteFailed: 'نرخی خزمەتگوزارییەکان بار نەکران — پەڕەکە نوێ بکەرەوە و دووبارە هەوڵ بدەرەوە.',
   saving: 'پاشەکەوت دەکرێت…',

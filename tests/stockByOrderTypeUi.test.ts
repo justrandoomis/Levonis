@@ -97,10 +97,14 @@ test('direct stock is option-owned until a colour is linked, then exact option-c
   assert.match(model, /أدخل مخزون البيع المباشر لهذا الخيار/);
 });
 
-test('the product-level selling section keeps delivery and warranty, not stock or surcharge fields', () => {
+test('the product-level section ٤ is «خدمات الطابعة» / «الحالة والأبعاد», not stock or surcharge fields', () => {
   const form = read(FORM);
-  assert.match(form, /ar="التوصيل والضمان"/);
-  assert.match(form, /Delivery & warranty/);
+  // Owner, 2026-11-18 (DECISIONS row 358): «التوصيل والضمان» became «خدمات الطابعة» on a printer and
+  // «الحالة والأبعاد» on any other product; the old delivery and extended-warranty blocks are gone.
+  assert.match(form, /ar=\{isPrinterCatalog \? 'خدمات الطابعة' : 'الحالة والأبعاد'\}/);
+  assert.match(form, /en=\{isPrinterCatalog \? 'Printer services' : 'Condition & size'\}/);
+  assert.doesNotMatch(form, /ar="التوصيل والضمان"/);
+  assert.doesNotMatch(form, /Delivery & warranty/);
   assert.doesNotMatch(form, /ar="مخزون المنتج"/);
   assert.doesNotMatch(form, /ar="حد التنبيه"/);
   assert.doesNotMatch(form, /ar="زيادة البيع المباشر"/);

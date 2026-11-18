@@ -55,6 +55,8 @@ import type { ProductRelationsView } from '../lib/productOverlay';
 import { validateSelection } from '../lib/productRelations';
 import { validateCoupon } from '../lib/membershipOps';
 import { couponLinesOf, productCouponFacts } from '../lib/couponLines';
+import { allocateCareOffers, type LiveCareOffer } from '../lib/carePartGrants';
+import { spendableCareOffers } from '../lib/carePartOfferCaps';
 import { couponPoolFacts, couponPoolOffer } from '@levonis/pricing/coupons';
 import { grantViewsOfCoupons, couponTargets } from '../lib/rewards/coupons';
 import { livePool } from '../lib/rewards/pool';
@@ -180,7 +182,7 @@ import {
 import { giftSelectionOf, selectionFromColumns, type GiftSelection } from '../lib/gifts/selection';
 import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 import { auditStatements } from '../lib/audit';
-import { enrolledClasses, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
+import { enrolledClasses, productEnrolled, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
 import { parseConditionDoc } from '../lib/condition';
 import { addonLinesMatch, addonUnavailableOf, kitLinesMatch, kitNotOffered, kitPricing, kitUnavailable, offeredAddon, offeredKit, resolveAddon, resolveKit, RANDOM_COLOUR, type ColourWishes, type ResolvedAddon, type ResolvedKit } from '../lib/printerKits';
 import { addonNotOffered, addonUnavailable, applyPrinterDiscount, attachedLineOf, benefitRegularUnit, printerDiscountView, printerLineDiscount, repickRandomColour, type AppliedPrinterDiscount } from '../lib/printerOffers';
@@ -1428,7 +1430,11 @@ async function loadCart(c: Context<AppContext>) {
       // total it yields — what the cart's "Extended Warranty" disclosure
       // shows before the customer picks one. Printers only; the cart refuses
       // a plan on anything else (WARRANTY_NOT_PRINTER).
-      warranty_plans: pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter),
+      // A printer enrolled in the PUBLISHED printer services sells those instead — never the legacy plans
+      // (DECISIONS rows 339, 358; the product page hides them the same way, `productEnrolled`).
+      warranty_plans: productEnrolled(ctx.printerServices ?? null, { id: String(row.id), condition: doc.condition })
+        ? []
+        : pricedPlans(doc.warranty_plans, resolved.regular_iqd, doc.warranty_base_months, isPrinter),
       // Which routes exist — never their commission (V2-0, C5).
       preorder_transports: publicPreorderRoutes(doc.preorder_transports),
       shipping_methods: safeParse(row.shipping_methods, []), // legacy UI compatibility
@@ -1618,6 +1624,40 @@ async function cartCouponLines(
     ancestry,
     preorder ? 'pre_order' : 'direct_sale'
   );
+}
+
+type CartCareItem = CartCouponItem & { kit_line?: unknown; addon_line?: unknown };
+
+/**
+ * THE CART'S LEVO CARE PART OFFERS (phase 5): each live offer of this customer whose product has an eligible
+ * line here, with what it takes off ONE unit. Eligible = an ordinary line: never a kit or add-on attached to a
+ * printer, a bundle / mystery offer, or a gift — the same lines the checkout leaves out. [] when he has none
+ * (one small read) and on a database without 0243.
+ */
+async function cartCareOffers(
+  db: D1Database,
+  offers: readonly LiveCareOffer[],
+  items: readonly CartCareItem[],
+  factsOver: (ticked: ReadonlySet<string>) => ReadonlyMap<string, CouponLineFact>
+) {
+  if (!offers.length) return [];
+  const wanted = new Set(offers.map((o) => o.product_id));
+  const eligible = items.filter(
+    (it) => wanted.has(String(it.productId ?? '')) && !it.kit_line && !it.addon_line && it.kind !== 'bundle' && it.kind !== 'mystery' && it.kind !== 'gift'
+  );
+  if (!eligible.length) return [];
+  // Every line of the cart prices the membership's line saving; only the eligible ones may take an offer.
+  const lines = await cartCouponLines(db, items, factsOver);
+  const ids = new Set(eligible.map((it) => String(it.id ?? '')));
+  return allocateCareOffers(
+    offers,
+    lines.filter((l) => ids.has(l.line_id)).map((l) => ({
+      line_id: l.line_id, tie_key: l.tie_key ?? l.line_id, product_id: l.product_id, qty: l.qty, unit_goods_iqd: l.unit_goods_iqd, taken_iqd: 0,
+    }))
+  ).map((o) => ({
+    grant_id: o.grant_id, claim_id: o.claim_id, product_id: o.product_id, cart_item_id: o.cart_item_id,
+    discount_pct: o.discount_pct, discount_iqd: o.discount_iqd, expires_at: o.expires_at,
+  }));
 }
 
 /** The goods a free-delivery line is tested on: the prices, less what the membership takes at the line. A gift pays nothing. */
@@ -1833,8 +1873,14 @@ cartRoutes.get('/', async (c) => {
   // holding only a store's goods answered `scope: null`, the cart page never
   // rendered the store cart — the only way to /store-checkout — and the badge
   // was reset to 0 over a full cart.
-  const [{ items, unavailable_lines, tier, tierActive, delivery_methods, delivery_tariff, membership, printer_extras }, allLines] = await Promise.all([
+  const [{ items, unavailable_lines, tier, tierActive, delivery_methods, delivery_tariff, membership, printer_extras, couponFactsOver }, liveOffers, allLines] = await Promise.all([
     loadCart(c),
+    // Phase 5: the customer's live Levo Care part offers, read beside the cart (no extra round trip). FAIL OPEN:
+    // a Care read must never break the cart — any error here is logged and the cart answers without offers.
+    spendableCareOffers(c.env.DB, user.id).catch((e: unknown) => {
+      console.error('cart: Levo Care part offers not read', e instanceof Error ? e.message : String(e));
+      return [] as LiveCareOffer[];
+    }),
     c.env.DB
       .prepare('SELECT seller_type, merchant_id, store_id, qty FROM cart_items WHERE user_id = ? ORDER BY created_at, id')
       .bind(user.id)
@@ -1849,6 +1895,13 @@ cartRoutes.get('/', async (c) => {
   // the customer discovers it by being refused. null = empty, so any type may
   // still be started.
   const shippingType = cartShippingType(items as Array<{ transport_method?: unknown }>);
+  // Phase 5 (0243; DECISIONS row 358): the customer's live Levo Care part offers that land on a line of this
+  // cart — the same arithmetic the quote and the order apply (`allocateCareOffers`). Display only: the cart
+  // prints no total with coupons, and the checkout quote is the authority.
+  const careOffers = await cartCareOffers(c.env.DB, liveOffers, items as CartCareItem[], couponFactsOver).catch((e: unknown) => {
+    console.error('cart: Levo Care part offers not applied', e instanceof Error ? e.message : String(e));
+    return [];
+  });
   // WHOSE CART THIS IS, answered from the rows already in hand.
   //
   // The page used to ask `/cart/scope` in a second request — the same table,
@@ -1871,6 +1924,7 @@ cartRoutes.get('/', async (c) => {
     membership,
     // 0235: the membership chosen with a printer (its order quote, or the refusal) — kits ride on the lines.
     printer_extras,
+    care_offers: careOffers,
     // «سعر تقديري» (docs/SMART_PRICING.md §5.3): `has_estimates: true` when a line is an estimate — absent otherwise.
     ...cartEstimateFlag(items),
     delivery_methods,

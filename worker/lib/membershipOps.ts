@@ -21,6 +21,7 @@ import { isSchemaMissing } from './membershipBenefits';
 import { allocateCoupon, type CouponAllocation, type CouponContext, type CouponLine, type CouponRule, type PoolAllocation, type PoolCoupon } from '@levonis/pricing/coupons';
 import { couponNamesDelivery, couponRuleOf, wholeOrderTarget } from './couponLines';
 import { poolFor, spentAsExtra } from './rewards/pool';
+import { isCareCouponId } from './carePartGrants';
 
 /**
  * Calendar-month addition with month-end clamping: the day-of-month is
@@ -382,6 +383,11 @@ export async function validateCoupon(
   // used printer. Answered exactly as an unknown code — no minimum, no tier —
   // so a prober learns nothing about whose it is, or that it exists.
   if (coupon.assigned_user_id && coupon.assigned_user_id !== userId) return { ok: false, reason: 'CODE_NOT_FOUND' };
+  // A LEVO CARE PART OFFER'S COUPON IS NEVER TYPED (migration 0243; DECISIONS row 358): its code is random and
+  // shown to nobody, and the offer applies by itself in the cart, the quote and the order
+  // (worker/lib/carePartGrants.ts). Typed — by its own customer too — it is an unknown code, so it can
+  // never be applied a second time beside its automatic use.
+  if (isCareCouponId(coupon.id)) return { ok: false, reason: 'CODE_NOT_FOUND' };
 
   // A REWARD COUPON SPENDS AS A POOL (DECISIONS row 295): this customer's code,
   // and everything else of theirs this order can use, the delivery with the

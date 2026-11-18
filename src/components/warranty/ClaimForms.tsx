@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Paperclip, X } from 'lucide-react';
+import { Check, Paperclip, X } from 'lucide-react';
 import type { Language } from '../../translations';
 import { api, ApiError, newIdempotencyKey, uploadTimeoutMs } from '../../lib/api';
 import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { Overlay } from '../ui/Overlay';
 import type { Attachment, Device } from './types';
+import type { ClaimKind } from './DeviceCard';
 import { productName } from './types';
 import type { WarrantyStrings } from './strings';
 import { BTN_PRIMARY, ERROR_BOX, FOCUS } from './ui';
@@ -37,7 +38,8 @@ function CloseX({ onClick, label }: { onClick: () => void; label: string }) {
       type="button"
       onClick={onClick}
       aria-label={label}
-      className={`absolute top-4 end-4 p-2 text-text-muted hover:text-text-primary bg-surface-raised border border-border-subtle shadow-1 rounded-full transition-colors active:shadow-press ${FOCUS}`}
+      style={{ width: 44, height: 44 }}
+      className={`absolute top-3 end-3 inline-flex items-center justify-center text-text-muted hover:text-text-primary bg-surface-raised border border-border-subtle shadow-1 rounded-full transition-colors active:shadow-press ${FOCUS}`}
     >
       <X aria-hidden="true" className="w-4 h-4" />
     </button>
@@ -62,15 +64,22 @@ function Field({ id, label, children }: { id: string; label: string; children: R
 
 export function DeviceClaimOverlay({
   device,
+  kind: openedAs = 'warranty',
   anchor,
   lang,
   s,
   onClose,
   onSubmitted,
+  onKindSent,
   onOpenClaim,
 }: {
   /** The device the claim is about; null when the window is closed. */
   device: Device | null;
+  /**
+   * D8 (row 358): what the button that opened the window asked for. On a device with Levo Care in
+   * force the form shows the choice and starts on this one; on any other device it is a warranty request.
+   */
+  kind?: ClaimKind;
   anchor: React.RefObject<HTMLElement | null>;
   lang: Language;
   s: WarrantyStrings;
@@ -80,6 +89,8 @@ export function DeviceClaimOverlay({
    * ALREADY recorded under this window's key — see `submit` below.
    */
   onSubmitted: (result: { id: string; replay: boolean }) => void;
+  /** Told just before `onSubmitted`: the kind the request was sent as (the customer may have switched it in the form). */
+  onKindSent?: (kind: ClaimKind) => void;
   /**
    * W-3: the device already has an open claim of the caller's own — the
    * refusal carries its id, and the form offers to open that conversation.
@@ -92,6 +103,11 @@ export function DeviceClaimOverlay({
   if (device) lastDevice.current = device;
   const shown = device ?? lastDevice.current;
 
+  // Levo Care can be asked for only while it is in force on this device (the server refuses otherwise: CARE_NOT_ACTIVE).
+  const careActive = shown?.care?.state === 'active';
+  const [kind, setKind] = useState<ClaimKind>('warranty');
+  const openedAsRef = useRef<ClaimKind>(openedAs);
+  openedAsRef.current = openedAs;
   const [subject, setSubject] = useState('');
   const [description, setDescription] = useState('');
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -133,6 +149,7 @@ export function DeviceClaimOverlay({
       setAttachments([]);
       setError('');
       setOpenElsewhere(null);
+      setKind(openedAsRef.current);
       claimKey.current = newIdempotencyKey();
     }
   }, [unitId]);
@@ -181,12 +198,15 @@ export function DeviceClaimOverlay({
     setBusy(true);
     setError('');
     setOpenElsewhere(null);
+    const sentAs: ClaimKind = careActive && kind === 'care' ? 'care' : 'warranty';
     try {
       const res = await api.post<{ id: string; replay?: boolean }>(`/api/devices/units/${encodeURIComponent(device.unit_id)}/claims`, {
         subject: subject.trim(),
         description: description.trim(),
         attachments: attachments.map((a) => a.key),
         idempotencyKey: claimKey.current,
+        // D8: a Levo Care request says so at filing; a warranty request sends nothing new.
+        ...(sentAs === 'care' ? { kind: 'care' } : {}),
       });
       /**
        * A REPLAY IS NOT A SUBMIT, AND THE CUSTOMER IS TOLD SO.
@@ -200,6 +220,7 @@ export function DeviceClaimOverlay({
        * opens the claim's conversation — the one place the missing evidence
        * can still be sent.
        */
+      onKindSent?.(sentAs);
       onSubmitted({ id: res.id, replay: res.replay === true });
       onClose();
     } catch (e2) {
@@ -273,6 +294,26 @@ export function DeviceClaimOverlay({
               {s.contactSupport}
             </Link>
           ) : null}
+          {/* D8: warranty fault, or a Levo Care discount — one line each on what it is. */}
+          {careActive && (
+            <fieldset data-claim-kind-choice={kind}>
+              <legend className="text-[12px] text-text-secondary mb-1.5 block font-medium">{s.kindLegend}</legend>
+              <div className="space-y-2">
+                {(['warranty', 'care'] as const).map((k) => (
+                  <label key={k} data-selected={kind === k} className="lv-choice flex cursor-pointer items-start gap-3 p-3" data-claim-kind-option={k}>
+                    <input type="radio" name="warranty-claim-kind" value={k} className="sr-only" checked={kind === k} onChange={() => setKind(k)} />
+                    <span className="lv-choice-mark mt-0.5" aria-hidden="true">
+                      <Check className="w-3 h-3" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-[13.5px] font-bold leading-snug text-text-primary">{k === 'care' ? s.kindCare : s.kindWarranty}</span>
+                      <span className="mt-0.5 block text-[12px] leading-relaxed text-text-secondary">{k === 'care' ? s.kindCareSub : s.kindWarrantySub}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           <Field id="warranty-claim-subject" label={s.subject}>
             <input
               className="lv-input min-w-0 py-2.5 text-sm"
@@ -355,7 +396,7 @@ export function DeviceClaimOverlay({
             )}
           </div>
           <button type="submit" disabled={busy || uploadBusy} className={`${BTN_PRIMARY} w-full`}>
-            {busy ? s.submitting : s.submit}
+            {busy ? s.submitting : careActive && kind === 'care' ? s.submitCare : s.submit}
           </button>
         </form>
       </div>

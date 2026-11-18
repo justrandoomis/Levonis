@@ -29,6 +29,7 @@ import { adminRoutes } from '../worker/routes/admin';
 import { OWNER, STAFF, CUSTOMER, adminApp, customerApp, checkoutBody, received, restoreFetch, seed, submitted } from './sv2_tradein_fixture';
 
 test.after(restoreFetch);
+import { careOfferUses, seedCareOffer } from './fixtures/careOffer';
 
 const cancels = (sqls: string[]) => sqls.some((s) => /SET status = 'cancelled'/.test(s));
 
@@ -151,4 +152,24 @@ test('F3: a credit coupon whose row says more than the request approved pays the
   const redeemed = row<{ amount_iqd: number }>(raw, 'SELECT amount_iqd FROM coupon_redemptions WHERE coupon_id = ?', t.coupon)!.amount_iqd;
   assert.equal(redeemed, t.credit);
   assert.equal(row<{ credit_iqd: number }>(raw, 'SELECT credit_iqd FROM trade_in_requests WHERE id = ?', t.id)!.credit_iqd, t.credit);
+});
+
+// ------------------------------------------------------------------ phase 5: the Levo Care part offer (DECISIONS row 358)
+
+test('a Levo Care part offer is not applied on an order paid with a trade-in credit: the credit is spent as approved and the offer waits', async () => {
+  const raw = seed({ deliveredDaysAgo: 20 });
+  const t = await readyToPay(raw);
+  const offer = seedCareOffer(raw, { user: 'cust', product: 'p_p1s', pct: 10 });
+  const q = await json(await post(customerApp(raw), '/api/orders/quote', checkoutBody({ couponCode: t.code })));
+  assert.equal(q.success, true, JSON.stringify(q));
+  assert.deepEqual([q.quote.care_offers, q.quote.care_offer_discount_iqd, q.quote.coupon.discount_iqd], [[], 0, t.credit]);
+  const placed = await post(customerApp(raw), '/api/orders', checkoutBody({ couponCode: t.code }));
+  const body = await json(placed);
+  await Promise.all(pending.splice(0));
+  assert.equal(placed.status, 200, JSON.stringify(body));
+  assert.equal(row<{ amount_iqd: number }>(raw, 'SELECT amount_iqd FROM coupon_redemptions WHERE coupon_id = ?', t.coupon)!.amount_iqd, t.credit);
+  const snap = JSON.parse(String(row<{ s: string }>(raw, 'SELECT coupon_snapshot AS s FROM orders WHERE id = ?', body.order.id)!.s));
+  assert.deepEqual([snap.coupon_id, snap.discount_iqd, snap.care_offers], [t.coupon, t.credit, undefined], 'the snapshot figure is the credit alone');
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM order_items WHERE order_id = ? AND coupon_discount_iqd <> 0', body.order.id), 0);
+  assert.equal(careOfferUses(raw, offer.couponId), 0, 'the offer is still the customer’s, for the next order');
 });

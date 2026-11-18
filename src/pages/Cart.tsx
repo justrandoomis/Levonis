@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useLanguage } from '../LanguageContext';
 import {
-  ArrowLeft, ArrowRight, ChevronRight, Check, X, ShoppingCart, HeartHandshake, Info, Truck,
+  ArrowLeft, ArrowRight, ChevronRight, Check, X, ShoppingCart, BadgePercent, Info, Truck,
   ShieldCheck, FileText, Sparkles, Gift,
 } from 'lucide-react';
 import { useWallet } from '../WalletContext';
@@ -412,8 +412,21 @@ function cartDeliveryEstimate(items: CartItem[], tariff: CartDeliveryTariff | nu
   return charge.total_iqd;
 }
 
+/** A Levo Care part offer landing on a cart line (GET /api/cart `care_offers`): ONE unit of that line, the server's figure. */
+interface CartCareOffer {
+  grant_id: string;
+  claim_id?: string;
+  product_id: string;
+  cart_item_id: string;
+  discount_pct: number;
+  discount_iqd: number;
+  expires_at?: string;
+}
+
 interface CartResponse {
   items: CartItem[];
+  /** Phase 5 (row 358); absent from an older server. */
+  care_offers?: CartCareOffer[];
   unavailable_lines?: UnavailableLine[];
   membership?: CartMembership | null;
   delivery_tariff?: CartDeliveryTariff;
@@ -431,6 +444,7 @@ interface CartResponse {
  */
 interface CartWriteResponse {
   items: CartItem[];
+  care_offers?: CartCareOffer[];
   unavailable_lines?: UnavailableLine[];
   membership?: CartMembership | null;
   printer_extras?: CartPrinterExtras;
@@ -575,6 +589,8 @@ export default function Cart() {
   const [servicesLineId, setServicesLineId] = useState<string | null>(null);
   /** Phase 2 (0235): the membership chosen with a printer line (`printer_extras`), as the server last quoted it. */
   const [printerExtras, setPrinterExtras] = useState<CartPrinterExtras | null>(null);
+  /** Phase 5 (row 358): the Levo Care part offers that land on a line of this cart (`care_offers`); [] from an older server. */
+  const [careOffers, setCareOffers] = useState<CartCareOffer[]>([]);
   const [servicesError, setServicesError] = useState<Record<string, string>>({});
   /** The printer line whose choice is being saved: «تطبيق» is busy, a second press sends nothing. */
   const [servicesSavingId, setServicesSavingId] = useState<string | null>(null);
@@ -690,6 +706,9 @@ export default function Cart() {
       if (Array.isArray(data.unavailable_lines)) setUnavailableLines(data.unavailable_lines);
       // A write that does not carry the extras keeps them only while their printer line is still there.
       const ids = new Set((data.items || []).map((i) => i.id));
+      // A write that does not carry the Care offers keeps those whose line is still in the cart.
+      if (Array.isArray(data.care_offers)) setCareOffers(data.care_offers);
+      else setCareOffers((prev) => (prev.some((o) => !ids.has(o.cart_item_id)) ? prev.filter((o) => ids.has(o.cart_item_id)) : prev));
       if ('printer_extras' in data) setPrinterExtras(data.printer_extras ?? null);
       else setPrinterExtras((x) => (x?.membership && !ids.has(x.membership.printer_cart_item_id) ? { ...x, membership: null } : x));
       if ('membership' in data) putMembership(data.membership ?? null);
@@ -789,6 +808,7 @@ export default function Cart() {
       applyItems(data.items || [], { detectPriceChange: !!opts?.silent });
       setUnavailableLines(Array.isArray(data.unavailable_lines) ? data.unavailable_lines : []);
       setPrinterExtras(data.printer_extras ?? null);
+      setCareOffers(Array.isArray(data.care_offers) ? data.care_offers : []);
       // §10: the server's own answer about what this membership saved, per
       // line and in total — null for a customer without one, and for one whose
       // membership has lapsed.
@@ -1508,7 +1528,23 @@ export default function Cart() {
     deliveryIqd: shipping,
     pointsIqd: usePoints ? pointBalance : 0,
   });
-  const couponGoods = selectedItems.reduce((sum, item) => sum + (coupons.lineAmounts.get(item.id) ?? 0), 0);
+  /**
+   * «خصم ليفو كير» (DECISIONS row 358): a part the warranty team offered this customer at a discount is
+   * in the cart, and the discount applies by itself — one unit, once, the server's figure. It is a coupon
+   * on the goods like the others, so it rides in `couponGoods` (the sums below take it exactly once) and
+   * is NAMED on its own row and on its line. Never more than the line still costs after its coupon; the
+   * checkout quote stays the authority.
+   */
+  const careLineAmounts = new Map<string, number>();
+  for (const offer of careOffers) {
+    const line = selectedItems.find((i) => i.id === offer.cart_item_id);
+    if (!line) continue;
+    const room = Math.max(0, line.unit_price_iqd * line.qty - (coupons.lineAmounts.get(line.id) ?? 0) - (careLineAmounts.get(line.id) ?? 0));
+    const off = Math.min(Math.max(0, Math.floor(Number(offer.discount_iqd) || 0)), room);
+    if (off > 0) careLineAmounts.set(line.id, (careLineAmounts.get(line.id) ?? 0) + off);
+  }
+  const careGoods = [...careLineAmounts.values()].reduce((sum, v) => sum + v, 0);
+  const couponGoods = selectedItems.reduce((sum, item) => sum + (coupons.lineAmounts.get(item.id) ?? 0), 0) + careGoods;
   // Never more than the fee on screen: the estimate may have moved since the answer.
   const couponDelivery = Math.min(coupons.deliveryOff, shipping ?? 0);
   /** Everything the selected lines saved, however each part was applied. A delivery fee the coupons bring back is no saving. */
@@ -2024,6 +2060,14 @@ export default function Cart() {
           {(coupons.lineAmounts.get(item.id) ?? 0) > 0 && selected && (
             <p className="-mt-1 mb-2 text-[12px] font-semibold leading-relaxed tabular-nums text-success" data-cart-line-coupon={item.id}>
               {cartCouponText(coupons.mode === 'promo' ? 'lineChipPromo' : 'lineChip', asLang(lang))} {minus(money(coupons.lineAmounts.get(item.id) ?? 0))}
+            </p>
+          )}
+
+          {/* «خصم ليفو كير» on the part it was offered for: applied by itself, on one unit (row 358). */}
+          {(careLineAmounts.get(item.id) ?? 0) > 0 && selected && (
+            <p className="-mt-1 mb-2 text-[12px] font-semibold leading-relaxed tabular-nums text-success" data-cart-line-care={item.id}>
+              {loc('خصم ليفو كير — يُطبَّق تلقائيًا على قطعة واحدة', 'Levo Care discount — applied automatically to one unit', 'داشکاندنی لیڤۆ کێر — خۆکارانە لەسەر یەک دانە جێبەجێ دەبێت')}{' '}
+              {minus(money(careLineAmounts.get(item.id) ?? 0))}
             </p>
           )}
 
@@ -2800,7 +2844,7 @@ export default function Cart() {
             className="px-4 py-3 flex items-center justify-between text-start hover:bg-surface-selected transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus"
           >
             <div className="flex items-center gap-2 min-w-0">
-              <HeartHandshake className="w-5 h-5 text-text-secondary shrink-0" aria-hidden="true" />
+              <BadgePercent className="w-5 h-5 text-text-secondary shrink-0" aria-hidden="true" />
               <span className="text-text-primary text-[15px] font-bold">{sc.title}</span>
               {activeSupportRef && currentInfo && (
                 <span className="bg-gold/10 text-gold text-[11px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap">
@@ -2991,10 +3035,21 @@ export default function Cart() {
           )}
 
           {couponGoods > 0 && (
-            <div className="flex justify-between items-center text-success" data-cart-coupon-goods>
-              <span className="text-[14px]">{cartCouponText(coupons.mode === 'promo' ? 'summaryPromo' : 'summaryGoods', asLang(lang))}</span>
-              <span className="text-[14px] font-medium">- {money(couponGoods)}</span>
-            </div>
+            <>
+              {/* `couponGoods` holds the coupons AND the Levo Care offers; each is named on its own row, taken once. */}
+              {couponGoods - careGoods > 0 && (
+                <div className="flex justify-between items-center text-success" data-cart-coupon-goods>
+                  <span className="text-[14px]">{cartCouponText(coupons.mode === 'promo' ? 'summaryPromo' : 'summaryGoods', asLang(lang))}</span>
+                  <span className="text-[14px] font-medium">- {money(couponGoods - careGoods)}</span>
+                </div>
+              )}
+              {careGoods > 0 && (
+                <div className="flex justify-between items-center text-success" data-cart-care-offer>
+                  <span className="text-[14px]">{loc('خصم ليفو كير', 'Levo Care discount', 'داشکاندنی لیڤۆ کێر')}</span>
+                  <span className="text-[14px] font-medium">- {money(careGoods)}</span>
+                </div>
+              )}
+            </>
           )}
 
           {pointsDiscount > 0 && (

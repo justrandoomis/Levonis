@@ -1,56 +1,88 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, ClipboardList, Crown, MessageSquare, Printer } from 'lucide-react';
+import { ArrowLeft, ArrowRight, ClipboardList, Crown, Gift, BadgePercent, MessageSquare, Plus, Printer, ShieldCheck } from 'lucide-react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError } from '../lib/api';
 import { Skeleton, SkeletonGroup } from '../components/ui/Skeleton';
 import { EmptyState, ErrorState } from '../components/ui/AsyncStates';
-import { WARRANTY_STRINGS } from '../components/warranty/strings';
+import { CARE_STRINGS, WARRANTY_STRINGS } from '../components/warranty/strings';
 import type { Claim, Device, MineResponse } from '../components/warranty/types';
-import { fmtInt } from '../components/warranty/types';
+import { fmtCount, fmtInt } from '../components/warranty/types';
 import { AddDevicePanel } from '../components/warranty/AddDevicePanel';
-import { DeviceCard } from '../components/warranty/DeviceCard';
+import { DeviceCard, type ClaimKind } from '../components/warranty/DeviceCard';
 import { ClaimCard } from '../components/warranty/ClaimCard';
 import { DeviceClaimOverlay } from '../components/warranty/ClaimForms';
 import { ClaimThreadOverlay } from '../components/warranty/ClaimThreadOverlay';
 import { UnlinkSheet } from '../components/warranty/UnlinkSheet';
-import { FOCUS, OK_BOX } from '../components/warranty/ui';
+import { NoticeStack, type PageNotice } from '../components/warranty/Notices';
+import { BTN_PRIMARY, BTN_SECONDARY, CARD, FOCUS } from '../components/warranty/ui';
 import { IconButton } from '../components/ui/Button';
 
 /**
- * Warranty center, built around the PHYSICAL printers linked to an account:
+ * THE WARRANTY CENTER, REBUILT AROUND ONE QUESTION: «طابعتي — ما الذي يغطيها،
+ * وحتى متى، وماذا أفعل الآن؟» (DECISIONS row 358). Top to bottom:
  *
- *   1. a header with the one-line promise and the membership strip (PRO
- *      priority service — never a claim about longer coverage, because
- *      membership does not change coverage);
- *   2. "Add a printer" — by serial/receipt number, from the account's own
- *      delivered orders, or by scanning the receipt QR / label barcode;
- *   3. "My printers" — one card per unit with the coverage timeline and the
- *      actions that belong to a unit (claim, support, receipt, order, and
- *      "remove from my account" behind a confirmation sheet);
- *   4. "My claims" — the claims list, the thread and the per-device claim form.
+ *   1. the notices — they stay until the customer puts them away, and ride
+ *      under the header so a notice raised from a card far down is still seen;
+ *      with them, a part offered at a Levo Care discount that waits in a
+ *      conversation («لديك عرض قطعة بخصم ليفو كير»);
+ *   2. «طابعاتي» — one cover card per printer: the warranty and then Levo Care
+ *      after it, in words and as one line; what Care gives; the requests open
+ *      on it; «افتح طلب ضمان» and, with Care in force, «اطلب خصم ليفو كير».
+ *      «إضافة طابعة» is the first thing on the page only while there is no
+ *      printer; after that it is a section the button beside the heading opens;
+ *   3. «مطالباتي» — every request and its conversation;
+ *   4. how the cover works, in three lines.
  *
- * THE FREE-FORM «مطالبة عامة» LINK IS GONE BY THE OWNER'S DECISION: «يحذف —
- * فالضمان للطابعات فقط». Warranty is for printers, so the only way to open a
- * claim is from a linked device. The route behind the old link is untouched —
- * the general claims already filed have `unit_id IS NULL`, and the list above
- * and the admin queue both still show and answer them; there is simply no
- * longer a control that files a new one.
+ * THE FREE-FORM «مطالبة عامة» LINK STAYS GONE BY THE OWNER'S DECISION: «يحذف —
+ * فالضمان للطابعات فقط». The only way to open a request is from a linked
+ * printer. The route behind the old link is untouched — the general claims
+ * already filed have `unit_id IS NULL`, and the list below still shows them.
  *
  * Every window is the house Overlay/Sheet: it arrives from the control that
  * raised it and leaves the same way. Data flows one way — the server says what
- * the coverage is, and this page draws exactly that.
+ * the cover is, and this page draws exactly that.
  *
- * `?claim=<id>` OPENS THAT CLAIM'S CONVERSATION. It is the address every
+ * `?claim=<id>` OPENS THAT REQUEST'S CONVERSATION. It is the address every
  * warranty notification carries (worker/lib/engagementNotify.ts
  * `warrantyClaimLink`) — «رد من فريق الضمان» in the bell lands the customer IN
  * the thread, not on a list they then have to search.
  */
 
+function DeviceSkeleton() {
+  return (
+    <div className={`${CARD} p-4`} aria-hidden="true">
+      <div className="flex gap-3">
+        <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
+        <div className="flex-1 space-y-2 pt-1">
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-3 w-1/2" />
+        </div>
+      </div>
+      <div className="mt-4 border-t border-border-subtle pt-4 flex gap-2.5">
+        <Skeleton className="h-9 w-9 rounded-full shrink-0" />
+        <div className="flex-1 space-y-2">
+          <Skeleton className="h-4 w-3/4" />
+          <Skeleton className="h-3 w-1/3" />
+        </div>
+      </div>
+      <Skeleton className="h-2 w-full rounded-full mt-4" />
+      <div className="flex justify-between mt-2">
+        <Skeleton className="h-3 w-24" />
+        <Skeleton className="h-3 w-24" />
+      </div>
+      <Skeleton className="h-3 w-2/3 mt-4" />
+      <Skeleton className="h-3 w-1/2 mt-2" />
+      <Skeleton className="h-11 w-full rounded-md mt-4" />
+    </div>
+  );
+}
+
 export default function Warranty() {
   const navigate = useNavigate();
   const { lang, dir } = useLanguage();
   const s = WARRANTY_STRINGS[lang];
+  const c = CARE_STRINGS[lang];
   const [searchParams, setSearchParams] = useSearchParams();
   const deepClaim = searchParams.get('claim');
 
@@ -66,16 +98,29 @@ export default function Warranty() {
   const [mine, setMine] = useState<MineResponse | null>(null);
   const [devicesLoading, setDevicesLoading] = useState(true);
   const [devicesError, setDevicesError] = useState<unknown>(null);
-  const [devicesNotice, setDevicesNotice] = useState('');
   // Bumped whenever the set of linked devices changes, so the "from my
   // orders" list inside the add panel knows to reload.
   const [refreshKey, setRefreshKey] = useState(0);
+  // «إضافة طابعة» as a secondary section, once there is a printer.
+  const [addOpen, setAddOpen] = useState(false);
+  const addButton = useRef<HTMLButtonElement | null>(null);
 
   // -------------------------------------------------------------- claims
   const [claims, setClaims] = useState<Claim[]>([]);
   const [claimsLoading, setClaimsLoading] = useState(true);
   const [claimsError, setClaimsError] = useState<unknown>(null);
-  const [claimsNotice, setClaimsNotice] = useState('');
+
+  // ------------------------------------------------------------- notices
+  // They stay until dismissed (they used to vanish after six seconds).
+  const [notices, setNotices] = useState<PageNotice[]>([]);
+  const noticeSeq = useRef(0);
+  const notify = useCallback((tone: PageNotice['tone'], text: string, action?: PageNotice['action']) => {
+    noticeSeq.current += 1;
+    const id = `n${noticeSeq.current}`;
+    // The same sentence twice is one notice, the newer one.
+    setNotices((prev) => [...prev.filter((n) => n.text !== text), { id, tone, text, action }]);
+  }, []);
+  const dismiss = useCallback((id: string) => setNotices((prev) => prev.filter((n) => n.id !== id)), []);
 
   // ------------------------------------------------------------- windows
   // The control each window grows out of. Devices and claims are stacks of
@@ -84,6 +129,8 @@ export default function Warranty() {
   const claimAnchor = useRef<HTMLElement | null>(null);
   const threadAnchor = useRef<HTMLElement | null>(null);
   const [claimForDevice, setClaimForDevice] = useState<Device | null>(null);
+  const [claimKind, setClaimKind] = useState<ClaimKind>('warranty');
+  const sentKind = useRef<ClaimKind>('warranty');
   const [openClaimId, setOpenClaimId] = useState<string | null>(null);
   const [threadNotice, setThreadNotice] = useState('');
 
@@ -108,7 +155,7 @@ export default function Warranty() {
   const loadClaims = useCallback(async () => {
     try {
       const res = await api.get<{ claims: Claim[] }>('/api/devices/claims');
-      setClaims(res.claims);
+      setClaims(res.claims ?? []);
       setClaimsError(null);
     } catch (e) {
       setClaimsError(e);
@@ -131,17 +178,11 @@ export default function Warranty() {
     setOpenClaimId(deepClaim);
   }, [deepClaim]);
 
-  // Success notices are transient: they confirm, then get out of the way.
+  // Opening «إضافة طابعة» moves focus to its name, so a keyboard or a screen
+  // reader lands in the section the button just opened.
   useEffect(() => {
-    if (!devicesNotice) return;
-    const t = window.setTimeout(() => setDevicesNotice(''), 6000);
-    return () => window.clearTimeout(t);
-  }, [devicesNotice]);
-  useEffect(() => {
-    if (!claimsNotice) return;
-    const t = window.setTimeout(() => setClaimsNotice(''), 6000);
-    return () => window.clearTimeout(t);
-  }, [claimsNotice]);
+    if (addOpen) document.getElementById('warranty-add-title')?.focus();
+  }, [addOpen]);
 
   // --------------------------------------------------------------- actions
   const onLinked = (device: Device) => {
@@ -153,10 +194,18 @@ export default function Warranty() {
     });
     setRefreshKey((k) => k + 1);
     loadDevices();
+    // A request filed on it before it was linked now belongs on its card.
+    loadClaims();
   };
 
-  const openClaimFor = (device: Device, trigger: HTMLElement) => {
+  const closeAdd = () => {
+    setAddOpen(false);
+    addButton.current?.focus();
+  };
+
+  const openClaimFor = (device: Device, kind: ClaimKind, trigger: HTMLElement) => {
     claimAnchor.current = trigger;
+    setClaimKind(kind);
     setClaimForDevice(device);
   };
 
@@ -179,7 +228,7 @@ export default function Warranty() {
       await api.delete(`/api/devices/units/${encodeURIComponent(unlinkDevice.unit_id)}/registration`);
       setUnlinkOpen(false);
       setMine((prev) => (prev ? { ...prev, devices: prev.devices.filter((d) => d.unit_id !== unlinkDevice.unit_id) } : prev));
-      setDevicesNotice(s.unlinkedOk);
+      notify('ok', s.unlinkedOk);
       setRefreshKey((k) => k + 1);
       loadDevices();
     } catch (e) {
@@ -215,8 +264,10 @@ export default function Warranty() {
       next.delete('claim');
       setSearchParams(next, { replace: true });
     }
-    // The thread may have grown while it was open.
+    // The thread may have grown while it was open — and a Care quote accepted
+    // or a part offer used in it changes what the printer's card says is left.
     loadClaims();
+    loadDevices();
   };
 
   const onClaimSubmitted = (result: { id: string; replay: boolean }) => {
@@ -224,23 +275,42 @@ export default function Warranty() {
       // The stored claim kept its FIRST version; what the customer added on
       // the retry was not saved. Say so, and open the one place it can still
       // be sent — the claim's own conversation.
-      setClaimsNotice(s.claimReplayNotice);
+      notify('warn', s.claimReplayNotice);
       setThreadNotice(s.claimReplayNotice);
       threadAnchor.current = claimAnchor.current;
       setOpenClaimId(result.id);
     } else {
-      setClaimsNotice(s.claimSubmitted);
+      const id = result.id;
+      notify('ok', sentKind.current === 'care' ? s.careSubmitted : s.claimSubmitted, { label: s.openThread, run: (el) => openThread(id, el) });
     }
     loadClaims();
-    // open_claims on the card changes too.
+    // The card's open request and its actions change too.
     loadDevices();
   };
 
   const devices = mine?.devices ?? [];
   const priority = mine?.priority_service === true;
+  const hasDevices = devices.length > 0;
+  const devicesReady = !devicesLoading && devicesError == null;
+
+  // Each printer's own requests, newest first as the list sends them.
+  const claimsByUnit = useMemo(() => {
+    const map = new Map<string, Claim[]>();
+    for (const cl of claims) {
+      if (!cl.unit_id) continue;
+      const list = map.get(cl.unit_id);
+      if (list) list.push(cl);
+      else map.set(cl.unit_id, [cl]);
+    }
+    return map;
+  }, [claims]);
+
+  // A part offered at a Levo Care discount waits in a conversation: said at the top of the page.
+  const offerClaims = claims.filter((cl) => (Number(cl.part_offers_live) || 0) > 0);
+  const offersLive = offerClaims.reduce((n, cl) => n + (Number(cl.part_offers_live) || 0), 0);
 
   return (
-    <div className="w-full pb-24 text-text-secondary min-h-screen">
+    <div className="w-full pb-24 text-text-secondary min-h-screen" data-warranty-page>
       {/* Translucent chrome over content: the page passes under it. */}
       <header className="sticky top-0 z-40 material material-thin px-4 py-3 flex items-center gap-3">
         <IconButton
@@ -255,81 +325,98 @@ export default function Warranty() {
         <h1 className="text-text-primary font-bold text-lg">{s.title}</h1>
       </header>
 
-      <div className="p-4 space-y-6 max-w-2xl mx-auto">
-        {/* ------------------------------------------------ intro + membership */}
-        <section className="space-y-3">
-          <p className="text-text-secondary text-[13px] leading-relaxed">{s.intro}</p>
-          {priority ? (
-            <div className="flex items-center gap-3 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3" data-testid="warranty-pro-strip">
-              <Crown aria-hidden="true" className="w-5 h-5 text-gold shrink-0" />
-              <p className="text-[13px] text-text-primary flex-1 min-w-0 leading-snug">{s.proStrip}</p>
-              <Link to="/subscription" className={`text-[12px] font-bold text-gold whitespace-nowrap hover:underline underline-offset-2 rounded ${FOCUS}`}>
-                {s.proStripLink}
-              </Link>
-            </div>
-          ) : mine ? (
-            <p className="text-[12px] text-text-muted">
-              <Link to="/subscription" className={`hover:text-text-primary underline underline-offset-2 rounded ${FOCUS}`}>
-                {s.proTeaser}
-              </Link>
-            </p>
-          ) : null}
-          <p className="text-[11px] text-text-muted">{s.coverageNote}</p>
-        </section>
+      <div className="p-4 space-y-5 max-w-2xl mx-auto">
+        <p className="text-text-secondary text-[13.5px] leading-relaxed">{s.intro}</p>
 
-        {/* ------------------------------------------------------ add a printer */}
-        <AddDevicePanel lang={lang} s={s} refreshKey={refreshKey} onLinked={onLinked} />
+        {/* ------------------------------------------------------- notices */}
+        {/* The live region is always in the page (so a notice is announced when it
+            arrives); it takes room, and rides under the header, only while it holds one. */}
+        <div className={notices.length > 0 ? 'sticky z-30' : 'sr-only'} style={notices.length > 0 ? { top: 68 } : undefined}>
+          <NoticeStack notices={notices} onDismiss={dismiss} dismissLabel={s.dismiss} />
+        </div>
+        {offersLive > 0 && (
+          <button
+            type="button"
+            onClick={(e) => openThread(offerClaims[0].id, e.currentTarget)}
+            className={`flex w-full min-h-[44px] items-center gap-2.5 text-start lv-alert lv-alert-info ${FOCUS}`}
+            data-warranty-offers={offersLive}
+          >
+            <Gift aria-hidden="true" className="w-4 h-4 shrink-0" style={{ color: 'var(--color-info)' }} />
+            <span className="min-w-0 flex-1 text-[13px] font-bold leading-snug text-text-primary">{c.offerWaiting(offersLive, fmtCount(offersLive))}</span>
+            <span className="shrink-0 text-[12.5px] font-bold underline underline-offset-2 text-text-primary">{c.seeOffer}</span>
+          </button>
+        )}
+
+        {priority && (
+          <div className="flex items-center gap-3 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3" data-testid="warranty-pro-strip">
+            <Crown aria-hidden="true" className="w-5 h-5 text-gold shrink-0" />
+            <p className="text-[13px] text-text-primary flex-1 min-w-0 leading-snug">{s.proStrip}</p>
+            <Link to="/subscription" className={`inline-flex min-h-[44px] items-center text-[12px] font-bold text-gold whitespace-nowrap hover:underline underline-offset-2 rounded ${FOCUS}`}>
+              {s.proStripLink}
+            </Link>
+          </div>
+        )}
 
         {/* --------------------------------------------------------- my printers */}
         <section aria-labelledby="warranty-devices-title" className="space-y-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 id="warranty-devices-title" className="text-text-primary font-bold text-base">
+          <div className="flex items-center justify-between gap-3 min-h-[44px]">
+            <h2 id="warranty-devices-title" className="text-text-primary font-bold text-[17px]">
               {s.myPrinters}
+              {hasDevices && <span className="ms-2 text-text-muted text-[13px] font-normal tabular-nums">{fmtInt(devices.length, lang)}</span>}
             </h2>
-            {devices.length > 0 && <span className="text-text-muted text-[12px] tabular-nums">{fmtInt(devices.length, lang)}</span>}
+            {/* Once there is a printer, adding another is a secondary action. */}
+            {devicesReady && hasDevices && (
+              <button
+                ref={addButton}
+                type="button"
+                onClick={() => setAddOpen((o) => !o)}
+                aria-expanded={addOpen}
+                aria-controls="warranty-add"
+                className={`${BTN_SECONDARY} lv-button-sm shrink-0`}
+                data-warranty-add-toggle
+              >
+                <Plus aria-hidden="true" className="w-4 h-4" />
+                {s.addTitle}
+              </button>
+            )}
           </div>
-          {devicesNotice && (
-            <div role="status" className={OK_BOX}>
-              {devicesNotice}
-            </div>
-          )}
+
+          {devicesReady && hasDevices && addOpen && <AddDevicePanel lang={lang} s={s} refreshKey={refreshKey} onLinked={onLinked} onClose={closeAdd} />}
+
           {devicesLoading ? (
             <SkeletonGroup className="space-y-3">
-              {[0, 1].map((i) => (
-                <div key={i} className="rounded-xl border border-border-subtle bg-surface p-4" aria-hidden="true">
-                  <div className="flex gap-3">
-                    <Skeleton className="w-16 h-16 rounded-lg shrink-0" />
-                    <div className="flex-1 space-y-2 pt-1">
-                      <Skeleton className="h-4 w-2/3" />
-                      <Skeleton className="h-3 w-1/2" />
-                    </div>
-                  </div>
-                  <Skeleton className="h-3 w-28 mt-5" />
-                  <Skeleton className="h-px w-full mt-4" />
-                  <div className="flex justify-between mt-2">
-                    <Skeleton className="h-3 w-24" />
-                    <Skeleton className="h-3 w-24" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-4">
-                    <Skeleton className="h-11 rounded-md" />
-                    <Skeleton className="h-11 rounded-md" />
-                  </div>
-                </div>
-              ))}
+              <DeviceSkeleton />
+              <DeviceSkeleton />
             </SkeletonGroup>
           ) : devicesError != null ? (
             <ErrorState error={devicesError} onRetry={loadDevices} />
-          ) : devices.length === 0 ? (
-            <EmptyState icon={<Printer aria-hidden="true" className="w-6 h-6" />} title={s.devicesEmpty} description={s.devicesEmptyDesc} />
+          ) : !hasDevices ? (
+            <>
+              {/* No printer yet: the page says what it is for, and adding one is the first thing on it. */}
+              <div className={`${CARD} p-5 text-center`} data-warranty-empty>
+                <span className="lv-well inline-flex h-12 w-12 items-center justify-center rounded-full text-gold">
+                  <Printer aria-hidden="true" className="w-6 h-6" />
+                </span>
+                <h3 className="mt-3 text-[17px] font-bold leading-snug text-text-primary">{s.devicesEmpty}</h3>
+                <p className="mt-1.5 text-[13px] leading-relaxed text-text-secondary">{s.devicesEmptyDesc}</p>
+                <button type="button" onClick={() => document.getElementById('warranty-serial')?.focus()} className={`${BTN_PRIMARY} mt-4 w-full sm:w-auto`} data-warranty-empty-cta>
+                  <Plus aria-hidden="true" className="w-4 h-4" />
+                  {s.emptyCta}
+                </button>
+              </div>
+              <AddDevicePanel lang={lang} s={s} refreshKey={refreshKey} onLinked={onLinked} />
+            </>
           ) : (
             <div className="space-y-3">
               {devices.map((d) => (
                 <DeviceCard
                   key={d.unit_id}
                   device={d}
+                  claims={claimsByUnit.get(d.unit_id)}
                   lang={lang}
                   s={s}
                   onOpenClaim={openClaimFor}
+                  onOpenThread={(claim, trigger) => openThread(claim.id, trigger)}
                   onRemove={askUnlink}
                   maintenancePath={mine?.maintenance_path ?? null}
                 />
@@ -340,12 +427,10 @@ export default function Warranty() {
 
         {/* ----------------------------------------------------------- my claims */}
         <section aria-labelledby="warranty-claims-title" className="space-y-3">
-          <div className="flex items-baseline justify-between gap-3">
-            <h2 id="warranty-claims-title" className="text-text-primary font-bold text-base">
-              {s.claims}
-            </h2>
-            {claims.length > 0 && <span className="text-text-muted text-[12px] tabular-nums">{fmtInt(claims.length, lang)}</span>}
-          </div>
+          <h2 id="warranty-claims-title" className="text-text-primary font-bold text-[17px]">
+            {s.claims}
+            {claims.length > 0 && <span className="ms-2 text-text-muted text-[13px] font-normal tabular-nums">{fmtInt(claims.length, lang)}</span>}
+          </h2>
           {/* WHAT A TAP ON A CLAIM DOES, said before anyone has to guess —
               «لا يوجد هنالك توضيح … أن عند الضغط على مطالباتي تفتح المحادثة». */}
           {claims.length > 0 && (
@@ -354,15 +439,10 @@ export default function Warranty() {
               <span>{s.claimsHint}</span>
             </p>
           )}
-          {claimsNotice && (
-            <div role="status" className={OK_BOX}>
-              {claimsNotice}
-            </div>
-          )}
           {claimsLoading ? (
             <SkeletonGroup className="space-y-3">
               {[0, 1].map((i) => (
-                <div key={i} className="rounded-xl border border-border-subtle bg-surface p-4" aria-hidden="true">
+                <div key={i} className={`${CARD} p-4`} aria-hidden="true">
                   <div className="flex justify-between gap-3">
                     <Skeleton className="h-4 w-1/2" />
                     <Skeleton className="h-3 w-16" />
@@ -384,30 +464,57 @@ export default function Warranty() {
           ) : claimsError != null ? (
             <ErrorState error={claimsError} onRetry={loadClaims} />
           ) : claims.length === 0 ? (
-            <EmptyState icon={<ClipboardList aria-hidden="true" className="w-6 h-6" />} title={s.claimsEmpty} description={s.claimsEmptyDesc} />
+            <EmptyState compact icon={<ClipboardList aria-hidden="true" className="w-6 h-6" />} title={s.claimsEmpty} description={s.claimsEmptyDesc} />
           ) : (
             <div className="space-y-3">
               {claims.map((cl) => (
-                <ClaimCard
-                  key={cl.id}
-                  claim={cl}
-                  lang={lang}
-                  s={s}
-                  onOpen={(claim, trigger) => openThread(claim.id, trigger)}
-                />
+                <ClaimCard key={cl.id} claim={cl} lang={lang} s={s} onOpen={(claim, trigger) => openThread(claim.id, trigger)} />
               ))}
             </div>
           )}
+        </section>
+
+        {/* ------------------------------------------------ how the cover works */}
+        <section aria-labelledby="warranty-how-title" className={`${CARD} p-4`} data-warranty-how>
+          <h2 id="warranty-how-title" className="text-text-primary font-bold text-[15px]">
+            {s.howTitle}
+          </h2>
+          <ul className="mt-3 space-y-3 text-[13px] leading-relaxed text-text-secondary">
+            <li className="flex items-start gap-2.5">
+              <ShieldCheck aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0 text-gold" />
+              <span>{s.howWarranty}</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <BadgePercent aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0" style={{ color: 'var(--color-info)' }} />
+              <span>{s.howCare}</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <MessageSquare aria-hidden="true" className="w-4 h-4 mt-0.5 shrink-0 text-text-muted" />
+              <span>{s.howRequest}</span>
+            </li>
+          </ul>
+          <p className="mt-3 border-t border-border-subtle pt-3 text-[12px] leading-relaxed text-text-muted">
+            {s.coverageNote}
+          </p>
+          {mine && !priority ? (
+            <Link to="/subscription" className={`inline-flex min-h-[44px] items-center text-[12px] text-text-muted hover:text-text-primary underline underline-offset-2 rounded ${FOCUS}`}>
+              {s.proTeaser}
+            </Link>
+          ) : null}
         </section>
       </div>
 
       {/* ------------------------------------------------------------ windows */}
       <DeviceClaimOverlay
         device={claimForDevice}
+        kind={claimKind}
         anchor={claimAnchor}
         lang={lang}
         s={s}
         onClose={() => setClaimForDevice(null)}
+        onKindSent={(kind) => {
+          sentKind.current = kind;
+        }}
         onSubmitted={onClaimSubmitted}
         onOpenClaim={(claimId) => {
           // W-3: the device's open request — continue there instead of opening a second.

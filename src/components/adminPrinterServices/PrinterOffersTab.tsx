@@ -1,21 +1,19 @@
 /**
- * «الباقات والإضافات» — what is offered WITH this printer (phase 4, DECISIONS row 355): its filament
- * kits, its add-ons at a special price and the store bundles linked to it. Kits and add-ons made for
- * other printers are folded into one counted row, each with «أضِفها لهذه الطابعة» — by their own
- * title, never by the printers they belong to.
+ * Step ٢ — what is sold WITH this printer (phase 4, DECISIONS row 355): its filament kits, its
+ * add-ons at a special price and the store bundles linked to it. Kits and add-ons made for other
+ * printers are folded into one counted row, each with «أضِفها لهذه الطابعة» — by their own title,
+ * never by the printers they belong to.
  */
 import { addonsOf, kitsOf, type PrinterServicesConfig } from '../../../packages/pricing/src/printerServices';
-import { KitsPanel, onThisPrinter, text3, useNames, withThisPrinter, type Printer } from './PrinterExtrasPanels';
+import { Fold, onThisPrinter, text3, useNames, withThisPrinter, type Printer, type Upd } from './itemToolkit';
+import { KitsPanel } from './KitsPanel';
 import AddonsPanel from './AddonsPanel';
 import StoreBundlesPanel from './StoreBundlesPanel';
 import { S, say, type Loc } from './adminPrinterStrings';
 
-type Upd = (fn: (d: PrinterServicesConfig) => void) => void;
-
 export default function PrinterOffersTab({ draft, upd, loc, lang, printers, productId }: { draft: PrinterServicesConfig; upd: Upd; loc: Loc; lang: string; printers: Printer[]; productId: string }) {
   return (
     <div className="space-y-4" data-printer-offers-tab>
-      <p className="text-[12px] text-text-secondary leading-relaxed">{say(loc, S.offersIntro)}</p>
       <KitsPanel draft={draft} upd={upd} loc={loc} lang={lang} printers={printers} productId={productId} />
       <AddonsPanel draft={draft} upd={upd} loc={loc} lang={lang} printers={printers} productId={productId} />
       <StoreBundlesPanel draft={draft} upd={upd} loc={loc} lang={lang} productId={productId} />
@@ -40,21 +38,19 @@ function OthersFold({ draft, upd, loc, lang, productId }: { draft: PrinterServic
     </li>
   );
   return (
-    <details className="rounded-lg border border-border-subtle p-3 text-[12px] text-text-secondary" data-printer-offers-others>
-      <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-semibold text-text-primary">
-        {say(loc, S.others)} ({count})
-      </summary>
+    <Fold className="border-t border-border-subtle pt-2 text-[12px] text-text-secondary" attrs={{ 'data-printer-offers-others': '' }}
+      summaryClassName="flex min-h-11 cursor-pointer list-none items-center gap-2 text-[13px] font-semibold text-text-primary [&::-webkit-details-marker]:hidden" summary={`${say(loc, S.others)} (${count})`}>
       <p className="mt-1">{say(loc, S.othersHint)}</p>
       <ul className="mt-2 space-y-2">
-        {kits.map(({ k, n }) => row(`k${n}`, say(loc, S.kitKind), text3(k.title, lang) || k.id, () => upd((d) => {
+        {kits.map(({ k, n }) => row(`k${n}`, say(loc, S.kitKind), text3(k.title, lang) || loc(`باقة ${n + 1}`, `Kit ${n + 1}`, `پاکێجی ${n + 1}`), () => upd((d) => {
           const kit = (d.kits ?? [])[n];
           if (kit) kit.printers = withThisPrinter(kit.printers, productId, true, enrolledIds);
         })))}
-        {addons.map(({ a, n }) => row(`a${n}`, say(loc, S.addonKind), text3(a.title, lang) || names.get(a.product_id) || a.id, () => upd((d) => {
+        {addons.map(({ a, n }) => row(`a${n}`, say(loc, S.addonKind), text3(a.title, lang) || names.get(a.product_id) || loc(`إضافة ${n + 1}`, `Add-on ${n + 1}`, `زیادکراوی ${n + 1}`), () => upd((d) => {
           const addon = (d.addons ?? [])[n];
           if (addon) addon.printers = withThisPrinter(addon.printers, productId, true, enrolledIds);
         })))}
       </ul>
-    </details>
+    </Fold>
   );
 }

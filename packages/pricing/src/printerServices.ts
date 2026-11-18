@@ -67,6 +67,18 @@ export type PackageId = (typeof PACKAGE_IDS)[number];
 
 export const WARRANTY_TOTAL_MONTHS: Record<WarrantyChoice, 0 | 12 | 24> = { none: 0, w12: 12, w24: 24 };
 
+/**
+ * Levo Care runs for the warranty AND twelve months after it (owner, 2026-11-18; DECISIONS row 358):
+ * Care alone = 12 months of cover from delivery, a 12-month warranty + Care = 24, a 24-month warranty + Care = 36.
+ */
+export const CARE_AFTER_WARRANTY_MONTHS = 12;
+
+/** How long a printer bought with these two choices is under Levo Care, from its delivery: 0 | 12 | 24 | 36. */
+export function careTotalMonths(warranty: WarrantyChoice, care: CareChoice): number {
+  if (care === 'none') return 0;
+  return (WARRANTY_TOTAL_MONTHS[warranty] ?? 0) + CARE_AFTER_WARRANTY_MONTHS;
+}
+
 /** Translated text the admin writes; every customer-visible string has all three. */
 export interface Text3 { ar: string; en: string; ckb: string }
 
@@ -1004,6 +1016,8 @@ export interface PricedServices {
   package_discount_iqd: number;
   warranty_months: 0 | 12 | 24;
   care_months: 0 | 12;
+  /** The whole Care cover from delivery: the warranty's months + 12 after it (0 without Care). */
+  care_total_months: number;
   inspection_lead_business_days: [number, number] | null;
   /** Delivery per printer unit for the chosen method; null = not chosen / not priced. */
   delivery_fee_iqd: number | null;
@@ -1161,6 +1175,7 @@ export function priceServices(config: PrinterServicesConfig, classes: PrinterCla
     package_discount_iqd: discount,
     warranty_months: WARRANTY_TOTAL_MONTHS[s.warranty],
     care_months: s.care === 'c12' ? 12 : 0,
+    care_total_months: careTotalMonths(s.warranty, s.care),
     inspection_lead_business_days: s.inspection === 'full' ? [config.inspection.lead_business_days_min, config.inspection.lead_business_days_max] : null,
     delivery_fee_iqd,
     delivery_options,
@@ -1190,7 +1205,7 @@ export function presetPrices(config: PrinterServicesConfig, classes: PrinterClas
 export interface ServicesOffer {
   revision: number;
   warranty: { w12: number | null; w24: number | null; policy_version: number } | null;
-  care: { c12: number | null; months: 12; max_discount_pct: number; policy_version: number; terms: CareTerms | null } | null;
+  care: { c12: number | null; months: 12; /** Care runs for the warranty and `months` after it (clients read `?? false`). */ after_warranty: true; max_discount_pct: number; policy_version: number; terms: CareTerms | null } | null;
   packaging: { standard: 0; extra: number | null } | null;
   inspection: { full: number | null; lead_business_days: [number, number] } | null;
   academy: { recorded: number | null; live: number | null } | null;
@@ -1232,7 +1247,7 @@ export function servicesOffer(config: PrinterServicesConfig, classes: PrinterCla
       ? { w12: config.warranty.w12[fam], w24: config.warranty.w24[fam], policy_version: config.warranty.policy_version }
       : null,
     care: config.care.active
-      ? { c12: config.care.price_iqd, months: 12, max_discount_pct: config.care.max_discount_pct, policy_version: config.care.policy_version, terms: config.care.terms ?? null }
+      ? { c12: config.care.price_iqd, months: 12, after_warranty: true as const, max_discount_pct: config.care.max_discount_pct, policy_version: config.care.policy_version, terms: config.care.terms ?? null }
       : null,
     packaging: config.packaging.active ? { standard: 0, extra: config.packaging.extra_iqd } : null,
     inspection: config.inspection.active

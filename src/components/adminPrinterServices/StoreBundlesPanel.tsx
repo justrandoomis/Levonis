@@ -9,27 +9,34 @@ import { useEffect, useState } from 'react';
 import { api, formatIqd } from '../../lib/api';
 import { MAX_STORE_BUNDLES, type PrinterServicesConfig } from '../../../packages/pricing/src/printerServices';
 import { S, say, type Loc } from './adminPrinterStrings';
+import type { Upd } from './itemToolkit';
 
-type Upd = (fn: (d: PrinterServicesConfig) => void) => void;
 
-interface AdminBundleRow {
+export interface AdminBundleRow {
   id: string; slug: string; status: string; kind: string; name: string; name_ar: string; name_ku?: string;
   component_total_iqd: number | null; bundle_price_iqd: number | null; saving_percent: number | null;
 }
 
-const bundleName = (b: AdminBundleRow, lang: string) => (lang === 'en' ? b.name || b.name_ar : lang === 'ckb' ? b.name_ku || b.name || b.name_ar : b.name_ar || b.name) || b.slug;
+export const bundleName = (b: AdminBundleRow, lang: string) => (lang === 'en' ? b.name || b.name_ar : lang === 'ckb' ? b.name_ku || b.name || b.name_ar : b.name_ar || b.name) || b.slug;
 
-export default function StoreBundlesPanel({ draft, upd, loc, lang, productId }: { draft: PrinterServicesConfig; upd: Upd; loc: Loc; lang: string; productId: string }) {
-  const [rows, setRows] = useState<AdminBundleRow[] | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [pick, setPick] = useState('');
+/** The store's bundles, read once for the editor and for «ما يراه الزبون» (null while loading, 'failed' when the read failed). */
+let bundlesRead: Promise<AdminBundleRow[]> | null = null;
+export function useStoreBundles(): AdminBundleRow[] | null | 'failed' {
+  const [rows, setRows] = useState<AdminBundleRow[] | null | 'failed'>(null);
   useEffect(() => {
     let live = true;
-    api.get<{ bundles: AdminBundleRow[] }>('/api/admin/bundles?kind=bundle')
-      .then((r) => { if (live) setRows((r.bundles ?? []).filter((b) => b.kind === 'bundle')); })
-      .catch(() => { if (live) setFailed(true); });
+    bundlesRead ??= api.get<{ bundles: AdminBundleRow[] }>('/api/admin/bundles?kind=bundle').then((r) => (r.bundles ?? []).filter((b) => b.kind === 'bundle'));
+    bundlesRead.then((r) => { if (live) setRows(r); }, () => { bundlesRead = null; if (live) setRows('failed'); });
     return () => { live = false; };
   }, []);
+  return rows;
+}
+
+export default function StoreBundlesPanel({ draft, upd, loc, lang, productId }: { draft: PrinterServicesConfig; upd: Upd; loc: Loc; lang: string; productId: string }) {
+  const read = useStoreBundles();
+  const rows = read === 'failed' ? null : read;
+  const failed = read === 'failed';
+  const [pick, setPick] = useState('');
   const mapped = Object.hasOwn(draft.products, productId);
   const chosen = (mapped ? draft.products[productId].store_bundle_ids : undefined) ?? [];
   const byId = new Map((rows ?? []).map((b) => [b.id, b]));
@@ -47,7 +54,7 @@ export default function StoreBundlesPanel({ draft, upd, loc, lang, productId }: 
   const free = (rows ?? []).filter((b) => !chosen.includes(b.id));
 
   return (
-    <section className="rounded-lg border border-border-subtle p-3 text-[12px] text-text-secondary space-y-2" data-printer-services-store-bundles>
+    <section className="border-t border-border-subtle pt-3 text-[12px] text-text-secondary space-y-2" data-printer-services-store-bundles>
       <h3 className="text-[14px] font-bold text-text-primary">{say(loc, S.bundles)}</h3>
       <p className="leading-relaxed">{say(loc, S.bundlesHint)}</p>
       {!mapped ? <p className="text-warning" role="note">{say(loc, S.bundleNeedsMapping)}</p> : null}

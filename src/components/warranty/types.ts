@@ -78,6 +78,51 @@ export interface CarePublic {
   shipping?: 'discounted' | 'full_price' | null;
   eligible_parts?: Array<{ key: string; label: CareText }>;
   exclusions?: CareText[];
+  /**
+   * Phase 5 (row 358): Care runs 12 months AFTER the warranty. The warranty bought with the
+   * printer (0 | 12 | 24), the whole cover from delivery (12 | 24 | 36), and the day Care becomes
+   * the only cover. All three absent from an older server.
+   */
+  warranty_months?: number;
+  total_months?: number;
+  care_only_from?: string | null;
+}
+
+/** A discounted part the team offered on a Care claim (phase 5): an ordinary store product, one unit, this account only. */
+export type GrantState = 'live' | 'used' | 'revoked' | 'expired' | (string & {});
+export interface GrantProduct {
+  id: string;
+  slug: string;
+  name: string;
+  name_ar: string;
+  name_ku: string;
+  image: string;
+  /** Options or colours to choose: the customer adds it from the product page. */
+  needs_choices: boolean;
+  available: boolean;
+}
+export interface PartGrantPublic {
+  id: string;
+  claim_id: string;
+  /** Null when the product was deleted since. */
+  product: GrantProduct | null;
+  discount_pct: number;
+  max_discount_iqd: number | null;
+  price_iqd: number | null;
+  discount_iqd: number | null;
+  after_iqd: number | null;
+  state: GrantState;
+  expires_at: string;
+  created_at: string;
+  used_order_id: string | null;
+  discount_given_iqd: number | null;
+}
+
+/** The offered part's name in the reader's language. */
+export function grantProductName(p: GrantProduct, lang: Language): string {
+  if (lang === 'ar') return p.name_ar || p.name;
+  if (lang === 'ckb') return p.name_ku || p.name_ar || p.name;
+  return p.name || p.name_ar;
 }
 /** A Levo Care quote on a claim, as the claimant sees it. */
 export interface CareQuotePublic {
@@ -164,6 +209,10 @@ export interface Claim {
   } | null;
   /** Printer phase 3: a warranty or a Levo Care claim (absent from an older server = warranty). */
   claim_kind?: 'warranty' | 'care';
+  /** Phase 5: part offers on this claim the customer can still use (list only; absent from an older server). */
+  part_offers_live?: number;
+  /** The claim's Care quote state, where a list sends it («quoted» = it waits for the customer). Not sent today. */
+  care_quote_state?: string | null;
 }
 
 /**
@@ -191,6 +240,8 @@ export interface ClaimMessage {
   body: string;
   file_url: string | null;
   created_at: string;
+  /** Phase 5: this message carries a part offer — drawn as a product card from `care.part_grants`. */
+  part_grant_id?: string | null;
 }
 
 export interface ClaimDetail {
@@ -207,7 +258,7 @@ export interface ClaimDetail {
   } | null;
   messages: ClaimMessage[];
   /** Printer phase 3: Care at the filing date and its quote; null without a unit or 0236, absent from an older server. */
-  care?: { entitlement: CarePublic | null; quote: CareQuotePublic | null } | null;
+  care?: { entitlement: CarePublic | null; quote: CareQuotePublic | null; part_grants?: PartGrantPublic[] } | null;
 }
 
 export interface Attachment {
@@ -267,6 +318,14 @@ export function fmtInt(n: number, lang: Language): string {
   } catch {
     return String(Math.round(n));
   }
+}
+
+/**
+ * A percentage or a small count that sits beside a price («خصم ليفو كير 30%», «3 عروض»): Latin digits,
+ * like the money next to it (`formatMoney`) — one card never shows «٣٠%» over «17,500 د.ع».
+ */
+export function fmtCount(n: number): string {
+  return String(Math.round(Number(n) || 0));
 }
 
 export function isVideoUrl(u: string): boolean {

@@ -6,12 +6,14 @@ import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { Overlay } from '../ui/Overlay';
 import { Skeleton, SkeletonGroup } from '../ui/Skeleton';
 import { ErrorState } from '../ui/AsyncStates';
+import { StatusChip } from '../ui/Badge';
 import { ClaimProgress, PriorityBadge } from './ClaimCard';
 import type { ClaimDetail, ClaimMessage } from './types';
 import { claimOpen, filedCoverLine, fmtDate, fmtDateTime, isVideoUrl } from './types';
 import type { WarrantyStrings } from './strings';
 import { CARE_STRINGS } from './strings';
 import { CareQuoteBox } from './CareQuoteBox';
+import { PartOfferCard } from './PartOfferCard';
 import { ERROR_BOX, FOCUS } from './ui';
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif,video/mp4';
@@ -172,6 +174,11 @@ export function ClaimThreadOverlay({
             <h2 id="warranty-thread-title" className="text-text-primary text-base font-bold truncate">
               {detail?.claim.subject ?? s.thread}
             </h2>
+            {detail?.claim.claim_kind === 'care' && (
+              <StatusChip tone="info" dot={false} className="shrink-0 whitespace-nowrap">
+                {CARE_STRINGS[lang].claimBadge}
+              </StatusChip>
+            )}
             {detail?.claim.priority && <PriorityBadge s={s} />}
           </div>
           {facts && (
@@ -203,7 +210,7 @@ export function ClaimThreadOverlay({
         <button
           type="button"
           onClick={onClose}
-          className={`p-2 text-text-muted hover:text-text-primary bg-surface-raised rounded-full transition-colors shrink-0 ${FOCUS}`}
+          className={`-mt-1.5 -me-1 inline-flex h-11 w-11 items-center justify-center text-text-muted hover:text-text-primary bg-surface-raised rounded-full transition-colors shrink-0 ${FOCUS}`}
           aria-label={s.close}
         >
           <X aria-hidden="true" className="w-4 h-4" />
@@ -269,7 +276,27 @@ export function ClaimThreadOverlay({
             {detail.care?.quote && claimId && (
               <CareQuoteBox claimId={claimId} quote={detail.care.quote} lang={lang} c={CARE_STRINGS[lang]} onChanged={() => refresh().catch(() => undefined)} />
             )}
-            {detail.messages.map((msg) => (
+            {/* An offer no message carries (an older thread) is still shown, above the transcript. */}
+            {(detail.care?.part_grants ?? [])
+              .filter((g) => !detail.messages.some((m) => m.part_grant_id === g.id))
+              .map((g) => (
+                <PartOfferCard key={g.id} grant={g} lang={lang} c={CARE_STRINGS[lang]} />
+              ))}
+            {detail.messages.map((msg) => {
+              // Phase 5 (D7): a message that carries a part offer is drawn as that product, with its
+              // discount and its action. An offer the answer does not list keeps the message's own words.
+              const grant = msg.part_grant_id ? (detail.care?.part_grants ?? []).find((g) => g.id === msg.part_grant_id) : undefined;
+              if (grant) {
+                return (
+                  <div key={msg.id} data-claim-message-grant={grant.id}>
+                    <PartOfferCard grant={grant} lang={lang} c={CARE_STRINGS[lang]} />
+                    <time dateTime={msg.created_at} className="block text-[10px] text-text-muted mt-1 tabular-nums">
+                      {fmtDateTime(msg.created_at, lang)}
+                    </time>
+                  </div>
+                );
+              }
+              return (
               <div
                 key={msg.id}
                 className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
@@ -290,7 +317,8 @@ export function ClaimThreadOverlay({
                   {fmtDateTime(msg.created_at, lang)}
                 </time>
               </div>
-            ))}
+              );
+            })}
           </>
         )}
       </div>

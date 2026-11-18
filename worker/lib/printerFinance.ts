@@ -17,6 +17,7 @@
 import { allocateExact } from './operations';
 import type { OrderProfitBase } from './orderProfit';
 import { careClaimsInstalled } from './careClaims';
+import { isSchemaMissing } from './membershipBenefits';
 
 const n = (v: unknown) => {
   const x = Number(v);
@@ -141,6 +142,8 @@ export interface ServiceClaimsSummary {
   care_cost_iqd: number;
   /** The Care discount approved in the period (what the customers did not pay). */
   care_benefit_given_iqd: number;
+  /** Phase 5: Σ the discount of the Care part offers used on the period's orders (order day). INFORMATIONAL — a coupon discount already inside the orders' figures. 0 without 0243. */
+  care_part_discount_iqd: number;
   /** The co-pay collected in the period: service income (account 4300), added to the period's net. */
   copay_iqd: number;
   /** Claims with a live cost in the period. */
@@ -180,9 +183,17 @@ export async function serviceClaimsSummary(
   // voided) is reported with the claim as it now stands. The recorded expense itself — its category, its journal,
   // its period — is never rewritten (a closed period's books stay as closed).
   const kindOf = `(CASE WHEN (SELECT wc.claim_kind FROM warranty_claims wc WHERE wc.id = sc.claim_id) = 'care' THEN 'care' ELSE 'warranty' END )`;
-  const row = await db
+  // Phase 5 (0243): the discount of the Care part offers USED on orders of the period (by the order's Baghdad day;
+  // a cancelled order released its use and is not counted). INFORMATIONAL: it is a coupon discount, already inside
+  // the orders' own figures. Rides the same ONE statement; a database without 0243 reads 0 (one retry, there only).
+  const partDiscount = `(SELECT COALESCE(SUM(x.amount_iqd), 0) FROM care_part_grants g
+          JOIN coupon_redemption_extras x ON x.coupon_id = g.coupon_id AND x.state = 'active'
+          JOIN orders po ON po.id = x.order_id
+         WHERE date(po.created_at, '+3 hours') BETWEEN ?1 AND ?2)`;
+  const read = (part: string) => db
     .prepare(
       `SELECT
+        ${part} AS care_part_discount_iqd,
         (SELECT COALESCE(SUM(sc.amount_iqd), 0) FROM service_claim_costs sc WHERE sc.voided_at IS NULL AND ${kindOf} = 'warranty' AND sc.cost_day BETWEEN ?1 AND ?2) AS warranty_cost_iqd,
         (SELECT COALESCE(SUM(sc.amount_iqd), 0) FROM service_claim_costs sc WHERE sc.voided_at IS NULL AND ${kindOf} = 'care' AND sc.cost_day BETWEEN ?1 AND ?2) AS care_cost_iqd,
         (SELECT COUNT(DISTINCT claim_id) FROM service_claim_costs WHERE voided_at IS NULL AND cost_day BETWEEN ?1 AND ?2) AS claims,
@@ -193,6 +204,10 @@ export async function serviceClaimsSummary(
     )
     .bind(r.from, r.to)
     .first<Record<string, unknown>>();
+  const row = await read(partDiscount).catch((e: unknown) => {
+    if (isSchemaMissing(e)) return read('0');
+    throw e;
+  });
   const done = Math.trunc(n(row?.inspections));
   const given = opts.laborIqd === undefined ? laborFromSetting(row?.services_setting) : opts.laborIqd;
   const labor = typeof given === 'number' && Number.isSafeInteger(given) && given >= 0 ? given : null;
@@ -200,6 +215,7 @@ export async function serviceClaimsSummary(
     warranty_cost_iqd: Math.trunc(n(row?.warranty_cost_iqd)),
     care_cost_iqd: Math.trunc(n(row?.care_cost_iqd)),
     care_benefit_given_iqd: Math.trunc(n(row?.benefit_iqd)),
+    care_part_discount_iqd: Math.trunc(n(row?.care_part_discount_iqd)),
     copay_iqd: Math.trunc(n(row?.copay_iqd)),
     count: Math.trunc(n(row?.claims)),
     inspections_done: done,

@@ -45,6 +45,7 @@ import {
 /** A JSON body as the routes answer it, read field by field. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type J = Record<string, any>;
+import { careOfferUses, seedCareOffer } from './fixtures/careOffer';
 
 test('a checkout prices the gift at 0, reserves its real stock, links the line and marks the gift ordered — one batch', async () => {
   const raw = giftWorld();
@@ -491,4 +492,27 @@ test('the gift line drives no line of a cancelled order back into the shelf twic
   assert.deepEqual(optionStock(raw, 'v_04'), { stock: 3, reserved: 0 });
   assert.equal(row(raw, "SELECT stock_reserved FROM products WHERE id = 'p_plain'")?.stock_reserved ?? 0, 0);
   await send(a.buyer, 'DELETE', '/api/cart');
+});
+
+// ------------------------------------------------------------------ phase 5: the Levo Care part offer (DECISIONS row 358)
+
+test('a Levo Care part offer never lands on a gift line: alone it is not spent; beside a bought line of the part, that line takes it', async () => {
+  const raw = giftWorld();
+  const a = apps(raw);
+  const offer = seedCareOffer(raw, { user: 'buyer', product: 'p_nozzle' });
+  await giftInCart(a);
+  const alone = await placeOrder(a.buyer);
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM order_items WHERE order_id = ? AND coupon_discount_iqd <> 0', alone.id), 0);
+  assert.equal(careOfferUses(raw, offer.couponId), 0, 'a gift-only order leaves the offer with the customer');
+
+  const raw2 = giftWorld();
+  const b = apps(raw2);
+  const offer2 = seedCareOffer(raw2, { user: 'buyer', product: 'p_nozzle' });
+  const giftId = await giftInCart(b);
+  const paid = await json(await post(b.buyer, '/api/cart/items', { productId: 'p_nozzle', optionValueIds: ['v_04'], colorId: 'c_red', qty: 1 }));
+  assert.equal(paid.success, true, JSON.stringify(paid));
+  const order = await placeOrder(b.buyer);
+  const items = all<J>(raw2, 'SELECT unit_price_iqd, gift_entitlement_id, coupon_discount_iqd FROM order_items WHERE order_id = ? ORDER BY unit_price_iqd', order.id);
+  assert.deepEqual(items.map((i) => [i.unit_price_iqd, i.gift_entitlement_id, i.coupon_discount_iqd]), [[0, giftId, 0], [40000, null, 20000]]);
+  assert.equal(careOfferUses(raw2, offer2.couponId), 1);
 });

@@ -424,13 +424,13 @@ function Radio({ on }: { on: boolean }) {
   );
 }
 
-/** A preset's contents, shortest form: «الضمان 12 شهر · Levo Care · فحص كامل». */
+/** A preset's contents, shortest form: «الضمان 12 شهر · Levo Care +12 شهر · فحص كامل» (Care runs after the warranty). */
 function includesText(offer: ServicesOffer, id: 'smart' | 'complete', s: (typeof PS_STRINGS)['ar']): string {
   const inc = offer.packages[id]?.includes;
   if (!inc) return '';
   const parts: string[] = [];
   if (inc.warranty !== 'none') parts.push(`${s.warranty} ${s.months(inc.warranty === 'w12' ? 12 : 24)}`);
-  if (inc.care === 'c12') parts.push(s.care);
+  if (inc.care === 'c12') parts.push(`${s.care} +${s.months(12)}`);
   if (inc.packaging === 'extra') parts.push(s.packagingExtra);
   if (inc.inspection === 'full') parts.push(s.inspectionOption);
   return parts.join(' · ');

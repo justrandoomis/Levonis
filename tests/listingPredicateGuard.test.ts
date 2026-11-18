@@ -235,6 +235,8 @@ const EXPECTED_CALLS: Record<string, { visible: number; sellable: number; states
   'worker/routes/cart.ts': { visible: 0, sellable: 2, states: 0 },
   // `loadAddProduct`: SELLABLE, and «still shown? then 409 PRICE_NOT_AVAILABLE» — for the single and the batch add.
   'worker/lib/cartAdd.ts': { visible: 1, sellable: 1, states: 0 },
+  // Levo Care part offers (DECISIONS row 358): `visibleRows` — VISIBLE products with the SELLABLE flag, for the offer card and the staff picker.
+  'worker/lib/carePartGrantViews.ts': { visible: 1, sellable: 1, states: 0 },
   // +1 SELLABLE flag: past TREE_AVAILABILITY_CAP the map's per-section photographs read the visible products
   // in the shop's order, priced first (speed audit 2026-10-16) — the same question as the counts. VISIBLE is
   // the membership relation's own (worker/lib/catalogMembership.ts), so that read leaves in the map's first wave.

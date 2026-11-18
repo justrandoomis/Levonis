@@ -398,6 +398,13 @@ interface CheckoutQuoteDto {
     waived: boolean;
   };
   coupon: { code?: string; discount_iqd?: number; pool?: Array<{ coupon_id: string; code: string }> } | null;
+  /**
+   * Phase 5 (DECISIONS row 358): the Levo Care part offers the server applied by itself. Already inside the
+   * totals AND inside `coupon.discount_iqd` — named apart so the screen can say «خصم ليفو كير» without
+   * taking it twice. Absent from an older server.
+   */
+  care_offers?: Array<{ grant_id: string; product_id: string; cart_item_id: string; discount_iqd: number }>;
+  care_offer_discount_iqd?: number;
   /** §3.3 attribution — always `discount_iqd: 0`; it is not a discount. */
   support: { referrer_username: string; ref: string; discount_iqd: number } | null;
   /**
@@ -1765,6 +1772,15 @@ export default function Checkout() {
    */
   const promoOpen = showPromoField || !!quote?.coupon || !!couponCode;
   /**
+   * «خصم ليفو كير» (row 358). The server's coupon figure holds the typed code AND the Care offers; the two
+   * rows of the summary split it — the code's row carries what is left after the Care part, so the column
+   * still adds up to the server's total and nothing is subtracted twice.
+   */
+  const careOfferOff = Math.min(Math.max(0, Number(quote?.care_offer_discount_iqd) || 0), Math.max(0, Number(quote?.coupon?.discount_iqd) || 0));
+  const codeOff = Math.max(0, (Number(quote?.coupon?.discount_iqd) || 0) - careOfferOff);
+  const careOffByLine = new Map<string, number>();
+  for (const o of quote?.care_offers ?? []) careOffByLine.set(o.cart_item_id, (careOffByLine.get(o.cart_item_id) ?? 0) + (Number(o.discount_iqd) || 0));
+  /**
    * What the order would come to with this code on it: the page's own question, asked aside.
    * Silent, and it touches neither the page's quote nor its busy state.
    */
@@ -2108,6 +2124,10 @@ export default function Checkout() {
         // What the code took on this screen: a pool of reward coupons that has since
         // shrunk is refused with the new total, never charged quietly (row 295).
         couponDiscountSeen: quote?.coupon ? Number(quote.coupon.discount_iqd) || 0 : undefined,
+        // Phase 5: the Levo Care part offers THIS screen showed and their total. An offer that ended, was revoked
+        // or was spent since is refused (CARE_OFFER_CHANGED) with the new total, never charged quietly.
+        careOffersSeen: quote ? (quote.care_offers ?? []).map((o) => o.grant_id) : undefined,
+        careOfferDiscountSeen: quote ? Number(quote.care_offer_discount_iqd) || 0 : undefined,
         // Phase 2 (0235): the membership charge THIS screen showed; a different live figure is refused
         // (MEMBERSHIP_PRICE_CHANGED) instead of charged quietly.
         membershipChargeIqd: quote?.membership?.ok ? quote.membership.charge_iqd : undefined,
@@ -2234,6 +2254,24 @@ export default function Checkout() {
           return false;
         });
         setQuoteNonce((n) => n + 1);
+        setSubmitError(msg);
+      } else if (err instanceof ApiError && err.code === 'CARE_OFFER_CHANGED') {
+        // Phase 5: a Levo Care part offer ended, was revoked or was spent since this screen's quote. Nothing was
+        // written; the fresh quote is drawn exactly as for a reward pool that shrank (the branch below).
+        const fresh = err.details?.quote as CheckoutQuoteDto | undefined;
+        if (fresh && Array.isArray(fresh.lines) && fresh.shipping && Array.isArray(fresh.policies)) {
+          const sig = quoteSignature(fresh);
+          if (quoteSignatureRef.current && quoteSignatureRef.current !== sig) {
+            setPolicyAccepted((prev) => {
+              if (prev) setConsentResetNote(true);
+              return false;
+            });
+          }
+          quoteSignatureRef.current = sig;
+          setQuote(fresh);
+        } else {
+          setQuoteNonce((n) => n + 1);
+        }
         setSubmitError(msg);
       } else if (err instanceof ApiError && err.code === 'COUPON_POOL_CHANGED') {
         /**
@@ -3248,6 +3286,11 @@ export default function Checkout() {
                         percentUsd={line.offerSavingPercentUsd}
                       />
                     ) : null}
+                    {(careOffByLine.get(line.key) ?? 0) > 0 && (
+                      <span className="mt-1 text-[11.5px] font-semibold tabular-nums text-emerald-400" data-checkout-line-care={line.key}>
+                        {loc('خصم ليفو كير', 'Levo Care discount', 'داشکاندنی لیڤۆ کێر')} -{money(careOffByLine.get(line.key) ?? 0)}
+                      </span>
+                    )}
                     {line.gift && (
                       <span className="mt-1 flex flex-wrap items-center gap-1.5" data-checkout-gift-line={line.key}>
                         <span className="inline-flex items-center gap-1 rounded px-2 py-0.5 w-max bg-gold/10 text-gold text-[11px] font-bold">
@@ -3395,7 +3438,7 @@ export default function Checkout() {
               </div>
             )}
 
-            {quote?.coupon && Number(quote.coupon.discount_iqd) > 0 && (
+            {quote?.coupon && codeOff > 0 && (
               <div className="flex justify-between items-center text-emerald-400">
                 <span className="font-light">
                   {(quote.coupon.pool?.length ?? 0) > 1 ? (
@@ -3407,7 +3450,15 @@ export default function Checkout() {
                     </>
                   )}
                 </span>
-                <span className="font-normal">-{money(Number(quote.coupon.discount_iqd))}</span>
+                <span className="font-normal">-{money(codeOff)}</span>
+              </div>
+            )}
+
+            {/* The Levo Care part offer: applied by the server, on one unit of the part it was offered for. */}
+            {careOfferOff > 0 && (
+              <div className="flex justify-between items-center text-emerald-400" data-checkout-care-offer>
+                <span className="font-light">{loc('خصم ليفو كير', 'Levo Care discount', 'داشکاندنی لیڤۆ کێر')}</span>
+                <span className="font-normal tabular-nums">-{money(careOfferOff)}</span>
               </div>
             )}
 

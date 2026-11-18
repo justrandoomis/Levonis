@@ -226,6 +226,9 @@ import type { PointsRule, OrderPointsSnapshot } from '../lib/pointsOps';
 import { audit, auditStatements } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { couponDeliveryBase, quoteShipping } from '../lib/shipping';
+import { allocateCareOffers, careOffersOfSnapshot, type AppliedCareOffer } from '../lib/carePartGrants';
+import { spendableCareOffers } from '../lib/carePartOfferCaps';
+import { careRefusal } from '../lib/careClaims';
 import { deliveryCharge, type DeliveryPolicy } from '../lib/storeDelivery';
 import { normalizeGovernorate } from '../lib/iraqGovernorates';
 import { productCatalogPlacements } from '../lib/printerIdentity';
@@ -756,6 +759,7 @@ export function orderPublic(
   audience: 'customer' | 'admin' = 'customer'
 ) {
   const coupon = safeParse<Record<string, unknown> | null>(o.coupon_snapshot, null);
+  const careOfferByItem = new Map(careOffersOfSnapshot(coupon).map((x) => [x.order_item_id, { grant_id: x.grant_id, discount_iqd: x.discount_iqd }]));
   const shippingType = typeForTransport(
     String(o.shipping_type ?? '').startsWith('preorder_')
       ? String(o.shipping_type).slice('preorder_'.length)
@@ -923,6 +927,9 @@ export function orderPublic(
          * ordinary one.
          */
         is_gift: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '',
+        // Phase 5 (0243): the Levo Care part offer this line used — its discount is already inside the line's
+        // coupon discount (`coupon_discount_iqd`); null on every other line.
+        care_offer: careOfferByItem.get(String(it.id)) ?? null,
         gift_id: typeof it.gift_entitlement_id === 'string' && it.gift_entitlement_id !== '' ? it.gift_entitlement_id : null,
         /**
          * «سعر تقديري» (migration 0218; §5.3): a line sold at an estimated
@@ -2145,6 +2152,12 @@ export interface CheckoutComputation {
    */
   couponPrimaryAmount: number;
   couponExtras: ReadonlyArray<{ coupon_id: string; amount_iqd: number }>;
+  /**
+   * The Levo Care part offers this order spends (phase 5; migration 0243; DECISIONS row 358): each took
+   * `discount_iqd` off ONE unit of its line. Already inside `couponDiscount`, `couponLineDiscounts` and
+   * `couponExtras` — this list only names them for the quote and the snapshot.
+   */
+  careOffers: ReadonlyArray<AppliedCareOffer>;
   couponSnapshot: string | null;
   /**
    * What the coupon took off each order item (offers B2), keyed by item id —
@@ -3954,6 +3967,57 @@ export async function computeCheckout(
       }
     }
 
+    /**
+     * ---- THE LEVO CARE PART OFFERS (phase 5; migration 0243; DECISIONS row 358).
+     *
+     * A live offer of THIS customer applies by itself — nothing is typed and the client sends nothing: the
+     * server reads his offers at every door (cart read, quote, order) and takes each one off ONE unit of its
+     * product. It rides BESIDE the order's own code (a promo code or the reward pool) and never replaces it.
+     *
+     * NEVER on a line attached to a printer (a kit or an add-on), a bundle / mystery parent or component, a
+     * gift, or the membership line (which is not in `p.lines`); never for another account (`liveCareOffers`
+     * reads by the session's user and the coupon's assigned_user_id); never twice (the use is one row of
+     * `coupon_redemption_extras`, refused by its trigger when the coupon is already spent).
+     *
+     * NOT WITH A TRADE-IN CREDIT: that coupon is payment in kind and its snapshot figure IS the credit
+     * (tradeInReissue, tradeInStock read it so) — the offer simply waits for the customer's next order.
+     *
+     * It is a coupon discount on the goods: it joins `couponMerchandise`, `couponDiscount` and the per-line
+     * figures here, BEFORE the points cap and the free-delivery basis are worked out below, so every later
+     * figure is computed on what the customer really pays.
+     */
+    let careOffers: AppliedCareOffer[] = [];
+    let careDiscount = 0;
+    if (!couponTradeIn) {
+      // With each device's caps as they stand NOW (the money ceiling and the claim limit are re-checked here).
+      const offers = (await spendableCareOffers(c.env.DB, user.id)).filter((o) => o.coupon_id !== couponId);
+      if (offers.length) {
+        const sourceById = new Map(p.lines.map((l) => [l.id, l]));
+        careOffers = allocateCareOffers(
+          offers,
+          couponLines.flatMap((cl) => {
+            const src = sourceById.get(cl.line_id);
+            if (!src || src.kit || src.addon || src.gift || src.bundle_parent_item_id || parentLineIds.has(src.id)) return [];
+            return [{
+              line_id: cl.line_id,
+              tie_key: cl.tie_key ?? cl.line_id,
+              product_id: cl.product_id,
+              qty: cl.qty,
+              unit_goods_iqd: cl.unit_goods_iqd,
+              taken_iqd: couponLineDiscounts.get(cl.line_id) ?? 0,
+            }];
+          })
+        );
+        careDiscount = careOffers.reduce((s, o) => s + o.discount_iqd, 0);
+        if (careDiscount > 0) {
+          couponLineDiscounts = new Map(couponLineDiscounts);
+          for (const o of careOffers) couponLineDiscounts.set(o.line_id, (couponLineDiscounts.get(o.line_id) ?? 0) + o.discount_iqd);
+          couponMerchandise += careDiscount;
+          couponDiscount += careDiscount;
+        }
+      }
+    }
+
     // §4.4 redemption: "use my points" applies ALL available points, capped at
     // the ELIGIBLE MERCHANDISE value after product/membership/coupon discounts —
     // never delivery, never transport commissions or warranty fees, never
@@ -4003,7 +4067,8 @@ export async function computeCheckout(
     if (couponRule && couponNamesDelivery(couponRule)) {
       couponDelivery = allocateCoupon(couponRule, couponLines, couponCtx(couponDeliveryBase(shipping))).delivery_iqd;
       couponDiscount = couponMerchandise + couponDelivery;
-      if (couponDiscount <= 0) throw badRequest('Coupon could not be applied (NO_DISCOUNT)', 'NO_DISCOUNT');
+      // Judged on the code's own part: a Care part offer beside it does not make a code that takes nothing «applied».
+      if (couponDiscount - careDiscount <= 0) throw badRequest('Coupon could not be applied (NO_DISCOUNT)', 'NO_DISCOUNT');
     }
     if (couponPool) {
       // The same on the pool, and which coupons it spends is decided here: a fee
@@ -4021,8 +4086,12 @@ export async function computeCheckout(
       couponPrimaryAmount = head.total_iqd;
       couponExtras = onFinalFee.used.filter((u) => u.coupon_id !== head.coupon_id).map((u) => ({ coupon_id: u.coupon_id, amount_iqd: u.total_iqd }));
     } else {
-      couponPrimaryAmount = couponDiscount;
+      // The order's own code took everything but the Care part offers, which are written beside it.
+      couponPrimaryAmount = couponId ? couponDiscount - careDiscount : 0;
     }
+    // A Care part offer is ALWAYS an extra (0243), with or without a typed code: `coupon_redemptions` stays
+    // «the code the customer gave». Primary + extras still add up to `couponDiscount`.
+    if (careOffers.length) couponExtras = [...couponExtras, ...careOffers.map((o) => ({ coupon_id: o.coupon_id, amount_iqd: o.discount_iqd }))];
     if (couponId) {
       couponSnapshot = JSON.stringify(
         couponPool
@@ -4047,6 +4116,22 @@ export async function computeCheckout(
             }
           : { coupon_id: couponId, code: couponCode, discount_iqd: couponDiscount, ...(tradeInLineId ? { trade_in_line_id: tradeInLineId } : {}) }
       );
+    }
+
+    if (careOffers.length) {
+      // The offers are named on the order's coupon record: with a typed code they sit beside it (its
+      // `discount_iqd` already includes them); alone they ARE the record — no code, no coupon id.
+      const base = couponSnapshot
+        ? safeParse<Record<string, unknown>>(couponSnapshot, {})
+        : { coupon_id: null, code: null, discount_iqd: couponDiscount, merchandise_iqd: couponMerchandise, delivery_iqd: couponDelivery };
+      couponSnapshot = JSON.stringify({
+        ...base,
+        care_offer_discount_iqd: careDiscount,
+        care_offers: careOffers.map((o) => ({
+          grant_id: o.grant_id, claim_id: o.claim_id, product_id: o.product_id, order_item_id: o.line_id,
+          cart_item_id: o.cart_item_id, discount_pct: o.discount_pct, discount_iqd: o.discount_iqd,
+        })),
+      });
     }
 
     // The membership bought with the order (0235) joins the total here, after
@@ -4403,6 +4488,7 @@ export async function computeCheckout(
       couponDiscount,
       couponPrimaryAmount,
       couponExtras,
+      careOffers,
       couponSnapshot,
       couponLineDiscounts,
       pointsDiscount,
@@ -4556,6 +4642,7 @@ export async function computeCheckout(
     couponDiscount: settled.couponDiscount,
     couponPrimaryAmount: settled.couponPrimaryAmount,
     couponExtras: settled.couponExtras,
+    careOffers: settled.careOffers,
     couponSnapshot: settled.couponSnapshot,
     couponLineDiscounts: settled.couponLineDiscounts,
     pointsBalance: available.points_available,
@@ -4993,6 +5080,13 @@ function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
         waived: comp.shipping.components.some((k) => k.kind === 'protected' && k.waived),
       },
       coupon: comp.couponSnapshot ? safeParse(comp.couponSnapshot, null) : null,
+      // Phase 5 (DECISIONS row 358): the Levo Care part offers applied by themselves — already inside the
+      // totals and inside `coupon.discount_iqd`; named here so the screen can say «خصم ليفو كير».
+      care_offers: comp.careOffers.map((o) => ({
+        grant_id: o.grant_id, claim_id: o.claim_id, product_id: o.product_id, cart_item_id: o.cart_item_id,
+        discount_pct: o.discount_pct, discount_iqd: o.discount_iqd, expires_at: o.expires_at,
+      })),
+      care_offer_discount_iqd: comp.careOffers.reduce((s, o) => s + o.discount_iqd, 0),
       // §5 unified snapshot, preview edition: the eligible basis the cap and
       // the accrual both come from is shown, so the customer sees WHY the
       // discount is what it is before committing.
@@ -5232,6 +5326,28 @@ export async function placeOrder(
    * they press again knowing the total. A pool only, and only for less: a tab on
    * an older bundle sends nothing, and more off the order surprises nobody.
    */
+  /**
+   * THE CARE PART OFFERS ARE NOT WHAT THE SCREEN SHOWED (phase 5 review, 2026-11-18). An offer applies by
+   * itself, so one that staff revoked, that ended, or that another tab spent between the quote and this press
+   * would simply be absent — and the buyer would pay the full price without a word. The page sends what its
+   * quote showed: the offers' ids (`careOffersSeen`) and their total (`careOfferDiscountSeen`). A different set
+   * of offers, or less off than shown, is answered 409 CARE_OFFER_CHANGED with the fresh quote; nothing is
+   * written and the buyer presses again knowing the total. More off with the same offers surprises nobody.
+   * Absent fields (an older page) = no guard, as before.
+   */
+  const careSeenIds = Array.isArray(body.careOffersSeen) ? [...new Set((body.careOffersSeen as unknown[]).filter((x): x is string => typeof x === 'string' && x !== '').slice(0, 50))] : null;
+  const careSeenTotal = body.careOfferDiscountSeen === undefined || body.careOfferDiscountSeen === null ? null : Number(body.careOfferDiscountSeen);
+  if (careSeenIds !== null || careSeenTotal !== null) {
+    const applied = new Set(comp.careOffers.map((o) => o.grant_id));
+    const appliedTotal = comp.careOffers.reduce((s, o) => s + o.discount_iqd, 0);
+    const sameSet = careSeenIds === null || (careSeenIds.length === applied.size && careSeenIds.every((id) => applied.has(id)));
+    const lower = careSeenTotal !== null && Number.isFinite(careSeenTotal) && appliedTotal < careSeenTotal;
+    if (!sameSet || lower) {
+      const fresh = quotePayload(comp, input);
+      throw careRefusal('CARE_OFFER_CHANGED', 409, { care_offers: fresh.care_offers, care_offer_discount_iqd: fresh.care_offer_discount_iqd, quote: fresh });
+    }
+  }
+
   const couponSeen = Number(body.couponDiscountSeen);
   if (
     Number.isInteger(couponSeen) &&
@@ -5513,17 +5629,17 @@ export async function placeOrder(
          VALUES (?, ?, ?, ?, ?, ?)`
       ).bind(newId('crd'), comp.couponId, user.id, orderId, comp.couponPrimaryAmount, now)
     );
-    // The other reward coupons this order spends (0225): their own trigger takes
-    // the same decision, inside this same transaction, and answers in the same
-    // words, so a coupon spent elsewhere a moment ago rolls the order back.
-    for (const extra of comp.couponExtras) {
-      stmts.push(
-        c.env.DB.prepare(
-          `INSERT INTO coupon_redemption_extras (id, coupon_id, user_id, order_id, amount_iqd, created_at)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        ).bind(newId('crx'), extra.coupon_id, user.id, orderId, extra.amount_iqd, now)
-      );
-    }
+  }
+  // The other reward coupons this order spends (0225), and its Levo Care part offers (0243; with or without
+  // a code of the order's own): their trigger takes the same decision, inside this same transaction, and
+  // answers in the same words, so a coupon spent elsewhere a moment ago rolls the order back.
+  for (const extra of comp.couponExtras) {
+    stmts.push(
+      c.env.DB.prepare(
+        `INSERT INTO coupon_redemption_extras (id, coupon_id, user_id, order_id, amount_iqd, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)`
+      ).bind(newId('crx'), extra.coupon_id, user.id, orderId, extra.amount_iqd, now)
+    );
   }
 
   // ONE `offer_redemptions` ROW PER (SUBJECT, ORDER), with `qty` SUMMED across

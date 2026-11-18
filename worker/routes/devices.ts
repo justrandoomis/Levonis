@@ -130,7 +130,9 @@ import { catalogIndexFor } from '../lib/catalogPresentation';
 import { MAINTENANCE_ROOT_ID, maintenanceFor } from '../lib/printerFits';
 import { warranty as WARRANTY_POLICY } from '../lib/policies/warranty';
 import { careBenefitOf, careClaimsInstalled, careEntitlements, carePublic, careQuotePublic, careRefusal, claimMoneySummaries } from '../lib/careClaims';
-import { careApprovalPending, careVoidOnReject, mountDeviceCareRoutes } from './deviceCare';
+import { carePartGrantsInstalled, grantsOfClaim, liveOfferCounts } from '../lib/carePartGrants';
+import { partGrantViews, type PartGrantPublic } from '../lib/carePartGrantViews';
+import { careApprovalPending, careVoidOnReject, mountDeviceCareRoutes, partOffersRevokeOnReject } from './deviceCare';
 
 export const deviceRoutes = new Hono<AppContext>();
 deviceRoutes.use('*', requireAuth);
@@ -874,7 +876,9 @@ deviceRoutes.get('/claims', async (c) => {
   )
     .bind(user.id)
     .all<ClaimRow>();
-  return c.json({ success: true, claims: results.map((r) => claimPublic(r)) });
+  // Phase 5 (0243): how many live Care part offers wait on each claim (0 without the table).
+  const offers = await liveOfferCounts(c.env.DB, results.map((r) => r.id));
+  return c.json({ success: true, claims: results.map((r) => ({ ...claimPublic(r), part_offers_live: offers.get(r.id) ?? 0 })) });
 });
 
 async function loadClaimAuthorized(c: Context<AppContext>, claimId: string) {
@@ -898,8 +902,10 @@ deviceRoutes.get('/claims/:id', async (c) => {
   // Stamped BEFORE the thread is read, so a staff message that lands while
   // this request is in flight is later than the stamp and stays «جديد».
   const seenAt = new Date().toISOString();
+  // Phase 5 (0243): a staff message may carry a Care part offer; a database without the column reads none.
+  const partCol = (await carePartGrantsInstalled(c.env.DB)) ? ', part_grant_id' : '';
   const [{ results: messages }, unit] = await Promise.all([
-    c.env.DB.prepare('SELECT id, sender_id, is_staff, body, file_key, created_at FROM claim_messages WHERE claim_id = ? ORDER BY created_at ASC LIMIT 500')
+    c.env.DB.prepare(`SELECT id, sender_id, is_staff, body, file_key, created_at${partCol} FROM claim_messages WHERE claim_id = ? ORDER BY created_at ASC LIMIT 500`)
       .bind(claim.id)
       .all<Record<string, unknown>>(),
     claim.unit_id
@@ -910,15 +916,21 @@ deviceRoutes.get('/claims/:id', async (c) => {
   const cov = unit ? unitCoverage(unit) : null;
   // Phase 3: the device's Levo Care on the day the claim was filed, and the claim's Care quote
   // (never what the claim cost the shop). null on a database without 0236.
-  let careBlock: { entitlement: ReturnType<typeof carePublic>; quote: ReturnType<typeof careQuotePublic> } | null = null;
+  let careBlock: { entitlement: ReturnType<typeof carePublic>; quote: ReturnType<typeof careQuotePublic>; part_grants: PartGrantPublic[] } | null = null;
   if (claim.unit_id && (await careClaimsInstalled(c.env.DB))) {
     const filedAt = Date.parse(claim.created_at);
-    const [ents, benefit] = await Promise.all([
+    const [ents, benefit, grants] = await Promise.all([
       careEntitlements(c.env.DB, [claim.unit_id], Number.isFinite(filedAt) ? filedAt : Date.now()),
       careBenefitOf(c.env.DB, claim.id),
+      grantsOfClaim(c.env.DB, claim.id),
     ]);
     const ent = ents.get(claim.unit_id);
-    careBlock = { entitlement: carePublic(ent), quote: careQuotePublic(benefit, ent?.terms ?? null) };
+    careBlock = {
+      entitlement: carePublic(ent),
+      quote: careQuotePublic(benefit, ent?.terms ?? null),
+      // Phase 5: the part offers of this claim, each as a product card priced for the claimant. Never who issued it.
+      part_grants: await partGrantViews(c.env.DB, grants, claim.user_id),
+    };
   }
   /**
    * THE CLAIMANT HAS NOW SEEN THE THREAD — the read marker behind «رد جديد من
@@ -964,6 +976,7 @@ deviceRoutes.get('/claims/:id', async (c) => {
       body: m.body,
       file_url: typeof m.file_key === 'string' && m.file_key ? `/api/devices/claim-files/${m.file_key}` : null,
       created_at: m.created_at,
+      part_grant_id: typeof m.part_grant_id === 'string' && m.part_grant_id ? m.part_grant_id : null,
       ...(isAdmin ? { sender_id: m.sender_id } : {}),
     })),
   });
@@ -977,6 +990,10 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
   const subject = str(body.subject, 'subject', { min: 3, max: 200 });
   const description = str(body.description, 'description', { min: 10, max: 5000 });
   const idempotencyKey = str(body.idempotencyKey, 'idempotencyKey', { min: 8, max: 80, required: false });
+  // Phase 5 (D8): the customer applies for Levo Care («ليفو كير — خصم على القطع») or files a warranty fault.
+  const kindRaw = body.kind === undefined || body.kind === null || body.kind === '' ? 'warranty' : body.kind;
+  if (kindRaw !== 'warranty' && kindRaw !== 'care') throw badRequest("kind must be 'warranty' or 'care'");
+  const careKind = kindRaw === 'care';
 
   // 0178: the unit's warranty was closed by a return (null before it applied).
   const closedCol = (await serialAssignmentsInstalled(c.env.DB)) ? 'u.warranty_closed_at' : 'NULL AS warranty_closed_at';
@@ -1009,6 +1026,14 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
   if (unit.traded_in_at || unit.in_shop_at || unit.warranty_closed_at) throw DEVICE_NOT_WITH_CUSTOMER();
   if (!holds) {
     throw badRequest('Register this device first (Warranty → Add device), then open the claim from it.', 'NOT_REGISTERED');
+  }
+  // Phase 5 (D8): a Care application is taken only while Levo Care is ACTIVE on the device today (its window
+  // runs from delivery to the warranty's months + 12; its terms are published). Anything else is refused with
+  // the state, and the customer may still file an ordinary claim.
+  if (careKind) {
+    if (!(await careClaimsInstalled(c.env.DB))) throw careRefusal('CARE_NOT_INSTALLED', 503);
+    const ent = (await careEntitlements(c.env.DB, [unit.id])).get(unit.id);
+    if (!ent || ent.state !== 'active') throw careRefusal('CARE_NOT_ACTIVE', 409, { state: ent?.state ?? 'none' });
   }
   // PRO priority service, snapshotted at creation exactly as support tickets
   // do — the one warranty perk the membership carries.
@@ -1105,8 +1130,8 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
   const insert = (await claimFiledColumnsInstalled(c.env.DB))
     ? c.env.DB.prepare(
         `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority,
-                                      filed_cover_state, filed_cover_via, filed_cover_end_at, filed_policy_version)
-         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'received', 'submitted', ?9, ?10, ?11, ?12, ?13
+                                      filed_cover_state, filed_cover_via, filed_cover_end_at, filed_policy_version${careKind ? ', claim_kind' : ''})
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'received', 'submitted', ?9, ?10, ?11, ?12, ?13${careKind ? ", 'care'" : ''}
           ${claimFence}
          ON CONFLICT(id) DO NOTHING`
       ).bind(
@@ -1114,8 +1139,8 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
         cov.state, cov.via, cov.end_at, `${WARRANTY_POLICY.key}@${WARRANTY_POLICY.version}`
       )
     : c.env.DB.prepare(
-        `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority)
-         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'received', 'submitted', ?9
+        `INSERT INTO warranty_claims (id, user_id, order_item_id, product_name, description, unit_id, subject, evidence, stage, status, priority${careKind ? ', claim_kind' : ''})
+         SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'received', 'submitted', ?9${careKind ? ", 'care'" : ''}
           ${claimFence}
          ON CONFLICT(id) DO NOTHING`
       ).bind(id, user.id, unit.order_item_id, productName, description, unit.id, subject, JSON.stringify(attachments), priority);
@@ -1247,7 +1272,7 @@ deviceRoutes.post('/units/:unitId/claims', async (c) => {
       `\nAttachments: ${attachments.length}`
   );
 
-  return c.json({ success: true, id, stage: 'received', priority: priority === 1, warranty_facts: warrantyFacts });
+  return c.json({ success: true, id, stage: 'received', priority: priority === 1, claim_kind: careKind ? 'care' : 'warranty', warranty_facts: warrantyFacts });
 });
 
 deviceRoutes.post('/claims/:id/messages', async (c) => {
@@ -2439,7 +2464,13 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
   }
   // A rejected claim keeps no Care: its live benefit is voided in the same batch as the move (never once the
   // co-pay was collected — CARE_REJECT_COPAY_COLLECTED). [] without 0236 or without a live benefit.
-  const careVoid = nextStage === 'rejected' ? await careVoidOnReject(c.env.DB, id, admin.id, reason || claim.decision_reason || 'rejected') : [];
+  const careVoid = nextStage === 'rejected'
+    ? [
+        ...(await careVoidOnReject(c.env.DB, id, admin.id, reason || claim.decision_reason || 'rejected')),
+        // Phase 5: …and no part offer the customer has not used yet ([] without 0243 or without one).
+        ...(await partOffersRevokeOnReject(c.env.DB, id, admin.id, reason || claim.decision_reason || 'rejected')),
+      ]
+    : [];
 
   // G-4: «REPLACED» NEEDS THE REPLACEMENT. The customer is told the device was
   // replaced, so the unit must carry the replacement the owner recorded

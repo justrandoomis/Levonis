@@ -43,6 +43,7 @@ import { orderRoutes } from '../worker/routes/orders';
 import { eligibleMerchandiseIqd } from '../worker/lib/pointsOps';
 import { addBundle, seedCatalogue, orderBody, DEFAULT_COMPONENTS, PAST } from './lib/bundles';
 import { test } from 'node:test';
+import { careOfferUses, seedCareOffer } from './fixtures/careOffer';
 
 const buyer: StubUser = { id: 'buyer', role: 'customer', email: 's@x.co' };
 const appFor = (db: unknown, user: StubUser = buyer) =>
@@ -637,4 +638,34 @@ test('case 4 — a pre-order bundle costs the same paid in advance or cash on de
   const parent = items(raw, res.order.id).find((r) => r.bundle_parent_item_id === null)!;
   assert.equal(Number(parent.unit_price_iqd), 90_000, 'the order charges what the cash quote showed');
   assert.equal(orderRow(raw, res.order.id).shipping_type, 'preorder_air', 'and it is still a pre-order on its journey');
+});
+
+// ------------------------------------------------------------------ phase 5: the Levo Care part offer (DECISIONS row 358)
+
+test('a Levo Care part offer never lands on a bundle or on a part inside it — an ordinary line of the same part takes it', async () => {
+  const raw = seedCatalogue();
+  addBundle(raw, { id: 'prd_b1', slug: 'starter', priceIqd: 400_000 });
+  const onBundle = seedCareOffer(raw, { user: 'buyer', product: 'prd_b1' });
+  const onPart = seedCareOffer(raw, { user: 'buyer', product: 'p_nozzle' });
+  const db = asD1(raw);
+  await addBundleToCart(db, { productId: 'prd_b1', qty: 1 });
+  const q = (await json(await post(appFor(db), '/api/orders/quote', orderBody()))).quote;
+  assert.deepEqual([q.care_offers, q.care_offer_discount_iqd, q.coupon], [[], 0, null]);
+  const res = await json(await post(appFor(db), '/api/orders', orderBody()));
+  assert.equal(res.success, true, JSON.stringify(res));
+  assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM order_items WHERE order_id = ? AND coupon_discount_iqd <> 0', res.order.id), 0);
+  assert.equal(Number(orderRow(raw, res.order.id).total_iqd), q.total_iqd);
+  assert.deepEqual([careOfferUses(raw, onBundle.couponId), careOfferUses(raw, onPart.couponId)], [0, 0], 'both offers are still the customer’s');
+  // The same part bought on its own line, beside a second bundle: the part's offer lands on that line only.
+  await addBundleToCart(db, { productId: 'prd_b1', qty: 1 });
+  await addBundleToCart(db, { productId: 'p_nozzle', qty: 1 });
+  const q2 = (await json(await post(appFor(db), '/api/orders/quote', orderBody()))).quote;
+  assert.equal(q2.care_offers.length, 1, JSON.stringify(q2.care_offers));
+  assert.equal(q2.care_offers[0].grant_id, onPart.grantId);
+  const res2 = await json(await post(appFor(db), '/api/orders', orderBody()));
+  assert.equal(res2.success, true, JSON.stringify(res2));
+  const discounted = all<Record<string, unknown>>(raw, 'SELECT product_id, bundle_parent_item_id, coupon_discount_iqd FROM order_items WHERE order_id = ? AND coupon_discount_iqd <> 0', res2.order.id);
+  assert.deepEqual(discounted.map((l) => [l.product_id, l.bundle_parent_item_id, l.coupon_discount_iqd]), [['p_nozzle', null, q2.care_offer_discount_iqd]]);
+  assert.equal(Number(orderRow(raw, res2.order.id).total_iqd), q2.total_iqd);
+  assert.deepEqual([careOfferUses(raw, onBundle.couponId), careOfferUses(raw, onPart.couponId)], [0, 1]);
 });

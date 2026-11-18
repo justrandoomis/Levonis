@@ -474,7 +474,8 @@ test('months and days are written with their plurals in all three languages — 
 
 test('one term for the used-sale period: the screens and the receipts use the warranty policy\'s own words, in three languages', () => {
   const policy = readFileSync(join(ROOT, 'worker/lib/policies/warranty.ts'), 'utf8');
-  const screens = readFileSync(join(ROOT, 'src/components/warranty/strings.ts'), 'utf8');
+  // The warranty page's words live by subject under copy/ (phase 5): the cover's are in page.ts.
+  const screens = readFileSync(join(ROOT, 'src/components/warranty/copy/page.ts'), 'utf8');
   const receipts = readFileSync(join(ROOT, 'worker/routes/warranty.ts'), 'utf8');
   for (const term of ['مدة بيع المستعمل', 'used-sale period', 'ماوەی فرۆشتنی بەکارهاتوو']) assert.ok(policy.includes(term), `policy: ${term}`);
   for (const term of ['مدة بيع المستعمل', 'Used-sale period', 'ماوەی فرۆشتنی بەکارهاتوو']) assert.ok(screens.includes(term), `screens: ${term}`);

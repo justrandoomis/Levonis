@@ -25,6 +25,9 @@ import { DEFAULT_PRINTER_SERVICES, type CareTerms } from '../packages/pricing/sr
 import { HttpError } from '../worker/lib/http';
 import { serviceClaimsSummary } from '../worker/lib/printerFinance';
 import { baghdadDay } from '../worker/lib/operations';
+import { addMonths } from '../worker/lib/membershipOps';
+import { careEntitlements } from '../worker/lib/careClaims';
+import { CARE_AFTER_WARRANTY_MONTHS, careTotalMonths } from '../packages/pricing/src/printerServices';
 
 const DAY = 86_400_000;
 const iso = (ms: number) => new Date(ms).toISOString();
@@ -47,12 +50,18 @@ const TERMS: CareTerms = {
   shipping: 'full_price',
   exclusions: [{ ar: 'الحريق', en: 'Fire', ckb: 'ئاگر' }],
 };
+/** u2's line: a 12-month warranty AND Care — Care runs 24 months from delivery (phase 5, DECISIONS row 358). */
 const SNAPSHOT = JSON.stringify({
   lines: [
     { service: 'warranty', choice: 'w12', fee_iqd: 25_000, policy_version: 1 },
     { service: 'care', choice: 'c12', fee_iqd: 19_000, policy_version: 1 },
   ],
-  fee_iqd: 44_000, package_discount_iqd: 0, warranty_months: 12, care_months: 12, revision: 1,
+  fee_iqd: 44_000, package_discount_iqd: 0, warranty_months: 12, care_months: 12, care_total_months: 24, revision: 1,
+});
+/** u1's line: Care with NO warranty bought — the unit's own facts (0 warranty months) and its snapshot now agree. */
+const SNAPSHOT_CARE_ONLY = JSON.stringify({
+  lines: [{ service: 'care', choice: 'c12', fee_iqd: 19_000, policy_version: 1 }],
+  fee_iqd: 19_000, package_discount_iqd: 0, warranty_months: 0, care_months: 12, care_total_months: 12, revision: 1,
 });
 const QUOTE = {
   parts: [{ key: 'nozzle', qty: 1, unit_iqd: 20_000 }, { key: 'fan', qty: 2, unit_iqd: 5_000 }],
@@ -75,16 +84,18 @@ function seed(raw: DatabaseSync = freshDb(), opts: { terms?: boolean } = {}): Da
        payment_method_id, subtotal_iqd, shipping_iqd, exchange_rate, total_iqd, due_on_delivery_iqd, delivered_at)
      VALUES ('ORD-1','buyer','delivered','{}','standard','{}','cash',1886000,0,1400,1886000,0,'${delivered}');
     INSERT INTO order_items (id, order_id, product_id, name_snapshot, qty, unit_price_iqd, line_total_iqd)
-     VALUES ('oi1','ORD-1','p1','Bambu A1',2,943000,1886000), ('oi2','ORD-1','p1','Bambu A1',1,899000,899000);
+     VALUES ('oi1','ORD-1','p1','Bambu A1',1,918000,918000), ('oi2','ORD-1','p1','Bambu A1',1,899000,899000),
+            ('oi3','ORD-1','p1','Bambu A1',1,943000,943000);
     INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index,
        delivered_at, warranty_base_months, warranty_start_at, warranty_end_at) VALUES
       ('u1','ORD-1','oi1','p1','buyer',1,'${delivered}',0,'${delivered}','${delivered}'),
-      ('u2','ORD-1','oi1','p1','buyer',2,'${delivered}',12,'${delivered}','${end}'),
+      ('u2','ORD-1','oi3','p1','buyer',1,'${delivered}',12,'${delivered}','${end}'),
       ('u3','ORD-1','oi2','p1','buyer',1,'${delivered}',0,'${delivered}','${delivered}');
     INSERT INTO device_registrations (unit_id, user_id) VALUES ('u1','buyer'), ('u2','buyer'), ('u3','buyer');
   `);
   try {
-    raw.prepare('UPDATE order_items SET services_snapshot = ? WHERE id = ?').run(SNAPSHOT, 'oi1');
+    raw.prepare('UPDATE order_items SET services_snapshot = ? WHERE id = ?').run(SNAPSHOT_CARE_ONLY, 'oi1');
+    raw.prepare('UPDATE order_items SET services_snapshot = ? WHERE id = ?').run(SNAPSHOT, 'oi3');
   } catch {
     /* a database before 0234 */
   }
@@ -607,4 +618,84 @@ test('PERIOD_CLOSED has words on the screens (ar / en / ckb)', () => {
   const t = REFUSAL_STRINGS.PERIOD_CLOSED;
   assert.ok(t && t.ar && t.en && t.ckb);
   assert.notEqual(t.ckb, t.ar);
+});
+
+// ------------------------------------------------------------------ phase 5: Care runs after the warranty (DECISIONS row 358)
+
+test('the Care window is delivery → warranty months + 12: none / 12 / 24 months of warranty give 12 / 24 / 36 of Care', async () => {
+  const raw = seed();
+  try {
+    const delivered = row<{ d: string }>(raw, "SELECT delivered_at AS d FROM order_item_units WHERE id = 'u1'")!.d;
+    // A third device: a 24-month warranty with Care, frozen BEFORE the snapshot carried care_total_months.
+    raw.exec(`
+      INSERT INTO order_items (id, order_id, product_id, name_snapshot, qty, unit_price_iqd, line_total_iqd) VALUES ('oi4','ORD-1','p1','Bambu A1',1,960000,960000);
+      INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index, delivered_at, warranty_base_months, warranty_start_at, warranty_end_at)
+        VALUES ('u4','ORD-1','oi4','p1','buyer',1,'${delivered}',24,'${delivered}','${iso(Date.parse(delivered) + 730 * DAY)}');
+      INSERT INTO device_registrations (unit_id, user_id) VALUES ('u4','buyer');
+    `);
+    raw.prepare('UPDATE order_items SET services_snapshot = ? WHERE id = ?').run(
+      JSON.stringify({ lines: [{ service: 'warranty', choice: 'w24', fee_iqd: 40_000, policy_version: 1 }, { service: 'care', choice: 'c12', fee_iqd: 19_000, policy_version: 1 }],
+        fee_iqd: 59_000, warranty_months: 24, care_months: 12, revision: 1 }), 'oi4');
+    const mine = await json(await get(as(raw, BUYER), '/api/devices/mine'));
+    const care = (unit: string) => mine.devices.find((d: { unit_id: string }) => d.unit_id === unit).care;
+    for (const [unit, warranty, total] of [['u1', 0, 12], ['u2', 12, 24], ['u4', 24, 36]] as const) {
+      const c = care(unit);
+      assert.deepEqual([c.state, c.warranty_months, c.total_months], ['active', warranty, total], unit);
+      assert.equal(c.start_at, delivered, `${unit}: Care starts at delivery (it serves misuse during the warranty)`);
+      assert.equal(c.end_at, addMonths(delivered, total), `${unit}: ends ${total} months after delivery`);
+      assert.equal(c.care_only_from, warranty ? addMonths(delivered, warranty) : delivered, `${unit}: the day Care is the only cover`);
+    }
+    assert.equal(care('u3'), null, 'no Care bought');
+    // Thirteen months on: Care alone (12) is over; warranty 12 + Care is in its Care-only year.
+    const later = Date.parse(delivered) + 396 * DAY;
+    const ents = await careEntitlements(asD1(raw), ['u1', 'u2', 'u4'], later);
+    assert.deepEqual(['u1', 'u2', 'u4'].map((u) => ents.get(u)!.state), ['expired', 'active', 'active']);
+    // Twenty-five months on: only the 36-month cover is left.
+    const last = await careEntitlements(asD1(raw), ['u1', 'u2', 'u4'], Date.parse(delivered) + 760 * DAY);
+    assert.deepEqual(['u1', 'u2', 'u4'].map((u) => last.get(u)!.state), ['expired', 'expired', 'active']);
+    // The admin panel carries the same window.
+    const id = await file(raw, 'u2');
+    const panel = await json(await get(as(raw, OWNER), `/api/devices/admin/claims/${id}/care`));
+    assert.deepEqual([panel.care.warranty_months, panel.care.total_months, panel.care.months], [12, 24, 12]);
+    assert.equal(panel.care.usage, undefined, 'the per-claim usage is internal');
+  } finally {
+    raw.close();
+  }
+});
+
+test('the pricing package: careTotalMonths, the snapshot figure and the offer flag', () => {
+  assert.equal(CARE_AFTER_WARRANTY_MONTHS, 12);
+  assert.deepEqual(
+    [careTotalMonths('none', 'none'), careTotalMonths('w24', 'none'), careTotalMonths('none', 'c12'), careTotalMonths('w12', 'c12'), careTotalMonths('w24', 'c12')],
+    [0, 0, 12, 24, 36]
+  );
+});
+
+test('the customer applies for Care (kind: care): only while Care is active on the device; the claim is filed as a Care claim', async () => {
+  const raw = seed();
+  try {
+    const body = (key: string, kind?: string) => ({ subject: 'Bent nozzle', description: 'I dropped the hotend and the nozzle bent.', idempotencyKey: key, ...(kind ? { kind } : {}) });
+    const care = await json(await post(as(raw, BUYER), '/api/devices/units/u1/claims', body('kind-care-1', 'care')));
+    assert.equal(care.success, true, JSON.stringify(care));
+    assert.equal(care.claim_kind, 'care');
+    assert.equal(row<{ k: string }>(raw, 'SELECT claim_kind AS k FROM warranty_claims WHERE id = ?', care.id)!.k, 'care');
+    assert.equal((await json(await get(as(raw, BUYER), `/api/devices/claims/${care.id}`))).claim.claim_kind, 'care');
+    // A device without Care is refused with its state — and nothing is filed.
+    const none = await post(as(raw, BUYER), '/api/devices/units/u3/claims', body('kind-care-3', 'care'));
+    assert.equal(none.status, 409);
+    const refused = await json(none);
+    assert.deepEqual([refused.code, refused.details.state], ['CARE_NOT_ACTIVE', 'none']);
+    assert.equal(row<{ n: number }>(raw, "SELECT COUNT(*) AS n FROM warranty_claims WHERE unit_id = 'u3'")!.n, 0);
+    // Absent or 'warranty' files an ordinary claim, as before; anything else is a bad request.
+    const plain = await json(await post(as(raw, BUYER), '/api/devices/units/u3/claims', body('kind-plain-3')));
+    assert.equal(plain.claim_kind, 'warranty');
+    assert.equal(row<{ k: string | null }>(raw, 'SELECT claim_kind AS k FROM warranty_claims WHERE id = ?', plain.id)!.k, null);
+    assert.equal((await post(as(raw, BUYER), '/api/devices/units/u2/claims', body('kind-bad-2', 'gift'))).status, 400);
+    // Care that ended: refused with 'expired'.
+    raw.exec(`UPDATE order_item_units SET delivered_at = '${iso(Date.now() - 800 * DAY)}' WHERE id = 'u2'`);
+    const over = await json(await post(as(raw, BUYER), '/api/devices/units/u2/claims', body('kind-care-2', 'care')));
+    assert.deepEqual([over.code, over.details.state], ['CARE_NOT_ACTIVE', 'expired']);
+  } finally {
+    raw.close();
+  }
 });
