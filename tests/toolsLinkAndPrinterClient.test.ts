@@ -133,3 +133,18 @@ test('a material with no shop price still offers the request its notice tells th
   const tools = read('src/pages/Tools.tsx');
   assert.match(tools, /\{quote && quote\.confidence === 'insufficient' && !requestsClosed && \(\s*<button type="button" onClick=\{\(\) => navigate\('\/requests'\)\}/);
 });
+
+test('the grams door reprices without closing the keyboard, and never for the same job twice', () => {
+  const grams = read('src/components/tools/GramsQuotePanel.tsx');
+  // Inputs stay enabled while a price loads; only Calculate waits (the focused box used to blur).
+  assert.ok(!/disabled=\{busy/.test(grams), 'a job input is disabled while a price loads');
+  // So an answer for a job the form has moved on from is dropped by its ticket.
+  assert.match(grams, /if \(seq !== reqSeq\.current\) return;/);
+  // A change that leaves the job as it was puts the last answer back, with no call.
+  assert.match(grams, /lastAnswer\.current\.sig === jobSig/);
+  // Once priced, later changes always reprice — even after clearing a box or a change mid-wait.
+  assert.match(grams, /if \(everPriced\.current\) setAutoRecalc\(true\);/);
+  // Adding an empty colour row is not a new job.
+  const add = grams.slice(grams.indexOf('const addRow'), grams.indexOf('const removeRow'));
+  assert.ok(!/invalidate\(\)/.test(add), 'adding an empty row throws the price away');
+});

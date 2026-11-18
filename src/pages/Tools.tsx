@@ -756,7 +756,11 @@ export default function Tools() {
         {mode === 'grams' ? (
           /* The catalogue is already loaded above, so the weight form reuses it
              rather than fetching the same two lists a second time. */
-          <GramsQuotePanel printers={printers} materials={materials} />
+          <GramsQuotePanel
+            printers={printers}
+            materials={materials}
+            onSendRequest={requestsClosed ? undefined : () => navigate('/requests')}
+          />
         ) : (
           <>
         {/* WHERE AM I. Three steps the customer can see the end of, so the

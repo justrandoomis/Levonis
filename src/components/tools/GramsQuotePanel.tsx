@@ -30,8 +30,8 @@
  * reader while looking correct. Spacing is logical (ms-/me-/ps-/pe-) so the
  * layout mirrors itself rather than being written twice.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Loader2, Plus, Scale, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertCircle, Check, Loader2, Plus, Scale, Trash2, Users } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { IconButton } from '../ui/Button';
 import { StatusChip } from '../ui/Badge';
@@ -78,6 +78,24 @@ interface FormRow {
 
 const MAX_ROWS = 8;
 
+/** The weights asked for at the counter, one tap each. */
+const GRAM_PRESETS = [50, 100, 250, 500, 1000];
+
+/**
+ * The spool colours most jobs are printed in. A swatch sets the same hex the
+ * colour picker beside it would; the picker stays for anything else.
+ */
+const COLOUR_PRESETS: Array<{ hex: string; ar: string; en: string; ckb: string }> = [
+  { hex: '#1A1A1A', ar: 'أسود', en: 'Black', ckb: 'ڕەش' },
+  { hex: '#F5F5F5', ar: 'أبيض', en: 'White', ckb: 'سپی' },
+  { hex: '#8A8D91', ar: 'رمادي', en: 'Grey', ckb: 'خۆڵەمێشی' },
+  { hex: '#C62828', ar: 'أحمر', en: 'Red', ckb: 'سوور' },
+  { hex: '#1565C0', ar: 'أزرق', en: 'Blue', ckb: 'شین' },
+  { hex: '#2E7D32', ar: 'أخضر', en: 'Green', ckb: 'سەوز' },
+  { hex: '#F9A825', ar: 'أصفر', en: 'Yellow', ckb: 'زەرد' },
+  { hex: '#EF6C00', ar: 'برتقالي', en: 'Orange', ckb: 'پرتەقاڵی' },
+];
+
 /** What was PRICED, apart from the printer — read from the server's echo, so
  *  a comparison is shown only between two answers to the same job. */
 export const pricedJob = (r: Pick<GramsQuoteResponse, 'rows' | 'print_minutes' | 'accessories'>): string =>
@@ -96,9 +114,13 @@ const newRow = (materialId: string, colorHex = '#D9D9D9'): FormRow => ({
 export default function GramsQuotePanel({
   printers,
   materials,
+  onSendRequest,
 }: {
   printers: GramsPrinterOption[];
   materials: GramsFilamentOption[];
+  /** The way to the print-request board, or undefined while it is closed to
+   *  this viewer (the page decides that, as it does for the file door). */
+  onSendRequest?: () => void;
 }) {
   const { money } = useMoney();
   const { loc } = useLanguage();
@@ -193,26 +215,57 @@ export default function GramsQuotePanel({
     setAutoRecalc(false);
   }, []);
 
-  const patchRow = (key: string, patch: Partial<FormRow>) => {
-    setRows((current) => (current.length ? current : effectiveRows).map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  /**
+   * «غيّرت الغرامات فاختفى السعر». Once a job has been priced, any change to it
+   * prices it again by itself after the customer stops typing, and the last
+   * answer stays where it was — dimmed, `aria-busy`, labelled «يجري تحديث
+   * السعر» — so it never sits there looking current and nothing jumps. The same
+   * rule as the file door (src/pages/Tools.tsx).
+   */
+  const [stale, setStale] = useState<GramsQuoteResponse | null>(null);
+  /** Once ANY answer came back, every later change reprices — clearing the box
+   *  to retype it, or a change made while a reprice was pending, must not switch
+   *  that off (review of e5cfd602, findings 1 and 3). */
+  const everPriced = useRef(false);
+  /** Each request takes a ticket; an answer whose ticket is no longer the
+   *  newest describes a job the form has moved on from and is dropped. That is
+   *  what lets the inputs stay ENABLED while a price loads — disabling the
+   *  focused box closed the phone keyboard mid-number (finding 4). */
+  const reqSeq = useRef(0);
+  /** The last answer and the exact job it answered, so a change that leaves the
+   *  job as it was (an empty «I know the time», a colour on an empty row) puts
+   *  that answer back instead of spending one of the route's 60 calls an hour. */
+  const lastAnswer = useRef<{ sig: string; answer: GramsQuoteResponse } | null>(null);
+  const changeJob = (apply: () => void) => {
+    if (result) setStale(result);
+    reqSeq.current += 1;
+    setBusy(false);
+    apply();
     invalidate();
+    if (everPriced.current) setAutoRecalc(true);
   };
 
+  const patchRow = (key: string, patch: Partial<FormRow>) =>
+    changeJob(() =>
+      setRows((current) => (current.length ? current : effectiveRows).map((r) => (r.key === key ? { ...r, ...patch } : r)))
+    );
+
+  // A new row has no weight yet, so it is not a new job: the price on screen
+  // still answers it, and stays (finding 2).
   const addRow = () => {
     setRows((current) => {
       const base = current.length ? current : effectiveRows;
       return base.length >= MAX_ROWS ? base : [...base, newRow(defaultMaterialId)];
     });
-    invalidate();
   };
 
-  const removeRow = (key: string) => {
-    setRows((current) => {
-      const base = current.length ? current : effectiveRows;
-      return base.length <= 1 ? base : base.filter((r) => r.key !== key);
-    });
-    invalidate();
-  };
+  const removeRow = (key: string) =>
+    changeJob(() =>
+      setRows((current) => {
+        const base = current.length ? current : effectiveRows;
+        return base.length <= 1 ? base : base.filter((r) => r.key !== key);
+      })
+    );
 
   const filled = effectiveRows.filter((r) => r.materialId && Number(r.grams) > 0);
   const canSubmit = !!printer && filled.length > 0 && !busy;
@@ -226,8 +279,21 @@ export default function GramsQuotePanel({
     return () => ctl.abort();
   }, []);
 
+  const priceRef = useRef<HTMLElement>(null);
+  const scrollToPrice = useRef(false);
+
+  /** The job exactly as `submit` would post it. */
+  const jobSig = JSON.stringify([
+    printer?.id ?? '',
+    filled.map((r) => [r.materialId, Number(r.grams), r.colorHex.toUpperCase()]),
+    statedMinutes > 0 ? statedMinutes : 0,
+    accessoryPayload(accessoryRows),
+  ]);
+
   const submit = useCallback(async () => {
     if (!printer) return;
+    // A press during the settle wait IS that reprice: the timer must not repeat it.
+    setAutoRecalc(false);
     const ready = effectiveRows.filter((r) => r.materialId && Number(r.grams) > 0);
     if (!ready.length) {
       setError(
@@ -239,8 +305,12 @@ export default function GramsQuotePanel({
       );
       return;
     }
+    const seq = ++reqSeq.current;
+    const sig = jobSig;
     setBusy(true);
     setError('');
+    // «Recalculate» on a current price dims it rather than removing it (finding 5).
+    if (result) setStale(result);
     setResult(null);
     try {
       // Hours and minutes are TIME, not money: turning "2 h 30" into 150 is
@@ -253,23 +323,57 @@ export default function GramsQuotePanel({
         print_minutes: stated > 0 ? stated : 0,
         accessories: accessoryPayload(accessoryRows),
       });
+      if (seq !== reqSeq.current) return;
+      everPriced.current = true;
+      lastAnswer.current = { sig, answer };
       setResult(answer);
     } catch (e) {
+      if (seq !== reqSeq.current) return;
+      scrollToPrice.current = false;
       const code = (e as { code?: string } | null)?.code ?? '';
       setError(refusalText(code, loc) || failureText(e, loc('تعذّر الحساب.', 'Could not work it out.', 'نەتوانرا بژمێردرێت.')));
     } finally {
-      setBusy(false);
+      if (seq === reqSeq.current) setBusy(false);
     }
-  }, [printer, effectiveRows, knowsTime, hours, minutes, accessoryRows, loc]);
+  }, [printer, effectiveRows, knowsTime, hours, minutes, accessoryRows, loc, jobSig, result]);
 
   useEffect(() => {
     if (!autoRecalc || busy || !printer) return;
+    // Every weight cleared: there is no job to price, so nothing to wait for.
+    if (!effectiveRows.some((r) => r.materialId && Number(r.grams) > 0)) {
+      setAutoRecalc(false);
+      return;
+    }
     // Wait for a material the new machine cannot run to be swapped (above).
     const allowed = new Set(usable.map((m) => m.id));
     if (!effectiveRows.every((r) => allowed.has(r.materialId))) return;
-    setAutoRecalc(false);
-    void submit();
-  }, [autoRecalc, busy, printer, usable, effectiveRows, submit]);
+    // SETTLE FIRST: typing «250» is one question, not three (the route allows
+    // 60 an hour). Each keystroke gives `submit` a new identity and restarts this.
+    const timer = setTimeout(() => {
+      // The same job that was last answered: put that answer back, no call.
+      if (lastAnswer.current && lastAnswer.current.sig === jobSig) {
+        setAutoRecalc(false);
+        setResult(lastAnswer.current.answer);
+        return;
+      }
+      setAutoRecalc(false);
+      void submit();
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [autoRecalc, busy, printer, usable, effectiveRows, submit, jobSig]);
+
+  useEffect(() => {
+    if (!busy && !autoRecalc) setStale(null);
+  }, [busy, autoRecalc]);
+  const repricing = !result && stale !== null && (autoRecalc || busy);
+  const shown = result ?? (repricing ? stale : null);
+
+  useEffect(() => {
+    if (!result || !scrollToPrice.current) return;
+    scrollToPrice.current = false;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    priceRef.current?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }, [result]);
 
   const t = {
     lead: loc(
@@ -299,6 +403,20 @@ export default function GramsQuotePanel({
       'کێش تەنها تێچووی ماددەمان پێدەڵێت. کاتژمێرەکانی ئامێریش تێچووی ڕاستەقینەن — ئەگەر نایانزانیت، ماددە و دەستکاری دەژمێرین و بە ڕوونی دەیڵێین.'
     ),
     calculate: loc('احسب السعر', 'Calculate', 'نرخ بژمێرە'),
+    recalc: loc('أعد الحساب', 'Recalculate', 'دووبارە بژمێرە'),
+    updating: loc('يجري تحديث السعر…', 'Updating the price…', 'نرخەکە نوێ دەکرێتەوە…'),
+    autoNote: loc(
+      'يتحدّث السعر وحده عندما تغيّر الوزن أو اللون أو الطابعة.',
+      'The price updates by itself when you change a weight, a colour or the printer.',
+      'کاتێک کێش، ڕەنگ یان چاپکەر دەگۆڕیت، نرخەکە خۆی نوێ دەبێتەوە.'
+    ),
+    quickGrams: loc('أوزان شائعة', 'Common weights', 'کێشە باوەکان'),
+    sendRequest: loc('أرسل طلب طباعة إلى التجّار', 'Send a print request to merchants', 'داواکاری چاپ بنێرە بۆ بازرگانان'),
+    sendNote: loc(
+      'التجّار يقدّمون عروضهم — سعر نهائي من شخص سيطبعها فعلًا.',
+      'Merchants bid — a final price from someone who will actually print it.',
+      'بازرگانان نرخ دەدەن — نرخی کۆتایی لە کەسێکەوە کە بەڕاستی دەیچاپێت.'
+    ),
     working: loc('يجري الحساب…', 'Working it out…', 'ژمێرین…'),
     price: loc('السعر التقديري', 'Estimated price', 'نرخی خەمڵێنراو'),
     range: loc('النطاق المتوقع', 'Expected range', 'مەودای چاوەڕوانکراو'),
@@ -333,13 +451,20 @@ export default function GramsQuotePanel({
             className="lv-input w-auto max-w-[16rem] min-h-10 py-2 text-[13px] leading-snug disabled:opacity-40 truncate"
             id="grams-printer"
             value={printer?.id ?? ''}
-            disabled={busy || !printers.length}
+            disabled={!printers.length}
             onChange={(e) => {
               const priced = result && result.quote.confidence !== 'insufficient' && printer ? result : null;
+              if (result) setStale(result);
+              reqSeq.current += 1;
+              setBusy(false);
               setPrinterId(e.target.value);
               invalidate();
               if (priced && printer) {
                 setComparison({ name: `${printer.manufacturer} ${printer.model}`, price: priced.quote.price_iqd, job: pricedJob(priced) });
+                setAutoRecalc(true);
+              } else if (everPriced.current) {
+                // Changed again during the wait, or after a «no price» answer:
+                // still a priced job, so it still reprices (finding 1).
                 setAutoRecalc(true);
               }
             }}
@@ -361,7 +486,8 @@ export default function GramsQuotePanel({
           <p className="px-4 py-2.5 text-[11px] leading-relaxed text-text-muted" data-grams-printer-untimed>
             {loc(
               'بدون زمن الطباعة لا تغيّر الطابعة هذا السعر: يُحسب ثمن المادة والتجهيز فقط. اذكر زمن الطباعة ليدخل وقت الطابعة في الحساب.',
-              'Without a print time the printer does not change this price: only the material and handling are priced. Give the print time to have machine time counted.'
+              'Without a print time the printer does not change this price: only the material and handling are priced. Give the print time to have machine time counted.',
+              'بەبێ کاتی چاپ، چاپکەر ئەم نرخە ناگۆڕێت: تەنها ماددە و ئامادەکاری دەژمێردرێن. کاتی چاپ بنووسە بۆ ئەوەی کاتی چاپکەر بچێتە ناو ژمێرینەوە.'
             )}
           </p>
         )}
@@ -386,7 +512,6 @@ export default function GramsQuotePanel({
                     className="lv-input py-2 text-[13px] leading-snug disabled:opacity-40 truncate"
                     id={`grams-material-${r.key}`}
                     value={r.materialId}
-                    disabled={busy}
                     onChange={(e) => patchRow(r.key, { materialId: e.target.value })}
                   >
                     {usable.map((m) => (
@@ -410,15 +535,38 @@ export default function GramsQuotePanel({
                     id={`grams-colour-${r.key}`}
                     type="color"
                     value={r.colorHex}
-                    disabled={busy}
                     onChange={(e) => patchRow(r.key, { colorHex: e.target.value })}
                     className="h-[46px] w-12 rounded-md lv-well border border-[var(--clay-field)] p-1 disabled:opacity-40 cursor-pointer"
                   />
                 </div>
 
                 {effectiveRows.length > 1 && (
-                  <IconButton label={t.remove} onClick={() => removeRow(r.key)} disabled={busy} icon={<Trash2 className="w-4 h-4" aria-hidden />} />
+                  <IconButton label={t.remove} onClick={() => removeRow(r.key)} icon={<Trash2 className="w-4 h-4" aria-hidden />} />
                 )}
+              </div>
+
+              {/* One tap for the colours most spools come in; the picker above
+                  stays for anything else. */}
+              <div role="group" aria-label={t.colour} className="flex flex-wrap gap-2">
+                {COLOUR_PRESETS.map((c) => {
+                  const on = r.colorHex.toUpperCase() === c.hex;
+                  return (
+                    <button
+                      key={c.hex}
+                      type="button"
+                      aria-pressed={on}
+                      aria-label={loc(c.ar, c.en, c.ckb)}
+                      title={loc(c.ar, c.en, c.ckb)}
+                      onClick={() => {
+                        if (!on) patchRow(r.key, { colorHex: c.hex });
+                      }}
+                      style={{ backgroundColor: c.hex }}
+                      className="w-7 h-7 rounded-full border border-border-subtle grid place-items-center disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                    >
+                      {on && <Check className={`w-3.5 h-3.5 ${c.hex === '#F5F5F5' || c.hex === '#F9A825' ? 'text-black' : 'text-white'}`} aria-hidden />}
+                    </button>
+                  );
+                })}
               </div>
 
               <div>
@@ -437,12 +585,38 @@ export default function GramsQuotePanel({
                     autoComplete="off"
                     placeholder={index === 0 ? '100' : ''}
                     value={r.grams}
-                    disabled={busy}
                     onChange={(e) => patchRow(r.key, { grams: e.target.value })}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && canSubmit) {
+                        e.preventDefault();
+                        scrollToPrice.current = true;
+                        void submit();
+                      }
+                    }}
                   />
                   <span className="pointer-events-none absolute inset-y-0 end-3 flex items-center text-text-muted text-[12px] leading-snug">
                     g
                   </span>
+                </div>
+                <div role="group" aria-label={t.quickGrams} className="flex flex-wrap gap-1.5 mt-2" dir="ltr">
+                  {GRAM_PRESETS.map((g) => {
+                    const on = Number(r.grams) === g;
+                    return (
+                      <button
+                        key={g}
+                        type="button"
+                        aria-pressed={on}
+                        onClick={() => {
+                          if (!on) patchRow(r.key, { grams: String(g) });
+                        }}
+                        className={`px-3 py-1.5 rounded-full border text-[12px] leading-snug tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40 ${
+                          on ? 'border-border-subtle bg-surface-raised text-text-primary font-medium shadow-1' : 'border-transparent lv-well text-text-secondary hover:text-text-primary'
+                        }`}
+                      >
+                        {g} g
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </li>
@@ -453,7 +627,6 @@ export default function GramsQuotePanel({
           <button
             type="button"
             onClick={addRow}
-            disabled={busy}
             className="w-full px-4 py-3 border-t border-border-subtle text-[13px] leading-snug text-gold flex items-center justify-center gap-2 hover:bg-surface-selected disabled:opacity-40 transition-colors"
           >
             <Plus className="w-4 h-4" aria-hidden />
@@ -473,11 +646,9 @@ export default function GramsQuotePanel({
             <button
               key={String(o.value)}
               type="button"
-              disabled={busy}
               aria-pressed={knowsTime === o.value}
               onClick={() => {
-                setKnowsTime(o.value);
-                invalidate();
+                if (knowsTime !== o.value) changeJob(() => setKnowsTime(o.value));
               }}
               className={`px-3 py-1.5 rounded-full border text-[12px] leading-snug transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40 ${
                 knowsTime === o.value ? 'border-border-subtle bg-surface-raised text-text-primary font-medium shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
@@ -504,10 +675,9 @@ export default function GramsQuotePanel({
                 autoComplete="off"
                 placeholder="4"
                 value={hours}
-                disabled={busy}
                 onChange={(e) => {
-                  setHours(e.target.value);
-                  invalidate();
+                  const v = e.target.value;
+                  changeJob(() => setHours(v));
                 }}
               />
             </div>
@@ -526,10 +696,9 @@ export default function GramsQuotePanel({
                 autoComplete="off"
                 placeholder="30"
                 value={minutes}
-                disabled={busy}
                 onChange={(e) => {
-                  setMinutes(e.target.value);
-                  invalidate();
+                  const v = e.target.value;
+                  changeJob(() => setMinutes(v));
                 }}
               />
             </div>
@@ -548,11 +717,7 @@ export default function GramsQuotePanel({
       <AccessoryPicker
         options={accessoryOptions}
         rows={accessoryRows}
-        disabled={busy}
-        onChange={(next) => {
-          setAccessoryRows(next);
-          invalidate();
-        }}
+        onChange={(next) => changeJob(() => setAccessoryRows(next))}
       />
 
       {error && (
@@ -562,49 +727,78 @@ export default function GramsQuotePanel({
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={() => void submit()}
-        disabled={!canSubmit}
-        className="lv-button lv-button-primary w-full h-12 text-[15px] leading-snug"
-      >
-        {busy ? (
-          <>
-            <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
-            {t.working}
-          </>
-        ) : (
-          <>
-            <Scale className="w-4 h-4" aria-hidden />
-            {t.calculate}
-          </>
-        )}
-      </button>
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={() => {
+            scrollToPrice.current = true;
+            void submit();
+          }}
+          disabled={!canSubmit}
+          // Once a price is on screen the next step is the request under it.
+          className={`lv-button w-full h-12 text-[15px] leading-snug ${shown ? 'lv-button-secondary' : 'lv-button-primary'}`}
+        >
+          {busy ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" aria-hidden />
+              {t.working}
+            </>
+          ) : (
+            <>
+              <Scale className="w-4 h-4" aria-hidden />
+              {shown ? t.recalc : t.calculate}
+            </>
+          )}
+        </button>
+        {shown && <p className="text-center text-text-muted text-[11px] leading-snug">{t.autoNote}</p>}
+      </div>
 
       {/* ------------------------------------------------------- the answer */}
       {result && result.quote.confidence === 'insufficient' && (
+        <>
         <p role="alert" className="lv-alert lv-alert-warning text-[12px] leading-relaxed text-text-primary flex items-start gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 mt-px" aria-hidden />
           <span>{t.insufficient}</span>
         </p>
+        {/* The notice says «send a request»: the way to do it sits under it. */}
+        {onSendRequest && (
+          <button type="button" onClick={onSendRequest} className="lv-button lv-button-primary w-full">
+            <Users className="w-4 h-4" aria-hidden />
+            {t.sendRequest}
+          </button>
+        )}
+        </>
       )}
 
-      {result && result.quote.confidence !== 'insufficient' && (
-        <section className="lv-surface-raised p-5">
-          <p className="text-[11px] leading-snug font-semibold uppercase tracking-wider text-text-muted">{t.price}</p>
+      {shown && shown.quote.confidence !== 'insufficient' && (
+        <section
+          ref={priceRef}
+          aria-busy={repricing}
+          aria-live="polite"
+          className={`lv-surface-raised p-5 scroll-mt-20 transition-opacity duration-200 motion-reduce:transition-none ${repricing ? 'opacity-60' : ''}`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] leading-snug font-semibold uppercase tracking-wider text-text-muted">{t.price}</p>
+            {repricing && (
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-gold">
+                <Loader2 className="w-3 h-3 animate-spin motion-reduce:animate-none" aria-hidden />
+                {t.updating}
+              </span>
+            )}
+          </div>
           <p className="text-text-primary font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-grams-price>
-            {money(result.quote.price_iqd)}
+            {money(shown.quote.price_iqd)}
           </p>
-          {result.quote.range_iqd.high > result.quote.range_iqd.low && (
-            <p className="text-text-secondary text-[12px] leading-snug mt-1 tabular-nums" dir="ltr">
-              {t.range}: {money(result.quote.range_iqd.low)} – {money(result.quote.range_iqd.high)}
+          {shown.quote.range_iqd.high > shown.quote.range_iqd.low && (
+            <p className="text-text-secondary text-[12px] leading-snug mt-1 tabular-nums">
+              {t.range}: <bdi dir="ltr">{money(shown.quote.range_iqd.low)}</bdi> – <bdi dir="ltr">{money(shown.quote.range_iqd.high)}</bdi>
             </p>
           )}
-          {comparison && comparison.job === pricedJob(result) && (
+          {result && comparison && comparison.job === pricedJob(result) && (
             <p className="text-text-secondary text-[12px] leading-snug mt-2" dir="auto" data-grams-price-comparison>
               {comparison.price === result.quote.price_iqd
-                ? loc(`السعر نفسه مع ${comparison.name}.`, `The same price as on ${comparison.name}.`, `${comparison.name}: ${money(comparison.price)}`)
-                : loc(`مع ${comparison.name}: ${money(comparison.price)}`, `On ${comparison.name}: ${money(comparison.price)}`, `${comparison.name}: ${money(comparison.price)}`)}
+                ? loc(`السعر نفسه مع ${comparison.name}.`, `The same price as on ${comparison.name}.`, `هەمان نرخ لەگەڵ ${comparison.name}.`)
+                : loc(`مع ${comparison.name}: ${money(comparison.price)}`, `On ${comparison.name}: ${money(comparison.price)}`, `لەگەڵ ${comparison.name}: ${money(comparison.price)}`)}
             </p>
           )}
 
@@ -612,8 +806,8 @@ export default function GramsQuotePanel({
               and never from the form, because what was charged for is not
               always what is currently typed. */}
           <AccessoryBreakdown
-            lines={result.accessories ?? []}
-            unknown={result.accessories_unknown ?? []}
+            lines={shown.accessories ?? []}
+            unknown={shown.accessories_unknown ?? []}
           />
 
           <p className="mt-3">
@@ -626,13 +820,13 @@ export default function GramsQuotePanel({
             <div className="bg-surface px-4 py-3">
               <dt className="text-text-muted text-[10px] leading-snug uppercase tracking-wider">{t.totalWeight}</dt>
               <dd className="text-text-primary text-[13px] leading-snug font-medium mt-0.5 tabular-nums" dir="ltr">
-                {result.grams_total} g
+                {shown.grams_total} g
               </dd>
             </div>
             <div className="bg-surface px-4 py-3">
               <dt className="text-text-muted text-[10px] leading-snug uppercase tracking-wider">{t.machineHours}</dt>
               <dd className="text-text-primary text-[13px] leading-snug font-medium mt-0.5 tabular-nums" dir="ltr">
-                {result.covers.material_only ? '—' : result.quote.machine_hours}
+                {shown.covers.material_only ? '—' : shown.quote.machine_hours}
               </dd>
             </div>
           </dl>
@@ -644,16 +838,27 @@ export default function GramsQuotePanel({
             offer is a rip-off. It is placed above the itemised lists, not below
             them, because it is the part that changes what the number means.
           */}
-          {result.covers.material_only && (
+          {shown.covers.material_only && (
             <p className="lv-alert lv-alert-warning mt-4 text-[12px] leading-relaxed text-text-primary">
               {t.materialOnly}
             </p>
           )}
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <CoverList title={t.includes} tone="in" codes={result.covers.included} />
-            <CoverList title={t.excludes} tone="out" codes={result.covers.excluded} />
+            <CoverList title={t.includes} tone="in" codes={shown.covers.included} />
+            <CoverList title={t.excludes} tone="out" codes={shown.covers.excluded} />
           </div>
+
+          {/* The step that ends in a print, as on the file door. */}
+          {result && onSendRequest && (
+            <div className="mt-4 pt-4 border-t border-border-subtle">
+              <button type="button" onClick={onSendRequest} className="lv-button lv-button-primary w-full">
+                <Users className="w-4 h-4" aria-hidden />
+                {t.sendRequest}
+              </button>
+              <p className="text-text-muted text-[11px] leading-relaxed mt-2.5 text-center">{t.sendNote}</p>
+            </div>
+          )}
         </section>
       )}
     </div>
