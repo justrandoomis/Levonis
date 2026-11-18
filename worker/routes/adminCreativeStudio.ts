@@ -409,6 +409,8 @@ R.put('/provider/support-assistant', requireOwner, async (c) => {
   }
   if ('guests' in body) next.guests = boolOf(body.guests);
   if ('ckb' in body) next.ckb = boolOf(body.ckb);
+  if ('wiki' in body) next.wiki = boolOf(body.wiki);
+  if ('photos' in body) next.photos = boolOf(body.photos);
   if ('daily_turns' in body) next.daily_turns = int(body.daily_turns, 'daily_turns', { min: 1, max: DAILY_TURNS_MAX });
   if ('guest_share_pct' in body) next.guest_share_pct = int(body.guest_share_pct, 'guest_share_pct', { min: 0, max: 100 });
   if ('enabled' in body) next.enabled = boolOf(body.enabled);
@@ -418,7 +420,7 @@ R.put('/provider/support-assistant', requireOwner, async (c) => {
   }
   await writeAssistAi(env.DB, next);
   await audit(env.DB, actorOf(c), 'support.assistant_ai.settings', 'supportAssistantAi', {
-    fields: Object.keys(body).filter((k) => ['enabled', 'model', 'guests', 'ckb', 'daily_turns', 'guest_share_pct'].includes(k)),
+    fields: Object.keys(body).filter((k) => ['enabled', 'model', 'guests', 'ckb', 'wiki', 'photos', 'daily_turns', 'guest_share_pct'].includes(k)),
     enabled: next.enabled,
   });
   return ok(c, await supportAssistantStatus(c));

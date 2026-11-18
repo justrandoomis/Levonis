@@ -52,6 +52,8 @@ function Body({
         ...(draft.model !== s.model ? { model: draft.model } : {}),
         guests: draft.guests,
         ckb: draft.ckb,
+        wiki: draft.wiki,
+        photos: draft.photos,
         daily_turns: draft.daily_turns,
         guest_share_pct: draft.guest_share_pct,
       });
@@ -83,6 +85,8 @@ function Body({
       </Field>
       <Switch checked={draft.guests} onChange={(v) => setDraft({ ...draft, guests: v })} label={w(S.saGuests)} disabled={busy} />
       <Switch checked={draft.ckb} onChange={(v) => setDraft({ ...draft, ckb: v })} label={w(S.saCkb)} description={w(S.saCkbHint)} disabled={busy} />
+      <Switch checked={draft.wiki} onChange={(v) => setDraft({ ...draft, wiki: v })} label={w(S.saWiki)} description={w(S.saWikiHint)} disabled={busy} />
+      <Switch checked={draft.photos} onChange={(v) => setDraft({ ...draft, photos: v })} label={w(S.saPhotos)} description={w(S.saPhotosHint)} disabled={busy} />
       <div className="grid gap-3 sm:grid-cols-2">
         <Field label={w(S.saDaily)}><Input type="number" ltr min={1} max={5000} value={draft.daily_turns} onChange={(e) => setDraft({ ...draft, daily_turns: num(e.target.value) })} /></Field>
         <Field label={w(S.saGuestShare)}><Input type="number" ltr min={0} max={100} value={draft.guest_share_pct} onChange={(e) => setDraft({ ...draft, guest_share_pct: num(e.target.value) })} /></Field>

@@ -81,6 +81,8 @@ export interface SupportAssistantDto {
   model: string | null;
   guests: boolean;
   ckb: boolean;
+  wiki: boolean;
+  photos: boolean;
   daily_turns: number;
   guest_share_pct: number;
   key_source: 'stored' | 'worker_secret' | 'none';

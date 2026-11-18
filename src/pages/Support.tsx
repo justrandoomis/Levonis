@@ -1830,11 +1830,36 @@ export default function Support() {
     attachedSinceOpen.current += 1;
     setAttachments((prev) => (prev.some((x) => x.key === a.key) ? prev : [...prev, a].slice(0, ATTACH_MAX)));
     setMessages((prev) => [...prev, { role: 'user', text: '', attachments: [a] }]);
+    if (a.kind === 'image' && isAuthenticated) void readPhoto(a.key);
+  };
+  /**
+   * A PHOTO MAY BE READ (DECISIONS row 349): when the owner turned Claude and
+   * photos on, the server reads an HMS screen or a fault and answers. `reply:
+   * null` (off, a cap, a failure) leaves the page's own acknowledgement below.
+   */
+  const photosRead = useRef(0);
+  const readPhoto = async (key: string) => {
+    try {
+      const d = await api.post<{ reply: AsstReply | null }>('/api/support/assistant', {
+        photo_key: key,
+        context: contextRef.current,
+        locale: lang,
+        history: chatHistory(messagesRef.current),
+      });
+      if (!d.reply) return;
+      photosRead.current += 1;
+      setMessages((prev) => [...prev, { role: 'assistant', text: d.reply!.text, reply: d.reply! }]);
+    } catch {
+      // The photo is still attached for the ticket; the acknowledgement says so.
+    }
   };
   const closeAttach = () => {
     setAttachOpen(false);
     if (attachedSinceOpen.current === 0) return;
+    const allRead = photosRead.current >= attachedSinceOpen.current;
     attachedSinceOpen.current = 0;
+    photosRead.current = 0;
+    if (allRead) return;
     setMessages((prev) => {
       const last = [...prev].reverse().find((m) => m.role === 'assistant' && m.reply?.intent !== 'attach_ack');
       const choices = last?.reply?.choices;

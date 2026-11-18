@@ -21,6 +21,10 @@ export interface AssistAiSettings {
   guests: boolean;
   /** Sorani customers get Claude replies (off by default: Sorani is never machine-written unless the owner says so). */
   ckb: boolean;
+  /** Claude looks printer error codes up on the makers' wikis (DECISIONS row 349). On unless the owner turns it off. */
+  wiki: boolean;
+  /** Claude reads a photo a signed-in customer attaches (DECISIONS row 349). On unless the owner turns it off. */
+  photos: boolean;
   /** Claude-answered turns per UTC day, the whole shop together. */
   daily_turns: number;
   /** The share of `daily_turns` signed-out customers may use, in percent. */
@@ -36,6 +40,8 @@ export const ASSIST_AI_OFF: AssistAiSettings = Object.freeze({
   model: null,
   guests: true,
   ckb: false,
+  wiki: true,
+  photos: true,
   daily_turns: DAILY_TURNS_DEFAULT,
   guest_share_pct: GUEST_SHARE_DEFAULT,
 }) as AssistAiSettings;
@@ -62,6 +68,8 @@ export function assistAiFromSetting(value: string | null | undefined): AssistAiS
     model,
     guests: o.guests !== false,
     ckb: o.ckb === true,
+    wiki: o.wiki !== false,
+    photos: o.photos !== false,
     daily_turns: intIn(o.daily_turns, 1, DAILY_TURNS_MAX, DAILY_TURNS_DEFAULT),
     guest_share_pct: intIn(o.guest_share_pct, 0, 100, GUEST_SHARE_DEFAULT),
   };
@@ -83,6 +91,8 @@ export async function writeAssistAi(db: D1Database, s: AssistAiSettings): Promis
     model: s.model,
     guests: s.guests,
     ckb: s.ckb,
+    wiki: s.wiki,
+    photos: s.photos,
     daily_turns: s.daily_turns,
     guest_share_pct: s.guest_share_pct,
   });

@@ -58,7 +58,8 @@ import { handleTurn, ownedPrinterNamed } from '../lib/assist/orchestrator';
 import { readContext, SHOWN_MAX } from '../lib/assist/context';
 import { viewerFor } from '../lib/assist/viewer';
 import { callTool } from '../lib/assist/registry';
-import { readHistory, runAiTurn, SORANI_ONLY, type AiRoute, type ProductFact } from '../lib/assist/ai/claude';
+import { ERROR_CODE_MENTION, readHistory, runAiTurn, SORANI_ONLY, type AiRoute, type ProductFact } from '../lib/assist/ai/claude';
+import { loadPhoto, ownedPhotoKey, type ClaudeImage } from '../lib/assist/ai/photo';
 import { readAssistAi } from '../lib/assist/ai/settings';
 import { reserveTurn } from '../lib/assist/ai/budget';
 import { ownDevices, type DeviceLite } from '../lib/assist/tools/devices';
@@ -2824,17 +2825,26 @@ async function consultClaude(
   text: string,
   loc: Locale,
   user: SessionUser | null,
-  rawHistory: unknown
+  rawHistory: unknown,
+  opts: { photoKey?: string; codeOnly?: boolean } = {}
 ): Promise<{ kind: 'reply'; reply: AssistantReply } | { kind: 'route'; route: AiRoute } | null> {
   try {
-    if (text.trim().length < 2) return null;
+    if (!opts.photoKey && text.trim().length < 2) return null;
     const settings = await readAssistAi(c.env.DB);
     if (!settings.enabled || !settings.model) return null;
+    // An error code ahead of the rules only when the wiki lookup is what answers it.
+    if (opts.codeOnly && !settings.wiki) return null;
+    if (opts.photoKey && !settings.photos) return null;
     if (!user && !settings.guests) return null;
     if (!settings.ckb && (loc === 'ckb' || SORANI_ONLY.test(text))) return null;
     const ip = c.req.header('CF-Connecting-IP') || 'unknown';
     const caps = { daily: settings.daily_turns, guestSharePct: settings.guest_share_pct };
     if (!(await reserveTurn(c.env.DB, { userId: user?.id ?? null, ip }, caps))) return null;
+    let image: ClaudeImage | null = null;
+    if (opts.photoKey) {
+      image = await loadPhoto(c.env, opts.photoKey);
+      if (!image) return null;
+    }
     const viewer = viewerFor(c.env.DB, user?.id ?? null, loc);
     const cardsById = new Map<string, AssistantCard>();
     const out = await runAiTurn(c.env, {
@@ -2843,6 +2853,8 @@ async function consultClaude(
       loc,
       history: readHistory(rawHistory),
       signedIn: !!user,
+      wiki: settings.wiki,
+      image,
       search: async (query) => {
         const r = await callTool('catalog.search', c.env.DB, viewer, { text: query, limit: 8 }).catch(() => null);
         if (!r?.ok) return [];
@@ -2892,6 +2904,30 @@ supportRoutes.post('/assistant', async (c) => {
    * reaches it.
    */
   const context = readContext(body.context);
+
+  /**
+   * A PHOTO THE CUSTOMER JUST ATTACHED (DECISIONS row 349). Claude reads it —
+   * an HMS screen, an app error, a fault — when the owner allows photos and
+   * the photo is this signed-in customer's own upload. Otherwise `reply: null`,
+   * and the page says its own «استلمت المرفق» exactly as before.
+   */
+  if (body.photo_key !== undefined) {
+    const photoKey = ownedPhotoKey(body.photo_key, user?.id ?? null);
+    const ai = photoKey ? await consultClaude(c, freeText, loc, user ?? null, body.history, { photoKey }) : null;
+    return c.json({ success: true, reply: ai?.kind === 'reply' ? { ...ai.reply, ...(body.context !== undefined ? { context } : {}) } : null });
+  }
+
+  /**
+   * AN ERROR CODE TYPED (DECISIONS row 349): «HMS 0300-0D00-0001-0003»,
+   * «Error 2000», «E0011». The rules can only file it for the team; Claude can
+   * read the maker's wiki and say what it means. Tried first when the wiki
+   * lookup is on; a refusal of any kind falls through to the rules below.
+   */
+  if (freeText && typeof body.intent !== 'string' && ERROR_CODE_MENTION.test(freeText)) {
+    const ai = await consultClaude(c, freeText, loc, user ?? null, body.history, { codeOnly: true });
+    if (ai?.kind === 'reply') return c.json({ success: true, reply: { ...ai.reply, context } });
+  }
+
   const chipIntent = typeof body.intent === 'string' && (INTENTS as readonly string[]).includes(body.intent) ? body.intent : null;
   /**
    * «طابعتي A1 من عندكم», «عندي اي ون»: a printer named alone by the one who

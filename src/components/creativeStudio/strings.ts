@@ -541,6 +541,14 @@ export const S = {
   saGuests: t('للزوار غير المسجلين أيضًا', 'For signed-out visitors too', 'بۆ سەردانکەرانی چوونەژوورنەکردووش'),
   saCkb: t('الرد بالكردية السورانية', 'Reply in Sorani Kurdish', 'وەڵامدانەوە بە کوردیی سۆرانی'),
   saCkbHint: t('مطفأ: عملاء السورانية يبقون على المساعد العادي.', 'Off: Sorani customers keep the rule-based assistant.', 'کوژاوە: کڕیارانی سۆرانی لەسەر یاریدەدەری ئاسایی دەمێننەوە.'),
+  saWiki: t('اقرأ رموز أخطاء الطابعات من مواقع الشركات', "Look printer error codes up on the makers' wikis", 'کۆدی هەڵەی چاپکەرەکان لە ویکیی کۆمپانیاکان بخوێنەوە'),
+  saWikiHint: t(
+    'رموز HMS وأخطاء Bambu Lab وSnapmaker وCreality: يبحث Claude في wiki.bambulab.com وwiki.snapmaker.com وwiki.creality.com فقط. يكلّف أكثر من الرد العادي.',
+    'HMS and error codes of Bambu Lab, Snapmaker and Creality: Claude searches wiki.bambulab.com, wiki.snapmaker.com and wiki.creality.com only. Costs more than a normal reply.',
+    'کۆدەکانی HMS و هەڵەکانی Bambu Lab و Snapmaker و Creality: Claude تەنها لە wiki.bambulab.com و wiki.snapmaker.com و wiki.creality.com دەگەڕێت. لە وەڵامی ئاسایی گرانترە.'
+  ),
+  saPhotos: t('اقرأ صور الأعطال التي يرفقها العميل', 'Read fault photos the customer attaches', 'وێنەی تێکچوونەکان بخوێنەوە کە کڕیار هاوپێچی دەکات'),
+  saPhotosHint: t('للعملاء المسجلين فقط. لا تُخزَّن أي قراءة للصورة.', 'Signed-in customers only. Nothing read from a photo is stored.', 'تەنها بۆ کڕیارانی چوونەژوورەوە. هیچ شتێک لە وێنەکە هەڵناگیرێت.'),
   saDaily: t('حد الردود اليومي للمتجر كله', 'Daily reply limit, whole shop', 'سنووری ڕۆژانەی وەڵامەکان، بۆ هەموو فرۆشگاکە'),
   saGuestShare: t('حصة الزوار من الحد (%)', "Visitors' share of the limit (%)", 'بەشی سەردانکەران لە سنوورەکە (%)'),
   saToday: t('اليوم: {n} رد ({g} للزوار)', 'Today: {n} replies ({g} to visitors)', 'ئەمڕۆ: {n} وەڵام ({g} بۆ سەردانکەران)'),
