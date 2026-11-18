@@ -246,6 +246,7 @@ test('the page draws its sections from the admin list, in the list’s order, he
     ['printer_finder', '<PrinterFinder'],
     ['latest_products', '<LatestProducts'],
     ['editorial_banners', '<EditorialBanners'],
+    ['in_stock', '<InStockNow'],
     ['services', '<ServicesGrid'],
   ]) {
     assert.match(home, new RegExp(`${id}: \\(\\) =>[\\s\\S]*?${el}`), `${id} renders ${el}`);
@@ -255,7 +256,7 @@ test('the page draws its sections from the admin list, in the list’s order, he
 
 test('everything below the first screen is its own lazy chunk', () => {
   const home = read('src/pages/Home.tsx');
-  for (const name of ['LatestProducts', 'EditorialBanners', 'ServicesGrid']) {
+  for (const name of ['LatestProducts', 'EditorialBanners', 'InStockNow', 'ServicesGrid']) {
     assert.match(home, new RegExp(`const ${name} = React\\.lazy\\(\\(\\) => import\\(`), `${name} must be lazy`);
     assert.doesNotMatch(home, new RegExp(`^import ${name} from`, 'm'), `${name} must not be a static import`);
   }

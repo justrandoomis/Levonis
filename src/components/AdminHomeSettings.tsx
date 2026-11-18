@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
 import { api, ApiError, uploadFile } from '../lib/api';
 import type { BentoPosition, SiteMediaEntry } from '../lib/api';
-import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle, RotateCcw, Pin, LayoutGrid, Search, PackageSearch, Wrench, Sparkles } from 'lucide-react';
+import { GripVertical, Plus, Settings, Eye, EyeOff, Save, Trash2, LayoutTemplate, Megaphone, Image as ImageIcon, ArrowLeft, ArrowRight, ChevronUp, ChevronDown, Upload, Check, AlertTriangle, RotateCcw, Pin, LayoutGrid, Search, PackageSearch, Wrench, Sparkles, PackageCheck } from 'lucide-react';
 import AdminAds from './AdminAds';
 import {
   HERO_SLIDE_GROUPS,
@@ -162,6 +162,7 @@ const SECTION_ICONS: Record<HomeSectionId, React.ElementType> = {
   printer_finder: Search,
   latest_products: PackageSearch,
   editorial_banners: ImageIcon,
+  in_stock: PackageCheck,
   services: Wrench,
 };
 
@@ -514,6 +515,13 @@ export default function AdminHomeSettings() {
             dir={dir}
             ar="«أحدث المنتجات» تُملأ تلقائيًا بأحدث المنتجات المنشورة، المتوفرة للبيع المباشر أولًا. يمكنك تحريكها أو إخفاؤها من تبويب الترتيب."
             en="“Latest products” fills itself with the newest published products, those available for direct sale first. Move or hide it from the Layout tab."
+          />
+        )}
+        {activeTab === 'in_stock' && (
+          <InfoPanel
+            dir={dir}
+            ar="«متوفر الآن» تُملأ تلقائيًا بالمنتجات المتوفرة للبيع المباشر الآن فقط، مع زر لكل فئة فيها مخزون. لا تظهر إذا لم يكن هناك منتج متوفر. يمكنك تحريكها أو إخفاؤها من تبويب الترتيب."
+            en="“In stock now” fills itself with the products available for direct sale right now, with a chip for each catalog that has stock. It is hidden when nothing is in stock. Move or hide it from the Layout tab."
           />
         )}
         {activeTab === 'services' && (

@@ -256,7 +256,7 @@ const LIVE_STORED = [
 
 test('the admin list is the page’s sections: hero and ticker pinned first, the rest movable', () => {
   assert.deepEqual(HOME_SECTIONS.map((s) => s.id), [
-    'hero', 'ads_panel', 'categories', 'printer_finder', 'latest_products', 'editorial_banners', 'services',
+    'hero', 'ads_panel', 'categories', 'printer_finder', 'latest_products', 'editorial_banners', 'in_stock', 'services',
   ]);
   assert.deepEqual(HOME_SECTIONS.filter((s) => s.pinned).map((s) => s.id), ['hero', 'ads_panel']);
 });
@@ -264,14 +264,25 @@ test('the admin list is the page’s sections: hero and ticker pinned first, the
 test('an old stored list maps onto the current sections without losing a hide choice', () => {
   const rows = normalizeHomeSections([...LIVE_STORED, { id: 'ads_panel', isVisible: false }, { id: 'editorial_banners', isVisible: false }]);
   assert.deepEqual(rows.map((r) => r.id), [
-    'hero', 'ads_panel', 'categories', 'editorial_banners', 'printer_finder', 'latest_products', 'services',
-  ], 'pinned first; the stored order for what was stored; new sections appended');
+    'hero', 'ads_panel', 'categories', 'editorial_banners', 'in_stock', 'printer_finder', 'latest_products', 'services',
+  ], 'pinned first; the stored order for what was stored; new sections appended — «متوفر الآن» right after the banners');
   assert.equal(rows.find((r) => r.id === 'editorial_banners')?.isVisible, false, 'a hidden section stays hidden');
   assert.equal(rows.find((r) => r.id === 'ads_panel')?.isVisible, true, 'the first entry for an id wins');
   assert.equal(rows.find((r) => r.id === 'printer_finder')?.isVisible, true, 'a never-saved section is shown');
   assert.equal(slideGroupVisible(LIVE_STORED, 'second_banner'), false, 'a hidden slide group stays hidden');
   assert.equal(slideGroupVisible(LIVE_STORED, 'first_banner'), true);
   assert.equal(slideGroupVisible([], 'first_banner'), true);
+});
+
+test('«متوفر الآن» lands just below the banners in an order the owner saved before it existed', () => {
+  const saved = ['categories', 'printer_finder', 'latest_products', 'editorial_banners', 'services'].map((id) => ({ id, isVisible: true }));
+  assert.deepEqual(normalizeHomeSections(saved).map((r) => r.id), [
+    'hero', 'ads_panel', 'categories', 'printer_finder', 'latest_products', 'editorial_banners', 'in_stock', 'services',
+  ]);
+  const moved = [...saved.filter((s) => s.id !== 'services'), { id: 'in_stock', isVisible: false }, { id: 'services', isVisible: true }];
+  const rows = normalizeHomeSections([moved[4], ...moved.slice(0, 4), moved[5]]);
+  assert.equal(rows.find((r) => r.id === 'in_stock')?.isVisible, false, 'once saved, its own switch and place win');
+  assert.equal(rows[2].id, 'in_stock');
 });
 
 test('saving writes the current sections and the slide-group switches, and drops retired ids', () => {
@@ -295,7 +306,7 @@ test('the admin panel has no editor left for a section the page does not draw', 
   }
   assert.doesNotMatch(admin, /GenericSectionSettings|INITIAL_SECTIONS|DATA_DRIVEN_SECTIONS/);
   assert.match(admin, /HOME_SECTIONS\.map\(\(section\) => tabButton\(section\.id/, 'one tab per live section');
-  for (const id of ['hero', 'ads_panel', 'categories', 'editorial_banners', 'printer_finder', 'latest_products', 'services']) {
+  for (const id of ['hero', 'ads_panel', 'categories', 'editorial_banners', 'printer_finder', 'latest_products', 'in_stock', 'services']) {
     assert.match(admin, new RegExp(`activeTab === '${id}' && \\(`), `the ${id} tab renders a panel — its gear button works`);
   }
   assert.match(admin, /<HomePhotoPairs/, 'the light/dark picture pairs are in the pictures tab');

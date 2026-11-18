@@ -12,7 +12,8 @@ import { normalizeHomeSections, slideGroupVisible, type HomeSectionId } from '..
  * HOMEPAGE V2 — the owner's spec board (docs/design/home-v2-*.png), in this
  * exact order: top controls → search → hero → ticker → «تسوق حسب الفئة» →
  * «محتار أي طابعة تناسبك؟» → «أحدث المنتجات» → two editorial banners →
- * services → the bottom bar. (Levo Community's project cards come between
+ * «متوفر الآن» (owner, 2026-11-18) → services → the bottom bar. (Levo
+ * Community's project cards come between
  * the banners and the services in the spec; the shop has no community posts
  * with likes and comments to draw them from, so that section is not drawn —
  * see docs/DECISIONS.md.)
@@ -29,6 +30,7 @@ import { normalizeHomeSections, slideGroupVisible, type HomeSectionId } from '..
  */
 const LatestProducts = React.lazy(() => import('../components/home/v2/LatestProducts'));
 const EditorialBanners = React.lazy(() => import('../components/home/v2/EditorialBanners'));
+const InStockNow = React.lazy(() => import('../components/home/v2/InStockNow'));
 const ServicesGrid = React.lazy(() => import('../components/home/ServicesGrid'));
 import { ErrorState, EmptyState } from '../components/ui/AsyncStates';
 import { markHomeCriticalReady } from '../lib/appBootstrap';
@@ -226,6 +228,14 @@ export default function Home() {
         <DeferredHomeSection ready={secondaryReady} fallback={<EditorialPlaceholder count={editorial.length} />}>
           <Suspense fallback={<EditorialPlaceholder count={editorial.length} />}>
             <EditorialBanners cards={editorial} />
+          </Suspense>
+        </DeferredHomeSection>
+      ) : null,
+    in_stock: () =>
+      !initialLoading && loadError == null ? (
+        <DeferredHomeSection ready={secondaryReady} fallback={<div aria-hidden="true" className="h-[330px]" />}>
+          <Suspense fallback={<div aria-hidden="true" className="h-[330px]" />}>
+            <InStockNow tree={categories} />
           </Suspense>
         </DeferredHomeSection>
       ) : null,

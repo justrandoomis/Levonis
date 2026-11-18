@@ -33,6 +33,7 @@ export type HomeSectionId =
   | 'printer_finder'
   | 'latest_products'
   | 'editorial_banners'
+  | 'in_stock'
   | 'services';
 
 export interface HomeSectionDef {
@@ -41,6 +42,13 @@ export interface HomeSectionDef {
   titleEn: string;
   /** Always first, in this order; can be hidden, cannot be moved. */
   pinned?: boolean;
+  /**
+   * A section added AFTER the owner first saved the order: when the stored
+   * list does not name it yet, it goes in right after this one instead of at
+   * the end — so it appears where the owner asked for it, not under the
+   * services. Once saved, the stored position wins like any other.
+   */
+  after?: HomeSectionId;
 }
 
 /** In the order of the owner's spec board — the default when nothing is stored. */
@@ -51,6 +59,8 @@ export const HOME_SECTIONS: readonly HomeSectionDef[] = [
   { id: 'printer_finder', titleAr: 'محتار أي طابعة تناسبك؟', titleEn: 'Printer finder' },
   { id: 'latest_products', titleAr: 'أحدث المنتجات', titleEn: 'Latest products' },
   { id: 'editorial_banners', titleAr: 'البانرات التحريرية', titleEn: 'Editorial banners' },
+  // Owner, 2026-11-18: «متوفر الآن» just below the two banners.
+  { id: 'in_stock', titleAr: 'متوفر الآن', titleEn: 'In stock now', after: 'editorial_banners' },
   { id: 'services', titleAr: 'الخدمات', titleEn: 'Services' },
 ] as const;
 
@@ -100,7 +110,8 @@ function rows(stored: unknown): StoredSection[] {
 /**
  * The stored list, read as the CURRENT sections: pinned ones first in their
  * fixed order, then the movable ones in the owner's stored order, then any
- * section the owner has never saved (appended in spec order, visible).
+ * section the owner has never saved (appended in spec order, visible — or
+ * placed after its `after` section when that one is in the list).
  */
 export function normalizeHomeSections(stored: unknown): HomeSectionRow[] {
   const seen = new Map<HomeSectionId, boolean>();
@@ -111,7 +122,12 @@ export function normalizeHomeSections(stored: unknown): HomeSectionRow[] {
     seen.set(id, s.isVisible !== false);
     order.push(id);
   }
-  for (const d of HOME_SECTIONS) if (!seen.has(d.id)) order.push(d.id);
+  for (const d of HOME_SECTIONS) {
+    if (seen.has(d.id)) continue;
+    const at = d.after ? order.indexOf(d.after) : -1;
+    if (at >= 0) order.splice(at + 1, 0, d.id);
+    else order.push(d.id);
+  }
   const pinned = HOME_SECTIONS.filter((d) => d.pinned).map((d) => d.id);
   const movable = order.filter((id) => !DEFS.get(id)!.pinned);
   return [...pinned, ...movable].map((id) => ({ ...DEFS.get(id)!, isVisible: seen.get(id) ?? true }));
