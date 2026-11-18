@@ -124,6 +124,16 @@ export const REQUEST_TIMEOUT_MS = 25_000;
 /** A wiki lookup or a photo: the provider searches and reads a page inside the same request. */
 export const LOOKUP_TIMEOUT_MS = 70_000;
 export const MAX_TOOL_ROUNDS = 3;
+/**
+ * THE WHOLE TURN'S DEADLINE (owner, 2026-11-18: «the reply does not reach,
+ * try again»). Every round gets only what is left of it, so a slow provider
+ * ends in the rules' own answer instead of a page that gave up waiting. The
+ * page waits ASSIST_CLIENT_TIMEOUT_MS (src/pages/Support.tsx), longer than both.
+ */
+export const TURN_BUDGET_MS = 40_000;
+export const LOOKUP_TURN_BUDGET_MS = 75_000;
+/** Less than this left is not worth a call: the rules answer instead. */
+const MIN_CALL_MS = 4_000;
 /** `pause_turn`: a long server-side lookup handed back to be continued, at most this many times. */
 const MAX_CONTINUES = 2;
 export const REPLY_MAX = 2_000;
@@ -315,11 +325,17 @@ export async function runAiTurn(
     ];
   }
   const lookup = turn.wiki || !!turn.image;
+  const deadline = started + (lookup ? LOOKUP_TURN_BUDGET_MS : TURN_BUDGET_MS);
   const system = systemPrompt(turn.loc, turn.signedIn, turn.wiki);
   let continues = 0;
   try {
     for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
       const lastRound = round === MAX_TOOL_ROUNDS;
+      const left = deadline - Date.now();
+      if (left < MIN_CALL_MS) {
+        logTurn('TURN_DEADLINE', round, usage, Date.now() - started);
+        return null;
+      }
       const res = await createRawMessage(
         env,
         {
@@ -333,7 +349,7 @@ export async function runAiTurn(
           ...toolsFor(lastRound, turn.wiki),
           output_config: { format: { type: 'json_schema', schema: OUTPUT_SCHEMA } },
         },
-        lookup ? LOOKUP_TIMEOUT_MS : REQUEST_TIMEOUT_MS,
+        Math.min(lookup ? LOOKUP_TIMEOUT_MS : REQUEST_TIMEOUT_MS, left),
         transport
       );
       if (!res.ok) {

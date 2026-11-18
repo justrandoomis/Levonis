@@ -49,6 +49,15 @@ const loadEstimateWords = () => import('../../packages/contracts/src/priceEstima
 
 /** A ticket takes at most this many assistant attachments (worker/lib/assist/attachments.ts). */
 const ATTACH_MAX = 6;
+/**
+ * How long a chat turn may take (owner, 2026-11-18: «the reply does not reach
+ * the server, try again»). A Claude reply that reads a maker's wiki or a photo
+ * runs up to 75 s on the server (LOOKUP_TURN_BUDGET_MS); the page's usual 20 s
+ * gave up first and blamed the connection for an answer that was coming.
+ */
+const ASSIST_CLIENT_TIMEOUT_MS = 90_000;
+/** After this long the waiting line says it may take up to a minute. */
+const ASSIST_SLOW_MS = 8_000;
 /** How much of the transcript survives a reload in this tab. */
 const TRANSCRIPT_KEEP = 40;
 
@@ -187,6 +196,7 @@ const STRINGS = {
     inputPlaceholder: 'اكتب سؤالك...',
     send: 'إرسال',
     thinking: 'جارٍ البحث...',
+    thinkingLong: 'ما زلت أبحث — قد يستغرق ذلك حتى دقيقة.',
     netError: 'تعذر الاتصال بالخادم — حاول مرة أخرى.',
     aiNote: 'رد آلي ذكي — قد يخطئ أحيانًا. للتأكد تحدث مع الفريق.',
     openTicketCta: 'إنشاء تذكرة دعم',
@@ -288,6 +298,7 @@ const STRINGS = {
     inputPlaceholder: 'Type your question...',
     send: 'Send',
     thinking: 'Looking that up...',
+    thinkingLong: 'Still looking — this can take up to a minute.',
     netError: 'Could not reach the server — please try again.',
     aiNote: 'Automatic smart reply — it can make mistakes. Talk to the team to be sure.',
     openTicketCta: 'Create a support ticket',
@@ -376,6 +387,7 @@ const STRINGS = {
     inputPlaceholder: 'پرسیارەکەت بنووسە...',
     send: 'ناردن',
     thinking: 'گەڕان بەردەوامە...',
+    thinkingLong: 'هێشتا دەگەڕێم — لەوانەیە تا خولەکێک بخایەنێت.',
     netError: 'پەیوەندی بە ڕاژەکار نەکرا — دووبارە هەوڵ بدەرەوە.',
     aiNote: 'وەڵامی خۆکاری زیرەک — لەوانەیە هەڵە بکات. بۆ دڵنیابوون لەگەڵ تیمەکە قسە بکە.',
     openTicketCta: 'دروستکردنی تیکێتی پشتگیری',
@@ -1659,6 +1671,18 @@ export default function Support() {
   const attachedSinceOpen = useRef(0);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  /** Photos Claude is reading right now (DECISIONS row 349): the waiting line shows for them too. */
+  const [photoReads, setPhotoReads] = useState(0);
+  const waiting = busy || photoReads > 0;
+  const [slowWait, setSlowWait] = useState(false);
+  useEffect(() => {
+    if (!waiting) {
+      setSlowWait(false);
+      return;
+    }
+    const t = setTimeout(() => setSlowWait(true), ASSIST_SLOW_MS);
+    return () => clearTimeout(t);
+  }, [waiting]);
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [ticketsRefresh, setTicketsRefresh] = useState(0);
   /**
@@ -1776,7 +1800,7 @@ export default function Support() {
            * never an error bubble. Nothing is stored server-side.
            */
           ...(payload.text !== undefined ? { history: chatHistory(messagesRef.current) } : {}),
-        });
+        }, { timeoutMs: ASSIST_CLIENT_TIMEOUT_MS });
         pendingRef.current = d.reply.expects;
         if (d.reply.context !== undefined) {
           contextRef.current = d.reply.context;
@@ -1839,18 +1863,25 @@ export default function Support() {
    */
   const photosRead = useRef(0);
   const readPhoto = async (key: string) => {
+    setPhotoReads((n) => n + 1);
     try {
-      const d = await api.post<{ reply: AsstReply | null }>('/api/support/assistant', {
-        photo_key: key,
-        context: contextRef.current,
-        locale: lang,
-        history: chatHistory(messagesRef.current),
-      });
+      const d = await api.post<{ reply: AsstReply | null }>(
+        '/api/support/assistant',
+        {
+          photo_key: key,
+          context: contextRef.current,
+          locale: lang,
+          history: chatHistory(messagesRef.current),
+        },
+        { timeoutMs: ASSIST_CLIENT_TIMEOUT_MS }
+      );
       if (!d.reply) return;
       photosRead.current += 1;
       setMessages((prev) => [...prev, { role: 'assistant', text: d.reply!.text, reply: d.reply! }]);
     } catch {
       // The photo is still attached for the ticket; the acknowledgement says so.
+    } finally {
+      setPhotoReads((n) => Math.max(0, n - 1));
     }
   };
   const closeAttach = () => {
@@ -2134,7 +2165,11 @@ export default function Support() {
               </div>
             ))}
 
-            {busy && <div className="text-xs text-text-muted px-1">{s.thinking}</div>}
+            {(busy || photoReads > 0) && (
+              <div className="text-xs text-text-muted px-1" data-assist-waiting={slowWait ? 'long' : 'short'}>
+                {slowWait ? s.thinkingLong : s.thinking}
+              </div>
+            )}
 
             {showTicketForm && (
               <TicketForm

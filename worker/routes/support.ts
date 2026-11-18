@@ -2853,7 +2853,9 @@ async function consultClaude(
       loc,
       history: readHistory(rawHistory),
       signedIn: !!user,
-      wiki: settings.wiki,
+      // The makers' wikis only for an error code or a photo: an ordinary
+      // question is answered without a web lookup, in seconds (not a minute).
+      wiki: settings.wiki && (!!opts.codeOnly || !!image || ERROR_CODE_MENTION.test(text)),
       image,
       search: async (query) => {
         const r = await callTool('catalog.search', c.env.DB, viewer, { text: query, limit: 8 }).catch(() => null);

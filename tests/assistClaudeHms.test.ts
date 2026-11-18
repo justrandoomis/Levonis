@@ -161,3 +161,50 @@ test('a photo that is not theirs, or with photos off, is never sent: reply null'
     done();
   }
 });
+
+test('an ordinary question is answered without the wikis, inside the shorter deadline', async () => {
+  // Words the rules do not understand and that name no error code.
+  const sent = provider([final({ reply: 'أكيد، أشرحلك.', product_ids: [], route: 'none' })]);
+  try {
+    const db = await shop(ON);
+    const reply = (await json(await ask(db, member, { text: 'شنو احسن شي للمبتدئ يطبع بالبيت وما يسوي ريحة' }))).reply as Rec;
+    assert.equal(reply.mode, 'ai');
+    assert.equal(sent.length, 1);
+    const server = ((sent[0].tools as Rec[] | undefined) ?? []).filter((t) => typeof t.type === 'string');
+    assert.deepEqual(server, [], 'no web lookup for a question without a code');
+  } finally {
+    done();
+  }
+});
+
+test('a turn that has spent its budget ends in the rules, not a page that gives up waiting', async () => {
+  const { runAiTurn, TURN_BUDGET_MS, LOOKUP_TURN_BUDGET_MS } = await import('../worker/lib/assist/ai/claude');
+  assert.ok(TURN_BUDGET_MS < LOOKUP_TURN_BUDGET_MS && LOOKUP_TURN_BUDGET_MS <= 80_000, 'the page waits 90 s, longer than any turn');
+  const realNow = Date.now;
+  let skew = 0;
+  Date.now = () => realNow() + skew;
+  const sent: Rec[] = [];
+  const transport = {
+    fetchImpl: (async (_url: string, init: RequestInit) => {
+      sent.push(JSON.parse(String(init.body)));
+      // The first round asks for a search, and by the time it answers the turn's budget is gone.
+      skew = TURN_BUDGET_MS;
+      return new Response(
+        JSON.stringify({ stop_reason: 'tool_use', usage, content: [{ type: 'tool_use', id: 'tu_1', name: 'search_products', input: { query: 'A1' } }] }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+    }) as typeof fetch,
+  };
+  try {
+    const db = await shop(ON);
+    const out = await runAiTurn(
+      { DB: db, ANTHROPIC_API_KEY: KEY } as never,
+      { model: 'test-model-1', text: 'سؤال', loc: 'ar', history: [], signedIn: true, wiki: false, search: async () => [] } as never,
+      transport as never
+    );
+    assert.equal(out, null, 'the rules answer');
+    assert.equal(sent.length, 1, 'no second round after the budget is spent');
+  } finally {
+    Date.now = realNow;
+  }
+});
