@@ -112,3 +112,24 @@ test('the admin editor is mounted under print pricing and writes the audited rou
   const index = read('worker/index.ts');
   assert.match(index, /app\.route\('\/api\/admin\/print-quote', adminPrintQuoteRoutes\);/);
 });
+
+test('settings reprice by themselves once, after they settle, and never leave a price looking current', () => {
+  const tools = read('src/pages/Tools.tsx');
+  // One measure call per settled decision (the route allows 40 an hour).
+  assert.match(tools, /const t = setTimeout\(\(\) => \{\s*setAutoRecalc\(false\);\s*void calculate\(\);\s*\}, 600\);/);
+  // A manual press during the wait IS that reprice: the timer may not repeat it.
+  const calc = tools.slice(tools.indexOf('const calculate = useCallback'), tools.indexOf('const busy ='));
+  assert.match(calc, /setAutoRecalc\(false\);\s*invalidate\(\);/);
+  // The measure and the price land together, so the card does not blink out mid-reprice.
+  assert.ok(calc.indexOf('setAnalysis(measured.analysis)') > calc.indexOf('await quoteAnalysis'));
+  // The previous answer is shown only while a reprice is pending, dimmed and aria-busy.
+  assert.match(tools, /const repricing = !fresh && stale !== null && \(autoRecalc \|\| busy\);/);
+  assert.match(tools, /aria-busy=\{repricing\}/);
+  // A printer that runs none of the materials cannot leave «updating» on screen.
+  assert.match(tools, /if \(!usableMaterials\.length\) \{[\s\S]{0,200}setAutoRecalc\(false\);/);
+});
+
+test('a material with no shop price still offers the request its notice tells the customer to send', () => {
+  const tools = read('src/pages/Tools.tsx');
+  assert.match(tools, /\{quote && quote\.confidence === 'insufficient' && !requestsClosed && \(\s*<button type="button" onClick=\{\(\) => navigate\('\/requests'\)\}/);
+});

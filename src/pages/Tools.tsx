@@ -96,6 +96,22 @@ const ACCEPT = '.stl,.3mf,.obj,.step,.stp,.amf,.glb,.gltf';
 
 const STRINGS = {
   ar: {
+    stepFile: 'الملف',
+    stepSettings: 'الإعدادات',
+    stepPrice: 'السعر',
+    dropHere: 'أفلت الملف هنا',
+    updating: 'يجري تحديث السعر…',
+    autoNote: 'يتحدّث السعر وحده عندما تغيّر أي إعداد.',
+    hintDraft: 'طبقات أسمك: أسرع وأرخص، والسطح أخشن.',
+    hintStandardQ: 'التوازن المعتاد بين نعومة السطح وزمن الطباعة.',
+    hintFine: 'طبقات أرقّ: سطح أنعم وزمن أطول.',
+    hintLight: 'جدران وحشوة أقل: للمجسمات والديكور.',
+    hintStandardS: 'مناسبة لأغلب القطع.',
+    hintStrong: 'جدران وحشوة أكثر: للقطع التي تتحمّل حملًا.',
+    hintSupportsOn: 'تسند الأجزاء المعلّقة وتُزال بعد الطباعة.',
+    hintSupportsOff: 'فقط إن كان المجسم لا يحتاجها.',
+    increase: 'زيادة',
+    decrease: 'إنقاص',
     title: 'احسب سعر طباعتك',
     lead: 'ارفع ملف المجسم، ونقيسه ونحسب لك تقديرًا للسعر.',
     pick: 'اختر ملف المجسم',
@@ -173,6 +189,22 @@ const STRINGS = {
     priceSame: (name: string) => `السعر نفسه مع ${name}.`,
   },
   en: {
+    stepFile: 'File',
+    stepSettings: 'Settings',
+    stepPrice: 'Price',
+    dropHere: 'Drop the file here',
+    updating: 'Updating the price…',
+    autoNote: 'The price updates by itself when you change a setting.',
+    hintDraft: 'Thicker layers: faster and cheaper, with a rougher surface.',
+    hintStandardQ: 'The usual balance of surface finish and print time.',
+    hintFine: 'Thinner layers: a smoother surface, a longer print.',
+    hintLight: 'Fewer walls and less infill: for display pieces.',
+    hintStandardS: 'Right for most parts.',
+    hintStrong: 'More walls and infill: for parts that carry load.',
+    hintSupportsOn: 'They hold up overhangs and are removed after printing.',
+    hintSupportsOff: 'Only if the model does not need them.',
+    increase: 'Increase',
+    decrease: 'Decrease',
     title: 'Print price calculator',
     lead: 'Upload your model — we measure it and work out an estimate.',
     pick: 'Choose a model file',
@@ -250,6 +282,22 @@ const STRINGS = {
     priceSame: (name: string) => `The same price as on ${name}.`,
   },
   ckb: {
+    stepFile: 'فایل',
+    stepSettings: 'ڕێکخستن',
+    stepPrice: 'نرخ',
+    dropHere: 'فایلەکە لێرە دابنێ',
+    updating: 'نرخەکە نوێ دەکرێتەوە…',
+    autoNote: 'کاتێک ڕێکخستنێک دەگۆڕیت، نرخەکە خۆی نوێ دەبێتەوە.',
+    hintDraft: 'چینی ئەستوورتر: خێراتر و هەرزانتر، ڕووکاری زبرتر.',
+    hintStandardQ: 'هاوسەنگیی ئاسایی نێوان نەرمیی ڕووکار و کاتی چاپ.',
+    hintFine: 'چینی تەنکتر: ڕووکاری نەرمتر و کاتی درێژتر.',
+    hintLight: 'دیوار و پڕکردنەوەی کەمتر: بۆ پارچەی نمایشی.',
+    hintStandardS: 'گونجاوە بۆ زۆربەی پارچەکان.',
+    hintStrong: 'دیوار و پڕکردنەوەی زیاتر: بۆ ئەو پارچانەی بار هەڵدەگرن.',
+    hintSupportsOn: 'بەشە هەڵواسراوەکان ڕادەگرن و دوای چاپ لادەبرێن.',
+    hintSupportsOff: 'تەنها ئەگەر مۆدێلەکە پێویستی پێیان نەبێت.',
+    increase: 'زیادکردن',
+    decrease: 'کەمکردنەوە',
     title: 'ژمێرەری نرخی چاپ',
     lead: 'فایلی مۆدێلەکەت باربکە، دەیپێوین و خەمڵاندنێکی نرخت بۆ دەکەین.',
     pick: 'فایلی مۆدێل هەڵبژێرە',
@@ -297,7 +345,7 @@ const STRINGS = {
     SUPPORT_PLACEMENT: 'شوێنی ڕاستەقینەی پاڵپشتەکان',
     SEAM_AND_TRAVEL: 'کاتی گواستنەوە و دروو',
     OPEN_MESH_VOLUME: 'قەبارەی تۆڕی کراوە',
-    PART_COUNT: 'ژمارەی بەشە جیاکانەوە',
+    PART_COUNT: 'ژمارەی بەشە جیاکان',
     sendRequest: 'داواکاری چاپ بنێرە بۆ بازرگانان',
     sendNote: 'بازرگانان مۆدێلەکە دەبینن و نرخ دەدەن — نرخی کۆتایی لە کەسێکەوە کە بەڕاستی دەیچاپێت.',
     back: 'گەڕانەوە',
@@ -309,25 +357,24 @@ const STRINGS = {
     zeroVolume: 'فایلەکە هیچ جەستەیەکی ڕەقی تێدا نییە بۆ پێوان.',
     modeFile: 'لە فایلەوە',
     modeGrams: 'بە گرام',
-    // NO NEW SORANI PROSE (project rule): the one short label is literal, and
-    // every sentence below is the Arabic source text — the same fallback
-    // `loc(ar, en)` applies across the app when no hand-written ckb exists.
+    // Every sentence is Sorani (CLAUDE.md, DECISIONS row 183: a ckb slot
+    // never carries a copy of the Arabic). Site names stay as they are.
     linkLabel: 'یان بەستەری مۆدێل دابنێ',
     linkHint: 'MakerWorld · Printables · Thingiverse',
-    linkBad: 'هذا لا يبدو رابط مجسم. انسخ رابط صفحة المجسم كما هو.',
+    linkBad: 'ئەمە وەک بەستەری مۆدێل نییە. بەستەری پەڕەی مۆدێلەکە وەک خۆی کۆپی بکە.',
     linkUnresolved: (site: string, id: string) =>
       id
-        ? `هذا المجسم رقم ${id} على ${site}. الموقع لا يعطينا وزن المجسم، فلا يمكن حساب السعر من الرابط وحده.`
-        : `هذا رابط من ${site}. الموقع لا يعطينا وزن المجسم، فلا يمكن حساب السعر من الرابط وحده.`,
-    linkDownload: 'نزّل الملف (STL أو 3MF) من الموقع',
-    linkThenUpload: 'ثم ارفعه هنا',
-    linkFromSite: 'الوزن من الموقع',
-    linkMaterialOnly: 'السعر للمادة والتجهيز فقط: الموقع لم يذكر زمن الطباعة.',
-    printerAllSame: 'السعر لا يعتمد على الطابعة حاليًا: كل الطابعات متطابقة في ما يدخل في الحساب (السرعة، التسخين، كلفة ساعة التشغيل).',
+        ? `ئەمە مۆدێلی ژمارە ${id} ـە لە ${site}دا. ماڵپەڕەکە کێشی مۆدێلەکەمان پێنادات، بۆیە تەنها لە بەستەرەکەوە نرخ ناژمێردرێت.`
+        : `ئەمە بەستەرێکە لە ${site}دا. ماڵپەڕەکە کێشی مۆدێلەکەمان پێنادات، بۆیە تەنها لە بەستەرەکەوە نرخ ناژمێردرێت.`,
+    linkDownload: 'فایلەکە (STL یان 3MF) لە ماڵپەڕەکە دابەزێنە',
+    linkThenUpload: 'پاشان لێرە باری بکە',
+    linkFromSite: 'کێش لە ماڵپەڕەکەوە',
+    linkMaterialOnly: 'نرخەکە تەنها بۆ ماددە و ئامادەکارییە: ماڵپەڕەکە کاتی چاپی نەگوتووە.',
+    printerAllSame: 'ئێستا نرخەکە بە گۆڕینی چاپکەر ناگۆڕێت: هەموو چاپکەرەکان لەوەی دەچێتە ناو ژمێرینەوە وەک یەکن (خێرایی، گەرمکردنەوە، تێچووی کاتژمێرێک کارکردن).',
     printerSameAs: (names: string) =>
-      `السعر هنا مطابق لـ ${names}: لا تختلف عنها حاليًا في أي شيء يدخل في الحساب (السرعة، التسخين، كلفة ساعة التشغيل).`,
-    priceWas: (name: string, price: string) => `${name}: ${price}`,
-    priceSame: (name: string) => `السعر نفسه مع ${name}.`,
+      `ئەم نرخە وەک نرخی ${names} وایە: ئێستا لە هیچ شتێکی ناو ژمێرینەکەدا جیاواز نین (خێرایی، گەرمکردنەوە، تێچووی کاتژمێرێک کارکردن).`,
+    priceWas: (name: string, price: string) => `لەگەڵ ${name}: ${price}`,
+    priceSame: (name: string) => `هەمان نرخ لەگەڵ ${name}.`,
   },
 } as const;
 
@@ -433,7 +480,12 @@ export default function Tools() {
   }, [materials, printer]);
 
   useEffect(() => {
-    if (!usableMaterials.length) return;
+    if (!usableMaterials.length) {
+      // Nothing this machine can run: there is no price to wait for, so the
+      // old one must not sit under «يجري تحديث السعر» indefinitely.
+      setAutoRecalc(false);
+      return;
+    }
     if (!usableMaterials.some((m) => m.id === materialId)) setMaterialId(usableMaterials[0].id);
   }, [usableMaterials, materialId]);
 
@@ -459,6 +511,8 @@ export default function Tools() {
     async (chosen: File) => {
       const seq = ++pickSeq.current;
       invalidate();
+      setStale(null);
+      setAutoRecalc(false);
       setFile(chosen);
       setAnalysisId('');
       setStage('uploading');
@@ -483,10 +537,16 @@ export default function Tools() {
 
   const calculate = useCallback(async () => {
     if (!analysisId || !printerId || !materialId) return;
+    // A press of the button during the settle wait IS that reprice: the timer
+    // must not send the same job a second time afterwards.
+    setAutoRecalc(false);
     invalidate();
     setStage('measuring');
+    // The measure and the price land TOGETHER: setting the measure first made
+    // the price card vanish for the whole pricing call of every reprice.
+    let measured: { analysis: AnalysisView; geometry: GeometryView } | null = null;
     try {
-      const measured = await measureModel(analysisId, {
+      measured = await measureModel(analysisId, {
         printer_model_id: printerId,
         material_id: materialId,
         quality_id: quality,
@@ -494,12 +554,18 @@ export default function Tools() {
         supports,
         quantity,
       });
-      setAnalysis(measured.analysis);
-      setGeometry(measured.geometry);
       setStage('pricing');
       const priced = await quoteAnalysis(analysisId);
+      setAnalysis(measured.analysis);
+      setGeometry(measured.geometry);
       setQuote(priced.quote);
     } catch (e) {
+      scrollToPrice.current = false;
+      // A refused price still leaves the measured facts worth showing.
+      if (measured) {
+        setAnalysis(measured.analysis);
+        setGeometry(measured.geometry);
+      }
       const code = (e as { code?: string } | null)?.code ?? '';
       const key = REFUSAL_KEY[code];
       setError(key ? (s[key] as string) : failureText(e, s.measuring));
@@ -529,9 +595,53 @@ export default function Tools() {
     // A printer that cannot run the current material swaps it first (the
     // effect above); price only once the pair is one this machine can take.
     if (!usableMaterials.some((m) => m.id === materialId)) return;
-    setAutoRecalc(false);
-    void calculate();
+    // SETTLE FIRST. Three taps on the quantity stepper are one decision, not
+    // three measure calls (the route allows 40 an hour): every settings change
+    // gives `calculate` a new identity and so restarts this timer.
+    const t = setTimeout(() => {
+      setAutoRecalc(false);
+      void calculate();
+    }, 600);
+    return () => clearTimeout(t);
   }, [autoRecalc, busy, analysisId, printerId, usableMaterials, materialId, calculate]);
+
+  /**
+   * «غيّرت الدقة فاختفى السعر». Every setting used to wipe the answer and wait
+   * for another press of «احسب السعر», so the page collapsed and the customer
+   * compared a number with a memory of one. Once a model has been priced, a
+   * setting change now prices it again by itself, and while that runs the last
+   * answer stays where it was — dimmed, `aria-busy`, and labelled «يجري تحديث
+   * السعر» — so it never sits there looking current, and nothing jumps.
+   */
+  const [stale, setStale] = useState<{
+    analysis: AnalysisView | null;
+    geometry: GeometryView | null;
+    quote: PublicQuoteView | null;
+  } | null>(null);
+  const changeSetting = (apply: () => void) => {
+    const priced = analysis !== null || quote !== null;
+    if (priced) setStale({ analysis, geometry, quote });
+    apply();
+    invalidate();
+    if (priced || stale) setAutoRecalc(true);
+  };
+  useEffect(() => {
+    if (stage === 'idle' && !autoRecalc) setStale(null);
+  }, [stage, autoRecalc]);
+  const fresh = analysis !== null || quote !== null || geometry !== null;
+  const repricing = !fresh && stale !== null && (autoRecalc || busy);
+  const view = fresh ? { analysis, geometry, quote } : repricing ? stale : null;
+
+  /** The first price of a model is often below the fold on a phone: bring it
+   *  into view once, when the customer pressed the button for it. */
+  const priceRef = useRef<HTMLElement>(null);
+  const scrollToPrice = useRef(false);
+  useEffect(() => {
+    if (!quote || !scrollToPrice.current) return;
+    scrollToPrice.current = false;
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    priceRef.current?.scrollIntoView({ block: 'nearest', behavior: reduce ? 'auto' : 'smooth' });
+  }, [quote]);
 
   /**
    * WHEN THE PRINTER GENUINELY CANNOT MOVE THIS PRICE, SAY SO. `price_group`
@@ -593,9 +703,19 @@ export default function Tools() {
    *  Calculate button exists, so it is the only one with nowhere else to show
    *  itself. Measuring and pricing already have that button's spinner. */
   const uploading = stage === 'uploading';
-  const totalGrams = analysis?.materials.reduce((n, m) => n + m.grams, 0) ?? 0;
-  const wasteGrams = analysis?.materials.reduce((n, m) => n + m.wasteGrams, 0) ?? 0;
-  const totalMinutes = analysis ? analysis.plate_count * (analysis.print_minutes_per_plate + analysis.preparation_minutes) : 0;
+  const shownAnalysis = view?.analysis ?? null;
+  const shownGeometry = view?.geometry ?? null;
+  const shownQuote = view?.quote ?? null;
+  const totalGrams = shownAnalysis?.materials.reduce((n, m) => n + m.grams, 0) ?? 0;
+  const wasteGrams = shownAnalysis?.materials.reduce((n, m) => n + m.wasteGrams, 0) ?? 0;
+  const totalMinutes = shownAnalysis
+    ? shownAnalysis.plate_count * (shownAnalysis.print_minutes_per_plate + shownAnalysis.preparation_minutes)
+    : 0;
+
+  /** Where the customer is: 1 the file, 2 the settings, 3 a price on screen. */
+  const step = !analysisId ? 1 : shownQuote ? 3 : 2;
+  const qualityHint = { draft: s.hintDraft, standard: s.hintStandardQ, fine: s.hintFine }[quality];
+  const strengthHint = { light: s.hintLight, standard: s.hintStandardS, strong: s.hintStrong }[strength];
 
   return (
     <div className="w-full pb-28 text-text-secondary min-h-screen" dir={dir}>
@@ -621,7 +741,7 @@ export default function Tools() {
               type="button"
               aria-pressed={mode === o.value}
               onClick={() => setMode(o.value)}
-              className={`h-10 rounded-full border text-[13px] leading-snug flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
+              className={`h-11 rounded-full border text-[13px] leading-snug flex items-center justify-center gap-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus ${
                 mode === o.value ? 'border-border-subtle bg-surface-raised text-text-primary font-medium shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
               }`}
             >
@@ -639,7 +759,12 @@ export default function Tools() {
           <GramsQuotePanel printers={printers} materials={materials} />
         ) : (
           <>
-        <p className="text-text-secondary text-[13px] leading-relaxed">{s.lead}</p>
+        {/* WHERE AM I. Three steps the customer can see the end of, so the
+            empty page reads as «step 1 of 3», not as a form with no bottom. */}
+        <div className="space-y-2.5">
+          <p className="text-text-secondary text-[13px] leading-relaxed">{s.lead}</p>
+          <StepRail current={step} labels={[s.stepFile, s.stepSettings, s.stepPrice]} />
+        </div>
 
         {/* ---------------------------------------------------------- 1. file */}
         <section
@@ -678,7 +803,7 @@ export default function Tools() {
               {/* The tile carries the state, because it is the one thing on the
                   row big enough to notice out of the corner of an eye. */}
               <span
-                className={`w-10 h-10 rounded-sm border grid place-items-center shrink-0 transition-colors duration-300 motion-reduce:transition-none ${
+                className={`w-11 h-11 rounded-md border grid place-items-center shrink-0 transition-colors duration-300 motion-reduce:transition-none ${
                   uploading
                     ? 'bg-gold/10 border-gold/40'
                     : analysisId
@@ -699,8 +824,8 @@ export default function Tools() {
                   <Box className="w-5 h-5 text-gold" aria-hidden />
                 )}
               </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-text-primary text-[13px] font-medium truncate">{file.name}</p>
+              <div className="min-w-0 flex-1" aria-live="polite">
+                <p className="text-text-primary text-[13px] font-medium truncate" dir="ltr">{file.name}</p>
                 {/* WHAT IT SAYS WHILE IT IS WORKING. `s.uploading` already
                     exists in all three languages — this screen showed it only
                     on the Calculate button, which is not rendered yet while the
@@ -727,14 +852,22 @@ export default function Tools() {
               type="button"
               onClick={() => fileInput.current?.click()}
               disabled={busy}
-              className="w-full p-8 flex flex-col items-center gap-2 text-center disabled:opacity-50"
+              className="block w-full p-3 text-center disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded-[inherit]"
             >
-              <span className="w-12 h-12 rounded-full lv-well grid place-items-center">
-                <FileUp className="w-5 h-5 text-gold" aria-hidden />
+              {/* A dashed well inside the card: the shape every visitor already
+                  reads as «put a file here», on a phone as much as on a desktop. */}
+              <span
+                className={`flex flex-col items-center gap-2 rounded-md border border-dashed px-4 py-8 transition-colors duration-200 motion-reduce:transition-none ${
+                  dragging ? 'border-gold' : 'border-[var(--clay-field)]'
+                }`}
+              >
+                <span className="w-14 h-14 rounded-full lv-well grid place-items-center">
+                  <FileUp className="w-6 h-6 text-gold" aria-hidden />
+                </span>
+                <span className="text-text-primary text-[15px] font-semibold mt-1">{dragging ? s.dropHere : s.pick}</span>
+                <span className="text-text-muted text-[11px]" dir="ltr">{s.formats}</span>
+                <span className="text-text-muted text-[11px] hidden sm:block">{s.drop}</span>
               </span>
-              <span className="text-text-primary text-[14px] font-medium mt-1">{s.pick}</span>
-              <span className="text-text-muted text-[11px]">{s.formats}</span>
-              <span className="text-text-muted text-[11px] hidden sm:block">{s.drop}</span>
             </button>
           )}
         </section>
@@ -833,6 +966,7 @@ export default function Tools() {
                 <div className="-mx-4 divide-y divide-border-subtle border-y border-border-subtle">
                 <Field label={s.printer}>
                   <Select
+                    label={s.printer}
                     value={printerId}
                     onChange={setPrinterId}
                     disabled={linkBusy}
@@ -841,6 +975,7 @@ export default function Tools() {
                 </Field>
                 <Field label={s.material}>
                   <Select
+                    label={s.material}
                     value={materialId}
                     onChange={setMaterialId}
                     disabled={linkBusy}
@@ -887,6 +1022,7 @@ export default function Tools() {
 
             <Field label={s.printer}>
               <Select
+                label={s.printer}
                 value={printerId}
                 onChange={(v) => {
                   if (quote && printer && quote.confidence !== 'insufficient') {
@@ -895,8 +1031,7 @@ export default function Tools() {
                   } else {
                     setComparison(null);
                   }
-                  setPrinterId(v);
-                  invalidate();
+                  changeSetting(() => setPrinterId(v));
                 }}
                 disabled={busy}
                 options={printers.map((p) => ({
@@ -913,11 +1048,9 @@ export default function Tools() {
 
             <Field label={s.material}>
               <Select
+                label={s.material}
                 value={materialId}
-                onChange={(v) => {
-                  setMaterialId(v);
-                  invalidate();
-                }}
+                onChange={(v) => changeSetting(() => setMaterialId(v))}
                 disabled={busy}
                 /**
                  * «اختيار الماده اجعلها بالانجليزي».
@@ -939,13 +1072,13 @@ export default function Tools() {
               />
             </Field>
 
-            <Field label={s.quality}>
+            {/* Each choice says what it does to the print, in one line: «سريعة»
+                alone does not tell a first-time customer it is also rougher. */}
+            <Field label={s.quality} hint={qualityHint}>
               <Segmented
+                label={s.quality}
                 value={quality}
-                onChange={(v) => {
-                  setQuality(v);
-                  invalidate();
-                }}
+                onChange={(v) => changeSetting(() => setQuality(v))}
                 disabled={busy}
                 options={[
                   { value: 'draft' as const, label: s.draft },
@@ -955,13 +1088,11 @@ export default function Tools() {
               />
             </Field>
 
-            <Field label={s.strength}>
+            <Field label={s.strength} hint={strengthHint}>
               <Segmented
+                label={s.strength}
                 value={strength}
-                onChange={(v) => {
-                  setStrength(v);
-                  invalidate();
-                }}
+                onChange={(v) => changeSetting(() => setStrength(v))}
                 disabled={busy}
                 options={[
                   { value: 'light' as const, label: s.light },
@@ -971,13 +1102,11 @@ export default function Tools() {
               />
             </Field>
 
-            <Field label={s.supports}>
+            <Field label={s.supports} hint={supports ? s.hintSupportsOn : s.hintSupportsOff}>
               <Segmented
+                label={s.supports}
                 value={supports}
-                onChange={(v) => {
-                  setSupports(v);
-                  invalidate();
-                }}
+                onChange={(v) => changeSetting(() => setSupports(v))}
                 disabled={busy}
                 options={[
                   { value: true, label: s.supportsOn },
@@ -990,20 +1119,18 @@ export default function Tools() {
               <div className="inline-flex items-center gap-1 rounded-md lv-well border border-[var(--clay-field)] p-1" dir="ltr">
                 <Stepper
                   sign="−"
+                  label={s.decrease}
                   disabled={busy || quantity <= 1}
-                  onClick={() => {
-                    setQuantity((n) => Math.max(1, n - 1));
-                    invalidate();
-                  }}
+                  onClick={() => changeSetting(() => setQuantity((n) => Math.max(1, n - 1)))}
                 />
-                <span className="w-10 text-center text-text-primary text-[14px] font-medium tabular-nums">{quantity}</span>
+                <span className="w-10 text-center text-text-primary text-[14px] font-medium tabular-nums" aria-live="polite">
+                  {quantity}
+                </span>
                 <Stepper
                   sign="+"
+                  label={s.increase}
                   disabled={busy || quantity >= 200}
-                  onClick={() => {
-                    setQuantity((n) => Math.min(200, n + 1));
-                    invalidate();
-                  }}
+                  onClick={() => changeSetting(() => setQuantity((n) => Math.min(200, n + 1)))}
                 />
               </div>
             </Field>
@@ -1013,55 +1140,114 @@ export default function Tools() {
         {error && <Notice tone="error">{error}</Notice>}
 
         {analysisId && (
-          <button
-            type="button"
-            onClick={() => void calculate()}
-            disabled={busy || !printerId || !materialId}
-            className="lv-button lv-button-primary w-full h-12 text-[15px]"
-          >
-            {busy ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" aria-hidden />
-                {stage === 'uploading' ? s.uploading : stage === 'measuring' ? s.measuring : s.pricing}
-              </>
-            ) : (
-              <>
-                {analysis ? <RefreshCw className="w-4 h-4" aria-hidden /> : <Upload className="w-4 h-4" aria-hidden />}
-                {analysis ? s.recalc : s.calculate}
-              </>
-            )}
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => {
+                scrollToPrice.current = true;
+                void calculate();
+              }}
+              disabled={busy || !printerId || !materialId}
+              // Once a price is on screen the next step is the request below,
+              // not this button: it steps down so only one thing is primary.
+              className={`lv-button w-full h-12 text-[15px] ${shownQuote ? 'lv-button-secondary' : 'lv-button-primary'}`}
+            >
+              {busy ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-none" aria-hidden />
+                  {stage === 'uploading' ? s.uploading : stage === 'measuring' ? s.measuring : s.pricing}
+                </>
+              ) : (
+                <>
+                  {shownAnalysis ? <RefreshCw className="w-4 h-4" aria-hidden /> : <Upload className="w-4 h-4" aria-hidden />}
+                  {shownAnalysis ? s.recalc : s.calculate}
+                </>
+              )}
+            </button>
+            {shownQuote && <p className="text-center text-text-muted text-[11px]">{s.autoNote}</p>}
+          </div>
+        )}
+
+        {/* ----------------------------------------------------- 3. the price
+            The answer comes first: it is what the customer came for. The
+            numbers behind it follow, for whoever wants to check them. */}
+        {shownQuote && shownQuote.confidence === 'insufficient' && !repricing && <Notice tone="warn">{s.insufficient}</Notice>}
+        {/* «أرسل طلبًا وسيسعّره التاجر» is what that notice tells the customer to
+            do, so the way to do it sits right under it. */}
+        {quote && quote.confidence === 'insufficient' && !requestsClosed && (
+          <button type="button" onClick={() => navigate('/requests')} className="lv-button lv-button-primary w-full">
+            <Users className="w-4 h-4" aria-hidden />
+            {s.sendRequest}
           </button>
         )}
 
-        {/* --------------------------------------------- 3. what the file says */}
-        {geometry && (
-          <section className="lv-surface overflow-hidden">
-            <h2 className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted border-b border-border-subtle flex items-center gap-2">
-              <Ruler className="w-3.5 h-3.5" aria-hidden />
-              {s.fromFile}
-            </h2>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-border-subtle">
-              <Fact label={s.size}>
-                {formatMm(geometry.dimensions_mm.x)} × {formatMm(geometry.dimensions_mm.y)} ×{' '}
-                {formatMm(geometry.dimensions_mm.z)} mm
-              </Fact>
-              <Fact label={s.volume}>{(geometry.volume_mm3 / 1000).toFixed(1)} cm³</Fact>
-              <Fact label={s.overhang}>{Math.round(geometry.overhang_ratio * 100)}%</Fact>
-              <Fact label={s.triangles}>{geometry.triangle_count.toLocaleString('en-US')}</Fact>
-              {geometry.shell_count !== null && <Fact label={s.parts}>{geometry.shell_count}</Fact>}
-            </dl>
-            {/* Warnings that change what the customer should DO, in their words. */}
-            <div className="p-3 space-y-2 empty:hidden">
-              {geometry.warnings.some((w) => w.code === 'HEAVY_OVERHANG') && <Hint>{s.warnHeavyOverhang}</Hint>}
-              {geometry.watertight === false && <Hint>{s.warnNotWatertight}</Hint>}
-              {geometry.unit_source === 'assumed' && <Hint>{s.warnUnitAssumed}</Hint>}
+        {shownQuote && shownQuote.confidence !== 'insufficient' && (
+          <section
+            ref={priceRef}
+            aria-busy={repricing}
+            aria-live="polite"
+            className={`lv-surface-raised p-5 scroll-mt-20 transition-opacity duration-200 motion-reduce:transition-none ${
+              repricing ? 'opacity-60' : ''
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{s.price}</p>
+              {repricing && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-gold">
+                  <Loader2 className="w-3 h-3 animate-spin motion-reduce:animate-none" aria-hidden />
+                  {s.updating}
+                </span>
+              )}
             </div>
+            <p className="text-text-primary font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-quote-price>
+              {money(shownQuote.price_iqd)}
+            </p>
+            {shownQuote.range_iqd.high > shownQuote.range_iqd.low && (
+              <p className="text-text-secondary text-[12px] mt-1 tabular-nums">
+                {s.rangeNote}: <bdi dir="ltr">{money(shownQuote.range_iqd.low)}</bdi> – <bdi dir="ltr">{money(shownQuote.range_iqd.high)}</bdi>
+              </p>
+            )}
+            <p className="mt-3">
+              <StatusChip tone={shownQuote.confidence === 'exact' ? 'success' : 'warning'} icon={<AlertCircle className="w-3 h-3" aria-hidden />}>
+                {shownQuote.confidence === 'exact' ? s.exactBadge : s.estimateBadge}
+              </StatusChip>
+            </p>
+            {quote && comparison && comparison.jobKey === jobKey && printer && (
+              <p className="text-text-secondary text-[12px] mt-2" data-price-comparison>
+                {comparison.price === quote.price_iqd ? (
+                  s.priceSame(comparison.name)
+                ) : (
+                  <span dir="auto">{s.priceWas(comparison.name, money(comparison.price))}</span>
+                )}
+              </p>
+            )}
+            {shownQuote.confidence !== 'exact' && (
+              <p className="text-text-muted text-[11px] leading-relaxed mt-3">{s.why}</p>
+            )}
+
+            {/* ------------------------------- the step that ends in a print
+                The print-request marketplace is part of Levo Community and
+                closes with it; while it is shut to this viewer the way there is
+                not offered at all, rather than leading to a maintenance card. */}
+            {quote && !requestsClosed && (
+              <div className="mt-4 pt-4 border-t border-border-subtle">
+                <button
+                  type="button"
+                  onClick={() => navigate('/requests')}
+                  className="lv-button lv-button-primary w-full"
+                >
+                  <Users className="w-4 h-4" aria-hidden />
+                  {s.sendRequest}
+                </button>
+                <p className="text-text-muted text-[11px] leading-relaxed mt-2.5 text-center">{s.sendNote}</p>
+              </div>
+            )}
           </section>
         )}
 
         {/* -------------------------------------------------- 4. the estimate */}
-        {analysis && (
-          <section className="lv-surface overflow-hidden">
+        {shownAnalysis && (
+          <section className={`lv-surface overflow-hidden transition-opacity duration-200 motion-reduce:transition-none ${repricing ? 'opacity-60' : ''}`}>
             <h2 className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted border-b border-border-subtle flex items-center gap-2">
               <Layers className="w-3.5 h-3.5" aria-hidden />
               {s.estimated}
@@ -1074,19 +1260,19 @@ export default function Tools() {
                   {formatDuration(totalMinutes, L)}
                 </span>
               </Fact>
-              <Fact label={s.plates}>{analysis.plate_count}</Fact>
-              <Fact label={s.layers}>{analysis.layer_count.toLocaleString('en-US')}</Fact>
+              <Fact label={s.plates}>{shownAnalysis.plate_count}</Fact>
+              <Fact label={s.layers}>{shownAnalysis.layer_count.toLocaleString('en-US')}</Fact>
             </dl>
             {wasteGrams > 0.05 && (
               <p className="px-4 py-2.5 text-[11px] text-text-muted border-t border-border-subtle">
                 {s.waste}: <span className="text-text-secondary tabular-nums" dir="ltr">{formatGrams(wasteGrams)}</span>
               </p>
             )}
-            {analysis.unmeasured.length > 0 && (
+            {shownAnalysis.unmeasured.length > 0 && (
               <div className="px-4 py-3 border-t border-border-subtle">
                 <p className="text-[11px] text-text-muted mb-1.5">{s.unmeasured}</p>
                 <ul className="flex flex-wrap gap-1.5">
-                  {analysis.unmeasured.map((u) => (
+                  {shownAnalysis.unmeasured.map((u) => (
                     <li key={u} className="text-[11px] text-text-secondary bg-surface-raised border border-border-subtle rounded-full px-2.5 py-1">
                       {(s as unknown as Record<string, string>)[u] ?? u}
                     </li>
@@ -1097,55 +1283,29 @@ export default function Tools() {
           </section>
         )}
 
-        {/* ----------------------------------------------------- 5. the price */}
-        {quote && quote.confidence === 'insufficient' && <Notice tone="warn">{s.insufficient}</Notice>}
-
-        {quote && quote.confidence !== 'insufficient' && (
-          <section className="lv-surface-raised p-5">
-            <p className="text-[11px] font-semibold uppercase tracking-wider text-text-muted">{s.price}</p>
-            <p className="text-text-primary font-bold text-[30px] leading-tight mt-1 tabular-nums" dir="ltr" data-quote-price>
-              {money(quote.price_iqd)}
-            </p>
-            {quote.range_iqd.high > quote.range_iqd.low && (
-              <p className="text-text-secondary text-[12px] mt-1 tabular-nums" dir="ltr">
-                {s.rangeNote}: {money(quote.range_iqd.low)} – {money(quote.range_iqd.high)}
-              </p>
-            )}
-            <p className="mt-3">
-              <StatusChip tone={quote.confidence === 'exact' ? 'success' : 'warning'} icon={<AlertCircle className="w-3 h-3" aria-hidden />}>
-                {quote.confidence === 'exact' ? s.exactBadge : s.estimateBadge}
-              </StatusChip>
-            </p>
-            {comparison && comparison.jobKey === jobKey && printer && (
-              <p className="text-text-secondary text-[12px] mt-2" data-price-comparison>
-                {comparison.price === quote.price_iqd ? (
-                  s.priceSame(comparison.name)
-                ) : (
-                  <span dir="auto">{s.priceWas(comparison.name, money(comparison.price))}</span>
-                )}
-              </p>
-            )}
-            {quote.confidence !== 'exact' && (
-              <p className="text-text-muted text-[11px] leading-relaxed mt-3">{s.why}</p>
-            )}
-          </section>
-        )}
-
-        {/* --------------------------------------- 6. the step that ends in a print
-            The print-request marketplace is part of Levo Community and closes
-            with it; while it is shut to this viewer the way there is not
-            offered at all, rather than leading to a maintenance card. */}
-        {quote && !requestsClosed && (
-          <section className="lv-surface p-4">
-            <button
-              type="button"
-              onClick={() => navigate('/requests')}
-              className="lv-button lv-button-secondary w-full"
-            >
-              <Users className="w-4 h-4 text-gold" aria-hidden />
-              {s.sendRequest}
-            </button>
-            <p className="text-text-muted text-[11px] leading-relaxed mt-2.5 text-center">{s.sendNote}</p>
+        {/* --------------------------------------------- 5. what the file says */}
+        {shownGeometry && (
+          <section className={`lv-surface overflow-hidden transition-opacity duration-200 motion-reduce:transition-none ${repricing ? 'opacity-60' : ''}`}>
+            <h2 className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-text-muted border-b border-border-subtle flex items-center gap-2">
+              <Ruler className="w-3.5 h-3.5" aria-hidden />
+              {s.fromFile}
+            </h2>
+            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-px bg-border-subtle">
+              <Fact label={s.size}>
+                {formatMm(shownGeometry.dimensions_mm.x)} × {formatMm(shownGeometry.dimensions_mm.y)} ×{' '}
+                {formatMm(shownGeometry.dimensions_mm.z)} mm
+              </Fact>
+              <Fact label={s.volume}>{(shownGeometry.volume_mm3 / 1000).toFixed(1)} cm³</Fact>
+              <Fact label={s.overhang}>{Math.round(shownGeometry.overhang_ratio * 100)}%</Fact>
+              <Fact label={s.triangles}>{shownGeometry.triangle_count.toLocaleString('en-US')}</Fact>
+              {shownGeometry.shell_count !== null && <Fact label={s.parts}>{shownGeometry.shell_count}</Fact>}
+            </dl>
+            {/* Warnings that change what the customer should DO, in their words. */}
+            <div className="p-3 space-y-2 empty:hidden">
+              {shownGeometry.warnings.some((w) => w.code === 'HEAVY_OVERHANG') && <Hint>{s.warnHeavyOverhang}</Hint>}
+              {shownGeometry.watertight === false && <Hint>{s.warnNotWatertight}</Hint>}
+              {shownGeometry.unit_source === 'assumed' && <Hint>{s.warnUnitAssumed}</Hint>}
+            </div>
           </section>
         )}
           </>
@@ -1157,12 +1317,51 @@ export default function Tools() {
 
 // ------------------------------------------------------------------- pieces
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div className="px-4 py-3 flex items-center justify-between gap-3 min-h-[3.25rem]">
-      <span className="text-text-secondary text-[13px] shrink-0">{label}</span>
-      <div className="min-w-0 flex justify-end">{children}</div>
+    <div className="px-4 py-3 min-h-[3.25rem]">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-text-secondary text-[13px] shrink-0">{label}</span>
+        <div className="min-w-0 flex justify-end">{children}</div>
+      </div>
+      {hint && <p className="mt-1.5 text-[11px] leading-relaxed text-text-muted">{hint}</p>}
     </div>
+  );
+}
+
+/**
+ * «الملف ← الإعدادات ← السعر». Three dots and a line: the step done carries a
+ * tick, the current one is gold, the next is quiet. Not a link bar — the steps
+ * open in order on their own, so nothing here is clickable.
+ */
+function StepRail({ current, labels }: { current: number; labels: string[] }) {
+  return (
+    <ol className="flex items-center gap-2" data-step-rail>
+      {labels.map((label, i) => {
+        const n = i + 1;
+        const done = n < current;
+        const now = n === current;
+        return (
+          <li key={label} className={`flex items-center gap-2 min-w-0 ${n < labels.length ? 'flex-1' : 'flex-none'}`} aria-current={now ? 'step' : undefined}>
+            <span
+              className={`w-6 h-6 shrink-0 rounded-full grid place-items-center text-[11px] font-semibold tabular-nums border transition-colors duration-300 motion-reduce:transition-none ${
+                done
+                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                  : now
+                    ? 'bg-gold/15 border-gold/50 text-gold'
+                    : 'bg-surface-raised border-border-subtle text-text-muted'
+              }`}
+            >
+              {done ? <Check className="w-3.5 h-3.5" aria-hidden /> : n}
+            </span>
+            <span className={`text-[12px] truncate ${now ? 'text-text-primary font-medium' : 'text-text-muted'}`}>{label}</span>
+            {n < labels.length && (
+              <span aria-hidden className={`h-px flex-1 ${done ? 'bg-emerald-500/40' : 'bg-border-subtle'}`} />
+            )}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -1178,11 +1377,13 @@ function Fact({ label, children }: { label: string; children: React.ReactNode })
 }
 
 function Select({
+  label,
   value,
   onChange,
   options,
   disabled,
 }: {
+  label: string;
   value: string;
   onChange: (v: string) => void;
   options: Array<{ value: string; label: string }>;
@@ -1191,6 +1392,7 @@ function Select({
   return (
     <select
       className="lv-input w-auto max-w-[16rem] min-h-10 py-2 text-[13px] disabled:opacity-40 truncate"
+      aria-label={label}
       value={value}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
@@ -1210,18 +1412,20 @@ function Select({
  * obvious, not loud.
  */
 function Segmented<T extends string | boolean>({
+  label,
   value,
   onChange,
   options,
   disabled,
 }: {
+  label: string;
   value: T;
   onChange: (v: T) => void;
   options: Array<{ value: T; label: string }>;
   disabled?: boolean;
 }) {
   return (
-    <div role="group" className="inline-flex rounded-full lv-well border border-border-subtle p-0.5 gap-0.5">
+    <div role="group" aria-label={label} className="inline-flex rounded-full lv-well border border-border-subtle p-0.5 gap-0.5">
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -1230,7 +1434,9 @@ function Segmented<T extends string | boolean>({
             type="button"
             disabled={disabled}
             aria-pressed={active}
-            onClick={() => onChange(o.value)}
+            onClick={() => {
+              if (!active) onChange(o.value);
+            }}
             className={`px-3 py-1.5 rounded-full border text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus disabled:opacity-40 ${
               active ? 'border-border-subtle bg-surface-raised text-text-primary font-medium shadow-1' : 'border-transparent text-text-secondary hover:text-text-primary'
             }`}
@@ -1243,13 +1449,13 @@ function Segmented<T extends string | boolean>({
   );
 }
 
-function Stepper({ sign, onClick, disabled }: { sign: string; onClick: () => void; disabled?: boolean }) {
+function Stepper({ sign, label, onClick, disabled }: { sign: string; label: string; onClick: () => void; disabled?: boolean }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      aria-label={sign === '+' ? 'increase' : 'decrease'}
+      aria-label={label}
       className="relative lv-hit w-9 h-9 rounded-sm bg-surface-raised text-text-secondary text-[15px] grid place-items-center shadow-1 no-press hover:text-text-primary active:shadow-press disabled:opacity-35 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
     >
       {sign}
