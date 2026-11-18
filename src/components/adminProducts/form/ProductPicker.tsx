@@ -36,6 +36,8 @@ export interface PickerProduct {
   price_iqd: number;
   status: string;
   composition: string;
+  /** The lowest V2 price it sells at; null while it needs pricing. */
+  from_iqd?: number | null;
 }
 
 interface Props {
@@ -48,6 +50,9 @@ interface Props {
   disabled?: boolean;
   /** A picker that stays open after a pick, for building a list. */
   keepOpen?: boolean;
+  /** Products never offered here (the bundles panel leaves printers out: a
+   *  printer is bundled through «خصص طابعتك», not as a component). */
+  excludeIds?: ReadonlySet<string>;
 }
 
 const label = (p: PickerProduct) => p.name_en || p.name_ar || p.id;
@@ -60,6 +65,7 @@ export default function ProductPicker({
   ariaLabel,
   disabled = false,
   keepOpen = false,
+  excludeIds,
 }: Props) {
   const { lang, dir } = useLanguage();
   const loc = (ar: string, en: string, ckb?: string) => (lang === 'en' ? en : lang === 'ckb' ? ckb || ar : ar);
@@ -122,14 +128,14 @@ export default function ProductPicker({
         const res = await api.get<{ products: PickerProduct[] }>(`/api/admin/products-v2?${params}`);
         if (mine !== seq.current) return;
         const list = res.products ?? [];
-        setRows(excludeComposition ? list.filter((p) => !p.composition) : list);
+        setRows(list.filter((p) => (!excludeComposition || !p.composition) && !excludeIds?.has(p.id)));
       } catch {
         if (mine === seq.current) setRows([]);
       } finally {
         if (mine === seq.current) setBusy(false);
       }
     },
-    [excludeComposition]
+    [excludeComposition, excludeIds]
   );
 
   useEffect(() => {

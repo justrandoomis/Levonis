@@ -36,10 +36,16 @@ import {
   ArrowUp,
   ArrowDown,
   X,
+  ImagePlus,
+  Sparkles,
+  Star,
+  Minus,
+  ChevronDown,
+  Pencil,
 } from 'lucide-react';
 import * as T from '../adminProducts/theme';
 import '../adminProducts/theme.css';
-import { api, ApiError, formatIqd } from '../../lib/api';
+import { api, ApiError, formatIqd, uploadFile, failureText } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import {
   Banner,
@@ -47,21 +53,20 @@ import {
   Grid,
   Money,
   Qty,
-  Repeater,
   SectionCard,
   Select,
   TextInput,
-  TextArea,
   Toggle,
   btnGhost,
   btnPrimary,
   btnDanger,
-  iconBtn,
 } from '../adminProducts/form/formUi';
 import { TriText } from '../adminProducts/ui';
 import ProductPicker from '../adminProducts/form/ProductPicker';
 import VariantImg from '../ui/VariantImg';
 import CompositionPricing from './CompositionPricing';
+import { bundleCover, bundleText, loadMember, type MemberInfo } from './bundleAutofill';
+import type { PickerProduct } from '../adminProducts/form/ProductPicker';
 
 // ------------------------------------------------------------------- types
 
@@ -371,6 +376,42 @@ export default function AdminBundles() {
   const [openSection, setOpenSection] = useState(1);
 
   const [relations, setRelations] = useState<Record<string, RelationsRow>>({});
+  /** Each member's names, cover and «from» price — the source of the auto-fill. */
+  const [members, setMembers] = useState<Record<string, MemberInfo>>({});
+  /** Printers are never components: they are bundled through «خصص طابعتك». */
+  const [printerIds, setPrinterIds] = useState<ReadonlySet<string>>(new Set());
+  /** While true, the name and description follow the products. Typing in either turns it off. */
+  const [autoText, setAutoText] = useState(false);
+  const [textOpen, setTextOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState<Record<number, boolean>>({});
+  const [imageBusy, setImageBusy] = useState<string | null>(null);
+  const [imageErr, setImageErr] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get<{ printers: Array<{ id: string }> }>('/api/admin/products-v2/printer-options')
+      .then((res) => {
+        if (!cancelled) setPrinterIds(new Set((res.printers ?? []).map((x) => x.id)));
+      })
+      .catch(() => {
+        // Without the list the picker still works; the server refuses nothing here.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const loadMemberInfo = useCallback(async (id: string, fromIqd: number | null = null) => {
+    if (!id) return;
+    try {
+      const m = await loadMember(id, fromIqd);
+      setMembers((prev) => ({ ...prev, [id]: { ...m, from_iqd: fromIqd ?? prev[id]?.from_iqd ?? null } }));
+    } catch {
+      // A member that cannot be read keeps its row; the save names the problem.
+    }
+  }, []);
 
   const loadRelations = useCallback(
     async (productId: string) => {
@@ -402,11 +443,15 @@ export default function AdminBundles() {
   }, []);
 
   const openNew = async () => {
-    setEditing({ doc: blankDoc(), config: blankConfig(), components: [blankComponent(0)], offer: null });
+    setEditing({ doc: blankDoc(), config: blankConfig(), components: [], offer: null });
     setPreview(null);
     setIssues([]);
     setWarnings([]);
     setOpenSection(1);
+    setAutoText(true);
+    setTextOpen(false);
+    setMoreOpen({});
+    setImageErr(null);
   };
 
   const openExisting = async (id: string) => {
@@ -451,9 +496,36 @@ export default function AdminBundles() {
       setWarnings(res.warning_details ?? []);
       setIssues([]);
       setOpenSection(1);
-      for (const c of res.components) void loadRelations(c.member_product_id);
+      setAutoText(false);
+      setTextOpen(false);
+      setMoreOpen({});
+      setImageErr(null);
+      for (const c of res.components) {
+        void loadRelations(c.member_product_id);
+        void loadMemberInfo(c.member_product_id);
+      }
     } catch (e) {
       setLoadErr(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /** Builds the cover from the products' pictures and uploads it; the URL, or null. */
+  const makeCover = async (urls: string[]): Promise<string | null> => {
+    setImageBusy(loc('جارٍ صنع صورة الحزمة من صور المنتجات…', 'Making the bundle picture from the product pictures…', 'دروستکردنی وێنەی پاکێج لە وێنەی بەرهەمەکان…'));
+    setImageErr(null);
+    try {
+      const file = await bundleCover(urls);
+      if (!file) {
+        setImageErr(loc('تعذّر قراءة صور المنتجات — ارفع صورة بنفسك.', 'Could not read the product pictures — upload one yourself.', 'وێنەی بەرهەمەکان نەخوێنرانەوە — خۆت وێنەیەک باربکە.'));
+        return null;
+      }
+      const res = await uploadFile(file, 'product');
+      return res.url;
+    } catch (e) {
+      setImageErr(failureText(e, loc('فشل رفع الصورة', 'Upload failed', 'بارکردن سەرنەکەوت')));
+      return null;
+    } finally {
+      setImageBusy(null);
     }
   };
 
@@ -463,21 +535,37 @@ export default function AdminBundles() {
     setIssues([]);
     setOk(null);
     try {
+      const chosen = editing.components.filter((c) => c.member_product_id);
+      let doc = editing.doc;
+      // No name typed and none generated yet: take it from the products now.
+      if (!doc.name_ar.trim() && !doc.name_en.trim() && !doc.name_ckb.trim()) {
+        const lines = chosen.filter((c) => members[c.member_product_id]).map((c) => ({ m: members[c.member_product_id], qty: c.qty }));
+        if (lines.length) doc = { ...doc, ...bundleText(lines) };
+      }
+      // No picture: make the cover from the products' pictures before saving.
+      if (doc.images.length === 0) {
+        const urls = chosen.map((c) => members[c.member_product_id]?.image ?? '').filter(Boolean);
+        if (urls.length) {
+          const url = await makeCover(urls);
+          if (url) doc = { ...doc, images: [url] };
+        }
+      }
+      if (doc !== editing.doc) setEditing({ ...editing, doc });
       const body: Record<string, unknown> = {
-        ...editing.doc,
-        images: editing.doc.images.map((url) => ({ url })),
-        media: editing.doc.images.map((url, i) => ({ id: `img_${i}`, url, primary: i === 0 })),
-        components: editing.components,
+        ...doc,
+        images: doc.images.map((url) => ({ url })),
+        media: doc.images.map((url, i) => ({ id: `img_${i}`, url, primary: i === 0 })),
+        components: chosen.map((c, i) => ({ ...c, sort: i })),
         config: editing.config,
         offer: editing.offer,
-        ...(editing.doc.id ? { expected_updated_at: editing.doc.updated_at } : {}),
+        ...(doc.id ? { expected_updated_at: doc.updated_at } : {}),
       };
       // DECISIONS row 251: the panel types no dinar price — the bundle is priced in section ٣ (Pricing V2),
       // and an absent price keeps the stored one (a new bundle is born «يحتاج تسعيرًا»).
       for (const k of ['price_iqd', 'original_price_iqd', 'prime_price_iqd', 'pro_price_iqd']) delete body[k];
-      const res = editing.doc.id
+      const res = doc.id
         ? await api.put<{ product: Record<string, unknown>; preview: Preview; warning_details: BundleIssue[] }>(
-            `/api/admin/bundles/${editing.doc.id}`,
+            `/api/admin/bundles/${doc.id}`,
             body
           )
         : await api.post<{ product: Record<string, unknown>; preview: Preview; warning_details: BundleIssue[] }>(
@@ -521,6 +609,19 @@ export default function AdminBundles() {
       loc('تم الترتيب', 'Reordered', 'ڕیزکرا')
     );
   };
+
+  // While the text follows the products, every change of products or quantities rewrites it.
+  useEffect(() => {
+    if (!editing || !autoText) return;
+    const lines = editing.components
+      .filter((c) => members[c.member_product_id])
+      .map((c) => ({ m: members[c.member_product_id], qty: c.qty }));
+    if (!lines.length) return;
+    const next = bundleText(lines);
+    const d = editing.doc;
+    if ((Object.keys(next) as Array<keyof typeof next>).every((k) => d[k] === next[k])) return;
+    setEditing({ ...editing, doc: { ...d, ...next } });
+  }, [editing, autoText, members]);
 
   const totalWarnings = useMemo(() => rows.reduce((n, b) => n + (b.warnings?.length ?? 0), 0), [rows]);
 
@@ -783,6 +884,84 @@ export default function AdminBundles() {
     setEditing({ ...editing, components: next });
   };
 
+  const nameOf = (id: string) => {
+    const m = members[id];
+    if (!m) return id;
+    return lang === 'en' ? m.name_en || m.name_ar : lang === 'ckb' ? m.name_ckb || m.name_ar || m.name_en : m.name_ar || m.name_en;
+  };
+  /** The price a member sells at alone: the picker's V2 «from», else the server preview's unit. */
+  const unitOf = (id: string): number | null =>
+    members[id]?.from_iqd ?? preview?.components.find((x) => x.member_product_id === id)?.unit_iqd ?? null;
+  const required = components.filter((c) => c.member_product_id && !c.optional);
+  const priceBefore = required.length && required.every((c) => unitOf(c.member_product_id) !== null)
+    ? required.reduce((n, c) => n + (unitOf(c.member_product_id) ?? 0) * c.qty, 0)
+    : null;
+  const memberImages = components.map((c) => members[c.member_product_id]?.image ?? '').filter(Boolean);
+  const shownName = lang === 'en' ? doc.name_en || doc.name_ar : lang === 'ckb' ? doc.name_ckb || doc.name_ar || doc.name_en : doc.name_ar || doc.name_en;
+  const shownDescription =
+    lang === 'en' ? doc.description_en || doc.description_ar : lang === 'ckb' ? doc.description_ckb || doc.description_ar || doc.description_en : doc.description_ar || doc.description_en;
+
+  /** Typing in a name or description stops the auto-fill: the owner's words win. */
+  const editText = (patch: Partial<EditorDoc>) => {
+    setAutoText(false);
+    setDoc(patch);
+  };
+  const pushImages = (urls: string[], front = false) =>
+    setEditing((prev) =>
+      prev
+        ? { ...prev, doc: { ...prev.doc, images: front ? [...urls, ...prev.doc.images] : [...prev.doc.images, ...urls] } }
+        : prev
+    );
+  const uploadPictures = async (files: File[]) => {
+    setImageErr(null);
+    for (const [k, file] of files.entries()) {
+      setImageBusy(loc(`جارٍ رفع الصورة ${k + 1} من ${files.length}…`, `Uploading picture ${k + 1} of ${files.length}…`, `بارکردنی وێنەی ${k + 1} لە ${files.length}…`));
+      try {
+        const res = await uploadFile(file, 'product');
+        pushImages([res.url]);
+      } catch (e) {
+        setImageErr(failureText(e, loc('فشل رفع الصورة', 'Upload failed', 'بارکردن سەرنەکەوت')));
+      }
+    }
+    setImageBusy(null);
+  };
+
+  /** A pick adds a line (or one more of a line already there). A product with
+   *  models or colours lets the customer choose them — all its options come along. */
+  const addProduct = async (id: string, p: PickerProduct | null) => {
+    if (!id) return;
+    const at = components.findIndex((c) => c.member_product_id === id);
+    if (at >= 0) {
+      setComponent(at, { qty: Math.min(99, components[at].qty + 1) });
+      return;
+    }
+    void loadMemberInfo(id, p?.from_iqd ?? null);
+    let rel = relations[id];
+    if (!rel) {
+      try {
+        const res = await api.get<RelationsRow>(`/api/admin/products/${id}/relations`);
+        rel = { values: res.values ?? [], colors: res.colors ?? [] };
+      } catch {
+        rel = { values: [], colors: [] };
+      }
+      const got = rel;
+      setRelations((prev) => ({ ...prev, [id]: got }));
+    }
+    const picksOption = rel.values.some((v) => !!v.active);
+    const picksColor = rel.colors.some((v) => !!v.active);
+    setEditing((prev) =>
+      prev && !prev.components.some((c) => c.member_product_id === id)
+        ? {
+            ...prev,
+            components: [
+              ...prev.components,
+              { ...blankComponent(prev.components.length), member_product_id: id, customer_picks_option: picksOption, customer_picks_color: picksColor },
+            ],
+          }
+        : prev
+    );
+  };
+
   const issuesFor = (componentId: string | undefined, index: number) =>
     issues.filter((x) => (componentId && x.component_id === componentId) || x.line === index + 1);
 
@@ -840,198 +1019,372 @@ export default function AdminBundles() {
         </Banner>
       )}
 
-      {/* 1 — identity */}
+      {/* 1 — the products. Everything else on this screen follows from them. */}
       <SectionCard
         n={1}
-        ar="الهوية"
-        en="Identity"
+        ar="المنتجات"
+        en="Products"
+        count={components.length}
         open={openSection === 1}
         onToggle={() => setOpenSection(openSection === 1 ? 0 : 1)}
       >
-        <TriText
-          labelAr="الاسم"
-          labelEn="Name"
-          ar={doc.name_ar}
-          en={doc.name_en}
-          ckb={doc.name_ckb}
-          onAr={(v) => setDoc({ name_ar: v })}
-          onEn={(v) => setDoc({ name_en: v })}
-          onCkb={(v) => setDoc({ name_ckb: v })}
-        />
-        <div className="h-3" />
-        <TriText
-          textarea
-          labelAr="الوصف"
-          labelEn="Description"
-          ar={doc.description_ar}
-          en={doc.description_en}
-          ckb={doc.description_ckb}
-          onAr={(v) => setDoc({ description_ar: v })}
-          onEn={(v) => setDoc({ description_en: v })}
-          onCkb={(v) => setDoc({ description_ckb: v })}
-        />
-        <div className="h-3" />
-        <Grid cols={3}>
-          <Field ar="الحالة" en="Status">
-            <Select value={doc.status} onChange={(e) => setDoc({ status: e.target.value as EditorDoc['status'] })}>
-              <option value="draft">{loc('مسودة', 'Draft', 'ڕەشنووس')}</option>
-              <option value="active">{loc('منشورة', 'Published', 'بڵاوکراوە')}</option>
-              <option value="hidden">{loc('مخفية', 'Hidden', 'شاراوە')}</option>
-            </Select>
-          </Field>
-          <Field ar="الترتيب" en="Display order">
-            <Qty value={doc.display_order} onChange={(v) => setDoc({ display_order: v ?? 0 })} placeholder="0" />
-          </Field>
-          <Field ar="مميّزة" en="Featured">
-            <Toggle
-              checked={doc.is_featured}
-              onChange={(v) => setDoc({ is_featured: v })}
-              label={loc('تظهر في الواجهة', 'Featured rail', 'لە ڕیزی سەرەکی')}
+        <div className="space-y-3 min-w-0" data-bundle-products>
+          <Field
+            ar="أضف منتجًا من المتجر"
+            en="Add a product from the store"
+            hint={loc(
+              'الاسم والوصف والصورة تُملأ من المنتجات. الطابعات لا تُضاف هنا: تُباع مع إضافاتها من «خصص طابعتك».',
+              'The name, description and picture come from the products. Printers are not added here: they are sold with their extras from «Customize your printer».',
+              'ناو و وەسف و وێنە لە بەرهەمەکانەوە دێن. چاپکەرەکان لێرە زیاد ناکرێن: لە «چاپکەرەکەت ڕێکبخە» دەفرۆشرێن.'
+            )}
+            span
+          >
+            <ProductPicker
+              value=""
+              keepOpen
+              excludeIds={printerIds}
+              ariaLabel={loc('أضف منتجًا', 'Add a product', 'بەرهەمێک زیاد بکە')}
+              placeholder={loc('ابحث واختر منتجًا…', 'Search and pick a product…', 'بگەڕێ و بەرهەمێک هەڵبژێرە…')}
+              onChange={(id, p) => void addProduct(id, p)}
             />
           </Field>
-        </Grid>
-        <div className="h-3" />
-        <Field ar="الصور" en="Images" hint={loc('أول صورة هي الغلاف', 'the first image is the cover', 'یەکەم وێنە بەرگەکەیە')} span>
-          <TextArea
-            value={doc.images.join('\n')}
-            onChange={(e) => setDoc({ images: e.target.value.split('\n').map((s) => s.trim()).filter(Boolean) })}
-            placeholder="https://…"
-          />
-        </Field>
+
+          {components.length === 0 ? (
+            <p className="text-[12.5px] text-[var(--ap-text-3)] py-2">
+              {loc('لم تُختر منتجات بعد.', 'No products picked yet.', 'هێشتا هیچ بەرهەمێک هەڵنەبژێردراوە.')}
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {components.map((c, i) => {
+                const rel = relations[c.member_product_id];
+                const rowIssues = issuesFor(c.id, i);
+                const m = members[c.member_product_id];
+                const unit = unitOf(c.member_product_id);
+                return (
+                  <li
+                    key={c.id ?? `new_${c.member_product_id}_${i}`}
+                    className={`rounded-lg border p-2.5 min-w-0 ${rowIssues.length ? 'border-red-500/50 bg-red-500/[0.04]' : 'border-[var(--ap-border)]'}`}
+                    data-bundle-line={c.member_product_id}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      {m?.image ? (
+                        <VariantImg sizes="48px" src={m.image} alt="" className={`${T.thumb} shrink-0`} loading="lazy" />
+                      ) : (
+                        <span className={`${T.thumb} shrink-0 grid place-items-center text-[var(--ap-text-3)]`} aria-hidden>
+                          <Boxes className="w-4 h-4" />
+                        </span>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] font-bold truncate text-[var(--ap-text-1)]">{nameOf(c.member_product_id)}</p>
+                        <p className="mt-0.5 text-[11.5px] text-[var(--ap-text-3)] flex flex-wrap gap-x-2 gap-y-0.5">
+                          <span>{unit === null ? loc('بلا سعر بعد', 'not priced yet', 'هێشتا نرخی نییە') : formatIqd(unit)}</span>
+                          {c.customer_picks_option && <span>· {loc('الزبون يختار الموديل', 'customer picks the model', 'کڕیار مۆدێل هەڵدەبژێرێت')}</span>}
+                          {c.customer_picks_color && <span>· {loc('الزبون يختار اللون', 'customer picks the colour', 'کڕیار ڕەنگ هەڵدەبژێرێت')}</span>}
+                          {c.optional && <span>· {loc('اختياري', 'optional', 'ئارەزوومەندانە')}</span>}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0" role="group" aria-label={loc('الكمية', 'Quantity', 'بڕ')}>
+                        <button
+                          type="button"
+                          className={T.btnIcon}
+                          disabled={c.qty <= 1}
+                          onClick={() => setComponent(i, { qty: Math.max(1, c.qty - 1) })}
+                          aria-label={loc('إنقاص', 'Less', 'کەمتر')}
+                        >
+                          <Minus className="w-4 h-4" aria-hidden />
+                        </button>
+                        <span className="min-w-[2ch] text-center text-[13px] font-bold tabular-nums">{c.qty}</span>
+                        <button
+                          type="button"
+                          className={T.btnIcon}
+                          onClick={() => setComponent(i, { qty: Math.min(99, c.qty + 1) })}
+                          aria-label={loc('زيادة', 'More', 'زیاتر')}
+                        >
+                          <Plus className="w-4 h-4" aria-hidden />
+                        </button>
+                      </div>
+                      <button
+                        type="button"
+                        className={T.btnIcon}
+                        aria-expanded={!!moreOpen[i]}
+                        onClick={() => setMoreOpen((prev) => ({ ...prev, [i]: !prev[i] }))}
+                        aria-label={loc('خيارات المنتج', 'Product choices', 'هەڵبژاردنەکانی بەرهەم')}
+                      >
+                        <ChevronDown className={`w-4 h-4 transition-transform ${moreOpen[i] ? 'rotate-180' : ''}`} aria-hidden />
+                      </button>
+                      <button
+                        type="button"
+                        className={T.btnIconDanger}
+                        onClick={() => {
+                          setEditing({ ...editing, components: components.filter((_, k) => k !== i) });
+                          setMoreOpen({});
+                        }}
+                        aria-label={loc('إزالة المنتج', 'Remove product', 'لابردنی بەرهەم')}
+                      >
+                        <Trash2 className="w-4 h-4" aria-hidden />
+                      </button>
+                    </div>
+
+                    {moreOpen[i] && (
+                      <div className="mt-2.5 pt-2.5 border-t border-[var(--ap-border)]">
+                        <Grid cols={3}>
+                          <Field ar="اختياري" en="Optional">
+                            <Toggle
+                              checked={c.optional}
+                              onChange={(v) => setComponent(i, { optional: v })}
+                              label={loc('يمكن للمشتري استبعاده', 'the buyer may decline it', 'کڕیار دەتوانێت لایبنێت')}
+                            />
+                          </Field>
+                          <Field
+                            ar="الموديل"
+                            en="Model"
+                            hint={loc('الزبون يختار، أو ثبّت واحدًا', 'the customer picks, or pin one', 'کڕیار هەڵدەبژێرێت، یان یەکێک دابمەزرێنە')}
+                          >
+                            <div className="space-y-2 min-w-0">
+                              <Toggle
+                                checked={c.customer_picks_option}
+                                onChange={(v) => setComponent(i, { customer_picks_option: v, option_value_ids: v ? [] : c.option_value_ids, choice_option_value_ids: v ? c.choice_option_value_ids : [] })}
+                                label={loc('الزبون يختار', 'customer picks', 'کڕیار هەڵدەبژێرێت')}
+                              />
+                              {!c.customer_picks_option && (
+                                <Select
+                                  value={c.option_value_ids[0] ?? ''}
+                                  onChange={(e) => setComponent(i, { option_value_ids: e.target.value ? [e.target.value] : [] })}
+                                >
+                                  <option value="">{loc('بدون تثبيت', 'not pinned', 'دیارینەکراو')}</option>
+                                  {(rel?.values ?? [])
+                                    .filter((v) => !!v.active)
+                                    .map((v) => (
+                                      <option key={v.id} value={v.id}>
+                                        {v.name_en}
+                                      </option>
+                                    ))}
+                                </Select>
+                              )}
+                            </div>
+                          </Field>
+                          <Field ar="اللون" en="Colour">
+                            <div className="space-y-2 min-w-0">
+                              <Toggle
+                                checked={c.customer_picks_color}
+                                onChange={(v) => setComponent(i, { customer_picks_color: v, color_id: v ? '' : c.color_id, choice_color_ids: v ? c.choice_color_ids : [] })}
+                                label={loc('الزبون يختار', 'customer picks', 'کڕیار هەڵدەبژێرێت')}
+                              />
+                              {!c.customer_picks_color && (
+                                <Select value={c.color_id} onChange={(e) => setComponent(i, { color_id: e.target.value })}>
+                                  <option value="">{loc('بدون تثبيت', 'not pinned', 'دیارینەکراو')}</option>
+                                  {(rel?.colors ?? [])
+                                    .filter((v) => !!v.active)
+                                    .map((v) => (
+                                      <option key={v.id} value={v.id}>
+                                        {v.name_en}
+                                      </option>
+                                    ))}
+                                </Select>
+                              )}
+                            </div>
+                          </Field>
+                        </Grid>
+                      </div>
+                    )}
+
+                    {rowIssues.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-[11.5px] text-red-300">
+                        {rowIssues.map((x, k) => (
+                          <li key={k}>{say(x)}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {components.length > 0 && (
+            <div className={`${T.surface} px-3 py-2 flex flex-wrap items-center justify-between gap-2`} data-bundle-price-before>
+              <span className="text-[12px] text-[var(--ap-text-3)]">
+                {loc('السعر قبل الحزمة (المنتجات منفردة)', 'Price before the bundle (products bought separately)', 'نرخ بەبێ پاکێج (بەرهەمەکان جیا)')}
+              </span>
+              <span className="text-[14px] font-bold text-[var(--ap-text-1)]">
+                {priceBefore === null
+                  ? loc('بعض المنتجات بلا سعر بعد', 'some products are not priced yet', 'هەندێک بەرهەم هێشتا نرخیان نییە')
+                  : formatIqd(priceBefore)}
+              </span>
+            </div>
+          )}
+        </div>
       </SectionCard>
 
-      {/* 2 — components */}
+      {/* 2 — name, description and picture, filled from the products */}
       <SectionCard
         n={2}
-        ar="المكوّنات"
-        en="Components"
-        count={components.length}
+        ar="الاسم والصورة"
+        en="Name and picture"
+        summary={autoText ? loc('تُملأ تلقائيًا من المنتجات', 'filled from the products', 'لە بەرهەمەکانەوە پڕدەکرێتەوە') : undefined}
         open={openSection === 2}
         onToggle={() => setOpenSection(openSection === 2 ? 0 : 2)}
       >
-        <Repeater
-          title={loc('منتجات الحزمة', 'The products in this bundle', 'بەرهەمەکانی پاکێج')}
-          addLabel={loc('مكوّن', 'component', 'پێکهاتە')}
-          onAdd={() => setEditing({ ...editing, components: [...components, blankComponent(components.length)] })}
-          empty={loc('لا مكوّنات بعد', 'no components yet', 'هێشتا پێکهاتە نییە')}
-        >
-          {components.map((c, i) => {
-            const rel = relations[c.member_product_id];
-            const rowIssues = issuesFor(c.id, i);
-            return (
-              <div
-                key={c.id ?? `new_${i}`}
-                className={`rounded-lg border p-2.5 min-w-0 ${rowIssues.length ? 'border-red-500/50 bg-red-500/[0.04]' : 'border-border-subtle'}`}
-              >
-                <Grid cols={3}>
-                  {/* A DEBOUNCED SEARCH, NOT THE FIRST 100 PRODUCTS.
-                      `/api/admin/products-v2` caps `limit` at 100, so a plain
-                      native select over one unsearchable page could not be widened
-                      and, on a real catalogue, simply did not contain the
-                      product an owner wanted to put in a bundle. The route
-                      already accepts `search`; this is the picker that uses
-                      it, and it resolves the CURRENT value by id so an existing
-                      row renders even when its product is on no result page. */}
-                  <Field ar="المنتج" en="Product" required>
-                    <ProductPicker
-                      value={c.member_product_id}
-                      ariaLabel={loc('اختر منتجًا', 'Choose a product', 'بەرهەمێک هەڵبژێرە')}
-                      onChange={(id) => {
-                        setComponent(i, {
-                          member_product_id: id,
-                          option_value_ids: [],
-                          color_id: '',
-                          choice_option_value_ids: [],
-                          choice_color_ids: [],
-                        });
-                        void loadRelations(id);
-                      }}
-                    />
-                  </Field>
-                  <Field ar="الكمية في الحزمة" en="Qty per bundle" required>
-                    <Qty value={c.qty} onChange={(v) => setComponent(i, { qty: Math.max(1, v ?? 1) })} placeholder="1" />
-                  </Field>
-                  <Field ar="اختياري" en="Optional">
-                    <Toggle
-                      checked={c.optional}
-                      onChange={(v) => setComponent(i, { optional: v })}
-                      label={loc('يمكن للمشتري استبعاده', 'the buyer may decline it', 'کڕیار دەتوانێت لایبنێت')}
-                    />
-                  </Field>
-                </Grid>
-                <div className="h-2.5" />
-                <Grid cols={2}>
-                  <Field
-                    ar="الخيار"
-                    en="Option"
-                    hint={loc('اتركه للعميل أو ثبّته', 'pin one, or let the customer choose', 'دایبمەزرێنە یان بیهێڵە بۆ کڕیار')}
-                  >
-                    <div className="space-y-2 min-w-0">
-                      <Toggle
-                        checked={c.customer_picks_option}
-                        onChange={(v) => setComponent(i, { customer_picks_option: v, option_value_ids: v ? [] : c.option_value_ids })}
-                        label={loc('العميل يختار', 'customer picks', 'کڕیار هەڵدەبژێرێت')}
-                      />
-                      {!c.customer_picks_option && (
-                        <Select
-                          value={c.option_value_ids[0] ?? ''}
-                          onChange={(e) => setComponent(i, { option_value_ids: e.target.value ? [e.target.value] : [] })}
-                        >
-                          <option value="">{loc('بدون تثبيت', 'not pinned', 'دیارینەکراو')}</option>
-                          {(rel?.values ?? [])
-                            .filter((v) => !!v.active)
-                            .map((v) => (
-                              <option key={v.id} value={v.id}>
-                                {v.name_en}
-                              </option>
-                            ))}
-                        </Select>
-                      )}
-                    </div>
-                  </Field>
-                  <Field ar="اللون" en="Colour">
-                    <div className="space-y-2 min-w-0">
-                      <Toggle
-                        checked={c.customer_picks_color}
-                        onChange={(v) => setComponent(i, { customer_picks_color: v, color_id: v ? '' : c.color_id })}
-                        label={loc('العميل يختار', 'customer picks', 'کڕیار هەڵدەبژێرێت')}
-                      />
-                      {!c.customer_picks_color && (
-                        <Select value={c.color_id} onChange={(e) => setComponent(i, { color_id: e.target.value })}>
-                          <option value="">{loc('بدون تثبيت', 'not pinned', 'دیارینەکراو')}</option>
-                          {(rel?.colors ?? [])
-                            .filter((v) => !!v.active)
-                            .map((v) => (
-                              <option key={v.id} value={v.id}>
-                                {v.name_en}
-                              </option>
-                            ))}
-                        </Select>
-                      )}
-                    </div>
-                  </Field>
-                </Grid>
-                {rowIssues.length > 0 && (
-                  <ul className="mt-2 space-y-1 text-[11.5px] text-red-300">
-                    {rowIssues.map((x, k) => (
-                      <li key={k}>{say(x)}</li>
-                    ))}
-                  </ul>
+        <div className="space-y-3 min-w-0" data-bundle-identity>
+          <div className={`${T.surface} p-3 min-w-0`}>
+            <div className="flex items-start justify-between gap-2 min-w-0">
+              <div className="min-w-0">
+                <p className="text-[14px] font-bold text-[var(--ap-text-1)] break-words">
+                  {shownName || (
+                    <span className="font-normal text-[var(--ap-text-3)]">
+                      {loc('اختر المنتجات وسيُكتب الاسم تلقائيًا.', 'Pick the products and the name writes itself.', 'بەرهەمەکان هەڵبژێرە و ناوەکە خۆی دەنووسرێت.')}
+                    </span>
+                  )}
+                </p>
+                {shownDescription && (
+                  <p className="mt-1 text-[12px] text-[var(--ap-text-2)] whitespace-pre-line line-clamp-5">{shownDescription}</p>
                 )}
-                <div className="mt-2 flex items-center justify-end">
-                  <button
-                    type="button"
-                    className={iconBtn}
-                    onClick={() => setEditing({ ...editing, components: components.filter((_, k) => k !== i) })}
-                    aria-label={loc('إزالة المكوّن', 'Remove component', 'لابردنی پێکهاتە')}
-                  >
-                    <Trash2 className="w-4 h-4" aria-hidden />
-                  </button>
-                </div>
               </div>
-            );
-          })}
-        </Repeater>
+              <button type="button" className={btnGhost} aria-expanded={textOpen} onClick={() => setTextOpen(!textOpen)}>
+                <Pencil className="w-4 h-4" aria-hidden /> {loc('تعديل النص', 'Edit text', 'دەستکاری دەق')}
+              </button>
+            </div>
+            <p className="mt-2 text-[11.5px] text-[var(--ap-text-3)]">
+              {autoText
+                ? loc(
+                    'الاسم والوصف يتبعان المنتجات. أي لغة ناقصة تُترجم تلقائيًا عند الحفظ.',
+                    'The name and description follow the products. Any missing language is translated when you save.',
+                    'ناو و وەسف بەدوای بەرهەمەکاندا دەچن. هەر زمانێکی کەم لە پاشەکەوتدا وەردەگێڕدرێت.'
+                  )
+                : loc('النص مكتوب يدويًا.', 'The text is written by hand.', 'دەقەکە بە دەست نووسراوە.')}{' '}
+              {!autoText && components.length > 0 && (
+                <button type="button" className="underline text-[var(--ap-accent,#6B46FF)]" onClick={() => setAutoText(true)}>
+                  {loc('أعد كتابته من المنتجات', 'Rewrite it from the products', 'لە بەرهەمەکانەوە دووبارە بینووسەوە')}
+                </button>
+              )}
+            </p>
+          </div>
+
+          {textOpen && (
+            <div className="space-y-3">
+              <TriText
+                labelAr="الاسم"
+                labelEn="Name"
+                ar={doc.name_ar}
+                en={doc.name_en}
+                ckb={doc.name_ckb}
+                onAr={(v) => editText({ name_ar: v })}
+                onEn={(v) => editText({ name_en: v })}
+                onCkb={(v) => editText({ name_ckb: v })}
+              />
+              <TriText
+                textarea
+                labelAr="الوصف"
+                labelEn="Description"
+                ar={doc.description_ar}
+                en={doc.description_en}
+                ckb={doc.description_ckb}
+                onAr={(v) => editText({ description_ar: v })}
+                onEn={(v) => editText({ description_en: v })}
+                onCkb={(v) => editText({ description_ckb: v })}
+              />
+            </div>
+          )}
+
+          <Field
+            ar="الصور"
+            en="Pictures"
+            hint={loc(
+              'الأولى هي الغلاف. إن لم تضف صورة، تُصنع صورة الحزمة من صور المنتجات عند الحفظ.',
+              'The first is the cover. Without one, the bundle picture is made from the product pictures when you save.',
+              'یەکەم بەرگەکەیە. ئەگەر وێنە زیاد نەکەیت، لە پاشەکەوتدا لە وێنەی بەرهەمەکان دروست دەکرێت.'
+            )}
+            span
+          >
+            <div className="space-y-2 min-w-0" data-bundle-images>
+              <div className="flex flex-wrap gap-2">
+                {doc.images.map((url, k) => (
+                  <div key={url} className="relative">
+                    <VariantImg sizes="96px" src={url} alt="" className="w-24 h-24 rounded-lg object-contain bg-[var(--ap-surface-2)] border border-[var(--ap-border)]" loading="lazy" />
+                    {k === 0 ? (
+                      <span className="absolute top-1 start-1 rounded px-1.5 py-0.5 text-[10px] font-bold bg-black/60 text-white">
+                        {loc('الغلاف', 'Cover', 'بەرگ')}
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="absolute top-1 start-1 rounded bg-black/60 p-1 text-white"
+                        onClick={() => setDoc({ images: [url, ...doc.images.filter((x) => x !== url)] })}
+                        aria-label={loc('اجعلها الغلاف', 'Make cover', 'بیکە بە بەرگ')}
+                      >
+                        <Star className="w-3.5 h-3.5" aria-hidden />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="absolute top-1 end-1 rounded bg-black/60 p-1 text-white"
+                      onClick={() => setDoc({ images: doc.images.filter((x) => x !== url) })}
+                      aria-label={loc('إزالة الصورة', 'Remove picture', 'لابردنی وێنە')}
+                    >
+                      <X className="w-3.5 h-3.5" aria-hidden />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" className={btnGhost} disabled={!!imageBusy} onClick={() => fileInput.current?.click()}>
+                  <ImagePlus className="w-4 h-4" aria-hidden /> {loc('رفع صورة', 'Upload picture', 'بارکردنی وێنە')}
+                </button>
+                <button
+                  type="button"
+                  className={btnGhost}
+                  disabled={!!imageBusy || memberImages.length === 0}
+                  onClick={() =>
+                    void makeCover(memberImages).then((url) => {
+                      if (url) pushImages([url], true);
+                    })
+                  }
+                  data-bundle-make-cover
+                >
+                  <Sparkles className="w-4 h-4" aria-hidden /> {loc('صنع صورة من المنتجات', 'Make a picture from the products', 'وێنە لە بەرهەمەکان دروست بکە')}
+                </button>
+                <input
+                  ref={fileInput}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    e.target.value = '';
+                    void uploadPictures(files);
+                  }}
+                />
+              </div>
+              {imageBusy && (
+                <p className="text-[12px] text-[var(--ap-text-3)] flex items-center gap-1.5" role="status">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" aria-hidden /> {imageBusy}
+                </p>
+              )}
+              {imageErr && <Banner kind="error">{imageErr}</Banner>}
+            </div>
+          </Field>
+
+          <Grid cols={3}>
+            <Field ar="الحالة" en="Status">
+              <Select value={doc.status} onChange={(e) => setDoc({ status: e.target.value as EditorDoc['status'] })}>
+                <option value="draft">{loc('مسودة', 'Draft', 'ڕەشنووس')}</option>
+                <option value="active">{loc('منشورة', 'Published', 'بڵاوکراوە')}</option>
+                <option value="hidden">{loc('مخفية', 'Hidden', 'شاراوە')}</option>
+              </Select>
+            </Field>
+            <Field ar="الترتيب" en="Display order">
+              <Qty value={doc.display_order} onChange={(v) => setDoc({ display_order: v ?? 0 })} placeholder="0" />
+            </Field>
+            <Field ar="مميّزة" en="Featured">
+              <Toggle
+                checked={doc.is_featured}
+                onChange={(v) => setDoc({ is_featured: v })}
+                label={loc('تظهر في الواجهة', 'Featured rail', 'لە ڕیزی سەرەکی')}
+              />
+            </Field>
+          </Grid>
+        </div>
       </SectionCard>
 
       {/* 3 — pricing */}
