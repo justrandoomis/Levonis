@@ -441,7 +441,7 @@ export function speedAttention(rows: readonly VitalsDayRow[], today: string): Sp
  * search entries and the live field's `nl=1` wiring; the figure follows the
  * build: 237.
  */
-export const STOREFRONT_FIXED_KB = 237;
+export const STOREFRONT_FIXED_KB = 238;
 /** The Arabic Cairo subset every store page preloads (index.html: 30,896 B); the Latin subsets load on demand. */
 export const STOREFRONT_FONT_KB = 31;
 

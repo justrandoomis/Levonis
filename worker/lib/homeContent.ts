@@ -25,6 +25,26 @@ export interface LocalizedText {
 export interface HomeBanner {
   id: string;
   image: string;
+  /**
+   * PER-SCREEN PICTURES (owner, 2026-11-19: the animated services banner
+   * «must not cut» on any device). The hero is a fixed height at every width,
+   * so one wide picture is always cropped at the sides on a phone. Optional:
+   * a phone (< 640 px) shows `imageMobile`, a tablet (640–1279 px)
+   * `imageTablet`, and each falls back to the next wider one, then `image`.
+   * Present only when set, so an existing banner keeps its exact shape.
+   */
+  imageMobile?: string;
+  imageTablet?: string;
+  /**
+   * A still drawn over the WHOLE hero behind such a slide (under the header and
+   * in the side bands) when its pictures are animations on a transparent ground,
+   * so the art's own background reaches every edge. Empty = a blurred copy.
+   */
+  imageBackground?: string;
+  /** Shown only to visitors reading this language (a picture with words in it). Absent = every language. */
+  lang?: 'ar' | 'en' | 'ckb';
+  /** Shown only on this site theme (light and dark artwork of one slide). Absent = both. */
+  theme?: 'light' | 'dark';
   link: string;
   /** Hero headline over the image. All three may be empty — then no text. */
   title: LocalizedText;
@@ -110,9 +130,19 @@ export function normalizeBanner(raw: unknown): HomeBanner | null {
   const subtitle = localized(o.subtitle, MAX_SUBTITLE);
   // A banner with neither a picture nor a headline has nothing to render.
   if (!image && isBlank(title)) return null;
+  const imageMobile = safeImage(o.imageMobile);
+  const imageTablet = safeImage(o.imageTablet);
+  const imageBackground = safeImage(o.imageBackground);
+  const lang = o.lang === 'ar' || o.lang === 'en' || o.lang === 'ckb' ? o.lang : undefined;
+  const theme = o.theme === 'light' || o.theme === 'dark' ? o.theme : undefined;
   return {
     id: typeof o.id === 'string' && o.id ? o.id.slice(0, 60) : nextId('bn'),
     image,
+    ...(imageMobile ? { imageMobile } : {}),
+    ...(imageTablet ? { imageTablet } : {}),
+    ...(imageBackground ? { imageBackground } : {}),
+    ...(lang ? { lang } : {}),
+    ...(theme ? { theme } : {}),
     link: safeLink(o.link),
     title,
     subtitle,

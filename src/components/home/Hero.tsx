@@ -167,11 +167,32 @@ function BannerSlide({
   const subtitle = pickText(banner.subtitle, lang);
   const cta = pickText(banner.cta, lang);
   const hasText = !!title || !!subtitle;
+  // The picture drawn for THIS screen (worker/lib/homeContent.ts): the hero is
+  // one fixed height at every width, so a banner may carry a phone and a tablet
+  // cut that are not cropped there. Read during render, so the first paint is
+  // already the right picture and only that one is downloaded. (A plain read,
+  // not src/lib/useMediaQuery: that module would join the entry bundle, which
+  // sits at its budget; the carousel re-renders this slide every few seconds.)
+  const image =
+    (innerWidth < 640 && banner.imageMobile) || (innerWidth < 1280 && banner.imageTablet) || banner.image;
+  // A slide made per screen is drawn WHOLE (owner: «need all animation
+  // appear»): contained in the part of the hero below the site header, whose
+  // controls end at 125 px at every width, with a blurred copy of the same
+  // picture filling the rest (or the slide's own background still, under the
+  // header too), so no edge of the art is ever cut off. Two plain
+  // <img> of ONE address (one download): such a slide is an animated WebP,
+  // whose sized copies are the original anyway (worker/routes/uploads.ts).
+  const whole = !!(banner.imageMobile || banner.imageTablet);
 
   const body = (
     <>
-      {banner.image ? (
-        <SafeImage sizes="100vw" src={banner.image} alt={title} aspect="auto" eager className="w-full h-full" />
+      {image && whole ? (
+        <>
+          <img src={banner.imageBackground || image} alt="" className={`absolute inset-0 size-full object-cover ${banner.imageBackground ? '' : 'blur-2xl'}`} />
+          <img src={image} alt={title} className="relative size-full object-contain pt-[132px]" />
+        </>
+      ) : image ? (
+        <SafeImage sizes="100vw" src={image} alt={title} aspect="auto" eager className="w-full h-full" />
       ) : (
         // Text-only banner: the owner wrote a headline but uploaded no
         // picture. Rendering the brand gradient beats rendering a grey box.

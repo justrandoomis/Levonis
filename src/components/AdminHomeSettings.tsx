@@ -33,6 +33,11 @@ interface LocalizedText { ar: string; en: string; ckb: string }
 interface Banner {
   id: string;
   image: string;
+  imageMobile?: string;
+  imageTablet?: string;
+  imageBackground?: string;
+  lang?: 'ar' | 'en' | 'ckb';
+  theme?: 'light' | 'dark';
   link: string;
   // Hero copy, one string per language. NEVER machine-translated: the owner
   // writes each one, and the storefront falls back to whichever language they
@@ -1178,7 +1183,7 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
   saveState: SaveState;
   saveError: string | null;
 }) {
-  const { dir } = useLanguage();
+  const { dir, loc } = useLanguage();
 
   const add = () => {
     onChange([
@@ -1223,6 +1228,67 @@ function BannerSettings({ titleEn, titleAr, banners, onChange, onSave, saveState
                   }}
                   dir={dir}
                 />
+              </div>
+              {/* Optional per-screen pictures, so a banner is not cropped on a
+                  phone or a tablet (worker/lib/homeContent.ts). Empty = the
+                  next wider picture is used. */}
+              {(['imageTablet', 'imageMobile', 'imageBackground'] as const).map((field) => (
+                <div key={field}>
+                  <label className="block text-xs font-bold text-text-muted uppercase mb-1">
+                    {field === 'imageTablet'
+                      ? loc('صورة التابلت (اختياري، 640–1279 بكسل)', 'Tablet image (optional, 640–1279 px)', 'وێنەی تابلێت (ئارەزوومەندانە، 640–1279 پیکسڵ)')
+                      : field === 'imageMobile'
+                        ? loc('صورة الهاتف (اختياري، أقل من 640 بكسل)', 'Phone image (optional, under 640 px)', 'وێنەی مۆبایل (ئارەزوومەندانە، کەمتر لە 640 پیکسڵ)')
+                        : loc('خلفية الشريحة (اختياري، تملأ الهيرو كله خلف الصورة)', 'Slide background (optional, fills the whole hero behind the picture)', 'باکگراوندی سلاید (ئارەزوومەندانە، هەموو هیرۆکە پڕ دەکاتەوە لە پشت وێنەکە)')}
+                  </label>
+                  <ImageField
+                    value={b[field] ?? ''}
+                    onChange={(url) => {
+                      const nb = banners.map((x, xi) => (xi === i ? { ...x, [field]: url } : x));
+                      onChange(nb);
+                    }}
+                    dir={dir}
+                  />
+                </div>
+              ))}
+              <div>
+                <label className="block text-xs font-bold text-text-muted uppercase mb-1">
+                  {loc('لغة الشريحة', 'Slide language', 'زمانی سلاید')}
+                </label>
+                <select
+                  className="lv-input text-sm"
+                  value={b.lang ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const lang: Banner['lang'] = v === 'ar' || v === 'en' || v === 'ckb' ? v : undefined;
+                    const nb = banners.map((x, xi) => (xi === i ? { ...x, lang } : x));
+                    onChange(nb);
+                  }}
+                >
+                  <option value="">{loc('كل اللغات', 'Every language', 'هەموو زمانەکان')}</option>
+                  <option value="ar">العربية</option>
+                  <option value="en">English</option>
+                  <option value="ckb">کوردی</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-text-muted uppercase mb-1">
+                  {loc('مظهر الشريحة', 'Slide theme', 'ڕووکاری سلاید')}
+                </label>
+                <select
+                  className="lv-input text-sm"
+                  value={b.theme ?? ''}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    const theme: Banner['theme'] = v === 'light' || v === 'dark' ? v : undefined;
+                    const nb = banners.map((x, xi) => (xi === i ? { ...x, theme } : x));
+                    onChange(nb);
+                  }}
+                >
+                  <option value="">{loc('الفاتح والداكن', 'Light and dark', 'ڕووناک و تاریک')}</option>
+                  <option value="light">{loc('الفاتح فقط', 'Light only', 'تەنها ڕووناک')}</option>
+                  <option value="dark">{loc('الداكن فقط', 'Dark only', 'تەنها تاریک')}</option>
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-bold text-text-muted uppercase mb-1">Link URL</label>

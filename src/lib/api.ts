@@ -2063,6 +2063,15 @@ export interface LocalizedText {
 export interface HomeBanner {
   id: string;
   image: string;
+  /** Optional per-screen pictures (worker/lib/homeContent.ts): phone < 640 px, tablet 640–1279 px. */
+  imageMobile?: string;
+  imageTablet?: string;
+  /** The still behind a per-screen slide, across the whole hero (worker/lib/homeContent.ts). */
+  imageBackground?: string;
+  /** Shown only to visitors reading this language; absent = every language. */
+  lang?: 'ar' | 'en' | 'ckb';
+  /** Shown only on this site theme (light and dark artwork of one slide). Absent = both. */
+  theme?: 'light' | 'dark';
   link: string;
   title: LocalizedText;
   subtitle: LocalizedText;

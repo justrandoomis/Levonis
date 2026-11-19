@@ -484,7 +484,10 @@ const STOREFRONT_BUDGET = 47 * KB;
 // 2026-11-13: the measured payload is unchanged in content, yet the compressed chunk names (content hashes) move it a
 // few bytes either way — the live build sat 12 bytes under 239 KB and the next one, with no storefront byte changed,
 // 4 bytes over. Back to the rule above: the speed tab's figure (STOREFRONT_FIXED_KB, 237) plus the 3 KB tolerance.
-const STOREFRONT_APP_BUDGET = 240 * KB;
+// 2026-11-19 (owner, «Yes, raise to 241 KB»; DECISIONS row 361): the home hero draws a per-screen slide whole over
+// its blurred copy, about 0.1 KB of entry code, and the live build sat 94 bytes under 240 KB. The speed tab's
+// figure moves with it (STOREFRONT_FIXED_KB 238), keeping the rule above.
+const STOREFRONT_APP_BUDGET = 241 * KB;
 const STOREFRONT_SHARED_UI = ['Overlay', 'overlayStack', 'Segmented'];
 /** Vendor chunks a lazy page may share; they are budgeted on their own, not against a page. */
 const isSharedVendor = (f: string) => /^vendor-/.test(f);

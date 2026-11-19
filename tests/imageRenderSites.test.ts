@@ -65,6 +65,7 @@ const ALLOWED_RAW: Record<string, Record<string, string>> = {
   },
   'src/components/merchant/share/ShareStore.tsx': { icon: 'the generated store icon (/store-icon/), not a stored picture' },
   'src/components/pwa/InstallAppSheet.tsx': { icon: 'a static app icon from /icons/' },
+  'src/components/home/Hero.tsx': { 'banner.imageBackground || image': 'the still behind a per-screen hero slide, or that slide’s own picture blurred (same address, one download; DECISIONS row 361)', image: 'a per-screen hero slide drawn whole over its own blurred copy: one address keeps the two to one download, and an animated WebP has no smaller copies (DECISIONS row 361)' },
   'src/components/reviews/ReviewSection.tsx': { 'p.url': "the reviewer's own unpublished photos (private until published)", 'igShot.url': 'private evidence of an Instagram post' },
   'src/components/tradeIn/parts.tsx': { 'photo.url': 'private trade-in photographs being uploaded' },
   'src/components/warranty/ClaimForms.tsx': { 'a.url': 'a private warranty-claim attachment' },

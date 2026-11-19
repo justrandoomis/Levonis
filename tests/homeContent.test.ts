@@ -210,3 +210,34 @@ test('normalizing is idempotent — a stored value re-read stays identical', () 
   const items = normalizeSectionItems({ top_brands: [{ id: 'si_1', title: 'B', image: '/b.png' }] });
   assert.deepEqual(normalizeSectionItems(items), items);
 });
+
+test('a banner keeps its optional phone and tablet pictures, and only when they are real links', () => {
+  // Owner 2026-11-19: the animated services banner «must not cut» on any device.
+  const b = normalizeBanner({ id: 'bn_3', image: '/l.webp', imageTablet: '/m.webp', imageMobile: '/s.webp', link: '/products' });
+  assert.ok(b);
+  assert.equal(b.imageTablet, '/m.webp');
+  assert.equal(b.imageMobile, '/s.webp');
+  const bad = normalizeBanner({ image: '/l.webp', imageMobile: 'javascript:alert(1)', imageTablet: '' });
+  assert.ok(bad);
+  assert.equal('imageMobile' in bad, false, 'a script URL is dropped, not stored');
+  assert.equal('imageTablet' in bad, false, 'an empty field leaves the banner in its old shape');
+  const old = normalizeBanner({ id: 'bn_1', image: '/a.png', link: '/products' });
+  assert.deepEqual(Object.keys(old ?? {}).sort(), ['cta', 'id', 'image', 'link', 'subtitle', 'title']);
+});
+
+test('a per-screen banner keeps its background still, and drops a script URL there too', () => {
+  const b = normalizeBanner({ image: '/l.webp', imageMobile: '/s.webp', imageBackground: '/bg.webp' });
+  assert.equal(b?.imageBackground, '/bg.webp');
+  assert.equal('imageBackground' in (normalizeBanner({ image: '/l.webp', imageBackground: 'javascript:x' }) ?? {}), false);
+});
+
+test('a slide may be made for one language; anything else is every language', () => {
+  assert.equal(normalizeBanner({ image: '/a.webp', lang: 'ckb' })?.lang, 'ckb');
+  assert.equal('lang' in (normalizeBanner({ image: '/a.webp', lang: 'fr' }) ?? {}), false);
+  assert.equal('lang' in (normalizeBanner({ image: '/a.webp' }) ?? {}), false);
+});
+
+test('a slide may be made for one site theme; anything else is both', () => {
+  assert.equal(normalizeBanner({ image: '/a.webp', theme: 'dark' })?.theme, 'dark');
+  assert.equal('theme' in (normalizeBanner({ image: '/a.webp', theme: 'sepia' }) ?? {}), false);
+});

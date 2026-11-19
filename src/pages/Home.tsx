@@ -1,5 +1,6 @@
 import React, { Suspense, useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useLanguage } from '../LanguageContext';
+import { useTheme } from '../lib/theme';
 import { PackageSearch } from 'lucide-react';
 import { api, ApiProduct, PublicSettings, HomeTaxon, SiteMediaEntry, pickText } from '../lib/api';
 import Hero from '../components/home/Hero';
@@ -169,8 +170,14 @@ export default function Home() {
   const sectionVisible = (id: HomeSectionId) => layout.find((x) => x.id === id)?.isVisible ?? true;
   const slides = (group: 'first_banner' | 'second_banner') =>
     slideGroupVisible(settings?.homeSections, group) ? settings?.homeBanners?.[group] ?? [] : [];
-  // The hero takes the first slide group the owner filled, then the second.
-  const heroBanners = [...slides('first_banner'), ...slides('second_banner')];
+  // The hero takes the first slide group the owner filled, then the second. A
+  // slide made for one language (an animation with words in it, row 361) shows
+  // only to visitors reading that language, and one made for a theme only on
+  // that theme (light and dark artwork of the same slide).
+  const { theme } = useTheme();
+  const heroBanners = [...slides('first_banner'), ...slides('second_banner')].filter(
+    (b) => (!b.lang || b.lang === lang) && (!b.theme || b.theme === theme)
+  );
   const homeAds = sectionVisible('ads_panel') ? settings?.homeAds ?? [] : [];
 
   /**
