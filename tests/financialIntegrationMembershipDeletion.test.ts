@@ -66,7 +66,18 @@ for (const correctBeforeDelete of [false, true]) {
       assert.notEqual((await profitSourceFingerprint(w.db, 'o')).value, fingerprint.value);
       const wageSource=String(w.raw.prepare(`SELECT ${staffBasisFingerprintSql('?1')} value`).get('o')!.value);
       assert.match(wageSource, /^\["participant-net-v2",/);
-      assert.ok(wageSource.includes(JSON.stringify(w.snapshot())),
+      // SQLite 3.54 (Node 22.23.5) no longer keeps the JSON subtype of a sub-query's json_array, so
+      // the fingerprint may hold that part as an escaped string one level deeper. The evidence is the
+      // same either way: look for the snapshot text at any depth of nested JSON strings.
+      const strings = (v: unknown, out: string[] = []): string[] => {
+        if (typeof v === 'string') {
+          out.push(v);
+          try { const p: unknown = JSON.parse(v); if (p !== null && typeof p === 'object') strings(p, out); } catch { /* plain text */ }
+        } else if (Array.isArray(v)) v.forEach((x) => strings(x, out));
+        else if (v !== null && typeof v === 'object') Object.values(v).forEach((x) => strings(x, out));
+        return out;
+      };
+      assert.ok(strings(JSON.parse(wageSource)).includes(w.snapshot()),
         'net-profit recovery retains the original membership evidence and the deleted-product identities');
       await correctMembershipSale(w.db, 'o', w.day);
       await correctMembershipSale(w.db, 'o', w.day);
