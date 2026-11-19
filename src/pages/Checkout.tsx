@@ -388,6 +388,11 @@ interface CheckoutQuoteDto {
   delivery_method_fees?: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: 'needs_configuration' | 'governorate_stopped' }>;
   shipping: ShippingQuoteDto;
   is_pickup: boolean;
+  /**
+   * Phase 6 (DECISIONS row 362): a printer line chose «استلام من المخزن». Present only then; the order
+   * must go by the store's pickup method (the server refuses another one with SERVICES_PICKUP_METHOD).
+   */
+  printer_pickup?: { required: boolean; satisfied: boolean; delivery_method_id: string; cart_item_ids?: string[] };
   /** The delivery a delivery code may take (a printer's Personal delivery excluded). Absent from an older server. */
   coupon_delivery_iqd?: number;
   /** The protected-delivery add-on: offered only when the owner priced it. */
@@ -1119,6 +1124,15 @@ export default function Checkout() {
     if (next !== deliveryMethod) setDeliveryMethod(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availableDeliveryKey, quotedDeliveryKey, deliveryMethod, items.length]);
+
+  // Phase 6: a printer the customer chose to collect from the warehouse is ordered by the store's
+  // pickup method. The quote says so (`printer_pickup`), and the page takes that method — at the
+  // first quote and again if another method is picked, because the order would be refused with it.
+  const pickupWanted = quote?.printer_pickup?.required && !quote.printer_pickup.satisfied ? quote.printer_pickup.delivery_method_id : '';
+  useEffect(() => {
+    if (pickupWanted && deliveryMethod !== pickupWanted && availableDeliveryMethods.some((method) => method.id === pickupWanted)) setDeliveryMethod(pickupWanted);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pickupWanted, deliveryMethod, availableDeliveryKey]);
 
   // THE SCREEN OFFERS EXACTLY WHAT THE SERVER ALLOWS. The owner's rule is two
   // ways to pay — in advance from the wallet, or cash on delivery — for every

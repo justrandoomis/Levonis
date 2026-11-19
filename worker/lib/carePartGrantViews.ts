@@ -74,13 +74,52 @@ async function productsWithChoices(db: D1Database, ids: string[]): Promise<Set<s
   return new Set((results ?? []).map((r) => String(r.product_id)));
 }
 
+/** A failure of the database or the platform, not of one product's own data: it must surface (5xx), never read as «this product has no price». */
+const isStorageFailure = (e: unknown) => /D1_|SQLITE|no such (table|column)|database|network|timed? ?out|too many|fetch failed/i.test(String((e as Error)?.message ?? e));
+
+/**
+ * ONE PRODUCT NEVER TAKES THE PICKER DOWN (live bug 2026-11-19: `?q=hotend` answered 500 while `?q=hot`
+ * answered 200). The storefront's card builder is asked for the whole page at once. When it throws on a
+ * PRODUCT'S OWN DATA (a row it cannot project), every row is asked for on its own and the one that still
+ * throws has no card: the picker shows it with its own name, `price_iqd: null` and `available: false`, and
+ * its id is logged. A storage failure is never swallowed — not for the batch, not for a row — and when
+ * EVERY row of a page fails alone the batch's own error is thrown: that is not one bad product.
+ */
+async function cardsOneByOneOnFailure(
+  db: D1Database, rows: Record<string, unknown>[], ctx: Awaited<ReturnType<typeof pricingCtxForUser>>
+): Promise<Map<string, Record<string, unknown>>> {
+  let batchError: unknown;
+  try {
+    return await resolveListingCards(db, rows, ctx, null, 'flag');
+  } catch (e) {
+    if (isStorageFailure(e)) throw e;
+    batchError = e;
+    console.error('[care-part] card batch failed; pricing one by one', String((e as Error)?.message ?? e));
+  }
+  const out = new Map<string, Record<string, unknown>>();
+  let failed = 0;
+  for (const row of rows) {
+    try {
+      const card = (await resolveListingCards(db, [row], ctx, null, 'flag')).get(String(row.id));
+      if (card) out.set(String(row.id), card);
+    } catch (e) {
+      if (isStorageFailure(e)) throw e;
+      failed += 1;
+      console.error('[care-part] product cannot be priced', String(row.id), String((e as Error)?.message ?? e));
+    }
+  }
+  if (rows.length > 1 && failed === rows.length) throw batchError;
+  return out;
+}
+
 /** VISIBLE product rows → their card facts and today's price for `userId`. A hidden or deleted product is absent. */
 async function pricedProducts(db: D1Database, rows: Record<string, unknown>[], userId: string | null): Promise<Map<string, PricedProduct>> {
   const out = new Map<string, PricedProduct>();
   if (!rows.length) return out;
   const ids = rows.map((r) => String(r.id));
+  const ctx = await pricingCtxForUser(db, userId);
   const [cards, choices] = await Promise.all([
-    resolveListingCards(db, rows, await pricingCtxForUser(db, userId), null, 'flag'),
+    cardsOneByOneOnFailure(db, rows, ctx),
     productsWithChoices(db, ids),
   ]);
   for (const row of rows) {

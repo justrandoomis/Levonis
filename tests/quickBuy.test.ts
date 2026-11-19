@@ -766,3 +766,27 @@ test('a retried removal of the last line replays instead of failing', async () =
   assert.equal(session(raw).state, 'cancelled');
   assertMoneyAgrees(raw);
 });
+
+// «خصص طابعتك» (DECISIONS rows 339, 360): a printer sold with its services is chosen in the cart — Quick Buy has no step
+// for the package or its delivery. With or without the price anchor it answers the services' own refusal, never a
+// delivery-setup error (under the anchor such a line would price as the Smart package with no delivery chosen).
+for (const anchor of ['none', 'smart'] as const) {
+  test(`an enrolled printer is refused with the services' own code, never SHIPPING_NEEDS_CONFIG (price_anchor ${anchor})`, async () => {
+    const { DEFAULT_PRINTER_SERVICES } = await import('../packages/pricing/src/printerServices');
+    const { REFUSAL_STRINGS } = await import('../src/lib/refusalStrings');
+    const raw = world();
+    const live = { ...DEFAULT_PRINTER_SERVICES, revision: 1, price_anchor: anchor, products: { p_printer: { warranty_family: 'a1', delivery_class: 'd1' } } };
+    raw.prepare('INSERT INTO admin_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(
+      'printerServices', JSON.stringify({ draft: live, published: live, published_at: '2026-11-19T00:00:00.000Z', published_by: 'boss' }));
+    await activate(raw);
+    const res = await add(raw, 'p_printer', 1, { printerStandardDeliveryAcceptance: PRINTER_ACK });
+    const body = await json(res);
+    assert.equal(body.code, 'SERVICES_REQUIRED', JSON.stringify(body));
+    assert.ok(res.status >= 400 && res.status < 500);
+    const w = REFUSAL_STRINGS.SERVICES_REQUIRED;
+    assert.ok(w && w.ar && w.en && w.ckb);
+    assert.equal(count(raw, 'SELECT COUNT(*) AS n FROM quick_buy_items'), 0, 'nothing was added');
+    // Everything else still goes through.
+    assert.equal((await json(await add(raw, 'p_pla', 1))).success, true);
+  });
+}

@@ -2,7 +2,8 @@
  * «خدمات الطابعات والباقات» — the owner's price list for the printer
  * services (owner brief 2026-11-17; DECISIONS row 339).
  *
- *   GET    /api/admin/printer-services            draft, published, issues, printers to map
+ *   GET    /api/admin/printer-services            draft, published, issues, printers to map,
+ *                                                 anchor_notes (phase 6: printers priced below their anchor — told, never blocking)
  *   PUT    /api/admin/printer-services/draft      save the draft   { draft, base_revision } (owner)
  *   POST   /api/admin/printer-services/publish    publish the draft { base_revision }   (owner)
  *   POST   /api/admin/printer-services/unpublish  switch the feature off               (owner)
@@ -19,6 +20,7 @@ import { purgeCatalogueAfterWrite } from '../lib/edgePolicy';
 import { configIssues, publishIssues, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
 import {
   printerExtrasCatalogIssues,
+  printerAnchorNotes,
   loadPrinterServices,
   orderServiceTasks,
   printerCatalogForMapping,
@@ -45,6 +47,7 @@ adminPrinterServiceRoutes.get('/', async (c) => {
     ...state,
     draft_issues: configIssues(state.draft),
     publish_issues: [...publishIssues(state.draft), ...(await printerExtrasCatalogIssues(db, state.draft))],
+    anchor_notes: await printerAnchorNotes(db, state.draft),
     printers,
   });
 });
@@ -68,7 +71,11 @@ adminPrinterServiceRoutes.put('/draft', requireMoneyAuthority('printer_services'
     }
   }
   const state = await saveDraft(c.env.DB, c.get('user')!.id, draft, revisionOf((body as { base_revision?: unknown }).base_revision));
-  return c.json({ success: true, ...state, draft_issues: [], publish_issues: [...publishIssues(state.draft), ...(await printerExtrasCatalogIssues(c.env.DB, state.draft))] });
+  return c.json({
+    success: true, ...state, draft_issues: [],
+    publish_issues: [...publishIssues(state.draft), ...(await printerExtrasCatalogIssues(c.env.DB, state.draft))],
+    anchor_notes: await printerAnchorNotes(c.env.DB, state.draft),
+  });
 });
 
 adminPrinterServiceRoutes.post('/publish', requireMoneyAuthority('printer_services_publish'), async (c) => {

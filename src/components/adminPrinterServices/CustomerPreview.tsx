@@ -5,6 +5,11 @@
  * warranty), packaging, the inspection, the academy, delivery, the ready packages said in words,
  * the membership row, and this printer's kits, add-ons and store bundles.
  *
+ * Phase 6 (DECISIONS row 362): when the printer's price already includes the Smart package, every
+ * choice shows its DIFFERENCE from that price — «مشمول في السعر» for what the price includes, a
+ * minus for what a cheaper choice takes off, a plus for what a dearer one adds — and the warehouse
+ * pickup shows as the third delivery choice with its note.
+ *
  * The services' prices are the list's own (exact). A kit's or an add-on's price is an ESTIMATE from
  * the products' prices now — the cart prices them at the customer's tier — and is marked so.
  */
@@ -71,6 +76,21 @@ export default function CustomerPreview({ draft, loc, lang, printer }: { draft: 
     );
   };
   const months = (n: number) => loc(`${n} شهراً`, `${n} months`, `${n} مانگ`);
+  // Phase 6: what the price includes (the Smart package's own choices), or null without the anchor.
+  const inc = offer?.anchor ? offer.packages.smart?.includes ?? null : null;
+  /** A choice's figure: its price, or — under the anchor — its difference from what the price includes. */
+  const figure = (fee: number | null | undefined, includedFee: number | null | undefined, isIncluded: boolean): ReactNode => {
+    if (!inc) return fee === 0 ? say(loc, S.pvFree) : money(fee);
+    if (fee === null || fee === undefined) return money(fee);
+    if (isIncluded) return <span data-preview-included>{say(loc, S.pvIncluded)}</span>;
+    const d = fee - (includedFee ?? 0);
+    return <span dir="ltr" data-preview-delta={d}>{d < 0 ? '−' : '+'}{formatIqd(Math.abs(d))}</span>;
+  };
+  const wFee = (w: WarrantyChoice) => (w === 'none' ? 0 : offer?.warranty ? offer.warranty[w] : null);
+  const incWarranty = inc ? wFee(inc.warranty) : null;
+  const incCare = inc && inc.care === 'c12' ? offer?.care?.c12 ?? null : 0;
+  const incPack = inc && inc.packaging === 'extra' ? offer?.packaging?.extra ?? null : 0;
+  const incInspect = inc && inc.inspection === 'full' ? offer?.inspection?.full ?? null : 0;
   const warrantyWord = (w: WarrantyChoice) => say(loc, w === 'none' ? S.pvNoWarranty : w === 'w12' ? S.pvWith12 : S.pvWith24);
 
   return (
@@ -89,14 +109,16 @@ export default function CustomerPreview({ draft, loc, lang, printer }: { draft: 
 
       {!offer ? <p className="text-[13px] text-text-secondary leading-relaxed" data-preview-empty>{say(loc, S.noOffer)}</p> : (
         <div className="space-y-2">
+          {inc ? <p className="text-[12px] text-text-secondary leading-relaxed" data-preview-anchored>{say(loc, S.pvAnchored)}</p> : null}
           {offer.warranty ? group('warranty', S.pvWarranty, <>
-            {row('none', say(loc, S.pvNoWarranty), say(loc, S.pvFree))}
-            {row('w12', say(loc, S.pvMonths12), money(offer.warranty.w12))}
-            {row('w24', say(loc, S.pvMonths24), money(offer.warranty.w24))}
+            {row('none', say(loc, S.pvNoWarranty), figure(0, incWarranty, inc?.warranty === 'none'))}
+            {row('w12', say(loc, S.pvMonths12), figure(offer.warranty.w12, incWarranty, inc?.warranty === 'w12'))}
+            {row('w24', say(loc, S.pvMonths24), figure(offer.warranty.w24, incWarranty, inc?.warranty === 'w24'))}
           </>) : off('warranty', S.pvWarranty)}
 
           {offer.care ? group('care', S.pvCare, <>
-            {row('c12', say(loc, S.pvCarePrice), money(offer.care.c12))}
+            {inc && inc.care === 'c12' ? row('care-none', loc('بلا ليفو كير', 'Without Levo Care', 'بەبێ لیڤۆ کێر'), figure(0, incCare, false)) : null}
+            {row('c12', say(loc, S.pvCarePrice), figure(offer.care.c12, incCare, inc?.care === 'c12'))}
             {/* The customer's own line of what Care includes (DECISIONS row 359): the same words the product page says. */}
             <li className="py-1" data-preview-care-includes>
               <span className="text-[12px] text-text-secondary">{PS_STRINGS[lang === 'en' || lang === 'ckb' ? lang : 'ar'].careIncludes(offer.care.max_discount_pct ?? 90)}</span>
@@ -119,6 +141,7 @@ export default function CustomerPreview({ draft, loc, lang, printer }: { draft: 
           {offer.delivery ? group('delivery', S.pvDelivery, <>
             {row('economy', say(loc, S.pvEconomy), money(offer.delivery.economy))}
             {row('personal', say(loc, S.pvPersonal), money(offer.delivery.personal))}
+            {offer.delivery.pickup ? row('pickup', say(loc, S.pvPickup), say(loc, S.pvFree), text3(offer.delivery.pickup.note, lang) || undefined) : null}
           </>) : off('delivery', S.pvDelivery)}
 
           {/* The three a customer weighs first stay open; the rest is one tap away. */}
@@ -126,12 +149,12 @@ export default function CustomerPreview({ draft, loc, lang, printer }: { draft: 
             summaryClassName="flex min-h-11 cursor-pointer list-none items-center gap-2 text-[12px] font-semibold text-text-primary [&::-webkit-details-marker]:hidden" summary={say(loc, S.pvMore)}>
           <div className="space-y-2 pb-2">
           {offer.packaging ? group('packaging', S.pvPackaging, <>
-            {row('standard', say(loc, S.pvStandard), say(loc, S.pvFree))}
-            {row('extra', say(loc, S.pvExtra), money(offer.packaging.extra))}
+            {row('standard', say(loc, S.pvStandard), figure(0, incPack, inc?.packaging === 'standard'))}
+            {row('extra', say(loc, S.pvExtra), figure(offer.packaging.extra, incPack, inc?.packaging === 'extra'))}
           </>) : off('packaging', S.pvPackaging)}
 
           {offer.inspection ? group('inspection', S.pvInspection,
-            row('full', say(loc, S.pvInspection), money(offer.inspection.full),
+            row('full', say(loc, S.pvInspection), figure(offer.inspection.full, incInspect, inc?.inspection === 'full'),
               loc(`يضيف ${offer.inspection.lead_business_days[0]}–${offer.inspection.lead_business_days[1]} أيام عمل قبل الشحن`, `adds ${offer.inspection.lead_business_days[0]}–${offer.inspection.lead_business_days[1]} business days before dispatch`, `${offer.inspection.lead_business_days[0]}–${offer.inspection.lead_business_days[1]} ڕۆژی کار پێش ناردن زیاد دەکات`))
           ) : off('inspection', S.pvInspection)}
 
@@ -141,10 +164,10 @@ export default function CustomerPreview({ draft, loc, lang, printer }: { draft: 
           </>) : null}
 
           {group('packages', S.pvPackages, <>
-            {row('just', say(loc, S.pvJust), say(loc, S.pvFree))}
+            {row('just', say(loc, S.pvJust), figure(0, offer.anchor?.fee_iqd, false))}
             {(['smart', 'complete'] as const).map((id) => {
               const p = offer.packages[id];
-              return row(id, say(loc, pkgName(id)), p ? money(p.price_iqd) : <span className="text-text-muted">{say(loc, S.pvNotOffered)}</span>,
+              return row(id, say(loc, pkgName(id)), p ? figure(p.price_iqd, offer.anchor?.fee_iqd, id === 'smart') : <span className="text-text-muted">{say(loc, S.pvNotOffered)}</span>,
                 p ? packageContents(p.includes, loc).join(loc(' + ', ' + ', ' + ')) : undefined);
             })}
           </>)}

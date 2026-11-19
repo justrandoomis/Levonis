@@ -97,12 +97,23 @@ export function routeIsUsable(facts: RouteFacts | null | undefined, method: stri
  * cards no longer need to forget the route to stay correct: a buyer who looks
  * at the direct price and goes back to «طلب مسبق» finds their sea freight
  * still chosen, and nothing direct could ever have carried a transport.
+ *
+ * ONE OPEN ROUTE ANSWERS ITSELF (owner, 2026-11-19: «Availability select auto
+ * for the stock available»). A version that is out of stock falls to «طلب
+ * مسبق» by `resolveOrderType`, and the page then stood on «اختر وسيلة النقل»
+ * with a single route to choose from — a question with one answer, and a
+ * disabled buy button until it was tapped. With no usable press, the only
+ * usable route is the answer; two or more open routes stay a real question
+ * (''), and a usable press always wins — the buyer's choice is never replaced.
+ * It is derived per combination, so it is re-read on every version change.
  */
 export function resolveTransport(
   press: string,
   orderType: OrderType,
   facts: RouteFacts | null | undefined
 ): string {
-  if (orderType !== 'pre_order' || !press) return '';
-  return routeIsUsable(facts, press) ? press : '';
+  if (orderType !== 'pre_order') return '';
+  if (press && routeIsUsable(facts, press)) return press;
+  const open = (facts?.transports ?? []).filter((t) => routeIsUsable(facts, t.method));
+  return open.length === 1 ? open[0].method : '';
 }

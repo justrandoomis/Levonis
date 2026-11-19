@@ -29,7 +29,7 @@ import type { ResolvedPrice } from './pricing';
 import { compositionDetail, pricingCtx } from '../routes/products';
 import {
   addonsOf, kitsOf, storeBundleIdsFor, unitDiscount,
-  ADDON_CHANGED, ADDON_NOT_OFFERED, ADDON_UNAVAILABLE, ADDON_WITHOUT_PRINTER, KIT_COLOR_UNAVAILABLE, MAX_STORE_BUNDLES,
+  ADDON_CHANGED, ADDON_NOT_OFFERED, ADDON_PREORDER_SEPARATE, ADDON_UNAVAILABLE, ADDON_WITHOUT_PRINTER, KIT_COLOR_UNAVAILABLE, MAX_STORE_BUNDLES,
   type PrinterDiscount, type PrinterServicesConfig,
 } from '@levonis/pricing/printerServices';
 
@@ -215,6 +215,10 @@ export function addonNotOffered(addonId: string): HttpError {
 }
 export function addonUnavailable(addonId: string, productId: string | null, reason: string | null, extra: Record<string, unknown> = {}): HttpError {
   return new HttpError(409, 'This add-on cannot be sold right now — remove it or try again later.', ADDON_UNAVAILABLE, { addon_id: addonId, product_id: productId, reason, ...extra });
+}
+/** Phase 6: the add-on is sold by pre-order only — ordered separately, never inside a ready printer's order. */
+export function addonPreorderSeparate(addonId: string, productId: string | null, extra: Record<string, unknown> = {}): HttpError {
+  return new HttpError(409, 'This add-on is available by pre-order only — order it separately from its own page.', ADDON_PREORDER_SEPARATE, { addon_id: addonId, product_id: productId, ...extra });
 }
 export function addonChanged(printerCartItemId: string, addonId: string): HttpError {
   return new HttpError(409, 'An add-on of this printer changed — choose it again.', ADDON_CHANGED, { cart_item_id: printerCartItemId, addon_id: addonId });

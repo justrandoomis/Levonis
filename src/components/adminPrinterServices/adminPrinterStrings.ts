@@ -24,6 +24,8 @@ export const CLASS_LABEL: Record<DeliveryClass, Tri> = {
   d3: ['الفئة 3 · صندوق كبير', 'Class 3 · large box', 'پۆلی 3 · سندووقی گەورە'],
   d4: ['الفئة 4 · صندوق كبير جداً', 'Class 4 · very large box', 'پۆلی 4 · سندووقی زۆر گەورە'],
   d5: ['الفئة 5 · أكبر صندوق', 'Class 5 · largest box', 'پۆلی 5 · گەورەترین سندووق'],
+  // Phase 6 (DECISIONS row 362): the owner named this class by its box himself («the size for A1 is large box»).
+  d6: ['الفئة 6 · صندوق A1', 'Class 6 · A1 box', 'پۆلی 6 · سندوقی A1'],
 };
 
 export const S = {
@@ -143,6 +145,14 @@ export const S = {
   pvNotOffered: ['غير معروض', 'Not offered', 'پێشکەش ناکرێت'],
   pvOff: ['موقوف', 'Switched off', 'ڕاگیراوە'],
   pvEstimate: ['تقديري', 'estimate', 'خەمڵێنراو'],
+  // phase 6: the price anchor and the warehouse pickup, as the customer reads them
+  pvIncluded: ['مشمول في السعر', 'Included in the price', 'لەناو نرخدایە'],
+  pvPickup: ['استلام من المخزن', 'Pick up from the warehouse', 'وەرگرتن لە کۆگا'],
+  pvAnchored: [
+    'سعر الطابعة يتضمن «الاختيار الذكي»: كل اختيار أدناه يُعرض بفرقه عن السعر (− ينقص، + يزيد).',
+    'The printer\'s price includes «Smart Choice»: every choice below shows its difference from the price (− lowers it, + raises it).',
+    'نرخی پرینتەرەکە «هەڵبژاردنی زیرەک»ی تێدایە: هەر هەڵبژاردنێکی خوارەوە جیاوازییەکەی لە نرخەکە پیشان دەدات (− کەمی دەکاتەوە، + زیادی دەکات).',
+  ],
 
   // shared tab
   sharedBanner: ['تؤثر على كل الطابعات المسجّلة', 'Affects every enrolled printer', 'کار لە هەموو پرینتەرە تۆمارکراوەکان دەکات'],
@@ -163,6 +173,43 @@ export const S = {
   sharedRelock: ['أقفلها', 'Lock again', 'دووبارە قوفڵی بکە'],
   pkgContains: ['تتضمن', 'Includes', 'ئەمانەی تێدایە'],
   emptyNotOffered: ['دينار؛ الفراغ = غير متوفر', 'IQD; empty = not offered', 'دینار؛ بەتاڵ = بەردەست نییە'],
+  // phase 6: the price anchor
+  grpAnchor: ['ماذا يتضمن سعر الطابعة', 'What the printer\'s price includes', 'نرخی پرینتەر چی تێدایە'],
+  anchorSwitch: ['سعر الطابعة المعروض هو سعر الاختيار الذكي', 'The printer\'s shown price is the Smart Choice price', 'نرخی پیشاندراوی پرینتەر نرخی هەڵبژاردنی زیرەکە'],
+  anchorOnSummary: ['مفعّل: السعر يتضمن الاختيار الذكي', 'On: the price includes Smart Choice', 'چالاکە: نرخەکە هەڵبژاردنی زیرەکی تێدایە'],
+  anchorOffSummary: ['موقوف: كل خدمة تُضاف فوق السعر', 'Off: every service is added on top of the price', 'ڕاگیراوە: هەر خزمەتگوزارییەک دەخرێتە سەر نرخەکە'],
+  anchorHintOn: [
+    'عند التفعيل: سعر كل طابعة مسجّلة كما يظهر في المتجر هو سعرها مع باقة «الاختيار الذكي». من يختار «الطابعة فقط» يدفع أقل (يُطرح سعر الباقة)، ومن يختار «التجربة الكاملة» يدفع الفرق فقط. من يشتري بلا اختيار تُحسب وتُسجَّل له باقة الاختيار الذكي.',
+    'When on: every enrolled printer\'s price as the store shows it is its price WITH the «Smart Choice» package. A customer who picks «Printer only» pays less (the package\'s price is taken off); one who picks «Complete» pays only the difference. A purchase with no choice is priced and recorded as Smart Choice.',
+    'کاتێک چالاکە: نرخی هەر پرینتەرێکی تۆمارکراو وەک لە فرۆشگا دەردەکەوێت، نرخەکەیەتی لەگەڵ پاکێجی «هەڵبژاردنی زیرەک». ئەو کڕیارەی «تەنها پرینتەر» هەڵدەبژێرێت کەمتر دەدات (نرخی پاکێجەکە لێی دەردەکرێت)، و ئەوەی «ئەزموونی تەواو» هەڵدەبژێرێت تەنها جیاوازییەکە دەدات. کڕینێک بەبێ هەڵبژاردن وەک هەڵبژاردنی زیرەک هەژمار و تۆمار دەکرێت.',
+  ],
+  anchorHintOff: [
+    'عند الإيقاف: السعر المعروض للطابعة وحدها، وكل خدمة يختارها الزبون تُضاف فوقه.',
+    'When off: the shown price is for the printer alone, and every service the customer picks is added on top of it.',
+    'کاتێک ڕاگیراوە: نرخی پیشاندراو تەنها بۆ پرینتەرەکەیە، و هەر خزمەتگوزارییەک کڕیار هەڵیبژێرێت دەخرێتە سەری.',
+  ],
+  anchorExample: ['مثال من هذه الطابعة', 'An example from this printer', 'نموونەیەک لەم پرینتەرە'],
+  anchorPriceWord: ['السعر', 'Price', 'نرخ'],
+  anchorNeedsSmart: [
+    'يحتاج باقة «الاختيار الذكي» مفعّلة ومسعّرة لعائلة هذه الطابعة.',
+    'It needs the «Smart Choice» package switched on and priced for this printer\'s family.',
+    'پێویستی بە پاکێجی «هەڵبژاردنی زیرەک» هەیە کە چالاک بێت و بۆ خێزانی ئەم پرینتەرە نرخی هەبێت.',
+  ],
+  anchorBelow: [
+    'سعر هذه الطابعة أقل من سعر باقة الاختيار الذكي، فلا يُطبَّق عليها هذا الخيار: تُباع بسعرها والخدمات تُضاف فوقه.',
+    'This printer\'s price is below the Smart Choice package, so this switch does not apply to it: it sells at its price with the services added on top.',
+    'نرخی ئەم پرینتەرە لە نرخی پاکێجی هەڵبژاردنی زیرەک کەمترە، بۆیە ئەم هەڵبژاردەیە بۆی جێبەجێ نابێت: بە نرخی خۆی دەفرۆشرێت و خزمەتگوزارییەکان دەخرێنە سەری.',
+  ],
+  // phase 6: the warehouse pickup
+  pickupSwitch: ['استلام من المخزن — مجاناً', 'Pick up from the warehouse — free', 'وەرگرتن لە کۆگا — بەخۆڕایی'],
+  pickupHint: [
+    'خيار ثالث بجانب الاقتصادي والشخصي، بلا رسوم توصيل. يُكمَل الطلب بطريقة «الاستلام من المتجر» في صفحة الدفع.',
+    'A third choice beside Economy and Personal, with no delivery fee. The order is completed with the «store pickup» method at checkout.',
+    'هەڵبژاردەی سێیەم لە تەنیشت ئابووری و تایبەت، بەبێ کرێی گەیاندن. داواکارییەکە لە پەڕەی پارەدان بە شێوازی «وەرگرتن لە فرۆشگا» تەواو دەکرێت.',
+  ],
+  pickupNoteTitle: ['سطر العنوان وساعات الاستلام (يظهر للزبون تحت الخيار)', 'Address and pickup hours line (shown to the customer under the choice)', 'دێڕی ناونیشان و کاتەکانی وەرگرتن (لە ژێر هەڵبژاردەکە بۆ کڕیار پیشان دەدرێت)'],
+  pickupNoteRule: ['اكتبه بالعربية والإنجليزية والكردية معاً، أو اتركه فارغاً.', 'Write it in Arabic, English and Kurdish together, or leave it empty.', 'بە عەرەبی و ئینگلیزی و کوردی پێکەوە بینووسە، یان بە بەتاڵی بیهێڵەوە.'],
+  pickupOn: ['الاستلام من المخزن: متاح', 'Warehouse pickup: offered', 'وەرگرتن لە کۆگا: بەردەستە'],
 
   // offers tab
   kits: ['باقات الفيلامنت', 'Filament kits', 'پاکێجەکانی فیلامێنت'],

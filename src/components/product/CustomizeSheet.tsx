@@ -1,4 +1,15 @@
 /**
+ * PHASE 6 (owner, 2026-11-19; DECISIONS row 362) — four changes, all in this chunk:
+ *  - the chosen option and the primary action wear the house's own states (`lv-choice`: a
+ *    pressed fill and a gold check; `lv-button-accent`), not a pure white slab on a dark sheet;
+ *  - under a price anchor every choice says what it does to the PRICE («مشمول في السعر», −, +);
+ *  - each service says what it gives: one line under its title, and «ماذا يشمل؟» under its
+ *    choices (printerServicesExplain.ts) — Levo Care, the most important one, opens with its facts;
+ *  - the kit / add-on / bundle lists and the membership options are read when the sheet opens,
+ *    from the answers the card already asked for (`warmSheet`), so a row's list is there when it
+ *    is opened; a list still on its way is drawn as blocks of its rows' height.
+ * Delivery lists the free warehouse pickup when the offer carries it.
+ *
  * «تخصيص بنفسي» — the bottom sheet (owner brief 2026-11-17; DECISIONS row 339;
  * reference images «12_40_06» collapsed and «12_40_00» expanded).
  *
@@ -34,22 +45,35 @@ import { useAuth } from '../../AuthContext';
 import { authPathWithSupportRef } from '../../lib/supportRef';
 import { TIER_ORDER, tierLabel, type AnyTier } from '../subscription/tierMeta';
 import { CirclePlay, Check, ChevronDown, ClipboardCheck, Crown, Heart, Package, Shield, ShoppingCart, SlidersHorizontal, Spool, Truck, X } from 'lucide-react';
-import { AddonsBody, BeforeAfter, BundlesBody, KitColours, OffersLoading, RANDOM, colourProblem, loadOffers, type OfferExtras, type PrinterOffers } from './PrinterOffersRows';
+import { AddonsBody, BeforeAfter, BundlesBody, KitColours, OffersLoading, RANDOM, colourProblem, loadOffersWarm, offersNow, type OfferExtras, type PrinterOffers } from './PrinterOffersRows';
 import { OFFER_STRINGS, offerErrorText } from './printerOfferStrings';
 import { Sheet } from '../ui/Sheet';
 import VariantImg from '../ui/VariantImg';
 import { PS_STRINGS, servicesErrorText, type PsLang } from './printerServicesStrings';
+import { EXPLAIN } from './printerServicesExplain';
 import {
+  CHOSEN_EDGE,
   EMPTY_SELECTION,
+  anchorOf,
+  anchoredStart,
   asCustom,
+  deliveryChoices,
   deliveryFee,
   firstBlocker,
   loadMembershipOptions,
   moveRadioFocus,
+  netFee,
+  optionDelta,
+  pickupOf,
   readyToBuy,
   servicesOnly,
+  signedMoney,
   tabStop,
+  warmed,
+  warmedNow,
+  type DeliveryPick,
   type KitsFor,
+  type ServiceKey,
   type MembershipOption,
   type MembershipOptions,
   type PricedKit,
@@ -99,6 +123,24 @@ export interface CustomizeSheetProps {
 
 type Loaded<T> = { state: 'loading' } | { state: 'failed' } | { state: 'ready'; data: T };
 
+/** What one account's membership options are remembered under (printerServicesModel `warmed`). */
+const membersKey = (userId: string) => `m:${userId}`;
+
+/**
+ * Asked by the package card while it is idle (owner, 2026-11-19: «the filament kit and
+ * subscription is delayed to show»): the kits / add-ons / bundles answer for this printer
+ * selection, and — signed in — the membership options. Each once per key; the sheet reads the
+ * same answers when it opens, so its rows are there on the first paint.
+ */
+export function warmSheet(offer: ServicesOffer, kitsFor: KitsFor | null, lang: PsLang, userId: string | null): void {
+  if (kitsFor && (offer.kits.length || (offer.addons ?? []).length || (offer.store_bundles ?? []).length)) {
+    void loadOffersWarm(kitsFor, null, lang).catch(() => undefined);
+  }
+  if (userId && offer.membership && offer.membership.tiers.length) {
+    void warmed(membersKey(userId), () => loadMembershipOptions()).catch(() => undefined);
+  }
+}
+
 type DraftQuote = { key: string; state: 'fresh' | 'failed'; unit: number | null; sel: QuotedSelection | null };
 
 type RowKey = 'warranty' | 'care' | 'membership' | 'packaging' | 'delivery' | 'inspection' | 'academy' | 'filament' | 'addons' | 'bundles';
@@ -106,6 +148,8 @@ type RowKey = 'warranty' | 'care' | 'membership' | 'packaging' | 'delivery' | 'i
 export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, adding = false, offer, current, printer, lang, money, quote, busy = false, error = null, kitsFor = null }: CustomizeSheetProps) {
   const s = PS_STRINGS[lang];
   const o4 = OFFER_STRINGS[lang];
+  const x = EXPLAIN[lang];
+  const anchor = anchorOf(offer);
   const titleId = useId();
   const keyDir = lang === 'en' ? 'ltr' : 'rtl';
   const [draft, setDraft] = useState<ServiceSelection>(() => start(current, offer));
@@ -179,9 +223,10 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const [kits, setKits] = useState<Loaded<PrinterOffers> | null>(null);
   const [memberTry, setMemberTry] = useState(0);
   const [kitTry, setKitTry] = useState(0);
-  const wantMembers = open && memberOffered && !!user && (openRow === 'membership' || !!draft.extras?.membershipPlanId);
-  const wantKits = open && !!kitsFor && (kitsOffered || addonsOffered || bundlesOffered)
-    && (openRow === 'filament' || openRow === 'addons' || openRow === 'bundles' || !!draft.extras?.kitId || addonIds.length > 0);
+  // Read as soon as the sheet opens — from the answers the card already asked for (`warmSheet`) —
+  // so a row shows its list the moment it is opened, not a request later.
+  const wantMembers = open && memberOffered && !!user;
+  const wantKits = open && !!kitsFor && (kitsOffered || addonsOffered || bundlesOffered);
   // The colours picked so far: the server prices exactly those (a colour may carry its own price).
   // (Kit items are keyed by product id and add-ons by their own id: one `colors` query carries both.)
   const coloursKey = JSON.stringify(Object.entries({ ...(x4.kitColors ?? {}), ...(x4.addonColors ?? {}) }).sort(([a], [b]) => a.localeCompare(b)));
@@ -224,31 +269,45 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   }, [versionKey, offerKitsKey, offerAddonsKey, offerMemberKey, open]);
   useEffect(() => { setKits(null); }, [kitsKey]);
   useEffect(() => { setMembers(null); }, [offerMemberKey]);
+  const memberTried = useRef(0);
   useEffect(() => {
-    if (!wantMembers) return;
-    const ac = new AbortController();
-    setMembers((m) => (m?.state === 'ready' ? m : { state: 'loading' }));
-    loadMembershipOptions(ac.signal).then(
-      (data) => { if (!ac.signal.aborted) setMembers({ state: 'ready', data }); },
-      () => { if (!ac.signal.aborted) setMembers({ state: 'failed' }); }
+    if (!wantMembers || !user?.id) return;
+    let alive = true;
+    const key = membersKey(user.id);
+    // «إعادة المحاولة» asks the server again; otherwise the card's warm answer is the first paint.
+    const again = memberTried.current !== memberTry;
+    memberTried.current = memberTry;
+    const here = again ? undefined : warmedNow<MembershipOptions>(key);
+    if (here) setMembers({ state: 'ready', data: here });
+    else setMembers((m) => (m?.state === 'ready' ? m : { state: 'loading' }));
+    warmed(key, () => loadMembershipOptions(), again).then(
+      (data) => { if (alive) setMembers({ state: 'ready', data }); },
+      () => { if (alive) setMembers({ state: 'failed' }); }
     );
-    return () => ac.abort();
+    return () => { alive = false; };
   }, [wantMembers, memberTry, user?.id, offerMemberKey]);
   // A colour tap re-reads the figures (a colour may carry its own price): the last answer stays on screen
   // meanwhile, and the apply waits for the answer of exactly these colours (`coloursFresh`).
   const [pricedColours, setPricedColours] = useState('');
+  const kitTried = useRef(0);
+  // The selection whose list is on screen: only a colour tap AFTER that is debounced.
+  const kitsRead = useRef('');
   useEffect(() => {
     if (!wantKits || !kitsKey) return;
-    const ac = new AbortController();
-    setKits((k) => (k?.state === 'ready' ? k : { state: 'loading' }));
+    let alive = true;
+    const f = JSON.parse(kitsKey) as KitsFor;
     const colours = Object.fromEntries(JSON.parse(coloursKey) as Array<[string, string]>);
-    const timer = setTimeout(() => {
-      loadOffers(JSON.parse(kitsKey) as KitsFor, colours, lang, ac.signal).then(
-        (data) => { if (!ac.signal.aborted) { setKits({ state: 'ready', data }); setPricedColours(coloursKey); } },
-        () => { if (!ac.signal.aborted) setKits({ state: 'failed' }); }
-      );
-    }, 150);
-    return () => { clearTimeout(timer); ac.abort(); };
+    const again = kitTried.current !== kitTry;
+    kitTried.current = kitTry;
+    const landed = (data: PrinterOffers) => { if (alive) { kitsRead.current = kitsKey; setKits({ state: 'ready', data }); setPricedColours(coloursKey); } };
+    // The card's warm answer for exactly this selection and these colours: on screen at once.
+    const here = again ? undefined : offersNow(f, colours, lang);
+    if (here) { landed(here); return () => { alive = false; }; }
+    setKits((k) => (k?.state === 'ready' ? k : { state: 'loading' }));
+    const ask = () => { loadOffersWarm(f, colours, lang, again).then(landed, () => { if (alive) setKits({ state: 'failed' }); }); };
+    // The first read of a selection is asked at once; a colour tap waits a moment for the next one.
+    const timer = kitsRead.current === kitsKey ? setTimeout(ask, 150) : (ask(), undefined);
+    return () => { alive = false; if (timer) clearTimeout(timer); };
   }, [wantKits, kitsKey, kitTry, coloursKey, lang]);
   const blockedWords = (code: string) => s.memberBlocked[code] || servicesErrorText(code, lang) || s.unavailable;
   const blockedSentence = (code: string) => servicesErrorText(code, lang) || s.memberBlocked[code] || s.unavailable;
@@ -320,6 +379,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   // The server prices the services only; the extras are priced by their own endpoints below.
   const draftKey = JSON.stringify(servicesOnly(applied));
   const [q, setQ] = useState<DraftQuote | null>(null);
+  const quotedOnce = useRef(false);
   // The caller may hand a new function each render: the latest one is used, the draft is what re-asks.
   const quoteRef = useRef(quote);
   quoteRef.current = quote;
@@ -330,12 +390,13 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
     if (!open || !quote) return;
     const ac = new AbortController();
     const sel = JSON.parse(draftKey) as ServiceSelection;
+    // The opening's own figure is asked at once; a tap waits a moment for the next one.
     const timer = setTimeout(() => {
       quote(sel, ac.signal).then(
-        (r) => { if (!ac.signal.aborted) setQ({ key: draftKey, state: 'fresh', unit: r?.unit_iqd ?? null, sel: r?.selection ?? null }); },
+        (r) => { if (!ac.signal.aborted) { quotedOnce.current = true; setQ({ key: draftKey, state: 'fresh', unit: r?.unit_iqd ?? null, sel: r?.selection ?? null }); } },
         () => { if (!ac.signal.aborted) setQ({ key: draftKey, state: 'failed', unit: null, sel: null }); }
       );
-    }, 250);
+    }, quotedOnce.current ? 250 : 0);
     return () => { clearTimeout(timer); ac.abort(); };
   }, [open, draftKey, canQuote]);
   const fresh = quote && q?.key === draftKey ? q : null;
@@ -364,9 +425,12 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const unit = figures?.unit ?? null;
   const dFee = figures ? figures.sel.delivery_fee_iqd : null;
   /** Anything the folded «تفاصيل السعر» would list. */
-  const breakdown = (!!figures && figures.sel.fee_iqd > 0) || dFee !== null || memberCharge !== null || kitTotal !== null || addonsTotal !== null;
+  // Under an anchor the services line is what the draft does to the PRICE (the server's net figure).
+  const net = figures && anchor ? netFee(figures.sel) : null;
+  const servicesSaid = !figures ? null : net !== null ? (net === 0 ? s.included : signedMoney(net, money)) : figures.sel.fee_iqd > 0 ? `+ ${money(figures.sel.fee_iqd)}` : null;
+  const breakdown = servicesSaid !== null || dFee !== null || memberCharge !== null || kitTotal !== null || addonsTotal !== null;
 
-  const row = (key: RowKey, icon: React.ReactNode, title: string, sub: string, value: string, body: React.ReactNode, hidden = false) => {
+  const row = (key: RowKey, icon: React.ReactNode, title: string, sub: string, value: string, body: React.ReactNode, hidden = false, tag = '') => {
     if (hidden) return null;
     const expanded = openRow === key;
     const panelId = `${titleId}-${key}`;
@@ -377,14 +441,18 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
           aria-expanded={expanded}
           aria-controls={panelId}
           onClick={() => setOpenRow((r) => (r === key ? null : key))}
-          className="flex min-h-14 w-full items-center gap-3 px-1 py-2 text-start [touch-action:manipulation] active:opacity-70"
+          className="flex min-h-14 w-full items-center gap-3 px-1 py-2.5 text-start [touch-action:manipulation] active:opacity-70"
         >
           <span className="shrink-0 text-text-secondary">{icon}</span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[14px] font-semibold text-text-primary">{title}</span>
-            <span className="block truncate text-[11.5px] text-text-secondary">{sub}</span>
+            <span className="flex flex-wrap items-center gap-x-2">
+              <span className="text-[14px] font-bold text-text-primary">{title}</span>
+              {tag ? <span className="shrink-0 text-[10px] font-bold leading-4 text-gold" data-sheet-tag>{tag}</span> : null}
+            </span>
+            {/* One line that says what the service gives — read without opening the row. */}
+            <span className="mt-0.5 block text-[11.5px] leading-snug text-text-secondary">{sub}</span>
           </span>
-          <span className="shrink-0 text-[12.5px] font-semibold tabular-nums text-text-primary" dir="auto">{value}</span>
+          <bdi className={`shrink-0 text-[12.5px] font-bold tabular-nums ${value === s.included ? 'text-gold' : 'text-text-primary'}`} data-sheet-value>{value}</bdi>
           <ChevronDown aria-hidden="true" className={`w-4 h-4 shrink-0 text-text-secondary transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`} />
         </button>
         {/* Revealed with opacity and a 4px slide (compositor only): the height
@@ -394,7 +462,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
     );
   };
 
-  const choice = <T extends string>(name: string, options: Array<{ id: T; label: string; price: number | null; sub?: string }>, value: T, onPick: (v: T) => void, cols = 2) => {
+  const choice = <T extends string>(name: string, options: Array<{ id: T; label: string; price: number | null; sub?: string; said?: string }>, value: T, onPick: (v: T) => void, cols = 2) => {
     const stop = tabStop(options.map((o) => o.id), value, (id) => options.find((o) => o.id === id)?.price !== null);
     return (
       <div className={`grid gap-2 ${cols === 3 ? 'grid-cols-3' : 'grid-cols-2'}`} role="radiogroup" aria-label={name} onKeyDown={(e) => moveRadioFocus(e, keyDir)}>
@@ -409,16 +477,17 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               tabIndex={stop === o.id ? 0 : -1}
               disabled={o.price === null}
               onClick={() => onPick(o.id)}
-              className={`min-h-12 rounded-xl border px-2.5 py-1.5 text-start press-scale [touch-action:manipulation] disabled:opacity-50 ${on ? 'bg-white text-black border-transparent' : 'border-border-subtle text-text-primary'}`}
+              style={on ? CHOSEN_EDGE : undefined}
+              className="lv-choice min-h-12 px-2.5 py-2 text-start [touch-action:manipulation] disabled:opacity-50"
             >
-              <span className="flex items-center justify-between gap-1.5">
-                <span className="text-[12.5px] font-semibold leading-tight">{o.label}</span>
-                {on ? <Check aria-hidden="true" className="animate-in fade-in duration-200 motion-reduce:animate-none w-3.5 h-3.5 shrink-0" /> : null}
+              <span className="flex items-start justify-between gap-1.5">
+                <span className="text-[12.5px] font-bold leading-tight text-text-primary">{o.label}</span>
+                <span aria-hidden="true" className="lv-choice-mark"><Check className="h-3 w-3" /></span>
               </span>
-              <span className={`block text-[11px] tabular-nums ${on ? 'opacity-70' : 'text-text-secondary'}`} dir="auto">
-                {o.id === 'none' ? ' ' : o.price === null ? s.unavailable : o.price === 0 ? s.free : `+${money(o.price)}`}
-              </span>
-              {o.sub ? <span className={`block text-[10.5px] leading-snug ${on ? 'opacity-70' : 'text-text-secondary'}`}>{o.sub}</span> : null}
+              <bdi className={`mt-0.5 block text-[11px] tabular-nums ${o.said === s.included ? 'font-bold text-gold' : 'text-text-secondary'}`}>
+                {o.said ?? (o.id === 'none' ? ' ' : o.price === null ? s.unavailable : o.price === 0 ? s.free : `+${money(o.price)}`)}
+              </bdi>
+              {o.sub ? <span className="block text-[10.5px] leading-snug text-text-secondary">{o.sub}</span> : null}
             </button>
           );
         })}
@@ -428,7 +497,30 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
 
   const priceOf = (v: number | null | undefined) => (v === null || v === undefined ? null : v);
   const shown = (v: number | null) => (v === null ? '—' : v === 0 ? s.free : `+${money(v)}`);
-  const warrantyValue = draft.warranty === 'none' ? s.none : shown(priceOf(offer.warranty?.[draft.warranty]));
+  /*
+   * Phase 6 (DECISIONS row 362): every choice of the four priced services says what it does to the
+   * PRICE — «مشمول في السعر» for what the price already holds, a minus for less, a plus for more.
+   * Without an anchor nothing is included, so the figures are the «+» prices they always were.
+   */
+  const opt = <T extends string>(service: ServiceKey, id: T, label: string) => {
+    const d = optionDelta(offer, service, id);
+    return { id, label, price: d ? d.iqd : null, said: !d ? s.unavailable : d.included ? s.included : d.iqd === 0 ? (id === 'none' ? ' ' : s.free) : signedMoney(d.iqd, money) };
+  };
+  /** The collapsed row's figure for the choice in force; `zero` is its word when it changes nothing. */
+  const valueOf = (service: ServiceKey, id: string, zero: string) => {
+    const d = optionDelta(offer, service, id);
+    return !d ? '—' : d.included ? s.included : d.iqd === 0 ? zero : signedMoney(d.iqd, money);
+  };
+  /** «ماذا يشمل؟» — the facts of one service, folded under its choices (printerServicesExplain.ts). */
+  const includes = (key: string, points: string[], opened = false) => (
+    <details className="mt-1" open={opened || undefined} data-sheet-includes={key}>
+      <summary className="inline-flex min-h-11 cursor-pointer items-center text-[12px] font-bold text-text-primary underline">{x.whatIncluded}</summary>
+      <ul className="list-disc space-y-1 ps-5 text-[11.5px] leading-relaxed text-text-secondary">
+        {points.map((line, i) => <li key={i}>{line}</li>)}
+      </ul>
+    </details>
+  );
+  const warrantyValue = valueOf('warranty', draft.warranty, draft.warranty === 'none' ? s.none : s.free);
   const academyLive = draft.academy !== 'recorded';
   const actionBusy = busy || adding;
 
@@ -449,17 +541,18 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               disabled={o.disabled}
               onClick={() => onPick(o.id)}
               data-sheet-option={o.id}
-              className={`min-h-12 w-full rounded-xl border px-2.5 py-1.5 text-start press-scale [touch-action:manipulation] disabled:opacity-50 ${on ? 'bg-white text-black border-transparent' : o.suggested ? 'border-dashed border-text-muted text-text-primary' : 'border-border-subtle text-text-primary'}`}
+              style={on ? CHOSEN_EDGE : undefined}
+              className={`lv-choice min-h-12 w-full px-2.5 py-2 text-start [touch-action:manipulation] disabled:opacity-50 ${o.suggested && !on ? 'border-dashed' : ''}`}
             >
               <span className="flex items-center justify-between gap-1.5">
-                <span className="text-[12.5px] font-semibold leading-tight">{o.label}</span>
-                <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-semibold tabular-nums" dir="auto">
+                <span className="text-[12.5px] font-bold leading-tight text-text-primary">{o.label}</span>
+                <span className="flex shrink-0 items-center gap-1.5 text-[12px] font-bold tabular-nums text-text-primary" dir="auto">
                   {o.right}
-                  {on ? <Check aria-hidden="true" className="animate-in fade-in duration-200 motion-reduce:animate-none w-3.5 h-3.5 shrink-0" /> : null}
+                  <span aria-hidden="true" className="lv-choice-mark"><Check className="h-3 w-3" /></span>
                 </span>
               </span>
               {o.lines.filter(Boolean).map((l, i) => (
-                <span key={i} className={`block text-[11px] leading-snug ${on ? 'opacity-70' : 'text-text-secondary'}`} dir="auto">{l}</span>
+                <span key={i} className="mt-0.5 block text-[11px] leading-snug text-text-secondary" dir="auto">{l}</span>
               ))}
             </button>
           );
@@ -468,9 +561,9 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
     );
   };
 
-  const loadingLine = (state: 'loading' | 'failed', loading: string, failed: string, again: () => void) =>
+  const loadingLine = (state: 'loading' | 'failed', loading: string, failed: string, again: () => void, rows = 2) =>
     state === 'loading' ? (
-      <p role="status" className="text-[11.5px] text-text-secondary">{loading}</p>
+      <OffersLoading state="loading" lang={lang} again={again} rows={rows} label={loading} />
     ) : (
       <p role="alert" className="flex flex-wrap items-center gap-2 text-[11.5px] text-text-primary">
         {failed}
@@ -495,7 +588,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
         </>
       );
     }
-    if (!members || members.state !== 'ready') return <>{loadingLine(members?.state === 'failed' ? 'failed' : 'loading', s.memberLoading, s.memberFailed, () => setMemberTry((n) => n + 1))}{terms}</>;
+    if (!members || members.state !== 'ready') return <>{loadingLine(members?.state === 'failed' ? 'failed' : 'loading', s.memberLoading, s.memberFailed, () => setMemberTry((n) => n + 1), (offer.membership?.tiers.length ?? 1) + 1)}{terms}</>;
     const m = members.data;
     if (!m.offered) return <p className="text-[11.5px] text-text-secondary">{s.memberOff}</p>;
     // The package's tier is only drawn as a suggestion until the customer taps (a visual default is not consent).
@@ -530,7 +623,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
 
   function kitsBody() {
     const note = <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary">{s.kitNote}</p>;
-    if (!kits || kits.state !== 'ready') return <>{loadingLine(kits?.state === 'failed' ? 'failed' : 'loading', s.kitsLoading, s.kitsFailed, () => setKitTry((n) => n + 1))}{note}</>;
+    if (!kits || kits.state !== 'ready') return <>{loadingLine(kits?.state === 'failed' ? 'failed' : 'loading', s.kitsLoading, s.kitsFailed, () => setKitTry((n) => n + 1), offer.kits.length + 1)}{note}</>;
     // A customer-colour item names its picked colour (or «لون عشوائي») instead of a fixed variant.
     const picked = (pid: string) => {
       const v = x4.kitColors?.[pid] ?? RANDOM;
@@ -606,9 +699,9 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               {breakdown ? (
                 <details data-sheet-breakdown>
                   <summary className="cursor-pointer font-semibold text-text-primary">{o4.priceDetails}</summary>
-                  {figures && figures.sel.fee_iqd > 0 ? <span className="block tabular-nums" dir="auto">{s.services}: + {money(figures.sel.fee_iqd)}</span> : null}
-                  {dFee !== null ? <span className="block tabular-nums" dir="auto">{s.deliveryLine}: + {money(dFee)}</span> : null}
-                  {dFee !== null ? <span className="block">{s.deliveryApart}</span> : null}
+                  {servicesSaid !== null ? <span className="block tabular-nums" data-sheet-services>{s.services}: <bdi>{servicesSaid}</bdi></span> : null}
+                  {dFee !== null ? <span className="block tabular-nums" dir="auto">{s.deliveryLine}: {dFee === 0 ? s.free : `+ ${money(dFee)}`}</span> : null}
+                  {dFee !== null && dFee > 0 ? <span className="block">{s.deliveryApart}</span> : null}
                   {/* Phase 2: their own cart lines — each figure from its own endpoint, never added to the total. */}
                   {memberCharge !== null ? <span className="block tabular-nums" dir="auto" data-sheet-membership-charge>{s.membership}: + {money(memberCharge)}</span> : null}
                   {kitTotal !== null ? <span className="block tabular-nums" dir="auto" data-sheet-kit-total>{s.filament}: + {money(kitTotal)}</span> : null}
@@ -637,7 +730,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
                 type="button"
                 disabled={!ready}
                 onClick={() => { if (ready) onApply(applied, labels); }}
-                className="min-h-12 shrink-0 rounded-full border border-border-subtle px-4 text-[14px] font-semibold text-text-primary press-scale disabled:opacity-50"
+                className="lv-button lv-button-secondary shrink-0"
                 data-sheet-apply
               >
                 {busy ? s.saving : s.apply}
@@ -647,7 +740,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
                 disabled={!ready}
                 aria-busy={actionBusy || undefined}
                 onClick={() => { if (ready) onApplyAndAdd(applied, labels); }}
-                className="flex min-h-12 flex-1 items-center justify-center gap-2 rounded-full bg-white text-[15px] font-bold text-black press-scale disabled:opacity-50"
+                className="lv-button lv-button-accent min-w-0 flex-1"
                 data-sheet-add
               >
                 <ShoppingCart aria-hidden="true" className="w-4 h-4" /> {adding ? s.adding : s.addToCart}
@@ -659,7 +752,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               disabled={!ready}
               aria-busy={busy || undefined}
               onClick={() => { if (ready) onApply(applied, labels); }}
-              className="flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-white text-[15px] font-bold text-black press-scale disabled:opacity-50"
+              className="lv-button lv-button-accent w-full"
               data-sheet-apply
             >
               <Check aria-hidden="true" className="w-4 h-4" /> {busy ? s.saving : s.apply}
@@ -670,68 +763,81 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
       }
     >
       <div className="divide-y divide-border-subtle px-4 pb-4">
-        {row('warranty', <Shield className="w-5 h-5" aria-hidden="true" />, s.warranty, s.warrantySub, warrantyValue, (
+        {row('warranty', <Shield className="w-5 h-5" aria-hidden="true" />, s.warranty, x.warrantySum, warrantyValue, (
           <>
             {choice(s.warranty, [
-              { id: 'none' as const, label: s.none, price: 0 },
-              { id: 'w12' as const, label: s.months(12), price: priceOf(offer.warranty?.w12) },
-              { id: 'w24' as const, label: s.months(24), price: priceOf(offer.warranty?.w24) },
+              opt('warranty', 'none' as const, s.none),
+              opt('warranty', 'w12' as const, s.months(12)),
+              opt('warranty', 'w24' as const, s.months(24)),
             ], draft.warranty, (w) => set({ warranty: w, ack_no_warranty: w === 'none' ? draft.ack_no_warranty : false }), 3)}
             <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary">{s.warrantyNote}</p>
             {draft.warranty === 'none' ? (
               <div className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 rounded-xl border border-border-subtle p-2.5">
                 <p className="text-[11.5px] leading-relaxed text-text-secondary">{s.justWarning}</p>
                 <label className="mt-1.5 flex min-h-11 cursor-pointer items-center gap-2.5 text-[13px] font-medium text-text-primary">
-                  <input type="checkbox" className="h-5 w-5 shrink-0" style={{ accentColor: '#fff' }} checked={draft.ack_no_warranty} onChange={(e) => set({ ack_no_warranty: e.target.checked })} />
+                  <input type="checkbox" className="h-5 w-5 shrink-0" style={{ accentColor: 'var(--color-gold)' }} checked={draft.ack_no_warranty} onChange={(e) => set({ ack_no_warranty: e.target.checked })} />
                   {s.justAck}
                 </label>
               </div>
             ) : null}
-            <Link to="/policies/extended_warranty" className="mt-2 inline-flex min-h-11 items-center text-[12px] text-text-secondary underline">{s.terms}</Link>
+            {includes('warranty', x.warranty)}
+            <Link to="/policies/extended_warranty" className="inline-flex min-h-11 items-center text-[12px] text-text-secondary underline">{s.terms}</Link>
           </>
         ), !offer.warranty)}
 
+        {/* Levo Care is the service the owner calls the most important: it wears the tag, and its facts open with the row. */}
         {row('care', <Heart className="w-5 h-5" aria-hidden="true" />, s.care, s.careSub(offer.care?.max_discount_pct ?? 90),
-          draft.care === 'c12' ? shown(priceOf(offer.care?.c12)) : s.none,
+          valueOf('care', draft.care, draft.care === 'none' ? s.none : s.free),
           <>
             {choice(s.care, [
-              { id: 'none' as const, label: s.none, price: 0 },
-              { id: 'c12' as const, label: s.careOption(draft.warranty === 'w24' ? 36 : draft.warranty === 'w12' ? 24 : 12), price: priceOf(offer.care?.c12) },
+              opt('care', 'none' as const, s.none),
+              { ...opt('care', 'c12' as const, ''), label: s.careOption(draft.warranty === 'w24' ? 36 : draft.warranty === 'w12' ? 24 : 12) },
             ], draft.care, (v) => set({ care: v }))}
-            {/* What Care includes (DECISIONS row 359): the parts discount, the weekly coupons, the monthly draw. */}
-            <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary" data-sheet-care-includes>{s.careIncludes(offer.care?.max_discount_pct ?? 90)}</p>
-          </>, !offer.care)}
+            {/* What Care includes (DECISIONS row 359): the parts discount, the weekly coupons, the monthly draw — a chance, never a promise. */}
+            {includes('care', x.care(offer.care?.max_discount_pct ?? 90), true)}
+          </>, !offer.care, x.mostImportant)}
 
         {/* Phase 2: the membership bought WITH the printer — its own order line at the live plan price. */}
         {row('membership', <Crown className="w-5 h-5" aria-hidden="true" />, s.membership, s.membershipSub,
           memberCharge !== null ? `+${money(memberCharge)}` : draft.extras?.membershipPlanId === null ? s.none : '',
           membershipBody(), !memberOffered)}
 
-        {row('packaging', <Package className="w-5 h-5" aria-hidden="true" />, s.packaging, s.packagingSub,
-          draft.packaging === 'extra' ? shown(priceOf(offer.packaging?.extra)) : s.packagingStandard,
-          choice(s.packaging, [
-            { id: 'standard' as const, label: s.packagingStandard, price: 0 },
-            { id: 'extra' as const, label: s.packagingExtra, price: priceOf(offer.packaging?.extra) },
-          ], draft.packaging, (v) => set({ packaging: v })), !offer.packaging)}
+        {row('packaging', <Package className="w-5 h-5" aria-hidden="true" />, s.packaging, x.packagingSum,
+          valueOf('packaging', draft.packaging, draft.packaging === 'extra' ? s.free : s.packagingStandard),
+          <>
+            {choice(s.packaging, [
+              opt('packaging', 'standard' as const, s.packagingStandard),
+              opt('packaging', 'extra' as const, s.packagingExtra),
+            ], draft.packaging, (v) => set({ packaging: v }))}
+            {includes('packaging', x.packaging)}
+          </>, !offer.packaging)}
 
+        {/* How the printer arrives: Economy, Personal, or — when the owner offers it — the free warehouse pickup with its note. */}
         {row('delivery', <Truck className="w-5 h-5" aria-hidden="true" />, s.delivery, s.deliveryChoose,
           draft.delivery === null ? '—' : shown(deliveryFee(offer, draft.delivery)),
-          choice<DeliveryChoice>(s.delivery, [
-            { id: 'economy', label: s.deliveryEconomy, price: priceOf(offer.delivery?.economy), sub: s.deliveryEconomySub },
-            { id: 'personal', label: s.deliveryPersonal, price: priceOf(offer.delivery?.personal), sub: s.deliveryPersonalSub },
-          ], draft.delivery ?? ('' as DeliveryChoice), (v) => set({ delivery: v })), !offer.delivery)}
+          list(s.delivery, deliveryChoices(offer).map((d) => {
+            const fee = deliveryFee(offer, d);
+            return {
+              id: d as string,
+              label: d === 'economy' ? s.deliveryEconomy : d === 'personal' ? s.deliveryPersonal : s.deliveryPickup,
+              right: fee === null ? s.unavailable : fee === 0 ? s.free : `+${money(fee)}`,
+              lines: [d === 'economy' ? s.deliveryEconomySub : d === 'personal' ? s.deliveryPersonalSub : pickupOf(offer)?.note?.[lang] || s.deliveryPickupSub],
+              disabled: fee === null,
+            };
+          }), draft.delivery ?? '', (v) => set({ delivery: v as DeliveryChoice })), !offer.delivery)}
 
-        {row('inspection', <ClipboardCheck className="w-5 h-5" aria-hidden="true" />, s.inspection, s.inspectionSub,
-          draft.inspection === 'full' ? shown(priceOf(offer.inspection?.full)) : s.none,
+        {row('inspection', <ClipboardCheck className="w-5 h-5" aria-hidden="true" />, s.inspection, x.inspectionSum,
+          valueOf('inspection', draft.inspection, draft.inspection === 'full' ? s.free : s.none),
           <>
             {choice(s.inspection, [
-              { id: 'none' as const, label: s.none, price: 0 },
-              { id: 'full' as const, label: s.inspectionOption, price: priceOf(offer.inspection?.full) },
+              opt('inspection', 'none' as const, s.none),
+              opt('inspection', 'full' as const, s.inspectionOption),
             ], draft.inspection, (v) => set({ inspection: v }))}
-            {offer.inspection ? <p className="mt-2 text-[11.5px] text-text-secondary">{s.inspectionLead(offer.inspection.lead_business_days[0], offer.inspection.lead_business_days[1])}</p> : null}
+            {offer.inspection && draft.inspection === 'full' ? <p className="mt-2 text-[11.5px] text-text-secondary">{s.inspectionLead(offer.inspection.lead_business_days[0], offer.inspection.lead_business_days[1])}</p> : null}
+            {offer.inspection ? includes('inspection', x.inspection(offer.inspection.lead_business_days[0], offer.inspection.lead_business_days[1])) : null}
           </>, !offer.inspection)}
 
-        {row('academy', <CirclePlay className="w-5 h-5" aria-hidden="true" />, s.academy, s.academySub,
+        {row('academy', <CirclePlay className="w-5 h-5" aria-hidden="true" />, s.academy, x.academySum,
           academyLive ? shown(priceOf(offer.academy?.live)) : s.free,
           <>
             {choice<AcademyChoice>(s.academy, [
@@ -740,6 +846,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               { id: 'live_in_person', label: s.academyInPerson, price: priceOf(offer.academy?.live) },
             ], draft.academy, (v) => set({ academy: v }))}
             {academyLive ? <p className="mt-2 text-[11.5px] text-text-secondary">{s.academyNote}</p> : null}
+            {includes('academy', x.academy)}
           </>, !offer.academy)}
 
         {/* Phase 2: the owner's filament kits for this printer — one kit or skip; no kit = the ordinary listing. */}
@@ -758,7 +865,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
           addonList ? (
             <AddonsBody addons={addonList} chosen={addonIds} onToggle={toggleAddon} picked={x4.addonColors} onPick={pickColour('addonColors')} lang={lang} dir={keyDir} money={money} />
           ) : (
-            <OffersLoading state={kits?.state === 'failed' ? 'failed' : 'loading'} lang={lang} again={() => setKitTry((n) => n + 1)} />
+            <OffersLoading state={kits?.state === 'failed' ? 'failed' : 'loading'} lang={lang} again={() => setKitTry((n) => n + 1)} rows={offerAddons.length} />
           ), !addonsOffered)}
 
         {/* Phase 4: the store bundles linked to this printer — added to the cart on their own, at their own price. */}
@@ -766,7 +873,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
           bundleList ? (
             <BundlesBody bundles={bundleList} lang={lang} money={money} signedIn={!!user} signInPath={authPathWithSupportRef(`${location.pathname}${location.search}`)} />
           ) : (
-            <OffersLoading state={kits?.state === 'failed' ? 'failed' : 'loading'} lang={lang} again={() => setKitTry((n) => n + 1)} />
+            <OffersLoading state={kits?.state === 'failed' ? 'failed' : 'loading'} lang={lang} again={() => setKitTry((n) => n + 1)} rows={offerBundles.length} />
           ), !bundlesOffered)}
       </div>
     </Sheet>
@@ -780,8 +887,11 @@ function codeOf(o: MembershipOption): string {
 
 /** The sheet starts from what was confirmed, or from nothing paid (never from a package). */
 function start(current: ServiceSelection | null, offer: ServicesOffer): ServiceSelection {
-  // A delivery the offer no longer has (switched off) is not carried into the draft.
-  const delivery = offer.delivery ? current?.delivery ?? null : null;
+  // A delivery the offer no longer has (switched off, or the pickup taken away) is not carried into the draft.
+  const held = current?.delivery ?? null;
+  const delivery = offer.delivery && ((held as DeliveryPick | null) !== 'pickup' || pickupOf(offer)) ? held : null;
   if (current?.confirmed) return { ...current, delivery };
-  return { ...EMPTY_SELECTION, delivery, ...(current?.extras ? { extras: current.extras } : {}) };
+  // Under an anchor (phase 6) the price already holds the Smart package, so the draft opens on it — never on less.
+  const included = anchoredStart(offer);
+  return { ...(included ? { ...included, confirmed: false } : EMPTY_SELECTION), delivery, ...(current?.extras ? { extras: current.extras } : {}) };
 }

@@ -54,6 +54,8 @@ interface State {
   published_at: string | null;
   draft_issues: string[];
   publish_issues: string[];
+  /** Phase 6: printers priced below their price anchor (told, never blocking); absent from an older server. */
+  anchor_notes?: string[];
   printers: ServicesPrinter[];
 }
 
@@ -311,7 +313,8 @@ export default function AdminPrinterServices({ productId, onDirtyChange, reloadK
 
         {usable ? foldedStep('shared', 3, S.step3, S.step3Hint, say(loc, S.step3Tail),
           <>
-            <SharedPriceListTab draft={draft} upd={upd} loc={loc} published={state.published} productId={productId} />
+            <SharedPriceListTab draft={draft} upd={upd} loc={loc} published={state.published} productId={productId}
+              anchorBelow={(state.anchor_notes ?? []).some((n) => n.startsWith(`products.${productId}:`))} />
             {state.published && !readOnly ? (
               <div className="mt-4 border-t border-border-subtle pt-3 space-y-2" data-printer-services-off>
                 {confirmOff ? (

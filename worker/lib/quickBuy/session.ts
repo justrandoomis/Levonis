@@ -27,6 +27,7 @@ import { listing, refuseIfOnlyCatalog } from '../listing';
 import type { Context } from 'hono';
 import type { AppContext, SessionUser } from '../types';
 import { HttpError, badRequest, conflict, int, str } from '../http';
+import { SERVICES_REQUIRED } from '@levonis/pricing/printerServices';
 import { newId, newOrderId } from '../crypto';
 import { fence } from '../operations';
 import { freeOnTargets, planInventory, stockRowKey, type InventoryPlan, type StockMove, type StockTarget } from '../inventory';
@@ -466,6 +467,12 @@ async function quoteCandidates(
       exchangeRate: session?.exchange_rate,
     },
   });
+  // A printer sold with its services is chosen in the cart («خصص طابعتك»: the package, and how it is delivered) —
+  // Quick Buy has no step for it, and says so with the services' own refusal, never a delivery-setup error
+  // (phase 6: under the price anchor such a line prices as the Smart package with no delivery chosen).
+  if (comp.lines.some((l) => !!l.services_snapshot)) {
+    throw badRequest('Choose how you want this printer (its package and delivery) — add it to the cart', SERVICES_REQUIRED);
+  }
   if (comp.delivery.id !== 'standard') throw directOnly();
   if (comp.shippingType !== 'direct') throw directOnly();
   for (const l of comp.lines) {

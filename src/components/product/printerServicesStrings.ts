@@ -81,6 +81,17 @@ export interface PsStrings {
   memberAtCheckout: string;
   removeMembership: string; removeKit: string; rechoose: string;
   kitFollows: string;
+  /**
+   * Phase 6 (DECISIONS row 362): the printer's price already holds the Smart package. A tile then reads
+   * «مشمول في السعر», a smaller choice a minus figure, a larger one a plus.
+   */
+  included: string;
+  priceIncludes: (pkg: string) => string;
+  /** «الطابعة فقط» under an anchor: what leaves the price with it. */
+  justRemoves: string;
+  /** The delivery block's question, and the free warehouse pickup (offered only when the owner's switch is on). */
+  deliveryHow: string;
+  deliveryPickup: string; deliveryPickupSub: string;
 }
 
 const AR: PsStrings = {
@@ -90,7 +101,7 @@ const AR: PsStrings = {
   just: 'الطابعة فقط', justSub: 'بدون خدمات',
   smart: 'الاختيار الذكي', smartSub: 'ضمان سنة + Levo Care',
   complete: 'التجربة الكاملة', completeSub: 'ضمان سنتين + كل الخدمات',
-  customize: 'تخصيص بنفسي', customizeSub: 'اختر كل خدمة كما تريد',
+  customize: 'تخصيص بنفسي', customizeSub: 'اختر كل خدمة واقرأ ما تشمله',
   custom: 'مخصص',
   free: 'مجاناً',
   chooseFirst: 'اختر باقتك وطريقة التوصيل أولاً',
@@ -153,6 +164,11 @@ const AR: PsStrings = {
   memberAtCheckout: 'سطر مستقل يُضاف إلى إجمالي الطلب عند الدفع.',
   removeMembership: 'إزالة العضوية', removeKit: 'إزالة الباقة', rechoose: 'اختر من جديد',
   kitFollows: 'كميتها تتبع الطابعة، وتُزال مع الطابعة.',
+  included: 'مشمول في السعر',
+  priceIncludes: (pkg) => `السعر المعروض يشمل «${pkg}» — غيّره إن أردت`,
+  justRemoves: 'يُخصم من السعر',
+  deliveryHow: 'كيف تصلك الطابعة؟',
+  deliveryPickup: 'استلام من المخزن', deliveryPickupSub: 'تستلمها بنفسك — بلا أجور توصيل',
 };
 
 const EN: PsStrings = {
@@ -162,7 +178,7 @@ const EN: PsStrings = {
   just: 'Just Printer', justSub: 'No services',
   smart: 'Smart Choice', smartSub: '1-year warranty + Levo Care',
   complete: 'Complete', completeSub: '2-year warranty + everything',
-  customize: 'Customize myself', customizeSub: 'Pick each service yourself',
+  customize: 'Customize myself', customizeSub: 'Pick each service and see what it includes',
   custom: 'Custom',
   free: 'Free',
   chooseFirst: 'Choose your package and delivery first',
@@ -225,6 +241,11 @@ const EN: PsStrings = {
   memberAtCheckout: 'Its own line, added to the order total at checkout.',
   removeMembership: 'Remove membership', removeKit: 'Remove kit', rechoose: 'Choose again',
   kitFollows: 'Its quantity follows the printer, and it is removed with the printer.',
+  included: 'Included in the price',
+  priceIncludes: (pkg) => `The price shown includes ${pkg} — change it if you like`,
+  justRemoves: 'Taken off the price',
+  deliveryHow: 'How do you get the printer?',
+  deliveryPickup: 'Pick up from the warehouse', deliveryPickupSub: 'You collect it yourself — no delivery fee',
 };
 
 const CKB: PsStrings = {
@@ -234,7 +255,7 @@ const CKB: PsStrings = {
   just: 'تەنها پرینتەر', justSub: 'بێ خزمەتگوزاری',
   smart: 'هەڵبژاردنی زیرەک', smartSub: 'گەرەنتی ساڵێک + Levo Care',
   complete: 'ئەزموونی تەواو', completeSub: 'گەرەنتی دوو ساڵ + هەموو خزمەتگوزارییەکان',
-  customize: 'خۆم ڕێکی دەخەم', customizeSub: 'هەر خزمەتگوزارییەک خۆت هەڵبژێرە',
+  customize: 'خۆم ڕێکی دەخەم', customizeSub: 'هەر خزمەتگوزارییەک هەڵبژێرە و بزانە چی لەخۆدەگرێت',
   custom: 'دڵخواز',
   free: 'بەخۆڕایی',
   chooseFirst: 'سەرەتا پاکێج و جۆری گەیاندن هەڵبژێرە',
@@ -297,6 +318,11 @@ const CKB: PsStrings = {
   memberAtCheckout: 'دێڕێکی جیایە، لە کاتی پارەداندا دەخرێتە سەر کۆی داواکاری.',
   removeMembership: 'لابردنی ئەندامێتی', removeKit: 'لابردنی پاکێج', rechoose: 'دووبارە هەڵبژێرە',
   kitFollows: 'بڕەکەی شوێن پرینتەرەکە دەکەوێت، و لەگەڵ پرینتەرەکە لادەبرێت.',
+  included: 'لەناو نرخدایە',
+  priceIncludes: (pkg) => `نرخی پیشاندراو «${pkg}» لەخۆدەگرێت — ئەگەر ویستت بیگۆڕە`,
+  justRemoves: 'لە نرخەکە کەم دەکرێتەوە',
+  deliveryHow: 'پرینتەرەکە چۆن دەگاتە دەستت؟',
+  deliveryPickup: 'وەرگرتن لە کۆگا', deliveryPickupSub: 'خۆت وەریدەگریت — بێ کرێی گەیاندن',
 };
 
 export const PS_STRINGS: Record<PsLang, PsStrings> = { ar: AR, en: EN, ckb: CKB };

@@ -72,6 +72,15 @@ const SEA_FULL: RouteFacts = {
   ],
 };
 
+/** Sea unpriced, and TWO other routes open: dropping sea leaves a real question. */
+const NO_SEA_TWO_OPEN: RouteFacts = {
+  transports: [
+    { method: 'sea', configured: false },
+    { method: 'land', configured: true },
+    { method: 'air', configured: true },
+  ],
+};
+
 /** One press of a version button: the answers stay, the facts change. */
 const afterVersionTap = (
   press: { order: '' | 'direct_sale' | 'pre_order'; route: string },
@@ -103,8 +112,11 @@ test('THE OWNER’S SEQUENCE: pre-order, sea freight, then a version tap', () =>
 test('a version that does not offer the chosen route drops it — and only it', () => {
   const press = { order: 'pre_order' as const, route: 'sea' };
   // Nobody priced sea on this version, so the route cannot be sent…
-  const tapped = afterVersionTap(press, BOTH, NO_SEA);
+  const tapped = afterVersionTap(press, BOTH, NO_SEA_TWO_OPEN);
   assert.equal(tapped.route, '', 'a route this version does not offer must not reach the door');
+  // …and when exactly ONE route is left open, that route is the answer (owner, 2026-11-19:
+  // «Availability select auto for the stock available» — a question with one answer is not asked).
+  assert.equal(afterVersionTap(press, BOTH, NO_SEA).route, 'land', 'never sea — and the only open route needs no tap');
   // …but the buyer's PRE-ORDER answer is still theirs. Dropping that too is
   // what the old code did, and it is why the fulfilment card un-ticked itself.
   assert.equal(tapped.order, 'pre_order', 'the fulfilment answer went with the route again');
@@ -112,7 +124,9 @@ test('a version that does not offer the chosen route drops it — and only it', 
 
 test('a route whose own quota is full is dropped; its siblings are not', () => {
   const press = { order: 'pre_order' as const, route: 'sea' };
-  assert.equal(afterVersionTap(press, BOTH, SEA_FULL).route, '');
+  // The full route is never sent; land is the only one left open, so it answers itself (2026-11-19).
+  assert.equal(afterVersionTap(press, BOTH, SEA_FULL).route, 'land');
+  assert.notEqual(afterVersionTap(press, BOTH, SEA_FULL).route, 'sea');
   assert.equal(afterVersionTap({ ...press, route: 'land' }, BOTH, SEA_FULL).route, 'land');
   // A route with no quota row at all is unlimited — `null` is not `false`.
   assert.equal(routeIsUsable(THREE_ROUTES, 'sea'), true);
@@ -126,7 +140,9 @@ test('the route comes back by itself when a later version offers it again', () =
   // This is what "remembered, not cleared" buys, and it cannot be had any
   // other way: the buyer never re-tapped sea, and sea is chosen again.
   const press = { order: 'pre_order' as const, route: 'sea' };
-  assert.equal(afterVersionTap(press, BOTH, NO_SEA).route, '');
+  assert.equal(afterVersionTap(press, BOTH, NO_SEA_TWO_OPEN).route, '');
+  // A version with one open route takes that route meanwhile — and the press is still remembered.
+  assert.equal(afterVersionTap(press, BOTH, NO_SEA).route, 'land');
   assert.equal(afterVersionTap(press, BOTH, THREE_ROUTES).route, 'sea', 'the memory was consumed');
 });
 

@@ -182,12 +182,13 @@ import {
 import { giftSelectionOf, selectionFromColumns, type GiftSelection } from '../lib/gifts/selection';
 import { changedExactlyOne, isLostRace } from '../lib/gifts/fence';
 import { auditStatements } from '../lib/audit';
-import { enrolledClasses, productEnrolled, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
+import { enrolledClasses, offerForLine, pricedServicesView, productEnrolled, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
+import { goodsBaseUnitIqd, settleServicesAnchor } from '../lib/pricing';
 import { parseConditionDoc } from '../lib/condition';
 import { addonLinesMatch, addonUnavailableOf, kitLinesMatch, kitNotOffered, kitPricing, kitUnavailable, offeredAddon, offeredKit, resolveAddon, resolveKit, RANDOM_COLOUR, type ColourWishes, type ResolvedAddon, type ResolvedKit } from '../lib/printerKits';
 import { addonNotOffered, addonUnavailable, applyPrinterDiscount, attachedLineOf, benefitRegularUnit, printerDiscountView, printerLineDiscount, repickRandomColour, type AppliedPrinterDiscount } from '../lib/printerOffers';
 import { membershipPlanById, orderMembershipQuotePayload, quoteOrderMembership } from './memberships';
-import { addonsOf, parseSelection, servicesOfferFor, kitsForPrinter, offeredMembershipTiers, CART_MEMBERSHIP_CONFLICT, EXTRAS_NOT_PRINTER, KIT_LINE_LOCKED, KIT_UNAVAILABLE, MEMBERSHIP_NOT_OFFERED, type FilamentKit, SERVICES_CODES, SERVICES_NOT_OFFERED, SERVICES_REQUIRED, type PrinterClasses, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
+import { addonsOf, anchorFeeFor, parseSelection, servicesOfferFor, kitsForPrinter, offeredMembershipTiers, CART_MEMBERSHIP_CONFLICT, EXTRAS_NOT_PRINTER, KIT_LINE_LOCKED, KIT_UNAVAILABLE, MEMBERSHIP_NOT_OFFERED, type FilamentKit, SERVICES_CODES, SERVICES_NOT_OFFERED, SERVICES_REQUIRED, type PrinterClasses, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
 
 /** The cart line's printer-services block (absent for every other line). */
 function cartServicesView(
@@ -200,14 +201,15 @@ function cartServicesView(
 ): Record<string, unknown> {
   if (!config || !classes) return {};
   const p = resolved.services;
+  const stored = sel.services ? parseSelection(sel.services) : null;
   return {
     printer_services: {
-      offer: servicesOfferFor(config, classes, productId, sel.optionValueIds ?? []),
-      selection: sel.services ? parseSelection(sel.services) : null,
-      priced: p
-        ? { fee_iqd: p.fee_iqd, lines: p.lines, warranty_months: p.warranty_months, delivery_fee_iqd: p.delivery_fee_iqd, blockers: p.blockers }
-        : null,
+      offer: offerForLine(servicesOfferFor(config, classes, productId, sel.optionValueIds ?? []), resolved),
+      // Phase 6: a line with no choice that the price anchor priced as the Smart package shows that package.
+      selection: stored ?? (p?.defaulted ? p.selection : null),
+      priced: p ? pricedServicesView(p) : null,
       needs_choice: !p,
+      ...(p?.defaulted ? { defaulted: true as const } : {}),
     },
   };
 }
@@ -517,6 +519,9 @@ export function resolveCartLine(
   const valueIds = optionValueIdsInRelationOrder(identityIds, view);
   const servicesClasses = enrolledClasses(ctx.printerServices ?? null, { id: String(row.id), condition: doc.condition }, valueIds);
   const servicesSelection = servicesClasses && sel.services ? parseSelection(sel.services) : null;
+  // Phase 6 (DECISIONS row 362): under the price anchor a line with NO choice is still handed to the
+  // resolver, which prices it as the Smart package when the anchor applies to its price.
+  const servicesAnchored = !!servicesClasses && !!ctx.printerServices && anchorFeeFor(ctx.printerServices, servicesClasses) !== null;
 
   // The resolver prices ONE option; with several groups the first selected
   // value carries the price override, and per-field inheritance fills the
@@ -531,9 +536,11 @@ export function resolveCartLine(
     fulfillmentType:
       sel.fulfillmentType === 'direct_sale' || sel.fulfillmentType === 'pre_order' ? sel.fulfillmentType : null,
     warrantyPlanId: sel.warrantyPlanId || null,
-    printerServices: servicesClasses && servicesSelection && ctx.printerServices
+    printerServices: servicesClasses && ctx.printerServices && (servicesSelection || servicesAnchored)
       ? { config: ctx.printerServices, classes: servicesClasses, selection: servicesSelection }
       : null,
+    // The anchor leaves the price AFTER the live offer below (settleServicesAnchor).
+    deferServicesAnchor: true,
     tier,
     tierActive,
     proPolicy: ctx.proPolicy,
@@ -548,7 +555,7 @@ export function resolveCartLine(
   // listing became used) is stale: the line prices and sells as before, nothing
   // of the services is charged or frozen, and the next write clears it.
   const servicesStale = !servicesClasses && !!sel.services && sel.servicesStored === true;
-  if (servicesClasses && !servicesSelection) resolved.errors.push(SERVICES_REQUIRED);
+  if (servicesClasses && !resolved.services) resolved.errors.push(SERVICES_REQUIRED);
   if (!servicesClasses && sel.services && !servicesStale) resolved.errors.push(SERVICES_NOT_OFFERED);
 
   // With relational links present, the real AND/OR algebra decides whether the
@@ -598,9 +605,17 @@ export function resolveCartLine(
       ? applyOfferToResolved(resolved, offer.view, tier, tierActive, offer.nowMs, doc)
       : { resolved, offer_id: offer?.view?.window?.id ?? null, source: 'ladder' as const, plus_iqd: null };
 
+  // Phase 6: the anchor is settled on the price actually applied — the offer's, when one is live. A line
+  // with NO choice that the offer took below the anchor loses the Smart package the anchor would have
+  // given it, and is refused like every enrolled printer with no choice.
+  let settled = settleServicesAnchor(withOffer.resolved);
+  if (servicesClasses && withOffer.resolved.services && !settled.services) {
+    settled = { ...settled, errors: [...settled.errors, SERVICES_REQUIRED] };
+  }
+
   return {
     doc,
-    resolved: withOffer.resolved,
+    resolved: settled,
     variantLabel: labels.join(' / '),
     selectionErrors,
     // The offer this line was priced under, frozen into the order snapshot by
@@ -1304,8 +1319,10 @@ async function loadCart(c: Context<AppContext>) {
       sub_category_id: doc.sub_category_id ?? null,
       ancestry: ancestryFor(ctx.catalogAncestry, doc.category_id ?? null, doc.sub_category_id ?? null),
       // A printer-discounted line is read like an offer-priced one (D10): the rule sees the price before.
-      regular_unit_iqd: benefitRegularUnit(resolved, printerDiscount),
-      applied_unit_iqd: resolved.applied_iqd,
+      // Phase 6 (rule C): an anchored printer line bought below the Smart package is read at what it charges
+      // (goodsBaseUnitIqd) — both figures move together, so a rule's saving is unchanged. Every other line: 0.
+      regular_unit_iqd: benefitRegularUnit(resolved, printerDiscount) - (resolved.applied_iqd - goodsBaseUnitIqd(resolved)),
+      applied_unit_iqd: goodsBaseUnitIqd(resolved),
       // Which rule the resolver actually credited — a typed member price or a
       // live offer beats one, and a rule that did not set this price must not
       // be reported as having saved anything.
@@ -1412,6 +1429,9 @@ async function loadCart(c: Context<AppContext>) {
       // The same unit in the shop's dollars (DECISIONS row 248), where it has a dollar base.
       ...(isUsdCents(resolved.unit_subtotal_usd_cents) ? { unit_price_usd_cents: resolved.unit_subtotal_usd_cents } : {}),
       breakdown: publicBreakdown(resolved, { estimate }),
+      // Phase 6 (rule C): present ONLY on an anchored printer line bought below the Smart package — what a
+      // coupon and the goods thresholds read for it (it charges less than its catalogue price).
+      ...(goodsBaseUnitIqd(resolved) < resolved.applied_iqd ? { goods_base_unit_iqd: goodsBaseUnitIqd(resolved) } : {}),
       // «سعر تقديري»: the line's price is an estimate (its chip) — only when true, never a figure or a source.
       ...(estimate ? { price_estimate: true as const } : {}),
       // Legacy field: the base row. `availability.stock` is the authoritative
@@ -1563,6 +1583,8 @@ interface CartCouponItem {
   color_id?: unknown;
   transport_method?: unknown;
   breakdown?: { applied_iqd?: unknown } | null;
+  /** Phase 6 (rule C): only on an anchored printer line bought below the Smart package — the unit a discount may read. */
+  goods_base_unit_iqd?: unknown;
 }
 
 /** The ticked line ids a request names: a list (a body) or comma-separated (a query). */
@@ -1610,7 +1632,7 @@ async function cartCouponLines(
         option_value_ids: Array.isArray(it.option_value_ids) ? it.option_value_ids.map(String) : [],
         color_id: String(it.color_id ?? ''),
         qty: Number(it.qty) || 0,
-        applied_iqd: Number(it.breakdown?.applied_iqd ?? it.unit_price_iqd ?? 0) || 0,
+        applied_iqd: Number(it.goods_base_unit_iqd ?? it.breakdown?.applied_iqd ?? it.unit_price_iqd ?? 0) || 0,
         transport_method: String(it.transport_method ?? ''),
         is_parent: it.kind === 'bundle' || it.kind === 'mystery',
         is_component: false,
@@ -1665,7 +1687,7 @@ function cartGoodsBasis(views: readonly CartCouponItem[], factsOver: (ticked: Re
   const facts = factsOver(new Set(views.map((it) => String(it.id ?? ''))));
   const goods = views.reduce((sum, it) => {
     if (it.kind === 'gift') return sum;
-    const applied = Number(it.breakdown?.applied_iqd ?? it.unit_price_iqd ?? 0) || 0;
+    const applied = Number(it.goods_base_unit_iqd ?? it.breakdown?.applied_iqd ?? it.unit_price_iqd ?? 0) || 0;
     return sum + applied * (Number(it.qty) || 0) - (facts.get(String(it.id ?? ''))?.member_line_discount_iqd ?? 0);
   }, 0);
   return Math.max(0, goods);

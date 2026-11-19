@@ -60,7 +60,7 @@ import { safeParse } from './json';
 import { effectiveAvailability } from './availability';
 import { unitDiscountIqd, type BenefitRule } from './membershipBenefits';
 import { effectiveBaseMonths, planFee, planTotalMonths } from './warrantyPlanMath';
-import { priceServices, SERVICES_NOT_CONFIRMED, SERVICES_NO_WARRANTY_ACK, SERVICES_WITH_LEGACY_WARRANTY, type PricedServices, type PrinterClasses, type PrinterServicesConfig, type ServiceSelection } from './printerServices';
+import { anchorDefaultSelection, anchorFeeFor, anchorFeeOf, priceServices, SERVICES_NOT_CONFIRMED, SERVICES_NO_WARRANTY_ACK, SERVICES_WITH_LEGACY_WARRANTY, type PricedServices, type PrinterClasses, type PrinterServicesConfig, type ServiceSelection } from './printerServices';
 import type { PhysicalDimensionOverrides } from './physicalDimensions';
 import { skuComboKey, type SkuChannel } from './skuChannel';
 
@@ -558,6 +558,13 @@ export interface ResolvedPrice {
     warranty_fee_iqd: number;
     /** The printer services' fee per unit (printerServices.ts), 0 when none. */
     services_fee_iqd?: number;
+    /**
+     * Phase 6 (DECISIONS row 362): the Smart package's fee the catalogue price already includes,
+     * per unit — present ONLY on an anchored line. The unit carries the services NET of it:
+     * `unit_subtotal = applied + fees + services_fee_iqd − services_anchor_iqd`. No price figure
+     * (applied, regular, the member rungs, the offer's before price) is changed by it.
+     */
+    services_anchor_iqd?: number;
   };
   /**
    * The pre-order journey this line is on (null on a direct line). The
@@ -584,9 +591,13 @@ export interface ResolvedPrice {
    * The printer services priced for this line (owner brief 2026-11-17), or
    * absent for every line that is not an enrolled printer. Its `fee_iqd` is
    * in `unit_subtotal_iqd`; its delivery fee is NOT (that goes to shipping).
+   * Phase 6: on an anchored line (`services.anchor_fee_iqd` present) the unit carries the services'
+   * NET fee (`services.net_fee_iqd` = fee − anchor), which is negative for a choice below the Smart
+   * package — so `unit_subtotal_iqd` may be BELOW `applied_iqd`. Discount bases read
+   * `goodsBaseUnitIqd`, never `applied_iqd`, on such a line.
    */
   services?: PricedServices | null;
-  unit_subtotal_iqd: number; // applied + effective commission + effective direct surcharge + warranty fee + services fee
+  unit_subtotal_iqd: number; // applied + effective commission + effective direct surcharge + warranty fee + services fee − services anchor
   errors: string[]; // non-empty = selection invalid, reject server-side
   /**
    * The SKU rung that priced this line; null/absent when the ladder did (docs/ux/PRODUCT-DISCOUNT.md
@@ -1014,8 +1025,21 @@ export function resolveUnitPrice(input: {
    * product page asking before the customer confirmed: the missing
    * confirmation and acknowledgment are not errors there; the cart and the
    * order send preview false and refuse on them.
+   *
+   * Phase 6 (DECISIONS row 362) — `selection: null` = the line carries NO choice (an old client,
+   * the API). When the list's price anchor applies to this line, it is priced and recorded as the
+   * Smart package (`services.defaulted`); otherwise nothing is priced and `services` stays absent
+   * (the caller refuses with SERVICES_REQUIRED, as before). The product quote does not pass a null
+   * selection: with no choice it shows the catalogue price, which IS the Smart price.
    */
-  printerServices?: { config: PrinterServicesConfig; classes: PrinterClasses; selection: ServiceSelection; preview?: boolean } | null;
+  printerServices?: { config: PrinterServicesConfig; classes: PrinterClasses; selection: ServiceSelection | null; preview?: boolean } | null;
+  /**
+   * Phase 6: true = the caller applies a live offer to the answer and settles the anchor itself
+   * (`settleServicesAnchor`) AFTER it, so the anchor leaves the price actually applied. The answer
+   * then still carries the catalogue figures with `services.anchor_fee_iqd` set. Every other
+   * caller leaves it out and gets the settled line.
+   */
+  deferServicesAnchor?: boolean;
   tier: Tier;
   tierActive: boolean;
   proPolicy?: ProPricingPolicy;
@@ -1451,7 +1475,7 @@ export function resolveUnitPrice(input: {
   let warranty: ResolvedPrice['warranty'] = null;
   // An enrolled printer (printerServices given) never prices a legacy plan: a
   // plan sent with it is refused below (SERVICES_WITH_LEGACY_WARRANTY).
-  if (input.warrantyPlanId && !input.printerServices) {
+  if (input.warrantyPlanId && !(input.printerServices && input.printerServices.selection)) {
     const plan = product.warranty_plans.find((w) => w.id === input.warrantyPlanId && w.active !== false);
     if (!plan) {
       errors.push('WARRANTY_PLAN_NOT_FOUND');
@@ -1487,11 +1511,26 @@ export function resolveUnitPrice(input: {
   let services: PricedServices | null = null;
   if (input.printerServices) {
     const ps = input.printerServices;
-    if (input.warrantyPlanId) errors.push(SERVICES_WITH_LEGACY_WARRANTY);
-    services = priceServices(ps.config, ps.classes, ps.selection);
-    for (const b of services.blockers) {
-      if (ps.preview && (b === SERVICES_NOT_CONFIRMED || b === SERVICES_NO_WARRANTY_ACK)) continue;
-      if (!errors.includes(b)) errors.push(b);
+    /**
+     * THE PRICE ANCHOR (phase 6, DECISIONS row 362). The catalogue price already includes the
+     * Smart package, so the services move the unit by their NET fee (fee − anchor). Here the line
+     * is only MARKED (`anchor_fee_iqd`) and still carries the full fee; `settleServicesAnchor`
+     * takes the anchor off — after a live offer, on the price actually applied — and un-marks a
+     * line whose price ends below the anchor (it then behaves as a list with no anchor).
+     */
+    const anchorFee = anchorFeeFor(ps.config, ps.classes);
+    const anchored = anchorFee !== null && appliedIqd >= anchorFee;
+    // No choice on an anchored line: the customer gets what the price includes — the Smart package.
+    const defaulted = !ps.selection && anchored;
+    const selection = ps.selection ?? (anchored ? anchorDefaultSelection(ps.config) : null);
+    if (selection) {
+      if (input.warrantyPlanId && !errors.includes(SERVICES_WITH_LEGACY_WARRANTY)) errors.push(SERVICES_WITH_LEGACY_WARRANTY);
+      const priced = priceServices(ps.config, ps.classes, selection);
+      services = anchored ? { ...priced, anchor_fee_iqd: anchorFee, ...(defaulted ? { defaulted: true as const } : {}) } : priced;
+      for (const b of services.blockers) {
+        if (ps.preview && (b === SERVICES_NOT_CONFIRMED || b === SERVICES_NO_WARRANTY_ACK)) continue;
+        if (!errors.includes(b)) errors.push(b);
+      }
     }
   }
   const servicesFee = services ? services.fee_iqd : 0;
@@ -1502,7 +1541,7 @@ export function resolveUnitPrice(input: {
   const regularUsdCents =
     skuRow !== null ? (skuRow.v2 === true && typeof skuRow.usd_cents === 'number' ? skuRow.usd_cents : null) : unanimousUsdCents(product.sku_prices, regularIqd);
 
-  return {
+  const line: ResolvedPrice = {
     regular_iqd: regularIqd,
     pro_iqd: proIqd,
     prime_iqd: primeIqd,
@@ -1560,6 +1599,67 @@ export function resolveUnitPrice(input: {
     },
     errors,
   };
+  return input.deferServicesAnchor === true ? line : settleServicesAnchor(line);
+}
+
+/**
+ * THE PRICE ANCHOR, SETTLED (phase 6, DECISIONS row 362) — the last step of pricing a printer line,
+ * AFTER the tier and any live offer. `r` carries the full services fee in its unit and, when the
+ * list's anchor may apply, `services.anchor_fee_iqd`.
+ *
+ *  - The price actually applied is at least the anchor: the unit loses the anchor and nothing else
+ *    moves — `unit_subtotal = applied + fees + (fee − anchor)`. `applied_iqd`, `regular_iqd`, the
+ *    member rungs and `offer_before_iqd` keep their meaning (the printer's catalogue / tier / offer
+ *    price), so price protection, the engine basis, the struck price and every invoice read an
+ *    anchored line exactly as they read it before the switch. The services say `net_fee_iqd`.
+ *  - It is below the anchor (a small price, or an offer took it there): the line is NOT anchored and
+ *    behaves as a list with none — a chosen selection is charged on top («+»), and a line that had
+ *    NO choice loses the Smart package the anchor would have given it (`services` removed: the
+ *    caller refuses SERVICES_REQUIRED, exactly as without an anchor).
+ *
+ * The unit's dollar twin describes the catalogue price: it is kept only when the unit IS the applied
+ * price (the Smart package with no other fee). A line without an anchor mark is returned untouched.
+ */
+export function settleServicesAnchor<T extends ResolvedPrice>(r: T): T {
+  const services = r.services ?? null;
+  if (!services || typeof services.anchor_fee_iqd !== 'number') return r;
+  const anchor = anchorFeeOf(services);
+  if (!(r.applied_iqd >= anchor)) {
+    const { anchor_fee_iqd: _anchor, net_fee_iqd: _net, defaulted, ...unanchored } = services;
+    if (!defaulted) return { ...r, services: unanchored };
+    // No choice and no anchor: nothing was bought with the printer — the line is the bare line again.
+    const { services: _services, unit_subtotal_usd_cents: _unitUsd, ...bare } = r;
+    const { services_fee_iqd: _fee, services_anchor_iqd: _a, ...components } = r.components;
+    const unit = r.unit_subtotal_iqd - services.fee_iqd;
+    return {
+      ...bare,
+      unit_subtotal_iqd: unit,
+      ...(unit === r.applied_iqd && typeof r.applied_usd_cents === 'number' ? { unit_subtotal_usd_cents: r.applied_usd_cents } : {}),
+      components,
+    } as unknown as T;
+  }
+  const { unit_subtotal_usd_cents: _unitUsd, ...rest } = r;
+  const unit = r.unit_subtotal_iqd - anchor;
+  return {
+    ...rest,
+    services: { ...services, net_fee_iqd: services.fee_iqd - anchor },
+    unit_subtotal_iqd: unit,
+    ...(unit === r.applied_iqd && typeof r.applied_usd_cents === 'number' ? { unit_subtotal_usd_cents: r.applied_usd_cents } : {}),
+    components: { ...r.components, services_anchor_iqd: anchor },
+  } as unknown as T;
+}
+
+/**
+ * THE GOODS BASE OF ONE UNIT (phase 6, rule C) — what coupons, points, membership rules applied at the
+ * line, the free-delivery and minimum-order thresholds and the merchandise total read for a line.
+ * Every line but one: its applied price, as always (the same number, the same code path).
+ * An ANCHORED printer line: `min(applied, unit_subtotal)` — a Smart or Complete buyer keeps exactly
+ * the base he had before the switch (the catalogue price), and a buyer of less than the Smart package
+ * has what he pays, so no discount can exceed what the line charges.
+ */
+export function goodsBaseUnitIqd(r: { applied_iqd: number; unit_subtotal_iqd: number; services?: { anchor_fee_iqd?: unknown } | null }): number {
+  if (!r.services || typeof r.services.anchor_fee_iqd !== 'number') return r.applied_iqd;
+  return Math.max(0, Math.min(r.applied_iqd, r.unit_subtotal_iqd));
 }
 
 /** Reads the PRO pricing policy + transport defaults out of admin settings values. */

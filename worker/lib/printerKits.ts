@@ -37,7 +37,8 @@ import {
 import { isComposition, judgeLevonisLine, loadAddContext, loadAddProduct, type AddContext, type AddLine, type AddShared, type JudgedLine } from './cartAdd';
 import { cartPricing, resolveCartLine } from '../routes/cart';
 import { productImageForSelection } from './productSelectionImage';
-import { addonUnavailable, kitColourUnavailable, kitUnitsPerPrinter, pickRandomColour, type ColourCandidate, type LineColourMode } from './printerOffers';
+import { addonPreorderSeparate, addonUnavailable, kitColourUnavailable, kitUnitsPerPrinter, pickRandomColour, type ColourCandidate, type LineColourMode } from './printerOffers';
+import { ADDON_PREORDER_SEPARATE } from '@levonis/pricing/printerServices';
 
 /** The cart-line discriminator of a kit line: never merges with the same filament bought alone. */
 export const KIT_LINE_PREFIX = 'kit:';
@@ -117,6 +118,8 @@ export interface ResolvedKitItem {
   slug: string;
   variant: string;
   image: string;
+  /** Phase 6: the promised lead days of the line as priced (the resolver's own answer); nulls when it states none. */
+  lead_days?: { min: number | null; max: number | null };
 }
 
 export interface ResolvedKit {
@@ -142,6 +145,19 @@ export interface ResolvedAddon {
   total_iqd: number | null;
   before_total_iqd: number | null;
   discount_total_iqd: number;
+  /**
+   * Phase 6: how the add-on can be bought. 'with_printer' = on the printer's own order type and route
+   * (the only way it is ever a line of the printer's order). 'pre_order' = it cannot go with this
+   * printer, but its product is sold by pre-order on `transport`: ordered separately
+   * (`available` false, reason ADDON_PREORDER_SEPARATE), with the pre-order's own figures in `preorder`.
+   */
+  fulfillment: 'with_printer' | 'pre_order';
+  transport: string | null;
+  lead_days: { min: number | null; max: number | null };
+  /** The pre-order as the part's own page sells it (informational; the engine's own unit price, the owner's discount NOT applied). */
+  preorder: { transport: string; unit_price_iqd: number; lead_days: { min: number | null; max: number | null } } | null;
+  /** Why it cannot go with the printer, when `fulfillment` is 'pre_order' (the with-printer door's own code). */
+  with_printer_reason: string | null;
 }
 
 /** The kit, when the published list offers it with this printer selection; else null. */
@@ -184,7 +200,9 @@ async function resolveAttachedItem(
   pricing: KitPricing,
   wish: string | undefined,
   discount: PrinterDiscount | null | undefined,
-  unitsPerPrinter: number
+  unitsPerPrinter: number,
+  /** The product row and its add context when a caller already loaded them for this request (the pre-order lookup): no second read. */
+  loaded?: { product: Record<string, unknown>; actx: AddContext }
 ): Promise<ResolvedKitItem> {
   const units = Math.max(1, Math.trunc(printer.qty) || 1);
   const shared: AddShared = { transportMethod: printer.transportMethod, fulfillmentType: printer.fulfillmentType, warrantyPlanId: '', services: '' };
@@ -199,7 +217,7 @@ async function resolveAttachedItem(
   };
   let product: Record<string, unknown>;
   try {
-    product = await loadAddProduct(c, spec.product_id);
+    product = loaded ? loaded.product : await loadAddProduct(c, spec.product_id);
   } catch (e) {
     return { ...base, reason: e instanceof HttpError ? e.code ?? 'UNAVAILABLE' : 'UNAVAILABLE' };
   }
@@ -207,7 +225,7 @@ async function resolveAttachedItem(
   if (isComposition(product)) return { ...named, reason: 'KIT_ITEM_COMPOSITION' };
   let actx: AddContext;
   try {
-    actx = await loadAddContext(c, product, { warrantyPlanId: '', pricing });
+    actx = loaded ? loaded.actx : await loadAddContext(c, product, { warrantyPlanId: '', pricing });
   } catch (e) {
     return { ...named, reason: e instanceof HttpError ? e.code ?? 'UNAVAILABLE' : 'UNAVAILABLE' };
   }
@@ -228,6 +246,7 @@ async function resolveAttachedItem(
       after_unit_iqd: resolved.unit_subtotal_iqd - off,
       variant: variantLabel,
       image: productImageForSelection(doc, { optionValueIds: line.optionValueIds, colorId: colorId || null }, actx.view),
+      lead_days: { min: resolved.fulfillment?.lead_time_min_days ?? null, max: resolved.fulfillment?.lead_time_max_days ?? null },
     };
   };
 
@@ -296,7 +315,37 @@ export async function resolveKit(c: Context<AppContext>, kit: FilamentKit, print
 /** One add-on for this customer and printer (its colour: `wish`, missing = random). */
 export async function resolveAddon(c: Context<AppContext>, addon: PrinterAddon, printer: KitPrinter, pricing: KitPricing = kitPricing(c), wish?: string): Promise<ResolvedAddon> {
   const units = Math.max(1, Math.trunc(printer.qty) || 1);
-  const r = await resolveAttachedItem(c, addon, printer, pricing, colorModeOf(addon) === 'customer' ? wish : undefined, addon.discount, Math.max(1, addon.qty));
+  const colourWish = colorModeOf(addon) === 'customer' ? wish : undefined;
+  let r = await resolveAttachedItem(c, addon, printer, pricing, colourWish, addon.discount, Math.max(1, addon.qty));
+  const noLead = { min: null, max: null };
+  let preorder: ResolvedAddon['preorder'] = null;
+  let withPrinterReason: string | null = null;
+  /**
+   * «IF NOT AVAILABLE PUT THEM ON PRE-ORDER» (owner, 2026-11-19). An add-on that cannot go with a READY
+   * printer (off the shelf, or its product sells by pre-order only) is looked up as its product's OWN
+   * pre-order: every route, judged and priced by the cart's door exactly as the part's page would sell it,
+   * and ONE chosen deterministically — the cheapest unit, then sea before air before land.
+   * It is never made a line of the printer's order: one order is one journey (the cart's one-shipping-type
+   * rule), so the answer says «pre-order, ordered separately» with the route and the lead days.
+   * A pre-order printer's add-on already follows the printer's route; a refused COLOUR stays that refusal.
+   */
+  const printerIsReady = !printer.transportMethod && printer.fulfillmentType !== 'pre_order';
+  if (!r.ok && !r.colour_refusal && r.product && r.actx && printerIsReady) {
+    const found: Array<{ transport: string; unit: number; lead: { min: number | null; max: number | null } }> = [];
+    // The product row and its context are the ones just read: each route is judged in memory, with no further read.
+    const loaded = { product: r.product, actx: r.actx };
+    for (const transport of PREORDER_ROUTES) {
+      const p = await resolveAttachedItem(c, addon, { ...printer, fulfillmentType: 'pre_order', transportMethod: transport }, pricing, colourWish, null, 1, loaded);
+      if (p.ok && typeof p.unit_iqd === 'number') found.push({ transport, unit: p.unit_iqd, lead: p.lead_days ?? noLead });
+    }
+    // Stable sort: the cheapest unit first; equal prices keep the route order (sea, air, land).
+    found.sort((x, y) => x.unit - y.unit);
+    if (found[0]) {
+      preorder = { transport: found[0].transport, unit_price_iqd: found[0].unit, lead_days: found[0].lead };
+      withPrinterReason = r.reason;
+      r = { ...r, reason: ADDON_PREORDER_SEPARATE };
+    }
+  }
   const per = r.ok ? (r.after_unit_iqd as number) * addon.qty : null;
   const before = r.ok ? (r.unit_iqd as number) * addon.qty : null;
   return {
@@ -304,8 +353,16 @@ export async function resolveAddon(c: Context<AppContext>, addon: PrinterAddon, 
     price_per_printer_iqd: per, before_per_printer_iqd: before,
     total_iqd: per === null ? null : per * units, before_total_iqd: before === null ? null : before * units,
     discount_total_iqd: r.ok ? r.discount_unit_iqd * addon.qty * units : 0,
+    fulfillment: preorder ? 'pre_order' : 'with_printer',
+    transport: preorder ? preorder.transport : r.ok ? r.shared.transportMethod || null : null,
+    lead_days: preorder ? preorder.lead_days : r.ok ? r.lead_days ?? noLead : noLead,
+    preorder,
+    with_printer_reason: withPrinterReason,
   };
 }
+
+/** The pre-order routes an add-on's own pre-order is looked up on, in tie-break order. */
+const PREORDER_ROUTES = ['sea', 'air', 'land'] as const;
 
 /** The colour choices of a customer-colour item, as the page shows them (after / before prices, no stock counts). */
 function colourChoices(i: ResolvedKitItem) {
@@ -391,6 +448,12 @@ export function addonPublic(r: ResolvedAddon) {
     before_per_printer_iqd: r.before_per_printer_iqd,
     total_iqd: r.total_iqd,
     before_total_iqd: r.before_total_iqd,
+    // Phase 6: 'with_printer' (a line of the printer's order) or 'pre_order' (its product sells by pre-order
+    // only: ordered separately — `available` is false, `reason` ADDON_PREORDER_SEPARATE, `preorder` its figures).
+    fulfillment: r.fulfillment,
+    transport: r.transport,
+    lead_days: r.lead_days,
+    ...(r.preorder ? { preorder: r.preorder, with_printer_reason: r.with_printer_reason } : {}),
     ...colourChoices(i),
   };
 }
@@ -412,6 +475,10 @@ export function kitUnavailable(r: ResolvedKit): HttpError {
 export function addonUnavailableOf(r: ResolvedAddon): HttpError {
   const i = r.resolved;
   if (i.colour_refusal) return kitColourUnavailable({ addon_id: r.addon.id, product_id: i.item.product_id, color_id: i.colour_refusal.color_id, reason: i.colour_refusal.reason });
+  // Phase 6: sold by pre-order only — its own code, naming the part's page, the route and the lead days.
+  if (r.preorder) {
+    return addonPreorderSeparate(r.addon.id, i.item.product_id, { slug: i.slug, transport: r.preorder.transport, lead_days: r.preorder.lead_days, reason: r.with_printer_reason });
+  }
   return addonUnavailable(r.addon.id, i.item.product_id, i.reason);
 }
 

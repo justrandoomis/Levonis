@@ -100,6 +100,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'A printer with its services goes by standard delivery (Economy or Personal) or store pickup — choose one of them to place the order.',
     ckb: 'پرینتەر لەگەڵ خزمەتگوزارییەکانی بە گەیاندنی ئاسایی (ئابووری یان تایبەت) دەنێردرێت یان لە فرۆشگا وەردەگیرێت — یەکێکیان هەڵبژێرە بۆ تەواوکردنی داواکاری.',
   },
+  // Phase 6 (DECISIONS row 362): a printer set to «collect from the warehouse» ordered with another method.
+  SERVICES_PICKUP_METHOD: {
+    ar: 'اخترت استلام الطابعة من المخزن — اختر «الاستلام من المتجر» طريقةً للتوصيل، أو غيّر توصيل الطابعة إلى اقتصادي أو شخصي من السلة.',
+    en: 'You chose to collect the printer from the warehouse — choose store pickup as the delivery method, or change the printer’s delivery to Economy or Personal in the cart.',
+    ckb: 'هەڵتبژاردووە پرینتەرەکە لە کۆگا وەربگریت — «وەرگرتن لە فرۆشگا» وەک شێوازی گەیاندن هەڵبژێرە، یان لە سەبەتەکەدا گەیاندنی پرینتەرەکە بگۆڕە بۆ ئابووری یان تایبەت.',
+  },
   CART_SERVICES_CONFLICT: {
     ar: 'هذه الطابعة في سلتك بباقة مختلفة — غيّر الباقة من السلة.',
     en: 'This printer is already in your cart with a different package — change it from the cart.',
@@ -188,6 +194,12 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'هذه الإضافة غير متوفرة الآن بهذه الكمية أو طريقة الشحن — أزلها أو حاول لاحقاً.',
     en: 'This add-on is not available now in this quantity or shipping type — remove it or try again later.',
     ckb: 'ئەم پاشکۆیە ئێستا بەم بڕە یان بەم جۆری ناردنە بەردەست نییە — لای ببە یان دواتر هەوڵ بدەرەوە.',
+  },
+  // Phase 6 (DECISIONS row 362): the add-on's product sells by pre-order only — a ready printer and a pre-order part never share an order.
+  ADDON_PREORDER_SEPARATE: {
+    ar: 'هذه الإضافة متوفرة بالطلب المسبق فقط، ولا تُجمع مع طابعة جاهزة في طلب واحد — أزلها هنا واطلبها من صفحتها بطلب مسبق.',
+    en: 'This add-on is available by pre-order only and cannot share an order with a ready printer — remove it here and pre-order it from its own page.',
+    ckb: 'ئەم پاشکۆیە تەنها بە داواکاریی پێشوەختە بەردەستە و لەگەڵ پرینتەری ئامادە لە یەک داواکاریدا کۆ ناکرێتەوە — لێرە لای ببە و لە پەڕەی خۆیەوە بە داواکاریی پێشوەختە داوای بکە.',
   },
   ADDON_CHANGED: {
     ar: 'تغيّرت إحدى إضافات هذه الطابعة — اخترها من جديد.',

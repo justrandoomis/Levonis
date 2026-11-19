@@ -153,7 +153,8 @@ import { normalizeHomeBento } from '../lib/homeBento';
 import { conditionSaving, parseConditionDoc } from '../lib/condition';
 import { salesBadgeFor } from '../lib/salesBadge';
 import { pricedPlans, WARRANTY_NOT_PRINTER } from '../lib/warrantyPlans';
-import { enrolledClasses, productEnrolled, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
+import { enrolledClasses, offerForLine, pricedServicesView, productEnrolled, publishedFromSetting, publishedPrinterServices } from '../lib/printerServices';
+import { settleServicesAnchor } from '../lib/pricing';
 import { addonPublic, kitPricing, kitPublic, resolveAddon, resolveKit, type ColourWishes } from '../lib/printerKits';
 import { storeBundlesFor } from '../lib/printerOffers';
 import { addonsForPrinter, kitsForPrinter, parseSelection, servicesOfferFor, SERVICES_WITH_LEGACY_WARRANTY } from '@levonis/pricing/printerServices';
@@ -6068,6 +6069,8 @@ productRoutes.post('/:slug/quote', async (c) => {
     printerServices: servicesClasses && servicesConfig && servicesSelection
       ? { config: servicesConfig, classes: servicesClasses, selection: servicesSelection, preview: true }
       : null,
+    // Phase 6: the price anchor leaves the price AFTER the live offer (settled just below).
+    deferServicesAnchor: true,
     tier: ctx.tier,
     tierActive: ctx.tierActive,
     proPolicy: ctx.proPolicy,
@@ -6087,7 +6090,7 @@ productRoutes.post('/:slug/quote', async (c) => {
   }
   // C2: priced under the live offer exactly as the cart line will be, so the
   // figure that lands here is never higher than the one the cart charges.
-  const priced = withLiveOffer(resolved, doc, ctx, offer, now);
+  const priced = settleServicesAnchor(withLiveOffer(resolved, doc, ctx, offer, now));
   // «سعر تقديري» FOLLOWS THE SELECTION (migration 0218; docs/SMART_PRICING.md §5.3): the SKU this request
   // names (`skuEstimated`) — a firm SKU of a mixed product carries none; a selection that names no single SKU
   // yet is labelled while any SKU that could finish it is an estimate.
@@ -6124,11 +6127,10 @@ productRoutes.post('/:slug/quote', async (c) => {
     ...(servicesClasses && servicesConfig
       ? {
           printer_services: {
-            offer: servicesOfferFor(servicesConfig, servicesClasses, String(row.id), priceValueIds),
-            selection: priced.services
-              ? { fee_iqd: priced.services.fee_iqd, lines: priced.services.lines, warranty_months: priced.services.warranty_months,
-                  delivery_fee_iqd: priced.services.delivery_fee_iqd, blockers: priced.services.blockers }
-              : null,
+            // Phase 6: `offer.anchor` only when the anchor applies to THIS line's price; the selection then
+            // carries `anchor_fee_iqd` and `net_fee_iqd` (the quote's unit already includes them).
+            offer: offerForLine(servicesOfferFor(servicesConfig, servicesClasses, String(row.id), priceValueIds), priced),
+            selection: priced.services ? pricedServicesView(priced.services) : null,
           },
         }
       : {}),

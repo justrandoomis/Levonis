@@ -1,35 +1,63 @@
 /**
- * «خصص طابعتك» — the THIN package card under the version selector (owner brief
- * 2026-11-17; DECISIONS row 339; reference image «12_40_10»).
+ * «خصص طابعتك» — the package card under the version selector (owner brief
+ * 2026-11-17; DECISIONS row 339) as redesigned on 2026-11-19 (row 362).
  *
- * Three presets and one «تخصيص بنفسي» row. Smart Choice is drawn as the
- * recommendation, but nothing is chosen until the customer taps: the page
- * holds `selection = null` and the cart refuses until `confirmed` (a visual
- * default is never consent). Just Printer asks for its one acknowledgment.
- * Delivery is asked here too when the offer has it — required then, never
- * defaulted — in one compact row. Monochrome on purpose: a white tile is the
- * chosen one; the recommendation is only outlined, never filled.
+ * WHAT THE CUSTOMER READS IN TWO SECONDS, top to bottom:
+ *   1. what the price on the page includes now (one line under the title);
+ *   2. three packages, each with what it changes in the price — «مشمول في
+ *      السعر», a minus or a plus — in one end-aligned column;
+ *   3. how the printer arrives: Economy, Personal, or free warehouse pickup;
+ *   4. «تخصيص بنفسي», which opens the detailed choices.
  *
- * Every figure is the server's: a tile shows the offer's package price, the
- * custom row the quote's `fee_iqd` for the choice on screen. The page's add is
- * allowed only when the quote priced exactly this choice without a blocker
- * (`onReady`); a pending or failed quote says so instead.
+ * THE ANCHOR (`offer.anchor`, row 362): the owner's rule is «today's price IS
+ * the Smart Choice price». Smart Choice is then the choice the card opens
+ * with — confirmed, because it is what the price pays for (the server prices a
+ * line with no choice the same way) — «الطابعة فقط» shows what it takes off
+ * the price, service by service, and «التجربة الكاملة» the difference.
+ * Without an anchor nothing is chosen until the customer taps, and every
+ * figure is the «+» price it always was.
+ *
+ * THE SELECTED STATE IS THE HOUSE'S OWN (`lv-choice`, DECISIONS row 207): the
+ * row sinks into the selected fill and its gold check appears — the same cue
+ * as «طريقة التوفر» above it, in both themes. It replaced a pure white slab
+ * with black ink, which was the brightest thing on a dark page (owner: «white
+ * very light … not very white»).
+ *
+ * Every figure is the server's, or the difference of two of them: a tile
+ * shows the offer's package price against the anchor, the custom row the
+ * quote's fee for the choice on screen. The page's add is allowed only when
+ * the quote priced exactly this choice without a blocker (`onReady`); a
+ * pending or failed quote says so instead. Delivery is asked here too when the
+ * offer has it — required then, never defaulted.
  */
-import React, { Suspense, lazy, startTransition, useCallback, useEffect, useId, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, SlidersHorizontal, Truck } from 'lucide-react';
+import React, { Suspense, lazy, startTransition, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { Check, ChevronLeft, ChevronRight, SlidersHorizontal, Truck } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMoney } from '../../CurrencyContext';
+import { useAuth } from '../../AuthContext';
 import { PS_STRINGS, servicesErrorText } from './printerServicesStrings';
 import {
+  CHOSEN_EDGE,
+  anchorOf,
+  anchoredStart,
+  deliveryChoices,
   deliveryFee,
   firstBlocker,
   moveRadioFocus,
+  netFee,
+  packageDelta,
+  pickupOf,
   presetFrom,
+  removedByJust,
+  signedMoney,
   tabStop,
   quoteDraft,
   readyToBuy,
   verdictOf,
+  type Delta,
   type DeliveryChoice,
+  type DeliveryPick,
+  type KitsFor,
   type QuoteBase,
   type QuotedServices,
   type QuoteState,
@@ -39,8 +67,9 @@ import {
 } from './printerServicesModel';
 import type { ExtrasLabels } from './CustomizeSheet';
 
-/** «تخصيص بنفسي»: its code loads on the first open. */
-const CustomizeSheet = lazy(() => import('./CustomizeSheet'));
+/** «تخصيص بنفسي»: its code is fetched when the card is idle (and at the latest on the first open). */
+const loadSheet = () => import('./CustomizeSheet');
+const CustomizeSheet = lazy(loadSheet);
 
 export interface PrinterPackagesProps {
   /** The quote's offer; null while the first quote is on its way (or failed). */
@@ -102,7 +131,7 @@ function PackagesWaiting({ failed }: { failed: boolean }) {
   const { lang: rawLang } = useLanguage();
   const s = PS_STRINGS[rawLang === 'en' || rawLang === 'ckb' ? rawLang : 'ar'];
   return (
-    <section className="lv-surface min-w-0 p-3" data-printer-packages data-packages-state={failed ? 'failed' : 'pending'}>
+    <section className="lv-surface min-w-0 p-3.5" data-printer-packages data-packages-state={failed ? 'failed' : 'pending'}>
       <h2 className="text-[15px] font-bold text-text-primary">{s.cardTitle}</h2>
       <p role={failed ? 'alert' : 'status'} className="mt-1 text-[12px] text-text-secondary">{failed ? s.quoteFailed : s.pending}</p>
     </section>
@@ -116,6 +145,7 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
   const lang = rawLang === 'en' || rawLang === 'ckb' ? rawLang : 'ar';
   const { money: fmt } = useMoney();
   const money = (v: number) => fmt(v);
+  const { user } = useAuth();
   const s = PS_STRINGS[lang];
   const [sheet, setSheet] = useState(false);
   // Mounted on the first open and kept: closing then plays the sheet's exit
@@ -173,8 +203,22 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
       addRef.current?.();
     }
   }, [queued, verdict, committedKey]);
-  // Delivery switched off after it was chosen: the choice no longer carries it (the server would refuse it).
-  const staleDelivery = !offer.delivery && !!selection?.delivery;
+  /*
+   * THE ANCHOR'S OPENING CHOICE (row 362). The price on the page is the Smart
+   * Choice price, so an untouched card holds Smart Choice — handed to the page
+   * like a tap, because the page's add and the server's quote read the page's
+   * choice. Only while the page holds NO choice: a choice the customer made is
+   * never replaced, and after an add (the page clears it) Smart is back.
+   */
+  const anchor = anchorOf(offer);
+  const opening = selection === null ? anchoredStart(offer) : null;
+  const openingKey = opening ? JSON.stringify(opening) : '';
+  useEffect(() => {
+    if (openingKey) change(JSON.parse(openingKey) as ServiceSelection);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openingKey]);
+  // Delivery switched off after it was chosen — or the pickup taken away: the choice no longer carries it (the server would refuse it).
+  const staleDelivery = !!selection?.delivery && (!offer.delivery || ((selection.delivery as DeliveryPick) === 'pickup' && !pickupOf(offer)));
   useEffect(() => {
     if (staleDelivery && selection) change({ ...selection, delivery: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -197,20 +241,60 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
     (sel: ServiceSelection, signal: AbortSignal) => quoteDraft(JSON.parse(baseKey) as QuoteBase, sel, signal),
     [baseKey]
   );
+  // The owner's kits are priced for this exact version, order type, route and the page's printer quantity
+  // (a kit is one per printer unit: its items follow the printer's quantity).
+  const kitsKey = quoteFor
+    ? JSON.stringify({ slug: quoteFor[0], optionValueIds: quoteFor[2], fulfillmentType: quoteFor[5] || undefined, transportMethod: quoteFor[4] || undefined, qty: Math.max(1, quoteFor[6] ?? 1) } satisfies KitsFor)
+    : '';
+  const kitsFor = useMemo(() => (kitsKey ? (JSON.parse(kitsKey) as KitsFor) : null), [kitsKey]);
+  /*
+   * THE SHEET IS READY BEFORE IT IS OPENED (owner, 2026-11-19: «the filament
+   * kit and subscription is delayed to show»). Its code, the kits / add-ons /
+   * bundles answer and the membership options used to be asked for only after
+   * the tap — the kit list painted about 1.9 s after its row was opened on the
+   * live site. Now: once the card is idle (and at once when a finger lands on
+   * it) the chunk is fetched and both lists are asked for, each once per key;
+   * the sheet reads the same answers (printerServicesModel `warmed`).
+   */
+  const userId = user?.id ?? null;
+  const offerRef = useRef(offer);
+  offerRef.current = offer;
+  const warmNow = useCallback(() => {
+    void loadSheet().then((m) => m.warmSheet(offerRef.current, kitsKey ? (JSON.parse(kitsKey) as KitsFor) : null, lang, userId)).catch(() => undefined);
+  }, [kitsKey, lang, userId]);
+  const offeredKey = `${offer.kits.length}|${(offer.addons ?? []).length}|${(offer.store_bundles ?? []).length}|${offer.membership ? 1 : 0}`;
+  useEffect(() => {
+    const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(warmNow, { timeout: 1200 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const id = window.setTimeout(warmNow, 250);
+    return () => window.clearTimeout(id);
+  }, [warmNow, offeredKey]);
   const titleId = useId();
+  const deliveryId = useId();
   const chosen: PresetId | 'custom' | null = shown?.confirmed ? shown.package : null;
-  const delivery = shown?.delivery ?? null;
+  const delivery = (shown?.delivery ?? null) as DeliveryPick | null;
 
   // Each preset's line says what it holds, read from the offer the server sent
   // (never a fixed sentence that could disagree with the price beside it).
-  const rows: Array<{ id: PresetId; name: string; sub: string; price: number | null }> = [
-    { id: 'just', name: s.just, sub: s.justSub, price: 0 },
-    { id: 'smart', name: s.smart, sub: includesText(offer, 'smart', s) || s.smartSub, price: offer.packages.smart?.price_iqd ?? null },
-    { id: 'complete', name: s.complete, sub: includesText(offer, 'complete', s) || s.completeSub, price: offer.packages.complete?.price_iqd ?? null },
+  const removed = removedByJust(offer);
+  const serviceName = { warranty: s.warranty, care: s.care, packaging: s.packagingExtra, inspection: s.inspectionOption };
+  const rows: Array<{ id: PresetId; name: string; sub: string; delta: Delta | null }> = [
+    { id: 'just', name: s.just, sub: s.justSub, delta: packageDelta(offer, 'just') },
+    { id: 'smart', name: s.smart, sub: includesText(offer, 'smart', s) || s.smartSub, delta: packageDelta(offer, 'smart') },
+    { id: 'complete', name: s.complete, sub: includesText(offer, 'complete', s) || s.completeSub, delta: packageDelta(offer, 'complete') },
   ];
-  const packageStop = tabStop(rows.map((r) => r.id), chosen === 'custom' ? null : chosen, (id) => rows.find((r) => r.id === id)?.price !== null);
-  const deliveryIds = ['economy', 'personal'] as const;
+  const packageStop = tabStop(rows.map((r) => r.id), chosen === 'custom' ? null : chosen, (id) => rows.find((r) => r.id === id)?.delta !== null);
+  const deliveryIds = deliveryChoices(offer);
   const deliveryStop = tabStop(deliveryIds, delivery, (d) => deliveryFee(offer, d) !== null);
+  const pickupNote = pickupOf(offer)?.note?.[lang] || s.deliveryPickupSub;
+  const deliveryRows: Record<DeliveryPick, { name: string; sub: string }> = {
+    economy: { name: s.deliveryEconomy, sub: s.deliveryEconomySub },
+    personal: { name: s.deliveryPersonal, sub: s.deliveryPersonalSub },
+    pickup: { name: s.deliveryPickup, sub: pickupNote },
+  };
 
   // The membership and the kit chosen in the sheet (phase 2) stay with a later package tap.
   const extras = shown?.extras ? { extras: shown.extras } : {};
@@ -245,13 +329,20 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
     const next = presetFrom(offer, id, delivery);
     if (next) change({ ...next, ...extras, confirmed: true });
   };
-  const setDelivery = (d: DeliveryChoice) => {
-    if (shown) change({ ...shown, delivery: d });
-    else change({ ...(presetFrom(offer, 'just', d) as ServiceSelection), ...extras, package: 'just', confirmed: false, delivery: d });
+  const setDelivery = (d: DeliveryPick) => {
+    const held = d as DeliveryChoice;
+    if (shown) change({ ...shown, delivery: held });
+    else change({ ...(presetFrom(offer, 'just', d) as ServiceSelection), ...extras, package: 'just', confirmed: false, delivery: held });
   };
 
   // The quote's fee for the choice on screen — a server figure, shown only while it answers this choice.
   const fee = quoteState === 'fresh' && quoted && !blocker ? quoted.fee_iqd : null;
+  // Under an anchor the custom row says what the choice does to the PRICE (the server's net figure).
+  const net = fee !== null && quoted && anchor ? netFee(quoted) : null;
+  const customSaid =
+    chosen !== 'custom' || fee === null ? s.customizeSub
+    : net === null ? `${s.custom} · + ${money(fee)}`
+    : `${s.custom} · ${net === 0 ? s.included : signedMoney(net, money)}`;
   const missing =
     verdict === 'incomplete'
       ? !selection?.confirmed ? s.chooseFirst : offer.delivery && delivery === null ? s.deliveryChoose : s.justAck
@@ -263,21 +354,21 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
   const keyDir = dir === 'rtl' ? 'rtl' : 'ltr';
 
   return (
-    <section ref={root} className="lv-surface min-w-0 p-3.5" aria-labelledby={titleId} data-printer-packages>
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 id={titleId} className="text-[15px] font-bold tracking-[-0.01em] text-text-primary">{s.cardTitle}</h2>
-        <p className="truncate text-[12px] text-text-secondary">{s.cardSub}</p>
-      </div>
+    <section ref={root} className="lv-surface min-w-0 p-3.5" aria-labelledby={titleId} data-printer-packages data-anchored={anchor ? 'smart' : undefined} onPointerDown={warmNow}>
+      <h2 id={titleId} className="text-[15px] font-bold tracking-[-0.01em] text-text-primary">{s.cardTitle}</h2>
+      {/* What the price on the page includes NOW — the first thing read. */}
+      <p className="mt-0.5 text-[12px] leading-snug text-text-secondary" data-packages-includes>{anchor ? s.priceIncludes(s.smart) : s.cardSub}</p>
 
-      {/* Three compact rows, one decision each. Arrow keys move focus; Enter,
-          Space or a tap chooses — a package is never chosen for the customer. */}
+      {/* Three rows, one decision each, their figures in one column. Arrow keys
+          move focus; Enter, Space or a tap chooses. */}
       <div className="mt-3 space-y-2" role="radiogroup" aria-labelledby={titleId} onKeyDown={(e) => moveRadioFocus(e, keyDir)}>
         {rows.map((t) => {
           const on = chosen === t.id;
-          // The recommendation is drawn only while nothing is chosen, and it is
-          // never checked: outlined (dashed), never filled — a filled row is a chosen one.
+          // Without an anchor the recommendation is only drawn (dashed) while nothing is
+          // chosen, and never checked: a pressed row is a chosen one.
           const suggested = chosen === null && t.id === 'smart';
-          const unavailable = t.price === null;
+          const unavailable = t.delta === null;
+          const lines = t.id === 'just' ? removed : [];
           return (
             <button
               key={t.id}
@@ -289,22 +380,30 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
               onClick={() => pick(t.id)}
               data-package={t.id}
               data-suggested={suggested || undefined}
-              className={`flex min-h-14 w-full items-center gap-3 rounded-xl border px-3 py-2 text-start press-scale [touch-action:manipulation] disabled:opacity-50 ${
-                on ? 'bg-white text-black border-transparent' : suggested ? 'border-dashed border-text-muted text-text-primary' : 'border-border-subtle text-text-primary'
-              }`}
+              style={on ? CHOSEN_EDGE : undefined}
+              className={`lv-choice flex min-h-14 w-full items-start gap-2.5 px-3 py-2.5 text-start [touch-action:manipulation] disabled:opacity-50 ${suggested ? 'border-dashed' : ''}`}
             >
-              <Radio on={on} />
+              <Mark />
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="text-[14px] font-semibold leading-tight">{t.name}</span>
-                  {t.id === 'smart' ? (
-                    <span className={`shrink-0 rounded-full border px-1.5 text-[10px] leading-4 ${on ? 'border-current/10' : 'border-border-subtle text-text-secondary'}`}>{s.recommended}</span>
-                  ) : null}
+                <span className="flex items-baseline justify-between gap-3">
+                  <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+                    <span className="text-[14px] font-bold leading-tight text-text-primary">{t.name}</span>
+                    {t.id === 'smart' ? <span className="shrink-0 text-[10px] font-bold leading-4 text-gold">{s.recommended}</span> : null}
+                  </span>
+                  <Figure delta={t.delta} money={money} included={s.included} zero={money(0)} />
                 </span>
-                <span className={`mt-0.5 block text-[11.5px] leading-snug line-clamp-2 ${on ? 'opacity-70' : 'text-text-secondary'}`}>{t.sub}</span>
-              </span>
-              <span className="shrink-0 text-[13px] font-semibold tabular-nums" dir="auto">
-                {unavailable ? '—' : t.price === 0 ? money(0) : `+${money(t.price!)}`}
+                {lines.length ? (
+                  // «الطابعة فقط» under the anchor: what leaves the price with it, each with its own figure.
+                  <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px] leading-snug text-text-secondary" data-package-removes>
+                    {lines.map((l) => (
+                      <span key={l.service} className="whitespace-nowrap">
+                        {serviceName[l.service]} <bdi className="tabular-nums">{signedMoney(l.iqd, money)}</bdi>
+                      </span>
+                    ))}
+                  </span>
+                ) : (
+                  <span className="mt-1 block text-[11.5px] leading-snug text-text-secondary">{t.sub}</span>
+                )}
               </span>
             </button>
           );
@@ -317,7 +416,7 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
           <label className="mt-1.5 flex min-h-11 cursor-pointer items-center gap-2.5 text-[13px] font-medium text-text-primary">
             <input
               type="checkbox"
-              className="h-5 w-5 shrink-0" style={{ accentColor: '#fff' }}
+              className="h-5 w-5 shrink-0" style={{ accentColor: 'var(--color-gold)' }}
               checked={shown.ack_no_warranty}
               onChange={(e) => change({ ...shown, ack_no_warranty: e.target.checked })}
             />
@@ -327,11 +426,11 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
       ) : null}
 
       {offer.delivery ? (
-        <div className="mt-3">
-          <p className="mb-1.5 flex items-center gap-1.5 text-[12px] text-text-secondary">
-            <Truck aria-hidden="true" className="w-4 h-4" /> {s.delivery}
+        <div className="mt-4">
+          <p id={deliveryId} className="mb-2 flex items-center gap-1.5 text-[13px] font-bold text-text-primary">
+            <Truck aria-hidden="true" className="w-4 h-4 text-text-secondary" /> {s.deliveryHow}
           </p>
-          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={s.delivery} onKeyDown={(e) => moveRadioFocus(e, keyDir)}>
+          <div className="space-y-2" role="radiogroup" aria-labelledby={deliveryId} onKeyDown={(e) => moveRadioFocus(e, keyDir)}>
             {deliveryIds.map((d) => {
               const price = deliveryFee(offer, d);
               const on = delivery === d;
@@ -345,14 +444,18 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
                   disabled={price === null}
                   onClick={() => setDelivery(d)}
                   data-delivery={d}
-                  className={`flex min-h-12 items-center gap-2 rounded-xl border px-2.5 py-1.5 text-start press-scale [touch-action:manipulation] disabled:opacity-50 ${on ? 'bg-white text-black border-transparent' : 'border-border-subtle text-text-primary'}`}
+                  style={on ? CHOSEN_EDGE : undefined}
+                  className="lv-choice flex min-h-12 w-full items-start gap-2.5 px-3 py-2 text-start [touch-action:manipulation] disabled:opacity-50"
                 >
-                  <Radio on={on} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-[12.5px] font-semibold">{d === 'economy' ? s.deliveryEconomy : s.deliveryPersonal}</span>
-                    <span className={`block text-[11px] tabular-nums ${on ? 'opacity-70' : 'text-text-secondary'}`} dir="auto">
-                      {price === null ? s.unavailable : `+${money(price)}`}
+                  <Mark />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-baseline justify-between gap-3">
+                      <span className="text-[13px] font-bold leading-tight text-text-primary">{deliveryRows[d].name}</span>
+                      <span className={`shrink-0 text-[12.5px] font-bold tabular-nums ${price === 0 ? 'text-success' : 'text-text-primary'}`}>
+                        {price === null ? s.unavailable : price === 0 ? s.free : <bdi>{signedMoney(price, money)}</bdi>}
+                      </span>
                     </span>
+                    <span className="mt-0.5 block text-[11.5px] leading-snug text-text-secondary" data-delivery-note={d}>{deliveryRows[d].sub}</span>
                   </span>
                 </button>
               );
@@ -361,21 +464,22 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
         </div>
       ) : null}
 
+      {/* «تخصيص بنفسي» opens the detailed choices; it is the pressed row while a custom choice is the one in force. */}
       <button
         type="button"
         onClick={() => { setSheetMounted(true); setSheet(true); }}
         aria-haspopup="dialog"
-        className={`mt-3 flex min-h-12 w-full items-center gap-2.5 rounded-xl border px-3 text-start press-scale [touch-action:manipulation] ${chosen === 'custom' ? 'bg-white text-black border-transparent' : 'border-border-subtle text-text-primary'}`}
+        data-selected={chosen === 'custom'}
+        style={chosen === 'custom' ? CHOSEN_EDGE : undefined}
+        className="lv-choice mt-4 flex min-h-12 w-full items-center gap-2.5 px-3 py-2 text-start [touch-action:manipulation]"
         data-customize-open
       >
-        <SlidersHorizontal aria-hidden="true" className="w-4 h-4 shrink-0" />
+        <SlidersHorizontal aria-hidden="true" className="w-4 h-4 shrink-0 text-gold" />
         <span className="min-w-0 flex-1">
-          <span className="block text-[13.5px] font-semibold">{s.customize}</span>
-          <span className={`block truncate text-[11.5px] ${chosen === 'custom' ? 'opacity-70' : 'text-text-secondary'}`}>
-            {chosen === 'custom' && fee !== null ? `${s.custom} · + ${money(fee)}` : s.customizeSub}
-          </span>
+          <span className="block text-[13.5px] font-bold text-text-primary">{s.customize}</span>
+          <span className="block text-[11.5px] leading-snug text-text-secondary" dir="auto">{customSaid}</span>
         </span>
-        <Chevron aria-hidden="true" className="w-4 h-4 shrink-0" />
+        <Chevron aria-hidden="true" className="w-4 h-4 shrink-0 text-text-secondary" />
       </button>
       {/* Phase 2: the membership and the kit chosen with this printer — their own cart lines, priced there. */}
       {shownPlan || shownKit ? (
@@ -388,13 +492,13 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
 
       {/* What Levo Care includes, wherever it is on sale (DECISIONS row 359): one calm line. */}
       {offer.care ? (
-        <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary" data-packages-care-includes>{s.care} — {s.careIncludes(offer.care.max_discount_pct ?? 90)}</p>
+        <p className="mt-3 text-[11.5px] leading-relaxed text-text-muted" data-packages-care-includes>{s.care} — {s.careIncludes(offer.care.max_discount_pct ?? 90)}</p>
       ) : null}
 
       {standing ? (
         <p role="alert" className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 text-[12px] text-text-primary" data-packages-blocked>{standing}</p>
       ) : attention && missing ? (
-        <p role="alert" className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 text-[12px] text-text-primary" data-packages-missing>{missing}</p>
+        <p role="alert" className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 text-[12px] font-bold text-warning" data-packages-missing>{missing}</p>
       ) : null}
       {sheetMounted ? (
         <Suspense fallback={null}>
@@ -410,9 +514,7 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
             lang={lang}
             money={money}
             quote={quoteBase ? sheetQuote : undefined}
-            // The owner's kits are priced for this exact version, order type, route and the page's printer quantity
-            // (a kit is one per printer unit: its items follow the printer's quantity).
-            kitsFor={quoteFor ? { slug: quoteFor[0], optionValueIds: quoteFor[2], fulfillmentType: quoteFor[5] || undefined, transportMethod: quoteFor[4] || undefined, qty: Math.max(1, quoteFor[6] ?? 1) } : null}
+            kitsFor={kitsFor}
           />
         </Suspense>
       ) : null}
@@ -420,12 +522,27 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
   );
 }
 
-/** The radio mark: an empty ring, or a ring whose dot scales in (transform only). */
-function Radio({ on }: { on: boolean }) {
+/**
+ * The chosen mark: a ring that is always there (these are radio rows), and the
+ * house's gold check inside it once the row is the chosen one (`lv-choice-mark`
+ * fades and scales in on its own).
+ */
+function Mark() {
   return (
-    <span aria-hidden="true" className={`grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border ${on ? 'border-current' : 'border-text-muted'}`}>
-      {on ? <span className="animate-in fade-in duration-200 motion-reduce:animate-none h-2 w-2 rounded-full bg-black" /> : null}
+    <span aria-hidden="true" className="mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border border-text-muted">
+      <span className="lv-choice-mark"><Check className="h-3 w-3" /></span>
     </span>
+  );
+}
+
+/** A row's figure in the end column: «مشمول في السعر», a minus, a plus — or the plain zero of an unanchored «الطابعة فقط». */
+function Figure({ delta, money, included, zero }: { delta: Delta | null; money: (v: number) => string; included: string; zero: string }) {
+  if (!delta) return <span className="shrink-0 text-[13px] font-bold text-text-muted">—</span>;
+  if (delta.included) return <span className="shrink-0 text-[11.5px] font-bold text-gold" data-figure="included">{included}</span>;
+  return (
+    <bdi className="shrink-0 text-[13px] font-bold tabular-nums text-text-primary" data-figure={delta.iqd < 0 ? 'minus' : 'plus'}>
+      {delta.iqd === 0 ? zero : signedMoney(delta.iqd, money)}
+    </bdi>
   );
 }
 

@@ -1582,18 +1582,12 @@ export default function Product() {
         setColorId('');
         setModelKey('');
         setKnowledgeCovers({ specs: false, box: false });
-        // A product that only pre-orders, by exactly one route, has already
-        // answered the route question — so it is answered for the buyer.
-        //
-        // This read the response's `mode`, which is the same field the derived
-        // type stopped reading: harmless on a FIRST load, since that request
-        // carries no preference for the server to echo, but the same
-        // expression, and a later reader has no way to tell the safe use from
-        // the unsafe one. It asks `resolveOrderType` instead — one rule, one
-        // place, and no `.mode` left in this file to copy by accident.
-        const usable = (data.availability?.preorder.transports ?? []).filter((t) => t.configured);
-        const opensAsPreorder = resolveOrderType('', data.availability?.modes ?? []) === 'pre_order';
-        setTransportMethod(!initial && opensAsPreorder && usable.length === 1 ? usable[0].method : '');
+        // A new product starts with no route pressed. A pre-order with exactly
+        // one open route needs no press at all: `resolveTransport` answers it
+        // (src/lib/productSelection.ts), here and after every version change —
+        // the load used to preselect it once, and a version that fell to «طلب
+        // مسبق» later stood on «اختر وسيلة النقل» with one route to tap.
+        setTransportMethod('');
         setOrderType(initial ? 'direct_sale' : '');
       } catch (err) {
         console.error(err);
@@ -3035,6 +3029,13 @@ export default function Product() {
    * price behind a loading flag — was the whole of the "stuck on updating
    * price" report.
    */
+  /*
+   * Phase 6 (DECISIONS row 362): on an anchored line the quote's `offer_before_iqd` is the PRINTER'S OWN
+   * part (the catalogue figure − the anchor), and its percent is computed on that part. The struck price
+   * is put back to the catalogue's (+ the anchor), so the dinar saving beside the price is exact, and the
+   * percent — which would be a few tenths off — is not shown at all.
+   */
+  const psAnchor = psQuoted?.selection?.anchor_fee_iqd || 0;
   const shownPrice: {
     unit: number;
     regular: number;
@@ -3063,8 +3064,8 @@ export default function Product() {
           applied: quote!.applied_iqd,
           tier: quote!.applied_tier,
           settled: true,
-          before: quote!.offer_before_iqd ?? null,
-          savingPercent: quote!.offer_saving_percent ?? null,
+          before: quote!.offer_before_iqd != null ? quote!.offer_before_iqd + psAnchor : null,
+          savingPercent: psAnchor ? null : quote!.offer_saving_percent ?? null,
           unitBase: unitUsdBase(quote),
           unitUsd: usdWith(quote!.unit_subtotal_iqd, unitUsdBase(quote)),
           regularUsd: quote!.regular_usd_cents ?? null,
@@ -4263,11 +4264,7 @@ export default function Product() {
               aria-pressed={preUsable && effectivePreorder}
               data-order-type="pre_order"
               data-usable={preUsable ? 'yes' : 'no'}
-              onClick={() => {
-                setOrderType('pre_order');
-                const usable = (availability?.preorder.transports ?? []).filter((t) => t.configured);
-                if (usable.length === 1) setTransportMethod(usable[0].method);
-              }}
+              onClick={() => setOrderType('pre_order')}
               className="lv-choice flex min-h-[52px] items-start gap-3 px-3 py-2.5 text-sm text-start disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <span className="min-w-0 flex-1">
@@ -5271,7 +5268,7 @@ export default function Product() {
         aria-label={buyButtonAria}
         onClick={handleAddToCart}
         disabled={addingToCart || (isAuthenticated && !canBuy)}
-        className="lv-button lv-button-primary w-full min-h-[50px] text-[15px] active:scale-[0.985] [touch-action:manipulation]"
+        className="lv-button lv-button-primary w-full active:scale-[0.985] [touch-action:manipulation]"
       >
         {cartIcon}
         {buyButtonLabel}
@@ -6037,7 +6034,7 @@ export default function Product() {
       </div>
 
       {/* ------------------------------------------------ phone purchase bar */}
-      <div ref={buyBarRef} data-testid="product-buybar" data-bottom-bar className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised px-3 pt-2.5 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-dock">
+      <div ref={buyBarRef} data-testid="product-buybar" data-bottom-bar className="lg:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-surface-raised px-3 pt-2 pb-[max(0.625rem,env(safe-area-inset-bottom))] shadow-dock">
         {noPrice ? (
           selectionUnoffered ? (
             /* A combination the product does not sell: nothing here can be bought or
@@ -6094,14 +6091,20 @@ export default function Product() {
           this bar is kept clear of.
         */}
         {!notice ? <div className="mx-auto w-full max-w-[640px]">{noteSlot}</div> : null}
-        <div className="mx-auto grid w-full max-w-[640px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:flex sm:gap-2.5">
+        <div className="mx-auto flex w-full max-w-[640px] flex-wrap items-center gap-x-2 gap-y-1 sm:gap-2.5">
           {/*
+            COMPACT ON A PHONE (owner, 2026-11-19: «re size the bottom make it
+            smaller»): the price is one line over the stepper and the 44 px
+            button, which share a row — 88 px where the bar stood 118. The
+            Quick Buy pair keeps its own full-width row (its labels are clipped
+            by a narrow capsule), under the price and the stepper.
+
             A FIXED FOOTPRINT. This cell used to be auto-sized, so its width
             followed whichever string it held — a number, «يجري تحديث السعر…»,
             or an em dash — and the `flex-1` CTA beside it visibly grew and
             shrank on every quote. Reserving the space keeps the bar still.
           */}
-          <div className="min-w-0 sm:basis-[7.5rem] sm:shrink-0">
+          <div className={`min-w-0 sm:block sm:basis-[7.5rem] sm:shrink-0 ${showQuickBuyToggle ? 'me-auto' : 'flex basis-full items-baseline justify-between gap-2'}`}>
             {/* «السعر · ● Black» (§3.12): the line that names the colour while ⚡ has the wide capsule. */}
             {/* «سعر تقديري» names the bar's figure too (§5.3): the card above may be scrolled away. */}
             {chosenColour ? (
@@ -6124,7 +6127,7 @@ export default function Product() {
             </div>
           </div>
           {barStepper}
-          <div className="col-span-2 min-w-0 sm:flex-1">{buyButton}</div>
+          <div className={`min-w-0 flex-1 ${showQuickBuyToggle ? 'w-full sm:w-auto' : ''}`}>{buyButton}</div>
         </div>
         </>
         )}

@@ -20,16 +20,19 @@ import {
   DEFAULT_PRINTER_SERVICES,
   canonicalConfig,
   classesFor,
+  anchorFeeFor,
   configIssues,
   kitItemKey,
   mappingResolves,
   publishIssues,
   withPhase2Defaults,
   canonicalCareTerms,
+  anchorFeeOf,
   type CareTerms,
   type PricedServices,
   type PrinterClasses,
   type PrinterServicesConfig,
+  type ServicesOffer,
 } from '@levonis/pricing/printerServices';
 import { conflict, badRequest, HttpError } from './http';
 import { parseConditionDoc } from './condition';
@@ -126,6 +129,7 @@ export async function saveDraft(db: D1Database, actorId: string, draft: unknown,
     const ins = d.inspection as unknown as Record<string, unknown> | undefined;
     if (ins && typeof ins === 'object' && ins.labor_iqd === undefined) ins.labor_iqd = state.draft.inspection.labor_iqd ?? null;
     keepPhase4Fields(d as unknown as Record<string, unknown>, state.draft);
+    keepPhase6Fields(d as unknown as Record<string, unknown>, state.draft);
   }
   const issues = configIssues(draft);
   if (issues.length) throw badRequest(`Invalid printer services: ${issues.slice(0, 5).join('; ')}`, 'PRINTER_SERVICES_INVALID');
@@ -181,6 +185,23 @@ export function keepPhase4Fields(d: Record<string, unknown>, stored: PrinterServ
 }
 
 /**
+ * Phase 6 (DECISIONS row 362): a page that does not know the phase 6 fields keeps what the stored
+ * draft holds instead of erasing it — the price anchor, the warehouse pickup (switch and note) and
+ * delivery class d6's two prices. Only ABSENT keys are filled.
+ */
+export function keepPhase6Fields(d: Record<string, unknown>, stored: PrinterServicesConfig): void {
+  if (d.price_anchor === undefined) d.price_anchor = stored.price_anchor ?? 'none';
+  const dl = d.delivery;
+  if (!dl || typeof dl !== 'object' || Array.isArray(dl)) return;
+  const delivery = dl as Record<string, unknown>;
+  if (delivery.pickup === undefined) delivery.pickup = stored.delivery.pickup ?? { active: false, note: null };
+  const classes = delivery.classes;
+  if (classes && typeof classes === 'object' && !Array.isArray(classes) && (classes as Record<string, unknown>).d6 === undefined) {
+    (classes as Record<string, unknown>).d6 = stored.delivery.classes.d6 ?? { economy_iqd: null, personal_iqd: null };
+  }
+}
+
+/**
  * Publishes the draft: it must validate fully (`publishIssues`), then it
  * becomes the live price list with the next revision number, which every
  * order line frozen afterwards carries.
@@ -188,6 +209,8 @@ export function keepPhase4Fields(d: Record<string, unknown>, stored: PrinterServ
 export async function publishDraft(db: D1Database, actorId: string, baseRevision: number, nowIso: string): Promise<PrinterServicesState> {
   const { state, token } = await loadPrinterServices(db);
   if (state.draft.revision !== baseRevision) throw conflict('The draft changed since you opened it. Reload.', 'PRINTER_SERVICES_STALE');
+  // The anchor's price notes (a printer cheaper than its anchor) are told to the owner, never a refusal:
+  // such a printer simply sells without the anchor (the pricing rule), and prices move after a publish anyway.
   const blocking = [...publishIssues(state.draft), ...(await printerExtrasCatalogIssues(db, state.draft))];
   if (blocking.length) throw badRequest(`Not ready to publish: ${blocking.slice(0, 5).join('; ')}`, 'PRINTER_SERVICES_NOT_READY');
   const revision = Math.max(state.draft.revision, (state.published?.revision ?? 0) + 1);
@@ -331,6 +354,56 @@ export async function printerExtrasCatalogIssues(db: D1Database, config: Printer
   }
   return out;
 }
+/**
+ * Phase 6 (DECISIONS row 362) — «THE PRINTER'S PRICE IS BELOW ITS ANCHOR», told to the owner beside the
+ * publish issues (never blocking: the pricing rule already protects such a line — it sells without the
+ * anchor, at its price plus the services, exactly as a list with no anchor). One line per mapped printer
+ * whose LOWEST live direct price (its V2 SKU rows; the product's own price when it has none) is below the
+ * Smart package's fee for it. A database without the SKU table reads the product price only.
+ */
+export async function printerAnchorNotes(db: D1Database, config: PrinterServicesConfig): Promise<string[]> {
+  if (config.price_anchor !== 'smart' || !config.packages.smart.active) return [];
+  const ids = Object.keys(config.products);
+  if (!ids.length) return [];
+  const lowest = new Map<string, number>();
+  const take = (id: string, v: unknown) => {
+    const n = Math.trunc(Number(v));
+    if (!Number.isFinite(n) || n <= 0) return;
+    const was = lowest.get(id);
+    if (was === undefined || n < was) lowest.set(id, n);
+  };
+  for (let i = 0; i < ids.length; i += 90) {
+    const chunk = ids.slice(i, i + 90);
+    const marks = chunk.map(() => '?').join(',');
+    let fromSkus = new Set<string>();
+    try {
+      const { results } = await db.prepare(
+        `SELECT product_id AS id, MIN(regular_price_iqd) AS low FROM product_sku_prices
+          WHERE product_id IN (${marks}) AND regular_price_iqd > 0 GROUP BY product_id`
+      ).bind(...chunk).all<{ id: string; low: number }>();
+      for (const r of results ?? []) { take(String(r.id), r.low); fromSkus.add(String(r.id)); }
+    } catch {
+      fromSkus = new Set<string>();
+    }
+    const { results: own } = await db.prepare(`SELECT id, price_iqd FROM products WHERE id IN (${marks})`).bind(...chunk).all<{ id: string; price_iqd: number }>();
+    for (const r of own ?? []) if (!fromSkus.has(String(r.id))) take(String(r.id), r.price_iqd);
+  }
+  const out: string[] = [];
+  for (const [pid, m] of Object.entries(config.products)) {
+    const low = lowest.get(pid);
+    if (low === undefined) continue;
+    const selections: string[][] = [[], ...Object.keys(m.by_option_value ?? {}).map((ov) => [ov])];
+    let anchor = 0;
+    for (const ovs of selections) {
+      const cls = classesFor(config, pid, ovs);
+      const fee = cls ? anchorFeeFor(config, cls) : null;
+      if (fee !== null && fee > anchor) anchor = fee;
+    }
+    if (anchor > 0 && low < anchor) out.push(`products.${pid}: its price (${low}) is below the Smart package (${anchor}) — the price anchor does not apply to it`);
+  }
+  return out;
+}
+
 /** The phase 2 name of printerExtrasCatalogIssues (kept for callers not yet renamed). */
 export const kitCatalogIssues = printerExtrasCatalogIssues;
 
@@ -460,6 +533,58 @@ export function withAttachedLink<T extends Record<string, string | number | null
   return out as T & { kit_parent_item_id?: string; kit_id?: string | null; addon_id?: string; kit_color_mode?: string; printer_discount_iqd?: number };
 }
 
+/**
+ * THE OFFER AS THIS LINE IS PRICED (phase 6): `offer.anchor` is kept only when the anchor really applies
+ * to the line — a priced selection that carries it, or (no selection) a price at least as large as the
+ * anchor. So «offer.anchor present» always means «the server charges price − anchor + the choice».
+ */
+export function offerForLine(offer: ServicesOffer, resolved: { applied_iqd: number; services?: PricedServices | null }): ServicesOffer {
+  if (!offer.anchor) return offer;
+  const applies = resolved.services ? typeof resolved.services.anchor_fee_iqd === 'number' : resolved.applied_iqd >= offer.anchor.fee_iqd;
+  if (applies) return offer;
+  const { anchor: _dropped, ...rest } = offer;
+  return rest;
+}
+
+/**
+ * A priced selection as the quote and the cart line show it. Phase 6: on an anchored line it also says
+ * what the catalogue price already includes (`anchor_fee_iqd`) and what the choice moves the UNIT by
+ * (`net_fee_iqd` = fee − anchor: 0 for Smart, negative below it). `fee_iqd` stays what the customer
+ * holds; the line's applied / regular / before prices are untouched. Both keys are absent on every
+ * other line, which reads exactly as before.
+ */
+export function pricedServicesView(p: PricedServices): {
+  fee_iqd: number; lines: PricedServices['lines']; warranty_months: number; delivery_fee_iqd: number | null; blockers: string[];
+  anchor_fee_iqd?: number; net_fee_iqd?: number;
+} {
+  const anchored = typeof p.anchor_fee_iqd === 'number';
+  const anchor = anchorFeeOf(p);
+  return {
+    fee_iqd: p.fee_iqd, lines: p.lines, warranty_months: p.warranty_months, delivery_fee_iqd: p.delivery_fee_iqd, blockers: p.blockers,
+    ...(anchored ? { anchor_fee_iqd: anchor, net_fee_iqd: p.fee_iqd - anchor } : {}),
+  };
+}
+
+/**
+ * Phase 6: the printer's delivery as the SHIPPING quote reads it. The warehouse pickup is not a courier
+ * choice: on the standard method it reads as «not chosen» (the quote says so; the order is refused with
+ * SERVICES_PICKUP_METHOD), on the store's pickup method nothing is quoted at all.
+ */
+export function courierDeliveryOf(services: PricedServices): 'economy' | 'personal' | null {
+  const d = services.selection.delivery;
+  return d === 'economy' || d === 'personal' ? d : null;
+}
+
+/** A printer set to warehouse pickup ordered with another delivery method (phase 6). */
+export { SERVICES_PICKUP_METHOD } from '@levonis/pricing/printerServices';
+export const SERVICES_PICKUP_METHOD_TEXT = {
+  ar: 'اخترت استلام الطابعة من المخزن — اختر «الاستلام من المتجر» طريقةً للتوصيل، أو غيّر توصيل الطابعة إلى اقتصادي أو شخصي من السلة',
+  en: 'You chose to collect the printer from the warehouse — choose store pickup as the delivery method, or change the printer’s delivery to Economy or Personal in the cart',
+  ckb: 'هەڵتبژاردووە پرینتەرەکە لە کۆگا وەربگریت — «وەرگرتن لە فرۆشگا» وەک شێوازی گەیاندن هەڵبژێرە، یان لە سەبەتەکەدا گەیاندنی پرینتەرەکە بگۆڕە بۆ ئابووری یان تایبەت',
+} as const;
+export const SERVICES_PICKUP_METHOD_MESSAGE =
+  `${SERVICES_PICKUP_METHOD_TEXT.ar} / ${SERVICES_PICKUP_METHOD_TEXT.en} / ${SERVICES_PICKUP_METHOD_TEXT.ckb}`;
+
 /** The refusal of a serviced printer on a method that is neither standard delivery nor store pickup. */
 export const SERVICES_DELIVERY_METHOD_TEXT = {
   ar: 'الطابعة مع خدماتها تُوصَّل بالتوصيل العادي (اقتصادي أو شخصي) أو تُستلم من المتجر — اختر التوصيل العادي أو الاستلام من المتجر',
@@ -565,6 +690,9 @@ export function orderServicesView(snapshot: string): {
   delivery: string | null;
   delivery_fee_iqd: number | null;
   revision: number | null;
+  /** Phase 6, only on a line sold under the price anchor: what the printer's price already included, and what the services moved the unit by (fee − that). */
+  anchor_fee_iqd?: number;
+  net_fee_iqd?: number;
 } | null {
   let v: Record<string, unknown>;
   try { v = JSON.parse(snapshot); } catch { return null; }
@@ -592,6 +720,7 @@ export function orderServicesView(snapshot: string): {
     delivery: sel && typeof sel.delivery === 'string' ? sel.delivery : null,
     delivery_fee_iqd: typeof v.delivery_fee_iqd === 'number' ? v.delivery_fee_iqd : null,
     revision: typeof v.revision === 'number' ? v.revision : null,
+    ...(typeof v.anchor_fee_iqd === 'number' ? { anchor_fee_iqd: anchorFeeOf(v), net_fee_iqd: num(v.fee_iqd) - anchorFeeOf(v) } : {}),
   };
 }
 

@@ -42,12 +42,25 @@
  * linked per printer product (`ProductMapping.store_bundle_ids`, at most 8, the bundle's own
  * price). A config stored before phase 4 reads as fixed colours, no discounts, no add-ons, no
  * bundles (`withPhase4Defaults`). PACKAGES still carry no discount.
+ *
+ * PHASE 6 (owner, 2026-11-19; DECISIONS row 362):
+ *  - THE PRICE ANCHOR (`price_anchor: 'smart'`): «today's price IS the Smart Choice price». The
+ *    catalogue price P of an enrolled printer already includes the Smart package, so a line is
+ *    charged P − anchor + fee(selection), where anchor = the Smart package's fee for the printer's
+ *    family (`anchorFeeFor`). Just Printer costs LESS than P; Smart costs exactly P. The anchor
+ *    applies only while the price actually applied (after the tier and a live offer) is at least
+ *    the anchor (a line never goes below 0; below it the printer behaves as 'none'). It lives in
+ *    the SERVICES component alone (net fee = fee − anchor): the line's applied / regular / member /
+ *    offer figures keep their meaning. ONE place does it, `settleServicesAnchor` (pricing.ts);
+ *    `priceServices` keeps returning the real services fee.
+ *  - Delivery class d6 (the A1 box) and the free warehouse pickup choice (`delivery.pickup`).
+ *  A config stored before phase 6 reads as no anchor, d6 unpriced, pickup off (`withPhase6Defaults`).
  */
 
 export const WARRANTY_FAMILIES = ['a1', 'xpa2', 'h2', 'h3c'] as const;
 export type WarrantyFamily = (typeof WARRANTY_FAMILIES)[number];
 
-export const DELIVERY_CLASSES = ['d1', 'd2', 'd3', 'd4', 'd5'] as const;
+export const DELIVERY_CLASSES = ['d1', 'd2', 'd3', 'd4', 'd5', 'd6'] as const;
 export type DeliveryClass = (typeof DELIVERY_CLASSES)[number];
 
 export const WARRANTY_CHOICES = ['none', 'w12', 'w24'] as const;
@@ -60,8 +73,12 @@ export const INSPECTION_CHOICES = ['none', 'full'] as const;
 export type InspectionChoice = (typeof INSPECTION_CHOICES)[number];
 export const ACADEMY_CHOICES = ['recorded', 'live_whatsapp', 'live_in_person'] as const;
 export type AcademyChoice = (typeof ACADEMY_CHOICES)[number];
-export const DELIVERY_CHOICES = ['economy', 'personal'] as const;
+/** 'pickup' (phase 6) = collected from the warehouse, free; offered only while `delivery.pickup.active`. */
+export const DELIVERY_CHOICES = ['economy', 'personal', 'pickup'] as const;
 export type DeliveryChoice = (typeof DELIVERY_CHOICES)[number];
+/** Phase 6: what the printer's catalogue price already includes — nothing, or the Smart package. */
+export const PRICE_ANCHORS = ['none', 'smart'] as const;
+export type PriceAnchor = (typeof PRICE_ANCHORS)[number];
 export const PACKAGE_IDS = ['just', 'smart', 'complete', 'custom'] as const;
 export type PackageId = (typeof PACKAGE_IDS)[number];
 
@@ -277,7 +294,21 @@ export interface PrinterServicesConfig {
     labor_iqd?: number | null;
   };
   academy: { active: boolean; recorded_iqd: number | null; live_iqd: number | null };
-  delivery: { active: boolean; classes: Record<DeliveryClass, { economy_iqd: number | null; personal_iqd: number | null }> };
+  delivery: {
+    active: boolean;
+    /** d6 (phase 6) may be missing from a config stored before it: every reader goes through `deliveryRow`. */
+    classes: Record<DeliveryClass, { economy_iqd: number | null; personal_iqd: number | null }>;
+    /**
+     * Phase 6: «استلام من المخزن — مجاناً». Absent = off. `note` is the address / hours line shown
+     * under the choice (all three languages, or null).
+     */
+    pickup?: { active: boolean; note: Text3 | null };
+  };
+  /**
+   * Phase 6: 'smart' = the catalogue price of every enrolled printer already includes the Smart
+   * package (see the header). Absent = 'none'.
+   */
+  price_anchor?: PriceAnchor;
   packages: { smart: PackagePreset; complete: PackagePreset };
   /** Phase 2; optional in a stored config (`withPhase2Defaults`). */
   membership?: MembershipOffer;
@@ -314,8 +345,11 @@ export const DEFAULT_PRINTER_SERVICES: PrinterServicesConfig = {
       d3: { economy_iqd: 15_000, personal_iqd: 40_000 },  // A2L, A2L Combo
       d4: { economy_iqd: 15_000, personal_iqd: 50_000 },  // H2 family
       d5: { economy_iqd: 20_000, personal_iqd: 65_000 },  // H3C
+      d6: { economy_iqd: null, personal_iqd: null },      // the A1 box (phase 6): unpriced until the owner sets it
     },
+    pickup: { active: false, note: null },
   },
+  price_anchor: 'none',
   packages: {
     smart: { active: true, warranty: 'w12', care: 'c12', packaging: 'standard', inspection: 'none', discount_iqd: null, membership_tier: null },
     complete: { active: true, warranty: 'w24', care: 'c12', packaging: 'extra', inspection: 'full', discount_iqd: null, membership_tier: null },
@@ -387,7 +421,7 @@ export function withPhase3Defaults(c: PrinterServicesConfig): PrinterServicesCon
 export function withPhase4Defaults(c: PrinterServicesConfig): PrinterServicesConfig {
   const products: Record<string, ProductMapping> = {};
   for (const [pid, m] of Object.entries(c.products)) products[pid] = { ...m, store_bundle_ids: m.store_bundle_ids ? [...m.store_bundle_ids] : [] };
-  return {
+  return withPhase6Defaults({
     ...c,
     products,
     kits: (c.kits ?? []).map((k) => ({
@@ -396,6 +430,37 @@ export function withPhase4Defaults(c: PrinterServicesConfig): PrinterServicesCon
       items: k.items.map((i) => ({ ...i, color_mode: colorModeOf(i) })),
     })),
     addons: (c.addons ?? []).map((a) => ({ ...a, discount: a.discount ?? null, color_mode: colorModeOf(a) })),
+  });
+}
+
+/** The price anchor of a config (absent or unknown = 'none'). */
+export function priceAnchorOf(c: Pick<PrinterServicesConfig, 'price_anchor'>): PriceAnchor {
+  return c.price_anchor === 'smart' ? 'smart' : 'none';
+}
+/** A delivery class's two prices; a class the stored config does not carry (d6 before phase 6) is unpriced. */
+export function deliveryRow(c: PrinterServicesConfig, cls: DeliveryClass): { economy_iqd: number | null; personal_iqd: number | null } {
+  const row = Object.hasOwn(c.delivery.classes, cls) ? c.delivery.classes[cls] : undefined;
+  return { economy_iqd: row?.economy_iqd ?? null, personal_iqd: row?.personal_iqd ?? null };
+}
+/** The warehouse pickup of a config (absent = off). */
+export function pickupOf(c: PrinterServicesConfig): { active: boolean; note: Text3 | null } {
+  const p = c.delivery.pickup;
+  return p ? { active: p.active === true, note: p.note ?? null } : { active: false, note: null };
+}
+
+/**
+ * Phase 6 (DECISIONS row 362): a config stored before it reads as no price anchor, class d6
+ * unpriced and the warehouse pickup off — exactly what it sold before.
+ */
+export function withPhase6Defaults(c: PrinterServicesConfig): PrinterServicesConfig {
+  return {
+    ...c,
+    delivery: {
+      ...c.delivery,
+      classes: Object.fromEntries(DELIVERY_CLASSES.map((k) => [k, deliveryRow(c, k)])) as PrinterServicesConfig['delivery']['classes'],
+      pickup: pickupOf(c),
+    },
+    price_anchor: priceAnchorOf(c),
   };
 }
 
@@ -487,10 +552,21 @@ export function configIssues(raw: unknown): string[] {
   if (!isObj(ac) || typeof ac.active !== 'boolean' || !isMoneyOrNull(ac.recorded_iqd) || !isMoneyOrNull(ac.live_iqd)) out.push('academy: {active, recorded_iqd, live_iqd}');
   const dl = c.delivery;
   if (!isObj(dl) || typeof dl.active !== 'boolean' || !isObj(dl.classes)) out.push('delivery: {active, classes}');
-  else for (const k of DELIVERY_CLASSES) {
-    const row = (dl.classes as Record<string, unknown>)[k];
-    if (!isObj(row) || !isMoneyOrNull(row.economy_iqd) || !isMoneyOrNull(row.personal_iqd)) out.push(`delivery.classes.${k}: {economy_iqd, personal_iqd}`);
+  else {
+    for (const k of DELIVERY_CLASSES) {
+      const row = (dl.classes as Record<string, unknown>)[k];
+      // Phase 6: a config stored before class d6 existed has no d6 row — it reads as unpriced.
+      if (row === undefined && k === 'd6') continue;
+      if (!isObj(row) || !isMoneyOrNull(row.economy_iqd) || !isMoneyOrNull(row.personal_iqd)) out.push(`delivery.classes.${k}: {economy_iqd, personal_iqd}`);
+    }
+    if (dl.pickup !== undefined) {
+      const pu = dl.pickup;
+      if (!isObj(pu) || typeof pu.active !== 'boolean' || !(pu.note === null || isTextOf(pu.note, MAX_PICKUP_NOTE))) {
+        out.push(`delivery.pickup: {active, note: null or {ar, en, ckb} of at most ${MAX_PICKUP_NOTE} characters each}`);
+      }
+    }
   }
+  if (c.price_anchor !== undefined && !oneOf(PRICE_ANCHORS, c.price_anchor)) out.push('price_anchor: none or smart');
   const pg = c.packages;
   if (!isObj(pg)) out.push('packages: object');
   else for (const id of ['smart', 'complete'] as const) {
@@ -525,6 +601,8 @@ export function configIssues(raw: unknown): string[] {
   return out;
 }
 
+/** The longest pickup note (address / hours) per language. */
+export const MAX_PICKUP_NOTE = 200;
 const isTextOf = (v: unknown, max: number): v is Text3 =>
   isObj(v) && (['ar', 'en', 'ckb'] as const).every((k) => typeof v[k] === 'string' && (v[k] as string).length <= max);
 
@@ -801,8 +879,10 @@ export function canonicalConfig(c: PrinterServicesConfig): PrinterServicesConfig
     academy: { active: c.academy.active, recorded_iqd: c.academy.recorded_iqd, live_iqd: c.academy.live_iqd },
     delivery: {
       active: c.delivery.active,
-      classes: Object.fromEntries(DELIVERY_CLASSES.map((k) => [k, { economy_iqd: c.delivery.classes[k].economy_iqd, personal_iqd: c.delivery.classes[k].personal_iqd }])) as PrinterServicesConfig['delivery']['classes'],
+      classes: Object.fromEntries(DELIVERY_CLASSES.map((k) => [k, deliveryRow(c, k)])) as PrinterServicesConfig['delivery']['classes'],
+      pickup: ((p) => ({ active: p.active, note: p.note && (p.note.ar.trim() || p.note.en.trim() || p.note.ckb.trim()) ? tx(p.note) : null }))(pickupOf(c)),
     },
+    price_anchor: priceAnchorOf(c),
     packages: { smart: pkg(c.packages.smart), complete: pkg(c.packages.complete) },
     membership: { active: m.active, tiers: MEMBERSHIP_TIERS.filter((t) => m.tiers.includes(t)) },
     kits,
@@ -862,6 +942,24 @@ export function publishIssues(c: PrinterServicesConfig): string[] {
   // Phase 4: a store bundle linked to a printer is never a mapped printer.
   for (const [pid, m] of mapped) {
     for (const b of m.store_bundle_ids ?? []) if (Object.hasOwn(c.products, b)) out.push(`products.${pid}: store bundle ${idLabel(b)} is a printer`);
+  }
+  // Phase 6: the pickup note is shown to customers in their language — all three, or none.
+  const note = pickupOf(c).note;
+  if (note && !(note.ar.trim() && note.en.trim() && note.ckb.trim()) && (note.ar.trim() || note.en.trim() || note.ckb.trim())) {
+    out.push('delivery.pickup.note: needs Arabic, English and Kurdish (or none)');
+  }
+  // Phase 6: «the printer's price is the Smart Choice price» needs a Smart package every mapped
+  // printer can be priced with — otherwise that printer would sell at its price with nothing in it.
+  if (priceAnchorOf(c) === 'smart') {
+    if (!c.packages.smart.active) out.push('price_anchor: the Smart package is off — switch it on, or switch the price anchor off');
+    else for (const [pid, m] of mapped) {
+      const selections: string[][] = [[], ...Object.keys(m.by_option_value ?? {}).map((ov) => [ov])];
+      const unpriced = selections.some((ovs) => {
+        const cls = classesFor(c, pid, ovs);
+        return !!cls && anchorFeeFor(c, cls) === null;
+      });
+      if (unpriced) out.push(`products.${pid}: the Smart package is not priced for this printer's warranty family — the price anchor cannot apply`);
+    }
   }
   return out;
 }
@@ -1028,6 +1126,26 @@ export interface PricedServices {
   selection: ServiceSelection;
   /** Refusal codes; non-empty = this selection cannot be bought. */
   blockers: string[];
+  /**
+   * Phase 6 (DECISIONS row 362): the Smart package's fee the printer's catalogue price already
+   * includes, per unit. The line's price figures (applied, regular, the member rungs, the offer's
+   * before price) are NEVER touched by it: the anchor lives in the services component alone — the
+   * unit carries `net_fee_iqd = fee_iqd − anchor_fee_iqd` (0 for Smart, negative below it).
+   * Written by the pricing step ONLY on an anchored line; ABSENT = 0 (no anchor, and every line
+   * frozen before phase 6), so an unanchored snapshot is byte-identical to before. `fee_iqd` stays
+   * the real services fee (what the customer holds). Read it through `anchorFeeOf`.
+   */
+  anchor_fee_iqd?: number;
+  /** Phase 6, beside `anchor_fee_iqd` only: what the services move the unit by — fee_iqd − anchor_fee_iqd (may be negative). */
+  net_fee_iqd?: number;
+  /** Phase 6: true when the line came with NO choice and the anchor priced it as the Smart package. */
+  defaulted?: true;
+}
+
+/** The anchor inside a priced / frozen services object (absent or malformed = 0). */
+export function anchorFeeOf(p: { anchor_fee_iqd?: unknown } | null | undefined): number {
+  const v = p?.anchor_fee_iqd;
+  return typeof v === 'number' && Number.isSafeInteger(v) && v > 0 ? v : 0;
 }
 
 export const SERVICES_NOT_CONFIRMED = 'SERVICES_NOT_CONFIRMED';
@@ -1039,6 +1157,8 @@ export const SERVICES_PACKAGE_UNAVAILABLE = 'SERVICES_PACKAGE_UNAVAILABLE';
 export const SERVICES_REQUIRED = 'SERVICES_REQUIRED';
 /** A line holding a services choice the published list no longer offers. */
 export const SERVICES_NOT_OFFERED = 'SERVICES_NOT_OFFERED';
+/** Phase 6: a printer set to «collect from the warehouse» ordered with a method other than the store's pickup. */
+export const SERVICES_PICKUP_METHOD = 'SERVICES_PICKUP_METHOD';
 /** A legacy extended-warranty plan sent with the services (never both). */
 export const SERVICES_WITH_LEGACY_WARRANTY = 'SERVICES_WITH_LEGACY_WARRANTY';
 
@@ -1089,6 +1209,15 @@ export const ADDON_UNAVAILABLE = 'ADDON_UNAVAILABLE';
 export const ADDON_CHANGED = 'ADDON_CHANGED';
 /** An add-on line is bought only together with its printer. */
 export const ADDON_WITHOUT_PRINTER = 'ADDON_WITHOUT_PRINTER';
+
+/**
+ * Phase 6 (owner 2026-11-19: «if not available put them on pre-order»): the add-on cannot go with this
+ * printer (not on the shelf, or sold by pre-order only) but its product IS sold by pre-order. One
+ * order is one journey — a ready printer and a pre-order part never share an order (the cart's
+ * one-shipping-type rule, CART_SHIPPING_CONFLICT) — so the add-on is ordered separately, as a
+ * pre-order: the answer names the route and the lead days, and the page links to the part.
+ */
+export const ADDON_PREORDER_SEPARATE = 'ADDON_PREORDER_SEPARATE';
 
 /** The phase 4 codes the page words (src/lib/refusalStrings.ts carries each). */
 export const PHASE4_CODES: ReadonlySet<string> = new Set<string>([
@@ -1161,11 +1290,13 @@ export function priceServices(config: PrinterServicesConfig, classes: PrinterCla
 
   const gross = lines.reduce((sum, l) => sum + l.fee_iqd, 0);
 
-  const dRow = config.delivery.active ? config.delivery.classes[classes.delivery_class] : null;
+  const dRow = config.delivery.active ? deliveryRow(config, classes.delivery_class) : null;
   const delivery_options = { economy_iqd: dRow?.economy_iqd ?? null, personal_iqd: dRow?.personal_iqd ?? null };
   let delivery_fee_iqd: number | null = null;
   if (s.delivery) {
-    delivery_fee_iqd = s.delivery === 'economy' ? delivery_options.economy_iqd : delivery_options.personal_iqd;
+    // Phase 6: the warehouse pickup is free, and offered only while the owner's switch is on.
+    delivery_fee_iqd = s.delivery === 'pickup' ? (config.delivery.active && pickupOf(config).active ? 0 : null)
+      : s.delivery === 'economy' ? delivery_options.economy_iqd : delivery_options.personal_iqd;
     if (delivery_fee_iqd === null) blockers.add(SERVICES_OPTION_UNAVAILABLE);
   }
 
@@ -1198,6 +1329,22 @@ export function presetPrices(config: PrinterServicesConfig, classes: PrinterClas
 }
 
 /**
+ * Phase 6: THE ANCHOR of one printer — the Smart package's services fee per unit for its family
+ * (exactly `priceServices(...).fee_iqd` of the Smart preset, delivery excluded), or null when the
+ * config has no anchor, the Smart package is off, or it cannot be priced for this printer.
+ * Whether it APPLIES to a line also needs the line's price (resolvePrice: applied ≥ anchor).
+ */
+export function anchorFeeFor(config: PrinterServicesConfig, classes: PrinterClasses): number | null {
+  if (priceAnchorOf(config) !== 'smart') return null;
+  return presetPrices(config, classes).smart;
+}
+
+/** The Smart package as a CONFIRMED choice: what an anchored printer bought with no choice is priced and recorded as. */
+export function anchorDefaultSelection(config: PrinterServicesConfig): ServiceSelection {
+  return { ...presetSelection(config, 'smart'), confirmed: true };
+}
+
+/**
  * What the product page and the sheet show for ONE printer: each option's
  * per-unit price (null = not offered), the package totals, and the active
  * packages. Customer-safe: prices only, no costs, no internal ids.
@@ -1209,7 +1356,14 @@ export interface ServicesOffer {
   packaging: { standard: 0; extra: number | null } | null;
   inspection: { full: number | null; lead_business_days: [number, number] } | null;
   academy: { recorded: number | null; live: number | null } | null;
-  delivery: { economy: number | null; personal: number | null } | null;
+  /** `pickup` (phase 6) is present only while the warehouse pickup is on: free, with its note line. */
+  delivery: { economy: number | null; personal: number | null; pickup?: { note: Text3 | null } } | null;
+  /**
+   * Phase 6: present (non-null) when this printer's catalogue price already includes the Smart
+   * package: a line with a choice is charged `price − fee_iqd + the choice's fee`. ABSENT when
+   * there is no anchor (read `offer.anchor ?? null`), so an unanchored offer is byte-identical.
+   */
+  anchor?: { package: 'smart'; fee_iqd: number } | null;
   packages: {
     just: { price_iqd: 0 };
     smart: { price_iqd: number; includes: Omit<PackagePreset, 'active' | 'discount_iqd'>; discount_iqd: number } | null;
@@ -1227,7 +1381,9 @@ export interface ServicesOffer {
 
 export function servicesOffer(config: PrinterServicesConfig, classes: PrinterClasses): ServicesOffer {
   const fam = classes.warranty_family;
-  const d = config.delivery.classes[classes.delivery_class];
+  const d = deliveryRow(config, classes.delivery_class);
+  const pickup = pickupOf(config);
+  const anchorFee = anchorFeeFor(config, classes);
   const prices = presetPrices(config, classes);
   const pkg = (id: 'smart' | 'complete') => {
     const p = config.packages[id];
@@ -1254,7 +1410,10 @@ export function servicesOffer(config: PrinterServicesConfig, classes: PrinterCla
       ? { full: config.inspection.price_iqd, lead_business_days: [config.inspection.lead_business_days_min, config.inspection.lead_business_days_max] }
       : null,
     academy: config.academy.active ? { recorded: config.academy.recorded_iqd, live: config.academy.live_iqd } : null,
-    delivery: config.delivery.active ? { economy: d.economy_iqd, personal: d.personal_iqd } : null,
+    delivery: config.delivery.active
+      ? { economy: d.economy_iqd, personal: d.personal_iqd, ...(pickup.active ? { pickup: { note: pickup.note } } : {}) }
+      : null,
+    ...(anchorFee !== null ? { anchor: { package: 'smart' as const, fee_iqd: anchorFee } } : {}),
     packages: { just: { price_iqd: 0 }, smart: pkg('smart'), complete: pkg('complete') },
     membership: tiers.length ? { tiers } : null,
     kits: [],

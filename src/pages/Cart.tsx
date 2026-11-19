@@ -2165,6 +2165,15 @@ export default function Cart() {
             // The server’s verdict on the saved choice (e.g. an option no longer offered): said on the line.
             const blocker = ps.priced?.blockers.find((b) => b !== 'SERVICES_NOT_CONFIRMED') ?? null;
             const blockerSaid = blocker ? servicesErrorText(blocker, lang) || w.unavailable : '';
+            // Phase 6 (DECISIONS row 362): under a price anchor the line says what the choice does to the
+            // PRICE — the server's net figure (fee − anchor): «مشمول في السعر», a minus, or a plus.
+            const anchorFee = (ps.priced as { anchor_fee_iqd?: number } | null)?.anchor_fee_iqd ?? 0;
+            const netFee = (ps.priced as { net_fee_iqd?: number } | null)?.net_fee_iqd ?? (ps.priced ? ps.priced.fee_iqd - anchorFee : 0);
+            const feeSaid = !ps.priced ? ''
+              : anchorFee > 0 ? (netFee === 0 ? w.included : netFee < 0 ? `−${money(-netFee)}` : `+${money(netFee)}`)
+              : ps.priced.fee_iqd > 0 ? `+${money(ps.priced.fee_iqd)}` : '';
+            const chosenDelivery = ps.selection?.delivery as string | null | undefined;
+            const deliverySaid = !chosenDelivery ? '' : chosenDelivery === 'economy' ? w.deliveryEconomy : chosenDelivery === 'pickup' ? w.deliveryPickup : w.deliveryPersonal;
             return (
               <div className="mb-2" data-cart-printer-services={item.id}>
                 <button
@@ -2180,7 +2189,7 @@ export default function Cart() {
                     <span className="block text-[11px] leading-tight truncate tabular-nums text-text-secondary">
                       {ps.needs_choice || !name
                         ? w.chooseFirst
-                        : `${name}${ps.priced && ps.priced.fee_iqd > 0 ? ` · +${money(ps.priced.fee_iqd)}` : ''}${ps.selection?.delivery ? ` · ${ps.selection.delivery === 'economy' ? w.deliveryEconomy : w.deliveryPersonal}` : ''}`}
+                        : `${name}${feeSaid ? ` · ${feeSaid}` : ''}${deliverySaid ? ` · ${deliverySaid}` : ''}`}
                     </span>
                   </span>
                   <ChevronRight className={`w-3.5 h-3.5 text-text-muted shrink-0 ${dir === 'rtl' ? 'rotate-180' : ''}`} aria-hidden="true" />

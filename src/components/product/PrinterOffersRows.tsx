@@ -16,7 +16,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { api, ApiError } from '../../lib/api';
 import VariantImg from '../ui/VariantImg';
-import { moveRadioFocus, tabStop, type KitsFor, type PricedKit, type SelectionExtras } from './printerServicesModel';
+import { moveRadioFocus, tabStop, warmed, warmedNow, type KitsFor, type PricedKit, type SelectionExtras } from './printerServicesModel';
 import { OFFER_STRINGS, type OfferLang, type OfferStrings } from './printerOfferStrings';
 
 type Text3 = { ar: string; en: string; ckb: string };
@@ -57,6 +57,27 @@ export interface OfferAddon {
   available: boolean;
   money: OfferMoney;
   colour: ColourChoice | null;
+  /** Phase 6: «30» or «10–20» days when the add-on comes as a pre-order (`''` = no figure given); null = it ships with the printer. */
+  preorder: string | null;
+  /** Phase 6: the part's own page (a pre-order part is ordered there, on its own order) and its pre-order unit price. */
+  slug: string;
+  preorder_unit_iqd: number | null;
+}
+
+/**
+ * Phase 6: how an add-on arrives, read defensively from the kits answer or a cart line
+ * (`fulfillment: 'with_printer' | 'pre_order'`, `lead_days: { min, max }`; absent = with the printer).
+ * A pre-order answers its days as «max», or «min–max» when both are given and differ.
+ */
+export function preorderDays(raw: unknown): string | null {
+  const x = (raw ?? {}) as { fulfillment?: unknown; lead_days?: { min?: unknown; max?: unknown } | null };
+  if (x.fulfillment !== 'pre_order') return null;
+  const whole = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.round(v) : null);
+  const min = whole(x.lead_days?.min);
+  const max = whole(x.lead_days?.max);
+  // A left-to-right isolate: in an Arabic line «10–20» must not turn into «20–10».
+  if (min !== null && max !== null && min < max) return `\u2066${min}–${max}\u2069`;
+  return max !== null ? String(max) : min !== null ? String(min) : '';
 }
 
 export interface StoreBundleOffer {
@@ -154,6 +175,9 @@ export function readOffers(raw: unknown, lang: OfferLang): PrinterOffers {
       available: x.available !== false,
       money: moneyOf(x),
       colour: colourChoiceOf(x, lang, str(x.id)),
+      preorder: preorderDays(x),
+      slug: str(x.slug),
+      preorder_unit_iqd: num(rec(x.preorder).unit_price_iqd),
     };
   }).filter((a) => !!a.id);
   const store_bundles: StoreBundleOffer[] = (Array.isArray(r.store_bundles) ? r.store_bundles : []).map((b) => {
@@ -189,6 +213,26 @@ export async function loadOffers(f: KitsFor, colours: Record<string, string> | n
   if (picked.length) q.set('colors', picked.map(([p, c]) => `${p}:${c}`).join(','));
   const r = await api.get<unknown>(`/api/products/${encodeURIComponent(f.slug)}/kits?${q}`, { signal, timeoutMs: 12000 });
   return readOffers(r, lang);
+}
+
+/** What one kits answer is remembered under: the printer selection, the colours picked and the reader's language. */
+export function offersKey(f: KitsFor, colours: Record<string, string> | null | undefined, lang: OfferLang): string {
+  const picked = Object.entries(colours ?? {}).filter(([, v]) => !!v).sort(([a], [b]) => a.localeCompare(b));
+  return 'k:' + JSON.stringify([f.slug, [...f.optionValueIds], f.fulfillmentType ?? '', f.transportMethod ?? '', Math.max(1, f.qty), picked, lang]);
+}
+
+/**
+ * The same answer, asked ONCE per key and shared (printerServicesModel `warmed`): the card asks when it
+ * mounts, the sheet reads what came back. No abort signal on purpose — the request belongs to every
+ * reader of the key, and the answer is small. `fresh` asks again («إعادة المحاولة»).
+ */
+export function loadOffersWarm(f: KitsFor, colours: Record<string, string> | null | undefined, lang: OfferLang, fresh = false): Promise<PrinterOffers> {
+  return warmed(offersKey(f, colours, lang), () => loadOffers(f, colours, lang), fresh);
+}
+
+/** The answer already here for this key, for the sheet's first paint. */
+export function offersNow(f: KitsFor, colours: Record<string, string> | null | undefined, lang: OfferLang): PrinterOffers | undefined {
+  return warmedNow<PrinterOffers>(offersKey(f, colours, lang));
 }
 
 /** A picked colour that cannot be served now (sold out, or no longer a candidate). */
@@ -251,7 +295,8 @@ export function ColourChips({ choice, value, onPick, s, dir, money }: { choice: 
               disabled={o.disabled}
               onClick={() => onPick(o.id)}
               data-offer-colour={o.id}
-              className={`inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold press-scale [touch-action:manipulation] disabled:opacity-50 ${on ? 'bg-white text-black border-transparent' : o.id === RANDOM ? 'border-dashed border-text-muted text-text-primary' : 'border-border-subtle text-text-primary'}`}
+              style={{ minHeight: 44 }}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 text-[12px] font-semibold press-scale [touch-action:manipulation] disabled:opacity-50 ${on ? 'bg-surface-selected text-text-primary border-gold' : o.id === RANDOM ? 'border-dashed border-text-muted text-text-primary' : 'border-border-subtle text-text-primary'}`}
             >
               {o.id === RANDOM ? null : <Swatch hex={o.hex} />}
               <span dir="auto">{o.label}</span>
@@ -297,6 +342,28 @@ export function AddonsBody({ addons, chosen, onToggle, picked, onPick, lang, dir
       <div className="space-y-2" data-sheet-addons>
         {addons.map((a) => {
           const on = chosen.includes(a.id);
+          /*
+           * Phase 6 (phase6-api.md, ADDON_PREORDER_SEPARATE): a part that is not on the shelf comes as a
+           * PRE-ORDER, and one order is one journey — so it is not a tick box here. The row says when it
+           * arrives and leads to the part's own page, where it is ordered on its own order.
+           */
+          if (a.preorder !== null && !a.available && !on) {
+            return (
+              <div key={a.id} className="rounded-xl border border-dashed border-border-subtle px-2.5 py-2" data-sheet-addon={a.id} data-addon-separate>
+                <div className="flex items-center gap-3">
+                  {a.image ? <VariantImg sizes="48px" src={a.image} alt="" style={{ width: 48, height: 40 }} className="shrink-0 rounded-lg bg-white object-contain" /> : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[12.5px] font-semibold leading-tight text-text-primary line-clamp-2" dir="auto">{a.title}</span>
+                    <span className="mt-0.5 block text-[11px] font-bold text-warning" data-addon-preorder={a.id}>{s.preorder(a.preorder)}</span>
+                  </span>
+                  {a.preorder_unit_iqd !== null ? <span className="shrink-0 text-end text-[12px] font-semibold tabular-nums text-text-primary">{money(a.preorder_unit_iqd)}</span> : null}
+                </div>
+                <p className="mt-1 text-[11.5px] leading-snug text-text-secondary">{s.preorderSeparate}</p>
+                {/* Opens the part's own page: nothing is added from here. */}
+                {a.slug ? <Link to={`/product/${a.slug}`} className="lv-button lv-button-secondary lv-button-sm mt-1.5 w-full" data-addon-preorder-link>{s.preorderOrder}</Link> : null}
+              </div>
+            );
+          }
           return (
             <div key={a.id} className={`rounded-xl border ${on ? 'border-text-muted' : 'border-border-subtle'}`} data-sheet-addon={a.id}>
               <button
@@ -309,12 +376,12 @@ export function AddonsBody({ addons, chosen, onToggle, picked, onPick, lang, dir
               >
                 <span
                   aria-hidden="true"
-                  className={`grid shrink-0 place-items-center rounded border text-[12px] font-bold ${on ? 'bg-white text-black border-transparent' : 'border-border-subtle'}`}
-                  style={{ width: 20, height: 20 }}
+                  className={`grid shrink-0 place-items-center rounded border text-[12px] font-bold ${on ? 'border-transparent' : 'border-text-muted'}`}
+                  style={on ? { width: 20, height: 20, background: 'var(--color-gold)', color: 'var(--color-accent-contrast)' } : { width: 20, height: 20 }}
                 >
                   {on ? '✓' : ''}
                 </span>
-                {a.image ? <VariantImg sizes="48px" src={a.image} alt="" className="h-10 w-12 shrink-0 rounded-lg bg-white object-contain" /> : null}
+                {a.image ? <VariantImg sizes="48px" src={a.image} alt="" style={{ width: 48, height: 40 }} className="shrink-0 rounded-lg bg-white object-contain" /> : null}
                 <span className="min-w-0 flex-1">
                   <span className="block text-[12.5px] font-semibold leading-tight text-text-primary line-clamp-2" dir="auto">{a.title}</span>
                   <span className="block text-[11px] text-text-secondary" dir="auto">
@@ -374,7 +441,7 @@ export function BundlesBody({ bundles, lang, money, signedIn, signInPath }: { bu
             <div key={b.id} className="flex min-w-0 flex-col rounded-xl border border-border-subtle p-2" data-sheet-store-bundle={b.id}>
               <div className="relative">
                 {b.image ? <VariantImg sizes="160px" src={b.image} alt="" className="aspect-square w-full rounded-lg bg-white object-contain" /> : null}
-                {saving ? <span className="absolute top-1 start-1 rounded-full bg-white px-2 text-[11px] font-bold text-black">{s.save(b.saving_percent)}</span> : null}
+                {saving ? <span className="absolute top-1 start-1 rounded-full bg-gold px-2 text-[11px] font-bold text-accent-contrast">{s.save(b.saving_percent)}</span> : null}
               </div>
               <p className="mt-1.5 text-[12px] font-semibold leading-tight text-text-primary line-clamp-2" dir="auto">{b.name}</p>
               <p className="mt-0.5 text-[12.5px] font-bold text-text-primary">
@@ -412,10 +479,20 @@ export function BundlesBody({ bundles, lang, money, signedIn, signInPath }: { bu
 }
 
 /** The shared loading / failed line (same look as the sheet's own). */
-export function OffersLoading({ state, lang, again }: { state: 'loading' | 'failed'; lang: OfferLang; again: () => void }) {
+/**
+ * While a list is on its way: quiet blocks of the height its rows will take (`rows` of them), so the
+ * sheet does not jump when the answer lands — and no sentence that flashes for a moment. The words
+ * stay for a screen reader.
+ */
+export function OffersLoading({ state, lang, again, rows = 1, label }: { state: 'loading' | 'failed'; lang: OfferLang; again: () => void; rows?: number; label?: string }) {
   const s = OFFER_STRINGS[lang];
   return state === 'loading' ? (
-    <p role="status" className="text-[11.5px] text-text-secondary">{s.loading}</p>
+    <div role="status" className="space-y-2" data-offers-skeleton>
+      <span className="sr-only">{label ?? s.loading}</span>
+      {Array.from({ length: Math.max(1, Math.min(rows, 6)) }, (_, i) => (
+        <div key={i} aria-hidden="true" className="h-16 rounded-xl bg-surface-raised animate-pulse motion-reduce:animate-none" />
+      ))}
+    </div>
   ) : (
     <p role="alert" className="flex flex-wrap items-center gap-2 text-[11.5px] text-text-primary">
       {s.failed}

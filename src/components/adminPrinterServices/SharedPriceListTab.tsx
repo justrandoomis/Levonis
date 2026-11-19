@@ -14,6 +14,11 @@ import { formatIqd } from '../../lib/api';
 import {
   DELIVERY_CLASSES,
   WARRANTY_FAMILIES,
+  classesFor,
+  deliveryRow,
+  pickupOf,
+  presetPrices,
+  priceAnchorOf,
   type DeliveryClass,
   type PrinterServicesConfig,
   type WarrantyFamily,
@@ -21,12 +26,14 @@ import {
 import { CareTermsPanel, InspectionLaborField } from './CareTermsPanel';
 import { MembershipPanel } from './MembershipPanel';
 import { CLASS_LABEL, FAMILY_LABEL, S, packageContents, pkgName, say, type Loc } from './adminPrinterStrings';
-import { Fold } from './itemToolkit';
+import { Fold, useDocs } from './itemToolkit';
 
 type Upd = (fn: (d: PrinterServicesConfig) => void) => void;
 
-export default function SharedPriceListTab({ draft, upd, loc, published, productId }: {
+export default function SharedPriceListTab({ draft, upd, loc, published, productId, anchorBelow }: {
   draft: PrinterServicesConfig; upd: Upd; loc: Loc; published: PrinterServicesConfig | null; productId: string;
+  /** Phase 6: the server found this printer's price below its anchor — said beside the switch. */
+  anchorBelow?: boolean;
 }) {
   const [unlocked, setUnlocked] = useState(false);
   const enrolled = Object.keys(draft.products).length;
@@ -75,12 +82,56 @@ export default function SharedPriceListTab({ draft, upd, loc, published, product
     </div>
   );
   const classRow = (c: DeliveryClass) => (
-    <div key={c} className="space-y-1" role="group" aria-label={say(loc, CLASS_LABEL[c])}>
+    <div key={c} className="space-y-1" role="group" aria-label={say(loc, CLASS_LABEL[c])} data-shared-class={c}>
       <p className="text-[13px] font-bold text-text-primary">{say(loc, CLASS_LABEL[c])}</p>
       <div className="grid grid-cols-2 gap-2">
-        {num(draft.delivery.classes[c].economy_iqd, (n) => upd((d) => { d.delivery.classes[c].economy_iqd = n; }), ecoWord)}
-        {num(draft.delivery.classes[c].personal_iqd, (n) => upd((d) => { d.delivery.classes[c].personal_iqd = n; }), perWord)}
+        {/* deliveryRow: a draft stored before class 6 existed has no row for it yet. */}
+        {num(deliveryRow(draft, c).economy_iqd, (n) => upd((d) => { d.delivery.classes[c] = { ...deliveryRow(d, c), economy_iqd: n }; }), ecoWord)}
+        {num(deliveryRow(draft, c).personal_iqd, (n) => upd((d) => { d.delivery.classes[c] = { ...deliveryRow(d, c), personal_iqd: n }; }), perWord)}
       </div>
+    </div>
+  );
+
+  // ---- phase 6 (DECISIONS row 362): what the printer's price includes, and the warehouse pickup
+  const anchored = priceAnchorOf(draft) === 'smart';
+  const pickup = pickupOf(draft);
+  const note = pickup.note ?? { ar: '', en: '', ckb: '' };
+  const setNote = (k: 'ar' | 'en' | 'ckb', v: string) => upd((d) => {
+    const next = { ...(pickupOf(d).note ?? { ar: '', en: '', ckb: '' }), [k]: v.slice(0, 200) };
+    d.delivery.pickup = { active: pickupOf(d).active, note: next.ar || next.en || next.ckb ? next : null };
+  });
+  const noteField = (k: 'ar' | 'en' | 'ckb', label: string, dirOf: 'rtl' | 'ltr') => (
+    <label className="flex flex-col gap-1 text-[12px] text-text-secondary">
+      {label}
+      <input className="lv-input h-11 px-2" dir={dirOf} maxLength={200} value={note[k]} onChange={(e) => setNote(k, e.target.value)} />
+    </label>
+  );
+  // The worked example is THIS printer's: its own price when the form knows it, and always the three packages' figures.
+  const docs = useDocs([productId]);
+  const ownPrice = docs[productId]?.price_iqd;
+  const price = typeof ownPrice === 'number' && Number.isFinite(ownPrice) && ownPrice > 0 ? ownPrice : null;
+  const myClasses = classesFor(draft, productId, []);
+  const packs = myClasses ? presetPrices(draft, myClasses) : null;
+  const smartFee = packs && draft.packages.smart.active ? packs.smart : null;
+  const signed = (v: number) => <bdi dir="ltr">{v < 0 ? '−' : '+'}{formatIqd(Math.abs(v))}</bdi>;
+  const example = smartFee === null ? null : (
+    <div className="rounded-lg border border-border-subtle p-2 text-[12px] text-text-secondary" data-anchor-example>
+      <p className="font-semibold text-text-primary">{say(loc, S.anchorExample)}</p>
+      <ul className="list-disc ps-5 leading-relaxed">
+        {price !== null && price >= smartFee ? (
+          <>
+            <li>{say(loc, S.anchorPriceWord)} {fig(price)} = {say(loc, pkgName('smart'))}</li>
+            <li>{say(loc, S.pvJust)}: {fig(price - smartFee)}</li>
+            {packs && packs.complete !== null && draft.packages.complete.active ? <li>{say(loc, pkgName('complete'))}: {fig(price - smartFee + packs.complete)}</li> : null}
+          </>
+        ) : (
+          <>
+            <li>{say(loc, pkgName('smart'))}: {say(loc, S.pvIncluded)}</li>
+            <li>{say(loc, S.pvJust)}: {signed(-smartFee)}</li>
+            {packs && packs.complete !== null && draft.packages.complete.active ? <li>{say(loc, pkgName('complete'))}: {signed(packs.complete - smartFee)}</li> : null}
+          </>
+        )}
+      </ul>
     </div>
   );
   /** This printer's own row first, under its own heading; the rest folded once more. */
@@ -104,8 +155,8 @@ export default function SharedPriceListTab({ draft, upd, loc, published, product
     ? <><bdi>{FAMILY_LABEL[myFamily]}</bdi> · {loc('12 شهراً', '12 months', '12 مانگ')} {fig(draft.warranty.w12[myFamily])} · {loc('24 شهراً', '24 months', '24 مانگ')} {fig(draft.warranty.w24[myFamily])}</>
     : null;
   const dSummary = myClass
-    ? <>{say(loc, CLASS_LABEL[myClass])} · {ecoWord} {fig(draft.delivery.classes[myClass].economy_iqd)} · {loc('شخصي', 'Personal', 'تایبەت')} {fig(draft.delivery.classes[myClass].personal_iqd)}</>
-    : null;
+    ? <>{say(loc, CLASS_LABEL[myClass])} · {ecoWord} {fig(deliveryRow(draft, myClass).economy_iqd)} · {loc('شخصي', 'Personal', 'تایبەت')} {fig(deliveryRow(draft, myClass).personal_iqd)}{pickup.active ? <> · {say(loc, S.pickupOn)}</> : null}</>
+    : pickup.active ? say(loc, S.pickupOn) : null;
 
   return (
     <div className="space-y-3" data-shared-price-list data-shared-locked={unlocked ? 'no' : 'yes'}>
@@ -120,6 +171,19 @@ export default function SharedPriceListTab({ draft, upd, loc, published, product
 
       {/* Locked: every figure readable, none editable. The parent's fieldset still disables all of it for a non-owner. */}
       <fieldset disabled={!unlocked} className="m-0 min-w-0 border-none p-0 space-y-3" data-shared-fields>
+        {group('anchor', say(loc, S.grpAnchor), say(loc, anchored ? S.anchorOnSummary : S.anchorOffSummary),
+          <div className="space-y-2 text-[12px] text-text-secondary" data-price-anchor={anchored ? 'smart' : 'none'}>
+            <label className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-text-primary">
+              <input type="checkbox" checked={anchored} onChange={(e) => upd((d) => { d.price_anchor = e.target.checked ? 'smart' : 'none'; })} data-price-anchor-switch />
+              {say(loc, S.anchorSwitch)}
+            </label>
+            <p className="leading-relaxed">{say(loc, S.anchorHintOn)}</p>
+            <p className="leading-relaxed">{say(loc, S.anchorHintOff)}</p>
+            {example}
+            {anchored && smartFee === null ? <p className="lv-alert lv-alert-warning p-3 text-[12px]" role="note" data-anchor-needs-smart>{say(loc, S.anchorNeedsSmart)}</p> : null}
+            {anchored && (anchorBelow || (price !== null && smartFee !== null && price < smartFee)) ? <p className="lv-alert lv-alert-warning p-3 text-[12px]" role="note" data-anchor-below>{say(loc, S.anchorBelow)}</p> : null}
+          </div>)}
+
         {group('warranty', say(loc, S.grpWarranty), wSummary,
           <>
             <p className="mb-2 text-[11px] text-text-muted">{say(loc, S.emptyNotOffered)}</p>
@@ -130,6 +194,20 @@ export default function SharedPriceListTab({ draft, upd, loc, published, product
           <>
             <p className="mb-2 text-[11px] text-text-muted">{say(loc, S.emptyNotOffered)}</p>
             {mineFirst(DELIVERY_CLASSES, myClass, classRow, say(loc, S.thisClass), say(loc, S.otherClasses))}
+            <div className="mt-3 border-t border-border-subtle pt-2 space-y-2" data-shared-pickup={pickup.active ? 'on' : 'off'}>
+              <label className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-text-primary">
+                <input type="checkbox" checked={pickup.active} onChange={(e) => upd((d) => { d.delivery.pickup = { active: e.target.checked, note: pickupOf(d).note }; })} data-pickup-switch />
+                {say(loc, S.pickupSwitch)}
+              </label>
+              <p className="text-[12px] text-text-secondary leading-relaxed">{say(loc, S.pickupHint)}</p>
+              <p className="text-[12px] font-semibold text-text-primary">{say(loc, S.pickupNoteTitle)}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {noteField('ar', loc('بالعربية', 'In Arabic', 'بە عەرەبی'), 'rtl')}
+                {noteField('en', loc('بالإنجليزية', 'In English', 'بە ئینگلیزی'), 'ltr')}
+                {noteField('ckb', loc('بالكردية', 'In Kurdish', 'بە کوردی'), 'rtl')}
+              </div>
+              <p className="text-[11px] text-text-muted">{say(loc, S.pickupNoteRule)}</p>
+            </div>
           </>)}
 
         {group('services', say(loc, S.grpServices), <>{loc('ليفو كير', 'Levo Care', 'لیڤۆ کێر')} {fig(draft.care.price_iqd)}</>,

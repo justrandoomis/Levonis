@@ -133,7 +133,7 @@ import {
   type EstimateChannel,
   type EstimateCheckoutLine,
 } from '../lib/orderEstimates';
-import { SKU_STRICT_ERROR, type PreorderPricing } from '../lib/pricing';
+import { SKU_STRICT_ERROR, goodsBaseUnitIqd, type PreorderPricing } from '../lib/pricing';
 import { printerProductIds } from '../lib/printerIdentity';
 import { catalogIndexFor } from '../lib/catalogPresentation';
 import { MAINTENANCE_ROOT_ID, maintenanceFor, type MaintenanceTarget } from '../lib/printerFits';
@@ -254,7 +254,7 @@ import { addonLinesMatch, kitLinesMatch, offeredAddon, offeredKit } from '../lib
 import { addonChanged, addonWithoutPrinter, applyPrinterDiscount, attachedLineOf, benefitRegularUnit, printerDiscountView, printerLineDiscount, type AppliedPrinterDiscount } from '../lib/printerOffers';
 import { membershipPlanById, orderMembershipPendingRefusal, orderMembershipQuotePayload, quoteOrderMembership, tierLabel, type MembershipPlanRow } from './memberships';
 import { publishedFromSetting } from '../lib/printerServices';
-import { orderServicesView, serviceTaskStatements, servicesForMethod, SERVICES_DELIVERY_METHOD_MESSAGE, SERVICES_DELIVERY_METHOD_TEXT, withAttachedLink, withServicesSnapshot } from '../lib/printerServices';
+import { courierDeliveryOf, orderServicesView, serviceTaskStatements, servicesForMethod, SERVICES_DELIVERY_METHOD_MESSAGE, SERVICES_DELIVERY_METHOD_TEXT, SERVICES_PICKUP_METHOD, SERVICES_PICKUP_METHOD_MESSAGE, SERVICES_PICKUP_METHOD_TEXT, withAttachedLink, withServicesSnapshot } from '../lib/printerServices';
 
 /**
  * 409 PRODUCT_CURRENTLY_UNAVAILABLE naming the products (the clean start, spec addendum A.5): a line
@@ -1878,6 +1878,14 @@ export interface ComputedLine {
   warranty_snapshot: string | null;
   /** The printer services priced and frozen for this line (0234), absent/null on every other line. */
   services_snapshot?: string | null;
+  /** Phase 6: the customer chose to collect THIS printer from the warehouse — the order needs the store's pickup method. */
+  printer_pickup?: true;
+  /**
+   * Phase 6 (rule C): only on an anchored printer line bought below the Smart package — how far `applied_iqd`
+   * (here the goods BASE, what the line charges) sits under the line's true applied price. `benefit.regular_unit_iqd`
+   * and the frozen `pricing_snapshot` keep the true catalogue figures.
+   */
+  goods_shift_iqd?: number;
   transport_snapshot: string | null;
   breakdown: ReturnType<typeof publicBreakdown>;
   /** catalogs.is_printer_catalog — drives the home-delivery NOTE, never a fee. */
@@ -3278,7 +3286,10 @@ export async function computeCheckout(
       const unit = resolved.unit_subtotal_iqd;
       const line = unit * qty;
       subtotal += line;
-      merchandise += resolved.applied_iqd * qty;
+      // Phase 6 (rule C): the goods base — the applied price on every line; on an anchored printer line bought
+      // below the Smart package, what the line charges (so no discount can exceed it).
+      const goodsUnit = goodsBaseUnitIqd(resolved);
+      merchandise += goodsUnit * qty;
       productIds.push(String(row.id));
       const facts = shippingFactsFrom(row.ops_policy, row);
       /**
@@ -3306,7 +3317,8 @@ export async function computeCheckout(
         ...(resolved.services
           ? {
               printer_service: {
-                delivery: resolved.services.selection.delivery,
+                // Phase 6: a warehouse pickup is no courier choice — the standard quote reads it as «not chosen».
+                delivery: courierDeliveryOf(resolved.services),
                 delivery_class: resolved.services.classes.delivery_class,
                 economy_iqd: resolved.services.delivery_options.economy_iqd,
                 personal_iqd: resolved.services.delivery_options.personal_iqd,
@@ -3391,7 +3403,8 @@ export async function computeCheckout(
         qty,
         unit,
         line,
-        applied_iqd: resolved.applied_iqd,
+        applied_iqd: goodsUnit,
+        ...(goodsUnit < resolved.applied_iqd ? { goods_shift_iqd: resolved.applied_iqd - goodsUnit } : {}),
         tracked: stockRes.tracked,
         pricing_snapshot: JSON.stringify({
           ...pricingSnapshot,
@@ -3401,6 +3414,7 @@ export async function computeCheckout(
         }),
         warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
         services_snapshot: servicesFrozen ? JSON.stringify(servicesFrozen) : null,
+        ...(resolved.services?.selection.delivery === 'pickup' ? { printer_pickup: true as const } : {}),
         transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
         breakdown: publicBreakdown(resolved),
         is_printer: isPrinter,
@@ -3680,7 +3694,8 @@ export async function computeCheckout(
             category_id: l.benefit.category_id,
             sub_category_id: l.benefit.sub_category_id,
             ancestry: ancestryFor(benefitAncestry, l.benefit.category_id, l.benefit.sub_category_id),
-            regular_unit_iqd: l.benefit.regular_unit_iqd,
+            // Both figures move together on a line read at its goods base (rule C): a rule's saving is unchanged.
+            regular_unit_iqd: l.benefit.regular_unit_iqd - (l.goods_shift_iqd ?? 0),
             applied_unit_iqd: l.applied_iqd,
             applied_rule_id: l.benefit.applied_rule_id,
             offer_before_unit_iqd: l.benefit.offer_before_unit_iqd ?? null,
@@ -3898,7 +3913,7 @@ export async function computeCheckout(
             !!offer ||
             // Phase 4: the owner's printer discount is an offer price (owner default 6).
             !!l.printer_discount ||
-            (!!l.benefit && l.applied_iqd < l.benefit.regular_unit_iqd) ||
+            (!!l.benefit && l.applied_iqd + (l.goods_shift_iqd ?? 0) < l.benefit.regular_unit_iqd) ||
             (member?.total_iqd ?? 0) > 0 ||
             (parentLineIds.has(l.id) && Number(l.composition_saving_percent ?? 0) > 0),
           // Not `l.id`: that is a new random id on every quote, and a tie decided on it flips.
@@ -5066,6 +5081,18 @@ function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
        *  figure on every card before the customer has chosen anything. */
       delivery_method_fees: comp.deliveryMethodFees,
       is_pickup: comp.isPickup,
+      // Phase 6: present only when a printer in this cart is set to «collect from the warehouse» — the page
+      // preselects / requires the store's pickup method; the order is refused otherwise (SERVICES_PICKUP_METHOD).
+      ...(comp.lines.some((l) => l.printer_pickup === true)
+        ? {
+            printer_pickup: {
+              required: true as const,
+              satisfied: comp.isPickup,
+              delivery_method_id: 'pickup' as const,
+              cart_item_ids: comp.lines.filter((l) => l.printer_pickup === true).map((l) => String(l.cart_item_id ?? '')),
+            },
+          }
+        : {}),
       /**
        * Whether the protected-delivery add-on can be offered at all, and what
        * it costs THIS customer. The fee is quoted even when the toggle is off,
@@ -5276,6 +5303,15 @@ export async function placeOrder(
   const comp = await computeCheckout(c, user, input, { allocate: true, source: quickBuy?.source });
   quickBuy?.guard?.(comp);
 
+  // Phase 6 (DECISIONS row 362): a printer the customer chose to COLLECT FROM THE WAREHOUSE is ordered with the
+  // store's pickup method — refused with its own code on any other, before the «never chosen» refusal below
+  // (on the standard method such a line has no courier choice, which is exactly that state).
+  const collected = comp.lines.filter((l) => l.printer_pickup === true).map((l) => String(l.cart_item_id ?? ''));
+  if (collected.length > 0 && !comp.isPickup) {
+    throw badRequest(SERVICES_PICKUP_METHOD_MESSAGE, SERVICES_PICKUP_METHOD, {
+      cart_item_ids: collected, delivery_method_id: comp.delivery.id, required_delivery_method_id: 'pickup', message: SERVICES_PICKUP_METHOD_TEXT,
+    });
+  }
   // A printer whose delivery (Economy / Personal) was never chosen is refused
   // with its own code — never defaulted to either (DECISIONS row 339).
   const undecided = comp.shipping.needs_config.find((n) => n.endsWith(':printer_delivery_required'));

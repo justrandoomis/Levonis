@@ -339,6 +339,39 @@ test('the staff picker lists store parts that may be offered — never a printer
   }
 });
 
+test('the staff picker never answers 500 because of ONE product the card builder cannot project (live: ?q=hotend)', async () => {
+  const raw = seed();
+  // A row whose stored pictures are not a list: the storefront's card builder throws on it (upgradeMedia).
+  raw.exec(`INSERT INTO products (id,slug,name,name_ar,name_ku,price_iqd,status,stock,options,colors,selling_type,sale_types,warranty_plans,ops_policy,images) VALUES
+    ('p_hot_bad','hotends-combo','Hotends Combo','هوت إند','هۆتێند',0,'active',5,'[]','[]','direct_sale','["direct_sale"]','[]','{}','{"not":"a list"}'),
+    ('p_hot_ok','hotend-04','Hotend 0.4','هوت إند 0.4','هۆتێندی 0.4',30000,'active',9,'[]','[]','direct_sale','["direct_sale"]','[]','{}','[]');
+    INSERT INTO product_catalogs (product_id, catalog_id, position) VALUES ('p_hot_bad','cat_s',5), ('p_hot_ok','cat_s',6);`);
+  const logged: unknown[][] = [];
+  const realError = console.error;
+  console.error = (...a: unknown[]) => { logged.push(a); };
+  try {
+    for (const q of ['hotend', 'hot end', 'hot']) {
+      const res = await get(as(raw, FINANCE), `/api/devices/admin/part-products?q=${encodeURIComponent(q)}`);
+      assert.equal(res.status, 200, q);
+    }
+    const hit = await json(await get(as(raw, FINANCE), '/api/devices/admin/part-products?q=hotend'));
+    const byId = new Map<string, { price_iqd: number | null; available: boolean; name: string }>(hit.products.map((p: { id: string }) => [p.id, p]));
+    assert.deepEqual([byId.get('p_hot_bad')?.price_iqd, byId.get('p_hot_bad')?.available, byId.get('p_hot_bad')?.name], [null, false, 'Hotends Combo'], 'listed, not offerable');
+    // The healthy neighbour is priced exactly as it is without the broken row beside it.
+    const alone = (await json(await get(as(raw, FINANCE), '/api/devices/admin/part-products?q=hotend-04'))).products[0];
+    assert.ok(alone, 'the healthy product answers alone');
+    assert.deepEqual(byId.get('p_hot_ok'), alone);
+    assert.ok(logged.some((l) => l.includes('p_hot_bad')), 'the log names the product');
+    // The same guard serves the offer itself: the broken product reads as not on sale, never a 500.
+    const id = await file(raw, 'u1', 'care');
+    const refused = await offer(raw, FINANCE, id, { product_id: 'p_hot_bad', discount_pct: 50 });
+    assert.ok(refused.status < 500, String(refused.status));
+  } finally {
+    console.error = realError;
+    raw.close();
+  }
+});
+
 // ------------------------------------------------------------------ the automatic discount
 
 test('the discount applies by itself: cart = quote = order, on ONE unit, on the line; then never again', async () => {

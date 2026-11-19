@@ -41,6 +41,18 @@ export interface OfferStrings {
   retry: string;
   none: string;
   unavailable: string;
+  /**
+   * Phase 6: an add-on that is not in stock comes as a PRE-ORDER (the kits answer's `fulfillment:
+   * 'pre_order'` and `lead_days`). `days` is «20» or «10–20»; '' when the server gave no figure.
+   */
+  preorder: (days: string) => string;
+  /**
+   * The server's rule (phase6-api.md, ADDON_PREORDER_SEPARATE): one order is one journey, so a part that
+   * comes as a pre-order is not ticked with the printer — it is ordered on its own, from its own page.
+   */
+  preorderSeparate: string;
+  /** The link button to the part's own page (nothing is added to the cart from here). */
+  preorderOrder: string;
 }
 
 const AR: OfferStrings = {
@@ -75,6 +87,9 @@ const AR: OfferStrings = {
   retry: 'إعادة المحاولة',
   none: 'بدون',
   unavailable: 'غير متوفر حالياً',
+  preorder: (days) => (days ? `طلب مسبق · ${days} يوماً` : 'طلب مسبق'),
+  preorderSeparate: 'يُطلب منفرداً — يصل بعد الطابعة',
+  preorderOrder: 'اطلبه كطلب مسبق',
 };
 
 const EN: OfferStrings = {
@@ -109,6 +124,9 @@ const EN: OfferStrings = {
   retry: 'Try again',
   none: 'None',
   unavailable: 'Not available right now',
+  preorder: (days) => (days ? `Pre-order · ${days} days` : 'Pre-order'),
+  preorderSeparate: 'Ordered separately — arrives after the printer',
+  preorderOrder: 'Order it as a pre-order',
 };
 
 const CKB: OfferStrings = {
@@ -143,6 +161,9 @@ const CKB: OfferStrings = {
   retry: 'دووبارە هەوڵ بدەرەوە',
   none: 'هیچ',
   unavailable: 'ئێستا بەردەست نییە',
+  preorder: (days) => (days ? `پێشداواکاری · ${days} ڕۆژ` : 'پێشداواکاری'),
+  preorderSeparate: 'بە جیا داوا دەکرێت — دوای پرینتەرەکە دەگات',
+  preorderOrder: 'وەک پێشداواکاری داوای بکە',
 };
 
 export const OFFER_STRINGS: Record<OfferLang, OfferStrings> = { ar: AR, en: EN, ckb: CKB };

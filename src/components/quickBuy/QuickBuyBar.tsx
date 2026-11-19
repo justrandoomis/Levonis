@@ -11,7 +11,7 @@
  * English) and grows toward the inline end, pushing the cart capsule aside
  * and taking its place. The bar's width never changes: the ⚡ capsule is
  * `C + D·p` wide and the cart capsule takes what is left, where `C` is the
- * compact circle (50px) and `D` the boundary's travel. ONE progress value
+ * compact circle (44px) and `D` the boundary's travel. ONE progress value
  * `p` ∈ [0, 1] drives everything at once — both widths, the cart label
  * clipped by its shrinking capsule and fading out over p ∈ [0, .45] while it
  * slides toward its icon, the cart icon gliding to the centre of the compact
@@ -52,8 +52,8 @@ import { useLanguage } from '../../LanguageContext';
 import { useMotion, VelocityTracker } from '../../lib/motion';
 import { quickBuyChrome } from './chromeStrings';
 
-/** The compact capsule: a 50×50 circle. */
-const C = 50;
+/** The compact capsule: a 44×44 circle (the bar was made smaller, owner 2026-11-19; 44 px is the touch floor). */
+const C = 44;
 /** The gap between the two capsules. */
 const G = 6;
 /** Room inside the bar's paint containment for the focus ring (2px + 2px offset). */
@@ -464,7 +464,7 @@ export function QuickBuyBar(props: QuickBuyBarProps) {
           swallowClick.current = false;
         }}
         onFocus={() => live.current.onWarm()}
-        className="lv-button relative shrink-0 overflow-hidden rounded-full px-0 min-h-[50px] text-[15px] text-gold"
+        className="lv-button relative shrink-0 overflow-hidden rounded-full px-0 text-gold"
         style={{ touchAction: 'pan-y', background: 'transparent', border: 0 }}
       >
         <span aria-hidden="true" className="absolute inset-0 rounded-full border border-border-subtle bg-surface-raised" />
@@ -497,7 +497,7 @@ export function QuickBuyBar(props: QuickBuyBarProps) {
         disabled={!quick && cart.disabled}
         aria-busy={(!quick && cart.busy) || undefined}
         onClick={onCartClick}
-        className="lv-button relative min-w-0 flex-1 overflow-hidden rounded-full px-0 min-h-[50px] text-[15px] active:scale-[0.985] [touch-action:manipulation]"
+        className="lv-button relative min-w-0 flex-1 overflow-hidden rounded-full px-0 active:scale-[0.985] [touch-action:manipulation]"
         style={{ background: 'transparent', border: 0, minWidth: C }}
       >
         <span aria-hidden="true" className="absolute inset-0 rounded-full border border-border-subtle bg-surface-raised" />
