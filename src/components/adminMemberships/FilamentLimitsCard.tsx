@@ -139,7 +139,7 @@ export default function FilamentLimitsCard() {
             <Save className="w-4 h-4" aria-hidden="true" /> {loc('حفظ', 'Save', 'پاشەکەوتکردن')}
           </button>
         ) : (
-          <p className="text-[12px] font-semibold text-text-secondary">{loc('يعدّلها المالك فقط.', 'Only the owner can change this.', 'تەنها خاوەن دەتوانێت ئەمە بگۆڕێت.')}</p>
+          <p className="text-[12px] leading-snug font-semibold text-text-secondary">{loc('يعدّلها المالك فقط.', 'Only the owner can change this.', 'تەنها خاوەن دەتوانێت ئەمە بگۆڕێت.')}</p>
         )}
         {state === 'saved' && (
           <p className="text-xs font-semibold text-text-muted flex items-center gap-1 mt-2">
