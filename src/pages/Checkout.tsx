@@ -1110,6 +1110,9 @@ export default function Checkout() {
     return items.every((item) => item.delivery_availability?.[method.id] !== false);
   });
   const availableDeliveryKey = availableDeliveryMethods.map((method) => method.id).join(',');
+  // Phase 7 (DECISIONS row 363): a serviced printer whose delivery is decided HERE — the home method is named
+  // «توصيل إلى المنزل» for this order (its fee is the quote's: the printer's class at the Economy price).
+  const printerHomeDelivery = items.some((item) => (item.printer_services?.offer?.delivery as { choose_at?: string } | null | undefined)?.choose_at === 'checkout');
   const quotedDeliveryFees = quoteMatchesItems ? quote?.delivery_method_fees : undefined;
   const quotedDeliveryKey = quotedDeliveryFees?.map((fee) => `${fee.id}:${fee.available}`).join(',') ?? '';
 
@@ -2884,8 +2887,8 @@ export default function Checkout() {
                         {getMethodIcon(method.icon || '', "w-5 h-5")}
                       </div>
                       <div className="min-w-0">
-                        <h3 className={`font-normal text-base ${selected ? 'text-text-primary' : 'text-text-secondary'}`}>
-                          {methodTitle(method, lang)}
+                        <h3 className={`font-normal text-base ${selected ? 'text-text-primary' : 'text-text-secondary'}`} data-printer-home-delivery={printerHomeDelivery && method.id === 'standard' ? '' : undefined}>
+                          {printerHomeDelivery && method.id === 'standard' ? PS_STRINGS[psLang].homeDelivery : methodTitle(method, lang)}
                         </h3>
                         <p className="text-xs text-text-muted mt-0.5 font-light">{methodDesc(method, lang)}</p>
                         {/*

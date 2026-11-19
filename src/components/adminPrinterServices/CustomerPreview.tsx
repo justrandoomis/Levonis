@@ -138,11 +138,15 @@ export default function CustomerPreview({ draft, loc, lang, printer }: { draft: 
             ) : null}
           </>, S.pvCareHint) : off('care', S.pvCare)}
 
-          {offer.delivery ? group('delivery', S.pvDelivery, <>
+          {/* Phase 7 (DECISIONS row 363): decided at checkout = what the checkout offers; a disabled Personal is not listed. */}
+          {!offer.delivery ? off('delivery', S.pvDelivery) : offer.delivery.choose_at === 'checkout' ? group('delivery', S.pvDelivery, <>
+            {row('home', say(loc, S.pvHome), money(offer.delivery.economy))}
+            {row('store', say(loc, S.pvStorePickup), say(loc, S.pvFree))}
+          </>, S.pvAtCheckout) : group('delivery', S.pvDelivery, <>
             {row('economy', say(loc, S.pvEconomy), money(offer.delivery.economy))}
-            {row('personal', say(loc, S.pvPersonal), money(offer.delivery.personal))}
+            {offer.delivery.personal_active === false ? null : row('personal', say(loc, S.pvPersonal), money(offer.delivery.personal))}
             {offer.delivery.pickup ? row('pickup', say(loc, S.pvPickup), say(loc, S.pvFree), text3(offer.delivery.pickup.note, lang) || undefined) : null}
-          </>) : off('delivery', S.pvDelivery)}
+          </>)}
 
           {/* The three a customer weighs first stay open; the rest is one tap away. */}
           <Fold className="border-t border-border-subtle" attrs={{ 'data-preview-more': '' }}

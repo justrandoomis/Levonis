@@ -55,6 +55,18 @@
  *    `priceServices` keeps returning the real services fee.
  *  - Delivery class d6 (the A1 box) and the free warehouse pickup choice (`delivery.pickup`).
  *  A config stored before phase 6 reads as no anchor, d6 unpriced, pickup off (`withPhase6Defaults`).
+ *
+ * PHASE 7 (owner, 2026-11-20; DECISIONS row 363) — two owner switches inside `delivery`, both
+ * ABSENT in every config stored before it (absent = exactly what it sold before):
+ *  - `personal_active: false` — Personal (Al-Waseet) is DISABLED, not deleted: its prices stay in
+ *    the list, but it is offered nowhere, a choice that says Personal is priced and recorded as
+ *    Economy (never refused), and the PRO discount no longer names it.
+ *  - `choose_at: 'checkout'` — the printer's delivery is decided by the CHECKOUT's delivery method,
+ *    not on the product page: a selection's own `delivery` is ignored at every door before the
+ *    order (priced as «not chosen», never required), and the order derives it from the method —
+ *    home delivery = Economy at the class's fee, the store's pickup method = pickup, free
+ *    (`servicesAtCheckout`).
+ *  ONE function decides what a stored delivery means under the two switches: `effectiveDelivery`.
  */
 
 export const WARRANTY_FAMILIES = ['a1', 'xpa2', 'h2', 'h3c'] as const;
@@ -76,6 +88,9 @@ export type AcademyChoice = (typeof ACADEMY_CHOICES)[number];
 /** 'pickup' (phase 6) = collected from the warehouse, free; offered only while `delivery.pickup.active`. */
 export const DELIVERY_CHOICES = ['economy', 'personal', 'pickup'] as const;
 export type DeliveryChoice = (typeof DELIVERY_CHOICES)[number];
+/** Phase 7: the printer's delivery is chosen on the product page (as before), or decided by the checkout's delivery method. */
+export const DELIVERY_CHOOSE_AT = ['product', 'checkout'] as const;
+export type DeliveryChooseAt = (typeof DELIVERY_CHOOSE_AT)[number];
 /** Phase 6: what the printer's catalogue price already includes — nothing, or the Smart package. */
 export const PRICE_ANCHORS = ['none', 'smart'] as const;
 export type PriceAnchor = (typeof PRICE_ANCHORS)[number];
@@ -303,6 +318,10 @@ export interface PrinterServicesConfig {
      * under the choice (all three languages, or null).
      */
     pickup?: { active: boolean; note: Text3 | null };
+    /** Phase 7: false = Personal is disabled (its prices are kept). Absent = true. `personalActiveOf`. */
+    personal_active?: boolean;
+    /** Phase 7: where the customer decides the printer's delivery. Absent = 'product'. `deliveryChooseAtOf`. */
+    choose_at?: DeliveryChooseAt;
   };
   /**
    * Phase 6: 'smart' = the catalogue price of every enrolled printer already includes the Smart
@@ -475,6 +494,27 @@ export function pickupOf(c: PrinterServicesConfig): { active: boolean; note: Tex
   return p ? { active: p.active === true, note: p.note ?? null } : { active: false, note: null };
 }
 
+/** Phase 7: is Personal delivery offered? (absent = yes; only an explicit `false` disables it). */
+export function personalActiveOf(c: Pick<PrinterServicesConfig, 'delivery'>): boolean {
+  return c.delivery.personal_active !== false;
+}
+/** Phase 7: where the printer's delivery is decided (absent or unknown = 'product'). */
+export function deliveryChooseAtOf(c: Pick<PrinterServicesConfig, 'delivery'>): DeliveryChooseAt {
+  return c.delivery.choose_at === 'checkout' ? 'checkout' : 'product';
+}
+/**
+ * Phase 7 — WHAT A SELECTION'S DELIVERY MEANS UNDER THE OWNER'S TWO SWITCHES, before the order:
+ *  - decided at checkout → null, whatever the selection says (the checkout's method decides);
+ *  - Personal while it is disabled → Economy (repriced, never refused);
+ *  - otherwise the choice itself.
+ * Without the switches it returns its input, so nothing moves.
+ */
+export function effectiveDelivery(c: Pick<PrinterServicesConfig, 'delivery'>, d: DeliveryChoice | null): DeliveryChoice | null {
+  if (deliveryChooseAtOf(c) === 'checkout') return null;
+  if (d === 'personal' && !personalActiveOf(c)) return 'economy';
+  return d;
+}
+
 /**
  * Phase 6 (DECISIONS row 362): a config stored before it reads as no price anchor, class d6
  * unpriced and the warehouse pickup off — exactly what it sold before.
@@ -592,6 +632,8 @@ export function configIssues(raw: unknown): string[] {
         out.push(`delivery.pickup: {active, note: null or {ar, en, ckb} of at most ${MAX_PICKUP_NOTE} characters each}`);
       }
     }
+    if (dl.personal_active !== undefined && typeof dl.personal_active !== 'boolean') out.push('delivery.personal_active: boolean');
+    if (dl.choose_at !== undefined && !oneOf(DELIVERY_CHOOSE_AT, dl.choose_at)) out.push('delivery.choose_at: product or checkout');
   }
   if (c.price_anchor !== undefined && !oneOf(PRICE_ANCHORS, c.price_anchor)) out.push('price_anchor: none or smart');
   const pg = c.packages;
@@ -914,6 +956,9 @@ export function canonicalConfig(c: PrinterServicesConfig): PrinterServicesConfig
       active: c.delivery.active,
       classes: Object.fromEntries(DELIVERY_CLASSES.map((k) => [k, deliveryRow(c, k)])) as PrinterServicesConfig['delivery']['classes'],
       pickup: ((p) => ({ active: p.active, note: p.note && (p.note.ar.trim() || p.note.en.trim() || p.note.ckb.trim()) ? tx(p.note) : null }))(pickupOf(c)),
+      // Phase 7: stored only once the owner set them, so a list saved before it stays byte-identical.
+      ...(c.delivery.personal_active !== undefined ? { personal_active: c.delivery.personal_active } : {}),
+      ...(c.delivery.choose_at !== undefined ? { choose_at: c.delivery.choose_at } : {}),
     },
     price_anchor: priceAnchorOf(c),
     packages: { smart: pkg(c.packages.smart), complete: pkg(c.packages.complete) },
@@ -1124,6 +1169,19 @@ export function encodeSelection(s: ServiceSelection): string {
   });
 }
 
+/**
+ * Phase 7: a choice's canonical text as the cart STORES and SHOWS it under the owner's two delivery
+ * switches — its delivery is the one `effectiveDelivery` gives (none when the checkout decides,
+ * Economy for a disabled Personal). The SAME text when nothing moves (and for '' or a malformed one).
+ */
+export function settledSelectionText(config: Pick<PrinterServicesConfig, 'delivery'> | null | undefined, text: string): string {
+  if (!config || !text) return text;
+  const sel = parseSelection(text);
+  if (!sel) return text;
+  const d = effectiveDelivery(config, sel.delivery);
+  return d === sel.delivery ? text : encodeSelection({ ...sel, delivery: d });
+}
+
 /** Two selections are the same purchase when everything but the delivery preference matches. */
 export function sameServices(a: ServiceSelection, b: ServiceSelection): boolean {
   return a.package === b.package && a.warranty === b.warranty && a.care === b.care && a.packaging === b.packaging
@@ -1307,6 +1365,11 @@ export function priceServices(
   const blockers = new Set<string>();
   const lines: PricedServiceLine[] = [];
   const fam = classes.warranty_family;
+  // Phase 7: the delivery this choice means under the owner's switches (decided at checkout → none
+  // here; Personal while disabled → Economy). The SAME object when nothing moves, so a list without
+  // the switches prices and freezes exactly what it did.
+  const meant = effectiveDelivery(config, s.delivery);
+  if (meant !== s.delivery) s = { ...s, delivery: meant };
 
   if (s.warranty !== 'none') {
     const fee = config.warranty.active ? config.warranty[s.warranty][fam] : null;
@@ -1373,7 +1436,8 @@ export function priceServices(
   const dRow = config.delivery.active ? deliveryRow(config, classes.delivery_class) : null;
   // Personal delivery is a paid service too: PRO pays it discounted. Economy is
   // the ordinary delivery, waived (or not) by the free-delivery rules instead.
-  const personalList = dRow?.personal_iqd ?? null;
+  // Phase 7: while Personal is disabled it has no price here at all — not offered, and the PRO discount does not name it.
+  const personalList = personalActiveOf(config) ? dRow?.personal_iqd ?? null : null;
   const personalAfter = personalList === null ? null : proDiscountedFee(personalList, proPct);
   const delivery_options = { economy_iqd: dRow?.economy_iqd ?? null, personal_iqd: personalAfter };
   let delivery_fee_iqd: number | null = null;
@@ -1409,6 +1473,22 @@ export function priceServices(
         }
       : {}),
   };
+}
+
+/**
+ * Phase 7 (DECISIONS row 363) — THE PRINTER'S DELIVERY AS THE CHECKOUT DECIDES IT. With
+ * `choose_at: 'checkout'` a priced line carries no delivery (`effectiveDelivery`); the order's
+ * delivery method supplies it. This returns the line as a HOME delivery: Economy at the class's
+ * fee, written exactly where a customer's own Economy choice would have put it (same keys, same
+ * order), so the shipping quote charges it and the snapshot records it as if it had been chosen.
+ * An unpriced class keeps `delivery_fee_iqd: null` and the shipping quote says so
+ * (`printer_delivery_unpriced`) — never an invented fee. The store's pickup method then drops it
+ * again and records «pickup» (worker `servicesForMethod`). Under 'product' the line is returned
+ * untouched.
+ */
+export function servicesAtCheckout(config: PrinterServicesConfig | null | undefined, services: PricedServices): PricedServices {
+  if (!config || deliveryChooseAtOf(config) !== 'checkout') return services;
+  return { ...services, delivery_fee_iqd: services.delivery_options.economy_iqd, selection: { ...services.selection, delivery: 'economy' } };
 }
 
 /** The per-unit price of each preset for a printer (what the package card shows). */
@@ -1451,7 +1531,12 @@ export interface ServicesOffer {
   inspection: { full: number | null; lead_business_days: [number, number] } | null;
   academy: { recorded: number | null; live: number | null } | null;
   /** `pickup` (phase 6) is present only while the warehouse pickup is on: free, with its note line. */
-  delivery: { economy: number | null; personal: number | null; pickup?: { note: Text3 | null } } | null;
+  /**
+   * Phase 7, both ABSENT unless the owner set the switch: `personal_active: false` = Personal is disabled
+   * (`personal` is then null: not offered); `choose_at: 'checkout'` = the page asks for no delivery — the
+   * checkout's method decides (home delivery = `economy`, the store's pickup method = free).
+   */
+  delivery: { economy: number | null; personal: number | null; pickup?: { note: Text3 | null }; personal_active?: false; choose_at?: 'checkout' } | null;
   /**
    * Phase 6: present (non-null) when this printer's catalogue price already includes the Smart
    * package: a line with a choice is charged `price − fee_iqd + the choice's fee`. ABSENT when
@@ -1507,7 +1592,13 @@ export function servicesOffer(config: PrinterServicesConfig, classes: PrinterCla
       : null,
     academy: config.academy.active ? { recorded: config.academy.recorded_iqd, live: config.academy.live_iqd } : null,
     delivery: config.delivery.active
-      ? { economy: d.economy_iqd, personal: d.personal_iqd, ...(pickup.active ? { pickup: { note: pickup.note } } : {}) }
+      ? {
+          economy: d.economy_iqd,
+          personal: personalActiveOf(config) ? d.personal_iqd : null,
+          ...(pickup.active ? { pickup: { note: pickup.note } } : {}),
+          ...(personalActiveOf(config) ? {} : { personal_active: false as const }),
+          ...(deliveryChooseAtOf(config) === 'checkout' ? { choose_at: 'checkout' as const } : {}),
+        }
       : null,
     ...(anchorFee !== null ? { anchor: { package: 'smart' as const, fee_iqd: anchorFee } } : {}),
     packages: { just: { price_iqd: 0 }, smart: pkg('smart'), complete: pkg('complete') },

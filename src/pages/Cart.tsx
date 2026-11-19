@@ -2173,7 +2173,9 @@ export default function Cart() {
               : anchorFee > 0 ? (netFee === 0 ? w.included : netFee < 0 ? `−${money(-netFee)}` : `+${money(netFee)}`)
               : ps.priced.fee_iqd > 0 ? `+${money(ps.priced.fee_iqd)}` : '';
             const chosenDelivery = ps.selection?.delivery as string | null | undefined;
-            const deliverySaid = !chosenDelivery ? '' : chosenDelivery === 'economy' ? w.deliveryEconomy : chosenDelivery === 'pickup' ? w.deliveryPickup : w.deliveryPersonal;
+            // Phase 7 (DECISIONS row 363): when the owner decides delivery at checkout the line names no delivery — it says where it is decided.
+            const deliveryAtCheckout = (ps.offer?.delivery as { choose_at?: string } | null | undefined)?.choose_at === 'checkout';
+            const deliverySaid = deliveryAtCheckout ? w.atCheckout : !chosenDelivery ? '' : chosenDelivery === 'economy' ? w.deliveryEconomy : chosenDelivery === 'pickup' ? w.deliveryPickup : w.deliveryPersonal;
             return (
               <div className="mb-2" data-cart-printer-services={item.id}>
                 <button
@@ -2188,7 +2190,7 @@ export default function Cart() {
                     <span className="block text-[12px] font-bold text-text-primary leading-tight">{w.cardTitle}</span>
                     <span className="block text-[11px] leading-tight truncate tabular-nums text-text-secondary">
                       {ps.needs_choice || !name
-                        ? w.chooseFirst
+                        ? (deliveryAtCheckout ? w.choosePackage : w.chooseFirst)
                         : `${name}${feeSaid ? ` · ${feeSaid}` : ''}${deliverySaid ? ` · ${deliverySaid}` : ''}`}
                     </span>
                   </span>

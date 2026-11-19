@@ -250,7 +250,7 @@ import { createInvoiceForOrder } from '../lib/invoices';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
 import { orderConfirmKeyboard } from '../lib/orderTelegramConfirm';
 import { notifyOrderPlaced } from '../lib/orderNotify';
-import { SERVICES_CODES, KIT_CHANGED, KIT_WITHOUT_PRINTER, MEMBERSHIP_NOT_OFFERED, MEMBERSHIP_NOT_WITH_BNPL, MEMBERSHIP_PRICE_CHANGED, offeredMembershipTiers } from '@levonis/pricing/printerServices';
+import { SERVICES_CODES, servicesAtCheckout, deliveryChooseAtOf, KIT_CHANGED, KIT_WITHOUT_PRINTER, MEMBERSHIP_NOT_OFFERED, MEMBERSHIP_NOT_WITH_BNPL, MEMBERSHIP_PRICE_CHANGED, offeredMembershipTiers } from '@levonis/pricing/printerServices';
 import { activateOrderMembership, orderMembershipPublic, orderMembershipPurchases } from '../lib/orderMembershipSale';
 import { addonLinesMatch, kitLinesMatch, offeredAddon, offeredKit } from '../lib/printerKits';
 import { addonChanged, addonWithoutPrinter, applyPrinterDiscount, attachedLineOf, benefitRegularUnit, printerDiscountView, printerLineDiscount, type AppliedPrinterDiscount } from '../lib/printerOffers';
@@ -1882,6 +1882,8 @@ export interface ComputedLine {
   services_snapshot?: string | null;
   /** Phase 6: the customer chose to collect THIS printer from the warehouse — the order needs the store's pickup method. */
   printer_pickup?: true;
+  /** Phase 7: a serviced printer whose delivery THIS order's method decides (home delivery = Economy, store pickup = free). */
+  printer_delivery_at_checkout?: true;
   /**
    * Phase 6 (rule C): only on an anchored printer line bought below the Smart package — how far `applied_iqd`
    * (here the goods BASE, what the line charges) sits under the line's true applied price. `benefit.regular_unit_iqd`
@@ -3307,7 +3309,13 @@ export async function computeCheckout(
        * price the printer by a tariff the customer never chose: refused, so they
        * use the standard delivery step.
        */
-      const servicesFrozen = resolved.services ? servicesForMethod(resolved.services, delivery.id) : null;
+      // Phase 7 (DECISIONS row 363): with «delivery is decided at checkout» the line carries no delivery of its
+      // own — THIS method supplies it: home delivery = Economy at the class's fee, written where the customer's
+      // own Economy choice would be (the shipping quote charges it, the snapshot records it); the store's pickup
+      // method then drops it and records «pickup» as it always did. Untouched under the product-page choice.
+      const atCheckout = !!resolved.services && !!pricingCtx.printerServices && deliveryChooseAtOf(pricingCtx.printerServices) === 'checkout';
+      const lineServices = resolved.services ? servicesAtCheckout(pricingCtx.printerServices ?? null, resolved.services) : null;
+      const servicesFrozen = lineServices ? servicesForMethod(lineServices, delivery.id) : null;
       if (resolved.services && !servicesFrozen) {
         throw badRequest(
           `"${displayName}": ${SERVICES_DELIVERY_METHOD_MESSAGE}`,
@@ -3320,11 +3328,13 @@ export async function computeCheckout(
         // An enrolled printer is delivered by its own class and the customer's choice (DECISIONS row 339).
         // Charged only by the standard quote (store pickup quotes nothing); kept on
         // the item so the other methods' preview fees price it the same way.
-        ...(resolved.services
+        ...(resolved.services && lineServices
           ? {
               printer_service: {
                 // Phase 6: a warehouse pickup is no courier choice — the standard quote reads it as «not chosen».
-                delivery: courierDeliveryOf(resolved.services),
+                // Phase 7: decided at checkout, it is Economy for every home-delivery figure (this method's and the
+                // other methods' preview fees alike).
+                delivery: courierDeliveryOf(lineServices),
                 delivery_class: resolved.services.classes.delivery_class,
                 economy_iqd: resolved.services.delivery_options.economy_iqd,
                 personal_iqd: resolved.services.delivery_options.personal_iqd,
@@ -3423,6 +3433,7 @@ export async function computeCheckout(
         warranty_snapshot: resolved.warranty ? JSON.stringify(resolved.warranty) : null,
         services_snapshot: servicesFrozen ? JSON.stringify(servicesFrozen) : null,
         ...(resolved.services?.selection.delivery === 'pickup' ? { printer_pickup: true as const } : {}),
+        ...(atCheckout ? { printer_delivery_at_checkout: true as const } : {}),
         transport_snapshot: resolved.transport ? JSON.stringify(resolved.transport) : null,
         breakdown: publicBreakdown(resolved),
         is_printer: isPrinter,
@@ -5120,6 +5131,17 @@ function quotePayload(comp: CheckoutComputation, input: CheckoutInput) {
               satisfied: comp.isPickup,
               delivery_method_id: 'pickup' as const,
               cart_item_ids: comp.lines.filter((l) => l.printer_pickup === true).map((l) => String(l.cart_item_id ?? '')),
+            },
+          }
+        : {}),
+      // Phase 7 (DECISIONS row 363): present only when a serviced printer's delivery is decided HERE — the page
+      // names the home method «توصيل إلى المنزل» and asks for nothing else; `delivery` is what this quote recorded.
+      ...(comp.lines.some((l) => l.printer_delivery_at_checkout === true)
+        ? {
+            printer_delivery: {
+              choose_at: 'checkout' as const,
+              delivery: comp.isPickup ? ('pickup' as const) : ('economy' as const),
+              cart_item_ids: comp.lines.filter((l) => l.printer_delivery_at_checkout === true).map((l) => String(l.cart_item_id ?? '')),
             },
           }
         : {}),

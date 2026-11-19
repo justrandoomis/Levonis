@@ -5,6 +5,14 @@
  */
 export type PsLang = 'ar' | 'en' | 'ckb';
 
+/**
+ * «مع الضمان: إرجاع مجاني خلال 7 أيام» — the OWNER'S rule of 2026-11-20 (DECISIONS row 363). The ONE
+ * place the number lives: every sentence that says it (the card, the sheet, «ماذا يشمل؟») is built from
+ * this constant. It is the promise as the owner stated it; what the returns desk enforces is listed in
+ * that DECISIONS row for his ruling.
+ */
+export const WARRANTY_FREE_RETURN_DAYS = 7;
+
 export interface PsStrings {
   cardTitle: string;
   cardSub: string;
@@ -92,6 +100,30 @@ export interface PsStrings {
   /** The delivery block's question, and the free warehouse pickup (offered only when the owner's switch is on). */
   deliveryHow: string;
   deliveryPickup: string; deliveryPickupSub: string;
+  /**
+   * Phase 7 (DECISIONS row 363).
+   * `choosePackage`: «choose first» when the page asks for no delivery. `atCheckout`: where the delivery is
+   * decided now. `homeDelivery`: the checkout's home method for an order with a serviced printer.
+   */
+  choosePackage: string; atCheckout: string; homeDelivery: string;
+  /** With any warranty: the owner's free-return promise (built from WARRANTY_FREE_RETURN_DAYS). */
+  freeReturn: string; freeReturnWith: string;
+  /** What a choice without a warranty gives up: the list's title and its four lines. */
+  loseTitle: string;
+  lose: Record<'warranty' | 'care' | 'services' | 'return', string>;
+  /** The agreement box: its words before the list, and what a refused «add» says beside it. */
+  ackLead: string; ackAsk: string; listJoin: string;
+  /** Under the list: the one sentence of the old warning the list does not already say. */
+  rightsStay: string;
+  /** The sheet's price details: the printer's own row, the quantity mark, and the delivery note. */
+  printerLine: string; totalNoDelivery: string;
+  /** The card, under the chosen extras: the price above is the printer's; these are added beside it. */
+  extrasBeside: string;
+}
+
+/** «أفهم وأوافق: بلا ضمان، بلا ليفو كير …» — the agreement in one sentence, from the same lines as the list above it. */
+export function ackSentence(s: PsStrings, lost: ReadonlyArray<'warranty' | 'care' | 'services' | 'return'>): string {
+  return lost.length ? `${s.ackLead}: ${lost.map((k) => s.lose[k]).join(s.listJoin)}` : s.ackLead;
 }
 
 const AR: PsStrings = {
@@ -107,7 +139,7 @@ const AR: PsStrings = {
   chooseFirst: 'اختر باقتك وطريقة التوصيل أولاً',
   details: 'عرض التفاصيل',
   justWarning: 'ستشتري الطابعة بدون خدمات Levonis الاختيارية وبدون ضمان تجاري إضافي. حقوقك القانونية كمستهلك تبقى قائمة.',
-  justAck: 'فهمت وأوافق',
+  justAck: 'أفهم وأوافق',
   delivery: 'التوصيل', deliveryEconomy: 'اقتصادي', deliveryPersonal: 'شخصي (الوسيط)',
   deliveryEconomySub: 'توصيل عادي مع الشحنات', deliveryPersonalSub: 'مندوب خاص وعناية أكبر بالطابعة',
   deliveryChoose: 'اختر طريقة التوصيل',
@@ -169,6 +201,14 @@ const AR: PsStrings = {
   justRemoves: 'يُخصم من السعر',
   deliveryHow: 'كيف تصلك الطابعة؟',
   deliveryPickup: 'استلام من المخزن', deliveryPickupSub: 'تستلمها بنفسك — بلا أجور توصيل',
+  choosePackage: 'اختر باقتك أولاً', atCheckout: 'يُحدَّد التوصيل عند إتمام الطلب', homeDelivery: 'توصيل إلى المنزل',
+  freeReturn: `إرجاع مجاني خلال ${WARRANTY_FREE_RETURN_DAYS} أيام`, freeReturnWith: `مع الضمان: إرجاع مجاني خلال ${WARRANTY_FREE_RETURN_DAYS} أيام`,
+  loseTitle: 'ماذا تخسر',
+  lose: { warranty: 'بلا ضمان', care: 'بلا ليفو كير', services: 'بلا أي خدمات ليفو', return: 'بلا إرجاع مجاني' },
+  ackLead: 'أفهم وأوافق', ackAsk: 'ضع علامة على «أفهم وأوافق» لإضافة الطابعة', listJoin: '، ',
+  rightsStay: 'حقوقك القانونية كمستهلك تبقى قائمة.',
+  printerLine: 'الطابعة مع الخدمات', totalNoDelivery: 'التوصيل غير مشمول — يُحدَّد عند إتمام الطلب.',
+  extrasBeside: 'السعر أعلاه للطابعة وحدها — هذه تُضاف معها إلى السلة كسطور مستقلة.',
 };
 
 const EN: PsStrings = {
@@ -246,6 +286,14 @@ const EN: PsStrings = {
   justRemoves: 'Taken off the price',
   deliveryHow: 'How do you get the printer?',
   deliveryPickup: 'Pick up from the warehouse', deliveryPickupSub: 'You collect it yourself — no delivery fee',
+  choosePackage: 'Choose your package first', atCheckout: 'Delivery is decided at checkout', homeDelivery: 'Delivery to home',
+  freeReturn: `Free return within ${WARRANTY_FREE_RETURN_DAYS} days`, freeReturnWith: `With a warranty: free return within ${WARRANTY_FREE_RETURN_DAYS} days`,
+  loseTitle: 'What you give up',
+  lose: { warranty: 'No warranty', care: 'No Levo Care', services: 'No Levo services', return: 'No free return' },
+  ackLead: 'I understand and agree', ackAsk: 'Tick “I understand and agree” to add the printer', listJoin: ', ',
+  rightsStay: 'Your statutory consumer rights still apply.',
+  printerLine: 'Printer with services', totalNoDelivery: 'Delivery is not included — it is decided at checkout.',
+  extrasBeside: 'The price above is the printer alone — these are added to the cart with it as their own lines.',
 };
 
 const CKB: PsStrings = {
@@ -261,7 +309,7 @@ const CKB: PsStrings = {
   chooseFirst: 'سەرەتا پاکێج و جۆری گەیاندن هەڵبژێرە',
   details: 'وردەکارییەکان',
   justWarning: 'پرینتەرەکە بەبێ خزمەتگوزارییە ئارەزوومەندانەکانی Levonis و بەبێ گەرەنتی بازرگانی زیادە دەکڕیت. مافە یاساییەکانت وەک بەکاربەر هەر دەمێننەوە.',
-  justAck: 'تێگەیشتم و ڕازیم',
+  justAck: 'تێدەگەم و ڕازیم',
   delivery: 'گەیاندن', deliveryEconomy: 'ئابووری', deliveryPersonal: 'تایبەت (الوسيط)',
   deliveryEconomySub: 'گەیاندنی ئاسایی لەگەڵ بارەکانی تر', deliveryPersonalSub: 'نێردەری تایبەت و چاودێری زیاتر',
   deliveryChoose: 'جۆری گەیاندن هەڵبژێرە',
@@ -323,6 +371,14 @@ const CKB: PsStrings = {
   justRemoves: 'لە نرخەکە کەم دەکرێتەوە',
   deliveryHow: 'پرینتەرەکە چۆن دەگاتە دەستت؟',
   deliveryPickup: 'وەرگرتن لە کۆگا', deliveryPickupSub: 'خۆت وەریدەگریت — بێ کرێی گەیاندن',
+  choosePackage: 'سەرەتا پاکێجەکەت هەڵبژێرە', atCheckout: 'گەیاندن لە کاتی تەواوکردنی داواکاری دیاری دەکرێت', homeDelivery: 'گەیاندن بۆ ماڵەوە',
+  freeReturn: `گەڕاندنەوەی بەخۆڕایی لە ماوەی ${WARRANTY_FREE_RETURN_DAYS} ڕۆژدا`, freeReturnWith: `لەگەڵ گەرەنتی: گەڕاندنەوەی بەخۆڕایی لە ماوەی ${WARRANTY_FREE_RETURN_DAYS} ڕۆژدا`,
+  loseTitle: 'چی لەدەست دەدەیت',
+  lose: { warranty: 'بێ گەرەنتی', care: 'بێ لیڤۆ کێر', services: 'بێ هیچ خزمەتگوزارییەکی لیڤۆ', return: 'بێ گەڕاندنەوەی بەخۆڕایی' },
+  ackLead: 'تێدەگەم و ڕازیم', ackAsk: 'نیشانەی «تێدەگەم و ڕازیم» بکە بۆ زیادکردنی پرینتەرەکە', listJoin: '، ',
+  rightsStay: 'مافە یاساییەکانت وەک بەکاربەر هەر دەمێننەوە.',
+  printerLine: 'پرینتەر لەگەڵ خزمەتگوزارییەکان', totalNoDelivery: 'گەیاندن لەخۆناگرێت — لە کاتی تەواوکردنی داواکاری دیاری دەکرێت.',
+  extrasBeside: 'نرخی سەرەوە تەنها هی پرینتەرەکەیە — ئەمانە وەک دێڕی جیا لەگەڵیدا دەخرێنە ناو سەبەتە.',
 };
 
 export const PS_STRINGS: Record<PsLang, PsStrings> = { ar: AR, en: EN, ckb: CKB };

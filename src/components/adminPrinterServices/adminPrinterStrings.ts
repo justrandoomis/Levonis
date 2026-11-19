@@ -210,6 +210,24 @@ export const S = {
   pickupNoteTitle: ['سطر العنوان وساعات الاستلام (يظهر للزبون تحت الخيار)', 'Address and pickup hours line (shown to the customer under the choice)', 'دێڕی ناونیشان و کاتەکانی وەرگرتن (لە ژێر هەڵبژاردەکە بۆ کڕیار پیشان دەدرێت)'],
   pickupNoteRule: ['اكتبه بالعربية والإنجليزية والكردية معاً، أو اتركه فارغاً.', 'Write it in Arabic, English and Kurdish together, or leave it empty.', 'بە عەرەبی و ئینگلیزی و کوردی پێکەوە بینووسە، یان بە بەتاڵی بیهێڵەوە.'],
   pickupOn: ['الاستلام من المخزن: متاح', 'Warehouse pickup: offered', 'وەرگرتن لە کۆگا: بەردەستە'],
+  // phase 7 (DECISIONS row 363): where the delivery is decided, and Personal on / off
+  chooseAtSwitch: ['التوصيل يُحدَّد عند إتمام الطلب، لا في صفحة المنتج', 'Delivery is decided at checkout, not on the product page', 'گەیاندن لە کاتی تەواوکردنی داواکاری دیاری دەکرێت، نەک لە پەڕەی بەرهەم'],
+  chooseAtHint: [
+    'عند التفعيل: يختفي سؤال «كيف تصلك الطابعة؟» من صفحة المنتج ومن «تخصيص بنفسي». في إتمام الطلب: «توصيل إلى المنزل» يُحسب بسعر «اقتصادي» لفئة الطابعة، و«الاستلام من المتجر» بلا أجور توصيل. عند الإيقاف: يختار الزبون التوصيل في صفحة المنتج كما كان.',
+    'On: the question «How do you get the printer?» leaves the product page and «Customize myself». At checkout, «Delivery to home» charges the Economy price of the printer class, and store pickup has no delivery fee. Off: the customer chooses the delivery on the product page, as before.',
+    'کاتێک چالاکە: پرسیاری «پرینتەرەکە چۆن دەگاتە دەستت؟» لە پەڕەی بەرهەم و لە «خۆم ڕێکی دەخەم» نامێنێت. لە تەواوکردنی داواکاریدا: «گەیاندن بۆ ماڵەوە» بە نرخی «ئابووری»ی پۆلی پرینتەرەکە هەژمار دەکرێت، و «وەرگرتن لە فرۆشگا» کرێی گەیاندنی نییە. کاتێک ڕاگیراوە: کڕیار وەک پێشوو لە پەڕەی بەرهەم گەیاندن هەڵدەبژێرێت.',
+  ],
+  chooseAtOn: ['يُحدَّد عند إتمام الطلب', 'Decided at checkout', 'لە تەواوکردنی داواکاری دیاری دەکرێت'],
+  personalSwitch: ['التوصيل الشخصي (الوسيط) معروض للزبائن', 'Personal delivery (Al-Waseet) is offered to customers', 'گەیاندنی تایبەت (ئەلوەسیت) بۆ کڕیاران پێشکەش دەکرێت'],
+  personalHint: [
+    'عند الإيقاف: لا يُعرض «شخصي» للزبون في أي مكان، ومن كان قد اختاره في سلته يُحسب له «اقتصادي» دون رفض، ولا يشمله خصم PRO. أسعار «شخصي» تبقى محفوظة هنا وتعود كما هي عند إعادة التفعيل.',
+    'Off: Personal is shown to customers nowhere, a cart that already chose it is charged Economy without being refused, and the PRO discount does not cover it. The Personal prices stay stored here and return as they are when you switch it back on.',
+    'کاتێک ڕاگیراوە: «تایبەت» لە هیچ شوێنێک بۆ کڕیار پیشان نادرێت، ئەو سەبەتەیەی پێشتر هەڵیبژاردووە بەبێ ڕەتکردنەوە بە «ئابووری» هەژمار دەکرێت، و داشکاندنی PRO نایگرێتەوە. نرخەکانی «تایبەت» لێرە پارێزراو دەمێننەوە و کاتێک دووبارە چالاکی دەکەیتەوە وەک خۆیان دەگەڕێنەوە.',
+  ],
+  personalPaused: ['متوقف مؤقتاً', 'paused for now', 'بۆ ماوەیەک ڕاگیراوە'],
+  pvAtCheckout: ['لا يُسأل الزبون عن التوصيل في صفحة المنتج — يختاره عند إتمام الطلب:', 'The customer is not asked about delivery on the product page — it is chosen at checkout:', 'لە پەڕەی بەرهەم پرسیاری گەیاندن لە کڕیار ناکرێت — لە تەواوکردنی داواکاریدا هەڵیدەبژێرێت:'],
+  pvHome: ['توصيل إلى المنزل', 'Delivery to home', 'گەیاندن بۆ ماڵەوە'],
+  pvStorePickup: ['الاستلام من المتجر', 'Store pickup', 'وەرگرتن لە فرۆشگا'],
 
   // offers tab
   kits: ['باقات الفيلامنت', 'Filament kits', 'پاکێجەکانی فیلامێنت'],

@@ -201,6 +201,10 @@ export function keepPhase6Fields(d: Record<string, unknown>, stored: PrinterServ
   if (classes && typeof classes === 'object' && !Array.isArray(classes) && (classes as Record<string, unknown>).d6 === undefined) {
     (classes as Record<string, unknown>).d6 = stored.delivery.classes.d6 ?? { economy_iqd: null, personal_iqd: null };
   }
+  // Phase 7 (DECISIONS row 363): the two delivery switches. A page that does not send them keeps what the
+  // stored draft holds; a draft that never had them stays without them (absent = Personal on, chosen on the product page).
+  if (delivery.personal_active === undefined && stored.delivery.personal_active !== undefined) delivery.personal_active = stored.delivery.personal_active;
+  if (delivery.choose_at === undefined && stored.delivery.choose_at !== undefined) delivery.choose_at = stored.delivery.choose_at;
 }
 
 /**

@@ -19,9 +19,12 @@
  *  - Inspection: the warehouse task that must be completed, with its note, before the printer is
  *    handed to the courier (DECISIONS row 339), and the offer's own lead days.
  *  - Academy: the recorded videos, or a live course by WhatsApp or in person, arranged after the order.
+ *  - Phase 7 (DECISIONS row 363): «مع الضمان: إرجاع مجاني خلال 7 أيام» is the OWNER'S statement of 2026-11-20,
+ *    said in his words and nothing added (no «from», no conditions); the number is
+ *    WARRANTY_FREE_RETURN_DAYS and the sentence is PS_STRINGS' own.
  * Each language is written in that language; the Sorani is Sorani, not the Arabic respelled.
  */
-import type { PsLang } from './printerServicesStrings';
+import { PS_STRINGS, type PsLang } from './printerServicesStrings';
 
 export interface ExplainStrings {
   /** The disclosure under a service's choices. */
@@ -45,7 +48,7 @@ export interface ExplainStrings {
 const AR: ExplainStrings = {
   whatIncluded: 'ماذا يشمل؟',
   mostImportant: 'الأهم',
-  warrantySum: 'إصلاح أو استبدال القطعة التي فيها عيب مصنعي، مجاناً',
+  warrantySum: `إصلاح أو استبدال القطعة التي فيها عيب مصنعي، مجاناً · ${PS_STRINGS.ar.freeReturn}`,
   careSum: (pct) => `12 شهراً بعد الضمان: خصم حتى ${pct}% على القطعة التي تحتاجها`,
   packagingSum: 'حماية إضافية فوق تغليف المصنع قبل الشحن',
   inspectionSum: 'نفحص طابعتك نفسها فحصاً كاملاً قبل إرسالها',
@@ -83,7 +86,7 @@ const AR: ExplainStrings = {
 const EN: ExplainStrings = {
   whatIncluded: "What's included?",
   mostImportant: 'Most important',
-  warrantySum: 'A part with a factory defect is repaired or replaced, free',
+  warrantySum: `A part with a factory defect is repaired or replaced, free · ${PS_STRINGS.en.freeReturn}`,
   careSum: (pct) => `12 months after the warranty: up to ${pct}% off the part you need`,
   packagingSum: 'Extra protection over the factory packaging before it ships',
   inspectionSum: 'A full check of your own printer before it is sent',
@@ -121,7 +124,7 @@ const EN: ExplainStrings = {
 const CKB: ExplainStrings = {
   whatIncluded: 'چی لەخۆدەگرێت؟',
   mostImportant: 'گرنگترین',
-  warrantySum: 'ئەو پارچەیەی کەموکوڕیی کارگەی هەیە بەخۆڕایی چاک دەکرێتەوە یان دەگۆڕدرێت',
+  warrantySum: `ئەو پارچەیەی کەموکوڕیی کارگەی هەیە بەخۆڕایی چاک دەکرێتەوە یان دەگۆڕدرێت · ${PS_STRINGS.ckb.freeReturn}`,
   careSum: (pct) => `12 مانگ دوای گەرەنتی: داشکاندن تا ${pct}% لەسەر ئەو پارچەیەی پێویستتە`,
   packagingSum: 'پاراستنی زیادە لەسەر پێچانەوەی کارگە پێش ناردن',
   inspectionSum: 'پشکنینی تەواوی پرینتەرەکەی خۆت پێش ناردنی',

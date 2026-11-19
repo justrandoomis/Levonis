@@ -189,7 +189,7 @@ import { parseConditionDoc } from '../lib/condition';
 import { addonLinesMatch, addonUnavailableOf, kitLinesMatch, kitNotOffered, kitPricing, kitUnavailable, offeredAddon, offeredKit, resolveAddon, resolveKit, RANDOM_COLOUR, type ColourWishes, type ResolvedAddon, type ResolvedKit } from '../lib/printerKits';
 import { addonNotOffered, addonUnavailable, applyPrinterDiscount, attachedLineOf, benefitRegularUnit, printerDiscountView, printerLineDiscount, repickRandomColour, type AppliedPrinterDiscount } from '../lib/printerOffers';
 import { membershipPlanById, orderMembershipQuotePayload, quoteOrderMembership } from './memberships';
-import { addonsOf, anchorFeeFor, parseSelection, servicesOfferFor, kitsForPrinter, offeredMembershipTiers, CART_MEMBERSHIP_CONFLICT, EXTRAS_NOT_PRINTER, KIT_LINE_LOCKED, KIT_UNAVAILABLE, MEMBERSHIP_NOT_OFFERED, type FilamentKit, SERVICES_CODES, SERVICES_NOT_OFFERED, SERVICES_REQUIRED, type PrinterClasses, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
+import { addonsOf, anchorFeeFor, parseSelection, settledSelectionText, servicesOfferFor, kitsForPrinter, offeredMembershipTiers, CART_MEMBERSHIP_CONFLICT, EXTRAS_NOT_PRINTER, KIT_LINE_LOCKED, KIT_UNAVAILABLE, MEMBERSHIP_NOT_OFFERED, type FilamentKit, SERVICES_CODES, SERVICES_NOT_OFFERED, SERVICES_REQUIRED, type PrinterClasses, type PrinterServicesConfig } from '@levonis/pricing/printerServices';
 
 /** The cart line's printer-services block (absent for every other line). */
 function cartServicesView(
@@ -202,7 +202,8 @@ function cartServicesView(
 ): Record<string, unknown> {
   if (!config || !classes) return {};
   const p = resolved.services;
-  const stored = sel.services ? parseSelection(sel.services) : null;
+  // Phase 7: the stored choice as the owner's delivery switches read it (the same text without them).
+  const stored = sel.services ? parseSelection(settledSelectionText(config, sel.services)) : null;
   return {
     printer_services: {
       offer: offerForLine(servicesOfferFor(config, classes, productId, sel.optionValueIds ?? []), resolved),
@@ -3449,6 +3450,9 @@ cartRoutes.post('/items', async (c) => {
   }
 
   const actx = await loadAddContext(c, product, { warrantyPlanId });
+  // Phase 7 (DECISIONS row 363): the posted choice is stored as the owner's delivery switches read it
+  // (no delivery when the checkout decides it; Economy for a disabled Personal). Unchanged without them.
+  shared.services = settledSelectionText(actx.ctx.printerServices ?? null, shared.services);
   const judged = judgeLevonisLineOrThrow(actx, line, shared);
   // The full selection is stored canonically sorted (judgeLevonisLineOrThrow):
   // option_id is the lexically first canonical value, never the authored
@@ -3501,6 +3505,12 @@ cartRoutes.post('/items', async (c) => {
       'This printer is already in your cart with a different extended-warranty choice — change it from the cart.',
       CART_WARRANTY_CONFLICT
     );
+  }
+  // Phase 7: a line stored BEFORE the owner's switch may still say a delivery the switch now ignores. The same
+  // purchase is not «a different package»: this add keeps the line's own text (every fence below compares text).
+  if (existingLine && shared.services && String(existingLine.services ?? '') !== shared.services
+    && settledSelectionText(actx.ctx.printerServices ?? null, String(existingLine.services ?? '')) === shared.services) {
+    shared.services = String(existingLine.services);
   }
   // ONE SERVICES CHOICE PER LINE, the warranty plan's rule: a line already
   // holding a choice is never rewritten by another add (DECISIONS row 339).
@@ -3750,6 +3760,8 @@ cartRoutes.post('/items/batch', async (c) => {
     throw badRequest('This product cannot be added in several lines at once — add it from its page.', 'BATCH_NOT_SUPPORTED');
   }
   const actx = await loadAddContext(c, product, { warrantyPlanId });
+  // Phase 7: the posted choice as the owner's delivery switches read it (see the single add).
+  shared.services = settledSelectionText(actx.ctx.printerServices ?? null, shared.services);
 
   // 3. Every line through the single door's rules. ALL refusals are collected,
   //    not only the first, so the page can mark every colour that needs fixing.
@@ -4224,6 +4236,8 @@ cartRoutes.patch('/items/:id', async (c) => {
     estimateOrderingOf(c.env.DB, product),
   ]);
   refuseNonPrinterWarranty(isPrinter, warrantyPlanId);
+  // Phase 7: a posted choice is stored as the owner's delivery switches read it (see the add door).
+  if (servicesPosted) services = settledSelectionText(ctx.printerServices ?? null, services);
   const view = views.get(String(existing.product_id));
   const { doc, resolved, selectionErrors, servicesStale } = resolveCartLine(
     product,

@@ -1,4 +1,16 @@
 /**
+ * PHASE 7 (owner, 2026-11-20; DECISIONS row 363):
+ *  - THE TOTAL IS THE WHOLE PURCHASE. The footer's «الإجمالي الحالي» used to be the printer's unit alone
+ *    (the services quote's `unit_subtotal_iqd`): the kit, the add-ons and the membership were priced by
+ *    their own endpoints, listed under «تفاصيل السعر» and deliberately never added — so picking a kit
+ *    changed nothing in the figure the customer watches. It is now `sheetTotal` (printerServicesModel):
+ *    printer unit × quantity + the kit + the ticked add-ons + the membership, each a server figure, each
+ *    its own row in the details. Delivery is not in it.
+ *  - Delivery is not asked here when the owner decides it at checkout; the details say so.
+ *  - No warranty: the ✕ list of what the choice gives up, the agreement in one sentence, and the gate —
+ *    while the box is unticked the buttons look disabled, and a press opens the warranty row and points
+ *    at the box. A warranty option says the free return.
+ *
  * PHASE 6 (owner, 2026-11-19; DECISIONS row 362) — four changes, all in this chunk:
  *  - the chosen option and the primary action wear the house's own states (`lv-choice`: a
  *    pressed fill and a gold check; `lv-button-accent`), not a pure white slab on a dark sheet;
@@ -49,15 +61,21 @@ import { AddonsBody, BeforeAfter, BundlesBody, KitColours, OffersLoading, RANDOM
 import { OFFER_STRINGS, offerErrorText } from './printerOfferStrings';
 import { Sheet } from '../ui/Sheet';
 import VariantImg from '../ui/VariantImg';
-import { PS_STRINGS, servicesErrorText, type PsLang } from './printerServicesStrings';
+import { PS_STRINGS, ackSentence, servicesErrorText, type PsLang } from './printerServicesStrings';
 import { EXPLAIN } from './printerServicesExplain';
 import {
+  AGREEMENT_HOT,
+  AGREEMENT_HOT_MS,
   CHOSEN_EDGE,
   EMPTY_SELECTION,
   anchorOf,
   anchoredStart,
   asCustom,
+  asksDelivery,
   deliveryChoices,
+  lostWith,
+  pointAtAgreement,
+  sheetTotal,
   deliveryFee,
   firstBlocker,
   loadMembershipOptions,
@@ -362,7 +380,8 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const kitTotal = chosenKit?.available ? chosenKit.total_iqd : null;
   // Phase 4: the chosen add-ons' totals and what the discounts save — each the server's figure, listed.
   const addonTotals = chosenAddons.map((a) => a.money.after_total).filter((n): n is number => n !== null);
-  const addonsTotal = addonTotals.length ? addonTotals.reduce((a, b) => a + b, 0) : null;
+  // Only when EVERY ticked add-on has its server figure: a partial sum is never shown as the add-ons' total.
+  const addonsTotal = addonTotals.length && addonTotals.length === addonIds.length ? addonTotals.reduce((a, b) => a + b, 0) : null;
   const savedTotal = (chosenKit?.available ? chosenKit.money.saving_total : 0) + chosenAddons.reduce((n, a) => n + (a.available ? a.money.saving_total : 0), 0);
   // Only the colours of what is chosen travel (a colour for a product no longer chosen is not sent).
   const only = (held: Record<string, string> | null | undefined, keys: readonly string[]) => {
@@ -412,8 +431,27 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const complete = readyToBuy(applied, offer);
   const quoted = !quote || (fresh?.state === 'fresh' && !!priced && !blocker);
   const ready = complete && quoted && !extrasBlock && !busy && !adding;
+  /*
+   * THE AGREEMENT GATE (phase 7). `ackMissing` = no warranty and the box unticked. The buttons then LOOK
+   * disabled (aria-disabled, muted) but stay pressable: a press opens the warranty row, brings the box to
+   * the centre, focuses it and pulses it, with one line that says what to tick.
+   */
+  const ackMissing = draft.warranty === 'none' && !draft.ack_no_warranty;
+  const lost = lostWith(draft);
+  const ackBox = useRef<HTMLDivElement | null>(null);
+  const [pointed, setPointed] = useState(0);
+  const [hot, setHot] = useState(false);
+  useEffect(() => {
+    if (!pointed) return;
+    pointAtAgreement(ackBox.current);
+    setHot(true);
+    const t = window.setTimeout(() => setHot(false), AGREEMENT_HOT_MS);
+    return () => window.clearTimeout(t);
+  }, [pointed]);
+  const askAgreement = () => { setOpenRow('warranty'); setPointed((n) => n + 1); };
+  const gateLook = ackMissing && !busy && !adding ? { opacity: 0.5, filter: 'grayscale(1)' } : undefined;
   const hint = extrasBlock ? extrasBlock : !complete
-    ? offer.delivery && draft.delivery === null ? s.deliveryChoose : draft.warranty === 'none' && !draft.ack_no_warranty ? s.justAck : ''
+    ? asksDelivery(offer) && draft.delivery === null ? s.deliveryChoose : ackMissing ? s.ackAsk : ''
     : !quote ? ''
     : !fresh ? s.pending
     : fresh.state === 'failed' ? s.quoteFailed
@@ -430,6 +468,8 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   const figures = shownQuote ?? (fresh ? null : lastShown.current);
   const stale = !shownQuote && !!figures;
   const unit = figures?.unit ?? null;
+  // The line's printer quantity: the page's (or the cart line's) — what the kit and the add-ons are priced for.
+  const printerQty = Math.max(1, Math.trunc(Number(kitsFor?.qty) || 1));
   const dFee = figures ? figures.sel.delivery_fee_iqd : null;
   /** The PRO services discount on this draft (owner, 2026-11-19): a server figure, only shown. */
   const proSaved = figures ? proSavingOf(figures.sel, draft.delivery) : 0;
@@ -437,7 +477,17 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
   // Under an anchor the services line is what the draft does to the PRICE (the server's net figure).
   const net = figures && anchor ? netFee(figures.sel) : null;
   const servicesSaid = !figures ? null : net !== null ? (net === 0 ? s.included : signedMoney(net, money)) : figures.sel.fee_iqd > 0 ? `+ ${money(figures.sel.fee_iqd)}` : null;
-  const breakdown = servicesSaid !== null || dFee !== null || memberCharge !== null || kitTotal !== null || addonsTotal !== null;
+  /*
+   * THE TOTAL (phase 7): the printer × its quantity plus everything chosen with it — what the cart will show
+   * for these lines. An extra that is chosen but not priced yet (its list is loading, or its colours are being
+   * re-priced) holds the figure back, dimmed: never a sum that leaves a chosen line out.
+   */
+  const total = sheetTotal({ unit_iqd: unit, qty: printerQty, kit_total_iqd: kitTotal, addons_total_iqd: addonsTotal, membership_iqd: memberCharge });
+  const extrasPending = (!!kitId && kitTotal === null) || (addonIds.length > 0 && addonsTotal === null) || (!!planId && memberCharge === null);
+  const extrasStale = (!!chosenKit || chosenAddons.length > 0) && !coloursFresh;
+  const grand = extrasPending ? null : total.total_iqd;
+  const dim = stale || extrasStale;
+  const breakdown = total.printer_iqd !== null || servicesSaid !== null || dFee !== null || memberCharge !== null || kitTotal !== null || addonsTotal !== null;
 
   const row = (key: RowKey, icon: React.ReactNode, title: string, sub: string, value: string, body: React.ReactNode, hidden = false, tag = '') => {
     if (hidden) return null;
@@ -521,11 +571,11 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
     return !d ? '—' : d.included ? s.included : d.iqd === 0 ? zero : signedMoney(d.iqd, money);
   };
   /** «ماذا يشمل؟» — the facts of one service, folded under its choices (printerServicesExplain.ts). */
-  const includes = (key: string, points: string[], opened = false) => (
+  const includes = (key: string, points: string[], opened = false, first = '') => (
     <details className="mt-1" open={opened || undefined} data-sheet-includes={key}>
       <summary className="inline-flex min-h-11 cursor-pointer items-center text-[12px] font-bold text-text-primary underline">{x.whatIncluded}</summary>
       <ul className="list-disc space-y-1 ps-5 text-[11.5px] leading-relaxed text-text-secondary">
-        {points.map((line, i) => <li key={i}>{line}</li>)}
+        {(first ? [first, ...points] : points).map((line, i) => <li key={i}>{line}</li>)}
       </ul>
     </details>
   );
@@ -704,10 +754,12 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
           <div className="mb-2 flex items-end justify-between gap-3">
             {/* The server's figures for this exact draft — listed, never summed here. Folded at 390px so the footer stays
                 two lines: «تفاصيل السعر» and «وفّرت X»; the total beside them never wraps. */}
-            <div className={`min-w-0 flex-1 text-[11.5px] text-text-secondary ${stale ? 'opacity-50 transition-opacity' : ''}`}>
+            <div className={`min-w-0 flex-1 text-[11.5px] text-text-secondary ${dim ? 'opacity-50 transition-opacity' : ''}`}>
               {breakdown ? (
                 <details data-sheet-breakdown>
                   <summary className="cursor-pointer font-semibold text-text-primary">{o4.priceDetails}</summary>
+                  {/* Each part of the total is its own row: the printer (its services inside), then what is bought with it. */}
+                  {total.printer_iqd !== null ? <span className="block tabular-nums" dir="auto" data-sheet-printer-line>{s.printerLine}{printerQty > 1 ? ` ×${printerQty}` : ''}: {money(total.printer_iqd)}</span> : null}
                   {servicesSaid !== null ? <span className="block tabular-nums" data-sheet-services>{s.services}: <bdi>{servicesSaid}</bdi></span> : null}
                   {dFee !== null ? <span className="block tabular-nums" dir="auto">{s.deliveryLine}: {dFee === 0 ? s.free : `+ ${money(dFee)}`}</span> : null}
                   {dFee !== null && dFee > 0 ? <span className="block">{s.deliveryApart}</span> : null}
@@ -720,7 +772,8 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
                   {memberCharge !== null ? <span className="block tabular-nums" dir="auto" data-sheet-membership-charge>{s.membership}: + {money(memberCharge)}</span> : null}
                   {kitTotal !== null ? <span className="block tabular-nums" dir="auto" data-sheet-kit-total>{s.filament}: + {money(kitTotal)}</span> : null}
                   {addonsTotal !== null ? <span className="block tabular-nums" dir="auto" data-sheet-addons-total>{o4.addonsLine}: + {money(addonsTotal)}</span> : null}
-                  {memberCharge !== null || kitTotal !== null || addonsTotal !== null ? <span className="block">{addonsTotal !== null ? o4.extrasApart : s.extrasApart}</span> : null}
+                  {/* Delivery is decided at checkout (phase 7): never in this total, and said so. */}
+                  {!asksDelivery(offer) && offer.delivery ? <span className="block" data-sheet-no-delivery>{s.totalNoDelivery}</span> : null}
                 </details>
               ) : null}
               {savedTotal > 0 ? <span className="block font-semibold tabular-nums text-success" dir="auto" data-sheet-saved>{o4.saved(money(savedTotal))}</span> : null}
@@ -728,12 +781,12 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
             <div className="shrink-0 text-end" aria-live="polite" aria-atomic="true">
               <span className="block text-[11.5px] text-text-secondary">{s.total}</span>
               <span
-                key={stale ? 'stale' : String(unit)}
-                className={`block whitespace-nowrap text-[20px] font-bold tabular-nums text-text-primary ${stale ? 'opacity-50 transition-opacity' : 'animate-in fade-in duration-200 motion-reduce:animate-none'}`}
+                key={dim ? 'stale' : String(grand)}
+                className={`block whitespace-nowrap text-[20px] font-bold tabular-nums text-text-primary ${dim ? 'opacity-50 transition-opacity' : 'animate-in fade-in duration-200 motion-reduce:animate-none'}`}
                 dir="auto"
                 data-sheet-total
               >
-                {unit === null ? '—' : money(unit)}
+                {grand === null ? '—' : money(grand)}
               </span>
             </div>
           </div>
@@ -742,8 +795,10 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
             <div className="flex gap-2">
               <button
                 type="button"
-                disabled={!ready}
-                onClick={() => { if (ready) onApply(applied, labels); }}
+                disabled={!ready && !ackMissing}
+                aria-disabled={ackMissing || undefined}
+                style={gateLook}
+                onClick={() => { if (ackMissing) askAgreement(); else if (ready) onApply(applied, labels); }}
                 className="lv-button lv-button-secondary shrink-0"
                 data-sheet-apply
               >
@@ -751,9 +806,11 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               </button>
               <button
                 type="button"
-                disabled={!ready}
+                disabled={!ready && !ackMissing}
+                aria-disabled={ackMissing || undefined}
+                style={gateLook}
                 aria-busy={actionBusy || undefined}
-                onClick={() => { if (ready) onApplyAndAdd(applied, labels); }}
+                onClick={() => { if (ackMissing) askAgreement(); else if (ready) onApplyAndAdd(applied, labels); }}
                 className="lv-button lv-button-accent min-w-0 flex-1"
                 data-sheet-add
               >
@@ -763,9 +820,11 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
           ) : (
             <button
               type="button"
-              disabled={!ready}
+              disabled={!ready && !ackMissing}
+              aria-disabled={ackMissing || undefined}
+              style={gateLook}
               aria-busy={busy || undefined}
-              onClick={() => { if (ready) onApply(applied, labels); }}
+              onClick={() => { if (ackMissing) askAgreement(); else if (ready) onApply(applied, labels); }}
               className="lv-button lv-button-accent w-full"
               data-sheet-apply
             >
@@ -781,20 +840,30 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
           <>
             {choice(s.warranty, [
               opt('warranty', 'none' as const, s.none),
-              opt('warranty', 'w12' as const, s.months(12)),
-              opt('warranty', 'w24' as const, s.months(24)),
+              { ...opt('warranty', 'w12' as const, s.months(12)), sub: s.freeReturn },
+              { ...opt('warranty', 'w24' as const, s.months(24)), sub: s.freeReturn },
             ], draft.warranty, (w) => set({ warranty: w, ack_no_warranty: w === 'none' ? draft.ack_no_warranty : false }), 3)}
             <p className="mt-2 text-[11.5px] leading-relaxed text-text-secondary">{s.warrantyNote}</p>
             {draft.warranty === 'none' ? (
-              <div className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 rounded-xl border border-border-subtle p-2.5">
-                <p className="text-[11.5px] leading-relaxed text-text-secondary">{s.justWarning}</p>
+              <div ref={ackBox} style={hot && ackMissing ? AGREEMENT_HOT : undefined} className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 rounded-xl border border-border-subtle p-2.5" data-agreement={ackMissing ? (hot ? 'pointed' : 'needed') : 'given'}>
+                <p className="text-[12.5px] font-bold text-text-primary">{s.loseTitle}</p>
+                <ul className="mt-1 space-y-0.5" data-lost>
+                  {lost.map((k) => (
+                    <li key={k} className="flex items-center gap-1.5 text-[12.5px] font-medium text-text-primary" data-lost-line={k}>
+                      <X aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-danger" /> {s.lose[k]}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-[11.5px] leading-relaxed text-text-secondary">{s.rightsStay}</p>
                 <label className="mt-1.5 flex min-h-11 cursor-pointer items-center gap-2.5 text-[13px] font-medium text-text-primary">
-                  <input type="checkbox" className="h-5 w-5 shrink-0" style={{ accentColor: 'var(--color-gold)' }} checked={draft.ack_no_warranty} onChange={(e) => set({ ack_no_warranty: e.target.checked })} />
-                  {s.justAck}
+                  <input type="checkbox" className="h-5 w-5 shrink-0" style={{ accentColor: 'var(--color-gold)' }} checked={draft.ack_no_warranty} onChange={(e) => set({ ack_no_warranty: e.target.checked })} data-agreement-box />
+                  <span>{ackSentence(s, lost)}</span>
                 </label>
+                {hot && ackMissing ? <p role="alert" className="mt-1 text-[12px] font-bold text-warning" data-agreement-ask>{s.ackAsk}</p> : null}
               </div>
             ) : null}
-            {includes('warranty', x.warranty)}
+            {/* Phase 7: the owner's free-return rule heads the list (its number is WARRANTY_FREE_RETURN_DAYS). */}
+            {includes('warranty', x.warranty, false, `${s.freeReturnWith}.`)}
             <Link to="/policies/extended_warranty" className="inline-flex min-h-11 items-center text-[12px] text-text-secondary underline">{s.terms}</Link>
           </>
         ), !offer.warranty)}
@@ -838,7 +907,7 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
               lines: [d === 'economy' ? s.deliveryEconomySub : d === 'personal' ? s.deliveryPersonalSub : pickupOf(offer)?.note?.[lang] || s.deliveryPickupSub],
               disabled: fee === null,
             };
-          }), draft.delivery ?? '', (v) => set({ delivery: v as DeliveryChoice })), !offer.delivery)}
+          }), draft.delivery ?? '', (v) => set({ delivery: v as DeliveryChoice })), !asksDelivery(offer))}
 
         {row('inspection', <ClipboardCheck className="w-5 h-5" aria-hidden="true" />, s.inspection, x.inspectionSum,
           valueOf('inspection', draft.inspection, draft.inspection === 'full' ? s.free : s.none),
@@ -902,8 +971,9 @@ function codeOf(o: MembershipOption): string {
 /** The sheet starts from what was confirmed, or from nothing paid (never from a package). */
 function start(current: ServiceSelection | null, offer: ServicesOffer): ServiceSelection {
   // A delivery the offer no longer has (switched off, or the pickup taken away) is not carried into the draft.
+  // Phase 7: nor one the page no longer asks for (decided at checkout) or a disabled Personal.
   const held = current?.delivery ?? null;
-  const delivery = offer.delivery && ((held as DeliveryPick | null) !== 'pickup' || pickupOf(offer)) ? held : null;
+  const delivery = held && deliveryChoices(offer).includes(held as DeliveryPick) ? held : null;
   if (current?.confirmed) return { ...current, delivery };
   // Under an anchor (phase 6) the price already holds the Smart package, so the draft opens on it — never on less.
   const included = anchoredStart(offer);

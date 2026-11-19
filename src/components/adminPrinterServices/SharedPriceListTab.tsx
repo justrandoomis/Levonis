@@ -16,7 +16,9 @@ import {
   PRO_SERVICES_DISCOUNT_MAX_PCT,
   WARRANTY_FAMILIES,
   classesFor,
+  deliveryChooseAtOf,
   deliveryRow,
+  personalActiveOf,
   pickupOf,
   presetPrices,
   priceAnchorOf,
@@ -73,6 +75,9 @@ export default function SharedPriceListTab({ draft, upd, loc, published, product
   const w24Word = loc('ضمان 24 شهراً', 'Warranty 24 months', 'گەرەنتی 24 مانگ');
   const ecoWord = loc('اقتصادي', 'Economy', 'ئابووری');
   const perWord = loc('شخصي (الوسيط)', 'Personal (Al-Waseet)', 'تایبەت (ئەلوەسیت)');
+  // Phase 7 (DECISIONS row 363): the two delivery switches (absent in a stored list = Personal on, chosen on the product page).
+  const personalOn = personalActiveOf(draft);
+  const atCheckout = deliveryChooseAtOf(draft) === 'checkout';
 
   const familyRow = (f: WarrantyFamily) => (
     <div key={f} className="space-y-1" role="group" aria-label={FAMILY_LABEL[f]}>
@@ -89,7 +94,10 @@ export default function SharedPriceListTab({ draft, upd, loc, published, product
       <div className="grid grid-cols-2 gap-2">
         {/* deliveryRow: a draft stored before class 6 existed has no row for it yet. */}
         {num(deliveryRow(draft, c).economy_iqd, (n) => upd((d) => { d.delivery.classes[c] = { ...deliveryRow(d, c), economy_iqd: n }; }), ecoWord)}
-        {num(deliveryRow(draft, c).personal_iqd, (n) => upd((d) => { d.delivery.classes[c] = { ...deliveryRow(d, c), personal_iqd: n }; }), perWord)}
+        {/* Phase 7: while Personal is disabled its price stays stored and editable — drawn muted, and said so. */}
+        <div style={personalOn ? undefined : { opacity: 0.55 }} data-personal-price={personalOn ? 'on' : 'paused'}>
+          {num(deliveryRow(draft, c).personal_iqd, (n) => upd((d) => { d.delivery.classes[c] = { ...deliveryRow(d, c), personal_iqd: n }; }), personalOn ? perWord : `${perWord} — ${say(loc, S.personalPaused)}`)}
+        </div>
       </div>
     </div>
   );
@@ -157,7 +165,7 @@ export default function SharedPriceListTab({ draft, upd, loc, published, product
     ? <><bdi>{FAMILY_LABEL[myFamily]}</bdi> · {loc('12 شهراً', '12 months', '12 مانگ')} {fig(draft.warranty.w12[myFamily])} · {loc('24 شهراً', '24 months', '24 مانگ')} {fig(draft.warranty.w24[myFamily])}</>
     : null;
   const dSummary = myClass
-    ? <>{say(loc, CLASS_LABEL[myClass])} · {ecoWord} {fig(deliveryRow(draft, myClass).economy_iqd)} · {loc('شخصي', 'Personal', 'تایبەت')} {fig(deliveryRow(draft, myClass).personal_iqd)}{pickup.active ? <> · {say(loc, S.pickupOn)}</> : null}</>
+    ? <>{say(loc, CLASS_LABEL[myClass])} · {ecoWord} {fig(deliveryRow(draft, myClass).economy_iqd)} · {loc('شخصي', 'Personal', 'تایبەت')} {personalOn ? fig(deliveryRow(draft, myClass).personal_iqd) : say(loc, S.personalPaused)}{pickup.active ? <> · {say(loc, S.pickupOn)}</> : null}{atCheckout ? <> · {say(loc, S.chooseAtOn)}</> : null}</>
     : pickup.active ? say(loc, S.pickupOn) : null;
 
   return (
@@ -194,7 +202,19 @@ export default function SharedPriceListTab({ draft, upd, loc, published, product
 
         {group('delivery', say(loc, S.grpDelivery), dSummary,
           <>
-            <p className="mb-2 text-[11px] text-text-muted">{say(loc, S.emptyNotOffered)}</p>
+            <div className="space-y-2" data-shared-choose-at={atCheckout ? 'checkout' : 'product'}>
+              <label className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-text-primary">
+                <input type="checkbox" checked={atCheckout} onChange={(e) => upd((d) => { d.delivery.choose_at = e.target.checked ? 'checkout' : 'product'; })} data-choose-at-switch />
+                {say(loc, S.chooseAtSwitch)}
+              </label>
+              <p className="text-[12px] text-text-secondary leading-relaxed">{say(loc, S.chooseAtHint)}</p>
+              <label className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-text-primary" data-shared-personal={personalOn ? 'on' : 'off'}>
+                <input type="checkbox" checked={personalOn} onChange={(e) => upd((d) => { d.delivery.personal_active = e.target.checked; })} data-personal-switch />
+                {say(loc, S.personalSwitch)}
+              </label>
+              <p className="text-[12px] text-text-secondary leading-relaxed">{say(loc, S.personalHint)}</p>
+            </div>
+            <p className="mb-2 mt-3 border-t border-border-subtle pt-2 text-[11px] text-text-muted">{say(loc, S.emptyNotOffered)}</p>
             {mineFirst(DELIVERY_CLASSES, myClass, classRow, say(loc, S.thisClass), say(loc, S.otherClasses))}
             <div className="mt-3 border-t border-border-subtle pt-2 space-y-2" data-shared-pickup={pickup.active ? 'on' : 'off'}>
               <label className="flex min-h-11 items-center gap-2 text-[13px] font-semibold text-text-primary">

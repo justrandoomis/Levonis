@@ -29,18 +29,36 @@
  * the quote priced exactly this choice without a blocker (`onReady`); a
  * pending or failed quote says so instead. Delivery is asked here too when the
  * offer has it — required then, never defaulted.
+ *
+ * PHASE 7 (owner, 2026-11-20; DECISIONS row 363):
+ *  - when the owner decides delivery at checkout (`offer.delivery.choose_at`), the
+ *    «كيف تصلك الطابعة؟» block is not drawn and nothing waits for a delivery;
+ *  - a choice without a warranty lists what it gives up (✕ lines) and its box says
+ *    the same in one sentence; a warranty row also says the free return;
+ *  - THE AGREEMENT GATE: while that box is unticked the page's «أضف إلى السلة»
+ *    looks disabled (muted, aria-disabled — still focusable and pressable), and a
+ *    press brings the box to the centre, focuses it, pulses it and says what to
+ *    tick. The page's button is the product page's own element: this card (a lazy
+ *    chunk) marks it and listens for its press, so the page's opening carries not
+ *    one byte for the gate.
  */
 import React, { Suspense, lazy, startTransition, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, SlidersHorizontal, Truck } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, SlidersHorizontal, Truck, X } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useMoney } from '../../CurrencyContext';
 import { useAuth } from '../../AuthContext';
-import { PS_STRINGS, servicesErrorText } from './printerServicesStrings';
+import { PS_STRINGS, ackSentence, servicesErrorText } from './printerServicesStrings';
 import {
+  AGREEMENT_HOT,
+  AGREEMENT_HOT_MS,
   CHOSEN_EDGE,
   anchorOf,
   anchoredStart,
+  asksDelivery,
   deliveryChoices,
+  lostWith,
+  needsAck,
+  pointAtAgreement,
   deliveryFee,
   firstBlocker,
   moveRadioFocus,
@@ -152,10 +170,32 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
   // slide (and its focus hand-back) instead of vanishing on unmount.
   const [sheetMounted, setSheetMounted] = useState(false);
   const root = useRef<HTMLElement | null>(null);
-  // The page asked to add before the choice was complete: bring the card into view.
+  const ackBox = useRef<HTMLDivElement | null>(null);
+  // Phase 7: every refused press of «add» while the agreement is unticked (a counter: each press points again).
+  const [pointed, setPointed] = useState(0);
+  const [hot, setHot] = useState(false);
+  const gate = useRef(false);
+  const lastPoint = useRef(0);
+  const point = useCallback(() => {
+    // One press reaches here twice (the button's own press, then the page's «attention»): once is enough.
+    const now = Date.now();
+    if (now - lastPoint.current < 250) return;
+    lastPoint.current = now;
+    setPointed((n) => n + 1);
+  }, []);
+  // The page asked to add before the choice was complete: bring the card — or the agreement box — into view.
   useEffect(() => {
-    if (attention) root.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  }, [attention]);
+    if (!attention) return;
+    if (gate.current) point();
+    else root.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, [attention, point]);
+  useEffect(() => {
+    if (!pointed) return;
+    pointAtAgreement(ackBox.current);
+    setHot(true);
+    const t = window.setTimeout(() => setHot(false), AGREEMENT_HOT_MS);
+    return () => window.clearTimeout(t);
+  }, [pointed]);
   /*
    * A TAP PAINTS FIRST. The choice lives in the product page, and handing it
    * over re-renders that whole page (and asks for a new quote). So the card
@@ -218,7 +258,8 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openingKey]);
   // Delivery switched off after it was chosen — or the pickup taken away: the choice no longer carries it (the server would refuse it).
-  const staleDelivery = !!selection?.delivery && (!offer.delivery || ((selection.delivery as DeliveryPick) === 'pickup' && !pickupOf(offer)));
+  // Phase 7: nor one the page no longer asks for (decided at checkout) or a disabled Personal.
+  const staleDelivery = !!selection?.delivery && !deliveryChoices(offer).includes(selection.delivery as DeliveryPick);
   useEffect(() => {
     if (staleDelivery && selection) change({ ...selection, delivery: null });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -274,6 +315,29 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
   }, [warmNow, offeredKey]);
   const titleId = useId();
   const deliveryId = useId();
+  const ackHintId = useId();
+  /*
+   * THE AGREEMENT GATE (phase 7). `gated` = a confirmed choice without a warranty whose box is unticked.
+   * The page's «أضف إلى السلة» (its buttons carry data-testid="product-cta") is marked from here after
+   * every render — aria-disabled and a muted look, never `disabled`: it stays focusable and pressable —
+   * and unmarked the moment the box is ticked. A press while gated is refused by the page (the card's
+   * verdict is not «ready»); this card hears it and points at the box.
+   */
+  const gated = needsAck(shown);
+  gate.current = gated;
+  useEffect(() => {
+    markPageAdd(gated);
+  });
+  useEffect(() => () => markPageAdd(false), []);
+  useEffect(() => {
+    if (!gated) { setHot(false); return; }
+    const onPress = (e: MouseEvent) => {
+      if ((e.target as Element | null)?.closest?.(PAGE_ADD)) point();
+    };
+    document.addEventListener('click', onPress, true);
+    return () => document.removeEventListener('click', onPress, true);
+  }, [gated, point]);
+  const lost = lostWith(shown);
   const chosen: PresetId | 'custom' | null = shown?.confirmed ? shown.package : null;
   const delivery = (shown?.delivery ?? null) as DeliveryPick | null;
 
@@ -345,12 +409,39 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
     : `${s.custom} · ${net === 0 ? s.included : signedMoney(net, money)}`;
   const missing =
     verdict === 'incomplete'
-      ? !selection?.confirmed ? s.chooseFirst : offer.delivery && delivery === null ? s.deliveryChoose : s.justAck
+      ? !selection?.confirmed ? (asksDelivery(offer) ? s.chooseFirst : s.choosePackage) : asksDelivery(offer) && delivery === null ? s.deliveryChoose : s.ackAsk
       : verdict === 'pending' ? s.pending
       : null;
   // Said without waiting for a press: the server refused this choice, or its prices could not be read.
   const standing = verdict === 'blocked' ? servicesErrorText(blocker, lang) || s.unavailable : verdict === 'failed' ? s.quoteFailed : null;
   const Chevron = dir === 'rtl' ? ChevronLeft : ChevronRight;
+  // The agreement panel: right under «الطابعة فقط» when that is the choice, under the rows for a custom choice without a warranty.
+  const ackPanel = shown?.confirmed && shown.warranty === 'none' ? (
+        <div ref={ackBox} style={hot && gated ? AGREEMENT_HOT : undefined} className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 rounded-xl border border-border-subtle p-3" data-no-warranty-warning data-agreement={gated ? (hot ? 'pointed' : 'needed') : 'given'}>
+          {/* What this choice gives up — read from the choice itself, each line with its ✕. */}
+          <p className="text-[12.5px] font-bold text-text-primary">{s.loseTitle}</p>
+          <ul className="mt-1 space-y-0.5" data-lost>
+            {lost.map((k) => (
+              <li key={k} className="flex items-center gap-1.5 text-[12.5px] font-medium text-text-primary" data-lost-line={k}>
+                <X aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-danger" /> {s.lose[k]}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-[11.5px] leading-relaxed text-text-secondary">{s.rightsStay}</p>
+          <label className="mt-1.5 flex min-h-11 cursor-pointer items-center gap-2.5 text-[13px] font-medium text-text-primary">
+            <input
+              type="checkbox"
+              className="h-5 w-5 shrink-0" style={{ accentColor: 'var(--color-gold)' }}
+              checked={shown.ack_no_warranty}
+              aria-describedby={hot && gated ? ackHintId : undefined}
+              onChange={(e) => change({ ...shown, ack_no_warranty: e.target.checked })}
+              data-agreement-box
+            />
+            <span>{ackSentence(s, lost)}</span>
+          </label>
+          {hot && gated ? <p id={ackHintId} role="alert" className="mt-1 text-[12px] font-bold text-warning" data-agreement-ask>{s.ackAsk}</p> : null}
+        </div>
+  ) : null;
   const keyDir = dir === 'rtl' ? 'rtl' : 'ltr';
 
   return (
@@ -370,8 +461,8 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
           const unavailable = t.delta === null;
           const lines = t.id === 'just' ? removed : [];
           return (
+            <React.Fragment key={t.id}>
             <button
-              key={t.id}
               type="button"
               role="radio"
               aria-checked={on}
@@ -406,26 +497,15 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
                 )}
               </span>
             </button>
+            {t.id === 'just' && on ? ackPanel : null}
+            </React.Fragment>
           );
         })}
       </div>
 
-      {shown?.confirmed && shown.warranty === 'none' ? (
-        <div className="animate-in fade-in slide-in-from-top-2 duration-200 motion-reduce:animate-none mt-2 rounded-xl border border-border-subtle p-3" data-no-warranty-warning>
-          <p className="text-[12px] leading-relaxed text-text-secondary">{s.justWarning}</p>
-          <label className="mt-1.5 flex min-h-11 cursor-pointer items-center gap-2.5 text-[13px] font-medium text-text-primary">
-            <input
-              type="checkbox"
-              className="h-5 w-5 shrink-0" style={{ accentColor: 'var(--color-gold)' }}
-              checked={shown.ack_no_warranty}
-              onChange={(e) => change({ ...shown, ack_no_warranty: e.target.checked })}
-            />
-            {s.justAck}
-          </label>
-        </div>
-      ) : null}
+      {chosen !== 'just' ? ackPanel : null}
 
-      {offer.delivery ? (
+      {asksDelivery(offer) ? (
         <div className="mt-4">
           <p id={deliveryId} className="mb-2 flex items-center gap-1.5 text-[13px] font-bold text-text-primary">
             <Truck aria-hidden="true" className="w-4 h-4 text-text-secondary" /> {s.deliveryHow}
@@ -486,7 +566,7 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
         <div className="mt-2 space-y-0.5 text-[11.5px] text-text-secondary" data-packages-extras>
           {shownPlan ? <p className="truncate" data-packages-membership={shownPlan}>{s.membership}{planName ? `: ${planName}` : ''}</p> : null}
           {shownKit ? <p className="truncate" data-packages-kit={shownKit}>{s.filament}{kitName ? `: ${kitName}` : ''}</p> : null}
-          <p>{s.extrasApart}</p>
+          <p>{s.extrasBeside}</p>
         </div>
       ) : null}
 
@@ -522,6 +602,32 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
   );
 }
 
+/** The product page's own «أضف إلى السلة» buttons (the buy column's and the sticky bar's). */
+const PAGE_ADD = '[data-testid="product-cta"]';
+
+/**
+ * Marks (or clears) the page's add buttons as waiting for the agreement: aria-disabled and a muted
+ * look, set on the elements themselves — the page renders neither attribute, so React leaves them be,
+ * and a button the page draws later is marked by the card's next render. Never `disabled`: the press
+ * must still arrive, so it can point at the box.
+ */
+function markPageAdd(gated: boolean): void {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll<HTMLElement>(PAGE_ADD).forEach((el) => {
+    if (gated) {
+      el.setAttribute('aria-disabled', 'true');
+      el.dataset.agreementGate = '';
+      el.style.opacity = '0.5';
+      el.style.filter = 'grayscale(1)';
+    } else if ('agreementGate' in el.dataset) {
+      el.removeAttribute('aria-disabled');
+      delete el.dataset.agreementGate;
+      el.style.opacity = '';
+      el.style.filter = '';
+    }
+  });
+}
+
 /**
  * The chosen mark: a ring that is always there (these are radio rows), and the
  * house's gold check inside it once the row is the chosen one (`lv-choice-mark`
@@ -551,7 +657,8 @@ function includesText(offer: ServicesOffer, id: 'smart' | 'complete', s: (typeof
   const inc = offer.packages[id]?.includes;
   if (!inc) return '';
   const parts: string[] = [];
-  if (inc.warranty !== 'none') parts.push(`${s.warranty} ${s.months(inc.warranty === 'w12' ? 12 : 24)}`);
+  // Phase 7: a package with a warranty also gives the free return (the owner's rule, row 363).
+  if (inc.warranty !== 'none') parts.push(`${s.warranty} ${s.months(inc.warranty === 'w12' ? 12 : 24)}`, s.freeReturn);
   if (inc.care === 'c12') parts.push(`${s.care} +${s.months(12)}`);
   if (inc.packaging === 'extra') parts.push(s.packagingExtra);
   if (inc.inspection === 'full') parts.push(s.inspectionOption);

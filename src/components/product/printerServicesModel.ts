@@ -60,10 +60,26 @@ export function pickupOf(offer: ServicesOffer | null | undefined): { note: Text3
   return { note: n && typeof n.ar === 'string' && typeof n.en === 'string' && typeof n.ckb === 'string' && (n.ar || n.en || n.ckb) ? n : null };
 }
 
-/** The delivery choices this offer shows, in the card's order. */
+/**
+ * PHASE 7 (owner, 2026-11-20; DECISIONS row 363). Two owner switches arrive inside `offer.delivery`,
+ * each ABSENT unless set (an older server, or a list without them, draws exactly what it drew):
+ *  - `choose_at: 'checkout'` — the page asks for no delivery: the checkout's method decides it;
+ *  - `personal_active: false` — Personal is disabled and is listed nowhere.
+ */
+export function deliveryAtCheckout(offer: ServicesOffer | null | undefined): boolean {
+  return (offer?.delivery as { choose_at?: unknown } | null | undefined)?.choose_at === 'checkout';
+}
+/** The page (card, sheet) asks the customer how the printer arrives: delivery is offered AND chosen here. */
+export function asksDelivery(offer: ServicesOffer | null | undefined): boolean {
+  return !!offer?.delivery && !deliveryAtCheckout(offer);
+}
+
+/** The delivery choices this offer shows, in the card's order (none when the checkout decides; no disabled Personal). */
 export function deliveryChoices(offer: ServicesOffer | null | undefined): DeliveryPick[] {
-  if (!offer?.delivery) return [];
-  return pickupOf(offer) ? ['economy', 'personal', 'pickup'] : ['economy', 'personal'];
+  if (!offer?.delivery || deliveryAtCheckout(offer)) return [];
+  const personal = (offer.delivery as { personal_active?: unknown }).personal_active !== false;
+  const list: DeliveryPick[] = personal ? ['economy', 'personal'] : ['economy'];
+  return pickupOf(offer) ? [...list, 'pickup'] : list;
 }
 
 /** The four services a package fixes. */
@@ -200,8 +216,8 @@ export interface QuoteBase {
 
 /** The selection a package tile means (not yet confirmed until tapped). Delivery is kept only when it is offered. */
 export function presetFrom(offer: ServicesOffer, id: 'just' | 'smart' | 'complete', delivery: DeliveryPick | null): ServiceSelection | null {
-  // A pickup the offer no longer has is not carried either.
-  const d = (offer.delivery && (delivery !== 'pickup' || pickupOf(offer)) ? delivery : null) as DeliveryChoice | null;
+  // A pickup the offer no longer has is not carried either — nor any delivery the page no longer asks for (phase 7).
+  const d = (delivery && deliveryChoices(offer).includes(delivery) ? delivery : null) as DeliveryChoice | null;
   if (id === 'just') return { ...EMPTY_SELECTION, package: 'just', delivery: d };
   const p = offer.packages[id];
   if (!p) return null;
@@ -264,9 +280,73 @@ export function warmedNow<T>(key: string): T | undefined {
 /** Tests only. */
 export function forgetWarmed(): void { warm.clear(); }
 
-/** The choice is complete on the customer's side: tapped, delivery chosen when it is offered, no-warranty acknowledged. */
+/** The choice is complete on the customer's side: tapped, delivery chosen when the page asks for it, no-warranty acknowledged. */
 export function readyToBuy(s: ServiceSelection | null, offer: ServicesOffer | null): boolean {
-  return !!s && s.confirmed && (!offer?.delivery || s.delivery !== null) && (s.warranty !== 'none' || s.ack_no_warranty);
+  return !!s && s.confirmed && (!asksDelivery(offer) || s.delivery !== null) && (s.warranty !== 'none' || s.ack_no_warranty);
+}
+
+/**
+ * THE AGREEMENT GATE (phase 7): a confirmed choice with no warranty whose «أفهم وأوافق» box is not ticked.
+ * While it holds, «أضف إلى السلة» looks disabled and a press points at the box instead of adding.
+ */
+export function needsAck(s: Pick<ServiceSelection, 'confirmed' | 'warranty' | 'ack_no_warranty'> | null | undefined): boolean {
+  return !!s && s.confirmed && s.warranty === 'none' && !s.ack_no_warranty;
+}
+
+/**
+ * WHAT A CHOICE WITHOUT A WARRANTY GIVES UP (phase 7), from the choice itself — never a fixed list that
+ * could contradict it: no warranty and no free return always; no Levo Care only when Care is not
+ * chosen; «no Levo services» only when nothing at all is chosen (the «الطابعة فقط» package).
+ */
+export type Lost = 'warranty' | 'care' | 'services' | 'return';
+export function lostWith(s: ServiceSelection | Pick<ServiceSelection, 'warranty' | 'care' | 'packaging' | 'inspection' | 'academy'> | null | undefined): Lost[] {
+  if (!s || s.warranty !== 'none') return [];
+  const out: Lost[] = ['warranty'];
+  if (s.care === 'none') out.push('care');
+  if (s.care === 'none' && s.packaging === 'standard' && s.inspection === 'none' && s.academy === 'recorded') out.push('services');
+  out.push('return');
+  return out;
+}
+
+/**
+ * A REFUSED PRESS POINTS AT THE AGREEMENT BOX: it is brought to the centre of the view, its checkbox
+ * takes the focus, and it pulses three times. Under reduced motion nothing moves — the jump is
+ * instant and the caller's static outline is the whole cue. No stylesheet: the Web Animations API.
+ */
+export function pointAtAgreement(box: HTMLElement | null): void {
+  if (!box) return;
+  const calm = typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  box.scrollIntoView?.({ block: 'center', behavior: calm ? 'auto' : 'smooth' });
+  box.querySelector<HTMLInputElement>('input[type="checkbox"]')?.focus({ preventScroll: true });
+  if (!calm) box.animate?.([{ transform: 'scale(1)' }, { transform: 'scale(1.025)' }, { transform: 'scale(1)' }], { duration: 520, iterations: 3, easing: 'ease-in-out' });
+}
+/** How long the box keeps its highlighted outline after a refused press. */
+export const AGREEMENT_HOT_MS = 2200;
+/** The outline of the agreement box while it is pointed at (inline: the public stylesheet has no room). */
+export const AGREEMENT_HOT = { outline: '2px solid var(--color-warning)', outlineOffset: '2px' } as const;
+
+/**
+ * THE SHEET'S TOTAL (owner, 2026-11-20: «the total price on customize myself, when he tries to add kit,
+ * does not update the price»). What the cart will show for this printer and what is bought with it:
+ *   printer unit (its services inside, net of the anchor) × quantity
+ *   + the chosen kit's total + the ticked add-ons' total (each already for every printer of the line,
+ *     after its discount) + the membership's charge (once per order).
+ * Every input is a server figure; delivery is never in it. `total_iqd` is null until the printer's
+ * unit is known — an extra still loading is the caller's to hold the button for, never a wrong sum.
+ */
+export interface SheetTotal { printer_iqd: number | null; kit_iqd: number | null; addons_iqd: number | null; membership_iqd: number | null; total_iqd: number | null }
+export function sheetTotal(i: { unit_iqd: number | null; qty: number; kit_total_iqd?: number | null; addons_total_iqd?: number | null; membership_iqd?: number | null }): SheetTotal {
+  const whole = (v: number | null | undefined) => (typeof v === 'number' && Number.isFinite(v) ? Math.trunc(v) : null);
+  const qty = Math.max(1, Math.trunc(Number(i.qty) || 1));
+  const unit = whole(i.unit_iqd);
+  const printer = unit === null ? null : unit * qty;
+  const kit = whole(i.kit_total_iqd);
+  const addons = whole(i.addons_total_iqd);
+  const membership = whole(i.membership_iqd);
+  return {
+    printer_iqd: printer, kit_iqd: kit, addons_iqd: addons, membership_iqd: membership,
+    total_iqd: printer === null ? null : printer + (kit ?? 0) + (addons ?? 0) + (membership ?? 0),
+  };
 }
 
 /** Codes the page handles itself (the tap, the acknowledgment): never shown as a blocker. */
