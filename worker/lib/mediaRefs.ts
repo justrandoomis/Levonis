@@ -739,6 +739,7 @@ export const NON_MEDIA_COLUMNS: Readonly<Record<string, string>> = {
 
   // -- snapshots made of text and numbers, never of a location -------------
   'orders.address_snapshot': 'a postal address',
+  'orders.delivery_phone_key': 'the last ten digits of the delivery phone — the filament limit pooling key (0245)',
   // 0176 — Quick Buy. Addresses, prices, labels, ids and consent records. The
   // item snapshot deliberately carries NO image: the session view reads the
   // product's live image, and the order written at the end is the durable copy.

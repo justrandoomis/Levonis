@@ -516,8 +516,11 @@ function staticClosure(start: string): Set<string> {
  * update had used the headroom (the live tip measured 282.8 KB) and «خصص طابعتك»
  * adds ~0.4 KB of page wiring for the lazy printer card; every word, figure and
  * control of the card itself stays in its lazy chunks.
+ * RAISED TO 285 KB (2026-11-19, DECISIONS row 360): the PRO services discount
+ * (packages/pricing printerServices) and the lazy filament-limit note's wiring
+ * measured 284.2 KB; the note's words and request stay in their lazy chunk.
  */
-const PRODUCT_OPENING_BUDGET = 284 * KB;
+const PRODUCT_OPENING_BUDGET = 285 * KB;
 
 test('opening a product excludes below-fold reviews, closed purchase dialogs, refusal translations, the price-request panel, the knowledge tabs, the several-colours panel and the estimate notice', () => {
   const files = readdirSync(ASSETS).filter((file) => file.endsWith('.js'));

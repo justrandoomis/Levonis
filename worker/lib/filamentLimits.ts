@@ -314,7 +314,8 @@ export async function readFilamentUsage(
        FROM fil LEFT JOIN usage ON usage.product_id = fil.id`;
   const { results } = await db
     .prepare(sql)
-    .bind(FILAMENT_SECTION_ID, JSON.stringify(ids), input.userId, JSON.stringify(keys), input.sinceIso, pendingSince)
+    // ?6 only exists in the phone clause: a database without 0245 must not be handed a sixth value.
+    .bind(...[FILAMENT_SECTION_ID, JSON.stringify(ids), input.userId, JSON.stringify(keys), input.sinceIso, ...(byPhone ? [pendingSince] : [])])
     .all<FilamentUsageRow>();
   for (const r of results ?? []) {
     const en = String(r.name ?? '');
