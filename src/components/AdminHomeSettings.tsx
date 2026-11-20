@@ -121,6 +121,22 @@ function SaveStatusLabel({ state, error, dir }: { state: SaveState; error: strin
   return null;
 }
 
+/**
+ * AN ANIMATION IS STORED WHOLE (owner, 2026-11-19: the animated services hero
+ * banner, DECISIONS row 361). `purpose=product` re-encodes every picture to a
+ * still WebP and refuses an animated one rather than keep one frame; the ads
+ * route (`reward_ad`: admin-only, public, `rewards/ads/poster/…`) stores the
+ * file exactly as picked. So an animated WebP or a GIF goes there; a still
+ * picture keeps the product pipeline. The stored URL is referenced from
+ * `admin_settings.homeBanners`, which the media sweeper reads (mediaRefs.ts).
+ */
+async function isAnimation(file: File): Promise<boolean> {
+  const b = new Uint8Array(await file.slice(0, 32).arrayBuffer());
+  const tag = (o: number, s: string) => s.split('').every((ch, i) => b[o + i] === ch.charCodeAt(0));
+  if (tag(0, 'GIF8')) return true;
+  return tag(0, 'RIFF') && tag(8, 'WEBP') && tag(12, 'VP8X') && (b[20] & 0x02) !== 0;
+}
+
 /** URL input + real upload option for an image field. */
 function ImageField({ value, onChange, dir }: { value: string; onChange: (url: string) => void; dir: string }) {
   const [uploading, setUploading] = useState(false);
@@ -144,7 +160,7 @@ function ImageField({ value, onChange, dir }: { value: string; onChange: (url: s
             setUploading(true);
             setUploadError(null);
             try {
-              const result = await uploadFile(file, 'product');
+              const result = await uploadFile(file, (await isAnimation(file)) ? 'reward_ad' : 'product');
               onChange(result.url);
             } catch (err) {
               setUploadError(err instanceof ApiError ? err.message : 'Upload failed');
