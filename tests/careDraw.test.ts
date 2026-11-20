@@ -23,6 +23,7 @@ import type { DatabaseSync } from 'node:sqlite';
 import { all, asD1, count, get, json, post, row, stubApp, type StubUser } from './fixtures/app';
 import { giftWorld } from './fixtures/giftWorld';
 import type { Env } from '../worker/lib/types';
+import { addMonths } from '../worker/lib/membershipOps';
 import { adminRewardsRoutes } from '../worker/routes/adminRewards';
 import { deviceRoutes } from '../worker/routes/devices';
 import { giftRoutes } from '../worker/routes/gifts';
@@ -97,7 +98,8 @@ function device(raw: DatabaseSync, owner: string, opts: { daysAgo?: number; warr
       `INSERT INTO order_item_units (id, order_id, order_item_id, product_id, owner_user_id, unit_index, delivered_at, warranty_base_months, warranty_start_at, warranty_end_at, warranty_closed_at, warranty_closed_reason)
        VALUES (?, ?, ?, 'p_printer', ?, 1, ?, ?, ?, ?, ?, ?)`
     )
-    .run(`cdu${n}`, `CD-${n}`, `cdi${n}`, owner, delivered, opts.warranty ?? 12, delivered, iso(NOW + 300 * DAY), opts.closed ? iso(NOW - DAY) : null, opts.closed ? 'returned' : null);
+    // The window the delivery hook writes: delivery + the warranty months bought (phase 8: Care follows the device's real warranty end).
+    .run(`cdu${n}`, `CD-${n}`, `cdi${n}`, owner, delivered, opts.warranty ?? 12, delivered, addMonths(delivered, opts.warranty ?? 12), opts.closed ? iso(NOW - DAY) : null, opts.closed ? 'returned' : null);
   raw.prepare('INSERT INTO device_registrations (unit_id, user_id) VALUES (?, ?)').run(`cdu${n}`, owner);
   return `cdu${n}`;
 }

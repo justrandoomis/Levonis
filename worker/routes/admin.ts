@@ -153,7 +153,9 @@ import { runGuardedMediaCleanupJobs } from '../lib/mediaRefs';
 import { supportInboxCounts } from './adminChats';
 import { canHandleDisputes, canReviewKyc } from '../lib/staffCapabilities';
 import { searchIndexStatus } from '../lib/search/store';
-import { INSPECTION_NOT_DONE_MESSAGE, isInspectionGateAbort, openInspectionBlocksDispatch, orderServiceTasks } from '../lib/printerServices';
+import { INSPECTION_NOT_DONE_MESSAGE, isInspectionGateAbort, openInspectionBlocksDispatch, orderServiceTasksView, orderServicesView } from '../lib/printerServices';
+import { orderBreakdown } from '../lib/orderBreakdown';
+import { boardServiceFacts, boardServiceCounts, BOARD_SERVICE_FILTERS, boardServiceClause, drawPrizeItemIds, isPhysicalLine, receiptServiceNotes, ENDED_ORDER_STATUSES } from '../lib/orderServiceBoard';
 
 export const adminRoutes = new Hono<AppContext>();
 adminRoutes.use('*', requireAdmin);
@@ -1977,6 +1979,16 @@ adminRoutes.get('/orders', async (c) => {
    * told which happened (`search_kind`, `search.pierced`) so it can say so.
    */
   const pierces = search.kind === 'order_id' || search.kind === 'phone';
+  /**
+   * «خدمات الطابعة» ON THE BOARD (DECISIONS row 364): one optional filter — orders with a serviced printer,
+   * an inspection still to do, a store pickup, Levo Care, an Academy session to schedule, a membership
+   * waiting. It narrows whatever else is chosen, like the price holds below — except «أكاديمية للجدولة»:
+   * the session is arranged AFTER the printer arrives, so that one lists every order that is not
+   * cancelled, delivered ones included (`acrossScopes`), with no scope and no facet counts.
+   */
+  const serviceRaw = str(c.req.query('service'), 'service', { max: 24, required: false });
+  const service = serviceRaw ? oneOf(serviceRaw, 'service', BOARD_SERVICE_FILTERS) : '';
+  const acrossScopes = service === 'academy' && !pierces;
 
   const clauses: string[] = [];
   const params: unknown[] = [];
@@ -2022,7 +2034,9 @@ adminRoutes.get('/orders', async (c) => {
     facetParams.push(...bind);
   };
 
-  if (!pierces) {
+  if (acrossScopes) {
+    clauses.push("o.status <> 'cancelled'");
+  } else if (!pierces) {
     if (scope === 'delivered' || scope === 'cancelled') {
       facetClauses.push("o.status IN ('delivered','cancelled')");
     } else {
@@ -2190,6 +2204,8 @@ adminRoutes.get('/orders', async (c) => {
     );
   }
 
+  if (service) clauses.push(await boardServiceClause(c.env.DB, service));
+
   const where = clauses.length > 0 ? ` WHERE ${clauses.map((x) => `(${x})`).join(' AND ')}` : '';
   const facetWhere = facetClauses.length > 0 ? ` WHERE ${facetClauses.map((x) => `(${x})`).join(' AND ')}` : '';
 
@@ -2215,10 +2231,10 @@ adminRoutes.get('/orders', async (c) => {
    * — they may be live, delivered and cancelled together — and one completion
    * column cannot order them. `sort` is then echoed as null.
    */
-  const archiveScope = !pierces && isArchiveScope(scope) ? scope : null;
+  const archiveScope = !pierces && !acrossScopes && isArchiveScope(scope) ? scope : null;
   const orderBy = archiveScope ? archiveOrderSql(archiveScope, sort) : BOARD_ORDER_SQL;
 
-  const [{ results }, countRow, facetRows, heldRow, estimateRow] = await Promise.all([
+  const [{ results }, countRow, facetRows, heldRow, estimateRow, serviceCounts] = await Promise.all([
     // `board_day` and `board_lead_days` ride on the row so its bucket is the
     // SQL's own board day — the one the COUNT and `due` used — never a second
     // computation that could drift from it.
@@ -2252,7 +2268,7 @@ adminRoutes.get('/orders', async (c) => {
     // (shipping_type, status) grouping, so the number beside «جوي» and the
     // number beside «قيد التجهيز» can never be computed against two different
     // populations. `null` for a pierced lookup — see the facet note above.
-    pierces
+    pierces || acrossScopes
       ? Promise.resolve({ results: [] as Array<Record<string, unknown>> })
       : c.env.DB.prepare(
           `SELECT o.shipping_type AS t, o.status AS s, COUNT(*) AS n,
@@ -2274,6 +2290,8 @@ adminRoutes.get('/orders', async (c) => {
     c.env.DB.prepare("SELECT COUNT(DISTINCT order_id) AS n FROM order_price_estimates WHERE state IN ('open','proposed','rejected')")
       .first<{ n: number }>()
       .catch(() => ({ n: 0 })),
+    // The service filters' board-wide counts (row 364): three small reads, 0 on a database behind them.
+    boardServiceCounts(c.env.DB),
   ]);
 
   /**
@@ -2317,7 +2335,7 @@ adminRoutes.get('/orders', async (c) => {
     scope === 'open' ? t === 'direct' : scope === 'preorder' ? t !== 'direct' : true;
   const typeMatches = (t: string): boolean => scopeJourney(t) && (type ? t === type : true);
   const statusMatches = (st: string): boolean => (statusDim ? st === statusDim : true);
-  const options = pierces
+  const options = pierces || acrossScopes
     ? null
     : {
         /** The journey select, «الكل» included — it is the sum, not a query. */
@@ -2371,6 +2389,8 @@ adminRoutes.get('/orders', async (c) => {
   // «الأرقام n/m» (serial scan, 0178; spec §5.5): the page's serial counts in
   // three reads, empty before the migration or on any failure.
   const serialCounts = await boardSerialCounts(c.env, results);
+  // What each order holds of the printer services (row 364): two reads for the page, empty before 0234 / 0235.
+  const serviceFacts = await boardServiceFacts(c.env.DB, ids, byOrder, results);
   const lang = langOf(c);
   const out = results.map((o) => {
     const day = typeof o.delivery_due_day === 'string' ? o.delivery_due_day : '';
@@ -2380,10 +2400,17 @@ adminRoutes.get('/orders', async (c) => {
     // An order held by unsettled estimated lines (0218) offers no one-tap move:
     // the gate would refuse it — the row shows the badge instead of a button.
     const estimateHeld = itemsHoldOrder(byOrder.get(String(o.id)) ?? []);
-    const next = estimateHeld ? { quick_next: null } : quickNextOf(o, lang);
+    const facts = serviceFacts.get(String(o.id));
+    const offered = estimateHeld ? { quick_next: null } : quickNextOf(o, lang);
+    // «بانتظار الفحص قبل الإرسال»: an open inspection refuses the hand-over (orderStageOps, the courier door,
+    // trg_orders_inspection_gate) — the row offers no one-tap move the gate can only refuse.
+    const next = facts?.inspection_open && offered.quick_next && INSPECTION_GATED_STAGES.has(offered.quick_next.stage)
+      ? { quick_next: null }
+      : offered;
     const sc = serialCounts.get(String(o.id));
     return {
       ...next,
+      ...(facts ? { service_flags: facts } : {}),
       /** «بانتظار تأكيد السعر النهائي» (0218): present only while an estimated line waits. */
       ...(estimateHeld ? { price_estimate_open: true as const } : {}),
       /**
@@ -2517,6 +2544,9 @@ adminRoutes.get('/orders', async (c) => {
     /** «بانتظار تأكيد السعر» (0218): the filter's state and its board-wide count. */
     price_estimate: estimateOnly,
     price_estimate_count: Number(estimateRow?.n ?? 0),
+    /** The printer-services filter in force (row 364), and the board-wide counts of the three that wait on staff. */
+    service: service || null,
+    service_counts: serviceCounts,
   });
 });
 
@@ -2678,17 +2708,35 @@ adminRoutes.get('/orders/:id', async (c) => {
   const address = safeParse<Record<string, unknown>>(o.address_snapshot, {});
   // Each estimated line's state (0218): `items[].price_estimate` and the modal's estimate panel.
   await attachEstimateStates(c.env.DB, items);
+  // The warehouse's work for the printer services (0234), in the reader's words, with who closed each task.
+  const serviceTasks = await soft('service_tasks', () => orderServiceTasksView(c.env.DB, id), [] as Awaited<ReturnType<typeof orderServiceTasksView>>);
+  const membershipGift = safeParse<{ product_id?: unknown } | null>(o.membership_gift, null);
 
   return c.json({
     success: true,
     order: {
       ...orderPublic(o, items, snaps.get(id), await mysteryViewFor(c.env.DB, [id], 'admin'), 'admin'),
+      /** «بانتظار الفحص قبل الإرسال» (row 364): an inspection bought on this order is still open — it cannot be handed over. */
+      inspection_open: serviceTasks.some((t) => t.kind === 'inspection' && t.status === 'open'),
+      /** False once the order is cancelled, returned or refunded: its tasks can no longer be completed (ORDER_SERVICE_TASK_ORDER_ENDED). */
+      service_tasks_open: !ENDED_ORDER_STATUSES.has(String(o.status ?? '')),
+      /** The lines that are the monthly Levo Care draw's prize («جائزة سحب ليفو كير»): gift lines, physical, 0 IQD. */
+      draw_prize_item_ids: await soft('draw_prizes', () => drawPrizeItemIds(c.env.DB, items), [] as string[]),
+      /** The membership gift's product, named in three languages (the stored snapshot carries Arabic only). */
+      membership_gift_product: membershipGift && typeof membershipGift.product_id === 'string' && membershipGift.product_id
+        ? await soft(
+            'membership_gift_product',
+            () => c.env.DB.prepare('SELECT name, name_ar, name_ku FROM products WHERE id = ?').bind(membershipGift.product_id as string)
+              .first<{ name: string | null; name_ar: string | null; name_ku: string | null }>(),
+            null
+          )
+        : null,
       /** «بانتظار تأكيد السعر النهائي» (0218): an estimated line still waits — the modal opens the estimate panel. */
       price_estimate_open: itemsHoldOrder(items),
       admin_note: o.admin_note ?? '',
       // The warehouse's work for the printer services (0234): packing
       // instruction, inspection (blocks dispatch until done), Academy request.
-      service_tasks: await orderServiceTasks(c.env.DB, id),
+      service_tasks: serviceTasks,
       // 0235: the membership bought with the order (pending / active / blocked / cancelled), with its id for the retry.
       membership_purchases: (await orderMembershipPurchases(c.env.DB, id)).map((p) => ({ id: p.id, ...orderMembershipPublic(p) })),
       customer: {
@@ -3086,10 +3134,20 @@ async function receiptDataFor(c: Context<AppContext>, id: string) {
   // Several reward coupons on one order (0225): their count, where one coupon says its code.
   const couponPoolSize = Array.isArray(coupon?.pool) ? coupon.pool.length : 0;
   const shippingType = asShippingType(o.shipping_type);
+  // The named parts of the total (row 364): the code apart from the Levo Care part discount, and the
+  // member's discount — so the paper adds up like the screen (worker/lib/orderBreakdown.ts).
+  const breakdown = orderBreakdown(o, items ?? [], Number(o.merchandise_iqd) || 0);
+  const part = (key: string) => Math.abs(breakdown.rows.find((r) => r.key === key)?.amount_iqd ?? 0);
+  const careByItem = new Map(
+    (Array.isArray((coupon as { care_offers?: unknown } | null)?.care_offers) ? ((coupon as unknown as { care_offers: Array<Record<string, unknown>> }).care_offers) : [])
+      .map((x) => [String(x.order_item_id ?? ''), Math.trunc(Number(x.discount_iqd) || 0)] as const)
+  );
 
   return {
     order: o,
     address,
+    /** What is physically in the parcel (row 364): every top-level line but the membership — a gift or a draw prize ships. */
+    physical_count: (items ?? []).filter((it) => !it.bundle_parent_item_id && isPhysicalLine(it)).reduce((n, it) => n + (Number(it.qty) || 0), 0),
     data: {
       order_id: String(o.id),
       invoice_no: invoice?.invoice_no ?? null,
@@ -3111,12 +3169,14 @@ async function receiptDataFor(c: Context<AppContext>, id: string) {
           const kids = (items ?? []).filter(
             (k) => String(k.bundle_parent_item_id ?? '') === String(it.id)
           );
+          const notes = receiptServiceNotes(it, typeof it.services_snapshot === 'string' && it.services_snapshot ? orderServicesView(it.services_snapshot) : null, careByItem.get(String(it.id)) ?? 0);
           return {
             name: String(it.name_snapshot ?? ''),
             variant: String(it.option_snapshot ?? ''),
             qty: Number(it.qty) || 0,
             unit_iqd: Number(it.unit_price_iqd) || 0,
             line_iqd: Number(it.line_total_iqd) || 0,
+            ...(notes.length ? { notes } : {}),
             ...(kids.length
               ? {
                   included: kids.map((k) => ({
@@ -3132,10 +3192,14 @@ async function receiptDataFor(c: Context<AppContext>, id: string) {
       // filtered by the renderer, so an order with no coupon prints no
       // coupon line rather than "coupon: 0".
       adjustments: [
+        { label_ar: 'خصم العضوية', label_en: 'Membership discount', amount_iqd: part('membership_discount'), negative: true },
+        // The typed code or the reward coupons — never the Levo Care part offer, which has no code and its own row.
         { label_ar: couponPoolSize > 1 ? couponPoolLabel(couponPoolSize, 'ar') : `خصم الكود ${coupon?.code ?? ''}`.trim(),
           label_en: couponPoolSize > 1 ? couponPoolLabel(couponPoolSize, 'en') : `Coupon ${coupon?.code ?? ''}`.trim(),
-          amount_iqd: Number(coupon?.discount_iqd) || 0, negative: true },
+          amount_iqd: part('coupon'), negative: true },
+        { label_ar: 'خصم ليفو كير على قطعة', label_en: 'Levo Care part discount', amount_iqd: part('care_offer'), negative: true },
         { label_ar: 'خصم النقاط', label_en: 'Points', amount_iqd: Number(o.points_discount_iqd) || 0, negative: true },
+        { label_ar: 'ضريبة الدفع عند الاستلام', label_en: 'Cash on delivery tax', amount_iqd: Math.max(0, Math.trunc(Number(o.cod_tax_iqd) || 0)), negative: false },
         { label_ar: 'من المحفظة', label_en: 'Wallet', amount_iqd: Number(o.wallet_applied_iqd) || 0, negative: true },
         // «يتم الحساب داخل تطبيق جني» — without this row the receipt shows the
         // full price against a door amount of one delivery fee and does not
@@ -3304,8 +3368,7 @@ function labelFrom(data: Awaited<ReturnType<typeof receiptDataFor>>['data'], ord
 /** One delivery sticker. */
 adminRoutes.get('/orders/:id/label', async (c) => {
   const id = c.req.param('id');
-  const { data, order } = await receiptDataFor(c, id);
-  const count = data.lines.reduce((n, l) => n + l.qty, 0);
+  const { data, order, physical_count: count } = await receiptDataFor(c, id);
   c.header('Cache-Control', 'no-store');
   asDocument(c);
   return c.html(renderDeliveryLabel(labelFrom(data, order, count), printLang(c), wantsPrint(c)));
@@ -3358,11 +3421,15 @@ adminRoutes.get('/labels', async (c) => {
     const { results: rows } = await c.env.DB.prepare(
       // A bundle counts ONCE — its component rows are the physical truth behind
       // it, not four more things on the label (docs/BUNDLES_MYSTERY.md §6.3).
-      `SELECT order_id, SUM(qty) AS n FROM order_items
-        WHERE order_id IN (SELECT value FROM json_each(?)) AND bundle_parent_item_id IS NULL
-        GROUP BY order_id`
-    ).bind(JSON.stringify(orderIds)).all<{ order_id: string; n: number }>();
-    for (const r of rows ?? []) counts.set(String(r.order_id), Number(r.n) || 0);
+      // The membership bought with the order is not in the parcel (row 364): the
+      // whole row is read so a database before 0235 (no `line_kind`) still answers.
+      `SELECT * FROM order_items
+        WHERE order_id IN (SELECT value FROM json_each(?)) AND bundle_parent_item_id IS NULL`
+    ).bind(JSON.stringify(orderIds)).all<Record<string, unknown>>();
+    for (const r of rows ?? []) {
+      if (!isPhysicalLine(r)) continue;
+      counts.set(String(r.order_id), (counts.get(String(r.order_id)) ?? 0) + (Number(r.qty) || 0));
+    }
   }
 
   const labels = (results ?? []).map((o) => {
@@ -3564,11 +3631,16 @@ adminRoutes.post('/orders/:id/delivery', async (c) => {
   // stored `option_snapshot` is the authority for which ones were sold. Only
   // for an ORDINARY line: a bundle parent's snapshot is its member list, so a
   // parent (a line with child lines) is printed as its name and count.
-  const { results: items } = await c.env.DB.prepare(
-    `SELECT name_snapshot, option_snapshot, qty,
+  //
+  // PHYSICAL LINES ONLY (row 364): the membership bought with the order is not in the box — it used to be
+  // counted and named on the waybill. A gift line and a Levo Care draw prize ARE in the box and stay.
+  // `order_items.*` so a database before 0235 (no `line_kind`) still answers.
+  const { results: allItems } = await c.env.DB.prepare(
+    `SELECT order_items.*,
             EXISTS (SELECT 1 FROM order_items k WHERE k.order_id = order_items.order_id AND k.bundle_parent_item_id = order_items.id) AS composition_parent
        FROM order_items WHERE order_id = ? AND bundle_parent_item_id IS NULL`
-  ).bind(id).all<{ name_snapshot: string; option_snapshot: string | null; qty: number; composition_parent: number }>();
+  ).bind(id).all<{ name_snapshot: string; option_snapshot: string | null; qty: number; composition_parent: number } & Record<string, unknown>>();
+  const items = (allItems ?? []).filter(isPhysicalLine);
 
   const res = await driver.createShipment({
     orderId: String(order.id),

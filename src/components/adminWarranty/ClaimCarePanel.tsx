@@ -38,6 +38,8 @@ interface CareTerms {
 }
 interface QuotePart { key: string; label: Text3 | null; qty: number; unit_iqd: number; total_iqd: number }
 interface CareQuote {
+  /** Phase 8: the desk's own «misuse» tick on this quote (kept and read back, staff only). */
+  misuse?: boolean;
   state: 'quoted' | 'accepted' | 'approved' | 'void';
   version: number;
   policy_version: number;
@@ -135,7 +137,8 @@ const S = {
     day: 'اليوم (فارغ = اليوم)', incomeTo: (n: string) => `يُقيَّد إيراداً في حساب ${n}`,
     costs: 'تكاليف المطالبة',
     costsNote: 'مصروف عام في يومه، مما دُفع من الجيب فقط. القطع من المخزون تُسجَّل تالفاً مع رقم المطالبة في الملاحظة.',
-    costsOwnerOnly: 'التكاليف المسجّلة يراها المالك وحده.',
+    costsOwnerOnly: 'التكاليف المسجّلة يراها من له صلاحية الاطلاع على التكاليف فقط.',
+    quotedAsMisuse: 'سُجّل العطل سوء استخدام',
     costsTotal: 'المجموع', noCosts: 'لا تكاليف مسجّلة.', kind: 'النوع', amount: 'المبلغ (دينار)', costNote: 'ملاحظة',
     addCost: 'تسجيل التكلفة', voided: 'ملغاة', voidCost: 'إلغاء', confirm: 'تأكيد', back: 'رجوع',
     reasonRequired: 'اكتب سبباً من 5 أحرف على الأقل.', amountRequired: 'أدخل مبلغاً صحيحاً أكبر من صفر.',
@@ -171,7 +174,8 @@ const S = {
     day: 'Day (empty = today)', incomeTo: (n: string) => `Booked as income in ${n}`,
     costs: 'Claim costs',
     costsNote: 'A general expense on its day, out-of-pocket only. Stock parts are written off as stock loss with the claim number in the note.',
-    costsOwnerOnly: 'Recorded costs are visible to the owner only.',
+    costsOwnerOnly: 'Recorded costs are shown only to those allowed to see costs.',
+    quotedAsMisuse: 'Recorded as misuse',
     costsTotal: 'Total', noCosts: 'No costs recorded.', kind: 'Kind', amount: 'Amount (IQD)', costNote: 'Note',
     addCost: 'Record the cost', voided: 'Voided', voidCost: 'Void', confirm: 'Confirm', back: 'Back',
     reasonRequired: 'Write a reason of at least 5 characters.', amountRequired: 'Enter a whole amount above zero.',
@@ -207,7 +211,8 @@ const S = {
     day: 'ڕۆژ (بەتاڵ = ئەمڕۆ)', incomeTo: (n: string) => `وەک داهات لە هەژماری ${n} تۆمار دەکرێت`,
     costs: 'تێچووەکانی داواکاری',
     costsNote: 'خەرجییەکی گشتییە لە ڕۆژی خۆیدا، تەنها ئەوەی لە گیرفان دراوە. پارچەی کۆگا وەک زیانی کۆگا تۆمار دەکرێت و ژمارەی داواکارییەکە لە تێبینیدا دەنووسرێت.',
-    costsOwnerOnly: 'تێچووە تۆمارکراوەکان تەنها خاوەنەکە دەیانبینێت.',
+    costsOwnerOnly: 'تێچووە تۆمارکراوەکان تەنها ئەوانە دەیانبینن کە دەسەڵاتی بینینی تێچوویان هەیە.',
+    quotedAsMisuse: 'وەک خراپ بەکارهێنان تۆمارکراوە',
     costsTotal: 'کۆ', noCosts: 'هیچ تێچوویەک تۆمار نەکراوە.', kind: 'جۆر', amount: 'بڕ (دینار)', costNote: 'تێبینی',
     addCost: 'تۆمارکردنی تێچوو', voided: 'هەڵوەشاوەتەوە', voidCost: 'هەڵوەشاندنەوە', confirm: 'دڵنیاکردنەوە', back: 'گەڕانەوە',
     reasonRequired: 'هۆکارێک بنووسە کە لانیکەم 5 پیت بێت.', amountRequired: 'بڕێکی تەواو لە سەرووی سفر بنووسە.',
@@ -228,7 +233,7 @@ interface DraftPart { key: string; qty: number; unit_iqd: number }
 interface Draft { parts: DraftPart[]; labor_iqd: number; shipping_iqd: number; other_iqd: number; note: string; misuse: boolean }
 const draftOf = (q: CareQuote | null): Draft => ({
   parts: (q?.parts ?? []).map((p) => ({ key: p.key, qty: p.qty || 1, unit_iqd: p.unit_iqd || 0 })),
-  labor_iqd: q?.labor_iqd ?? 0, shipping_iqd: q?.shipping_iqd ?? 0, other_iqd: q?.other_iqd ?? 0, note: q?.note ?? '', misuse: false,
+  labor_iqd: q?.labor_iqd ?? 0, shipping_iqd: q?.shipping_iqd ?? 0, other_iqd: q?.other_iqd ?? 0, note: q?.note ?? '', misuse: q?.misuse === true,
 });
 
 /** The same arithmetic as the server's priceCareQuote, for the preview only — the saved quote is the server's. */
@@ -407,6 +412,7 @@ export default function ClaimCarePanel({ claimId, lang, onChanged }: { claimId: 
           rules={partRules ?? { default_pct: terms?.discount_pct ?? null, max_pct: 90, valid_days: 14, max_live: 5 }}
           canDecide={canDecide}
           careActive={care.state === 'active' && !!terms}
+          careState={care.state}
           claimOpen={!CLOSED_STAGES.has(stage)}
           claimsLeft={claimsLeftForThis}
           warrantyActive={data.warranty?.state === 'active'}
@@ -422,6 +428,9 @@ export default function ClaimCarePanel({ claimId, lang, onChanged }: { claimId: 
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <h4 className="text-[13px] font-bold text-text-primary">{s.savedQuote} · {s.version(quote.version)}</h4>
             <span className="inline-flex px-2.5 py-1 rounded-full bg-white/[0.06] text-text-secondary text-[11px] font-bold">{s.quoteState[quote.state] ?? quote.state}</span>
+            {quote.misuse && (
+              <span className="inline-flex px-2.5 py-1 rounded-full lv-chip [--chip:var(--color-warning)] text-[11px] font-bold" data-care-quote-misuse>{s.quotedAsMisuse}</span>
+            )}
           </div>
           {quote.parts.length > 0 && (
             <ul className="mb-2 space-y-0.5">

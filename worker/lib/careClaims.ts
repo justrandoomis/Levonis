@@ -220,8 +220,13 @@ export interface CareEntitlement {
   total_months: number;
   start_at: string | null;
   end_at: string | null;
-  /** The day Care becomes the device's only cover (delivery + warranty_months); null before delivery. */
+  /**
+   * The day Care becomes the device's only cover: delivery + warranty_months, or the device's REAL warranty end
+   * when an owner's goodwill change made it later (`careWindow`); null before delivery.
+   */
   care_only_from: string | null;
+  /** When the device came back (the unit asked about was closed), or null. */
+  closed_at: string | null;
   /**
    * The caps (D5): a claim counts once when it has an approved benefit or a USED part offer; the money is the
    * approved benefits plus the discount each used part offer actually gave.
@@ -241,8 +246,54 @@ interface UnitLink {
   id: string;
   order_item_id: string | null;
   delivered_at: string | null;
+  /** The unit's warranty end and record: Care follows the end ONLY where the record carries the owner's goodwill. */
+  warranty_end_at: string | null;
+  policy_version: string | null;
   replacement_of_unit_id: string | null;
   warranty_closed_at: string | null;
+}
+
+/**
+ * THE CARE WINDOW — one definition (phase 8, DECISIONS row 364). What was SOLD: Care from the delivery, the only
+ * cover from delivery + the warranty months bought, ending at delivery + the whole Care months (warranty + 12).
+ * An owner's GOODWILL change (the audited act on the device, recorded in its `policy_version.goodwill`) can leave
+ * the device with a later warranty end than was sold; Care is «twelve months after the warranty», so
+ * `care_only_from` follows that goodwill end and the Care end moves with it — never earlier than what was sold.
+ * NOTHING ELSE extends Care: a resold device's carried window is not goodwill and is never passed here
+ * (`goodwillEndOf`); it keeps its effect on the warranty alone.
+ */
+export function goodwillEndOf(unit: { warranty_end_at: string | null; policy_version: unknown } | null | undefined): string | null {
+  if (!unit || !unit.warranty_end_at) return null;
+  let pv: { goodwill?: unknown } | null = null;
+  try { pv = typeof unit.policy_version === 'string' ? JSON.parse(unit.policy_version) : (unit.policy_version as never); } catch { pv = null; }
+  return pv && typeof pv === 'object' && pv.goodwill && typeof pv.goodwill === 'object' ? unit.warranty_end_at : null;
+}
+export function careWindow(
+  deliveredAt: string | null,
+  sold: { warranty_months: number; total_months: number },
+  realWarrantyEndAt: string | null = null
+): { start_at: string | null; care_only_from: string | null; end_at: string | null } {
+  if (!deliveredAt || !Number.isFinite(Date.parse(deliveredAt))) return { start_at: deliveredAt, care_only_from: null, end_at: null };
+  const soldOnlyFrom = sold.warranty_months > 0 ? addMonths(deliveredAt, sold.warranty_months) : deliveredAt;
+  const soldEnd = addMonths(deliveredAt, sold.total_months);
+  const realMs = realWarrantyEndAt ? Date.parse(realWarrantyEndAt) : NaN;
+  if (!Number.isFinite(realMs) || realMs <= Date.parse(soldOnlyFrom)) return { start_at: deliveredAt, care_only_from: soldOnlyFrom, end_at: soldEnd };
+  const onlyFrom = new Date(realMs).toISOString();
+  const after = addMonths(onlyFrom, Math.max(0, sold.total_months - sold.warranty_months));
+  return { start_at: deliveredAt, care_only_from: onlyFrom, end_at: Date.parse(after) > Date.parse(soldEnd) ? after : soldEnd };
+}
+
+/** The state of a Care window at one instant — the rule `careEntitlements` applies, for a caller that judges many claims of one read. */
+export function careStateAt(
+  e: Pick<CareEntitlement, 'state' | 'start_at' | 'end_at' | 'terms' | 'closed_at'>,
+  atMs: number
+): CareState {
+  if (e.state === 'none') return 'none';
+  if (e.closed_at && Date.parse(e.closed_at) <= atMs) return 'closed';
+  if (!e.start_at) return 'not_delivered';
+  if (!e.end_at || Date.parse(e.end_at) <= atMs || Date.parse(e.start_at) > atMs) return 'expired';
+  if (!e.terms) return 'terms_missing';
+  return 'active';
 }
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0);
@@ -261,7 +312,7 @@ export async function careEntitlements(db: D1Database, unitIds: string[], atMs =
   for (let hop = 0; hop <= MAX_REPLACEMENT_HOPS && frontier.length; hop++) {
     const { results } = await db
       .prepare(
-        `SELECT id, order_item_id, delivered_at, replacement_of_unit_id, warranty_closed_at
+        `SELECT id, order_item_id, delivered_at, warranty_end_at, policy_version, replacement_of_unit_id, warranty_closed_at
            FROM order_item_units WHERE id IN (SELECT value FROM json_each(?))`
       )
       .bind(JSON.stringify(frontier))
@@ -333,14 +384,18 @@ export async function careEntitlements(db: D1Database, unitIds: string[], atMs =
     const base: CareEntitlement = {
       state: 'none', unit_id: id, root_unit_id: root.id, order_item_id: c ? root.order_item_id : null,
       policy_version: c?.version ?? null, months: c?.months ?? 0, warranty_months: c?.warranty ?? 0, total_months: c?.total ?? 0,
-      start_at: null, end_at: null, care_only_from: null,
+      start_at: null, end_at: null, care_only_from: null, closed_at: unit.warranty_closed_at ?? null,
       used_claims: u.n, used_benefit_iqd: u.s, usage: usageOfRoot, claims_left: null, benefit_left_iqd: null, terms: null,
     };
     if (!c) { out.set(id, base); continue; }
     const terms = policies.get(c.version) ?? null;
+    // Phase 8: the window follows the warranty end an owner's goodwill set, never shorter than sold.
+    // The goodwill of the unit the customer holds now (a replacement), else of the unit first sold — the later one.
+    const gw = [goodwillEndOf(unit), goodwillEndOf(root)].filter((x): x is string => !!x).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
+    const win = careWindow(root.delivered_at, { warranty_months: c.warranty, total_months: c.total }, gw);
     const start = root.delivered_at;
-    const end = start ? addMonths(start, c.total) : null;
-    const careOnlyFrom = start ? (c.warranty > 0 ? addMonths(start, c.warranty) : start) : null;
+    const end = win.end_at;
+    const careOnlyFrom = win.care_only_from;
     const left = terms
       ? {
           claims_left: Math.max(0, num(terms.max_claims) - u.n),
@@ -526,6 +581,8 @@ export function careQuotePublic(b: CareBenefitRow | null | undefined, terms: Car
     shipping_iqd: num(q.shipping_iqd),
     other_iqd: num(q.other_iqd),
     note: typeof q.note === 'string' ? q.note : '',
+    // Phase 8: the desk's own «misuse» tick on this quote (staff only — it is the desk's finding, not a figure).
+    ...(opts.admin ? { misuse: (q as { misuse?: unknown }).misuse === true } : {}),
     list_iqd: num(b.list_iqd),
     eligible_iqd: num(b.eligible_iqd),
     discount_pct: num(b.discount_pct),

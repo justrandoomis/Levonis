@@ -74,6 +74,7 @@ const S = {
     whyLimit: (n: number) => `على هذه المطالبة ${n} عروض سارية — الحد الأقصى. اسحب واحداً أولاً.`,
     whyAlready: 'لهذه القطعة عرض سارٍ على هذه المطالبة.',
     whyNotActive: 'ليفو كير غير سارٍ لهذا الجهاز عند تقديم المطالبة، فلا يُرسل عرض.',
+    whyNoCare: 'لم يشترِ الزبون ليفو كير لهذا الجهاز، فلا يُرسل عرض قطعة بخصم.',
     whyClosed: 'المطالبة مغلقة: لا تُرسل عليها عروض جديدة.',
     whyNoClaims: 'استنفد هذا الجهاز عدد مطالبات ليفو كير.',
     financeOnly: 'إرسال العرض وسحبه يحتاجان صلاحية المال.',
@@ -107,6 +108,7 @@ const S = {
     whyLimit: (n: number) => `this claim has ${n} live offers — the most allowed. Take one back first.`,
     whyAlready: 'this part already has a live offer on this claim.',
     whyNotActive: 'Levo Care was not active for this device when the claim was filed, so no offer can be sent.',
+    whyNoCare: 'the customer did not buy Levo Care for this device, so no discounted part can be sent.',
     whyClosed: 'the claim is closed: no new offers are sent on it.',
     whyNoClaims: 'this device has used all its Levo Care claims.',
     financeOnly: 'Sending and taking back an offer need the financial scope.',
@@ -140,6 +142,7 @@ const S = {
     whyLimit: (n: number) => `ئەم داواکارییە ${n} پێشنیاری کارای هەیە — زۆرترین ڕێگەپێدراو. سەرەتا یەکێکیان بکشێنەوە.`,
     whyAlready: 'ئەم پارچەیە پێشتر پێشنیارێکی کارای لەسەر ئەم داواکارییە هەیە.',
     whyNotActive: 'لە کاتی پێشکەشکردنی داواکارییەکەدا لیڤۆ کێر بۆ ئەم ئامێرە کارا نەبوو، بۆیە پێشنیار نانێردرێت.',
+    whyNoCare: 'کڕیار لیڤۆ کێری بۆ ئەم ئامێرە نەکڕیوە، بۆیە پارچەی داشکێنراو نانێردرێت.',
     whyClosed: 'داواکارییەکە داخراوە: پێشنیاری نوێی لەسەر نانێردرێت.',
     whyNoClaims: 'ئەم ئامێرە هەموو داواکارییەکانی لیڤۆ کێری بەکارهێناوە.',
     financeOnly: 'ناردن و کشاندنەوەی پێشنیار پێویستیان بە دەسەڵاتی دارایی هەیە.',
@@ -176,13 +179,15 @@ function Thumb({ src }: { src: string }) {
   return <VariantImg src={src} sizes="48px" alt="" className="h-12 w-12 shrink-0 rounded-md border border-border-subtle object-cover" onError={() => setBroken(true)} />;
 }
 
-export default function PartOfferPanel({ claimId, lang, grants, rules, canDecide, careActive, claimOpen, claimsLeft, warrantyActive, benefitLeftIqd, busy, run }: {
+export default function PartOfferPanel({ claimId, lang, grants, rules, canDecide, careActive, careState, claimOpen, claimsLeft, warrantyActive, benefitLeftIqd, busy, run }: {
   claimId: string; lang: Language;
   grants: PartGrantAdmin[]; rules: PartRules;
   /** The financial scope (`can_decide`): issuing and revoking are money acts. */
   canDecide: boolean;
   /** Levo Care was active, with written terms, at the claim's filing date. */
   careActive: boolean;
+  /** Phase 8: why Care is not active — a device that never bought Care is told so, not «was not active». */
+  careState?: string;
   claimOpen: boolean;
   /** Claims left on the device, this claim's own use not counted (null = unknown). */
   claimsLeft: number | null;
@@ -236,7 +241,7 @@ export default function PartOfferPanel({ claimId, lang, grants, rules, canDecide
   const capped = price !== null && pctOk && off !== null && off < Math.min(price, Math.floor((price * pctN) / 100));
   // The first thing in the way, in the order the form is filled.
   const why = !claimOpen ? s.whyClosed
-    : !careActive ? s.whyNotActive
+    : !careActive ? (careState === 'none' ? s.whyNoCare : s.whyNotActive)
       : claimsLeft !== null && claimsLeft <= 0 ? s.whyNoClaims
         : live.length >= rules.max_live ? s.whyLimit(live.length)
           : !product ? s.whyNoProduct

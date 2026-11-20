@@ -238,6 +238,8 @@ export function OrdersReport({ data, scope: ref, onClearScope, openOrder, onMiss
     return <button type="button" className="fw-status fw-status--neutral fw-chip-button" title={rs(loc, 'toCollections')} data-finance-cash={c} onClick={(e) => { e.stopPropagation(); onCollections(orderId(o)); }}>{text}</button>;
   };
   const sales = (o: FinanceOrder) => money(o, 'retained_revenue_iqd');
+  const servicesOf = (o: FinanceOrder): Num => o.services_profit_iqd ?? 0;
+  const servicesShown = !u && data.orders.some((o) => (o.services_profit_iqd ?? 0) > 0);
   // An unknown goods cost opens what fixes it: a missing purchase price «التكاليف الناقصة», a returned piece's cost the order itself.
   const cogsChip = (o: FinanceOrder) => {
     const s = standingOf(o, data), own = s.reason === 'return_cost';
@@ -253,6 +255,9 @@ export function OrdersReport({ data, scope: ref, onClearScope, openOrder, onMiss
     { key: 'day', head: rs(loc, 'colDelivered'), sort: (o) => o.delivered_at || o.created_at, cell: (o) => dayIn(L, financeDay(o.delivered_at || o.created_at), data.range), total: rows.length },
     { key: 'sales', head: rs(loc, 'colSales'), sort: sales, cell: (o) => <><Amount v={sales(o)} usd={u} />{refundCell(loc, (o.unknown_refunds ?? 0) > 0)}</>,
       total: <><TotalAmount t={totalOf(rows, sales)} usd={u} chip={missingChip(loc, totalOf(rows, sales))} />{refundTotal(loc, refunds)}</> },
+    // Phase 8 (DECISIONS row 364) «ربح الخدمات»: the printer services' part of the sales, the shop's alone — drawn when the period has any, in dinars.
+    ...(servicesShown ? [{ key: 'services', head: rs(loc, 'colServices'), sort: servicesOf, cell: (o: FinanceOrder) => (servicesOf(o) ? <Amount v={servicesOf(o)} usd={false} /> : null),
+      total: <TotalAmount t={totalOf(rows, servicesOf)} usd={false} chip={null} /> }] : []),
     // A waiting order's known goods cost on an estimate says so (its chip names what it waits for); the total counts every order's.
     { key: 'cogs', head: fw(loc, 'cogs'), sort: (o) => money(o, 'cogs_iqd'), cell: (o) => { const v = money(o, 'cogs_iqd'), s = standingOf(o, data);
       return <><Amount v={v} usd={u} missing={cogsChip(o)} />{estimatedCell(loc, v != null && s.state === 'waiting' && costOnEstimate(o, s))}</>; },
@@ -304,6 +309,7 @@ export function OrdersReport({ data, scope: ref, onClearScope, openOrder, onMiss
           c: <>{dayIn(L, financeDay(o.delivered_at || o.created_at), data.range)} · <Amount v={sales(o)} usd={u} /></>, e: netOf(o, money) == null ? undefined : said(o) })} />
         : <p className="fw-note" role="status">{data.orders.length ? rs(loc, 'noMatch') : rs(loc, 'noneInPeriod')}</p>}
       <p className="fw-note">{rs(loc, 'ordersNote')}</p>
+      {servicesShown && <p className="fw-note" data-finance-services-note>{rs(loc, 'servicesNote')}</p>}
     </Surface>
     <OrderKinds data={data} />
   </div>;
@@ -360,6 +366,9 @@ export function GroupsReport({ data, level, onLevel, onOpenOrders, onMissing }: 
   const sales = (p: FinanceProduct) => groupSales(p, money), gross = (p: FinanceProduct) => money(p, 'gross_profit_iqd'), net = (p: FinanceProduct) => groupNet(p, money);
   const grossRows = rows.map(gross);
   const t = (f: (p: FinanceProduct) => Num) => totalOf(every, f);
+  // Phase 8 (DECISIONS row 364) «ربح الخدمات»: the printer services' part of a product's sales — the shop's alone; in dinars, when the period has any.
+  const servicesOf = (p: FinanceProduct): Num => p.services_profit_iqd ?? 0;
+  const servicesShown = !u && all.some((p) => (p.services_profit_iqd ?? 0) > 0);
   const known = every.filter((p) => gross(p) != null);
   const standing = (p: FinanceProduct): OrderStanding | null => (p.finance_state ? { state: p.finance_state, reason: p.finance_state === 'waiting' ? p.wait_reason ?? 'other' : null } : null);
   const status = (p: FinanceProduct) => { const s = standing(p); return s && <StandingChip s={s} onMissing={onMissing} />; };
@@ -381,6 +390,8 @@ export function GroupsReport({ data, level, onLevel, onOpenOrders, onMissing }: 
     { key: 'pieces', head: fw(loc, 'pieces'), sort: piecesOf, cell: own(pieces), total: <span className="fw-num">{rows.reduce((v, p) => v + piecesOf(p), 0)}</span> },
     { key: 'sales', head: rs(loc, 'colSales'), sort: sales, cell: own((p) => <><Amount v={sales(p)} usd={u} />{refundCell(loc, (p.unknown_refunds ?? 0) > 0)}</>),
       total: <><TotalAmount t={t(sales)} usd={u} chip={missingChip(loc, t(sales))} />{refundTotal(loc, refunds)}</> },
+    ...(servicesShown ? [{ key: 'services', head: rs(loc, 'colServices'), sort: servicesOf, cell: own((p: FinanceProduct) => (servicesOf(p) ? <Amount v={servicesOf(p)} usd={false} /> : null)),
+      total: <TotalAmount t={t(servicesOf)} usd={false} chip={null} /> }] : []),
     // As on the orders: a waiting row's known goods cost on an estimate says so, and the total counts the rows whose cost rests on one.
     { key: 'cogs', head: fw(loc, 'cogs'), sort: (p) => money(p, 'cogs_iqd'), cell: own((p) => <><Amount v={money(p, 'cogs_iqd')} usd={u} missing={noCost(p)} />{estimatedCell(loc, onEstimate(p))}</>),
       total: <><TotalAmount t={t((p) => money(p, 'cogs_iqd'))} usd={u} chip={missingChip(loc, t((p) => money(p, 'cogs_iqd')))} />{estimates((p) => money(p, 'cogs_iqd'))}</> },
@@ -418,6 +429,7 @@ export function GroupsReport({ data, level, onLevel, onOpenOrders, onMissing }: 
       phone={phone} phoneTotal={<><b>{rs(loc, 'total')}</b><span><TotalAmount t={t(gross)} usd={u} chip={missingChip(loc, t(gross))} />{estimates(gross)}</span></>} />
       : <p className="fw-note" role="status">{all.length ? rs(loc, 'noMatch') : rs(loc, 'noneInPeriod')}</p>}
     <p className="fw-note">{rs(loc, 'productsNote')}</p>
+    {servicesShown && <p className="fw-note" data-finance-services-note>{rs(loc, 'servicesNote')}</p>}
   </Surface>;
 }
 
@@ -433,7 +445,7 @@ export function DaysReport({ data, onOpenOrders }: { data: FinanceSummary; onOpe
   const waits = (n: number) => <MissingValue text={n ? fw(loc, 'waitingN', { n }) : fw(loc, 'missingCell')} />;
   const est = (n: number) => estimatedTotal(loc, n);
   const t = (f: (r: DayRow) => Num) => totalOf(rows, f);
-  const deductions = rows.some((r) => r.deductions !== 0);
+  const deductions = rows.some((r) => r.deductions !== 0), serviceIncome = rows.some((r) => r.service !== 0);
   const cost = (r: DayRow) => r.cost, investor = (r: DayRow) => r.investor, net = (r: DayRow) => r.net;
   const cols: Col<DayRow>[] = [
     { key: 'day', head: rs(loc, by === 'day' ? 'colDay' : by === 'week' ? 'colWeek' : 'colMonth'), start: true, sort: (r) => r.from, cell: label, total: <b>{rs(loc, 'total')}</b> },
@@ -446,6 +458,8 @@ export function DaysReport({ data, onOpenOrders }: { data: FinanceSummary; onOpe
     { key: 'investor', head: fw(loc, 'investor'), sort: investor, cell: (r) => <Amount v={r.investor} usd={u} missing={waits(r.investorWaits)} />,
       total: <TotalAmount t={t(investor)} usd={u} chip={waits(countWhereUnknown(rows, investor, (r) => r.investorWaits))} /> },
     ...(deductions ? [{ key: 'deductions', head: rs(loc, 'colDeductions'), sort: (r: DayRow) => r.deductions, cell: (r: DayRow) => <Amount v={r.deductions} usd={u} />, total: <TotalAmount t={t((r) => r.deductions)} usd={u} chip={null} /> }] : []),
+    // Phase 8: the Levo Care co-pays collected on the day come ON its net, so the days add up to the period's net.
+    ...(serviceIncome ? [{ key: 'service', head: rs(loc, 'colServiceIncome'), sort: (r: DayRow) => r.service, cell: (r: DayRow) => (r.service ? <Amount v={r.service} usd={u} /> : null), total: <TotalAmount t={t((r) => r.service)} usd={u} chip={null} /> }] : []),
     // «صافيك» names the orders it counts on a sale-time estimate (owner decision 3), the day's and the total's.
     { key: 'net', head: rs(loc, 'colNet'), sort: net, cell: (r) => <><b><Amount v={r.net} usd={u} missing={waits(r.waiting)} /></b>{r.net != null && est(r.estimated)}</>,
       total: <><b><TotalAmount t={t(net)} usd={u} chip={waits(countWhereUnknown(rows, net, (r) => r.waiting))} /></b>{est(countWhereKnown(rows, net, (r) => r.estimated))}</> },

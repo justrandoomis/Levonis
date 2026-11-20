@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import WarrantySection from '../adminWarranty/WarrantySection';
-import { X, ChevronDown, MessageSquare, ClipboardList, Package, Receipt, ScanLine, ShieldCheck, Tag, Truck, Check } from 'lucide-react';
+import { X, ChevronDown, MessageSquare, ClipboardList, ClipboardCheck, Gift, Package, Receipt, ScanLine, ShieldCheck, Tag, Truck, Check } from 'lucide-react';
 import { useLanguage } from '../../LanguageContext';
 import { useAuth } from '../../AuthContext';
-import { api, formatIqd, type AdminOrderDetail } from '../../lib/api';
+import { api, formatIqd, type AdminOrderDetail, type OrderBreakdownKey } from '../../lib/api';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
 import { useMotion } from '../../lib/motion';
 import Spinner from '../ui/Spinner';
@@ -31,11 +31,18 @@ import type { GateMissing, OrderSerials } from './serials/types';
 import VariantImg from '../ui/VariantImg';
 import { couponPoolLabel } from '../../../packages/contracts/src/couponPool';
 import ServiceTasksSection, { type ServiceTask } from './ServiceTasksSection';
+import OrderServicesBlock from '../orders/OrderServicesBlock';
+import { orderServicesStrings } from '../orders/orderServicesStrings';
+import { formatDate, formatDateTime } from '../orders/format';
 import OrderMembershipSection, { type OrderMembershipPurchase } from './OrderMembershipSection';
 
 /** 0235: a filament-kit line names the printer line it is packed with; the membership line is its own kind. */
-type PhaseTwoLine = { id: string; kit?: { printer_item_id: string; kit_id: string | null } | null; kind?: string; line_kind?: string };
-const kitParentOf = (it: unknown): string | null => (it as PhaseTwoLine).kit?.printer_item_id ?? null;
+type PhaseTwoLine = { id: string; kit?: { printer_item_id: string; kit_id: string | null } | null; addon?: { printer_item_id: string } | null; kind?: string; line_kind?: string };
+/**
+ * The printer line a KIT OR ADD-ON line is packed with (row 364). It used to read the kit only, so an
+ * add-on — «تُغلَّف معها» — was listed as a separate line a packer could put in another box.
+ */
+const kitParentOf = (it: unknown): string | null => (it as PhaseTwoLine).kit?.printer_item_id ?? (it as PhaseTwoLine).addon?.printer_item_id ?? null;
 /**
  * 0242 (phase 4; DECISIONS row 355): how a kit or add-on line's colour was decided, the add-on's
  * printer, and the owner's printer discount already inside its unit price (report-only figures).
@@ -43,7 +50,8 @@ const kitParentOf = (it: unknown): string | null => (it as PhaseTwoLine).kit?.pr
 type PhaseFourLine = {
   kit?: { color_mode?: 'chosen' | 'random' | null } | null;
   addon?: { printer_item_id: string; addon_id: string; color_mode?: 'chosen' | 'random' | null } | null;
-  printer_discount?: { before_unit_iqd: number; discount_unit_iqd: number; total_iqd?: number } | null;
+  /** `before_unit_iqd` may be null on a line whose snapshot does not carry it — then no «before» is drawn. */
+  printer_discount?: { before_unit_iqd: number | null; discount_unit_iqd: number | null; total_iqd?: number } | null;
 };
 const isMembershipLine = (it: unknown): boolean => (it as PhaseTwoLine).kind === 'membership' || (it as PhaseTwoLine).line_kind === 'membership';
 
@@ -170,20 +178,22 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
    * decided (the customer's own, or picked by the system from stock), and the price before the
    * owner's printer discount (already inside the unit price; never subtracted again).
    */
-  const offerBadges = (it: unknown) => {
+  const offerBadges = (it: unknown, grouped = false) => {
     const x = it as PhaseFourLine;
     const mode = x.kit?.color_mode ?? x.addon?.color_mode ?? null;
-    const d = x.printer_discount && x.printer_discount.discount_unit_iqd > 0 ? x.printer_discount : null;
-    if (!x.addon && !mode && !d) return null;
+    // The figure is PER UNIT and says so; a snapshot without it (null) draws no «before» at all.
+    const d = x.printer_discount && (x.printer_discount.discount_unit_iqd ?? 0) > 0 && typeof x.printer_discount.before_unit_iqd === 'number' ? x.printer_discount : null;
+    const showAddon = !!x.addon && !grouped;
+    if (!showAddon && !mode && !d) return null;
     const chip = 'lv-chip [--chip:var(--color-info)] shrink-0 rounded-full px-2 py-0.5 text-[11px] font-bold';
     return (
       <span className="mt-1 flex flex-wrap gap-1.5" data-order-item-offer>
-        {x.addon ? <span className={chip}>{loc('إضافة مع الطابعة — تُغلَّف معها', 'Add-on — packed with the printer', 'زیادکراو — لەگەڵ پرینتەرەکە دەپێچرێتەوە')}</span> : null}
+        {showAddon ? <span className={chip}>{loc('إضافة مع الطابعة — تُغلَّف معها', 'Add-on — packed with the printer', 'زیادکراو — لەگەڵ پرینتەرەکە دەپێچرێتەوە')}</span> : null}
         {mode === 'chosen' ? <span className={chip} data-order-item-colour-mode="chosen">{loc('لون اختاره الزبون', 'Colour chosen by the customer', 'ڕەنگێک کە کڕیار هەڵیبژاردووە')}</span> : null}
         {mode === 'random' ? <span className={chip} data-order-item-colour-mode="random">{loc('لون عشوائي — اختاره النظام من المخزون', 'Random colour — picked by the system from stock', 'ڕەنگی هەڕەمەکی — سیستەمەکە لە کۆگا هەڵیبژاردووە')}</span> : null}
         {d ? (
           <span className={`${chip} tabular-nums`} data-order-item-price-before>
-            {loc('السعر قبل الخصم', 'Price before discount', 'نرخ پێش داشکاندن')}: {formatIqd(d.before_unit_iqd)}
+            {loc('السعر قبل الخصم', 'Price before discount', 'نرخ پێش داشکاندن')} ({loc('للقطعة', 'each', 'بۆ هەر دانەیەک')}): {formatIqd(d.before_unit_iqd as number)}
           </span>
         ) : null}
       </span>
@@ -224,6 +234,59 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
   const membershipLineIqd = (detail?.items ?? []).filter(isMembershipLine).reduce((n, it) => n + (Number(it.line_total_iqd) || 0), 0);
   /** «بانتظار تأكيد السعر النهائي» (0218): an estimated line still waits, so the order cannot move yet. */
   const estimateOpen = detail?.price_estimate_open === true;
+  // ---- «خدمات الطابعة» (row 364)
+  const sv = orderServicesStrings(loc);
+  const serviceTasks: ServiceTask[] = detail?.service_tasks ?? [];
+  /** «بانتظار الفحص قبل الإرسال»: the hand-over is refused until the inspection task is closed. */
+  const inspectionOpen = detail?.inspection_open === true || serviceTasks.some((t) => t.kind === 'inspection' && t.status === 'open');
+  const tasksOpen = detail?.service_tasks_open !== false;
+  const drawPrizes = new Set(detail?.draw_prize_item_ids ?? []);
+  const printerNames: Record<string, string> = Object.fromEntries((detail?.items ?? []).filter((it) => it.services).map((it) => [it.id, it.name]));
+  /** «اذهب إلى المهمة»: the order tab, scrolled to «مهام الخدمات». */
+  const goToTasks = () => {
+    setTab('order');
+    window.setTimeout(() => document.getElementById('order-service-tasks')?.scrollIntoView({ block: 'start', behavior: m.reduced ? 'auto' : 'smooth' }), 60);
+  };
+  const breakdown = fin?.breakdown ?? null;
+  const breakdownLabel = (key: OrderBreakdownKey, amount: number): string => {
+    switch (key) {
+      case 'goods': return loc('البضاعة (الطابعات بسعرها المعلن)', 'Goods (printers at their listed price)', 'کاڵا (پرینتەرەکان بە نرخی ڕاگەیەنراو)');
+      case 'printer_services':
+        return amount < 0
+          ? loc('خدمات الطابعة — السعر يشمل «الاختيار الذكي» واختار الزبون أقل', 'Printer services — the price includes Smart Choice; the customer chose less', 'خزمەتگوزارییەکانی پرینتەر — نرخەکە «هەڵبژاردنی زیرەک»ی تێدایە؛ کڕیار کەمتری هەڵبژارد')
+          : amount === 0
+            ? loc('خدمات الطابعة — مشمولة في سعر الطابعة', 'Printer services — included in the printer price', 'خزمەتگوزارییەکانی پرینتەر — لە نرخی پرینتەرەکەدا لەخۆگیراون')
+            : loc('خدمات الطابعة', 'Printer services', 'خزمەتگوزارییەکانی پرینتەر');
+      case 'membership': return loc('العضوية المشتراة مع الطلب', 'Membership bought with the order', 'ئەندامێتیی کڕدراو لەگەڵ داواکارییەکە');
+      case 'other_fees': return loc('رسوم أخرى (شحن الطلب المسبق / زيادة البيع المباشر)', 'Other fees (pre-order transport / direct-sale extra)', 'کرێی تر (گواستنەوەی پێش‌داواکاری / زیادەی فرۆشتنی ڕاستەوخۆ)');
+      case 'membership_discount': return loc('خصم العضوية', 'Membership discount', 'داشکاندنی ئەندامێتی');
+      case 'coupon':
+        return (detail?.coupon?.pool?.length ?? 0) > 1
+          ? loc(couponPoolLabel(detail!.coupon!.pool!.length, 'ar'), couponPoolLabel(detail!.coupon!.pool!.length, 'en'), couponPoolLabel(detail!.coupon!.pool!.length, 'ckb'))
+          : `${loc('كوبون', 'Coupon', 'کۆپۆن')}${breakdown?.coupon?.code ? ` (${breakdown.coupon.code})` : ''}`;
+      case 'care_offer': return loc('خصم ليفو كير على قطعة', 'Levo Care part discount', 'داشکاندنی لیڤۆ کێر لەسەر پارچە');
+      case 'points': return `${loc('نقاط', 'Points', 'خاڵ')} (${fin?.points_used ?? 0})`;
+      case 'printer_delivery':
+        return breakdown?.delivery.printer_delivery === 'personal'
+          ? loc('توصيل الطابعة إلى المنزل (شخصي)', 'Printer home delivery (Personal)', 'گەیاندنی پرینتەر بۆ ماڵەوە (تایبەت)')
+          : loc('توصيل الطابعة إلى المنزل', 'Printer home delivery', 'گەیاندنی پرینتەر بۆ ماڵەوە');
+      case 'delivery':
+        return (breakdown?.delivery.printer_units ?? 0) > 0
+          ? loc('توصيل باقي الطلب', 'Delivery of the rest of the order', 'گەیاندنی پاشماوەی داواکارییەکە')
+          : loc('التوصيل', 'Delivery', 'گەیاندن');
+      case 'cod_tax': return loc('ضريبة الدفع عند الاستلام', 'Cash on Delivery Tax', 'باجی پارەدان لە کاتی گەیاندن');
+      case 'price_adjustment': return loc('تعديل السعر (بموافقة الزبون)', 'Price adjustment (customer-approved)', 'گۆڕینی نرخ (بە پەسەندی کڕیار)');
+      default: return loc('فرق غير مفسَّر — راجِع الطلب', 'Unexplained difference — review this order', 'جیاوازیی ڕوون‌نەکراوە — داواکارییەکە پێداچوونەوە بکە');
+    }
+  };
+  const breakdownValue = (key: OrderBreakdownKey, amount: number): string => {
+    if ((key === 'delivery' || key === 'printer_delivery') && amount === 0) {
+      if (detail?.delivery_method?.id === 'pickup') return loc('استلام من المخزن', 'Store pickup', 'وەرگرتن لە کۆگا');
+      return loc('مجاني', 'waived', 'بەخۆڕایی');
+    }
+    if (amount < 0) return `− ${formatIqd(Math.abs(amount))}`;
+    return key === 'price_adjustment' ? `+ ${formatIqd(amount)}` : formatIqd(amount);
+  };
 
   // WHY `Overlay` AND NOT `Sheet`, AND WHY IT STILL RISES FROM THE BOTTOM EDGE.
   //
@@ -358,6 +421,25 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 )}
               </p>
             ) : null}
+            {/* THE INSPECTION HOLD, above the path it blocks (0234; row 364): every hand-over below answers
+                INSPECTION_NOT_DONE until the task is closed in «مهام الخدمات» — said here, with the way there. */}
+            {inspectionOpen && tasksOpen ? (
+              <div data-inspection-hold-note role="status" className="rounded-xl border border-warning/35 bg-warning/10 px-3 py-2">
+                <p className="flex items-start gap-2 text-[12.5px] font-bold text-warning">
+                  <ClipboardCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+                  <span className="min-w-0">
+                    {loc(
+                      'بانتظار الفحص قبل الإرسال — اشترى الزبون فحصاً كاملاً للطابعة، ولا يُسلَّم الطلب للمندوب أو للزبون قبل إغلاق مهمة الفحص.',
+                      'Waiting for the pre-dispatch inspection — the customer bought a full inspection of the printer; the order cannot be handed to the courier or the customer until the inspection task is closed.',
+                      'چاوەڕێی پشکنین پێش ناردن — کڕیار پشکنینی تەواوی پرینتەرەکەی کڕیوە؛ تا ئەرکی پشکنین دانەخرێت داواکارییەکە نادرێت بە گەیەنەر یان کڕیار.'
+                    )}
+                  </span>
+                </p>
+                <button type="button" onClick={goToTasks} data-go-to-inspection className="lv-button lv-button-secondary lv-button-sm mt-2">
+                  {loc('افتح مهمة الفحص', 'Open the inspection task', 'ئەرکی پشکنین بکەرەوە')}
+                </button>
+              </div>
+            ) : null}
             {detail.gini ? (
               <GiniReceiptPanel orderId={orderId} gini={detail.gini} dir={dir} onScanned={load} />
             ) : null}
@@ -399,6 +481,25 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               serialsListedAbove={serialsListedAbove}
               onSerialGateRefused={refreshSerials}
             />
+            {/* The services' work in the order's story (row 364): what was closed, by whom, when. */}
+            {serviceTasks.some((t) => t.status === 'done') ? (
+              <section data-service-task-log>
+                <h3 className="text-[13px] font-bold text-text-secondary mb-2">{loc('سجل مهام الخدمات', 'Service task log', 'تۆماری ئەرکەکانی خزمەتگوزاری')}</h3>
+                <ul className="rounded-lg border border-border-subtle divide-y divide-border-subtle">
+                  {serviceTasks.filter((t) => t.status === 'done').map((t) => (
+                    <li key={t.id} className="px-3 py-2.5 text-[12.5px] text-text-secondary">
+                      <span className="block font-bold text-text-primary">
+                        {t.kind === 'inspection' ? loc('أُنجز الفحص قبل الإرسال', 'Pre-dispatch inspection done', 'پشکنین پێش ناردن کرا')
+                          : t.kind === 'academy' ? loc('حُدِّد موعد الدورة التعليمية', 'Training session arranged', 'کاتی خولی فێرکاری دیاری کرا')
+                            : loc('أُنجز التغليف', 'Packaging done', 'پێچانەوە کرا')}
+                      </span>
+                      <span className="block">{[t.done_by_name, t.done_at ? formatDateTime(t.done_at, lang) : ''].filter(Boolean).join(' · ')}</span>
+                      {t.result_note ? <span className="block whitespace-pre-wrap break-words">{t.result_note}</span> : null}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
@@ -514,6 +615,29 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                   </button>
                   {showBreakdown && (
                     <dl data-breakdown className="mt-2 rounded-lg border border-border-subtle divide-y divide-border-subtle">
+                      {/* EVERY PART NAMED, ADDING UP TO THE TOTAL (row 364): the server's own rows
+                          (worker/lib/orderBreakdown.ts) — goods, the printer's services, the membership bought,
+                          the member's discount, the code, the Levo Care part discount, delivery. An older
+                          server sends none and the rows it always sent are drawn instead. */}
+                      {breakdown ? (
+                        <>
+                          {breakdown.rows.map((r, i) => (
+                            <React.Fragment key={r.key}>
+                              {/* The subtotal sits where the charges end and the discounts begin. */}
+                              {i > 0 && ['goods', 'printer_services', 'membership', 'other_fees'].includes(breakdown.rows[i - 1].key) && !['goods', 'printer_services', 'membership', 'other_fees'].includes(r.key) && (
+                                <Row label={loc('المجموع الفرعي', 'Subtotal', 'کۆی بەشەکی')} value={formatIqd(breakdown.subtotal_iqd)} />
+                              )}
+                              <Row
+                                label={breakdownLabel(r.key, r.amount_iqd)}
+                                value={breakdownValue(r.key, r.amount_iqd)}
+                                tone={r.amount_iqd < 0 ? 'down' : undefined}
+                                rowKey={r.key}
+                              />
+                            </React.Fragment>
+                          ))}
+                        </>
+                      ) : (
+                        <>
                       <Row label={loc('البضاعة', 'Merchandise', 'کاڵا')} value={formatIqd(fin.merchandise_iqd)} />
                       {fin.fees_iqd > 0 && (
                         <Row
@@ -556,6 +680,11 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           value={formatIqd(fin.cod_tax_iqd)}
                         />
                       )}
+                        </>
+                      )}
+                      {/* THE TOTAL CLOSES THE SUM (row 364): the rows above add up to it. What follows is not part
+                          of it — the tier in force, and how the total is paid (the wallet is a payment, not a discount). */}
+                      <Row label={loc('الإجمالي', 'Total', 'کۆی گشتی')} value={formatIqd(fin.total_iqd)} strong />
                       {detail.membership_tier_snapshot && detail.membership_tier_snapshot !== 'free' && (
                         <Row
                           label={loc('العضوية وقت الطلب', 'Membership at order time', 'ئەندامێتی لە کاتی داواکاری')}
@@ -569,7 +698,6 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           tone="down"
                         />
                       )}
-                      <Row label={loc('الإجمالي', 'Total', 'کۆی گشتی')} value={formatIqd(fin.total_iqd)} strong />
                       <Row
                         label={loc('المتبقي عند التسليم', 'Outstanding on delivery', 'ماوە لە گەیاندن')}
                         value={formatIqd(fin.outstanding_iqd)}
@@ -669,7 +797,14 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                     {loc('يُرفَق مع الشحنة — هدية عضوية', 'Ships with the parcel — membership gift', 'لەگەڵ پاکەتەکە — دیاری ئەندامێتی')}
                   </p>
                   <p className="text-[12px] text-text-secondary mt-0.5">
-                    {detail.membership_gift.label_ar || detail.membership_gift.product_id}
+                    {detail.membership_gift_product
+                      ? loc(
+                          detail.membership_gift_product.name_ar || detail.membership_gift.label_ar || detail.membership_gift_product.name || '',
+                          detail.membership_gift_product.name || detail.membership_gift_product.name_ar || detail.membership_gift.label_ar || '',
+                          detail.membership_gift_product.name_ku || detail.membership_gift_product.name_ar || detail.membership_gift.label_ar || ''
+                        )
+                      : detail.membership_gift.label_ar || loc('هدية العضوية', 'Membership gift', 'دیاریی ئەندامێتی')}
+                    {' — '}{sv.gift}
                     {detail.membership_gift.qty > 1 && ` × ${detail.membership_gift.qty}`}
                   </p>
                 </div>
@@ -679,7 +814,9 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                   // A kit line is drawn under its printer (below), not as a line of its own.
                   const parentId = kitParentOf(it);
                   if (parentId && detail.items.some((x) => x.id === parentId)) return null;
-                  const kitLines = detail.items.filter((x) => kitParentOf(x) === it.id);
+                  const attachedLines = detail.items.filter((x) => kitParentOf(x) === it.id);
+                  const kitLines = attachedLines.filter((x) => !x.addon);
+                  const addonLines = attachedLines.filter((x) => !!x.addon);
                   const units = detail.units.filter((u) => u.order_item_id === it.id);
                   return (
                     <li
@@ -708,6 +845,20 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           {' · '}
                           <span className="text-text-secondary">{formatIqd(it.line_total_iqd)}</span>
                         </p>
+                        {/* WHAT KIND OF LINE THIS IS, in words (row 364): a gift costs 0 and still ships; the
+                            Levo Care draw's prize is named; a Levo Care part offer is named — never «كوبون». */}
+                        {it.is_gift ? (
+                          <span className="mt-1 flex flex-wrap items-center gap-1.5" data-order-item-gift={drawPrizes.has(it.id) ? 'care_draw' : 'gift'}>
+                            <span className="lv-chip [--chip:var(--color-gold)] inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold">
+                              <Gift className="h-3 w-3 shrink-0" aria-hidden />
+                              {drawPrizes.has(it.id) ? sv.drawPrize : sv.gift}
+                            </span>
+                            <span className="text-[11px] text-text-secondary">{sv.giftShips}</span>
+                          </span>
+                        ) : null}
+                        {it.care_offer && it.care_offer.discount_iqd > 0 ? (
+                          <p className="mt-1 text-[12px] font-bold text-success" data-order-item-care-offer={it.id}>{sv.careOfferLine(formatIqd(it.care_offer.discount_iqd))}</p>
+                        ) : null}
                         {offerBadges(it)}
                         {/* Sold at an estimated price (0218): where its final price stands. */}
                         {it.price_estimate && (
@@ -742,6 +893,18 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           guessed split, or today's product names, can cause
                           the wrong item to be packed. */}
                       {it.variant && <div className="w-full min-w-0"><PackingSelection value={it.variant} /></div>}
+                      {/* «خدمات الطابعة» (row 364): what this box needs, the cover bought, the fees — per printer. */}
+                      {it.services ? (
+                        <OrderServicesBlock
+                          services={it.services}
+                          qty={it.qty}
+                          audience="admin"
+                          loc={loc}
+                          money={formatIqd}
+                          formatDay={(iso) => formatDate(iso, lang)}
+                          tasks={serviceTasks.filter((t) => t.order_item_id === it.id)}
+                        />
+                      ) : null}
                       {/* «اطلبها من المورّد»: the owner's supplier links of the exact SKU a pre-order line bought —
                           its own chunk and route, never drawn for staff, and never inside the price panels any
                           admin reads (EstimateConfirmPanel, PriceAdjustPanel, PreorderOriginsPanel). */}
@@ -773,24 +936,35 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                             ))}
                           </ul>
                         )}
-                      {/* 0235: the owner's filament kit packed WITH this printer — its lines grouped under it. */}
-                      {kitLines.length > 0 && (
-                        <div className="w-full min-w-0 border-s-2 border-border-subtle ps-3" data-order-kit={it.id}>
-                          <p className="text-[12px] font-bold text-text-secondary mb-1">{loc('باقة الفيلامنت — تُغلَّف مع الطابعة', 'Filament kit — packed with the printer', 'پاکێجی فیلامێنت — لەگەڵ پرینتەرەکە دەپێچرێتەوە')}</p>
-                          <ul className="space-y-3">
-                            {kitLines.map((k) => (
-                              <li key={k.id} className="text-[12px] text-text-secondary flex items-baseline gap-2" data-order-kit-line={k.id}>
-                                <span className="font-bold text-text-primary tabular-nums shrink-0">×{k.qty}</span>
-                                <span className="min-w-0 flex-1 break-words">
-                                  {k.name}
-                                  {k.variant && <PackingSelection value={k.variant} />}
-                                  {offerBadges(k)}
-                                  {serialChip(k.id)}
-                                </span>
-                                <span className="shrink-0 tabular-nums">{formatIqd(k.line_total_iqd)}</span>
-                              </li>
-                            ))}
-                          </ul>
+                      {/* 0235 / 0242 (row 364): EVERYTHING THAT GOES IN THE BOX WITH THIS PRINTER — the owner's
+                          filament kit and the add-ons, each under its own caption, grouped under the printer. */}
+                      {attachedLines.length > 0 && (
+                        <div className="w-full min-w-0 border-s-2 border-border-subtle ps-3 space-y-3" data-order-kit={it.id}>
+                          <p className="flex items-center gap-1.5 text-[12.5px] font-black text-text-primary">
+                            <Package className="h-4 w-4 shrink-0 text-text-secondary" aria-hidden />
+                            {sv.packedWith}
+                          </p>
+                          {([['kit', kitLines, loc('باقة الفيلامنت — تُغلَّف مع الطابعة', 'Filament kit — packed with the printer', 'پاکێجی فیلامێنت — لەگەڵ پرینتەرەکە دەپێچرێتەوە')], ['addon', addonLines, sv.addons]] as const).map(([kind, lines, caption]) =>
+                            lines.length === 0 ? null : (
+                              <div key={kind} data-order-attached={kind}>
+                                <p className="text-[12px] font-bold text-text-secondary mb-1">{caption}</p>
+                                <ul className="space-y-3">
+                                  {lines.map((k) => (
+                                    <li key={k.id} className="text-[12px] text-text-secondary flex items-baseline gap-2" data-order-kit-line={k.id}>
+                                      <span className="font-bold text-text-primary tabular-nums shrink-0">×{k.qty}</span>
+                                      <span className="min-w-0 flex-1 break-words">
+                                        <span className="font-bold text-text-primary">{k.name}</span>
+                                        {k.variant && <PackingSelection value={k.variant} />}
+                                        {offerBadges(k, true)}
+                                        {serialChip(k.id)}
+                                      </span>
+                                      <span className="shrink-0 tabular-nums">{formatIqd(k.line_total_iqd)}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )
+                          )}
                         </div>
                       )}
                     </li>
@@ -798,6 +972,15 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                 })}
               </ul>
             </section>
+
+            {/* «مهام الخدمات» (0234): packing, inspection (blocks the hand-over), Academy — directly under the
+                goods they are about (row 364), in the reader's language, with who closed each. */}
+            <ServiceTasksSection
+              tasks={serviceTasks}
+              open={tasksOpen}
+              printerNames={printerNames}
+              onChanged={(tasks) => setDetail((d) => (d ? { ...d, service_tasks: tasks, inspection_open: tasks.some((t) => t.kind === 'inspection' && t.status === 'open') } : d))}
+            />
 
             <InventoryOriginsPanel key={`inventory-origins-${orderId}`} orderId={orderId} revision={serials} />
             {detail.shipping_type !== 'direct' && <PreorderOriginsPanel key={`preorder-origins-${orderId}`} orderId={orderId} />}
@@ -823,12 +1006,6 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
               viewerOwner={viewerOwner}
               purchases={((detail as { membership_purchases?: OrderMembershipPurchase[] }).membership_purchases) ?? []}
               onChanged={() => void load()}
-            />
-
-            {/* «مهام الخدمات» (0234): packing, inspection (blocks the hand-over), Academy. */}
-            <ServiceTasksSection
-              tasks={((detail as { service_tasks?: ServiceTask[] }).service_tasks) ?? []}
-              onChanged={(tasks) => setDetail((d) => (d ? ({ ...d, service_tasks: tasks } as typeof d) : d))}
             />
 
             {detail.admin_note && (
@@ -913,15 +1090,19 @@ function Row({
   value,
   tone,
   strong,
+  rowKey,
 }: {
   label: string;
   value: string;
   tone?: 'down';
   strong?: boolean;
+  /** The breakdown part this row is (row 364), for tests and the harness. */
+  rowKey?: string;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-3 py-2.5 min-w-0">
-      <dt className={`text-[13px] min-w-0 truncate ${strong ? 'text-text-primary font-bold' : 'text-text-secondary'}`}>{label}</dt>
+    <div className="flex items-start justify-between gap-3 px-3 py-2.5 min-w-0" data-breakdown-row={rowKey}>
+      {/* The label WRAPS: «خدمات الطابعة — السعر يشمل…» cut to an ellipsis on a phone is the part a packer needs. */}
+      <dt className={`text-[13px] leading-relaxed min-w-0 break-words ${strong ? 'text-text-primary font-bold' : 'text-text-secondary'}`}>{label}</dt>
       <dd
         className={`text-[13px] shrink-0 tabular-nums ${
           tone === 'down' ? 'text-success' : strong ? 'text-text-primary font-black' : 'text-text-primary'

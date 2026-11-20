@@ -13,6 +13,7 @@ import { settledThroughSql, settlementInstalled } from './staffSettledSql';
 import { advanceCollectionsSql } from './membershipSaleCorrection';
 import { readDeletedProductFinanceScopes } from './financeDeletedProductScope';
 import { participantNetProfit } from './participantProfit';
+import { servicesOutOfShares } from './printerPart';
 export { recordFinancialFailure } from './financePostingErrors';
 
 export interface CostRule {
@@ -311,7 +312,9 @@ export async function runOrderFinancialEffects(
     const relevant = goods.lines.filter((l) => lineIds.includes(l.id));
     const percentageLines=['profit_percent','revenue_percent'].includes(rule.basis)?percentageBase!.lines.filter(l=>lineIds.includes(l.id)):null;
     const qty = relevant.reduce((s, l) => s + l.qty, 0),
-      revenue = percentageLines?percentageLines.reduce((sum,l)=>sum+l.retained_revenue_iqd,0):relevant.reduce((s, l) => s + l.net_goods_iqd, 0);
+      // Ruling R1 (DECISIONS row 364): a STAFF percentage counts a serviced printer's own part (printerPart.ts); 0 elsewhere.
+      servicesOut = percentageLines&&staff?percentageLines.reduce((sum,l)=>sum+servicesOutOfShares(percentageBase!.order,l),0):0,
+      revenue = percentageLines?percentageLines.reduce((sum,l)=>sum+l.retained_revenue_iqd,0)-servicesOut:relevant.reduce((s, l) => s + l.net_goods_iqd, 0);
     const costLines=percentageLines??relevant;
     const cogs = costLines.some((l) => l.cogs_iqd === null || !isConfirmedOrderCost(l.cost_confidence))
       ? null
@@ -324,6 +327,7 @@ export async function runOrderFinancialEffects(
       fifo_cogs_iqd: cogs,
       qty,
       staff_id: staff,
+      ...(servicesOut > 0 ? { printer_part: true } : {}),
     });
     const staffProfit=staff&&rule.basis==='profit_percent';
     const profit=staffProfit?(cogs===null||percentageLines!.some(line=>netProfit.get(line.id)==null)?null:Math.max(0,percentageLines!.reduce((sum,line)=>sum+netProfit.get(line.id)!,0))):null;

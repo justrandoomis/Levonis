@@ -1,6 +1,7 @@
+import { servicesOutOfShares } from './printerPart';
 import { investorAccountProgress } from './financeInvestorAccount';
 import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
-import { lostDeliveryDay, reconcileEffectiveWages } from './financeWageCalculation';
+import { lostDeliveryDay, printerPartMark, reconcileEffectiveWages } from './financeWageCalculation';
 import { investorHeldPartSql, investorWholeHoldSql } from './investorFinance';
 import { getOrderProfitBase } from './orderProfit';
 import { participantNetFingerprintSql, participantNetProfit } from './participantProfit';
@@ -457,7 +458,7 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
   const staffStarts=await employmentInstalled(db)?new Map(((await db.prepare('SELECT * FROM finance_staff').all<EmploymentStaff>()).results??[]).map((s)=>[s.id,s])):new Map<string,EmploymentStaff>();
   const frozen=await db.prepare('SELECT rules_json FROM finance_order_snapshots WHERE order_id=?').bind(orderId).first<{rules_json:string}>();
   const snapshot=frozen?JSON.parse(frozen.rules_json) as Array<{line_id:string;rules:Array<{id:string}>}>:[];
-  const plans:Array<{cost:typeof costs[number];amount:number;base_iqd:number}>=[],caps=new Map<string,number>();
+  const plans:Array<{cost:typeof costs[number];amount:number;base_iqd:number;printer_part:boolean}>=[],caps=new Map<string,number>();
   for(const cost of costs.filter((c)=>c.manual_override))caps.set(cost.rule_id,(caps.get(cost.rule_id)??0)+(cost.effective_iqd??0));
   // An order that lost its delivery earns no new pay (DECISIONS row 307): its
   // timeline wages went to 0 above, and these older percentages stay exactly as
@@ -488,19 +489,20 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
         const task=await db.prepare('SELECT staff_id,completed_at FROM finance_task_assignments WHERE order_id=? AND group_key=?').bind(orderId,cost.group_key).first<{staff_id:string;completed_at:string|null}>();
         if(!task || task.staff_id!==cost.staff_id || (cost.milestone==='prepared'&&!task.completed_at))continue;
       }
-      const revenue=targets.reduce((v,l)=>v+l.retained_revenue_iqd,0),cogs=targets.reduce((v,l)=>v+(l.cogs_iqd??0),0);
+      // Ruling R1 (DECISIONS row 364): a STAFF percentage counts a serviced printer's own part (printerPart.ts); 0 on every other line.
+      const revenue=targets.reduce((v,l)=>v+l.retained_revenue_iqd-(cost.staff_id?servicesOutOfShares(base.order,l):0),0),cogs=targets.reduce((v,l)=>v+(l.cogs_iqd??0),0);
       if(cost.staff_id&&rule.basis==='profit_percent'&&targets.some(line=>netProfit.get(line.id)==null))throw conflict(serverMessage('NET_PROFIT_PENDING'),'NET_PROFIT_PENDING');
       const targetBase=Math.max(0,rule.basis==='profit_percent'?(cost.staff_id?targets.reduce((sum,line)=>sum+netProfit.get(line.id)!,0):revenue-cogs):revenue);
       let amount=Number(BigInt(targetBase)*BigInt(rule.amount)/10000n);
       if(rule.cap_iqd!==null)amount=Math.min(amount,Math.max(0,rule.cap_iqd-used));
       caps.set(cost.rule_id,used+amount);
-      if(amount!==cost.effective_iqd)plans.push({cost,amount,base_iqd:targetBase});
+      if(amount!==cost.effective_iqd)plans.push({cost,amount,base_iqd:targetBase,printer_part:!!cost.staff_id&&targets.some(l=>servicesOutOfShares(base.order,l)>0)});
     }
   }
   if(plans.length)await periodOpen(db,day);
   const actor=opts.actor??null;
   const statements=fence(db,`${basisSql.replace(/\?1/g,'?2')}=?3`,[orderId,beforeBasis]);
-  for(const {cost,amount,base_iqd} of plans) {
+  for(const {cost,amount,base_iqd,printer_part} of plans) {
     if(cost.held_iqd>0 && amount<cost.paid_iqd+cost.held_iqd)throw conflict('يوجد طلب سحب محجوز تأثر بالتصحيح؛ حرره ثم أعد احتساب الأرباح');
     const liability=cost.staff_id?'2100':'2000';
     if(cost.state==='pending_cost') {
@@ -508,6 +510,7 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
       statements.push(...fence(db,"EXISTS(SELECT 1 FROM finance_order_costs WHERE id=? AND state='pending_cost' AND staff_id IS ? AND snapshot=?)",[cost.id,cost.staff_id,cost.snapshot]));
       if(expense)statements.push(db.prepare('INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,note) VALUES (?,?,?,?,?,?)').bind(expense,cost.category_id,amount,day,cost.rule_name,`طلب ${orderId} / تكلفة متحققة`));
       statements.push(db.prepare("UPDATE finance_order_costs SET amount_iqd=?,base_iqd=?,state='due',expense_id=?,cost_day=? WHERE id=? AND state='pending_cost'").bind(amount,base_iqd,expense,day,cost.id));
+      if(printer_part)statements.push(printerPartMark(db,cost.id));
       if(amount>0)statements.push(...journalPlan(db,{key:`order-cost:${cost.id}`,day,title:cost.rule_name,source:'order_cost',sourceId:cost.id,actor},[{account:'5100',debit:amount},{account:liability,credit:amount}]).statements);
       statements.push(...(await auditStatements(db,actor,'finance.staff_cost_materialized',cost.id,{amount_iqd:amount,order_id:orderId})).statements);
       continue;
@@ -517,6 +520,7 @@ export async function reconcileStaffOrderCosts(db: D1Database, orderId: string, 
       db.prepare("INSERT INTO finance_cost_adjustments(id,cost_id,kind,delta_iqd,before_iqd,after_iqd,actor_id,adjustment_day,created_at) VALUES (?,?,'recalculation',?,?,?,?,?,?)").bind(id,cost.id,delta,cost.effective_iqd,amount,actor,day,new Date().toISOString()),
       ...journalPlan(db,{key:`staff-adjustment:${id}`,day,title:'تحديث أجر نسبة بعد تصحيح الطلب',source:'finance_cost_adjustment',sourceId:id,actor},delta>0?[{account:'5100',debit:delta},{account:liability,credit:delta}]:[{account:liability,debit:-delta},{account:'5100',credit:-delta}]).statements,
       ...(await auditStatements(db,actor,'finance.staff_percentage_recalculated',cost.id,{before_iqd:cost.effective_iqd,after_iqd:amount,order_id:orderId})).statements);
+    if(printer_part)statements.push(printerPartMark(db,cost.id));
   }
   // Independent costs may have changed in this same batch. Certify the
   // resulting source, after those writes, while the initial fence still

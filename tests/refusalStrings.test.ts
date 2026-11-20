@@ -121,6 +121,9 @@ test('every code the table translates is one the server can actually emit', () =
     // The cart and the checkout's shared «متجر تجريبي — لا يمكن الشراء منه» (community demo data).
     'worker/lib/storeOrderOps.ts',
     'worker/routes/orders.ts',
+    // «مهام الخدمات» on the admin order window (DECISIONS row 364): closing a packing / inspection /
+    // Academy task answers ORDER_SERVICE_TASK_* — worded here so staff never read the raw code.
+    'worker/routes/adminPrinterServices.ts',
     'worker/routes/returns.ts',
     // Who may move money in the services (owner decision 3, row 223): every
     // service money door answers through this one rule.

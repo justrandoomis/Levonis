@@ -12,6 +12,11 @@ import { dateLocale } from './orders/format';
 import UnitHistory from './adminWarranty/UnitHistory';
 import { isVideoUrl } from './warranty/types';
 import { formatMoney } from '../lib/money';
+import UnitCoverBlock, { CoverChip } from './adminWarranty/UnitCoverBlock';
+import {
+  DESK, TONE_CLASS, deskLang, nextActionText, verdictTone,
+  type ClaimCover, type CoverVerdict, type DeskCare, type DeskCover, type DeskServices, type DeskSummary,
+} from './adminWarranty/deskStrings';
 
 // The §16 serial / warranty page (serial scan, 0178), opened from a unit's serial.
 const SerialDetail = React.lazy(() => import('./adminWarranty/serial/SerialDetail'));
@@ -36,7 +41,7 @@ const STRINGS = {
     load: 'عرض',
     loading: 'جارٍ التحميل…',
     noUnits: 'لا توجد وحدات مسجّلة لهذا البحث.',
-    notSerialized: 'لا يحتوي هذا الطلب على منتجات مُرقّمة (ops_policy.serialized).',
+    notSerialized: 'لا يحتوي هذا الطلب على منتجات تُتابَع بأرقام تسلسلية (طابعات).',
     backfill: 'إنشاء الوحدات (إعادة المحاولة آمنة)',
     backfillDone: (n: number) => `تم إنشاء ${n} وحدة.`,
     backfillAll: 'إنشاء وحدات كل الطلبات المُسلَّمة الناقصة',
@@ -177,7 +182,7 @@ const STRINGS = {
     load: 'Load',
     loading: 'Loading…',
     noUnits: 'No units recorded for this search.',
-    notSerialized: 'This order has no serialized products (ops_policy.serialized).',
+    notSerialized: 'This order has no products followed by serial number (printers).',
     backfill: 'Create units (safe to retry)',
     backfillDone: (n: number) => `${n} unit(s) created.`,
     backfillAll: 'Create missing units for all delivered orders',
@@ -315,7 +320,7 @@ const STRINGS = {
     load: 'پیشاندان',
     loading: 'باردەکرێت…',
     noUnits: 'هیچ یەکەیەک بۆ ئەم گەڕانە تۆمار نەکراوە.',
-    notSerialized: 'ئەم داواکارییە بەرهەمی ژمارە زنجیرەیی تێدا نییە (ops_policy.serialized).',
+    notSerialized: 'ئەم داواکارییە بەرهەمی شوێنکەوتوو بە ژمارە زنجیرەیی (چاپکەر) تێدا نییە.',
     backfill: 'دروستکردنی یەکەکان (دووبارەکردنەوە سەلامەتە)',
     backfillDone: (n: number) => `${n} یەکە دروستکرا.`,
     backfillAll: 'إنشاء وحدات كل الطلبات المُسلَّمة الناقصة', // OWNER: Sorani to be written by hand.
@@ -481,6 +486,10 @@ interface AdminDevice {
    *  email is exactly the admin who does not know the serial yet. */
   buyer: AdminAccount | null;
   holder: AdminAccount | null;
+  /** Phase 8 (row 364): what the line sold, the Care window, and what holds today. Absent from an older server. */
+  services?: DeskServices | null;
+  care?: DeskCare | null;
+  cover?: DeskCover | null;
 }
 
 /** An audited unit action waiting on the admin's confirmation and reason. */
@@ -556,6 +565,10 @@ interface AdminClaim {
   care_benefit?: { state: string; benefit_iqd: number; copay_iqd: number } | null;
   /** The claim's live out-of-pocket costs — the owner's only (null for anyone else). */
   costs_total_iqd?: number | null;
+  /** Phase 8 (row 364): which of the four situations the claim was filed in. */
+  cover?: ClaimCover | null;
+  order_id?: string | null;
+  customer_name?: string | null;
 }
 
 interface AdminClaimsPage {
@@ -565,7 +578,11 @@ interface AdminClaimsPage {
   next_cursor?: string | null;
   /** The whole queue per stage (not the page) — each filter says what it holds. */
   counts?: Record<string, number>;
+  /** The desk's strip — on the first page only. */
+  summary?: DeskSummary;
 }
+
+const COVER_FILTERS: readonly CoverVerdict[] = ['warranty', 'warranty_care', 'care', 'none'];
 
 interface ClaimMessage {
   id: string;
@@ -622,7 +639,9 @@ function fmtDate(iso: string | null, lang: string): string {
     : d.toLocaleDateString(dateLocale(lang), { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function CoverageBadge({ device, s }: { device: AdminDevice; s: (typeof STRINGS)[Lang] }) {
+function CoverageBadge({ device, s, lang }: { device: AdminDevice; s: (typeof STRINGS)[Lang]; lang: string }) {
+  // Phase 8: «no warranty bought» is its own neutral word — never the red «منتهي» of a warranty that ran out.
+  if (device.cover) return <CoverChip cover={device.cover} lang={lang} />;
   const st = device.warranty.state;
   const cls =
     st === 'active'
@@ -653,6 +672,7 @@ function CoverageBadge({ device, s }: { device: AdminDevice; s: (typeof STRINGS)
 export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {}) {
   const { lang } = useLanguage();
   const s = STRINGS[lang];
+  const d = DESK[deskLang(lang)];
   // SERVER HINTS, NEVER THE GATE (src/lib/api.ts): the routes refuse
   // regardless. They only decide what this screen offers and explains.
   const auth = useOptionalAuth();
@@ -703,6 +723,10 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
   const [pendingBase, setPendingBase] = useState('');
   const [pendingExt, setPendingExt] = useState('');
   const [pendingShorter, setPendingShorter] = useState(false);
+  // Phase 8: a printer sold with the services takes ONE total (the owner's goodwill), and a Care-only device is
+  // replaced only on an explicit yes.
+  const [pendingTotal, setPendingTotal] = useState('');
+  const [pendingCareOnly, setPendingCareOnly] = useState(false);
   // The corrected delivery instant, as the `datetime-local` field holds it.
   const [pendingDelivery, setPendingDelivery] = useState('');
 
@@ -718,11 +742,11 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       setSerialUnits(data.units);
     } catch (e) {
       setSerialUnits(null);
-      setUnitsError(e instanceof ApiError ? e.message : s.error);
+      setUnitsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), d.loadFailed) : s.error);
     } finally {
       setUnitsLoading(false);
     }
-  }, [s.error]);
+  }, [s.error, d.loadFailed, lang]);
 
   const loadOrder = useCallback(async (orderId: string) => {
     if (!orderId.trim()) return;
@@ -736,11 +760,11 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       setOrderData(data);
     } catch (e) {
       setOrderData(null);
-      setUnitsError(e instanceof ApiError ? e.message : s.error);
+      setUnitsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), d.loadFailed) : s.error);
     } finally {
       setUnitsLoading(false);
     }
-  }, [s.error]);
+  }, [s.error, d.loadFailed, lang]);
 
   const loadCustomer = useCallback(async (email: string) => {
     if (!email.trim()) return;
@@ -754,11 +778,11 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       setCustomerUnits(data.units);
     } catch (e) {
       setCustomerUnits(null);
-      setUnitsError(e instanceof ApiError ? e.message : s.error);
+      setUnitsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), d.loadFailed) : s.error);
     } finally {
       setUnitsLoading(false);
     }
-  }, [s.error]);
+  }, [s.error, d.loadFailed, lang]);
 
   const refreshCurrent = useCallback(() => {
     setHistoryTick((n) => n + 1);
@@ -857,6 +881,8 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
     setPendingShorter(false);
     setPendingBase(action.device.warranty.base_months !== null ? String(action.device.warranty.base_months) : '');
     setPendingExt(String(action.device.warranty.ext_months ?? 0));
+    setPendingTotal(String(action.device.cover?.months ?? action.device.services?.warranty_months ?? ''));
+    setPendingCareOnly(false);
     setPendingDelivery(toLocalInput(action.device.delivered_at));
   };
 
@@ -875,6 +901,20 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       if (pending.kind === 'reassign') {
         await api.post(`/api/devices/admin/units/${pending.device.unit_id}/serial`, { serial: pending.serial, reassign: true, reason });
         setSerialDrafts((d) => ({ ...d, [pending.device.unit_id]: '' }));
+      } else if (pending.kind === 'warranty' && pending.device.services) {
+        // The total the owner grants — never below what the customer bought (the server refuses it too).
+        const total = Number(pendingTotal);
+        const sold = pending.device.services.warranty_months;
+        if (pendingTotal.trim() === '' || !Number.isInteger(total) || total < sold || total > 240) {
+          setPendingError(d.svcBelowSold(sold));
+          return;
+        }
+        await api.patch(`/api/devices/admin/units/${pending.device.unit_id}/warranty`, {
+          total_months: total,
+          reason,
+          confirm_shorter: pendingShorter || undefined,
+        });
+        setUnitsNotice(s.warrantySaved);
       } else if (pending.kind === 'warranty') {
         const base = Number(pendingBase);
         if (!Number.isInteger(base) || base < 1 || base > 240) {
@@ -909,6 +949,8 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
         await api.post(`/api/devices/admin/units/${pending.device.unit_id}/replace`, {
           new_serial: pendingSerial.trim() || undefined,
           reason,
+          // Levo Care is a discount on parts, not a free replacement: the owner's explicit yes.
+          confirm_care_only: pendingCareOnly || undefined,
         });
         // The screen's own sentence, in the admin's language (the route's
         // `note` is one English line).
@@ -947,6 +989,13 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
   const [claimsCursor, setClaimsCursor] = useState<string | null>(null);
   const [claimsHasMore, setClaimsHasMore] = useState(false);
   const [claimCounts, setClaimCounts] = useState<Record<string, number> | null>(null);
+  // Phase 8: the queue's own search (serial / customer / order), its kind and its cover — all applied by the server.
+  const [claimSearch, setClaimSearch] = useState('');
+  const [claimQuery, setClaimQuery] = useState('');
+  const [kindFilter, setKindFilter] = useState<'all' | 'warranty' | 'care'>('all');
+  const [coverFilter, setCoverFilter] = useState<'all' | CoverVerdict>('all');
+  const [deskSummary, setDeskSummary] = useState<DeskSummary | null>(null);
+  const [moveCareVoid, setMoveCareVoid] = useState(false);
   const [openClaim, setOpenClaim] = useState<string | null>(null);
   const [careOpen, setCareOpen] = useState<string | null>(null);
   const [thread, setThread] = useState<ClaimMessage[]>([]);
@@ -968,6 +1017,9 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       const qs = new URLSearchParams();
       if (after) qs.set('after', after);
       if (stageFilter !== 'all') qs.set('stage', stageFilter);
+      if (kindFilter !== 'all') qs.set('kind', kindFilter);
+      if (coverFilter !== 'all') qs.set('cover', coverFilter);
+      if (claimQuery) qs.set('q', claimQuery);
       const data = await api.get<AdminClaimsPage>(`/api/devices/admin/claims?${qs.toString()}`);
       setClaims((prev) =>
         !after ? data.claims : [...prev, ...data.claims.filter((cl) => !prev.some((p) => p.id === cl.id))]
@@ -975,12 +1027,13 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
       setClaimsCursor(data.next_cursor ?? null);
       setClaimsHasMore(data.has_more === true);
       setClaimCounts(data.counts ?? null);
+      if (data.summary) setDeskSummary(data.summary);
     } catch (e) {
-      setClaimsError(e instanceof ApiError ? e.message : s.error);
+      setClaimsError(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), d.loadFailed) : s.error);
     } finally {
       setClaimsLoading(false);
     }
-  }, [stageFilter, s.error]);
+  }, [stageFilter, kindFilter, coverFilter, claimQuery, s.error, d.loadFailed, lang]);
 
   useEffect(() => {
     if (tab === 'claims') loadClaims(null);
@@ -1012,7 +1065,11 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
     setMoveDecision(claim.decision && options.includes(claim.decision) ? claim.decision : '');
     setMoveReason('');
     setMoveError('');
+    setMoveCareVoid(false);
   };
+  /** Misuse on a device whose Levo Care was in force at the filing: Care covers exactly that. */
+  const misuseOnCare = (claim: AdminClaim, to: string, decision: string) =>
+    to === 'rejected' && decision === 'misuse' && claim.cover?.care === 'active';
 
   const confirmMove = async () => {
     if (!claimMove || moveBusy) return;
@@ -1035,6 +1092,8 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
         reason: reason || undefined,
         // G-3: what the decision is, sent with the move that makes it.
         decision: options.length > 0 ? moveDecision : undefined,
+        // Phase 8: the desk's explicit «reject anyway» — without it the server refuses (CLAIM_MISUSE_CARE_ACTIVE).
+        confirm_care_void: misuseOnCare(claim, to, moveDecision) && moveCareVoid ? true : undefined,
       });
       setClaimMove(null);
       await loadClaims(null);
@@ -1087,17 +1146,20 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
   };
   const sendReply = (claimId: string) => postReply(claimId);
 
+  // Phase 8: the unit in the action sheet was sold with the printer services (its warranty is a bought total).
+  const pendingServices = pending?.device.services ?? null;
+
   const renderUnitsTable = (units: AdminDevice[]) => (
     <div className="lv-surface overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-start border-collapse min-w-[980px]">
+        <table className="w-full text-start border-collapse min-w-[980px]" style={{ minWidth: 1180 }}>
           <thead>
             <tr className="bg-surface-raised border-b border-border-subtle">
               <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.unit}</th>
               <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.serial}</th>
               <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.delivered}</th>
               <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.warrantyEnd}</th>
-              <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.stage}</th>
+              <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{d.coverHeader}</th>
               <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase">{s.account}</th>
               <th className="py-3 px-4 text-xs font-bold text-text-secondary uppercase" />
             </tr>
@@ -1168,14 +1230,22 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                   )}
                 </td>
                 <td className="py-3 px-4">
-                  <div className="text-sm text-text-secondary whitespace-nowrap">{fmtDate(u.warranty.end_at, lang)}</div>
-                  <div className="text-[11px] text-text-muted whitespace-nowrap" data-unit-start={u.unit_id}>
-                    {s.warrantyStart}: {fmtDate(u.warranty.start_at, lang)}
-                  </div>
-                  <div className="text-[11px] text-text-muted">
-                    {u.warranty.base_months !== null ? `${u.warranty.base_months}m` : '—'}
-                    {u.warranty.ext_months > 0 ? ` +${u.warranty.ext_months}m` : ''}
-                  </div>
+                  {/* No warranty bought: there is no end date to read — the word, never the delivery day in its place. */}
+                  {u.cover?.warranty === 'none' ? (
+                    <div className="text-sm text-text-secondary" data-unit-no-warranty={u.unit_id}>{d.noWarranty}</div>
+                  ) : (
+                    <>
+                      <div className="text-sm text-text-secondary whitespace-nowrap">{fmtDate(u.warranty.end_at, lang)}</div>
+                      <div className="text-[11px] text-text-muted whitespace-nowrap" data-unit-start={u.unit_id}>
+                        {s.warrantyStart}: {fmtDate(u.warranty.start_at, lang)}
+                      </div>
+                      <div className="text-[11px] text-text-muted">
+                        {u.cover?.months != null
+                          ? d.warrantyMonths(u.cover.months)
+                          : `${u.warranty.base_months !== null ? d.warrantyMonths(u.warranty.base_months + (u.warranty.ext_months || 0)) : '—'}`}
+                      </div>
+                    </>
+                  )}
                   {/* The duration itself, not just the delivery date it is
                       measured from. A replaced unit is frozen here for the
                       same reason it is frozen everywhere else on this row. */}
@@ -1186,11 +1256,24 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                       disabled={busyUnit === u.unit_id}
                       className="inline-flex items-center gap-1 mt-1 text-[11px] text-text-secondary hover:text-text-primary transition-colors disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus rounded"
                     >
-                      <ShieldCheck className="w-3 h-3" aria-hidden="true" />{s.editWarranty}
+                      <ShieldCheck className="w-3 h-3" aria-hidden="true" />{u.services ? d.svcOpen : s.editWarranty}
                     </button>
                   )}
                 </td>
-                <td className="py-3 px-4"><CoverageBadge device={u} s={s} /></td>
+                <td className="py-3 px-4" style={{ minWidth: 290 }}>
+                  <CoverageBadge device={u} s={s} lang={lang} />
+                  <div className="mt-1.5">
+                    <UnitCoverBlock
+                      services={u.services ?? null}
+                      care={u.care ?? null}
+                      cover={u.cover}
+                      lang={lang}
+                      remainingDays={u.warranty.remaining_days}
+                      deliveredAt={u.delivered_at}
+                      chip={false}
+                    />
+                  </div>
+                </td>
                 <td className="py-3 px-4 text-[11px] leading-relaxed">
                   {u.buyer !== undefined || u.holder !== undefined ? (
                     <>
@@ -1279,7 +1362,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               onClick={() => setTab(tb)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${tab === tb ? 'bg-surface-raised text-text-primary shadow-1' : 'text-text-secondary hover:text-text-primary'}`}
             >
-              {tb === 'units' ? s.tabUnits : s.tabClaims}
+              {tb === 'units' ? s.tabUnits : d.tabClaims}
             </button>
           ))}
         </div>
@@ -1349,7 +1432,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               <div className="lv-surface p-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
                 <span className="font-mono text-text-primary font-bold">{orderData.order.id}</span>
                 <span className="text-text-secondary">{s.customer}: <span className="text-text-primary">{orderData.order.email || orderData.order.user_id}</span></span>
-                <span className="text-text-secondary capitalize">{orderData.order.status}</span>
+                <span className="text-text-secondary">{d.orderStatus[orderData.order.status] ?? orderData.order.status}</span>
                 <span className="text-text-secondary">{s.delivered}: {fmtDate(orderData.order.delivered_at, lang)}</span>
               </div>
               {orderData.items.some((it) => it.serialized) ? (
@@ -1486,7 +1569,9 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
               {pending?.kind === 'replace'
                 ? s.replaceTitle
                 : pending?.kind === 'warranty'
-                  ? s.warrantyTitle
+                  ? pendingServices
+                    ? d.svcWarrantyTitle
+                    : s.warrantyTitle
                   : pending?.kind === 'delivery'
                     ? s.deliveryTitle
                     : s.reassignTitle}
@@ -1508,11 +1593,31 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
             {pending?.kind === 'replace'
               ? `${s.replaceBody} ${s.replaceNote}`
               : pending?.kind === 'warranty'
-                ? s.warrantyBody
+                ? pending.device.services
+                  ? d.svcWarrantyBody
+                  : s.warrantyBody
                 : pending?.kind === 'delivery'
                   ? s.deliveryBody
                   : s.reassignConfirm}
           </p>
+          {/* LEVO CARE IS A DISCOUNT ON PARTS, NOT A FREE REPLACEMENT (phase 8): a device out of warranty that only
+              Care holds is replaced on the owner's explicit yes. The server refuses without it (REPLACE_CARE_ONLY). */}
+          {pending?.kind === 'replace' && pending.device.cover?.now === 'care' && (
+            <div className="lv-alert lv-alert-warning space-y-2" data-replace-care-only>
+              <p className="text-text-primary text-[13px] leading-relaxed">{d.replaceCareOnly}</p>
+              <label className="flex items-start gap-2 text-[12px] text-text-primary font-bold cursor-pointer">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4"
+                  style={{ accentColor: 'var(--color-warning)' }}
+                  checked={pendingCareOnly}
+                  onChange={(e) => setPendingCareOnly(e.target.checked)}
+                  disabled={pendingBusy}
+                />
+                <span>{d.replaceCareOnlyConfirm}</span>
+              </label>
+            </div>
+          )}
           {/* The paper is a snapshot by design; moving the clock never
               rewrites a receipt already handed over. Saying so here is the
               difference between a snapshot and a document that went stale
@@ -1572,7 +1677,58 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 )}
             </div>
           )}
-          {pending?.kind === 'warranty' && (
+          {/* A PRINTER SOLD WITH THE SERVICES (phase 8): the warranty is the total the customer bought — no base, no
+              extension. What can change is the owner's goodwill: one new total, never below what was sold. */}
+          {pending?.kind === 'warranty' && pending.device.services && (
+            <div className="space-y-3" data-unit-services-warranty>
+              <dl className="lv-well rounded-lg p-3 text-[12px] space-y-1">
+                <div className="flex justify-between gap-3">
+                  <dt className="text-text-muted">{d.svcSold}</dt>
+                  <dd className="text-text-primary font-bold">
+                    {pending.device.services.warranty_months === 0 ? d.noWarranty : d.warrantyMonths(pending.device.services.warranty_months)}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-3">
+                  <dt className="text-text-muted">{d.svcNow}</dt>
+                  <dd className="text-text-primary font-bold">
+                    {(pending.device.cover?.months ?? 0) === 0 ? d.noWarranty : d.warrantyMonths(pending.device.cover?.months ?? 0)}
+                    {pending.device.cover?.warranty_end_at ? ` · ${fmtDate(pending.device.cover.warranty_end_at, lang)}` : ''}
+                  </dd>
+                </div>
+              </dl>
+              {!isOwner ? (
+                <div className="lv-alert lv-alert-warning text-[12px] text-text-primary" data-unit-services-owner-only>{d.svcOwnerOnly}</div>
+              ) : (
+                <div>
+                  <label htmlFor="admin-unit-warranty-total" className="text-[12px] text-text-secondary mb-1.5 block font-medium">{d.svcNewTotal}</label>
+                  <input
+                    className="lv-input text-sm"
+                    id="admin-unit-warranty-total"
+                    type="number"
+                    min={pending.device.services.warranty_months}
+                    max={240}
+                    step={1}
+                    dir="ltr"
+                    value={pendingTotal}
+                    onChange={(e) => setPendingTotal(e.target.value)}
+                    disabled={pendingBusy}
+                    data-unit-warranty-total
+                  />
+                  {pending.device.services.warranty_months > 0 && (
+                    <p className="text-[12px] text-text-muted mt-1">{d.svcBelowSold(pending.device.services.warranty_months)}</p>
+                  )}
+                  {pending.device.services.care && <p className="text-[12px] text-text-muted mt-1">{d.svcCareFollows}</p>}
+                </div>
+              )}
+              {pendingShorter && (
+                <div className="lv-alert lv-alert-warning space-y-2">
+                  <p className="text-text-primary text-[13px] font-bold">{s.shorterTitle}</p>
+                  <p className="text-text-secondary text-[12px] leading-relaxed">{s.shorterBody}</p>
+                </div>
+              )}
+            </div>
+          )}
+          {pending?.kind === 'warranty' && !pending.device.services && (
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -1647,7 +1803,12 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
             <button
               type="button"
               onClick={confirmPending}
-              disabled={pendingBusy || pendingReason.trim().length < 5}
+              disabled={
+                pendingBusy ||
+                pendingReason.trim().length < 5 ||
+                (pending?.kind === 'warranty' && !!pending.device.services && !isOwner) ||
+                (pending?.kind === 'replace' && pending.device.cover?.now === 'care' && !pendingCareOnly)
+              }
               className="lv-button lv-button-danger"
             >
               {pendingBusy
@@ -1657,7 +1818,9 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                   : pending?.kind === 'warranty'
                     ? pendingShorter
                       ? s.shorterConfirm
-                      : s.saveWarranty
+                      : pending.device.services
+                        ? d.svcSave
+                        : s.saveWarranty
                     : pending?.kind === 'delivery'
                       ? s.saveDelivery
                       : s.confirmReassign}
@@ -1735,6 +1898,35 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                   </div>
                 </fieldset>
               )}
+              {/* MISUSE IS WHAT LEVO CARE COVERS (phase 8): say so before the desk rejects, point at the Care panel,
+                  and take the rejection only on an explicit yes. */}
+              {misuseOnCare(claimMove.claim, claimMove.to, moveDecision) && (
+                <div className="lv-alert lv-alert-warning space-y-2" data-claim-move-misuse-care>
+                  <p className="text-text-primary text-[13px] leading-relaxed">{d.misuseCareWarn}</p>
+                  <button
+                    type="button"
+                    className="lv-button lv-button-secondary lv-button-sm"
+                    disabled={moveBusy}
+                    onClick={() => {
+                      setCareOpen(claimMove.claim.id);
+                      setClaimMove(null);
+                    }}
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />{d.openCarePanel}
+                  </button>
+                  <label className="flex items-start gap-2 text-[12px] text-text-primary font-bold cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4"
+                      style={{ accentColor: 'var(--color-warning)' }}
+                      checked={moveCareVoid}
+                      onChange={(e) => setMoveCareVoid(e.target.checked)}
+                      disabled={moveBusy}
+                    />
+                    <span>{d.misuseCareConfirm}</span>
+                  </label>
+                </div>
+              )}
               <div>
                 <label htmlFor="admin-claim-move-reason" className="text-[12px] text-text-secondary mb-1.5 block font-medium">
                   {REASON_STAGES.has(claimMove.to) ? s.reasonToCustomer : s.noteToCustomer}
@@ -1770,7 +1962,8 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                     moveBusy ||
                     (MONEY_STAGES.has(claimMove.to) && !canDecide) ||
                     (REASON_STAGES.has(claimMove.to) && moveReason.trim().length < 5) ||
-                    ((DECISION_OPTIONS[claimMove.to] ?? []).length > 0 && !moveDecision)
+                    ((DECISION_OPTIONS[claimMove.to] ?? []).length > 0 && !moveDecision) ||
+                    (misuseOnCare(claimMove.claim, claimMove.to, moveDecision) && !moveCareVoid)
                   }
                   className="lv-button lv-button-primary"
                   data-claim-move-confirm
@@ -1785,6 +1978,98 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
 
       {tab === 'claims' && (
         <div className="space-y-4">
+          {/* THE DESK AT A GLANCE (phase 8): what is open and under which cover, who holds Levo Care, what waits
+              for inspection, and the part offers out there. Counts only — a tap on a tile filters the queue. */}
+          {deskSummary && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2" data-desk-summary>
+              <div className="lv-surface p-3">
+                <div className="text-[11px] text-text-muted font-bold">{d.sumOpen}</div>
+                <div className="text-xl font-black text-text-primary tabular-nums">{deskSummary.open_claims.total}</div>
+                <div className="text-[11px] text-text-secondary tabular-nums">{d.sumOpenSplit(deskSummary.open_claims.warranty, deskSummary.open_claims.care)}</div>
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  {COVER_FILTERS.filter((v) => deskSummary.open_claims.by_verdict[v] > 0).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setCoverFilter(v)}
+                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${TONE_CLASS[verdictTone(v)]}`}
+                      data-desk-verdict={v}
+                    >
+                      {d.verdict[v]} · {deskSummary.open_claims.by_verdict[v]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {deskSummary.care && (
+                <div className="lv-surface p-3">
+                  <div className="text-[11px] text-text-muted font-bold">{d.sumCare}</div>
+                  <div className="text-xl font-black text-text-primary tabular-nums">{deskSummary.care.holders}</div>
+                  <div className={`text-[11px] tabular-nums ${deskSummary.care.ending_30d > 0 ? 'text-warning' : 'text-text-secondary'}`}>
+                    {d.sumCareEnding(deskSummary.care.ending_30d)}
+                  </div>
+                </div>
+              )}
+              {deskSummary.inspections_pending !== null && (
+                <div className="lv-surface p-3">
+                  <div className="text-[11px] text-text-muted font-bold">{d.sumInspect}</div>
+                  <div className={`text-xl font-black tabular-nums ${deskSummary.inspections_pending > 0 ? 'text-warning' : 'text-text-primary'}`}>
+                    {deskSummary.inspections_pending}
+                  </div>
+                </div>
+              )}
+              {deskSummary.part_offers && (
+                <div className="lv-surface p-3">
+                  <div className="text-[11px] text-text-muted font-bold">{d.sumOffers}</div>
+                  <div className="text-xl font-black text-text-primary tabular-nums">{deskSummary.part_offers.live}</div>
+                  <div className="text-[11px] text-text-secondary tabular-nums">
+                    {d.sumOffersUsed(deskSummary.part_offers.used, formatMoney(deskSummary.part_offers.used_discount_iqd, lang))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <form
+            className="flex flex-col sm:flex-row gap-2"
+            onSubmit={(e) => { e.preventDefault(); setClaimQuery(claimSearch.trim()); }}
+            data-claims-filters
+          >
+            <input
+              className="lv-input flex-1 min-w-0 text-sm"
+              type="search"
+              value={claimSearch}
+              onChange={(e) => { setClaimSearch(e.target.value); if (!e.target.value.trim()) setClaimQuery(''); }}
+              placeholder={d.searchClaims}
+              aria-label={d.searchClaims}
+              maxLength={120}
+              data-claims-search
+            />
+            <select
+              className="lv-input w-auto text-sm"
+              value={kindFilter}
+              onChange={(e) => setKindFilter(e.target.value as 'all' | 'warranty' | 'care')}
+              aria-label={d.filterKind}
+              data-claims-kind
+            >
+              <option value="all">{d.filterKind}: {d.any}</option>
+              <option value="warranty">{d.kindWarranty}</option>
+              <option value="care">{d.kindCare}</option>
+            </select>
+            <select
+              className="lv-input w-auto text-sm"
+              value={coverFilter}
+              onChange={(e) => setCoverFilter(e.target.value as 'all' | CoverVerdict)}
+              aria-label={d.filterCover}
+              data-claims-cover
+            >
+              <option value="all">{d.filterCover}: {d.any}</option>
+              {COVER_FILTERS.map((v) => (
+                <option key={v} value={v}>{d.verdict[v]}</option>
+              ))}
+            </select>
+            <button type="submit" className="lv-button lv-button-secondary shrink-0">
+              <Search className="w-4 h-4" aria-hidden="true" />{s.load}
+            </button>
+          </form>
           <div className="flex items-center gap-3 flex-wrap">
             <div className="flex lv-well border border-border-subtle p-1 rounded-xl overflow-x-auto">
               {(['all', ...CLAIM_STAGES] as const).map((st) => (
@@ -1824,9 +2109,53 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                   <div className="min-w-0">
                     <div className="text-text-primary font-bold text-sm">{cl.subject}</div>
                     <div className="text-[11px] text-text-muted mt-0.5">
-                      {cl.product_name} · {cl.email || '—'} · {cl.serial ? <span className="font-mono">{cl.serial}</span> : '—'} · {fmtDate(cl.created_at, lang)}
+                      {cl.product_name} · {cl.customer_name ? `${cl.customer_name} · ` : ''}{cl.email || '—'} ·{' '}
+                      {cl.serial ? (
+                        <button
+                          type="button"
+                          className="font-mono underline underline-offset-2 hover:text-text-primary"
+                          onClick={() => { setSerialPageMounted(true); setSerialPage(cl.serial); }}
+                          aria-haspopup="dialog"
+                          title={d.openSerial}
+                          data-claim-serial={cl.id}
+                        >
+                          {cl.serial}
+                        </button>
+                      ) : '—'}
+                      {cl.order_id && (
+                        <>
+                          {' · '}
+                          <a
+                            href={`/admin?tab=orders&order=${encodeURIComponent(cl.order_id)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono underline underline-offset-2 hover:text-text-primary"
+                            title={d.openOrder}
+                            data-claim-order={cl.id}
+                          >
+                            {cl.order_id}
+                          </a>
+                        </>
+                      )}
+                      {' · '}{fmtDate(cl.created_at, lang)}
                       {cl.message_count !== undefined && <> · {s.messagesN(cl.message_count)}</>}
                     </div>
+                    {/* WHICH OF THE FOUR SITUATIONS (phase 8), judged at the filing, and what to do next. */}
+                    {cl.cover && (
+                      <div className="mt-1.5 space-y-1" data-claim-cover={cl.cover.verdict}>
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold ${TONE_CLASS[verdictTone(cl.cover.verdict)]}`}>
+                          {d.verdict[cl.cover.verdict]}
+                        </span>
+                        <p className="text-[12px] text-text-secondary leading-relaxed">
+                          {d.verdictWhy[cl.cover.verdict](cl.cover, (iso) => fmtDate(iso, lang))}
+                        </p>
+                        {nextActionText(d, cl.cover, cl.care_benefit?.state, claimIsOpen(cl), cl.stage) && (
+                          <p className="text-[12px] text-text-primary font-bold leading-relaxed" data-claim-next={cl.id}>
+                            {nextActionText(d, cl.cover, cl.care_benefit?.state, claimIsOpen(cl), cl.stage)}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {cl.awaiting_staff && (
                       <div className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-warning" data-claim-awaiting={cl.id}>
                         <MessageSquare className="w-3 h-3" aria-hidden="true" />
@@ -1834,7 +2163,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                       </div>
                     )}
                     {/* W-1 (policy 5.16): the cover the claim was FILED under — never today's. Nothing for an older claim. */}
-                    {(cl.coverage_at_filing?.state === 'active' || cl.coverage_at_filing?.state === 'expired') && (
+                    {!cl.cover && (cl.coverage_at_filing?.state === 'active' || cl.coverage_at_filing?.state === 'expired') && (
                       <div
                         className={`mt-1 ms-2 inline-flex items-center gap-1 text-[11px] font-bold ${cl.coverage_at_filing.state === 'active' ? 'text-success' : 'text-text-muted'}`}
                         data-claim-filed-cover={cl.id}
@@ -1922,7 +2251,7 @@ export default function AdminSerials({ view }: { view?: 'units' | 'claims' } = {
                 {(cl.care_benefit || cl.costs_total_iqd != null) && (
                   <p className="text-[12px] text-text-secondary mt-1 tabular-nums" data-claim-money={cl.id}>
                     {cl.care_benefit && cl.care_benefit.state !== 'void'
-                      ? s.careSummary(formatMoney(cl.care_benefit.benefit_iqd, lang), formatMoney(cl.care_benefit.copay_iqd, lang))
+                      ? `${d.quoteState[cl.care_benefit.state] ?? ''} — ${s.careSummary(formatMoney(cl.care_benefit.benefit_iqd, lang), formatMoney(cl.care_benefit.copay_iqd, lang))}`
                       : null}
                     {cl.care_benefit && cl.care_benefit.state !== 'void' && cl.costs_total_iqd != null ? ' · ' : null}
                     {cl.costs_total_iqd != null ? s.costsTotal(formatMoney(cl.costs_total_iqd, lang)) : null}

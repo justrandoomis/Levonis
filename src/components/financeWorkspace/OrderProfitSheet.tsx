@@ -14,7 +14,13 @@ import VariantImg from '../ui/VariantImg';
 
 const FinanceOperationsPanel = lazy(() => import('../adminOperations/FinanceOperationsPanel'));
 
-type EditableField = 'net_goods_iqd' | 'cogs_iqd' | 'shipping_iqd' | 'cod_tax_iqd' | 'courier_fee_iqd' | 'payment_fee_iqd' | 'manual_direct_iqd' | 'staff_cost';
+const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+const PRINTER_SERVICE_NAMES = [
+  ['warranty', 'ضمان إضافي', 'Extended warranty', 'گەرەنتی زیادە'], ['care', 'ليفو كير', 'Levo Care', 'لیڤۆ کێر'], ['packaging', 'تغليف إضافي', 'Extra packaging', 'پێچانەوەی زیادە'],
+  ['inspection', 'فحص قبل الشحن', 'Pre-dispatch inspection', 'پشکنین پێش ناردن'], ['academy', 'الأكاديمية', 'Academy', 'ئەکادیمیا'],
+] as const;
+
+type EditableField ='net_goods_iqd' | 'cogs_iqd' | 'shipping_iqd' | 'cod_tax_iqd' | 'courier_fee_iqd' | 'payment_fee_iqd' | 'manual_direct_iqd' | 'staff_cost';
 type Edit = { field: EditableField; label: string; line_id?: string; cost_id?: string; value: string };
 
 /** The step an order is opened at: recording its cash, or entering a missing purchase price. */
@@ -150,7 +156,7 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, onSaved,
     if (cost.rate == null) return cost.rule_name;
     if (cost.basis === 'unit') return <>{formatMoney(cost.rate)} {loc('لكل قطعة', 'per unit')}</>;
     if (cost.basis === 'order') return <>{formatMoney(cost.rate)} {loc('لكل طلب', 'per order')}</>;
-    if (cost.basis === 'profit_percent' || cost.basis === 'revenue_percent') return <>{cost.rate / 100}% {cost.basis === 'profit_percent' ? loc('من الربح', 'of profit') : loc('من المبيعات', 'of sales')} {cost.base_iqd != null && <> · {loc('أساس الاستحقاق الأصلي قبل التسويات', 'Original accrual base before adjustments')}: {formatMoney(cost.base_iqd)}</>}</>;
+    if (cost.basis === 'profit_percent' || cost.basis === 'revenue_percent') return <>{cost.rate / 100}% {cost.basis === 'profit_percent' ? loc('من الربح', 'of profit') : loc('من المبيعات', 'of sales')} {cost.base_iqd != null && <> · {loc('أساس الاستحقاق الأصلي قبل التسويات', 'Original accrual base before adjustments')}: {formatMoney(cost.base_iqd)}</>}{cost.printer_part && <> · {loc('الأساس حصة الطابعة وحدها؛ خدمات الطابعة للمتجر', 'the base is the printer’s own part; its services are the shop’s', 'بنەماکە تەنها بەشی پرینتەرەکەیە؛ خزمەتگوزارییەکانی بۆ فرۆشگایە')}</>}</>;
     return cost.rule_name;
   };
   const reviewCost = (line: ProfitLine) => {
@@ -184,6 +190,12 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, onSaved,
     return editable ? <button type="button" className="fw-line-metric fw-line-metric--editable" onClick={() => beginEdit(field, label, line.id)}
       aria-label={`${loc('تعديل', 'Edit')} ${label} · ${line.name_snapshot}`}>{content}</button> : <div className="fw-line-metric">{content}</div>;
   };
+  // Phase 8 (DECISIONS row 364): this order's printer / services split, and who the services belong to.
+  const pb = data?.printer_breakdown ?? null;
+  const showPrinter = !!pb && (num(pb.printer_lines) > 0 || num(pb.kits_net_iqd) > 0 || num(pb.addons_net_iqd) > 0 || num(pb.printer_discounts_iqd) > 0 || num(data?.care_part_discount_iqd) > 0);
+  const sharesNote = data?.printer_part_rule === false
+    ? `${loc('طُلب قبل', 'Ordered before', 'داواکراوە پێش')} ${data.printer_part_from_day ?? ''}: ${loc('حُسبت الحصص على سعر السطر كاملاً، كما كانت.', 'shares were counted on the whole line, as they were.', 'بەشەکان لەسەر تەواوی نرخی دێڕەکە ژمێردراون، وەک خۆی.')}`
+    : loc('حصة المستثمر وعمولة الموظف تُحسب على هذا المبلغ وحده؛ خدمات الطابعة للمتجر.', 'The investor’s share and staff commission are counted on this amount alone; the printer’s services are the shop’s.', 'بەشی وەبەرهێنەر و کۆمیشنی کارمەند تەنها لەسەر ئەم بڕە دەژمێردرێت؛ خزمەتگوزارییەکانی پرینتەر بۆ فرۆشگایە.');
   const amountLabel = view?.amountKind === 'projected_goods_margin' ? loc('هامش البضاعة المتوقع قبل المصاريف', 'Forecast goods margin before expenses') : loc('صافي المالك', 'Owner net');
   const warnings = data?.warnings?.filter(warning => !warning.startsWith('cost:') || view?.needsReview) ?? [];
   return <Sheet title={`${loc('تفاصيل ربح الطلب', 'Order profit')} · ${orderId}`} subtitle={data?.order?.customer_name || loc('كل قطعة، وتكلفتها وربحها', 'Each product, its cost and profit')}
@@ -221,10 +233,42 @@ export default function OrderProfitSheet({ orderId, onClose, onChanged, onSaved,
         </div>
         {editor(line.id)}
         {(line.refund_iqd ?? 0) > 0 && <><Row label={loc('المبلغ المرتجع', 'Refunded amount')} value={<DisplayMoney iqd={line.refund_iqd} cents={lineCents(line, 'refund_iqd')} />} /><Row label={loc('البيع المتبقي بعد المرتجع', 'Sales retained after returns')} value={<DisplayMoney iqd={line.retained_revenue_iqd} cents={lineCents(line, 'retained_revenue_iqd')} />} /></>}
+        {/* Phase 8 (DECISIONS row 364): a printer sold with services — its own part and «ربح الخدمات», the shop's alone. */}
+        {line.services_snapshot && line.services_profit_iqd != null && <div data-finance-line-services>
+          <Row label={loc('حصة الطابعة (دون خدماتها)', 'The printer’s own part (without its services)', 'بەشی پرینتەرەکە (بەبێ خزمەتگوزارییەکانی)')}
+            hint={sharesNote} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={(line.retained_revenue_iqd ?? line.net_goods_iqd ?? 0) - line.services_profit_iqd} /></span>} />
+          <Row label={loc('ربح الخدمات — للمتجر وحده', 'Services profit — the shop’s alone', 'قازانجی خزمەتگوزارییەکان — تەنها بۆ فرۆشگا')}
+            hint={loc('داخل صافي البيع أعلاه', 'inside the net sales above', 'لەناو پوختەی فرۆشتنی سەرەوەدایە')} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={line.services_profit_iqd} /></span>} />
+        </div>}
         {!view?.expectsDelivery && view?.hasFinancialActivity && <><div className="fw-line-profit"><span>{loc('ربح البضاعة', 'Goods profit')}</span><DisplayMoney iqd={line.gross_profit_iqd} cents={lineCents(line, 'gross_profit_iqd')} /></div>
         <Row label={loc('حصة المستثمر', 'Investor share')} value={<DisplayMoney iqd={line.investor_iqd} cents={lineCents(line, 'investor_iqd')} />} />
         <Row label={loc('صافي المالك', 'Owner net')} value={<DisplayMoney iqd={line.owner_net_iqd} cents={lineCents(line, 'owner_net_iqd')} />} prominent /></>}
       </Surface>)}
+      {pb && showPrinter && <Surface title={loc('الطابعة وخدماتها في هذا الطلب', 'The printer and its services in this order', 'پرینتەر و خزمەتگوزارییەکانی لەم داواکارییەدا')}
+        subtitle={loc('للاطلاع: داخل أرقام الطلب أعلاه، لا تُطرح مرة أخرى.', 'For information: inside the order’s figures above, never subtracted again.', 'بۆ زانیاری: لەناو ژمارەکانی داواکارییەکەدایە، دووبارە دەرناکرێت.')}>
+        <div data-finance-order-printer>
+          {num(pb.printer_lines) > 0 && <>
+            <Row label={loc('حصة الطابعة (دون خدماتها)', 'The printer’s own part (without its services)', 'بەشی پرینتەرەکە (بەبێ خزمەتگوزارییەکانی)')} hint={sharesNote} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.printer_net_iqd)} /></span>} />
+            {'printer_margin_iqd' in pb && <Row label={loc('هامش الطابعة', 'Printer margin', 'قازانجی پرینتەرەکە')} hint={loc('حصة الطابعة − تكلفة بضاعتها', 'its own part − its goods cost', 'بەشی پرینتەرەکە − تێچووی کاڵاکەی')}
+              value={pb.printer_margin_iqd == null ? <Status tone="warning">{loc('ينتظر تكلفة شراء', 'Waiting for a purchase cost', 'چاوەڕێی نرخی کڕینە')}</Status> : <Money value={pb.printer_margin_iqd} />} />}
+            <Row label={loc('ربح الخدمات — للمتجر وحده', 'Services profit — the shop’s alone', 'قازانجی خزمەتگوزارییەکان — تەنها بۆ فرۆشگا')} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.services_net_iqd)} /></span>} prominent />
+            {PRINTER_SERVICE_NAMES.filter(([k]) => num(pb.services?.[k]) > 0).map(([k, ar, en, ckb]) => <Row key={k} label={<small>{loc(ar, en, ckb)}</small>} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.services?.[k])} compact /></span>} />)}
+            {num(pb.anchor_reduction_iqd) > 0 && <Row label={loc('اختار الزبون أقل من «الاختيار الذكي»', 'The customer chose below the Smart package', 'کڕیار کەمتر لە «هەڵبژاردنی زیرەک»ی هەڵبژارد')}
+              hint={loc('نزل السعر بهذا المبلغ؛ داخل السعر، لا يُطرح مرة أخرى', 'the price came down by this; inside the price, never subtracted again', 'نرخەکە بەم بڕە دابەزی؛ لەناو نرخەکەدایە، دووبارە دەرناکرێت')} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.anchor_reduction_iqd)} compact /></span>} />}
+            {num(pb.pro_services_discount_iqd) > 0 && <Row label={loc('خصم PRO على الخدمات', 'PRO discount on services', 'داشکاندنی PRO لەسەر خزمەتگوزارییەکان')}
+              hint={loc('داخل رسوم الخدمات', 'inside the services’ fees', 'لەناو کرێی خزمەتگوزارییەکاندایە')} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.pro_services_discount_iqd)} compact /></span>} />}
+          </>}
+          {num(pb.kits_net_iqd) > 0 && <Row label={loc('باقات الفلامنت', 'Filament kits', 'پاکێجەکانی فیلامێنت')} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.kits_net_iqd)} /></span>} />}
+          {num(pb.addons_net_iqd) > 0 && <Row label={loc('إضافات الطابعة', 'Printer add-ons', 'زیادکراوەکانی پرینتەر')} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.addons_net_iqd)} /></span>} />}
+          {num(pb.printer_discounts_iqd) > 0 && <Row label={loc('خصمك على الباقات والإضافات', 'Your discount on kits and add-ons', 'داشکاندنەکەت لەسەر پاکێج و زیادکراوەکان')}
+            hint={loc('داخل أسعارها؛ يتحمّله صاحب بضاعتها كما هو اليوم', 'inside their prices; borne by the stock’s own investor as today', 'لەناو نرخەکانیاندایە؛ خاوەنی کاڵاکە هەڵیدەگرێت وەک ئەمڕۆ')} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.printer_discounts_iqd)} compact /></span>} />}
+          {num(pb.membership_iqd) > 0 && <Row label={loc('العضوية المباعة مع الطابعة', 'Membership sold with the printer', 'ئەندامێتیی فرۆشراو لەگەڵ پرینتەرەکە')} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.membership_iqd)} /></span>} />}
+          {num(data.care_part_discount_iqd) > 0 && <Row label={loc('خصم ليفو كير على قطعة', 'Levo Care discount on a part', 'داشکاندنی لیڤۆ کێر لەسەر پارچەیەک')}
+            hint={loc('داخل صافي البيع؛ يتحمّله صاحب بضاعة القطعة كما هو اليوم', 'inside the net sales; borne by the part’s own stock as today', 'لەناو پوختەی فرۆشتندایە؛ خاوەنی کاڵای پارچەکە هەڵیدەگرێت وەک ئەمڕۆ')} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(data.care_part_discount_iqd)} compact /></span>} />}
+          {num(pb.printer_lines) > 0 && (num(pb.delivery_income_iqd) > 0 || num(pb.courier_fee_iqd) > 0) && <Row label={loc('التوصيل: على الزبون − أجرة شركة التوصيل', 'Delivery: charged − courier fee', 'گەیاندن: لەسەر کڕیار − کرێی کۆمپانیای گەیاندن')}
+            hint={<><bdi dir="ltr">{formatMoney(num(pb.delivery_income_iqd))} − {formatMoney(num(pb.courier_fee_iqd))}</bdi></>} value={<span style={{ whiteSpace: 'nowrap' }}><Money value={num(pb.delivery_income_iqd) - num(pb.courier_fee_iqd)} /></span>} />}
+        </div>
+      </Surface>}
       <Surface title={loc('التوصيل وتكاليف الطلب', 'Delivery and order costs')} subtitle={loc('التعديل يخص هذا الطلب فقط', 'Changes apply to this order only')}>
         <Row label={loc('التوصيل على الزبون', 'Customer delivery charge')} value={<DisplayMoney iqd={data.totals.shipping_income_iqd ?? data.order.shipping_iqd} cents={orderCents('shipping_income_iqd')} />}
           onClick={() => beginEdit('shipping_iqd', loc('التوصيل على الزبون', 'Customer delivery charge'))} />

@@ -34,6 +34,10 @@ export const RS = {
   colSales: ['المبيعات', 'Sales', 'فرۆشتن'],
   colPromotion: ['الترويج', 'Promotion', 'بانگەشە'],
   colInvestor: ['المستثمر', 'Investor', 'وەبەرهێنەر'],
+  // Phase 8 (DECISIONS row 364).
+  colServices: ['ربح الخدمات', 'Services profit', 'قازانجی خزمەتگوزارییەکان'],
+  colServiceIncome: ['إيراد الصيانة', 'Service income', 'داهاتی چاککردنەوە'],
+  servicesNote: ['«ربح الخدمات»: ما أبقته خدمات الطابعات (الضمان، ليفو كير، التغليف، الفحص، الأكاديمية) من المبيعات — للمتجر وحده، وهو داخل «المبيعات» و«صافيك» لا يُضاف إليهما. حصص المستثمرين وعمولة الموظفين تُحسب على الطابعة وحدها.', '“Services profit”: what the printer services (warranty, Levo Care, packaging, inspection, academy) kept of the sales — the shop’s alone, already inside “Sales” and “Your net”, never added to them. Investor shares and staff commission are counted on the printer alone.', '«قازانجی خزمەتگوزارییەکان»: ئەوەی خزمەتگوزارییەکانی پرینتەر (گەرەنتی، لیڤۆ کێر، پێچانەوە، پشکنین، ئەکادیمیا) لە فرۆشتن هێشتیانەوە — تەنها بۆ فرۆشگایە و لەناو «فرۆشتن» و «سافی تۆ»دایە، زیادیان ناکرێت. بەشی وەبەرهێنەران و کۆمیشنی کارمەندان تەنها لەسەر پرینتەرەکە دەژمێردرێت.'],
   colNet: ['صافيك', 'Your net', 'سافی تۆ'],
   colSection: ['القسم', 'Section', 'بەش'],
   colDay: ['اليوم', 'Day', 'ڕۆژ'],

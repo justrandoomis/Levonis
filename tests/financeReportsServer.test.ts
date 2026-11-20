@@ -199,7 +199,7 @@ test('the export follows the page: orders, products, sections and days, each fro
   for (const q of ['view=nonsense', 'view=sections&level=deep', 'view=orders&part=half']) assert.equal((await get(w.app, `/f/export.csv?${w.range}&${q}`)).status, 400, q);
   const lines = await w.text(`/f/export.csv?${w.range}`);
   assert.equal(lines, await w.text(`/f/export.csv?${w.range}&view=lines`));
-  assert.equal(lines.split('\r\n')[0], '\uFEFF"order_id","id","product_id","name_snapshot","sku_snapshot","qty","returned_qty","main_name","sub_name","net_goods_iqd","refund_iqd","cogs_iqd","cost_confidence","gross_profit_iqd","wages_iqd","materials_iqd","manual_direct_iqd","shipping_income_iqd","cod_tax_iqd","courier_fee_iqd","payment_fee_iqd","promotion_iqd","investor_iqd","owner_net_iqd","pending_costs","coupon_iqd","price_protection_iqd","trade_in_credit_returned_iqd","net_after_report_adjustments_iqd","row_kind"');
+  assert.equal(lines.split('\r\n')[0], '\uFEFF"order_id","id","product_id","name_snapshot","sku_snapshot","qty","returned_qty","main_name","sub_name","net_goods_iqd","refund_iqd","cogs_iqd","cost_confidence","gross_profit_iqd","wages_iqd","materials_iqd","manual_direct_iqd","shipping_income_iqd","cod_tax_iqd","courier_fee_iqd","payment_fee_iqd","promotion_iqd","investor_iqd","owner_net_iqd","pending_costs","coupon_iqd","price_protection_iqd","trade_in_credit_returned_iqd","net_after_report_adjustments_iqd","services_profit_iqd","row_kind"');
   const named = await get(w.app, `/f/export.csv?${w.range}&view=sections&level=sub`);
   assert.match(named.headers.get('Content-Disposition') ?? '', /filename="finance-sections-sub-[\d-]+-[\d-]+\.csv"/);
 });

@@ -72,6 +72,8 @@ export interface WarrantyDocData {
   verify_url: string;
   /** Shown when the document supersedes or is superseded by another. */
   chain: { replaces: string | null; replaced_by: string | null };
+  /** Phase 8: the paper was issued for a printer bought with NO warranty — drawn void, with this said. */
+  no_warranty?: boolean;
 }
 
 const COPY = {
@@ -237,6 +239,12 @@ function section(title: string, inner: string): string {
 
 type Copy = (typeof COPY)['ar'] | (typeof COPY)['en'];
 
+/** Why a paper issued for a printer bought without a warranty is void (phase 8, DECISIONS row 364). */
+export const NO_WARRANTY_NOTE = {
+  ar: 'لم يُشترَ ضمان: اشترى الزبون هذه الطابعة بدون ضمان، وهذا الوصل غير صالح ولا يثبت أي تغطية.',
+  en: 'No warranty was bought: the customer bought this printer without a warranty; this receipt is not valid and proves no cover.',
+} as const;
+
 /** A banner for anything that is not a live, in-date receipt. */
 function statusBanner(data: WarrantyDocData, t: Copy): string {
   const text =
@@ -251,7 +259,8 @@ function statusBanner(data: WarrantyDocData, t: Copy): string {
             : '';
   if (!text) return '';
   const tone = data.status === 'expired' ? 'warn' : data.status === 'draft' ? 'draft' : 'bad';
-  return `<div class="banner ${tone}">${escapeHtml(text)}</div>`;
+  const why = data.no_warranty ? ` — ${NO_WARRANTY_NOTE[t === COPY.en ? 'en' : 'ar']}` : '';
+  return `<div class="banner ${tone}">${escapeHtml(text + why)}</div>`;
 }
 
 const CSS = `

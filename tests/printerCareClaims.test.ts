@@ -523,7 +523,11 @@ test('rejecting a claim voids its approved Care in the same move; never once the
   const raw = seed();
   try {
     const id = await approvedCare(raw);
-    const res = await patch(as(raw, OWNER), `/api/devices/admin/claims/${id}`, { stage: 'rejected', decision: 'misuse', reason: 'Burnt by a power surge' });
+    // Phase 8 (row 364): misuse is what Care covers — the desk is told so and must confirm the rejection.
+    const warned = await patch(as(raw, OWNER), `/api/devices/admin/claims/${id}`, { stage: 'rejected', decision: 'misuse', reason: 'Burnt by a power surge' });
+    assert.deepEqual([warned.status, (await json(warned)).code], [409, 'CLAIM_MISUSE_CARE_ACTIVE']);
+    assert.equal(row<{ state: string }>(raw, 'SELECT state FROM care_claim_benefits WHERE claim_id = ?', id)!.state, 'approved');
+    const res = await patch(as(raw, OWNER), `/api/devices/admin/claims/${id}`, { stage: 'rejected', decision: 'misuse', reason: 'Burnt by a power surge', confirm_care_void: true });
     assert.equal(res.status, 200, await res.clone().text());
     assert.equal(row<{ state: string }>(raw, 'SELECT state FROM care_claim_benefits WHERE claim_id = ?', id)!.state, 'void');
     assert.deepEqual([claimRow(raw, id).stage, claimRow(raw, id).claim_kind], ['rejected', null]);
@@ -692,7 +696,9 @@ test('the customer applies for Care (kind: care): only while Care is active on t
     assert.equal(row<{ k: string | null }>(raw, 'SELECT claim_kind AS k FROM warranty_claims WHERE id = ?', plain.id)!.k, null);
     assert.equal((await post(as(raw, BUYER), '/api/devices/units/u2/claims', body('kind-bad-2', 'gift'))).status, 400);
     // Care that ended: refused with 'expired'.
-    raw.exec(`UPDATE order_item_units SET delivered_at = '${iso(Date.now() - 800 * DAY)}' WHERE id = 'u2'`);
+    // The whole window moves, as a delivery correction moves it (phase 8: Care follows the device's real warranty end).
+    raw.exec(`UPDATE order_item_units SET delivered_at = '${iso(Date.now() - 800 * DAY)}', warranty_start_at = '${iso(Date.now() - 800 * DAY)}',
+              warranty_end_at = '${addMonths(iso(Date.now() - 800 * DAY), 12)}' WHERE id = 'u2'`);
     const over = await json(await post(as(raw, BUYER), '/api/devices/units/u2/claims', body('kind-care-2', 'care')));
     assert.deepEqual([over.code, over.details.state], ['CARE_NOT_ACTIVE', 'expired']);
   } finally {

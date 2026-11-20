@@ -47,6 +47,12 @@ const OrderFiles = React.lazy(() => import('../components/orders/OrderFiles'));
  */
 const EstimateStatusCard = React.lazy(() => import('../components/orders/EstimateStatusCard'));
 const EstimateLineChip = React.lazy(() => import('../components/orders/EstimateStatusCard').then((m) => ({ default: m.EstimateLineChip })));
+/**
+ * «خدمات الطابعة» (DECISIONS row 364): what the customer bought with a printer — warranty until…, Levo Care
+ * until…, packaging, inspection, training, home delivery or pickup. Its own chunk: fetched only by an
+ * order that holds a serviced printer.
+ */
+const OrderServicesBlock = React.lazy(() => import('../components/orders/OrderServicesBlock'));
 
 /**
  * ONE order, everything the customer can know or do about it.
@@ -757,7 +763,8 @@ export default function OrderDetail() {
                       if (colourMode === 'chosen') extras.push(loc('لون اخترته', 'Your chosen colour', 'ڕەنگی هەڵبژاردەی خۆت'));
                       else if (colourMode === 'random') extras.push(loc('لون عشوائي', 'Random colour', 'ڕەنگی هەڕەمەکی'));
                       const pd = attached.printer_discount;
-                      if (!struckShown && pd && pd.discount_unit_iqd > 0) extras.push(`${loc('السعر قبل الخصم', 'Price before discount', 'نرخ پێش داشکاندن')}: ${money(pd.before_unit_iqd)}`);
+                      // A snapshot may carry no «before» figure (null): then nothing is said rather than «NaN».
+                      if (!struckShown && pd && pd.discount_unit_iqd > 0) { if (typeof pd.before_unit_iqd === 'number') extras.push(`${loc('السعر قبل الخصم', 'Price before discount', 'نرخ پێش داشکاندن')} (${loc('للقطعة', 'each', 'بۆ هەر دانەیەک')}): ${money(pd.before_unit_iqd)}`); }
                       const method = it.transport?.method;
                       if (method && s.transport[method]) extras.push(s.transport[method]);
                       // A pre-order paid cash on delivery: the line kept its
@@ -831,6 +838,24 @@ export default function OrderDetail() {
                             </div>
                             <p className="text-[13.5px] text-text-primary font-bold tabular-nums shrink-0">{money(it.line_total_iqd, lineUsd?.line)}</p>
                           </div>
+
+                          {/* «خدمات الطابعة» (row 364): what was bought with this printer, in the customer's words. */}
+                          {it.services ? (
+                            <div className="mt-3" data-order-item-services={it.id}>
+                              <ChunkBoundary compact renderFallback={() => null}>
+                                <React.Suspense fallback={null}>
+                                  <OrderServicesBlock
+                                    services={it.services}
+                                    qty={it.qty}
+                                    audience="customer"
+                                    loc={loc}
+                                    money={(n) => money(n)}
+                                    formatDay={(iso) => formatDate(iso, lang)}
+                                  />
+                                </React.Suspense>
+                              </ChunkBoundary>
+                            </div>
+                          ) : null}
 
                           {/* A bundle is ONE item here too, with its parts
                               unfolding underneath (§6.3). Each part's figure is

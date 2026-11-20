@@ -71,9 +71,12 @@ test('the waybill reads the stored selection and leaves bundle parts out', () =>
   const src = readFileSync(join(ROOT, 'worker/routes/admin.ts'), 'utf8');
   assert.match(
     src,
-    /SELECT name_snapshot, option_snapshot, qty,\s*EXISTS \(SELECT 1 FROM order_items k WHERE k\.order_id = order_items\.order_id AND k\.bundle_parent_item_id = order_items\.id\) AS composition_parent\s*FROM order_items WHERE order_id = \? AND bundle_parent_item_id IS NULL/,
-    'the courier query must read option_snapshot, mark a composition parent, and still exclude bundle children'
+    // DECISIONS row 364: the whole row is read (`order_items.*` carries name_snapshot, option_snapshot, qty
+    // and — since 0235 — `line_kind`), so the membership bought with the order is left off the waybill.
+    /SELECT order_items\.\*,\s*EXISTS \(SELECT 1 FROM order_items k WHERE k\.order_id = order_items\.order_id AND k\.bundle_parent_item_id = order_items\.id\) AS composition_parent\s*FROM order_items WHERE order_id = \? AND bundle_parent_item_id IS NULL/,
+    'the courier query must read the stored line, mark a composition parent, and still exclude bundle children'
   );
+  assert.match(src, /const items = \(allItems \?\? \[\]\)\.filter\(isPhysicalLine\);/, 'only what is in the box is named and counted');
   assert.match(src, /itemsSummary: courierItemsSummary\(items \?\? \[\], 500\)/);
   assert.ok(!/\.join\(', '\)\.slice\(0, 500\)/.test(src), 'the mid-line cut is gone');
 });

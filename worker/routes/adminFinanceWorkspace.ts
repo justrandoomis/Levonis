@@ -29,6 +29,8 @@ import { asDocument } from '../lib/securityPolicy';
 import { courierInstalled, courierOverview, courierRemittance, MAX_REMITTANCE_PARCELS, reconcileRemittance, recordRemittance, undoRemittance } from '../lib/courierCollections';
 import { CLOSED_MONTHS_SQL, EXPENSE_ROW_LIMIT, EXPENSE_ROWS_SQL, isGeneralKind, periodExpenses, PROMOTION_HISTORY_LIMIT, PROMOTION_HISTORY_SQL } from '../lib/financeExpenseKinds';
 import { printerBreakdown, serviceClaimsSummary, serviceIncomeDays } from '../lib/printerFinance';
+import { PRINTER_PART_FROM_DAY, printerPartRuleApplies } from '../lib/printerPart';
+import { isSchemaMissing } from '../lib/membershipBenefits';
 
 type Row=Record<string,unknown>;
 const n=(v:unknown)=>Number(v??0),s=(v:unknown)=>String(v??'');
@@ -54,7 +56,7 @@ function range(fromValue?:string,toValue?:string){
   if(days<0||days>365)throw badRequest('اختر فترة لا تتجاوز سنة');
   return {from,to};
 }
-const sumFields=['net_goods_iqd','retained_revenue_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','direct_cost_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','contribution_profit_iqd','profit_basis_iqd','promotion_iqd','investor_iqd','owner_net_iqd','coupon_iqd','price_protection_iqd','trade_in_credit_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd','refunded_iqd','refund_iqd','collected_iqd','collection_difference_iqd','pending_costs','unknown_lines','units'];
+const sumFields=['net_goods_iqd','retained_revenue_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','direct_cost_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','contribution_profit_iqd','profit_basis_iqd','promotion_iqd','investor_iqd','owner_net_iqd','coupon_iqd','price_protection_iqd','trade_in_credit_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd','refunded_iqd','refund_iqd','collected_iqd','collection_difference_iqd','pending_costs','unknown_lines','units','services_profit_iqd'];
 function sumRows(rows:Row[]):Row {
   const totals:Row={};
   for(const key of sumFields)totals[key]=rows.some((r)=>r[key]===null)?null:rows.reduce((v,r)=>v+n(r[key]),0);
@@ -307,13 +309,18 @@ function deliveredDay(b:OrderProfitBase){const at=s(b.order.delivered_at).replac
  */
 const dayCounts=(day:OrderProfitBase[])=>({estimated_orders:day.filter((b)=>b.totals.profit_basis_iqd!=null&&!restsOnConfirmedCosts(b)).length,
   unknown_refund_orders:day.filter((b)=>unknownRefunds(b.lines)>0).length});
-function summaryCharts(bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocated:Map<string,number>,totals:Row,truncated:boolean){
+/** A day's (or the period's) net with the Care co-pay collected on it (service income, DECISIONS row 364): revenue − costs − investor share − deductions + service income = the net. */
+function withService<T extends {owner_net_iqd:number|null;net_after_report_adjustments_iqd:number|null}>(amounts:T,service:number){
+  return {...amounts,service_income_iqd:service,owner_net_iqd:amounts.owner_net_iqd===null?null:amounts.owner_net_iqd+service,
+    net_after_report_adjustments_iqd:amounts.net_after_report_adjustments_iqd===null?null:amounts.net_after_report_adjustments_iqd+service};
+}
+function summaryCharts(bases:OrderProfitBase[],r:{from:string;to:string},expenses:Row[],unallocated:Map<string,number>,totals:Row,truncated:boolean,serviceDays:ReadonlyMap<string,number>=new Map()){
   const groups=new Map<string,OrderProfitBase[]>(),generalByDay=new Map(expenses.map((e)=>[s(e.expense_day),n(e.total)]));
   for(const b of bases){const day=deliveredDay(b),rows=groups.get(day)??[];rows.push(b);groups.set(day,rows);}
   const daily=[];
   for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10),rows=groups.get(day)??[],t=sumRows(rows.map((b)=>b.totals));t.orders_count=rows.length;
     const general=generalByDay.get(day)??0;
-    daily.push({day,...chartAmounts(t,general,unallocated.get(day)??0,truncated),...dayCounts(rows)});}
+    daily.push({day,...withService(chartAmounts(t,general,unallocated.get(day)??0,truncated),serviceDays.get(day)??0),...dayCounts(rows)});}
   const pending=n(totals.pending_costs)>0;
   const expense_composition=[
     {key:'goods',amount_iqd:totals.cogs_iqd===null||truncated?null:n(totals.cogs_iqd)},
@@ -473,7 +480,7 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   const atDay=(day:string,iqd:number)=>{const hit=usdRateAt(steps,baghdadDayStart(day));if(!hit)return null;if(hit.basis==='today')approximate=true;return iqdToCents(iqd,hit.rate);};
   const generalByDay=new Map<string,number>();for(const e of expenses){const c=atDay(s(e.expense_day),n(e.total));if(c===null)return unavailableUsd();generalByDay.set(s(e.expense_day),c);}
   const unallocatedByDay=new Map<string,number>();for(const [day,amount] of unallocatedDays){const c=atDay(day,amount);if(c===null)return unavailableUsd();unallocatedByDay.set(day,c);}
-  let service=0;for(const [day,amount] of serviceDays){const c=atDay(day,amount);if(c===null)return unavailableUsd();service+=c;}
+  let service=0;const serviceByDay=new Map<string,number>();for(const [day,amount] of serviceDays){const c=atDay(day,amount);if(c===null)return unavailableUsd();service+=c;serviceByDay.set(day,c);}
   const general=[...generalByDay.values()].reduce((v,x)=>v+x,0),unallocated=[...unallocatedByDay.values()].reduce((v,x)=>v+x,0);
   // The sum of no order is 0 in dollars as in dinars (sumRows): a period, or a day, without a delivered order
   // owes only its overheads — never a missing headline, cost tile or chart day beside the dinar figure.
@@ -486,9 +493,12 @@ async function summaryInUsd(db:D1Database,bases:OrderProfitBase[],r:{from:string
   Object.assign(totals,{general_expenses_cents:general,unallocated_promotion_cents:unallocated,service_income_cents:service,owner_period_net_cents:periodNet,
     owner_period_net_after_report_adjustments_cents:periodNet===null||afterDeductions===null||afterDeductions===undefined?null:afterDeductions-general-unallocated+service});
   const byDay=new Map<string,Cents[]>();for(const b of bases){const day=deliveredDay(b),rows=byDay.get(day)??[];rows.push(orders.get(b.order_id)!.cents);byDay.set(day,rows);}
-  const daily:Record<string,ReturnType<typeof chartCents>>={};
+  const daily:Record<string,ReturnType<typeof chartCents>&{service_income_cents:number}>={};
   for(let stamp=Date.parse(r.from);stamp<=Date.parse(r.to);stamp+=86400000){const day=new Date(stamp).toISOString().slice(0,10);
-    daily[day]=chartCents(sum(byDay.get(day)??[]),generalByDay.get(day)??0,unallocatedByDay.get(day)??0,truncated);}
+    const cents=chartCents(sum(byDay.get(day)??[]),generalByDay.get(day)??0,unallocatedByDay.get(day)??0,truncated),own=serviceByDay.get(day)??0;
+    // As in dinars: the day's Care co-pay income comes ON its net (DECISIONS row 364).
+    daily[day]={...cents,service_income_cents:own,owner_net_cents:cents.owner_net_cents===null?null:cents.owner_net_cents+own,
+      net_after_report_adjustments_cents:cents.net_after_report_adjustments_cents===null?null:cents.net_after_report_adjustments_cents+own};}
   // A kind without orders is 0 in every column, as its dinar row (sumRows) — never «ناقص» beside «0 طلب».
   const kinds=Object.fromEntries(ORDER_KINDS.map((kind)=>[kind,sum(bases.filter((b)=>(ORDER_KINDS as readonly string[]).includes(s(b.order.order_kind))?b.order.order_kind===kind:kind==='normal').map((b)=>orders.get(b.order_id)!.cents))]));
   const lines=bases.flatMap((b)=>b.lines.map((l)=>({...l,order_id:b.order_id})));
@@ -573,7 +583,9 @@ async function periodFigures(db:D1Database,r:{from:string;to:string}){
   // Printer services phase 3 (DECISIONS row 347): the claims' money. Their costs are already general expenses of their
   // cost day (shown as a line, never subtracted twice); the Care co-pay collected is service income (owner ruling D2),
   // added to the period's net. null / 0 on a database without 0236.
-  const serviceClaims=await serviceClaimsSummary(db,r);
+  // Phase 8 (DECISIONS row 364): the draw prizes delivered in the period are priced from these same lines; the co-pays by day feed the days.
+  const serviceClaims=await serviceClaimsSummary(db,r,{lines:bases.flatMap((b)=>b.lines.map((l)=>({id:l.id,cogs_iqd:l.cogs_iqd})))});
+  const serviceDays=serviceClaims?.copay_iqd?await serviceIncomeDays(db,r):new Map<string,number>();
   const serviceIncome=serviceClaims?.copay_iqd??0;totals.service_income_iqd=serviceIncome;
   totals.owner_period_net_iqd=totals.owner_net_iqd===null||truncated?null:n(totals.owner_net_iqd)-n(totals.general_expenses_iqd)-unallocated+serviceIncome;
   // F4/F5 at the period level: «الصافي بعد خصومات التقرير» — the orders after their own
@@ -587,8 +599,8 @@ async function periodFigures(db:D1Database,r:{from:string;to:string}){
   const lines=bases.flatMap((b)=>b.lines);
   const categories=await withSectionNames(db,[...grouped(lines,'main',postingErrors),...grouped(lines,'sub',postingErrors)]);
   const answer={success:true,range:r,totals,...knownAndMissing(bases,n(totals.general_expenses_iqd),unallocated,truncated,postingErrors,serviceIncome),orders:bases.map((b)=>orderRow(b,postingErrors)),kinds:byKind(bases),products:grouped(lines,'product',postingErrors),categories,
-    order_level:orderLevelOf(bases),chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sales_value',
-    printer_breakdown:printerBreakdown(bases),service_claims:serviceClaims,service_income_iqd:serviceIncome};
+    order_level:orderLevelOf(bases),chart_data:summaryCharts(bases,r,expenseDays,unallocatedDays,totals,truncated,serviceDays),exceptions:exceptions.slice(0,200),promotions:promotions.results??[],general_expenses_iqd:totals.general_expenses_iqd,truncated,allocation_basis:'sales_value',
+    printer_breakdown:printerBreakdown(bases),service_claims:serviceClaims,service_income_iqd:serviceIncome,printer_part_from_day:PRINTER_PART_FROM_DAY};
   return {answer,bases,truncated,expenseDays,unallocatedDays,totals};
 }
 adminFinanceWorkspaceRoutes.get('/summary',async(c)=>{
@@ -618,6 +630,12 @@ adminFinanceWorkspaceRoutes.get('/orders',async(c)=>{
   const orders=ordersInUsd(result.bases,steps,await lotRatesOf(c.env.DB,result.bases));
   return c.json({...answer,display_usd:!orders||(!steps?.today&&!steps?.steps.length)?unavailableUsd():{available:true,today_rate:steps?.today??null,...basisCounts(orders),orders:orderBlock(orders)}});
 });
+/** The Levo Care part-offer discount used on one order (0243); 0 on a database without it. Informational. */
+async function carePartDiscountOf(db:D1Database,orderId:string):Promise<number>{
+  const row=await db.prepare("SELECT COALESCE(SUM(x.amount_iqd),0) total FROM care_part_grants g JOIN coupon_redemption_extras x ON x.coupon_id=g.coupon_id AND x.state='active' WHERE x.order_id=?").bind(orderId).first<{total:number}>()
+    .catch((e:unknown)=>{if(isSchemaMissing(e))return null;throw e;});
+  return Math.trunc(n(row?.total));
+}
 async function detail(db:D1Database,id:string,canVerify=true){
   const base=await getOrderProfitBase(db,id);if(base.order.seller_type!=='levonis')throw notFound('Order not found');
   await addInvestors(db,[base],true);
@@ -628,6 +646,9 @@ async function detail(db:D1Database,id:string,canVerify=true){
   await enrichOrderProfitReview(db,base,canVerify);
   // Printer services phase 3: this order's printer / services / kits / membership split (report-only).
   (base as unknown as Row).printer_breakdown=printerBreakdown([base]);
+  // Phase 8 (DECISIONS row 364): does ruling R1 govern this order's shares (delivered from the rule's first day, or not yet)?
+  // And the Levo Care part-offer discount used on it — a coupon discount already inside its figures, shown only.
+  Object.assign(base as unknown as Row,{printer_part_rule:printerPartRuleApplies(base.order),printer_part_from_day:PRINTER_PART_FROM_DAY,care_part_discount_iqd:await carePartDiscountOf(db,base.order_id)});
   const history=await db.prepare('SELECT a.id,a.order_item_id line_id,a.field,a.old_value_iqd,a.new_value_iqd,a.version,a.actor_id,u.name actor_name,a.created_at,a.reason,a.journal_id FROM finance_order_adjustments a LEFT JOIN users u ON u.id=a.actor_id WHERE a.order_id=? ORDER BY a.version DESC LIMIT 200').bind(id).all<Row>();
   const wages=await db.prepare("SELECT a.id,c.order_item_id line_id,'amount_iqd' field,a.before_iqd old_value_iqd,a.after_iqd new_value_iqd,a.actor_id,u.name actor_name,a.created_at,a.kind,0 version FROM finance_cost_adjustments a JOIN finance_order_costs c ON c.id=a.cost_id LEFT JOIN users u ON u.id=a.actor_id WHERE c.order_id=? ORDER BY a.created_at DESC LIMIT 200").bind(id).all<Row>();
   return {...base,history:[...(history.results??[]),...(wages.results??[])].sort((a,b)=>s(b.created_at).localeCompare(s(a.created_at))).slice(0,200)};
@@ -884,14 +905,15 @@ const ORDER_LEVEL_NAMES=['خصومات على مستوى الطلب','Order-leve
 const EXPORT_VIEWS=['lines','orders','products','sections','days','expenses'] as const;
 const csvFile=(rows:Row[],fields:readonly string[],name:string)=>new Response('\uFEFF'+[fields.map(csvCell).join(','),...rows.map((row)=>fields.map((f)=>csvCell(row[f])).join(','))].join('\r\n'),
   {headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="${name}"`}});
-const MONEY_COLUMNS=['retained_revenue_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd'] as const;
+// Phase 8 (DECISIONS row 364): `services_profit_iqd` («ربح الخدمات») — the printer services' part of retained_revenue_iqd, the shop's; already inside the revenue and the profit, never a further sum.
+const MONEY_COLUMNS=['retained_revenue_iqd','services_profit_iqd','cogs_iqd','gross_profit_iqd','shipping_income_iqd','cod_tax_iqd','wages_iqd','materials_iqd','manual_direct_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd'] as const;
 const NET_COLUMNS=['investor_iqd','owner_net_iqd','coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd'] as const;
 const ORDER_COLUMNS=['order_id','delivered_day','customer_name','order_kind','finance_state','wait_reason','cash_state','revenue_iqd',...MONEY_COLUMNS,'general_expenses_iqd',...NET_COLUMNS,'collected_iqd','collection_difference_iqd','pending_costs','unknown_lines','unknown_refunds','estimated_cost','row_kind'] as const;
 const GROUP_COLUMNS=['kept_qty','returned_qty',...MONEY_COLUMNS,...NET_COLUMNS,'finance_state','wait_reason','estimated_lines','orders_count','pending_costs','unknown_lines','unknown_refunds','row_kind'] as const;
 // Since the second review of step 4 a day also says how many of its orders stand on a sale-time estimate and how many count an
 // unrecorded refund as 0 (dayCounts), as the page does beside its cost, net and revenue; since the third, the estimates only
 // beside a known cost (exportView), where the page names them.
-const DAY_COLUMNS=['day','orders_count','revenue_iqd','cost_iqd','investor_iqd','deductions_iqd','net_after_report_adjustments_iqd','owner_net_iqd','unknown_lines','pending_costs','estimated_orders','unknown_refund_orders'] as const;
+const DAY_COLUMNS=['day','orders_count','revenue_iqd','cost_iqd','investor_iqd','deductions_iqd','service_income_iqd','net_after_report_adjustments_iqd','owner_net_iqd','unknown_lines','pending_costs','estimated_orders','unknown_refund_orders'] as const;
 /** A week or a month of Reports → Days: its first and last day in the period, then the day's columns. */
 const BUCKET_COLUMNS=['from','to',...DAY_COLUMNS.slice(1)] as const;
 /** «غير مصنف» in the file's three name columns: a line with no section, or no subsection. */
@@ -933,7 +955,7 @@ function dayBuckets(daily:Row[],by:'week'|'month'):Row[]{
   for(const d of daily){const day=s(d.day),key=by==='month'?day.slice(0,7):weekOf(day),row=out.get(key);
     if(!row){out.set(key,{...d,from:day,to:day});continue;}
     out.set(key,{from:row.from,to:day,orders_count:n(row.orders_count)+n(d.orders_count),revenue_iqd:n(row.revenue_iqd)+n(d.revenue_iqd),cost_iqd:plus(row.cost_iqd,d.cost_iqd),
-      investor_iqd:plus(row.investor_iqd,d.investor_iqd),deductions_iqd:n(row.deductions_iqd)+n(d.deductions_iqd),
+      investor_iqd:plus(row.investor_iqd,d.investor_iqd),deductions_iqd:n(row.deductions_iqd)+n(d.deductions_iqd),service_income_iqd:n(row.service_income_iqd)+n(d.service_income_iqd),
       net_after_report_adjustments_iqd:plus(row.net_after_report_adjustments_iqd,d.net_after_report_adjustments_iqd),owner_net_iqd:plus(row.owner_net_iqd,d.owner_net_iqd),
       unknown_lines:n(row.unknown_lines)+n(d.unknown_lines),pending_costs:n(row.pending_costs)+n(d.pending_costs),
       estimated_orders:n(row.estimated_orders)+n(d.estimated_orders),unknown_refund_orders:n(row.unknown_refund_orders)+n(d.unknown_refund_orders)});}
@@ -1112,7 +1134,7 @@ adminFinanceWorkspaceRoutes.get('/export.csv',async(c)=>{
   if(view==='expenses')return exportExpenses(c.env.DB,range(c.req.query('from'),c.req.query('to')));
   if(view!=='lines')return exportView(c.env.DB,range(c.req.query('from'),c.req.query('to')),view as Exclude<(typeof EXPORT_VIEWS)[number],'lines'|'expenses'>,level as 'main'|'sub',filter);
   const r=range(c.req.query('from'),c.req.query('to')),{bases,truncated}=await selectOrders(c.env.DB,r,{summary:true});if(truncated)throw badRequest('اختر فترة أضيق لتصدير جميع البنود');
-  const fields=['order_id','id','product_id','name_snapshot','sku_snapshot','qty','returned_qty','main_name','sub_name','net_goods_iqd','refund_iqd','cogs_iqd','cost_confidence','gross_profit_iqd','wages_iqd','materials_iqd','manual_direct_iqd','shipping_income_iqd','cod_tax_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd','investor_iqd','owner_net_iqd','pending_costs','coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd','row_kind'];
+  const fields=['order_id','id','product_id','name_snapshot','sku_snapshot','qty','returned_qty','main_name','sub_name','net_goods_iqd','refund_iqd','cogs_iqd','cost_confidence','gross_profit_iqd','wages_iqd','materials_iqd','manual_direct_iqd','shipping_income_iqd','cod_tax_iqd','courier_fee_iqd','payment_fee_iqd','promotion_iqd','investor_iqd','owner_net_iqd','pending_costs','coupon_iqd','price_protection_iqd','trade_in_credit_returned_iqd','net_after_report_adjustments_iqd','services_profit_iqd','row_kind'];
   const rows=[fields.map(csvCell).join(','),...bases.flatMap((b)=>{const rest=orderLevelDeductions(b);
     return [...b.lines.map((l):Row=>({...l,row_kind:'line'})),...(rest?[rest]:[])].map((l)=>fields.map((f)=>csvCell(f==='order_id'?b.order_id:l[f])).join(','));})];
   return new Response('\uFEFF'+rows.join('\r\n'),{headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':`attachment; filename="finance-lines-${r.from}-${r.to}.csv"`}});

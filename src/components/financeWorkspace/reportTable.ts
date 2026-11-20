@@ -217,7 +217,9 @@ export const bucketOf = (day: string, by: DayGroup) => (by === 'month' ? day.sli
  * known cost and a known net alike: where the net is known every order is complete, and a complete order rests on an estimate
  * exactly when it stands «تقديري»; where only the cost is, it counts the waiting orders whose cost is known too (the second review).
  */
-export interface DayRow { key: string; from: string; to: string; orders: number; revenue: number; cost: Num; investor: Num; deductions: number; net: Num; waiting: number;
+export interface DayRow { key: string; from: string; to: string; orders: number; revenue: number; cost: Num; investor: Num; deductions: number;
+  /** Phase 8: the Levo Care co-pays collected in the row's days — already on `net`. */
+  service: number; net: Num; waiting: number;
   costWaits: number; investorWaits: number; estimated: number; refunds: number }
 const plus = (a: Num, b: Num) => (a == null || b == null ? null : a + b);
 type DayCounts = Pick<DayRow, 'waiting' | 'costWaits' | 'investorWaits' | 'estimated' | 'refunds'>;
@@ -240,14 +242,14 @@ export function groupDays(daily: ReadonlyArray<FinanceChartAmounts & { day: stri
   for (const d of daily) {
     const c = usd?.chart?.daily?.[d.day], counts = countsOn.get(d.day) ?? NO_COUNTS;
     const day: DayRow = usd
-      ? { key: '', from: d.day, to: d.day, orders: d.orders_count, revenue: c?.revenue_cents ?? 0, cost: c ? c.cost_cents : null, investor: c ? c.investor_cents : null, deductions: c?.deductions_cents ?? 0,
+      ? { key: '', from: d.day, to: d.day, orders: d.orders_count, revenue: c?.revenue_cents ?? 0, cost: c ? c.cost_cents : null, investor: c ? c.investor_cents : null, deductions: c?.deductions_cents ?? 0, service: c?.service_income_cents ?? 0,
         net: c ? (c.net_after_report_adjustments_cents !== undefined ? c.net_after_report_adjustments_cents : c.owner_net_cents) : null, ...counts }
-      : { key: '', from: d.day, to: d.day, orders: d.orders_count, revenue: d.revenue_iqd, cost: d.cost_iqd, investor: d.investor_iqd, deductions: d.deductions_iqd ?? 0,
+      : { key: '', from: d.day, to: d.day, orders: d.orders_count, revenue: d.revenue_iqd, cost: d.cost_iqd, investor: d.investor_iqd, deductions: d.deductions_iqd ?? 0, service: d.service_income_iqd ?? 0,
         net: d.net_after_report_adjustments_iqd !== undefined ? d.net_after_report_adjustments_iqd : d.owner_net_iqd, ...counts };
     const key = bucketOf(d.day, by), row = rows.get(key);
     if (!row) { rows.set(key, { ...day, key }); continue; }
     rows.set(key, { key, from: row.from < day.from ? row.from : day.from, to: row.to > day.to ? row.to : day.to, orders: row.orders + day.orders, revenue: row.revenue + day.revenue,
-      cost: plus(row.cost, day.cost), investor: plus(row.investor, day.investor), deductions: row.deductions + day.deductions, net: plus(row.net, day.net),
+      cost: plus(row.cost, day.cost), investor: plus(row.investor, day.investor), deductions: row.deductions + day.deductions, service: row.service + day.service, net: plus(row.net, day.net),
       waiting: row.waiting + day.waiting, costWaits: row.costWaits + day.costWaits, investorWaits: row.investorWaits + day.investorWaits, estimated: row.estimated + day.estimated, refunds: row.refunds + day.refunds });
   }
   return [...rows.values()];

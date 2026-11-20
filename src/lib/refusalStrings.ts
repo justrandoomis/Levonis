@@ -2937,6 +2937,22 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'The pre-dispatch inspection is not done yet — complete it under «Service tasks» in the order details, then try again.',
     ckb: 'پشکنینی پرینتەر پێش ناردن هێشتا تەواو نەکراوە — لە «ئەرکەکانی خزمەتگوزاری» لە وردەکاریی داواکارییەکەدا تەواوی بکە و دووبارە هەوڵ بدەرەوە.',
   },
+  // «مهام الخدمات» on the admin order window (0234; DECISIONS row 364): closing a packing / inspection / Academy task.
+  ORDER_SERVICE_TASK_CLOSED: {
+    ar: 'هذه المهمة أُغلقت من قبل أو تغيّر الطلب أثناء عملك — أعد فتح الطلب لترى حالتها الآن.',
+    en: 'This task was already closed, or the order changed while you were working — reopen the order to see where it stands.',
+    ckb: 'ئەم ئەرکە پێشتر داخراوە، یان داواکارییەکە لە کاتی کارکردنتدا گۆڕاوە — داواکارییەکە دووبارە بکەرەوە تا دۆخی ئێستای ببینیت.',
+  },
+  ORDER_SERVICE_TASK_ORDER_ENDED: {
+    ar: 'الطلب أُلغي أو أُرجع، فلم تعد مهام خدماته تُنفَّذ.',
+    en: 'This order was cancelled or returned, so its service tasks are no longer carried out.',
+    ckb: 'ئەم داواکارییە هەڵوەشێنراوەتەوە یان گەڕێنراوەتەوە، بۆیە ئەرکەکانی خزمەتگوزارییەکەی چیتر جێبەجێ ناکرێن.',
+  },
+  ORDER_SERVICE_TASK_NOTE_REQUIRED: {
+    ar: 'اكتب ملاحظة قبل الإغلاق: للفحص ماذا فُحص وماذا وُجد، وللدورة التعليمية الموعد المتفق عليه.',
+    en: 'Write a note before closing: for the inspection, what was checked and found; for the training session, the agreed time.',
+    ckb: 'پێش داخستن تێبینییەک بنووسە: بۆ پشکنین چی پشکنرا و چی دۆزرایەوە، بۆ خولی فێرکاری کاتی ڕێککەوتوو.',
+  },
   SERIALS_REQUIRED: {
     ar: 'تبقى أرقام تسلسلية غير مرتبطة لهذا الطلب.',
     en: 'Some units of this order still have no serial number linked.',
@@ -3044,6 +3060,47 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     ar: 'أُغلق ضمان هذه الوحدة (مرتجع) — لا يُصدر لها وصل.',
     en: "This unit's warranty was closed (returned) — no receipt can be issued.",
     ckb: 'گەرەنتی ئەم یەکەیە داخراوە (گەڕێنراوەتەوە) — پسووڵەی بۆ دەرناکرێت.',
+  },
+  // Phase 8 (DECISIONS row 364): the warranty desk reads what the customer bought with the printer.
+  NO_WARRANTY_BOUGHT: {
+    ar: 'اشترى الزبون هذه الطابعة بدون ضمان، فلا يصدر لها وصل ضمان. إن أراد المالك منحها ضماناً فليعدّل ضمان الجهاز أولاً (منحة من المالك مع سبب)، ثم يُصدر الوصل.',
+    en: 'The customer bought this printer with no warranty, so no warranty receipt is issued for it. If the owner wants to grant one, change the device’s warranty first (an owner’s goodwill grant with a reason), then issue the receipt.',
+    ckb: 'کڕیار ئەم چاپکەرەی بەبێ گەرەنتی کڕیوە، بۆیە پسووڵەی گەرەنتی بۆ دەرناچێت. ئەگەر خاوەن بیەوێت گەرەنتی پێ ببەخشێت، با سەرەتا گەرەنتی ئامێرەکە بگۆڕێت (بەخشینی خاوەن لەگەڵ هۆکار)، پاشان پسووڵەکە دەربکرێت.',
+  },
+  RECEIPT_FOLLOWS_DEVICE: {
+    ar: 'ضمان هذه الطابعة هو ما اشتراه الزبون مع خدماتها؛ الوصل يطبع سجل الجهاز كما هو، ولا تُكتب له مدة أو تواريخ أخرى. لتغيير المدة يعدّل المالك ضمان الجهاز.',
+    en: 'This printer’s warranty is what the customer bought with its services; the receipt prints the device record as it is and takes no other months or dates. To change the length, the owner changes the device’s warranty.',
+    ckb: 'گەرەنتی ئەم چاپکەرە ئەوەیە کە کڕیار لەگەڵ خزمەتگوزارییەکانیدا کڕیویەتی؛ پسووڵەکە تۆماری ئامێرەکە وەک خۆی چاپ دەکات و ماوە یان بەرواری تر وەرناگرێت. بۆ گۆڕینی ماوەکە، خاوەن گەرەنتی ئامێرەکە دەگۆڕێت.',
+  },
+  SERVICES_WARRANTY_NO_EXTENSION: {
+    ar: 'ضمان هذه الطابعة مدة كاملة اشتراها الزبون مع خدماتها، ولا يُضاف فوقها تمديد. المالك وحده يغيّرها منحةً، بالمدة الكاملة الجديدة مع السبب.',
+    en: 'This printer’s warranty is one total the customer bought with its services; no extension is stacked on it. Only the owner changes it, as goodwill, with the new total and a reason.',
+    ckb: 'گەرەنتی ئەم چاپکەرە یەک ماوەی تەواوە کە کڕیار لەگەڵ خزمەتگوزارییەکانیدا کڕیویەتی، و هیچ درێژکردنەوەیەکی ناخرێتە سەر. تەنها خاوەن وەک بەخشین دەیگۆڕێت، بە ماوە تەواوە نوێیەکە لەگەڵ هۆکار.',
+  },
+  SERVICES_WARRANTY_BELOW_SOLD: {
+    ar: 'لا يُقصَّر الضمان عمّا اشتراه الزبون مع الطابعة.',
+    en: 'The warranty cannot go below what the customer bought with the printer.',
+    ckb: 'گەرەنتی لەوەی کڕیار لەگەڵ چاپکەرەکە کڕیویەتی کەمتر ناکرێتەوە.',
+  },
+  CARRIED_END: {
+    ar: 'هذه وحدة بديلة تحمل تاريخ نهاية ضمان الجهاز الأصلي، فمدتها لا تُعدَّل هنا — عدّل ضمان الوحدة الأصلية.',
+    en: 'This is a replacement unit carrying the original device’s warranty end date, so its months are not changed here — change the original unit’s warranty instead.',
+    ckb: 'ئەمە یەکەیەکی جێگرەوەیە کە بەرواری کۆتایی گەرەنتی ئامێرە ڕەسەنەکەی هەڵگرتووە، بۆیە ماوەکەی لێرە ناگۆڕدرێت — گەرەنتی یەکە ڕەسەنەکە بگۆڕە.',
+  },
+  CONFIRM_SHORTER_REQUIRED: {
+    ar: 'هذا التغيير يُنهي التغطية قبل تاريخها الحالي، وقد يكون الزبون أُبلغ بالتاريخ القديم. أكّد أنك تقصد التقصير ثم احفظ من جديد.',
+    en: 'This change ends the cover earlier than it ends today, and the customer may already have been told the old date. Confirm that you mean to shorten it, then save again.',
+    ckb: 'ئەم گۆڕانکارییە داپۆشینەکە پێش بەرواری ئێستای کۆتایی پێدەهێنێت، و لەوانەیە کڕیار بەرواری کۆنی پێ وترابێت. پشتڕاستی بکەرەوە کە مەبەستت کورتکردنەوەیە، پاشان دووبارە پاشەکەوتی بکە.',
+  },
+  CLAIM_MISUSE_CARE_ACTIVE: {
+    ar: 'على هذا الجهاز ليفو كير سارية، وسوء الاستخدام هو ما تغطيه ليفو كير: اعرض على الزبون خصم ليفو كير من «ليفو كير والتكاليف» بدل الرفض. إن كان الرفض مقصوداً فأكّده، وسيُلغى عرض ليفو كير وعروض القطع غير المستخدمة.',
+    en: 'Levo Care is in force on this device, and misuse is what Levo Care covers: offer the customer the Levo Care discount from «Levo Care and costs» instead of rejecting. If the rejection is intended, confirm it — the Levo Care quote and any unused part offers will be cancelled.',
+    ckb: 'لیڤۆ کێر لەسەر ئەم ئامێرە کارایە، و خراپ بەکارهێنان ئەوەیە کە لیڤۆ کێر دەیگرێتەوە: لەبری ڕەتکردنەوە، لە «لیڤۆ کێر و تێچووەکان»ەوە داشکاندنی لیڤۆ کێر پێشکەشی کڕیار بکە. ئەگەر ڕەتکردنەوەکە مەبەستە، پشتڕاستی بکەرەوە — پێشنیاری لیڤۆ کێر و پێشنیارە بەکارنەهاتووەکانی پارچە هەڵدەوەشێنرێنەوە.',
+  },
+  REPLACE_CARE_ONLY: {
+    ar: 'هذا الجهاز خارج الضمان وعليه ليفو كير فقط: ليفو كير خصم على القطع وليس استبدالاً مجانياً. إن قرّر المالك الاستبدال رغم ذلك فليؤكّده صراحةً مع السبب.',
+    en: 'This device is out of warranty and held by Levo Care only: Levo Care is a discount on parts, not a free replacement. If the owner still decides to replace it, confirm it explicitly with the reason.',
+    ckb: 'ئەم ئامێرە لە دەرەوەی گەرەنتییە و تەنها لیڤۆ کێری لەسەرە: لیڤۆ کێر داشکاندنە لەسەر پارچەکان، نەک گۆڕینی بەخۆڕایی. ئەگەر خاوەن هێشتا بڕیاری گۆڕین بدات، با بە ڕوونی لەگەڵ هۆکار پشتڕاستی بکاتەوە.',
   },
   RETURN_SERIAL_MISMATCH: {
     ar: 'هذا الرقم التسلسلي ليس جهازًا من هذا البند لدى هذا الزبون.',

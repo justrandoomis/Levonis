@@ -43,7 +43,7 @@ import { Check, ChevronsRight, Loader2, ScanLine, Trash2 } from 'lucide-react';
 import { formatIqd, type AdminOrderRow, type OrderStatus } from '../../lib/api';
 import { SERIAL_STRINGS } from './serials/strings';
 import { GOVERNORATE_LABELS } from '../../lib/governorates';
-import { DayChip, DoneChip, OrderKindBadge, PriceHoldBadge, ProBadge, TypeBadge, countText, lateReasonOfRow } from './OrderBoardBadges';
+import { DayChip, DoneChip, OrderKindBadge, PriceHoldBadge, ProBadge, ServiceBadges, TypeBadge, countText, lateReasonOfRow } from './OrderBoardBadges';
 import { DeliveryMethodBadge } from './deliveryMethod';
 import { isFinished } from './archiveSort';
 
@@ -64,16 +64,39 @@ import { isFinished } from './archiveSort';
  *
  * The quantity is written in the digits of the language being read, the same
  * `countText` the header counts use, so «×٢» never sits beside Latin digits.
+ *
+ * A PRINTER'S KIT AND ADD-ONS ARE ITS OWN, NOT MORE LINES (DECISIONS row 364). They used to be flattened
+ * into the list, so «طابعة ×1 · PLA ×2 · فوهة ×1» read as three things to find; they are one box:
+ * «طابعة ×1 + معها: PLA ×2، فوهة ×1». The membership bought with the order is marked as one — it is
+ * not packed — and a gift line says so. `loc` supplies the three words; without it (the older callers)
+ * the marks are symbols only.
  */
-export function itemsSummary(order: Pick<AdminOrderRow, 'items'>, latin: boolean): string {
-  const items = Array.isArray(order.items) ? order.items : [];
+export function itemsSummary(
+  order: Pick<AdminOrderRow, 'items'>,
+  latin: boolean,
+  loc?: (ar: string, en: string, ckb?: string) => string
+): string {
+  const items = (Array.isArray(order.items) ? order.items : []).filter((it) => it && String(it.name ?? '').trim());
+  const one = (it: (typeof items)[number]) => {
+    const qty = Number(it.qty);
+    const n = Number.isFinite(qty) && qty > 0 ? Math.trunc(qty) : 1;
+    const variant = String(it.variant ?? '').trim();
+    return `${String(it.name).trim()}${variant ? ` (${variant})` : ''} ×${countText(n, latin)}`;
+  };
+  const ids = new Set(items.map((it) => it.id));
+  const parentOf = (it: (typeof items)[number]): string | null => {
+    const p = it.kit?.printer_item_id ?? it.addon?.printer_item_id ?? null;
+    return p && ids.has(p) ? p : null;
+  };
+  const withIt = loc ? loc('معها', 'with', 'لەگەڵی') : '+';
+  const sep = latin ? ', ' : '، ';
   return items
-    .filter((it) => it && String(it.name ?? '').trim())
+    .filter((it) => !parentOf(it))
     .map((it) => {
-      const qty = Number(it.qty);
-      const n = Number.isFinite(qty) && qty > 0 ? Math.trunc(qty) : 1;
-      const variant = String(it.variant ?? '').trim();
-      return `${String(it.name).trim()}${variant ? ` (${variant})` : ''} ×${countText(n, latin)}`;
+      if (it.kind === 'membership' || it.line_kind === 'membership') return `${loc ? loc('عضوية', 'Membership', 'ئەندامێتی') : '◇'}: ${String(it.name).trim()}`;
+      const attached = items.filter((x) => parentOf(x) === it.id);
+      const text = `${it.is_gift ? '🎁 ' : ''}${one(it)}`;
+      return attached.length ? `${text} + ${withIt}: ${attached.map(one).join(sep)}` : text;
     })
     .join(' · ');
 }
@@ -121,7 +144,7 @@ export default function OrderBoardRow({
   // The parcel's name, then the account holder's, then nothing — never the
   // email, which is what this row used to lead with.
   const name = order.address?.name || order.customer_name || '';
-  const items = itemsSummary(order, latin);
+  const items = itemsSummary(order, latin, loc);
 
   return (
     <article
@@ -148,6 +171,7 @@ export default function OrderBoardRow({
           <ProBadge order={order} />
           <PriceHoldBadge order={order} loc={loc} />
           <OrderKindBadge order={order} loc={loc} />
+          <ServiceBadges order={order} loc={loc} />
         </div>
 
         <p className="truncate text-[14px] leading-[1.45] font-bold text-text-primary" dir="auto">

@@ -17,6 +17,7 @@
 import React, { useEffect, useState } from 'react';
 import { History } from 'lucide-react';
 import { api, ApiError } from '../../lib/api';
+import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
 import { dateLocale } from '../orders/format';
 
 export interface UnitHistoryEntry {
@@ -41,6 +42,11 @@ const T = {
     delivered: 'التسليم',
     serial: 'الرقم التسلسلي',
     shortened: 'تقصير مؤكَّد',
+    goodwill: (sold: string) => `منحة من المالك (المبيع: ${sold})`,
+    soldNone: 'بدون ضمان',
+    careVoidConfirmed: 'رُفضت رغم ليفو كير (بتأكيد)',
+    careOnlyConfirmed: 'استبدال خارج الضمان بقرار المالك',
+    loadFailed: 'تعذّر تحميل السجل — أعد المحاولة.',
     actions: {
       'device.unit_warranty_months': 'تعديل مدة الضمان',
       'device.unit_delivery_correct': 'تصحيح تاريخ التسليم',
@@ -49,6 +55,7 @@ const T = {
       'device.register': 'رُبط بحساب',
       'device.unregister': 'فُكّ الربط من الحساب',
       'device.unit_replace': 'استبدال الجهاز',
+      'device.window_restored': 'أُعيدت نافذة الضمان إلى بيع هذه الوحدة',
     } as Record<string, string>,
   },
   en: {
@@ -64,6 +71,11 @@ const T = {
     delivered: 'Delivered',
     serial: 'Serial',
     shortened: 'confirmed shortening',
+    goodwill: (sold: string) => `owner’s goodwill (sold: ${sold})`,
+    soldNone: 'no warranty',
+    careVoidConfirmed: 'rejected despite Levo Care (confirmed)',
+    careOnlyConfirmed: 'replaced out of warranty by the owner’s decision',
+    loadFailed: 'Could not load the history — try again.',
     actions: {
       'device.unit_warranty_months': 'Warranty duration changed',
       'device.unit_delivery_correct': 'Delivery date corrected',
@@ -72,6 +84,37 @@ const T = {
       'device.register': 'Linked to an account',
       'device.unregister': 'Unlinked from its account',
       'device.unit_replace': 'Device replaced',
+      'device.window_restored': 'Warranty window restored to this unit’s own sale',
+    } as Record<string, string>,
+  },
+  // Real Sorani, never the Arabic (DECISIONS row 183) — phase 8.
+  ckb: {
+    title: 'مێژووی گۆڕانکارییەکان',
+    empty: 'هیچ گۆڕانکارییەک لەسەر ئەم ئامێرە تۆمار نەکراوە.',
+    loading: 'باردەکرێت…',
+    by: 'لەلایەن',
+    system: 'سیستەم',
+    reason: 'هۆکار',
+    months: 'ماوە',
+    monthsUnit: 'مانگ',
+    end: 'کۆتایی',
+    delivered: 'گەیاندن',
+    serial: 'ژمارە زنجیرەیی',
+    shortened: 'کورتکردنەوەی پشتڕاستکراو',
+    goodwill: (sold: string) => `بەخشینی خاوەن (فرۆشراو: ${sold})`,
+    soldNone: 'بەبێ گەرەنتی',
+    careVoidConfirmed: 'سەرەڕای لیڤۆ کێر ڕەتکرایەوە (بە پشتڕاستکردنەوە)',
+    careOnlyConfirmed: 'گۆڕین لە دەرەوەی گەرەنتی بە بڕیاری خاوەن',
+    loadFailed: 'مێژووەکە بارنەکرا — دووبارە هەوڵ بدەوە.',
+    actions: {
+      'device.unit_warranty_months': 'ماوەی گەرەنتی گۆڕدرا',
+      'device.unit_delivery_correct': 'بەرواری گەیاندن ڕاستکرایەوە',
+      'device.serial_assign': 'ژمارە زنجیرەیی دیاریکرا',
+      'device.serial_reassign': 'ژمارە زنجیرەیی دووبارە دیاریکرا',
+      'device.register': 'بە هەژمارێکەوە بەسترا',
+      'device.unregister': 'لە هەژمارەکەی کرایەوە',
+      'device.unit_replace': 'ئامێرەکە گۆڕدرا',
+      'device.window_restored': 'ماوەی گەرەنتی گەڕێنرایەوە بۆ فرۆشتنی ئەم یەکەیە',
     } as Record<string, string>,
   },
 };
@@ -112,6 +155,11 @@ export function historyFacts(entry: UnitHistoryEntry, t: Strings): string[] {
   }
   if (str(d.new_serial)) out.push(`${t.serial}: ${str(d.new_serial)}`);
   if (d.shortened === true) out.push(t.shortened);
+  // Phase 8: a printer sold with the services — the change was the owner's goodwill over what was sold.
+  if (d.goodwill === true && d.sold_total_months !== undefined) {
+    out.push(t.goodwill(Number(d.sold_total_months) > 0 ? `${str(d.sold_total_months)} ${t.monthsUnit}` : t.soldNone));
+  }
+  if (d.care_only_confirmed === true) out.push(t.careOnlyConfirmed);
   return out;
 }
 
@@ -125,7 +173,7 @@ export default function UnitHistory({
   /** Bumped by the parent after a change it made, so the new row appears. */
   refreshKey?: number;
 }) {
-  const t = lang === 'en' ? T.en : T.ar;
+  const t = lang === 'en' ? T.en : lang === 'ckb' ? T.ckb : T.ar;
   const [rows, setRows] = useState<UnitHistoryEntry[] | null>(null);
   const [err, setErr] = useState('');
 
@@ -138,12 +186,12 @@ export default function UnitHistory({
         if (alive) setRows(r.history ?? []);
       })
       .catch((e: unknown) => {
-        if (alive) setErr(e instanceof ApiError ? e.message : String(e));
+        if (alive) setErr(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), t.loadFailed) : t.loadFailed);
       });
     return () => {
       alive = false;
     };
-  }, [unitId, refreshKey]);
+  }, [unitId, refreshKey, lang, t.loadFailed]);
 
   return (
     <div className="lv-well rounded-md p-2.5" data-unit-history={unitId}>

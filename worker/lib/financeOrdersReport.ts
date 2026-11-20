@@ -58,6 +58,8 @@ const COLUMNS: Array<{ key: string; kind: XlsxColumn['kind']; header: Tri }> = [
   { key: 'customer_name', kind: 'text', header: ['الزبون', 'Customer', 'کڕیار'] },
   { key: 'products', kind: 'text', header: ['المنتجات', 'Products', 'بەرهەمەکان'] },
   { key: 'sales', kind: 'money', header: ['المبيعات', 'Sales', 'فرۆشتن'] },
+  // Phase 8 (DECISIONS row 364): the printer services' part of the sales — the shop's alone; inside «المبيعات», never a further sum.
+  { key: 'services', kind: 'money', header: ['منها ربح الخدمات', 'Of which services profit', 'لەوانە قازانجی خزمەتگوزارییەکان'] },
   { key: 'delivery', kind: 'money', header: ['التوصيل المحصّل', 'Delivery charged', 'گەیاندنی وەرگیراو'] },
   { key: 'cogs', kind: 'money', header: ['تكلفة البضاعة', 'Goods cost', 'تێچووی کاڵا'] },
   { key: 'courier', kind: 'money', header: ['أجرة شركة التوصيل', 'Courier fee', 'کرێی کۆمپانیای گەیاندن'] },
@@ -87,14 +89,14 @@ export function productsOf(bases: ReadonlyArray<{ order_id: string; lines: Reado
 /** One file row from one CSV row (exportOrderRows). */
 export function reportRow(o: Row, products: ReadonlyMap<string, string>, lang: ReportLang): Row {
   if (o.row_kind === 'overhead') {
-    return { order_id: '', delivered_day: '', customer_name: pick(lang, W.overhead), products: '', sales: null, delivery: null, cogs: null, courier: null,
+    return { order_id: '', delivered_day: '', customer_name: pick(lang, W.overhead), products: '', sales: null, services: null, delivery: null, cogs: null, courier: null,
       wages: null, materials: null, promotion: amount(o.promotion_iqd), other: amount(o.general_expenses_iqd), investor: null, discounts: null,
       net: amount(o.net_after_report_adjustments_iqd), state: '', __kind: 'overhead' };
   }
   const state = o.finance_state === 'confirmed' ? W.confirmed : o.finance_state === 'estimated' ? W.estimated : o.finance_state === 'waiting' ? W.waiting : null;
   return {
     order_id: o.order_id, delivered_day: o.delivered_day, customer_name: o.customer_name, products: products.get(String(o.order_id)) ?? '',
-    sales: amount(o.retained_revenue_iqd), delivery: plus(o.shipping_income_iqd, o.cod_tax_iqd), cogs: amount(o.cogs_iqd), courier: amount(o.courier_fee_iqd),
+    sales: amount(o.retained_revenue_iqd), services: amount(o.services_profit_iqd) || null, delivery: plus(o.shipping_income_iqd, o.cod_tax_iqd), cogs: amount(o.cogs_iqd), courier: amount(o.courier_fee_iqd),
     wages: amount(o.wages_iqd), materials: amount(o.materials_iqd), promotion: amount(o.promotion_iqd), other: plus(o.manual_direct_iqd, o.payment_fee_iqd),
     investor: amount(o.investor_iqd), discounts: plus(o.coupon_iqd, o.price_protection_iqd, o.trade_in_credit_returned_iqd),
     net: amount(o.net_after_report_adjustments_iqd), state: state ? pick(lang, state) : '',
@@ -126,7 +128,7 @@ export function ordersReportSheet(input: OrdersReportInput): XlsxSheet {
     rows: input.orders.map((o) => reportRow(o, input.products, lang)),
     // Left to right as the net is built: the order, what came in, what it cost, what went to others, what is left.
     groups: [
-      { label: pick(lang, W.gOrder), span: 4 }, { label: pick(lang, W.gRevenue), span: 2 }, { label: pick(lang, W.gCosts), span: 6 },
+      { label: pick(lang, W.gOrder), span: 4 }, { label: pick(lang, W.gRevenue), span: 3 }, { label: pick(lang, W.gCosts), span: 6 },
       { label: pick(lang, W.gShares), span: 2 }, { label: pick(lang, W.gResult), span: 2 },
     ],
     strong: ['net'],

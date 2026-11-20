@@ -29,6 +29,16 @@ import { IconButton } from '../../ui/Button';
 import { serialStrings, type SerialStrings } from '../../adminOrders/serials/strings';
 import { dateTime, serialRefusal, shortDate } from '../../adminOrders/serials/serialsApi';
 import type { SerialStatus, SerialStory, StoryEvent, WarrantyState } from '../../adminOrders/serials/types';
+import UnitCoverBlock from '../UnitCoverBlock';
+import { DESK, deskLang, type DeskCare, type DeskCover, type DeskServices } from '../deskStrings';
+
+/** Phase 8 (row 364): what the device's line sold and what holds today, from the units door. */
+interface DeskUnit {
+  services?: DeskServices | null;
+  care?: DeskCare | null;
+  cover?: DeskCover | null;
+  warranty?: { remaining_days: number | null };
+}
 
 interface DetailResponse {
   row: null | {
@@ -137,10 +147,19 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [copied, setCopied] = useState(false);
+  const [desk, setDesk] = useState<DeskUnit | null>(null);
+  const d = DESK[deskLang(lang)];
 
   const load = useCallback(async (sn: string) => {
     setLoading(true);
     setError(null);
+    setDesk(null);
+    // What the customer bought and what holds today (phase 8). Its own read, contained: a serial with no
+    // delivered unit simply has none, and this page is whole without it.
+    api
+      .get<{ units: DeskUnit[] }>(`/api/devices/admin/units?serial=${encodeURIComponent(sn)}`)
+      .then((r) => setDesk(r.units?.[0] ?? null))
+      .catch(() => setDesk(null));
     try {
       const res = await api.get<DetailResponse>(`/api/devices/admin/serial-inventory/${encodeURIComponent(sn)}`);
       setData(res);
@@ -179,6 +198,8 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
 
   const warrantyState: WarrantyState | null = story?.warranty.state ?? null;
   const pending = warrantyState === 'PENDING_DELIVERY';
+  // A printer the customer bought with NO warranty: nothing expired — the page says «no warranty», with no end date.
+  const noWarranty = desk?.cover?.warranty === 'none';
 
   // The header is the sheet's drag handle (v2 Sheet); the page below scrolls.
   const header = (
@@ -307,12 +328,23 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
                   <ShieldCheck className="h-3.5 w-3.5" aria-hidden />
                   {s.warrantyCard}
                 </h3>
+                {desk?.cover && (
+                  <div className="lv-surface p-3 mb-2" data-serial-cover>
+                    <UnitCoverBlock
+                      services={desk.services ?? null}
+                      care={desk.care ?? null}
+                      cover={desk.cover}
+                      lang={lang}
+                      remainingDays={desk.warranty?.remaining_days ?? null}
+                    />
+                  </div>
+                )}
                 <Group>
                   <Row
                     label={s.warrantyStatus}
                     value={
-                      <span className={`font-semibold ${WARRANTY_TONE[warrantyState ?? ''] ?? 'text-text-primary'}`} data-serial-warranty-state={warrantyState ?? ''}>
-                        {warrantyState ? s.warranty[warrantyState] ?? warrantyState : s.none}
+                      <span className={`font-semibold ${noWarranty ? 'text-text-secondary' : WARRANTY_TONE[warrantyState ?? ''] ?? 'text-text-primary'}`} data-serial-warranty-state={noWarranty ? 'NONE_BOUGHT' : warrantyState ?? ''}>
+                        {noWarranty ? d.noWarrantyLong : warrantyState ? s.warranty[warrantyState] ?? warrantyState : s.none}
                       </span>
                     }
                   />
@@ -323,7 +355,9 @@ export default function SerialDetail({ serial, onClose }: { serial: string | nul
                   <Row
                     label={s.warrantyEnd}
                     value={
-                      pending && !(story.warranty.mode === 'carry' && story.warranty.end_at) ? (
+                      noWarranty ? (
+                        d.noWarranty
+                      ) : pending && !(story.warranty.mode === 'carry' && story.warranty.end_at) ? (
                         s.atDelivery
                       ) : story.warranty.end_at ? (
                         <span className="inline-flex flex-col items-end">

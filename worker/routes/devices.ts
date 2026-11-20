@@ -72,6 +72,7 @@ import {
   int,
 } from '../lib/http';
 import { newId, sha256Hex } from '../lib/crypto';
+import { addMonths } from '../lib/membershipOps';
 import { audit } from '../lib/audit';
 import { rateLimit, rateLimitKey } from '../lib/ratelimit';
 import { getTierStatus, benefits } from '../lib/entitlements';
@@ -109,10 +110,16 @@ import {
   CLAIM_ALREADY_OPEN_CUSTOMER,
   CLAIM_ALREADY_OPEN_DESK,
   claimFiledColumnsInstalled,
+  soldServicesOf,
+  servicesSnapshots,
+  unitMonthsExact,
   type ClaimStage,
+  type SoldServices,
   type UnitRow,
   type WarrantySnapshotLite,
 } from '../lib/deviceOps';
+import { COVER_VERDICTS, claimCoverVerdicts, deskSummary, unitDeskFacts, type ClaimCover, type CoverVerdict } from '../lib/warrantyDesk';
+import { likePattern } from '../lib/sqlLike';
 import { linkFromInventory } from '../lib/serialInventory';
 import { canonicalSerial, judgeFormat, maskedDetail, refuse as serialRefuse, serialActor, serialAssignmentsInstalled } from '../lib/serialAssignments';
 import { formatAudit, ruleForUnit } from '../lib/serialRules';
@@ -471,10 +478,16 @@ async function adminUnitsWithAccounts(db: D1Database, rows: DeviceRow[]) {
   const byId = new Map(people.map((x) => [x.id, x]));
   const person = (id: string | null | undefined): AdminAccount | null => (id ? byId.get(id) ?? null : null);
   const histories = await historiesOf(db, rows);
+  // Phase 8 (DECISIONS row 364): what each device's line SOLD (warranty 0 / 12 / 24, Levo Care, the inspection),
+  // its Care window, and what holds today — so «no warranty bought» never reads as an expired warranty.
+  const desk = await unitDeskFacts(db, rows);
   return rows.map((r) => ({
     ...devicePublic(r, { admin: true, history: histories.get(r.id) }),
     buyer: person(r.owner_user_id),
     holder: r.reg_user_id && !r.revoked_at ? person(r.reg_user_id) : null,
+    services: desk.get(r.id)?.services ?? null,
+    care: desk.get(r.id)?.care ?? null,
+    cover: desk.get(r.id)?.cover ?? null,
   }));
 }
 
@@ -1967,6 +1980,15 @@ deviceRoutes.patch('/admin/units/:unitId/warranty', async (c) => {
 
   const oldTotal = unitTotalMonths(unit);
   /**
+   * A PRINTER SOLD WITH THE SERVICES (phase 8, DECISIONS row 364). Its warranty is a TOTAL the customer bought —
+   * 0, 12 or 24 months, nothing stacked on it (row 339) — so this door takes no base + extension for it. What it
+   * takes is the OWNER'S GOODWILL: `total_months` with a reason, never below what was sold (the customer paid for
+   * that), audited with both. Levo Care's «only cover from» then follows the device's real warranty end
+   * (worker/lib/careClaims.ts `careWindow`), so the two can no longer drift apart.
+   */
+  const sold = soldServicesOf((await servicesSnapshots(c.env.DB, { itemId: unit.order_item_id })).get(unit.order_item_id) ?? null);
+  if (sold) return servicesUnitWarranty(c, unit, sold, body, reason);
+  /**
    * THE DEFAULT IS NOT EXEMPT FROM THE FLOOR. `int(v, name, { def })` returns
    * `def` BEFORE it compares against `min` (worker/lib/http.ts) — the early
    * return sits above the range check — so passing the stored value straight
@@ -2082,6 +2104,102 @@ deviceRoutes.patch('/admin/units/:unitId/warranty', async (c) => {
   });
 });
 
+/** The goodwill door of a services unit — see the PATCH above. */
+async function servicesUnitWarranty(
+  c: Context<AppContext>,
+  unit: UnitRow,
+  sold: SoldServices,
+  body: Record<string, unknown>,
+  reason: string
+) {
+  const admin = c.get('user')!;
+  const pv = safeParse<Record<string, unknown>>(unit.policy_version, {});
+  // A RESOLD device carries its first sale's warranty (owner decision 3): its months are not this door's.
+  // A warranty REPLACEMENT is the device the customer holds now for the same sale: the owner's goodwill is
+  // granted on it (the replaced unit is history), counted from the original start it carries.
+  if (pv.carried === 'original_end' && !(typeof pv.replacement_of === 'string' && pv.replacement_of && !pv.resale_of)) {
+    throw conflict(
+      'This unit carries the ORIGINAL device\'s warranty end date — its months are not the lever. Change the original unit\'s warranty instead.',
+      'CARRIED_END'
+    );
+  }
+  const refuse = (code: 'SERVICES_WARRANTY_NO_EXTENSION' | 'SERVICES_WARRANTY_BELOW_SOLD', text: string) =>
+    new HttpError(code === 'SERVICES_WARRANTY_NO_EXTENSION' ? 400 : 409, text, code, { sold_months: sold.warranty_months });
+  // No «extension» on a total: a page that still sends the two old fields is told, never guessed at.
+  if (Number(body.ext_months) > 0 || (body.total_months === undefined && body.base_months !== undefined)) {
+    throw refuse(
+      'SERVICES_WARRANTY_NO_EXTENSION',
+      'ضمان هذه الطابعة مدة كاملة اشتراها الزبون مع خدماتها (بلا تمديد فوقها). المالك وحده يغيّرها منحةً: أرسل المدة الكاملة الجديدة مع السبب. / This printer\'s warranty is one total the customer bought with its services (nothing is stacked on it). Only the owner changes it, as goodwill: send the new total with a reason. / گەرەنتی ئەم چاپکەرە یەک ماوەی تەواوە کە کڕیار لەگەڵ خزمەتگوزارییەکانیدا کڕیویەتی (هیچ درێژکردنەوەیەکی لەسەر نییە). تەنها خاوەن وەک بەخشین دەیگۆڕێت: ماوە تەواوە نوێیەکە لەگەڵ هۆکار بنێرە.'
+    );
+  }
+  const total = int(body.total_months, 'total_months', { min: 0, max: 240 });
+  const before = unitMonthsExact(unit) ?? sold.warranty_months;
+  if (total < sold.warranty_months) {
+    throw refuse(
+      'SERVICES_WARRANTY_BELOW_SOLD',
+      'لا يُقصَّر الضمان عمّا اشتراه الزبون مع الطابعة. / The warranty cannot go below what the customer bought with the printer. / گەرەنتی لەوەی کڕیار لەگەڵ چاپکەرەکە کڕیویەتی کەمتر ناکرێتەوە.'
+    );
+  }
+  // Every change on a sold total is the owner's alone — more months (goodwill) or taking goodwill back.
+  const authority = assertMoneyAuthority(c, { act: 'warranty_lengthen' });
+  const nextPolicy = JSON.stringify({
+    ...pv,
+    base: total,
+    ext: 0,
+    total,
+    sold_total: sold.warranty_months,
+    ...(total > sold.warranty_months ? { goodwill: { months: total - sold.warranty_months, by: admin.id, at: new Date().toISOString() } } : { goodwill: undefined }),
+  });
+  const start = unit.warranty_start_at ?? unit.delivered_at;
+  const win = unit.delivered_at && start ? { start_at: start, end_at: addMonths(start, total) } : { start_at: unit.warranty_start_at, end_at: unit.warranty_end_at };
+  const oldEndMs = unit.warranty_end_at ? Date.parse(unit.warranty_end_at) : NaN;
+  const newEndMs = win.end_at ? Date.parse(win.end_at) : NaN;
+  const shortens = Number.isFinite(oldEndMs) && Number.isFinite(newEndMs) && newEndMs < oldEndMs;
+  if (shortens && body.confirm_shorter !== true) {
+    throw new HttpError(
+      409,
+      'This shortens a warranty the customer may already have been told about. Repeat with the explicit confirm_shorter flag to record the decision.',
+      'CONFIRM_SHORTER_REQUIRED'
+    );
+  }
+  await c.env.DB.prepare(
+    `UPDATE order_item_units
+        SET warranty_base_months = ?, warranty_ext_months = 0, warranty_start_at = ?, warranty_end_at = ?, policy_version = ?
+      WHERE id = ?`
+  )
+    .bind(total, win.start_at, win.end_at, nextPolicy, unit.id)
+    .run();
+  await audit(c.env.DB, admin.id, 'device.unit_warranty_months', unit.id, {
+    reason,
+    services_unit: true,
+    goodwill: total > sold.warranty_months,
+    sold_total_months: sold.warranty_months,
+    shortened: shortens,
+    old_base_months: unit.warranty_base_months,
+    new_base_months: total,
+    old_ext_months: Number(unit.warranty_ext_months) || 0,
+    new_ext_months: 0,
+    old_total_months: before,
+    new_total_months: total,
+    old_end_at: unit.warranty_end_at,
+    new_end_at: win.end_at,
+    authority: authority.audit,
+  });
+  const cov = coverageState(unit.delivered_at, win.end_at);
+  return c.json({
+    success: true,
+    base_months: total,
+    ext_months: 0,
+    months: total,
+    sold_months: sold.warranty_months,
+    goodwill: total > sold.warranty_months,
+    warranty_start_at: win.start_at,
+    warranty_end_at: win.end_at,
+    shortened: shortens,
+    state: total === 0 ? 'none' : cov.state,
+  });
+}
+
 // ------------------------------------------------------------- replacement
 
 /** A WHOLE-UNIT REPLACEMENT is the owner's act alone (owner decision 3, row 223): a new device for an old one. */
@@ -2114,6 +2232,19 @@ deviceRoutes.post('/admin/units/:unitId/replace', requireMoneyAuthority('warrant
   if (!unit) throw notFound('Unit not found');
   if (unit.replaced_by_unit_id) throw conflict('This unit was already replaced');
 
+  // Phase 8 (DECISIONS row 364): LEVO CARE IS A DISCOUNT ON PARTS, NOT A FREE REPLACEMENT. A device whose warranty
+  // is not in force (none was bought, or it ended) and that is held only by Levo Care is replaced only when the
+  // owner says so on purpose — the flag is the second, explicit yes; the reason is already required above.
+  const deskFacts = (await unitDeskFacts(c.env.DB, [unit])).get(unitId);
+  if (deskFacts?.cover.now === 'care' && body.confirm_care_only !== true) {
+    throw new HttpError(
+      409,
+      'هذا الجهاز خارج الضمان وعليه ليفو كير فقط: ليفو كير خصم على القطع وليس استبدالاً مجانياً. إن قرّر المالك الاستبدال رغم ذلك فليؤكّده صراحةً مع السبب. / This device is out of warranty and held by Levo Care only: Levo Care is a discount on parts, not a free replacement. If the owner still decides to replace it, confirm it explicitly with the reason. / ئەم ئامێرە لە دەرەوەی گەرەنتییە و تەنها لیڤۆ کێری لەسەرە: لیڤۆ کێر داشکاندنە لەسەر پارچەکان، نەک گۆڕینی بەخۆڕایی. ئەگەر خاوەن هێشتا بڕیاری گۆڕین بدات، با بە ڕوونی لەگەڵ هۆکار پشتڕاستی بکاتەوە.',
+      'REPLACE_CARE_ONLY',
+      { care_end_at: deskFacts.care?.end_at ?? null }
+    );
+  }
+
   if (newSerialNorm) {
     const taken = await c.env.DB.prepare('SELECT unit_id FROM device_serials WHERE serial_norm = ?').bind(newSerialNorm).first();
     if (taken) throw conflict('The replacement serial is already assigned — resolve that first');
@@ -2144,7 +2275,9 @@ deviceRoutes.post('/admin/units/:unitId/replace', requireMoneyAuthority('warrant
     replacement_of: unit.id,
     base: unit.warranty_base_months,
     ext: unit.warranty_ext_months,
-    total: unitTotalMonths(unit),
+    // The zero kept (phase 8): a device bought with NO warranty is replaced by one with no warranty — `null`
+    // («not configured») let the replacement be handed the shop's default months on its receipt.
+    total: unitMonthsExact(unit),
   });
 
   const guard = 'EXISTS (SELECT 1 FROM order_item_units WHERE id = ?1)'; // new unit was created in this batch
@@ -2256,6 +2389,7 @@ deviceRoutes.post('/admin/units/:unitId/replace', requireMoneyAuthority('warrant
     new_serial: newSerialNorm || null,
     revoked_registration: !!activeReg,
     warranty_rule: 'carried_original_end',
+    ...(deskFacts?.cover.now === 'care' ? { care_only_confirmed: true } : {}),
     ...(format ? { format } : {}),
   });
   return c.json({
@@ -2328,39 +2462,107 @@ deviceRoutes.get('/admin/claims', async (c) => {
   const page = int(c.req.query('page'), 'page', { min: 1, max: 100_000, def: 1 });
   const after = parseClaimsCursor(c.req.query('after'));
   const stageSql = effectiveClaimStageSql('wc');
-  const conds: string[] = [];
-  const binds: unknown[] = [];
+  // Phase 8 (DECISIONS row 364): the queue is searched and filtered where it is paged — in the database.
+  //   kind   warranty | care           the claim's own kind (0236; ignored on a database before it)
+  //   q      serial / customer / order one box: the serial, the customer's email, username or name, an order id
+  //   cover  one of the four situations — judged per claim at its filing, so it is applied while the pages are
+  //          read (a bounded scan, the keyset continuing from the last row READ, never an offset)
+  const kindRaw = str(c.req.query('kind'), 'kind', { max: 20, required: false });
+  if (kindRaw && kindRaw !== 'all' && kindRaw !== 'warranty' && kindRaw !== 'care') throw badRequest('kind must be one of: all, warranty, care');
+  const kindFilter = kindRaw === 'warranty' || kindRaw === 'care' ? kindRaw : '';
+  const coverRaw = str(c.req.query('cover'), 'cover', { max: 20, required: false });
+  if (coverRaw && coverRaw !== 'all' && !(COVER_VERDICTS as readonly string[]).includes(coverRaw)) {
+    throw badRequest(`cover must be one of: all, ${COVER_VERDICTS.join(', ')}`);
+  }
+  const coverFilter = coverRaw && coverRaw !== 'all' ? (coverRaw as CoverVerdict) : '';
+  const search = likePattern(str(c.req.query('q'), 'q', { max: 120, required: false }));
+  const careInstalled = await careClaimsInstalled(c.env.DB);
+  const filterConds: string[] = [];
+  const filterBinds: unknown[] = [];
+  if (kindFilter && careInstalled) {
+    filterConds.push(kindFilter === 'care' ? "wc.claim_kind = 'care'" : "COALESCE(wc.claim_kind, 'warranty') <> 'care'");
+  }
+  if (search) {
+    const like = "LIKE ? ESCAPE '\\'";
+    filterConds.push(
+      `(s.serial_raw ${like} OR s.serial_norm ${like} OR u.email ${like} OR u.username ${like} OR u.name ${like} OR wc.id ${like} OR ou.order_id ${like})`
+    );
+    for (let i = 0; i < 7; i++) filterBinds.push(search);
+  }
+  const conds: string[] = [...filterConds];
+  const binds: unknown[] = [...filterBinds];
   if (stageFilter) {
     conds.push(`${stageSql} = ?`);
     binds.push(stageFilter);
   }
-  if (after) {
-    conds.push('(wc.priority, wc.created_at, wc.id) < (?, ?, ?)');
-    binds.push(after.priority, after.created_at, after.id);
-  }
-  const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-
-  const [{ results }, byStage] = await Promise.all([
-    c.env.DB.prepare(
-      `SELECT wc.*, s.serial_raw, u.email, u.username,${CLAIM_THREAD_COLS}
-         FROM warranty_claims wc
+  const FROM = `FROM warranty_claims wc
          LEFT JOIN device_serials s ON s.unit_id = wc.unit_id
          LEFT JOIN users u ON u.id = wc.user_id
-        ${where}
+         LEFT JOIN order_item_units ou ON ou.id = wc.unit_id`;
+  const pageOf = (cursor: { priority: number; created_at: string; id: string } | null, take: number, offset: number) => {
+    const w = [...conds];
+    const b = [...binds];
+    if (cursor) {
+      w.push('(wc.priority, wc.created_at, wc.id) < (?, ?, ?)');
+      b.push(cursor.priority, cursor.created_at, cursor.id);
+    }
+    return c.env.DB.prepare(
+      `SELECT wc.*, s.serial_raw, u.email, u.username, u.name AS customer_name, ou.order_id AS unit_order_id,${CLAIM_THREAD_COLS}
+         ${FROM}
+        ${w.length ? `WHERE ${w.join(' AND ')}` : ''}
         ORDER BY wc.priority DESC, wc.created_at DESC, wc.id DESC
         LIMIT ? OFFSET ?`
     )
-      // One row past the page tells a keyset page whether another follows.
-      .bind(...binds, limit + 1, after ? 0 : (page - 1) * limit)
-      .all<ClaimRow>(),
-    c.env.DB.prepare(`SELECT ${stageSql} AS stage, COUNT(*) AS n FROM warranty_claims wc GROUP BY 1`).all<{ stage: string; n: number }>(),
-  ]);
+      .bind(...b, take, offset)
+      .all<ClaimRow>();
+  };
+  const cursorOf = (r: ClaimRow) => ({ priority: Number(r.priority) || 0, created_at: r.created_at, id: r.id });
+
+  let rows: ClaimRow[];
+  let hasMore: boolean;
+  let lastRow: ClaimRow | undefined;
+  const verdicts = new Map<string, ClaimCover>();
+  if (!coverFilter) {
+    // One row past the page tells a keyset page whether another follows.
+    const { results } = await pageOf(after, limit + 1, after ? 0 : (page - 1) * limit);
+    rows = results.slice(0, limit);
+    hasMore = results.length > limit;
+    lastRow = rows[rows.length - 1];
+    for (const [k, v] of await claimCoverVerdicts(c.env.DB, rows)) verdicts.set(k, v);
+  } else {
+    rows = [];
+    hasMore = false;
+    let cursor = after;
+    // At most 6 reads of 100: «عرض المزيد» continues from the last row read, matched or not.
+    for (let read = 0; read < 6 && rows.length < limit; read++) {
+      const { results } = await pageOf(cursor, 101, 0);
+      const batch = results.slice(0, 100);
+      const got = await claimCoverVerdicts(c.env.DB, batch);
+      hasMore = results.length > 100;
+      for (const r of batch) {
+        lastRow = r;
+        if (got.get(r.id)?.verdict === coverFilter) {
+          rows.push(r);
+          verdicts.set(r.id, got.get(r.id)!);
+          if (rows.length >= limit) {
+            hasMore = hasMore || r !== batch[batch.length - 1];
+            break;
+          }
+        }
+      }
+      if (!batch.length || results.length <= 100) break;
+      cursor = cursorOf(lastRow!);
+    }
+  }
+  const byStage = await c.env.DB.prepare(
+    `SELECT ${stageSql} AS stage, COUNT(*) AS n ${FROM} ${filterConds.length ? `WHERE ${filterConds.join(' AND ')}` : ''} GROUP BY 1`
+  )
+    .bind(...filterBinds)
+    .all<{ stage: string; n: number }>();
   const counts: Record<string, number> = Object.fromEntries(CLAIM_STAGES.map((st) => [st, 0]));
   for (const r of byStage.results) counts[r.stage] = Number(r.n) || 0;
   const all = Object.values(counts).reduce((a, b) => a + b, 0);
   const total = stageFilter ? counts[stageFilter] ?? 0 : all;
-  const rows = results.slice(0, limit);
-  const lastRow = rows[rows.length - 1];
   /**
    * «تفيد في صيانة وطلب صيانة الطابعة» (0148): the spare parts that fit the
    * claimed printer — its MODEL's, for a used unit — so the team handling the
@@ -2391,6 +2593,10 @@ deviceRoutes.get('/admin/claims', async (c) => {
       const sum = money.get(r.id);
       return {
         ...claimPublic(r, { admin: true }),
+        // Phase 8: which of the four situations the claim was filed in, and the two doors a claim leads to.
+        cover: verdicts.get(r.id) ?? null,
+        order_id: typeof r.unit_order_id === 'string' ? r.unit_order_id : null,
+        customer_name: typeof r.customer_name === 'string' && r.customer_name ? r.customer_name : null,
         maintenance: m ? { printer_slug: m.slug, count: m.count, path: maintenancePath } : null,
         care_benefit: sum?.benefit ?? null,
         costs_total_iqd: seesMoney && sum ? sum.costs_total_iqd : null,
@@ -2399,9 +2605,11 @@ deviceRoutes.get('/admin/claims', async (c) => {
     page,
     limit,
     total,
-    has_more: results.length > limit,
+    has_more: hasMore,
     next_cursor: lastRow ? JSON.stringify([Number(lastRow.priority) || 0, lastRow.created_at, lastRow.id]) : null,
     counts: { all, ...counts },
+    // The desk's strip, on the first page only (it is the whole desk, not the filtered queue).
+    ...(!after && page === 1 ? { summary: await deskSummary(c.env.DB) } : {}),
   });
 });
 
@@ -2481,6 +2689,29 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
         ...(await partOffersRevokeOnReject(c.env.DB, id, admin.id, reason || claim.decision_reason || 'rejected')),
       ]
     : [];
+  // Phase 8 (DECISIONS row 364): NOTHING OF LEVO CARE IS TAKEN BACK IN SILENCE. Rejecting used to void the claim's
+  // Care quote and take back its part offers without a word — and misuse is exactly what Levo Care covers. The
+  // move into «rejected» is refused until the desk says it means it (`confirm_care_void: true`) whenever
+  //   · the claim is a Levo Care claim, or
+  //   · it holds a live Care quote or an unused part offer (whatever the decision — or none: an older page), or
+  //   · the decision is misuse and Levo Care was in force at the filing;
+  // and so is turning an already rejected claim's decision into misuse on a device whose Care was in force.
+  // The right door is the Care panel. Nothing changes for a device without Care.
+  if (nextStage === 'rejected' && body.confirm_care_void !== true) {
+    const entering = current !== 'rejected';
+    const toMisuse = decision === 'misuse' && (entering || stored !== 'misuse');
+    const careActive = async () => !!claim.unit_id && (await claimCoverVerdicts(c.env.DB, [claim])).get(id)?.care === 'active';
+    const needs = (entering && (claim.claim_kind === 'care' || careVoid.length > 0)) || (toMisuse && (await careActive()));
+    if (needs) {
+      const cover = claim.unit_id ? (await claimCoverVerdicts(c.env.DB, [claim])).get(id) : undefined;
+      throw new HttpError(
+        409,
+        'على هذا الجهاز ليفو كير سارية، وسوء الاستخدام هو ما تغطيه ليفو كير: اعرض على الزبون خصم ليفو كير من لوحة «ليفو كير والتكاليف» بدل الرفض. إن كان الرفض مقصوداً فأكّده، وسيُلغى عرض ليفو كير وعروض القطع غير المستخدمة. / Levo Care is in force on this device, and misuse is what Levo Care covers: offer the customer the Levo Care discount from the «Levo Care and costs» panel instead of rejecting. If the rejection is intended, confirm it — the Levo Care quote and any unused part offers will be cancelled. / لیڤۆ کێر لەسەر ئەم ئامێرە کارایە، و خراپ بەکارهێنان ئەوەیە کە لیڤۆ کێر دەیگرێتەوە: لەبری ڕەتکردنەوە، لە پانێڵی «لیڤۆ کێر و تێچووەکان»ەوە داشکاندنی لیڤۆ کێر پێشکەشی کڕیار بکە. ئەگەر ڕەتکردنەوەکە مەبەستە، پشتڕاستی بکەرەوە — پێشنیاری لیڤۆ کێر و پێشنیارە بەکارنەهاتووەکانی پارچە هەڵدەوەشێنرێنەوە.',
+        'CLAIM_MISUSE_CARE_ACTIVE',
+        { care_end_at: cover?.care_end_at ?? null, would_void: careVoid.length > 0 }
+      );
+    }
+  }
 
   // G-4: «REPLACED» NEEDS THE REPLACEMENT. The customer is told the device was
   // replaced, so the unit must carry the replacement the owner recorded
@@ -2554,6 +2785,7 @@ deviceRoutes.patch('/admin/claims/:id', async (c) => {
     reason,
     user_id: claim.user_id,
     unit_id: claim.unit_id,
+    ...(nextStage === 'rejected' && body.confirm_care_void === true ? { care_void_confirmed: true } : {}),
     ...(authority ? { authority: authority.audit } : {}),
   });
   /**

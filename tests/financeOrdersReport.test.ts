@@ -96,9 +96,9 @@ test('the workbook is the CSV’s rows in the brief’s columns, with the overhe
   assert.match(sheet, /rightToLeft="1"/);
   const grid = cells(sheet);
   const header = 7; // four heading lines, a blank, the column groups, then the header
-  assert.deepEqual(['A', 'E', 'G', 'M', 'O'].map((c) => grid.get(header - 1)!.get(c)!.value), ['الطلب', 'الإيراد', 'التكاليف', 'الحصص والخصومات', 'النتيجة'], 'the groups over the header');
-  assert.match(sheet, /<mergeCell ref="A6:D6"\/><mergeCell ref="E6:F6"\/><mergeCell ref="G6:L6"\/>/);
-  assert.match(sheet, /<autoFilter ref="A7:P\d+"\/>/, 'a filter on the header');
+  assert.deepEqual(['A', 'E', 'H', 'N', 'P'].map((c) => grid.get(header - 1)!.get(c)!.value), ['الطلب', 'الإيراد', 'التكاليف', 'الحصص والخصومات', 'النتيجة'], 'the groups over the header');
+  assert.match(sheet, /<mergeCell ref="A6:D6"\/><mergeCell ref="E6:G6"\/><mergeCell ref="H6:M6"\/>/);
+  assert.match(sheet, /<autoFilter ref="A7:Q\d+"\/>/, 'a filter on the header');
   assert.match(sheet, /<pageSetup paperSize="9" orientation="landscape" fitToWidth="1" fitToHeight="0"\/>/);
   assert.equal(grid.get(header)!.get('A')!.value, 'رقم الطلب');
   assert.equal(grid.get(header)!.get(LETTER.net)!.value, 'صافي الربح');

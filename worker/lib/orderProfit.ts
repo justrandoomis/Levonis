@@ -7,6 +7,7 @@ import { COST_BASIS, isConfirmedOrderCost, normalizeCostBasis } from './financeL
 import { membershipDiscountAtLine } from './orderMembership';
 import { participantNetFingerprintSql } from './participantProfit';
 import { financialCostLines } from './financeCostScope';
+import { printerPartOf } from './printerPart';
 
 type Row = Record<string, unknown>;
 const n = (v: unknown) => Number(v ?? 0);
@@ -133,6 +134,9 @@ const fieldKey = (field: ProfitField) => field === 'shipping_iqd' ? 'shipping_in
 export function refreshProfit(base: OrderProfitBase) {
   for (const l of base.lines) {
     l.retained_revenue_iqd = l.net_goods_iqd - l.refund_iqd;
+    // Phase 8 (DECISIONS row 364) «ربح الخدمات»: a serviced printer line's services, of what it retains — the shop's.
+    // Report figure only (already inside the line's revenue and profit); a line without services carries no such key.
+    if (l.services_snapshot) (l as Row).services_profit_iqd = printerPartOf(l).services_retained_iqd;
     l.gross_profit_iqd = l.cogs_iqd === null || n(l.unknown_refund)>0 ? null : l.retained_revenue_iqd - l.cogs_iqd;
     l.contribution_profit_iqd = l.gross_profit_iqd === null || n(l.pending_costs) > 0 ? null : l.gross_profit_iqd + l.shipping_income_iqd + l.cod_tax_iqd - l.direct_cost_iqd - l.manual_direct_iqd - l.courier_fee_iqd - l.payment_fee_iqd;
     l.profit_basis_iqd = l.contribution_profit_iqd;
@@ -147,6 +151,7 @@ export function totalProfit(lines: ProfitLine[]): ProfitTotals {
   total.units = lines.reduce((sum, l) => sum + l.qty, 0);
   total.returned_units = lines.reduce((sum, l) => sum + l.returned_qty, 0);
   total.refunded_iqd = total.refund_iqd;
+  total.services_profit_iqd = lines.reduce((sum, l) => sum + n(l.services_profit_iqd), 0);
   total.unknown_lines = lines.filter((l) => l.cogs_iqd === null).length;
   total.pending_costs = lines.reduce((sum, l) => sum + n(l.pending_costs), 0);
   return total as ProfitTotals;

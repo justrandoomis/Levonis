@@ -22,12 +22,13 @@ import type { Context } from 'hono';
 import type { AppContext } from '../lib/types';
 import { trustedOrigin } from '../lib/appOrigin';
 import { safeParse } from '../lib/types';
-import { requireAdmin, requireAuth, badRequest, notFound, conflict, str, int, oneOf } from '../lib/http';
+import { HttpError, requireAdmin, requireAuth, badRequest, notFound, conflict, str, int, oneOf } from '../lib/http';
 import { newId } from '../lib/crypto';
 import { audit } from '../lib/audit';
 import { rateLimit } from '../lib/ratelimit';
 import { getSetting, setSetting } from '../lib/settings';
-import { normalizeSerial, unitTotalMonths, type UnitRow } from '../lib/deviceOps';
+import { normalizeSerial, unitMonthsExact, unitTotalMonths, type UnitRow } from '../lib/deviceOps';
+import { unitDeskFacts, unitHasNoWarranty } from '../lib/warrantyDesk';
 import { originStarts, unitIdentity, type UsedSaleCover } from '../lib/deviceCustody';
 import { monthsWords } from '../../packages/pricing/src/warrantyTime';
 import { maskedDetail, serialActor } from '../lib/serialAssignments';
@@ -196,16 +197,57 @@ warrantyPublicRoutes.get('/verify/:key', async (c) => {
   // OR its used-sale period runs (policy v4): the device's own record says
   // which (dates only — nothing about who holds it).
   const unitPv = row.unit_id
-    ? await c.env.DB.prepare('SELECT policy_version FROM order_item_units WHERE id = ?')
+    ? await c.env.DB.prepare(
+        'SELECT policy_version, warranty_base_months, warranty_ext_months, warranty_start_at, warranty_end_at FROM order_item_units WHERE id = ?'
+      )
         .bind(row.unit_id)
-        .first<{ policy_version: string | null }>()
+        .first<NoWarrantyUnit>()
         .catch(() => null)
     : null;
   // A draft has not been handed to anyone; it must not verify as a document.
   const view = publicView(row, nowIso(), unitIdentity(unitPv?.policy_version ?? null).used_sale);
   if (view.status === 'draft') return miss();
+  // Phase 8 (DECISIONS row 364): THE DEVICE RECORD OWNS THE COVERAGE. A printer the customer bought with NO
+  // warranty carries none, whatever a paper issued for it by mistake says — it never verifies as covered. The
+  // paper is not rewritten (it is voided from the desk); the answer says «not valid», with no days to read.
+  if (unitPv && unitHasNoWarranty(unitPv) && (view.status === 'active' || view.status === 'expired')) {
+    return c.json({
+      success: true,
+      found: true,
+      warranty: { ...view, status: 'void', note: 'void', days_remaining: null, used_sale: null, covered_via: 'original', no_warranty: true },
+    });
+  }
   return c.json({ success: true, found: true, warranty: view });
 });
+
+interface NoWarrantyUnit {
+  policy_version: string | null;
+  warranty_base_months: number | null;
+  warranty_ext_months: number;
+  warranty_start_at: string | null;
+  warranty_end_at: string | null;
+}
+
+/**
+ * NO PAPER FOR A WARRANTY NOBODY BOUGHT (phase 8, DECISIONS row 364). A printer sold with the services and no
+ * warranty records zero months and an end at its delivery. The route used to read that zero as «not configured»,
+ * the screen filled the shop's default months, and a live 12-month receipt left the desk — one that verified
+ * publicly as covered. The way to give such a device a warranty is the owner's goodwill change on the DEVICE
+ * (PATCH /api/devices/admin/units/:id/warranty — owner only, reason, audited); the paper then prints the record.
+ */
+const NO_WARRANTY_BOUGHT = () =>
+  new HttpError(
+    409,
+    'اشترى الزبون هذه الطابعة بدون ضمان، فلا يصدر لها وصل ضمان. إن أراد المالك منحها ضماناً فليعدّل ضمان الجهاز أولاً (منحة من المالك مع سبب)، ثم يُصدر الوصل. / The customer bought this printer with no warranty, so no warranty receipt is issued for it. If the owner wants to grant one, change the device’s warranty first (an owner’s goodwill grant with a reason), then issue the receipt. / کڕیار ئەم چاپکەرەی بەبێ گەرەنتی کڕیوە، بۆیە پسوولەی گەرەنتی بۆ دەرناچێت. ئەگەر خاوەن بیەوێت گەرەنتی پێ ببەخشێت، با سەرەتا گەرەنتی ئامێرەکە بگۆڕێت (بەخشینی خاوەن لەگەڵ هۆکار)، پاشان پسوولەکە دەربکرێت.',
+    'NO_WARRANTY_BOUGHT'
+  );
+/** A printer sold with the services: its paper prints the device record — no other months, start or end. */
+const RECEIPT_FOLLOWS_DEVICE = () =>
+  new HttpError(
+    409,
+    'ضمان هذه الطابعة هو ما اشتراه الزبون مع خدماتها؛ الوصل يطبع سجل الجهاز كما هو، ولا تُكتب له مدة أو تواريخ أخرى. لتغيير المدة عدّل ضمان الجهاز (قرار المالك). / This printer’s warranty is what the customer bought with its services; the receipt prints the device record as it is, and takes no other months or dates. To change the length, change the device’s warranty (the owner’s decision). / گەرەنتی ئەم چاپکەرە ئەوەیە کە کڕیار لەگەڵ خزمەتگوزارییەکانیدا کڕیویەتی؛ پسوولەکە تۆماری ئامێرەکە وەک خۆی چاپ دەکات و ماوە یان بەرواری تر وەرناگرێت. بۆ گۆڕینی ماوەکە، گەرەنتی ئامێرەکە بگۆڕە (بڕیاری خاوەن).',
+    'RECEIPT_FOLLOWS_DEVICE'
+  );
 
 /**
  * THE DAY A UNIT'S WARRANTY RUNS FROM, for the paper (owner decision 3): one
@@ -444,6 +486,8 @@ warrantyAdminRoutes.get('/orders/:orderId', async (c) => {
   const address = safeParse<Record<string, unknown>>(order.address_snapshot, {});
   const cfg = await loadConfig(c.env.DB);
   const now = nowIso();
+  // Phase 8: what each device's line SOLD (warranty 0 / 12 / 24, Levo Care), its Care window and what holds today.
+  const desk = await unitDeskFacts(c.env.DB, units.map((u) => ({ ...u, order_id: orderId })));
   return c.json({
     success: true,
     order: {
@@ -474,7 +518,11 @@ warrantyAdminRoutes.get('/orders/:orderId', async (c) => {
       delivered_at: u.delivered_at ?? null,
       warranty_start_at: u.warranty_start_at ?? null,
       warranty_end_at: u.warranty_end_at ?? null,
-      months: unitTotalMonths(u),
+      // The device's months EXACTLY: 0 = the customer bought no warranty (never «unknown», which is null).
+      months: unitMonthsExact(u),
+      services: desk.get(u.id)?.services ?? null,
+      care: desk.get(u.id)?.care ?? null,
+      cover: desk.get(u.id)?.cover ?? null,
       base_months: u.warranty_base_months ?? null,
       ext_months: Number(u.warranty_ext_months) || 0,
       replaced: !!u.replaced_by_unit_id,
@@ -509,6 +557,8 @@ warrantyAdminRoutes.get('/orders/:orderId', async (c) => {
               end: !!u.warranty_end_at && !!u.receipt_end && u.warranty_end_at !== u.receipt_end,
             },
             serial: u.receipt_serial ?? null,
+            // A live paper on a device the customer bought with NO warranty: issued by mistake before phase 8.
+            no_warranty: unitHasNoWarranty(u),
           }
         : null,
     })),
@@ -595,7 +645,18 @@ warrantyAdminRoutes.post('/', async (c) => {
   // Dates. The window follows the DEVICE record by default (its start is the
   // authenticated delivery), and the admin may state a different start when
   // the sale was a counter handover the device record cannot know about.
-  const months = int(body.months, 'months', { min: 1, max: 240, def: unitTotalMonths(unitRow) ?? cfg.default_months });
+  // Phase 8 (DECISIONS row 364): the device's months EXACTLY. Zero = the customer bought no warranty → no paper.
+  // A printer sold with the services (its line carries the frozen snapshot) prints its device record and nothing
+  // else: no other months, no stated start or end. Every other unit keeps the rules it always had.
+  const exactMonths = unitMonthsExact(unitRow);
+  if (exactMonths === 0) throw NO_WARRANTY_BOUGHT();
+  const soldWithServices = (await unitDeskFacts(c.env.DB, [unitRow])).get(unitId)?.services ?? null;
+  if (soldWithServices && exactMonths !== null) {
+    const sentMonths = body.months === undefined || body.months === null || body.months === '' ? null : Number(body.months);
+    if ((sentMonths !== null && sentMonths !== exactMonths) || body.warranty_start_at || body.warranty_end_at) throw RECEIPT_FOLLOWS_DEVICE();
+    delete body.months;
+  }
+  const months = int(body.months, 'months', { min: 1, max: 240, def: exactMonths ?? unitTotalMonths(unitRow) ?? cfg.default_months });
   // A RESOLD device prints its ORIGINAL warranty (owner decision 3): the
   // first delivery its unit carries — or, for a resale recorded before the
   // origin was, the first delivery its `resale_of` chain reaches. A warranty
@@ -772,6 +833,15 @@ warrantyAdminRoutes.post('/', async (c) => {
   return c.json({ success: true, receipt: fresh ? adminView(fresh, now) : null });
 });
 
+async function receiptUnitHasNoWarranty(db: D1Database, unitId: string | null | undefined): Promise<boolean> {
+  if (!unitId) return false;
+  const unit = await db
+    .prepare('SELECT policy_version, warranty_base_months, warranty_ext_months, warranty_start_at, warranty_end_at FROM order_item_units WHERE id = ?')
+    .bind(unitId)
+    .first<NoWarrantyUnit>();
+  return !!unit && unitHasNoWarranty(unit);
+}
+
 /** A draft becomes the handed-over document. */
 warrantyAdminRoutes.post('/:id/activate', async (c) => {
   const admin = c.get('user')!;
@@ -781,6 +851,8 @@ warrantyAdminRoutes.post('/:id/activate', async (c) => {
     .first<WarrantyReceiptRow>();
   if (!row) throw notFound('Warranty receipt not found');
   if (row.status !== 'draft') throw conflict('Only a draft can be activated');
+  // Phase 8: a draft prepared for a device the customer bought with no warranty never becomes a live paper.
+  if (await receiptUnitHasNoWarranty(c.env.DB, row.unit_id)) throw NO_WARRANTY_BOUGHT();
   const now = nowIso();
   await c.env.DB.prepare(
     `UPDATE warranty_receipts SET status = 'active', issued_at = ?, updated_at = ? WHERE id = ? AND status = 'draft'`
@@ -817,6 +889,9 @@ warrantyAdminRoutes.post('/:id/reissue', async (c) => {
       'RECEIPT_VOID'
     );
   }
+
+  // Phase 8: reissuing would put a NEW live number on a paper that should not exist — void it instead.
+  if (await receiptUnitHasNoWarranty(c.env.DB, old.unit_id)) throw NO_WARRANTY_BOUGHT();
 
   const now = nowIso();
   const newIdValue = newId('wr');
@@ -992,10 +1067,19 @@ async function receiptDocument(c: Context<AppContext>, row: WarrantyReceiptRow, 
   // read off the unit — when the months agree, so a receipt an admin issued
   // with a different period never claims an extension it did not print.
   const unit = await c.env.DB.prepare(
-    'SELECT warranty_base_months, warranty_ext_months FROM order_item_units WHERE id = ?'
+    'SELECT policy_version, warranty_base_months, warranty_ext_months, warranty_start_at, warranty_end_at FROM order_item_units WHERE id = ?'
   )
     .bind(row.unit_id)
-    .first<{ warranty_base_months: number | null; warranty_ext_months: number | null }>();
+    .first<NoWarrantyUnit>();
+  // Phase 8 (DECISIONS row 364): a paper issued for a printer bought with NO warranty is drawn VOID, with the
+  // reason, and with no window to read — for the desk and for the holder's own copy alike (as /verify answers).
+  if (unit && unitHasNoWarranty(unit) && data.status !== 'replaced') {
+    data.status = 'void';
+    data.no_warranty = true;
+    data.warranty.months = 0;
+    data.warranty.start_at = null;
+    data.warranty.end_at = null;
+  }
   const extMonths = Number(unit?.warranty_ext_months ?? 0) || 0;
   const baseMonths = typeof unit?.warranty_base_months === 'number' ? unit.warranty_base_months : null;
   if (extMonths > 0 && baseMonths !== null && baseMonths + extMonths === Number(row.warranty_months)) {

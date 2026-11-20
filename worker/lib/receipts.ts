@@ -42,6 +42,12 @@ export interface ReceiptLine {
    * printed subtotal.
    */
   included?: Array<{ name: string; variant: string; qty: number }>;
+  /**
+   * What was bought WITH the line, in words (DECISIONS row 364): a printer's package, warranty months,
+   * Levo Care cover and services; «packed with the printer» on a kit / add-on line; a gift; a Levo Care
+   * part discount by its name. Printed small under the line; absent on an ordinary line.
+   */
+  notes?: Array<{ ar: string; en: string }>;
 }
 
 export interface ReceiptMoneyRow {
@@ -291,6 +297,8 @@ export function renderPurchaseReceipt(
                 k.variant ? ` — ${escapeHtml(k.variant)}` : ''
               } ×${k.qty}</span>`
           )
+          .join('')}${(l.notes ?? [])
+          .map((n) => `<br><span style="font-size:10.5px">– ${escapeHtml(lang === 'ar' ? n.ar : n.en)}</span>`)
           .join('')}</td>` +
         `<td style="text-align:center" class="ltr">${l.qty}</td>` +
         `<td style="text-align:end" class="ltr">${escapeHtml(iqd(l.line_iqd))}</td></tr>`
@@ -615,6 +623,10 @@ export function escposReceipt(data: PurchaseReceiptData, charsPerLine = 48): str
     out += pair(`  x${l.qty}`, iqd(l.line_iqd));
     for (const k of l.included ?? []) {
       out += `  - ${`${k.name}${k.variant ? ` ${k.variant}` : ''} x${k.qty}`.slice(0, charsPerLine - 4)}\n`;
+    }
+    // What was bought with the line (row 364), in the English this code page prints.
+    for (const n of l.notes ?? []) {
+      for (const part of wrapForPrinter(n.en, charsPerLine - 4)) out += `  . ${part}\n`;
     }
   }
   out += `${rule}\n`;

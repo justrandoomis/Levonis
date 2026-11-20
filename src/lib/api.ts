@@ -1265,7 +1265,106 @@ export interface ApiOrderItem {
       option_value_ids: string[];
     }>;
   } | null;
+  /**
+   * «خدمات الطابعة» (0234; DECISIONS row 364): what was bought WITH this printer line, frozen at checkout —
+   * the same view for the customer and the admin. Absent on every other line.
+   */
+  services?: OrderItemServices | null;
+  /** The Levo Care part offer this line used (0243); its discount is inside the order's coupon discount. */
+  care_offer?: { grant_id: string; discount_iqd: number } | null;
+  /** 0235: the membership bought with the order is its own line — never packed, never returned. */
+  kind?: 'membership';
+  line_kind?: 'membership';
+  /** 0235 / 0242: a filament-kit line or an add-on line names the printer line it is packed with. */
+  kit?: { printer_item_id: string; kit_id: string | null; color_mode?: 'chosen' | 'random' | null } | null;
+  addon?: { printer_item_id: string; addon_id: string; color_mode?: 'chosen' | 'random' | null } | null;
+  /** 0242: the owner's printer discount already inside the unit price (report-only). */
+  printer_discount?: { before_unit_iqd: number | null; discount_unit_iqd: number | null; total_iqd?: number } | null;
 }
+
+/** One service of a serviced printer line, per unit. `fee_iqd` is what was charged (after a PRO discount). */
+export interface OrderItemServiceLine {
+  service: 'warranty' | 'care' | 'packaging' | 'inspection' | 'academy' | string;
+  choice: string;
+  fee_iqd: number;
+  policy_version?: number;
+  fee_before_discount_iqd?: number;
+  pro_discount_iqd?: number;
+}
+
+/** worker/lib/printerServices.ts `orderServicesView` (+ `cover` once delivered). All money is per printer unit. */
+export interface OrderItemServices {
+  selection: {
+    package?: 'just' | 'smart' | 'complete' | 'custom' | string;
+    warranty?: string; care?: string; packaging?: string; inspection?: string; academy?: string;
+    delivery?: string | null;
+    /** The customer agreed to buy with no warranty. */
+    ack_no_warranty?: boolean;
+  } | null;
+  lines: OrderItemServiceLine[];
+  /** The services' own fee. NOT the charge on a line sold under the price anchor — read `net_fee_iqd`. */
+  fee_iqd: number;
+  package_discount_iqd: number;
+  warranty_months: number;
+  care_months: number;
+  /** The whole Levo Care cover from delivery (warranty months + 12 after it); 0 without Care. */
+  care_total_months: number;
+  inspection_lead_business_days: [number, number] | null;
+  delivery: 'economy' | 'personal' | 'pickup' | string | null;
+  delivery_fee_iqd: number | null;
+  revision: number | null;
+  /** Only on a line sold under the price anchor: what the printer's price already included… */
+  anchor_fee_iqd?: number;
+  /** …and what the services moved the unit by (fee − that; negative below the Smart package). THE CHARGE. */
+  net_fee_iqd?: number;
+  /** Once the order is delivered: the dates the months run to, counted from the delivery. */
+  cover?: { from: string; warranty_end_at: string | null; care_end_at: string | null };
+}
+
+/** worker/lib/orderBreakdown.ts: the total's parts, signed, adding up to `total_iqd`. */
+export type OrderBreakdownKey =
+  | 'goods' | 'printer_services' | 'membership' | 'other_fees' | 'membership_discount' | 'coupon' | 'care_offer'
+  | 'points' | 'printer_delivery' | 'delivery' | 'cod_tax' | 'price_adjustment' | 'unexplained';
+export interface OrderBreakdown {
+  rows: Array<{ key: OrderBreakdownKey; amount_iqd: number }>;
+  subtotal_iqd: number;
+  total_iqd: number;
+  balanced: boolean;
+  services: { net_iqd: number; fee_iqd: number; anchor_iqd: number; lines: number } | null;
+  coupon: { code: string | null; pool: number } | null;
+  delivery: { waived: boolean; printer_units: number; printer_delivery: 'economy' | 'personal' | 'mixed' | null };
+}
+
+/** A service task as the admin order window draws it (worker/lib/printerServices.ts `orderServiceTasksView`). */
+export interface AdminServiceTask {
+  id: string;
+  order_item_id: string;
+  kind: 'packaging' | 'inspection' | 'academy' | string;
+  choice: string;
+  qty?: number;
+  /** The Arabic note stored when the order was placed — the record, and the fallback when `text` is null. */
+  note: string;
+  /** What to do, in three languages; null for a kind an older screen does not know. */
+  text?: { ar: string; en: string; ckb: string } | null;
+  status: 'open' | 'done' | 'cancelled' | string;
+  result_note: string | null;
+  done_by: string | null;
+  done_by_name?: string | null;
+  done_at: string | null;
+}
+
+/** What a board row says of the order's printer services (worker/lib/orderServiceBoard.ts). */
+export interface OrderServiceFlags {
+  printer_services: boolean;
+  package: 'just' | 'smart' | 'complete' | 'custom' | 'mixed' | null;
+  care: boolean;
+  no_warranty: boolean;
+  pickup: boolean;
+  inspection_open: boolean;
+  academy_open: boolean;
+  membership: 'pending' | 'blocked' | null;
+}
+export type OrderServiceFilter = 'printer_services' | 'inspection' | 'pickup' | 'care' | 'academy' | 'membership_pending';
 
 /** Stages reached out of the path's length — the card's progress hairline. */
 export interface OrderStageProgress {
@@ -1518,6 +1617,8 @@ export interface OrderFinancial {
   /** Null when the accrual snapshot was not loaded — never a fabricated zero. */
   points?: OrderPointsEarned | null;
   support?: { referrer_username: string; ref: string; discount_iqd: 0 } | null;
+  /** «تفاصيل السعر» with every part named, adding up to the total (row 364); absent from an older server. */
+  breakdown?: OrderBreakdown;
 }
 
 /** One serialized device inside an order, as GET /api/orders/:id/units shows it. */
@@ -1697,6 +1798,8 @@ export interface AdminOrderRow extends ApiOrder {
   serials?: { required: number; linked: number; gate: boolean; holds_next: boolean };
   /** «بانتظار تأكيد السعر النهائي» (migration 0218): an estimated line still holds the order (the server sends it only when true). */
   price_estimate_open?: boolean;
+  /** The order's printer services, for the row's badges (row 364); absent on an order with none. */
+  service_flags?: OrderServiceFlags;
 }
 
 /** The whole board in one answer: a page, its totals, and what it understood. */
@@ -1750,6 +1853,9 @@ export interface AdminOrdersResponse {
   /** «بانتظار تأكيد السعر» (0218): the filter's state and its board-wide count; absent on an older server. */
   price_estimate?: boolean;
   price_estimate_count?: number;
+  /** The printer-services filter in force (row 364) and the board-wide counts of the three that wait on staff. */
+  service?: OrderServiceFilter | null;
+  service_counts?: { inspection: number; academy: number; membership_pending: number };
   /**
    * «عدد بجانب كل خيار» — how many rows each filter option would return.
    *
@@ -1822,6 +1928,16 @@ export interface AdminOrderDetail extends ApiOrder {
    * then shows the legacy units line only.
    */
   serials?: OrderSerials;
+  /** «مهام الخدمات» (0234): packing, inspection, Academy — with their words and who closed each. */
+  service_tasks?: AdminServiceTask[];
+  /** «بانتظار الفحص قبل الإرسال»: an inspection bought on the order is still open. */
+  inspection_open?: boolean;
+  /** False once the order is cancelled / returned: its tasks can no longer be completed. */
+  service_tasks_open?: boolean;
+  /** The gift lines that are the monthly Levo Care draw's prize. */
+  draw_prize_item_ids?: string[];
+  /** The membership gift's product in three languages (the snapshot carries Arabic only). */
+  membership_gift_product?: { name: string | null; name_ar: string | null; name_ku: string | null } | null;
 }
 
 export interface AdminOrderTracking {

@@ -13,6 +13,7 @@ import { readNeverLinkedLines } from './financeDeletedProductScope';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { participantNetProfit } from './participantProfit';
 import { financialCostLines } from './financeCostScope';
+import { servicesOutOfShares } from './printerPart';
 
 export interface WageCost {
   id:string;order_item_id:string|null;rule_id:string;staff_id:string;state:string;snapshot:string;
@@ -24,6 +25,8 @@ export interface WageCost {
 export interface WageTarget {
   cost:WageCost|null;rule:EffectiveWageRule;line_id:string|null;amount:number|null;
   qty:number;base_iqd:number|null;manual:boolean;line_ids:string[];
+  /** Phase 8 (ruling R1): a percentage wage whose base left a serviced printer's services to the shop. */
+  printer_part?:boolean;
 }
 export const wageCostQuery=(settled:boolean)=>`SELECT c.*,
  c.amount_iqd+COALESCE((SELECT SUM(delta_iqd) FROM finance_cost_adjustments WHERE cost_id=c.id),0) AS effective_iqd,
@@ -131,13 +134,15 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
     if(manual.some(c=>c.group_key===rule.group_key&&c.milestone===rule.milestone&&(c.order_item_id===null||lineId===null||c.order_item_id===lineId)))continue;
     const lines=base.lines.filter(l=>ids.includes(l.id));
     const qty=lines.reduce((n,l)=>n+Math.max(0,l.qty-l.returned_qty),0);
-    const revenue=lines.reduce((n,l)=>n+l.retained_revenue_iqd,0);
+    // Ruling R1 (DECISIONS row 364): a percentage wage counts a serviced printer's own part; its services are the shop's.
+    const servicesOut=['profit_percent','revenue_percent'].includes(rule.basis)?lines.reduce((n,l)=>n+servicesOutOfShares(base.order,l),0):0;
+    const revenue=lines.reduce((n,l)=>n+l.retained_revenue_iqd,0)-servicesOut;
     const cogs=lines.some(l=>l.cogs_iqd===null||!isConfirmedOrderCost(l.cost_confidence))?null:lines.reduce((n,l)=>n+l.cogs_iqd!,0);
     const unknownRevenue=['profit_percent','revenue_percent'].includes(rule.basis)&&lines.some(hasUnknownRefund);
     const profit=rule.basis==='profit_percent'?(cogs===null||lines.some(line=>netProfit.get(line.id)==null)?null:Math.max(0,lines.reduce((sum,line)=>sum+netProfit.get(line.id)!,0))):null;
     let amount=unknownRevenue?null:qty===0?0:rule.basis==='profit_percent'?(profit===null?null:Number(BigInt(profit)*BigInt(rule.amount)/10000n)):costAmount({...rule,cap_iqd:null},qty,Math.max(0,revenue),cogs);
     if(amount!==null){if(rule.cap_iqd!==null)amount=Math.min(amount,Math.max(0,rule.cap_iqd-(used.get(rule.id)??0)));used.set(rule.id,(used.get(rule.id)??0)+amount);}
-    result.push({cost:old.find(c=>key(c.rule_id,c.order_item_id)===key(rule.id,lineId))??null,rule,line_id:lineId,amount,qty,base_iqd:unknownRevenue?null:rule.basis==='profit_percent'?profit:revenue,manual:false,line_ids:ids});
+    result.push({cost:old.find(c=>key(c.rule_id,c.order_item_id)===key(rule.id,lineId))??null,rule,line_id:lineId,amount,qty,base_iqd:unknownRevenue?null:rule.basis==='profit_percent'?profit:revenue,manual:false,line_ids:ids,...(servicesOut>0?{printer_part:true}:{})});
   }
   // Scope exclusions, priority changes and an employment cutoff remove the
   // entitlement with an offset, preserving any payment that already happened.
@@ -149,6 +154,9 @@ export async function planStaffWages(db:D1Database,staff:EmploymentStaff,base:Or
   // the settled period; its target is dropped, so no duplicate row is created.
   return result.filter(t=>!t.cost?.settled);
 }
+
+/** A wage cost whose base left a serviced printer's services to the shop says so in its snapshot (the statement's « * »). No fingerprint reads this key. */
+export const printerPartMark=(db:D1Database,costId:string)=>db.prepare("UPDATE finance_order_costs SET snapshot=json_set(snapshot,'$.printer_part',json('true')) WHERE id=? AND json_valid(snapshot) AND json_extract(snapshot,'$.printer_part') IS NULL").bind(costId);
 
 export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:{actor?:string;day?:string}={}) {
   const allVersions=await wageVersions(db);if(!allVersions.length)return {adjusted:0,managed:new Set<string>(),netCostsChanged:false};
@@ -187,7 +195,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
       const id=cost?.id??newId('oc'),liability='2100';
       if(cost&&cost.held_iqd>0&&amount!==null&&amount<cost.paid_iqd+cost.held_iqd)throw conflict('طلب سحب مفتوح يحتاج إعادة اعتماد قبل تخفيض الاستحقاق');
       if(cost&&amount!==null)reservationTargets.push({cost_id:id,amount_iqd:amount});
-      const snapshot=JSON.stringify({rule,line_ids:target.line_ids,qty:target.qty,staff_id:staff.id,earning_day:earningDay,profit_basis:'net_excluding_store_promotion_v2'});
+      const snapshot=JSON.stringify({rule,line_ids:target.line_ids,qty:target.qty,staff_id:staff.id,earning_day:earningDay,profit_basis:'net_excluding_store_promotion_v2',...(target.printer_part?{printer_part:true}:{})});
       if(!cost){
         const expense=amount!==null&&amount>0?newId('opex'):null;
         if(expense)statements.push(db.prepare('INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,note) VALUES (?,?,?,?,?,?)').bind(expense,rule.category_id,amount,day,rule.name,`استحقاق تسليم ${earningDay} / طلب ${orderId}`));
@@ -199,6 +207,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
         const expense=amount>0?newId('opex'):null;
         if(expense)statements.push(db.prepare('INSERT INTO operating_expenses(id,category_id,amount_iqd,expense_day,title,note) VALUES (?,?,?,?,?,?)').bind(expense,rule.category_id,amount,day,rule.name,`استحقاق تسليم ${earningDay} / طلب ${orderId}`));
         statements.push(db.prepare("UPDATE finance_order_costs SET amount_iqd=?,state='due',base_iqd=?,expense_id=?,cost_day=? WHERE id=? AND state='pending_cost'").bind(amount,target.base_iqd,expense,day,id));
+        if(target.printer_part)statements.push(printerPartMark(db,id));
         if(amount)statements.push(...journalPlan(db,{key:`order-cost:${id}`,day,title:rule.name,source:'order_cost',sourceId:id,actor:opts.actor},[{account:'5100',debit:amount},{account:liability,credit:amount}]).statements);
         adjusted++;
       }else if(cost&&amount!==null&&amount!==cost.effective_iqd){
@@ -209,6 +218,7 @@ export async function reconcileEffectiveWages(db:D1Database,orderId:string,opts:
           .bind(adjustment,id,delta,cost.effective_iqd??0,amount,opts.actor??null,day,now,staff.employment_version,reason,rule.wage_version_id??null,earningDay,`wage:${id}:${staff.employment_version}:${revision}:${amount}`),
           ...journalPlan(db,{key:`wage-adjustment:${adjustment}`,day,title:reason,source:'finance_cost_adjustment',sourceId:adjustment,actor:opts.actor},delta>0?[{account:'5100',debit:delta},{account:liability,credit:delta}]:[{account:liability,debit:-delta},{account:'5100',credit:-delta}]).statements,
           ...(await auditStatements(db,opts.actor??null,'finance.wage_reconciled',id,{order_id:orderId,staff_id:staff.id,before_iqd:cost.effective_iqd,after_iqd:amount,earning_day:earningDay,wage_version_id:rule.wage_version_id,reason})).statements);
+        if(target.printer_part)statements.push(printerPartMark(db,id));
         adjusted++;
       }
       statements.push(db.prepare(`INSERT INTO finance_wage_targets(cost_id,wage_version_id,amount_iqd,basis,employment_version,earning_day,updated_at) VALUES (?,?,?,?,?,?,?) ON CONFLICT(cost_id) DO UPDATE SET wage_version_id=excluded.wage_version_id,amount_iqd=excluded.amount_iqd,basis=excluded.basis,employment_version=excluded.employment_version,earning_day=excluded.earning_day,updated_at=excluded.updated_at WHERE wage_version_id IS NOT excluded.wage_version_id OR amount_iqd IS NOT excluded.amount_iqd OR basis<>excluded.basis OR employment_version<>excluded.employment_version OR earning_day<>excluded.earning_day`)

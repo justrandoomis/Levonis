@@ -9,6 +9,7 @@
 import type { AdminOrderRow, OrderDueBucket, OrderLateReason, OrderShippingType } from '../../lib/api';
 import { PREPARE_DAY_STRINGS, dayLine, type Tri } from './prepareDayStrings';
 import { doneText } from './archiveSort';
+import { orderServicesStrings } from '../orders/orderServicesStrings';
 
 /** The context's own `loc`, passed down rather than re-derived per badge. */
 type Loc = (ar: string, en: string, ckb?: string) => string;
@@ -311,6 +312,72 @@ export function EstimateBadge({ order, loc }: { order: EstimateBoardRow; loc: Lo
       <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />
       {loc('بانتظار تأكيد السعر', 'Awaiting price confirmation', 'چاوەڕێی پشتڕاستکردنەوەی نرخ')}
     </span>
+  );
+}
+
+/**
+ * «خدمات الطابعة» ON THE ROW (DECISIONS row 364): what the packer must know before opening the order —
+ * in the order the work happens. Amber only for what WAITS ON STAFF (the inspection, a membership that
+ * needs a person); the rest are quiet facts, so amber keeps meaning «do something»:
+ *
+ *   · «بانتظار الفحص»        an inspection bought on the order is still open — it cannot be handed over;
+ *   · the package            «الاختيار الذكي» / «الطابعة فقط» … (what the customer bought with the printer);
+ *   · «بلا ضمان»             a printer on the order was bought with no warranty;
+ *   · «ليفو كير»             Levo Care was bought;
+ *   · (a store pickup is already on the row: the delivery-method badge says «استلام من المخزن»;
+ *     the board's filter of that name lists the serviced printers collected that way)
+ *   · «أكاديمية للجدولة»     a live session is still to be arranged with the customer;
+ *   · «عضوية معلّقة»         the membership bought with the order waits for delivery and payment,
+ *     «عضوية تحتاج مراجعة»   or is blocked and waits for a person.
+ *
+ * All from `service_flags`, which the server sends only for an order that has something to say.
+ */
+export function ServiceBadges({ order, loc }: { order: AdminOrderRow; loc: Loc }) {
+  const f = order.service_flags;
+  if (!f) return null;
+  const quiet = 'inline-flex items-center rounded-md border border-border-subtle bg-surface-raised px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold text-text-secondary';
+  const waits = 'lv-chip inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] leading-[1.4] font-bold [--chip:var(--color-warning)]';
+  const dot = <span className="h-1.5 w-1.5 rounded-full bg-warning" aria-hidden />;
+  const s = orderServicesStrings(loc);
+  return (
+    <>
+      {f.inspection_open && (
+        <span data-order-service="inspection" className={waits}>
+          {dot}
+          {loc('بانتظار الفحص', 'Awaiting inspection', 'چاوەڕێی پشکنین')}
+        </span>
+      )}
+      {f.printer_services && (
+        <span data-order-service="package" className={quiet}>
+          {s.package(f.package ?? undefined)}
+        </span>
+      )}
+      {f.printer_services && f.no_warranty && (
+        <span data-order-service="no-warranty" className={quiet}>
+          {loc('بلا ضمان', 'No warranty', 'بێ گەرەنتی')}
+        </span>
+      )}
+      {f.care && (
+        <span data-order-service="care" className={quiet}>
+          {s.care}
+        </span>
+      )}
+      {f.academy_open && (
+        <span data-order-service="academy" className={quiet}>
+          {loc('أكاديمية للجدولة', 'Training to schedule', 'فێرکاری بۆ کات‌دانان')}
+        </span>
+      )}
+      {f.membership === 'blocked' ? (
+        <span data-order-service="membership-blocked" className={waits}>
+          {dot}
+          {loc('عضوية تحتاج مراجعة', 'Membership needs review', 'ئەندامێتی پێداچوونەوەی دەوێت')}
+        </span>
+      ) : f.membership === 'pending' ? (
+        <span data-order-service="membership-pending" className={quiet}>
+          {loc('عضوية معلّقة', 'Membership pending', 'ئەندامێتیی هەڵپەسێردراو')}
+        </span>
+      ) : null}
+    </>
   );
 }
 

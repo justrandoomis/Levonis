@@ -128,10 +128,17 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
     if (line.returned_qty > returned.reduce((n, q) => n + q, 0) && rows.length > 1 && contracts.length) { pending = true; continue; }
     if (rows.length === 1) returned[0] = Math.max(returned[0], line.returned_qty);
     const weights = rows.map((a, i) => Math.max(0, a.qty - returned[i]));
-    const revenue = signedShares(line.retained_revenue_iqd, weights.some(q => q > 0) ? weights : rows.map(a => a.qty));
+    // Ruling R1 (DECISIONS row 364): on a serviced printer line the investor's sale is the printer's own part; the
+    // services' retained income is the shop's. 0 on every other line and on orders delivered before the rule's first day.
+    // The investor's OWN MONEY is untouched by it: capital recovery and the loss test read the whole retained line
+    // (`whole`), as they always did; only the profit that is shared is counted on the printer part (`revenue`).
+    const servicesOut = netProfit.servicesOut?.get(line.id) ?? 0, kept = line.retained_revenue_iqd - servicesOut;
+    const shareWeights = weights.some(q => q > 0) ? weights : rows.map(a => a.qty);
+    const whole = signedShares(line.retained_revenue_iqd, shareWeights), left = signedShares(servicesOut, shareWeights);
+    const revenue = whole.map((v, i) => v - left[i]);
     const originalCogs = rows.map(a => Number(a.cogs_iqd ?? 0) - Number(a.returned_cogs_iqd ?? 0) + (a.late_cost_iqd ?? 0));
     const costOverride = signedShares(line.cogs_iqd - originalCogs.reduce((n, v) => n + v, 0), rows.map(a => a.qty));
-    const expenses = net == null ? null : signedShares(line.retained_revenue_iqd - line.cogs_iqd - net, rows.map(a => a.qty));
+    const expenses = net == null ? null : signedShares(kept - line.cogs_iqd - net, rows.map(a => a.qty));
     for (const [i, a] of rows.entries()) {
       const lateCost = a.late_cost_iqd === undefined ? (adjustments.find(v => v.allocation_id === a.id)?.unit_delta ?? 0) * Math.max(0, a.qty - Number(a.returned_qty ?? 0)) : 0;
       const cost = originalCogs[i] + costOverride[i] + lateCost;
@@ -141,22 +148,23 @@ export async function investorOrderSplit(db: D1Database, orderId: string, previe
         const principalUnit=capitalUnits.find(p=>p.lot_id===a.lot_id&&p.contract_id===c.id);
         if(exactContracts.some(p=>p.contract_id===c.id)&&!principalUnit){pending=true;continue;}
         const assignedPrincipal=(principalUnit?.unit_principal_iqd??0)*weights[i];
-        const recovered=principalUnit?(cost>0&&revenue[i]<cost?Number(BigInt(assignedPrincipal)*BigInt(Math.max(0,revenue[i]))/BigInt(cost)):assignedPrincipal):percent(Math.max(0,Math.min(cost,revenue[i])),c.capital_share_bps);
+        const recovered=principalUnit?(cost>0&&whole[i]<cost?Number(BigInt(assignedPrincipal)*BigInt(Math.max(0,whole[i]))/BigInt(cost)):assignedPrincipal):percent(Math.max(0,Math.min(cost,whole[i])),c.capital_share_bps);
         // Principal is provable from this lot, its retained revenue and cost
         // even when a different expense still prevents calculating net profit.
         // Unresolved refund amounts must never be taken as evidence of revenue.
         if (!hasUnknownRefund(line)) capitalAllocations.push({ allocation_id:a.id,lot_id:a.lot_id,contract_id:c.id,contract_version:c.version,
-          capital_iqd:recovered,qty:weights[i],snapshot:JSON.stringify({source_fingerprint:sourceFingerprint,contract_version:c.version,qty:weights[i],principal_iqd:recovered,revenue:revenue[i],cost,delivered}) });
+          capital_iqd:recovered,qty:weights[i],snapshot:JSON.stringify({source_fingerprint:sourceFingerprint,contract_version:c.version,qty:weights[i],principal_iqd:recovered,revenue:whole[i],cost,delivered}) });
         if (profit === null) { pending = true; continue; }
         const earned = percent(Math.max(0, profit), c.profit_share_bps);
-        const loss = percent(Math.max(0, -profit), c.loss_share_bps);
+        // A loss is what the WHOLE sale lost (the services' part counted back in), exactly as before ruling R1.
+        const loss = percent(Math.max(0, -(profit + left[i])), c.loss_share_bps);
         investorProfit += earned;
         investorLoss += loss;
         out.push({ allocation_id: a.id, lot_id: a.lot_id, contract_id: c.id, user_id: c.user_id,
           qty: weights[i], profit_basis_iqd: profit, profit_iqd: earned,
           capital_iqd: recovered,
           loss_iqd: loss,raw_loss_iqd:loss,eligible: delivered && collected,
-          snapshot: JSON.stringify({ version: base.version, profit_basis:'net_excluding_store_promotion_v2',source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], principal_iqd:recovered, revenue: revenue[i], cost, expenses: expenses![i], profit, collected, delivered }) });
+          snapshot: JSON.stringify({ version: base.version, profit_basis:'net_excluding_store_promotion_v2',source_fingerprint:sourceFingerprint,contract_version: c.version, qty: weights[i], principal_iqd:recovered, revenue: revenue[i], cost, expenses: expenses![i], profit, collected, delivered, ...(servicesOut > 0 ? { printer_part: true } : {}) }) });
       }
     }
   }

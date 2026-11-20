@@ -583,6 +583,63 @@ export function unitTotalMonths(unit: Pick<UnitRow, 'warranty_base_months' | 'wa
 }
 
 /**
+ * A unit's months of warranty EXACTLY — `unitTotalMonths` with the zero kept (phase 8, DECISIONS row 364).
+ * A printer sold with the services and NO warranty records `total: 0` (0234) and an end at its delivery;
+ * `unitTotalMonths` reads that as «not configured» (null), which let a receipt fall back to the shop's
+ * default months. 0 = the customer bought no warranty; null = no duration is known at all (needs_config).
+ * A row written before `policy_version` carried the zero (base 0, a window that ends where it starts) is 0 too.
+ */
+export function unitMonthsExact(
+  unit: Pick<UnitRow, 'warranty_base_months' | 'warranty_ext_months' | 'policy_version'> & { warranty_start_at?: string | null; warranty_end_at?: string | null }
+): number | null {
+  const pv = safeParse<{ total?: unknown }>(unit.policy_version, {});
+  if (typeof pv.total === 'number' && Number.isInteger(pv.total) && pv.total >= 0) return pv.total;
+  const base = unit.warranty_base_months;
+  if (typeof base === 'number' && base > 0) return base + (Number(unit.warranty_ext_months) || 0);
+  if (base === 0 && unit.warranty_start_at && unit.warranty_end_at && Date.parse(unit.warranty_end_at) <= Date.parse(unit.warranty_start_at)) return 0;
+  return null;
+}
+
+/** What a line's frozen printer services (0234) SOLD, as the warranty desk reads it. null = sold without the services. */
+export interface SoldServices {
+  /** 'just' | 'smart' | 'complete' | 'custom', or null on a snapshot without a selection. */
+  package: string | null;
+  /** The warranty bought: a TOTAL from delivery (0 = none). */
+  warranty_months: 0 | 12 | 24;
+  /** Levo Care bought (12) or not (0), and its whole cover from delivery (warranty + 12; 0 without Care). */
+  care_months: number;
+  care_total_months: number;
+  /** The pre-dispatch inspection was bought. */
+  inspection: boolean;
+  /** The buyer ticked «I understand there is no warranty» (required when warranty is none). */
+  ack_no_warranty: boolean;
+  revision: number | null;
+}
+export function soldServicesOf(snapshot: string | null | undefined): SoldServices | null {
+  const v = safeParse<{
+    warranty_months?: unknown; care_months?: unknown; care_total_months?: unknown; revision?: unknown;
+    selection?: { package?: unknown; inspection?: unknown; ack_no_warranty?: unknown } | null;
+    lines?: Array<{ service?: unknown }> | null;
+  } | null>(snapshot ?? null, null);
+  if (!v || typeof v !== 'object') return null;
+  const months = v.warranty_months;
+  if (months !== 0 && months !== 12 && months !== 24) return null;
+  const care = typeof v.care_months === 'number' && v.care_months > 0 ? Math.trunc(v.care_months) : 0;
+  const total = care > 0 ? (typeof v.care_total_months === 'number' && v.care_total_months > 0 ? Math.trunc(v.care_total_months) : months + care) : 0;
+  const sel = v.selection && typeof v.selection === 'object' ? v.selection : null;
+  const inspected = Array.isArray(v.lines) && v.lines.some((l) => l?.service === 'inspection');
+  return {
+    package: sel && typeof sel.package === 'string' ? sel.package : null,
+    warranty_months: months,
+    care_months: care,
+    care_total_months: total,
+    inspection: inspected || (!!sel && typeof sel.inspection === 'string' && sel.inspection !== 'none'),
+    ack_no_warranty: !!sel && sel.ack_no_warranty === true,
+    revision: typeof v.revision === 'number' ? v.revision : null,
+  };
+}
+
+/**
  * Recomputes ONE unit's window for a corrected delivered_at. A unit that
  * CARRIES a warranty (policy_version.carried = 'original_end': a replacement,
  * or a resold device — owner decision 3) keeps BOTH its start and its end:

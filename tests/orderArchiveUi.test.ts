@@ -410,7 +410,7 @@ test('the board sends `sort` from the archive only, re-reads on a change, starts
   const archiveBranch = src.slice(src.indexOf('if (archive) {'), src.indexOf("} else if (journey === 'prepare') {"));
   assert.match(archiveBranch, /params\.set\('scope', archiveScope\);[\s\S]*params\.set\('sort', archiveSort\);/);
   assert.equal(src.match(/params\.set\('sort'/g)?.length, 1, 'never sent from the live board');
-  assert.match(src, /\}, \[archive, archiveScope, archiveSort, journey, status, query, page, lang, priceHold, priceEstimate\]\);/);
+  assert.match(src, /\}, \[archive, archiveScope, archiveSort, journey, status, query, page, lang, priceHold, priceEstimate, service\]\);/); // row 364: the printer-services filter joined the list
   assert.match(src, /useState<ArchiveSort>\(\(\) => readArchiveSort\(\)\)/, 'the remembered choice, read once');
   assert.match(src, /setArchiveSort\(s\);\s*saveArchiveSort\(s\);/);
   assert.match(src, /<ArchiveSortSwitch\s+archive=\{archive\}\s+data=\{data\}\s+value=\{archiveSort\}\s+onChoose=\{\(s\) => \{\s*chooseArchiveSort\(s\);\s*setPage\(0\);\s*\}\}/);

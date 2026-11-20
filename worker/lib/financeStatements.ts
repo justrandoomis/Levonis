@@ -58,6 +58,8 @@ export const STATEMENT_WORDS = {
   signReceiver: ['توقيع المستلم', 'Received by', 'واژووی وەرگر'],
   signOwner: ['توقيع المالك', 'Paid by', 'واژووی خاوەن'],
   signDate: ['التاريخ', 'Date', 'ڕێکەوت'],
+  // Phase 8 (DECISIONS row 364, ruling R1): a percentage wage on a printer sold with services.
+  printerPart: ['* أجر بنسبة على طابعة بيعت مع خدمات: أساسه حصة الطابعة وحدها؛ خدمات الطابعة للمتجر.', '* A percentage wage on a printer sold with services: its base is the printer’s own part; the printer’s services are the shop’s.', '* کرێی بە ڕێژە لەسەر پرینتەرێک کە لەگەڵ خزمەتگوزاری فرۆشراوە: بنەماکەی تەنها بەشی پرینتەرەکەیە؛ خزمەتگوزارییەکانی پرینتەر بۆ فرۆشگایە.'],
 } as const satisfies Record<string, Tri>;
 const W = STATEMENT_WORDS;
 
@@ -105,6 +107,7 @@ export async function staffPaymentStatement(db: D1Database, paymentId: string): 
   const rows = (await db.prepare(`SELECT c.cost_day,c.order_id,c.rule_name AS task,c.qty,c.base_iqd AS base,${effectiveStaffCostSql('c')} AS earned,a.amount_iqd AS paid_here,
       COALESCE((SELECT basis FROM finance_wage_targets t WHERE t.cost_id=c.id),json_extract(c.snapshot,'$.rule.basis')) AS basis,
       json_extract(c.snapshot,'$.rule.amount') AS rule_amount,
+      CASE WHEN json_valid(c.snapshot) THEN json_extract(c.snapshot,'$.printer_part') END AS printer_part,
       (SELECT COALESCE(SUM(o.amount_iqd),0) FROM finance_payment_allocations o WHERE o.cost_id=c.id AND o.payment_id<>a.payment_id) AS paid_before,
       (SELECT group_concat(i.name_snapshot||' ×'||i.qty,'، ') FROM order_items i WHERE i.order_id=c.order_id AND i.bundle_parent_item_id IS NULL) AS products
     FROM finance_payment_allocations a JOIN finance_order_costs c ON c.id=a.cost_id WHERE a.payment_id=? ORDER BY c.cost_day,c.id`).bind(paymentId).all<Row>()).results ?? [];
@@ -122,6 +125,9 @@ export async function staffPaymentStatement(db: D1Database, paymentId: string): 
   };
 }
 
+/** A wage row whose percentage base left a serviced printer's services to the shop (the cost's own snapshot says so). */
+const onPrinterPart = (r: Row) => r.printer_part === 1 || r.printer_part === true;
+
 /** The statement as one workbook sheet. */
 export function staffStatementSheet(st: StaffPaymentStatement, lang: ReportLang, at: Date): XlsxSheet {
   const p = st.payment;
@@ -135,6 +141,7 @@ export function staffStatementSheet(st: StaffPaymentStatement, lang: ReportLang,
     fill(pick(lang, W.advances), { amount: money(st.advances_iqd) }),
     fill(pick(lang, W.made), { at: baghdadClock(at) }),
     ...(st.rows.length ? [] : [pick(lang, W.none)]),
+    ...(st.rows.some(onPrinterPart) ? [pick(lang, W.printerPart)] : []),
   ];
   return {
     name: pick(lang, W.sheet),
@@ -142,7 +149,7 @@ export function staffStatementSheet(st: StaffPaymentStatement, lang: ReportLang,
     heading,
     totalLabel: pick(lang, W.total),
     columns: STAFF_STATEMENT_COLUMNS.map((c) => ({ key: c.key, kind: c.kind, header: pick(lang, c.header), ...(c.key === 'base' ? { total: false } : {}), ...(c.key === 'products' ? { width: 40 } : {}) })),
-    rows: st.rows.map((r) => ({ ...r, how: howCounted(lang, r.basis, r.rule_amount, r.qty), base: r.basis === 'profit_percent' || r.basis === 'revenue_percent' ? r.base : null })),
+    rows: st.rows.map((r) => ({ ...r, how: `${howCounted(lang, r.basis, r.rule_amount, r.qty)}${onPrinterPart(r) ? ' *' : ''}`, base: r.basis === 'profit_percent' || r.basis === 'revenue_percent' ? r.base : null })),
     groups: [{ label: pick(lang, W.gWage), span: 6 }, { label: pick(lang, W.gAmounts), span: 4 }],
     strong: ['paid_here'],
   };
@@ -172,7 +179,7 @@ export function staffStatementHtml(st: StaffPaymentStatement, lang: ReportLang, 
     ],
     figures,
     tables: [{ sheet }],
-    notes: st.rows.length ? [] : [pick(lang, W.none)],
+    notes: [...(st.rows.length ? [] : [pick(lang, W.none)]), ...(st.rows.some(onPrinterPart) ? [pick(lang, W.printerPart)] : [])],
     signatures: [pick(lang, W.signReceiver), pick(lang, W.signOwner), pick(lang, W.signDate)],
     printHint: pick(lang, W.print),
   });
@@ -222,6 +229,9 @@ export const WITHDRAWAL_WORDS = {
   fBefore: ['دفعته سحوبات سابقة', 'Paid by earlier withdrawals', 'ڕاکێشانی پێشوو دایانە'],
   fRemaining: ['الباقي', 'Remaining', 'ماوە'],
   signInvestor: ['توقيع المستثمر', 'Received by', 'واژووی وەبەرهێنەر'],
+  // Phase 8 (DECISIONS row 364, ruling R1): a printer sold with services; and what the «expenses» column holds.
+  printerPart: ['* طابعة بيعت مع خدمات: «سعر البيع» هو حصة الطابعة وحدها؛ خدمات الطابعة (الضمان، ليفو كير…) للمتجر ولا تدخل في حصتك.', '* A printer sold with services: “Sale” is the printer’s own part; the printer’s services (warranty, Levo Care…) are the shop’s and are not in your share.', '* پرینتەرێک کە لەگەڵ خزمەتگوزاری فرۆشراوە: «نرخی فرۆشتن» تەنها بەشی پرینتەرەکەیە؛ خزمەتگوزارییەکانی پرینتەر (گەرەنتی، لیڤۆ کێر…) بۆ فرۆشگایە و ناچێتە بەشەکەتەوە.'],
+  expensesNote: ['«المصاريف» = مصاريف الوحدة ناقص ما دفعه الزبون للتوصيل؛ تظهر سالبة حين يزيد التوصيل المحصّل على مصاريفها.', '“Expenses” = the unit’s expenses less the delivery the customer paid; it reads negative when the delivery charged is more than its expenses.', '«خەرجییەکان» = خەرجییەکانی یەکەکە کەم ئەوەی کڕیار بۆ گەیاندن داویەتی؛ نەرێنی دەردەکەوێت کاتێک گەیاندنی وەرگیراو لە خەرجییەکانی زیاترە.'],
 } as const satisfies Record<string, Tri>;
 const WW = WITHDRAWAL_WORDS;
 
@@ -244,7 +254,7 @@ export const WITHDRAWAL_UNIT_COLUMNS: StatementColumn[] = [
   { key: 'qty', kind: 'int', header: ['القطع', 'Pieces', 'پارچە'] },
   { key: 'revenue', kind: 'money', header: ['سعر البيع', 'Sale', 'نرخی فرۆشتن'] },
   { key: 'cost', kind: 'money', header: ['تكلفة البضاعة', 'Goods cost', 'تێچووی کاڵا'] },
-  { key: 'expenses', kind: 'money', header: ['المصاريف', 'Expenses', 'خەرجییەکان'] },
+  { key: 'expenses', kind: 'money', header: ['المصاريف ناقص التوصيل المحصّل', 'Expenses less delivery charged', 'خەرجییەکان کەم گەیاندنی وەرگیراو'] },
   { key: 'net', kind: 'money', header: ['صافي الربح', 'Net profit', 'قازانجی پوخت'] },
   { key: 'share', kind: 'text', header: ['حصة الربح', 'Profit share', 'بەشی قازانج'] },
   { key: 'earning', kind: 'money', header: ['ربح المستثمر', 'Investor’s profit', 'قازانجی وەبەرهێنەر'] },
@@ -263,6 +273,15 @@ const pct = (bps: unknown) => (isNum(bps) ? `${(bps / 100).toLocaleString('en-US
 const snap = (v: unknown, key: string): number | null => {
   try { const x = (JSON.parse(String(v ?? '{}')) as Record<string, unknown>)[key]; return isNum(x) ? x : null; } catch { return null; }
 };
+
+const snapFlag = (v: unknown, key: string): boolean => {
+  try { return (JSON.parse(String(v ?? '{}')) as Record<string, unknown>)[key] === true; } catch { return false; }
+};
+/** What the units sheet explains under its heading: a serviced printer's sale (when one is listed) and a negative «expenses». */
+const unitNotes = (st: WithdrawalStatement, lang: ReportLang): string[] => [
+  ...(st.units.some((u) => u.printer_part === true) ? [pick(lang, WW.printerPart)] : []),
+  ...(st.units.some((u) => isNum(u.expenses) && u.expenses < 0) ? [pick(lang, WW.expensesNote)] : []),
+];
 
 /** The statement of one withdrawal, from the rows it reserved and the ledger's own figures. */
 export async function withdrawalStatement(db: D1Database, withdrawalId: string, lang: ReportLang): Promise<WithdrawalStatement> {
@@ -315,7 +334,8 @@ export async function withdrawalStatement(db: D1Database, withdrawalId: string, 
     withdrawal: w,
     summary,
     units: units.map((u) => ({
-      agreement: u.agreement, order_id: u.order_id, day: u.day, product: u.product, qty: snap(u.snapshot, 'qty'),
+      agreement: u.agreement, order_id: u.order_id, day: u.day, product: `${String(u.product ?? '')}${snapFlag(u.snapshot, 'printer_part') ? ' *' : ''}`, qty: snap(u.snapshot, 'qty'),
+      printer_part: snapFlag(u.snapshot, 'printer_part'),
       revenue: snap(u.snapshot, 'revenue'), cost: snap(u.snapshot, 'cost'), expenses: snap(u.snapshot, 'expenses'), net: snap(u.snapshot, 'profit'),
       share: pct(u.profit_share_bps), earning: u.profit_iqd, capital: u.capital_iqd, loss: u.loss_iqd,
       state: pick(lang, Number(u.eligible) === 1 && !Number(u.pending) ? WW.counted : WW.waiting),
@@ -337,7 +357,7 @@ export function withdrawalSheets(st: WithdrawalStatement, lang: ReportLang, at: 
   return [
     { name: pick(lang, WW.summary), rtl: lang !== 'en', heading, totalLabel: pick(lang, W.total), columns: cols(WITHDRAWAL_SUMMARY_COLUMNS), rows: st.summary,
       groups: [{ label: pick(lang, WW.gInvestment), span: 3 }, { label: pick(lang, WW.gEarned), span: 2 }, { label: pick(lang, WW.gWithdrawal), span: 3 }], strong: ['this'] },
-    { name: pick(lang, WW.units), rtl: lang !== 'en', heading: [pick(lang, WW.units), fill(pick(lang, WW.investor), { name: w.user_name })], totalLabel: pick(lang, W.total),
+    { name: pick(lang, WW.units), rtl: lang !== 'en', heading: [pick(lang, WW.units), fill(pick(lang, WW.investor), { name: w.user_name }), ...unitNotes(st, lang)], totalLabel: pick(lang, W.total),
       columns: cols(WITHDRAWAL_UNIT_COLUMNS), rows: st.units,
       groups: [{ label: pick(lang, WW.gUnit), span: 5 }, { label: pick(lang, WW.gSale), span: 4 }, { label: pick(lang, WW.gShare), span: 4 }, { label: pick(lang, WW.gState), span: 1 }],
       strong: ['earning'] },
@@ -365,7 +385,7 @@ export function withdrawalStatementHtml(st: WithdrawalStatement, lang: ReportLan
       { label: pick(lang, WW.fRemaining), value: total('remaining'), kind: 'money' },
     ],
     tables: [{ caption: pick(lang, WW.summary), sheet: summary }, { caption: pick(lang, WW.units), sheet: units, newPage: true }],
-    notes: [pick(lang, WW.note)],
+    notes: [pick(lang, WW.note), ...unitNotes(st, lang)],
     signatures: [pick(lang, WW.signInvestor), pick(lang, W.signOwner), pick(lang, W.signDate)],
     printHint: pick(lang, W.print),
   });

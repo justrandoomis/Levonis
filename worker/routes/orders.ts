@@ -6,6 +6,7 @@ import type { Context } from 'hono';
 import type { AppContext, Env, SessionUser } from '../lib/types';
 import { rootDomainFrom, storeUrl } from '../lib/hosts';
 import { safeParse } from '../lib/types';
+import { orderBreakdown } from '../lib/orderBreakdown';
 import { stripFinancials } from '../lib/adminScope';
 import { stripInventoryProvenance } from '../lib/inventoryProvenancePrivacy';
 import { SESSION_CACHE_CONTROL } from '../lib/edgePolicy';
@@ -198,7 +199,7 @@ import {
   type BnplEligibility,
 } from '../lib/bnpl';
 import { priorityDeliveryVerdict, type PriorityDeliveryVerdict } from '../lib/priorityDelivery';
-import { validateCoupon } from '../lib/membershipOps';
+import { addMonths, validateCoupon } from '../lib/membershipOps';
 import { allocateCoupon, allocateCouponPool, type CouponContext, type CouponRule, type PoolCoupon, type PoolUse } from '@levonis/pricing/coupons';
 import { couponDeliveryMethod, couponLinesOf, couponNamesDelivery, productCouponFactsFromRows, transportOf } from '../lib/couponLines';
 import { TradeInError, isTradeInCreditFenceAbort, tradeInCouponLine, tradeInCreditFence } from '../lib/tradeIn';
@@ -429,6 +430,12 @@ function financialSnapshot(
     support: support
       ? { referrer_username: support.referrer_username ?? '', ref: support.ref ?? '', discount_iqd: 0 }
       : null,
+    /**
+     * «تفاصيل السعر» (DECISIONS row 364): every part of the total named — goods, the printer's services, the
+     * membership bought, the member's discount, the code, the Levo Care part discount, delivery — signed, and
+     * adding up to `total_iqd` (worker/lib/orderBreakdown.ts). Customer figures only.
+     */
+    breakdown: orderBreakdown(o, items, merchandise),
   };
 }
 
@@ -962,7 +969,7 @@ export function orderPublic(
         // for the customer and the admin: choices, fees, months. Absent on
         // every other line.
         ...(typeof it.services_snapshot === 'string' && it.services_snapshot
-          ? { services: orderServicesView(it.services_snapshot) }
+          ? { services: withServicesCover(orderServicesView(it.services_snapshot), o.delivered_at) }
           : {}),
         // 0235: the membership bought with the order is its own line (never returned), and a
         // filament-kit line names the printer line it was packed with. Absent on every other line.
@@ -2311,6 +2318,24 @@ function creditReserved(res: StockResolution, productId: string, credit: Readonl
       ? res.available
       : Math.min(...tracked.map((t) => Math.max(0, (t.stock as number) - t.reserved)));
   return { ...res, targets, available };
+}
+
+/**
+ * «الضمان حتى … · ليفو كير حتى …» (DECISIONS row 364): once the order is delivered, the two dates the
+ * months bought run to, counted from the delivery exactly as the unit's own cover is (addMonths). Absent
+ * before delivery — the screens then say the months «من يوم التسليم». The unit page stays the authority
+ * for a device whose cover was later changed by hand.
+ */
+function withServicesCover<T extends { warranty_months: number; care_total_months: number }>(view: T | null, deliveredAt: unknown) {
+  if (!view || typeof deliveredAt !== 'string' || !deliveredAt || Number.isNaN(Date.parse(deliveredAt))) return view;
+  return {
+    ...view,
+    cover: {
+      from: deliveredAt,
+      warranty_end_at: view.warranty_months > 0 ? addMonths(deliveredAt, view.warranty_months) : null,
+      care_end_at: view.care_total_months > 0 ? addMonths(deliveredAt, view.care_total_months) : null,
+    },
+  };
 }
 
 /** 0242: who picked an attached order line's colour; null = the owner's fixed colour (or a line before 0242). */

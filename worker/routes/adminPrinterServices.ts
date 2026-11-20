@@ -22,12 +22,13 @@ import {
   printerExtrasCatalogIssues,
   printerAnchorNotes,
   loadPrinterServices,
-  orderServiceTasks,
+  orderServiceTasksView,
   printerCatalogForMapping,
   publishDraft,
   saveDraft,
   unpublish,
 } from '../lib/printerServices';
+import { ENDED_ORDER_STATUSES } from '../lib/orderServiceBoard';
 
 export const adminPrinterServiceRoutes = new Hono<AppContext>();
 adminPrinterServiceRoutes.use('*', requireAdmin);
@@ -98,7 +99,7 @@ adminPrinterServiceRoutes.post('/unpublish', requireMoneyAuthority('printer_serv
  */
 export const adminOrderServiceTaskRoutes = new Hono<AppContext>();
 /** An order in one of these states has no warehouse work left: its tasks cannot be completed. */
-const ENDED_ORDER: ReadonlySet<string> = new Set(['cancelled', 'returned', 'refunded']);
+const ENDED_ORDER: ReadonlySet<string> = ENDED_ORDER_STATUSES;
 adminOrderServiceTaskRoutes.use('*', requireAdmin);
 
 adminOrderServiceTaskRoutes.post('/:id/done', async (c) => {
@@ -137,5 +138,6 @@ adminOrderServiceTaskRoutes.post('/:id/done', async (c) => {
     ).bind(actor, task.order_id, JSON.stringify({ task_id: id, kind: task.kind }), id, actor, nowIso),
   ]);
   if (!res?.meta?.changes) throw conflict('This task or its order changed while you were editing — reload.', 'ORDER_SERVICE_TASK_CLOSED');
-  return c.json({ success: true, tasks: await orderServiceTasks(c.env.DB, task.order_id) });
+  // The same view the order window loaded (words in three languages, who closed each task).
+  return c.json({ success: true, tasks: await orderServiceTasksView(c.env.DB, task.order_id) });
 });

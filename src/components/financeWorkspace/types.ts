@@ -31,6 +31,8 @@ export interface ProfitTotals {
   general_expenses_iqd?: number | null;
   /** Printer phase 3: co-pays collected in the period (account 4300), added to the period net (summary totals only). */
   service_income_iqd?: number | null;
+  /** Phase 8 (DECISIONS row 364) «ربح الخدمات»: the printer services' part of the retained sales — the shop's alone; already inside the sales and the profit. */
+  services_profit_iqd?: number | null;
   allocated_overhead_iqd?: number | null;
   refunded_iqd?: number | null;
   refund_iqd?: number | null;
@@ -164,7 +166,9 @@ export interface DisplayUsdSummary {
 export interface UsdKnownPart { orders_count: number; owner_net_cents: number | null; net_after_report_adjustments_cents: number | null }
 /** One day in cents; the deductions and the net after them since redesign step 4 (absent from a server that predates them). */
 export interface UsdDay { revenue_cents: number; cost_cents: number | null; owner_net_cents: number | null; investor_cents: number | null;
-  deductions_cents?: number; net_after_report_adjustments_cents?: number | null }
+  deductions_cents?: number; net_after_report_adjustments_cents?: number | null;
+  /** Phase 8: the day's Levo Care co-pays in cents (already on the day's net); absent on the period's own block and from an older server. */
+  service_income_cents?: number }
 /** `display_usd` of `GET /orders?display=USD`. */
 export interface DisplayUsdOrders { available: boolean; today_rate?: string | null; at_time_count?: number; today_count?: number; batch_cost_lines?: number; orders?: Record<string, UsdOrderCents> }
 /** `display_usd` of `GET /orders/:id?display=USD`. */
@@ -190,6 +194,8 @@ export type FinanceWaiting = { orders_count: number; totals: ProfitTotals; reaso
 /** What keeps the period from being complete: lines without a confirmed purchase price. */
 export type FinanceMissingCosts = { lines: number; orders: number; unknown_lines: number; estimated_lines: number; unknown_products: { product_id: string | null; name: string; qty: number; lines: number }[] };
 export interface FinanceSummary {
+  /** Phase 8 (DECISIONS row 364): the first day whose new orders are shared on the printer's own part. */
+  printer_part_from_day?: string;
   /** Absent from a server that predates them; null when no order of the period is complete. */
   known?: FinanceKnown | null;
   /** Absent from a server that predates it; null when every order of the period is complete. */
@@ -220,7 +226,20 @@ export interface FinanceSummary {
 
 export interface PrinterBreakdown {
   printer_lines?: number;
+  /** Phase 8: the orders that hold a serviced printer (the courier, delivery and membership rows count these only). */
+  printer_orders?: number;
+  /** The printers' own sales (what the lines retain less their services) — revenue, not a margin. */
   printer_net_iqd?: number;
+  /** Phase 8: their goods cost and the real margin; null while a cost is unknown. */
+  printer_cogs_iqd?: number | null;
+  printer_margin_iqd?: number | null;
+  /** Phase 8, information: what the price anchor took off printers bought below the Smart package; the PRO services discount given. */
+  anchor_reduction_iqd?: number;
+  pro_services_discount_iqd?: number;
+  /** Phase 8: kept printer units by the warranty bought, and those with Levo Care. */
+  sold?: { units?: number; warranty_0?: number; warranty_12?: number; warranty_24?: number; care?: number };
+  /** Phase 8: the delivery income of the orders that hold a serviced printer, beside courier_fee_iqd. */
+  delivery_income_iqd?: number;
   services_gross_iqd?: number;
   services_net_iqd?: number;
   services?: Partial<Record<'warranty' | 'care' | 'packaging' | 'inspection' | 'academy', number>>;
@@ -236,6 +255,12 @@ export interface ServiceClaimsSummary {
   warranty_cost_iqd?: number;
   care_cost_iqd?: number;
   care_benefit_given_iqd?: number;
+  /** The discount of the Levo Care part offers used on the period's delivered orders (inside their figures). */
+  care_part_discount_iqd?: number;
+  /** Phase 8: serviced printer units whose warranty / Levo Care is in force today. */
+  in_force?: { warranty_units?: number; care_units?: number } | null;
+  /** Phase 8: the Levo Care draw prizes delivered in the period and their goods cost (null = a cost is unknown). */
+  draw_prizes?: { count?: number; cost_iqd?: number | null } | null;
   copay_iqd?: number;
   count?: number;
   inspections_done?: number;
@@ -257,6 +282,8 @@ export interface FinanceChartAmounts {
   /** The day's coupons, credited price protection and returned trade-in credits, and its net after them (redesign step 4; absent from a server that predates them). */
   deductions_iqd?: number;
   net_after_report_adjustments_iqd?: number | null;
+  /** Phase 8: the Levo Care co-pays collected on the day — already ON the day's net (absent from an older server). */
+  service_income_iqd?: number;
 }
 export interface FinanceCharts extends FinanceChartAmounts {
   /**
@@ -301,6 +328,12 @@ export interface ProfitCostReview {
 
 export interface ProfitLine extends ProfitTotals {
   id: string;
+  /** Phase 8: the line's frozen printer services (JSON), its kit / add-on marks and the owner's discount on it; absent on other lines. */
+  services_snapshot?: string | null;
+  kit_id?: string | null;
+  addon_id?: string | null;
+  printer_discount_iqd?: number | null;
+  line_kind?: string | null;
   product_id: string | null;
   name_snapshot: string;
   sku_snapshot: string;
@@ -325,6 +358,8 @@ export interface ProfitLine extends ProfitTotals {
 
 export interface ProfitCost {
   id: string;
+  /** Phase 8: a staff percentage counted on a serviced printer's own part (its services are the shop's). */
+  printer_part?: boolean;
   rule_name: string;
   staff_id: string | null;
   staff_name?: string;
@@ -369,6 +404,13 @@ export interface OrderProfit {
   history: FinancialHistory[];
   /** Present only with `?display=USD`. */
   display_usd?: DisplayUsdOrder;
+  /** Printer phase 3: this order's printer / services / kits / membership split (report-only). */
+  printer_breakdown?: PrinterBreakdown | null;
+  /** Phase 8 (DECISIONS row 364): do investors and staff count this order's printers on the printer's own part (orders placed from `printer_part_from_day`)? */
+  printer_part_rule?: boolean;
+  printer_part_from_day?: string;
+  /** Phase 8: the Levo Care part-offer discount used on this order — inside its figures, shown only. */
+  care_part_discount_iqd?: number;
   /** Only on an order cancelled after its delivery, whose figures read as reversed like a return (DECISIONS row 318). */
   sale_reversal?: SaleReversal;
 }

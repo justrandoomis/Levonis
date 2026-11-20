@@ -627,7 +627,7 @@ export function servicesForMethod(services: PricedServices, methodId: string): R
 }
 
 const PACKAGING_NOTE: Record<string, string> = {
-  standard: 'التغليف: تغليف المصنع القياسي فقط (0 د.ع)',
+  standard: 'التغليف: تغليف المصنع القياسي فقط — بلا تغليف إضافي',
   extra: 'التغليف: تغليف حماية إضافي',
 };
 const ACADEMY_NOTE: Record<string, string> = {
@@ -717,7 +717,11 @@ export function orderServicesView(snapshot: string): {
   const sel = v.selection && typeof v.selection === 'object' ? (v.selection as Record<string, unknown>) : null;
   return {
     selection: sel
-      ? { package: sel.package, warranty: sel.warranty, care: sel.care, packaging: sel.packaging, inspection: sel.inspection, academy: sel.academy, delivery: sel.delivery }
+      ? {
+          package: sel.package, warranty: sel.warranty, care: sel.care, packaging: sel.packaging, inspection: sel.inspection, academy: sel.academy, delivery: sel.delivery,
+          // «أوافق: بلا ضمان» — the agreement the customer gave when he bought no warranty (row 364: the order screens say it was recorded).
+          ...(sel.ack_no_warranty === true ? { ack_no_warranty: true } : {}),
+        }
       : null,
     lines: Array.isArray(v.lines)
       ? (v.lines as Array<Record<string, unknown>>).map((l) => ({
@@ -744,6 +748,71 @@ export function orderServicesView(snapshot: string): {
   };
 }
 
+/**
+ * A SERVICE TASK IN THE READER'S LANGUAGE (DECISIONS row 364). The stored `note` was written in Arabic
+ * when the order was placed and stays as the record; the order screens draw this instead: what to do,
+ * for how many printers, from the task's own kind / choice / qty and — when the line's frozen snapshot
+ * is at hand — the packaging fee and the inspection's lead days. Null for a kind this code does not know
+ * (the screen then shows the stored note).
+ */
+export function serviceTaskText(
+  task: { kind: string; choice: string; qty?: number | null },
+  snapshot?: string | null
+): { ar: string; en: string; ckb: string } | null {
+  const units = Math.max(1, Math.trunc(Number(task.qty) || 1));
+  let priced: { lines?: Array<{ service?: string; fee_iqd?: number }>; inspection_lead_business_days?: [number, number] | null } | null = null;
+  if (snapshot) { try { priced = JSON.parse(snapshot); } catch { priced = null; } }
+  const times = units > 1
+    ? { ar: ` — لكل طابعة من الـ${units}`, en: ` — for each of the ${units} printers`, ckb: ` — بۆ هەر یەک لە ${units} پرینتەرەکە` }
+    : { ar: '', en: '', ckb: '' };
+  const withTimes = (t: { ar: string; en: string; ckb: string }) => ({ ar: t.ar + times.ar, en: t.en + times.en, ckb: t.ckb + times.ckb });
+  if (task.kind === 'packaging') {
+    if (task.choice === 'extra') {
+      const fee = Math.trunc(Number(priced?.lines?.find((l) => l.service === 'packaging')?.fee_iqd) || 0);
+      const paid = fee > 0 ? fee.toLocaleString('en-US') : '';
+      return withTimes({
+        ar: `تغليف حماية إضافي فوق تغليف المصنع${paid ? ` — دفع الزبون ${paid} د.ع` : ''}`,
+        en: `Extra protective packaging over the factory box${paid ? ` — the customer paid ${paid} IQD` : ''}`,
+        ckb: `پێچانەوەی پاراستنی زیادە لەسەر کارتۆنی کارگە${paid ? ` — کڕیار ${paid} د.ع داوە` : ''}`,
+      });
+    }
+    return withTimes({
+      ar: 'تغليف المصنع فقط — بلا تغليف إضافي',
+      en: 'Factory packaging only — no extra packaging',
+      ckb: 'تەنها پێچانەوەی کارگە — بێ پێچانەوەی زیادە',
+    });
+  }
+  if (task.kind === 'inspection') {
+    const lead = priced?.inspection_lead_business_days;
+    const [lo, hi] = Array.isArray(lead) && lead.length === 2 ? lead : [null, null];
+    const days = lo !== null && hi !== null
+      ? { ar: ` (يضيف ${lo}–${hi} أيام عمل للتجهيز)`, en: ` (adds ${lo}–${hi} business days to preparation)`, ckb: ` (${lo}–${hi} ڕۆژی کار بۆ ئامادەکردن زیاد دەکات)` }
+      : { ar: '', en: '', ckb: '' };
+    return withTimes({
+      ar: `فحص كامل للطابعة قبل الإرسال — لا تُسلَّم للمندوب قبل إكماله${days.ar}`,
+      en: `Full inspection of the printer before dispatch — do not hand it to the courier until it is done${days.en}`,
+      ckb: `پشکنینی تەواوی پرینتەرەکە پێش ناردن — تا تەواو نەبێت مەیدە بە گەیەنەر${days.ckb}`,
+    });
+  }
+  if (task.kind === 'academy') {
+    if (task.choice === 'live_in_person') {
+      return withTimes({
+        ar: 'دورة تعليمية حضورية — اتصل بالزبون وحدّد الموعد',
+        en: 'In-person training session — call the customer and agree a time',
+        ckb: 'خولی فێرکاریی ڕووبەڕوو — پەیوەندی بە کڕیارەوە بکە و کات دیاری بکە',
+      });
+    }
+    if (task.choice === 'live_whatsapp') {
+      return withTimes({
+        ar: 'دورة تعليمية مباشرة عبر واتساب — اتصل بالزبون وحدّد الموعد',
+        en: 'Live training session over WhatsApp — contact the customer and agree a time',
+        ckb: 'خولی فێرکاریی ڕاستەوخۆ لە ڕێگەی واتسئاپ — پەیوەندی بە کڕیارەوە بکە و کات دیاری بکە',
+      });
+    }
+  }
+  return null;
+}
+
 export interface ServiceTaskRow {
   /** How many printers of the line the task covers (0234); the note says «×N» too. */
   qty?: number;
@@ -763,6 +832,46 @@ export async function orderServiceTasks(db: D1Database, orderId: string): Promis
     if (/no such table/i.test(String((e as Error)?.message ?? e))) return [];
     throw e;
   }
+}
+
+/** A task as the admin order window draws it: its words in three languages and who closed it (a name, never an id). */
+export interface ServiceTaskView extends ServiceTaskRow {
+  text: { ar: string; en: string; ckb: string } | null;
+  done_by_name: string | null;
+}
+
+/**
+ * The order's tasks for the admin order window (row 364): each with `text` (serviceTaskText, from the
+ * line's own frozen snapshot) and `done_by_name`. Two extra reads at most, both tolerant: a failure of
+ * either leaves the plain rows.
+ */
+export async function orderServiceTasksView(db: D1Database, orderId: string): Promise<ServiceTaskView[]> {
+  const rows = await orderServiceTasks(db, orderId);
+  if (!rows.length) return [];
+  const snapshots = new Map<string, string>();
+  const names = new Map<string, string>();
+  try {
+    const { results } = await db
+      .prepare('SELECT id, services_snapshot FROM order_items WHERE order_id = ? AND services_snapshot IS NOT NULL')
+      .bind(orderId)
+      .all<{ id: string; services_snapshot: string | null }>();
+    for (const r of results ?? []) if (r.services_snapshot) snapshots.set(String(r.id), r.services_snapshot);
+  } catch { /* a database without 0234: the texts are built without the fee and the lead days */ }
+  const actors = [...new Set(rows.map((r) => r.done_by).filter((x): x is string => !!x))].slice(0, 50);
+  if (actors.length) {
+    try {
+      const { results } = await db
+        .prepare(`SELECT id, name, username FROM users WHERE id IN (${actors.map(() => '?').join(',')})`)
+        .bind(...actors)
+        .all<{ id: string; name: string | null; username: string | null }>();
+      for (const u of results ?? []) names.set(String(u.id), String(u.name || u.username || '').trim());
+    } catch { /* names are an enrichment */ }
+  }
+  return rows.map((r) => ({
+    ...r,
+    text: serviceTaskText(r, snapshots.get(r.order_item_id) ?? null),
+    done_by_name: r.done_by ? names.get(r.done_by) || null : null,
+  }));
 }
 
 /** True while an inspection bought on this order is still open: the order may not leave the warehouse. */

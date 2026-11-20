@@ -3,6 +3,7 @@ import { spread, workspaceInstalled, type OrderProfitBase } from './orderProfit'
 import { conflict } from './http';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { financialCostLines } from './financeCostScope';
+import { claimCostOutOfSharesSql, servicesOutOfShares } from './printerPart';
 
 type Row = Record<string, unknown>;
 const n = (value: unknown) => Number(value ?? 0);
@@ -11,7 +12,8 @@ const generalExpense = `e.voided_at IS NULL
   AND NOT EXISTS(SELECT 1 FROM finance_expense_links l WHERE l.expense_id=e.id)
   AND NOT EXISTS(SELECT 1 FROM finance_order_costs c WHERE c.expense_id=e.id)
   AND NOT EXISTS(SELECT 1 FROM finance_collections c WHERE c.expense_id=e.id)
-  AND NOT EXISTS(SELECT 1 FROM finance_monthly_promotions p WHERE p.expense_id=e.id)`;
+  AND NOT EXISTS(SELECT 1 FROM finance_monthly_promotions p WHERE p.expense_id=e.id)
+  AND NOT ${claimCostOutOfSharesSql('e')}`;
 
 function isProfitShare(cost: Row): boolean {
   if (!cost.staff_id) return false;
@@ -28,10 +30,19 @@ function isProfitShare(cost: Row): boolean {
  * to avoid a recursive wage calculation. Investors retain the established
  * ordering after staff costs. Fixed/revenue wages remain costs in both bases.
  * Monthly promotion is borne solely by the store, including its linked
- * operating expense; it affects neither participant profit nor capital loss. */
-export async function participantNetProfit(db: D1Database, base: OrderProfitBase, forStaff = false): Promise<Map<string, number | null>> {
+ * operating expense; it affects neither participant profit nor capital loss.
+ * Phase 8 (DECISIONS row 364): a serviced printer line gives the participants
+ * its printer part only — its services' retained income is the shop's (ruling
+ * R1; printerPart.ts, orders delivered from PRINTER_PART_FROM_DAY) — and a
+ * warranty / Levo Care claim cost is the shop's general expense, outside the
+ * month's spread and its fingerprint (ruling R3, `generalExpense` above). */
+/** The participants' net per line, and (`servicesOut`) what of each serviced printer line was left to the shop to get it. */
+export type ParticipantNet = Map<string, number | null> & { servicesOut?: Map<string, number> };
+export async function participantNetProfit(db: D1Database, base: OrderProfitBase, forStaff = false): Promise<ParticipantNet> {
   const adjustments = (await reportAdjustments(db, [base.order_id])).get(base.order_id)!;
-  const values = new Map<string, number | null>();
+  const values: ParticipantNet = new Map<string, number | null>();
+  const servicesOut = new Map<string, number>();
+  values.servicesOut = servicesOut;
   const costs = new Map(base.lines.map(line => [line.id, { amount: 0, pending: false }]));
   for (const cost of base.costs) {
     if (cost.state === 'reversed' || (forStaff && isProfitShare(cost))) continue;
@@ -61,12 +72,17 @@ export async function participantNetProfit(db: D1Database, base: OrderProfitBase
   base.lines.forEach((line, index) => {
     const direct = costs.get(line.id)!;
     const unknown = line.cogs_iqd === null || n(line.unknown_refund) > 0 || direct.pending;
+    // Ruling R1: the services' part is taken of what the line retains AFTER its share of an order-level coupon, so a
+    // code stored on the order costs the printer part exactly what the same code stored on the line would.
+    const services = line.services_snapshot ? servicesOutOfShares(base.order, { ...line, retained_revenue_iqd: line.retained_revenue_iqd - (coupons[index] ?? 0) }) : 0;
+    if (services) servicesOut.set(line.id, services);
     values.set(line.id, unknown ? null : line.retained_revenue_iqd - line.cogs_iqd!
       + line.shipping_income_iqd + line.cod_tax_iqd - direct.amount - line.manual_direct_iqd
       - line.courier_fee_iqd - line.payment_fee_iqd - (coupons[index] ?? 0)
       - (adjustments.price_protection_by_line.get(line.id) ?? 0)
       - (adjustments.trade_in_credit_returned_by_line.get(line.id) ?? 0)
-      - (general.get(line.id) ?? 0));
+      - (general.get(line.id) ?? 0)
+      - services);
   });
   return values;
 }

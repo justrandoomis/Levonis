@@ -445,7 +445,10 @@ test('the discount applies by itself: cart = quote = order, on ONE unit, on the 
     // …and in the period's report, informational.
     const day = baghdadDay();
     const sum = (await serviceClaimsSummary(asD1(raw), { from: day, to: day }, { laborIqd: null }))!;
-    assert.equal(sum.care_part_discount_iqd, 20_000);
+    // Phase 8 (DECISIONS row 364): counted on the order's DELIVERY day, once it is delivered — like every figure of the period.
+    assert.equal(sum.care_part_discount_iqd, 0, 'not delivered yet: in no period');
+    raw.prepare("UPDATE orders SET status='delivered', delivered_at=? WHERE id IN (SELECT x.order_id FROM care_part_grants g JOIN coupon_redemption_extras x ON x.coupon_id=g.coupon_id)").run(new Date().toISOString());
+    assert.equal((await serviceClaimsSummary(asD1(raw), { from: day, to: day }, { laborIqd: null }))!.care_part_discount_iqd, 20_000);
   } finally {
     raw.close();
   }
@@ -639,7 +642,11 @@ test('rejecting the claim takes back the offers the customer has not used; a use
     const waiting = (await issue(raw, id, { product_id: 'p_fan', discount_pct: 50 })).grant;
     await add(raw, BUYER, 'p_fan', 1);
     assert.equal((await cart(raw, BUYER)).care_offers.length, 1);
-    const res = await patch(as(raw, OWNER), `/api/devices/admin/claims/${id}`, { stage: 'rejected', decision: 'misuse', reason: 'Not a Care case after all' });
+    // Phase 8 (row 364): rejecting for misuse on a Care holder is refused until the desk confirms it — nothing is taken back in silence.
+    const warned = await patch(as(raw, OWNER), `/api/devices/admin/claims/${id}`, { stage: 'rejected', decision: 'misuse', reason: 'Not a Care case after all' });
+    assert.deepEqual([warned.status, (await json(warned)).code], [409, 'CLAIM_MISUSE_CARE_ACTIVE']);
+    assert.equal((await cart(raw, BUYER)).care_offers.length, 1, 'the offer still waits');
+    const res = await patch(as(raw, OWNER), `/api/devices/admin/claims/${id}`, { stage: 'rejected', decision: 'misuse', reason: 'Not a Care case after all', confirm_care_void: true });
     assert.equal(res.status, 200, JSON.stringify(await json(res.clone())));
     const panel = await json(await get(as(raw, OWNER), `/api/devices/admin/claims/${id}/care`));
     const state = (g: string) => panel.part_grants.find((x: { id: string }) => x.id === g).state;

@@ -22,6 +22,8 @@ import { api, ApiError } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { openWarrantyDoc, popupBlockedMessage } from './printDoc';
 import { serialRulesStrings } from './serialInventory/serialRulesStrings';
+import { apiRefusal, refusalLang } from '../../lib/refusalStrings';
+import { DESK, deskLang } from './deskStrings';
 
 interface ReceiptRow {
   id: string;
@@ -106,6 +108,20 @@ const STR = {
     page: 'صفحة',
     prints: 'نسخ مطبوعة',
     verify: 'صفحة التحقق العامة',
+    admin: 'الإدارة',
+    loadFailed: 'تعذّر التحميل — أعد المحاولة.',
+    receiptTitle: 'وصل ضمان',
+    months: (n: number) => `${n} شهراً`,
+    historyActions: {
+      'warranty.created': 'أُصدر الوصل',
+      'warranty.activated': 'فُعّل الوصل',
+      'warranty.reissued': 'أُعيد إصداره برقم جديد',
+      'warranty.superseded': 'حلّ محلّه وصل جديد',
+      'warranty.replaced': 'استُبدل الجهاز — وصل الجهاز السابق',
+      'warranty.voided': 'أُلغي الوصل',
+      'warranty.reprinted': 'طُبعت نسخة',
+    } as Record<string, string>,
+    views: { receipts: 'وصولات الضمان', serials: 'الأرقام التسلسلية', units: 'أجهزة الطلبات', group: 'الضمانات والأجهزة' },
   },
   en: {
     title: 'Warranties',
@@ -152,8 +168,84 @@ const STR = {
     page: 'Page',
     prints: 'copies printed',
     verify: 'Public verification page',
+    admin: 'Admin',
+    loadFailed: 'Could not load — try again.',
+    receiptTitle: 'Warranty receipt',
+    months: (n: number) => `${n} months`,
+    historyActions: {
+      'warranty.created': 'Receipt issued',
+      'warranty.activated': 'Receipt activated',
+      'warranty.reissued': 'Reissued under a new number',
+      'warranty.superseded': 'Superseded by a new receipt',
+      'warranty.replaced': 'Device replaced — the previous device’s receipt',
+      'warranty.voided': 'Receipt voided',
+      'warranty.reprinted': 'A copy was printed',
+    } as Record<string, string>,
+    views: { receipts: 'Warranty receipts', serials: 'Serial numbers', units: 'Order units', group: 'Warranties & devices' },
+  },
+  // Real Sorani, never the Arabic (DECISIONS row 183) — phase 8.
+  ckb: {
+    title: 'گەرەنتییەکان',
+    subtitle: 'هەموو پسووڵەیەکی گەرەنتی کە دەرچووە، بەستراو بە ئامێر و ژمارە زنجیرەییەکەیەوە.',
+    search: 'بە ژمارە زنجیرەیی، ژمارەی پسووڵە، تەلەفۆن، ناو، ژمارەی داواکاری یان بەرهەم بگەڕێ…',
+    all: 'هەموو',
+    active: 'کارا',
+    expired: 'بەسەرچووە',
+    draft: 'ڕەشنووس',
+    replaced: 'گۆڕدراوەتەوە',
+    void: 'هەڵوەشێنراوەتەوە',
+    receiptNo: 'ژمارەی پسووڵە',
+    customer: 'کڕیار',
+    product: 'بەرهەم',
+    model: 'مۆدێل',
+    serial: 'ژمارە زنجیرەیی',
+    order: 'داواکاری',
+    purchase: 'بەرواری کڕین',
+    start: 'سەرەتا',
+    end: 'کۆتایی',
+    status: 'دۆخ',
+    actions: '',
+    view: 'بینین',
+    print: 'چاپکردن',
+    pdf: 'PDF',
+    pdfHint: 'لە پەنجەرەی چاپکردندا «پاشەکەوتکردن وەک PDF» هەڵبژێرە',
+    reissue: 'دووبارە دەرکردن',
+    voidIt: 'هەڵوەشاندنەوە',
+    empty: 'هێشتا هیچ پسووڵەیەکی گەرەنتی نییە. دوای نووسینی ژمارە زنجیرەیی لە لاپەڕەی داواکارییەوە دروست دەکرێن.',
+    noResults: 'هیچ ئەنجامێک بۆ ئەم گەڕانە نییە.',
+    loading: 'باردەکرێت…',
+    refresh: 'نوێکردنەوە',
+    history: 'مێژووی پسووڵە',
+    reissueTitle: 'دووبارە دەرکردنی پسووڵە',
+    reissueBody: 'پسووڵەی ئێستا بە هۆکارێکی تۆمارکراو هەڵدەوەشێتەوە و پسووڵەیەکی نوێ بە ژمارەیەکی نوێ بۆ هەمان ئامێر دەردەچێت. کۆپییە کۆنەکە لە تۆماردا دەمێنێتەوە.',
+    voidTitle: 'هەڵوەشاندنەوەی پسووڵەی گەرەنتی',
+    voidBody: 'پسووڵەی هەڵوەشێنراو وەک کارا پشتڕاست ناکرێتەوە و لە تۆماردا دەمێنێتەوە. ناگەڕێتەوە.',
+    reason: 'هۆکار (لە تۆماری وردبینیدا تۆمار دەکرێت)',
+    refreshTerms: 'مەرجەکانی ئێستا بەکاربهێنە لەبری مەرجەکانی پسووڵە کۆنەکە',
+    confirm: 'جێبەجێکردن',
+    cancel: 'پاشگەزبوونەوە',
+    reasonRequired: 'هۆکار پێویستە (لانیکەم ٥ پیت).',
+    of: 'لە',
+    page: 'لاپەڕە',
+    prints: 'کۆپیی چاپکراو',
+    verify: 'لاپەڕەی پشتڕاستکردنەوەی گشتی',
+    admin: 'بەڕێوەبردن',
+    loadFailed: 'بارنەکرا — دووبارە هەوڵ بدەوە.',
+    receiptTitle: 'پسووڵەی گەرەنتی',
+    months: (n: number) => `${n} مانگ`,
+    historyActions: {
+      'warranty.created': 'پسووڵەکە دەرچوو',
+      'warranty.activated': 'پسووڵەکە چالاککرا',
+      'warranty.reissued': 'بە ژمارەیەکی نوێ دووبارە دەرچوو',
+      'warranty.superseded': 'پسووڵەیەکی نوێ جێگەی گرتەوە',
+      'warranty.replaced': 'ئامێرەکە گۆڕدرا — پسووڵەی ئامێری پێشوو',
+      'warranty.voided': 'پسووڵەکە هەڵوەشێنرایەوە',
+      'warranty.reprinted': 'کۆپییەک چاپکرا',
+    } as Record<string, string>,
+    views: { receipts: 'پسووڵەکانی گەرەنتی', serials: 'ژمارە زنجیرەییەکان', units: 'ئامێرەکانی داواکاری', group: 'گەرەنتییەکان و ئامێرەکان' },
   },
 };
+const strOf = (lang: string) => (lang === 'en' ? STR.en : lang === 'ckb' ? STR.ckb : STR.ar);
 
 const FILTERS = ['all', 'active', 'expired', 'draft', 'replaced', 'void'] as const;
 type Filter = (typeof FILTERS)[number];
@@ -198,10 +290,10 @@ export default function AdminWarranties({ initialView }: { initialView?: Warrant
       /* private mode: the view is simply not remembered */
     }
   };
-  const label = (ar: string, en: string) => (lang === 'en' ? en : ar);
+  const tv = strOf(lang).views;
   return (
     <div className={`${T.AP} space-y-4`} dir={dir}>
-      <div role="group" aria-label={label('الضمانات والأجهزة', 'Warranties & devices')} className="lv-well inline-flex max-w-full flex-wrap items-center gap-1 p-1 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)]">
+      <div role="group" aria-label={tv.group} className="lv-well inline-flex max-w-full flex-wrap items-center gap-1 p-1 rounded-[var(--ap-radius-md)] border border-[var(--ap-border)]">
         {VIEWS.map((v) => (
           <button
             key={v}
@@ -214,21 +306,21 @@ export default function AdminWarranties({ initialView }: { initialView?: Warrant
             }`}
           >
             {v === 'receipts'
-              ? label('وصولات الضمان', 'Warranty receipts')
+              ? tv.receipts
               : v === 'serials'
-                ? label('الأرقام التسلسلية', 'Serial numbers')
+                ? tv.serials
                 : v === 'serial_rules'
                   ? serialRulesStrings(lang).tabTitle
                   : v === 'units'
-                  ? label('أجهزة الطلبات', 'Order units')
-                  : label('مطالبات الضمان', 'Warranty claims')}
+                  ? tv.units
+                  : DESK[deskLang(lang)].tabClaims}
           </button>
         ))}
       </div>
       {view === 'receipts' ? (
         <WarrantyReceipts />
       ) : (
-        <React.Suspense fallback={<div className={`${T.surface} p-8 text-center text-[13px] text-[var(--ap-text-3)]`}>{label('جارٍ التحميل…', 'Loading…')}</div>}>
+        <React.Suspense fallback={<div className={`${T.surface} p-8 text-center text-[13px] text-[var(--ap-text-3)]`}>{strOf(lang).loading}</div>}>
           {view === 'serials' ? <SerialInventoryPanel /> : view === 'serial_rules' ? <SerialRulesTab /> : <AdminSerials view={view} />}
         </React.Suspense>
       )}
@@ -238,7 +330,7 @@ export default function AdminWarranties({ initialView }: { initialView?: Warrant
 
 function WarrantyReceipts() {
   const { lang, dir } = useLanguage();
-  const t = lang === 'en' ? STR.en : STR.ar;
+  const t = strOf(lang);
   const [rows, setRows] = useState<ReceiptRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [total, setTotal] = useState(0);
@@ -264,11 +356,11 @@ function WarrantyReceipts() {
       setCounts(res.counts ?? {});
       setErr(null);
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : String(e));
+      setErr(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), t.loadFailed) : t.loadFailed);
     } finally {
       setLoading(false);
     }
-  }, [page, search, filter]);
+  }, [page, search, filter, lang, t.loadFailed]);
 
   useEffect(() => {
     const id = window.setTimeout(() => void load(), search ? 250 : 0);
@@ -311,14 +403,14 @@ function WarrantyReceipts() {
         : s === 'draft'
           ? 'text-[var(--ap-text-2)] bg-[var(--ap-surface-2)] border-[var(--ap-border)]'
           : 'text-[var(--ap-danger)] bg-[var(--ap-danger-bg)] border-[var(--ap-danger-border)]';
-  const statusLabel = (s: string) => (t as Record<string, string>)[s] ?? s;
+  const statusLabel = (s: string) => (t as unknown as Record<string, string>)[s] ?? s;
 
   return (
     <div className={`${T.AP} space-y-4`} dir={dir} data-panel="warranties">
       {slot &&
         createPortal(
           <nav className={`${T.AP} hidden sm:flex items-center gap-1.5 text-[12.5px] text-[var(--ap-text-3)] min-w-0`} aria-label="breadcrumb" dir={dir}>
-            <span>{lang === 'en' ? 'Admin' : 'الإدارة'}</span>
+            <span>{t.admin}</span>
             <span aria-hidden>/</span>
             <span className="text-[var(--ap-text-1)] font-semibold truncate">{t.title}</span>
           </nav>,
@@ -367,7 +459,7 @@ function WarrantyReceipts() {
               data-warranty-filter={f}
               className={`${T.chip} h-9 px-3`}
             >
-              {(t as Record<string, string>)[f]}
+              {(t as unknown as Record<string, string>)[f]}
               {f !== 'all' && <span className={`${T.kbd} ms-1`}>{counts[f] ?? 0}</span>}
             </button>
           ))}
@@ -538,7 +630,7 @@ function DetailModal({
 }) {
   const r = detail.receipt;
   return (
-    <Modal titleAr="وصل ضمان" titleEn="Warranty receipt" onClose={onClose} wide>
+    <Modal titleAr={t.receiptTitle} titleEn={t === STR.en ? '' : STR.en.receiptTitle} onClose={onClose} wide>
       <div className={`${T.AP} space-y-4`}>
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-mono text-[15px] font-bold text-[var(--ap-text-1)]" dir="ltr">
@@ -568,10 +660,10 @@ function DetailModal({
             [t.order, r.order_id],
             [t.purchase, shortDate(r.purchase_date)],
             [t.start, shortDate(r.warranty_start_at)],
-            [t.end, shortDate(r.warranty_end_at)],
+            [t.end, `${shortDate(r.warranty_end_at)} · ${t.months(r.warranty_months)}`],
             // The localized word, not the stored enum: the dialog is what the
             // owner reads, and "replaced" is not a word on this screen.
-            [t.status, (t as Record<string, string>)[r.status] ?? r.status],
+            [t.status, (t as unknown as Record<string, string>)[r.status] ?? r.status],
           ] as const).map(([label, value]) => (
             <div key={label} className="flex gap-2 text-[12.5px] border-b border-[var(--ap-hairline)] py-1.5">
               <span className="w-28 shrink-0 font-semibold text-[var(--ap-text-2)]">{label}</span>
@@ -594,7 +686,7 @@ function DetailModal({
                 <span className="font-mono text-[var(--ap-text-3)]" dir="ltr">
                   {h.created_at.slice(0, 16).replace('T', ' ')}
                 </span>
-                <span className="font-semibold">{h.action.replace('warranty.', '')}</span>
+                <span className="font-semibold">{t.historyActions[h.action] ?? t.history}</span>
                 <span className="text-[var(--ap-text-3)]">{h.username || h.email || ''}</span>
                 {typeof h.detail?.reason === 'string' && <span className="w-full text-[var(--ap-text-3)]">{h.detail.reason}</span>}
               </li>
@@ -620,6 +712,7 @@ function ActionModal({
   onClose: () => void;
   onDone: (message: string) => Promise<void>;
 }) {
+  const { lang } = useLanguage();
   const [reason, setReason] = useState('');
   const [refreshTerms, setRefreshTerms] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -645,7 +738,8 @@ function ActionModal({
         await onDone(`${row.receipt_no} → ${res.receipt?.receipt_no ?? ''}`);
       }
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : String(e));
+      // NO_WARRANTY_BOUGHT (a paper on a printer bought with no warranty is voided, never reissued) reads in the admin's language.
+      setErr(e instanceof ApiError ? apiRefusal(e, refusalLang(lang), e.message) : String(e));
     } finally {
       setBusy(false);
     }
@@ -654,7 +748,7 @@ function ActionModal({
   return (
     <Modal
       titleAr={kind === 'void' ? t.voidTitle : t.reissueTitle}
-      titleEn={kind === 'void' ? 'Void receipt' : 'Reissue receipt'}
+      titleEn={t === STR.en ? '' : kind === 'void' ? STR.en.voidTitle : STR.en.reissueTitle}
       onClose={onClose}
       dirty={reason.length > 0}
       footer={

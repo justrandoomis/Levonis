@@ -44,7 +44,10 @@ export function EarningsSources({ summary, capitalAvailable, onWithdrawCapital }
     {!!summary.capital_pending_iqd && <div className="fp-row"><span>{ir.capitalPending}</span><Money value={summary.capital_pending_iqd} /></div>}
     {investorReturnView(summary, null).sources_surplus_iqd > 0 && <div className="fp-row"><span className="fp-row-meta">{ir.sourcesSurplus}</span><Money value={investorReturnView(summary, null).sources_surplus_iqd} /></div>}
     {capitalAvailable > 0 && <div className="fp-row"><div><span>{loc('رأس المال المتاح للسحب', 'Capital available to withdraw')}</span><p className="fp-row-meta"><Money value={capitalAvailable} /></p></div><Button size="sm" onClick={onWithdrawCapital}>{loc('سحب رأس المال', 'Withdraw capital')}</Button></div>}
-  </div></Surface>;
+  </div>
+    {/* Phase 8 (DECISIONS row 364, owner ruling R1): what a share or a percentage is counted on, said once. */}
+    {(summary.investor_profit_iqd > 0 || summary.staff_iqd > 0) && <p className="fp-note" data-earnings-printer-part>{loc('في الطابعات المباعة مع خدمات: حصتك أو نسبتك تُحسب على الطابعة وحدها؛ خدمات الطابعة (الضمان، ليفو كير…) للمتجر.', 'On printers sold with services: your share or percentage is counted on the printer alone; the printer’s services (warranty, Levo Care…) are the shop’s.', 'لەو پرینتەرانەی لەگەڵ خزمەتگوزاری فرۆشراون: بەشەکەت یان ڕێژەکەت تەنها لەسەر پرینتەرەکە دەژمێردرێت؛ خزمەتگوزارییەکانی پرینتەر (گەرەنتی، لیڤۆ کێر…) بۆ فرۆشگایە.')}</p>}
+  </Surface>;
 }
 
 export default function MyEarnings() {

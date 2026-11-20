@@ -22,6 +22,8 @@ import { apiRefusal } from '../../lib/refusalStrings';
 import { serialProblem } from '../../../packages/catalog/src/deviceSerials';
 import { openWarrantyDoc, popupBlockedMessage } from './printDoc';
 import UnitHistory from './UnitHistory';
+import UnitCoverBlock from './UnitCoverBlock';
+import { DESK, deskLang, type DeskCare, type DeskCover, type DeskServices } from './deskStrings';
 import UnitSerialSlots from '../adminOrders/serials/UnitSerialSlots';
 import { serialStrings } from '../adminOrders/serials/strings';
 import { formatNoteTexts, type LinkFormatWire } from '../adminOrders/serials/formatNotes';
@@ -38,7 +40,12 @@ export interface WarrantyUnitRow {
   delivered_at: string | null;
   warranty_start_at: string | null;
   warranty_end_at: string | null;
+  /** The device's months EXACTLY: 0 = the customer bought no warranty; null = no duration known. */
   months: number | null;
+  /** Phase 8 (row 364): what the line sold, the Care window, what holds today. Absent from an older server. */
+  services?: DeskServices | null;
+  care?: DeskCare | null;
+  cover?: DeskCover | null;
   base_months: number | null;
   ext_months: number;
   /** A replacement unit that carries the ORIGINAL device's end date. Its
@@ -59,6 +66,8 @@ export interface WarrantyUnitRow {
     /** The paper no longer matches the device record. It is not rewritten
      *  behind the owner's back — it is reported, and reissuing fixes it. */
     drift: { serial: boolean; end: boolean };
+    /** A live paper on a printer the customer bought with NO warranty (issued before phase 8). */
+    no_warranty?: boolean;
   } | null;
 }
 
@@ -202,14 +211,70 @@ const STR = {
   },
 };
 
+const STR_CKB: typeof STR.ar = {
+  title: 'گەرەنتی و ژمارە زنجیرەییەکان',
+  subtitle: 'پسووڵەی گەرەنتی جیا بۆ هەر ئامێرێک، بەستراو بە ژمارە زنجیرەییەکەیەوە.',
+  none: 'ئەم داواکارییە یەکەی شیاوی گەرەنتی تێدا نییە. یەکەکان کاتی گەیاندنی داواکارییەکە بۆ بەرهەمە ژمارەدارەکان (چاپکەرەکان) دروست دەکرێن.',
+  noneDelivered: 'داواکارییەکە گەیەنراوە بەڵام یەکەی ئامێرەکانی هێشتا دروست نەکراون (پێش ئەوەی گەیاندن لە ڕێگەی کۆمپانیای گەیاندنەوە دروستیان بکات گەیەنراوە). ئێستا دروستیان بکە تا گەرەنتییەکەیان لە بەرواری گەیاندنەوە دەست پێبکات و کڕیار بتوانێت بیانبەستێت.',
+  backfill: 'دروستکردنی یەکەکان',
+  backfilling: 'دروست دەکرێت…',
+  backfillNone: 'ئەم داواکارییە بەرهەمی ژمارەدار (چاپکەر) تێدا نییە — هیچ یەکەیەک نییە بۆ دروستکردن.',
+  unit: 'یەکە',
+  serial: 'ژمارە زنجیرەیی',
+  serialPlaceholder: 'وەک لەسەر لەیبڵی ئامێرەکە نووسراوە بینووسە',
+  save: 'پاشەکەوت',
+  saved: 'پاشەکەوتکرا',
+  months: 'ماوەی گەرەنتی (مانگ)',
+  start: 'سەرەتای گەرەنتی',
+  end: 'کۆتایی گەرەنتی',
+  generate: 'دروستکردنی پسووڵەی گەرەنتی',
+  generating: 'دروست دەکرێت…',
+  needSerial: 'سەرەتا ژمارە زنجیرەییەکە بنووسە — بەبێ ژمارە پسووڵە دەرناچێت.',
+  driftSerial: 'پسووڵە چاپکراوەکە ژمارە زنجیرەیی {old} هەڵگرتووە، بەڵام ئامێرەکە ئێستا {new}ـە. لە شاشەی «گەرەنتییەکان»ەوە دووبارە دەری بکە تا لەگەڵ ئامێرەکە یەک بگرێتەوە.',
+  driftEnd: 'بەرواری کۆتایی گەرەنتی لەسەر پسووڵەکە دوای ڕاستکردنەوەی گەیاندن لەگەڵ تۆماری ئامێرەکە یەک ناگرێتەوە. دووبارە دەری بکە تا یەک بگرنەوە.',
+  preview: 'پێشبینین',
+  print: 'چاپکردن',
+  pdf: 'پاشەکەوتی PDF',
+  reprint: 'کۆپییەکی تر',
+  receiptNo: 'ژمارەی پسووڵە',
+  status: 'دۆخ',
+  stDraft: 'ڕەشنووس',
+  stActive: 'کارا',
+  stExpired: 'بەسەرچووە',
+  stVoid: 'هەڵوەشێنراوەتەوە',
+  stReplaced: 'گۆڕدراوەتەوە',
+  replaced: 'یەکەی گۆڕدراو',
+  reassignConfirm: 'ئەم ژمارەیە بەکارهاتووە یان یەکەکە ژمارەیەکی تری هەیە. دووبارە دیاریکردن کردارێکی وردبینیکراوە و هۆکاری دەوێت. بەردەوام دەبیت؟',
+  reasonPrompt: 'هۆکار (لە تۆماری وردبینیدا تۆمار دەکرێت):',
+  reasonRequired: 'هۆکار پێویستە (لانیکەم ٥ پیت).',
+  copy: 'کۆپیکردنی ژمارەکە',
+  copied: 'کۆپیکرا',
+  notDelivered: 'داواکارییەکە هێشتا نەگەیەنراوە — دەتوانرێت ئێستا پسووڵەکە ئامادە بکرێت و گەرەنتی لە بەرواری خوارەوە دەست پێدەکات.',
+  cancelled: 'داواکارییەکە هەڵوەشێنراوەتەوە — بۆ داواکارییەک کە نەگەیەنراوە گەرەنتی دەرناچێت.',
+  loading: 'باردەکرێت…',
+  linkedTo: 'ئامێرەکە بەستراوە بە هەژماری',
+  linkedSince: 'لە',
+  notLinked: 'هێشتا بە هیچ هەژمارێک نەبەستراوە',
+  openClaims: 'داواکاریی گەرەنتی کراوە',
+  editDuration: 'گۆڕینی ماوەی گەرەنتی',
+  durationTitle: 'ماوەی گەرەنتی یەک جار لە کاتی گەیاندندا دەژمێردرێت. گۆڕینی بڕیارێکی بە ئەنقەستە کە بە ناو و کاتەکەتەوە لە تۆماری وردبینیدا تۆمار دەکرێت، و پسووڵە چاپکراوەکە دووبارە دەرناکرێتەوە.',
+  baseMonths: 'ماوەی بنەڕەتی (مانگ)',
+  extMonths: 'درێژکردنەوە (مانگ)',
+  durationReason: 'هۆکار (لانیکەم ٥ پیت، لە تۆماری وردبینیدا تۆمار دەکرێت)',
+  saveDuration: 'پاشەکەوتکردنی ماوە',
+  durationSaved: 'ماوەی گەرەنتی نوێکرایەوە.',
+  monthsRequired: 'ماوەیەکی بنەڕەتی دروست بنووسە (1 تا 240 مانگ).',
+  shorterWarn: 'ئەم گۆڕانکارییە داپۆشینەکە پێش بەرواری ئێستای کۆتایی پێدەهێنێت، و لەوانەیە کڕیار بەرواری کۆنی پێ وترابێت. بۆ بەردەوامبوون پشتڕاستی بکەرەوە.',
+  shorterConfirm: 'بەڵێ، داپۆشینەکە کورت بکەرەوە',
+  carriedEnd: 'یەکەیەکی جێگرەوەیە کە بەرواری کۆتایی ئامێرە ڕەسەنەکەی هەڵگرتووە — گەرەنتی یەکە ڕەسەنەکە بگۆڕە.',
+  cancel: 'پاشگەزبوونەوە',
+  delivered: 'گەیاندن',
+  history: 'مێژووی گۆڕانکارییەکان',
+  hideHistory: 'شاردنەوەی مێژوو',
+};
+
 const dateInput = (iso: string | null): string => (iso ? iso.slice(0, 10) : '');
 const toIso = (day: string): string => (day ? new Date(`${day}T00:00:00.000Z`).toISOString() : '');
-
-/** The section's own heading in Sorani (the rest of this table predates the requirement). */
-const CKB_HEAD = {
-  title: 'گەرەنتی و ژمارە زنجیرەییەکان',
-  subtitle: 'پسوولەی گەرەنتی جیا بۆ هەر ئامێرێک، بەستراو بە ژمارە زنجیرەییەکەیەوە.',
-};
 
 export default function WarrantySection({
   orderId,
@@ -237,8 +302,9 @@ export default function WarrantySection({
   onFocusHandled?: () => void;
 }) {
   const { lang, dir } = useLanguage();
-  const t = lang === 'en' ? STR.en : STR.ar;
-  const head = lang === 'ckb' ? CKB_HEAD : t;
+  const t = lang === 'en' ? STR.en : lang === 'ckb' ? STR_CKB : STR.ar;
+  const head = t;
+  const d = DESK[deskLang(lang)];
   const rl = (lang === 'en' || lang === 'ckb' ? lang : 'ar') as 'ar' | 'en' | 'ckb';
   const [data, setData] = useState<OrderWarrantyResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -264,7 +330,7 @@ export default function WarrantySection({
   // shorten confirmation arms ONLY after the server has refused this exact
   // change once, so a live window can never be pulled in on a first click.
   const [durationFor, setDurationFor] = useState<string | null>(null);
-  const [duration, setDuration] = useState({ base: '', ext: '', reason: '', shorter: false });
+  const [duration, setDuration] = useState({ base: '', ext: '', total: '', reason: '', shorter: false });
   const [durationNote, setDurationNote] = useState('');
   // «مَن غيّر ومتى»: the per-unit history, open per row, refetched after every
   // reload of the section so a change just saved appears in it at once.
@@ -286,18 +352,19 @@ export default function WarrantySection({
             // carry a day, so sending it back unchanged would replace the
             // device's exact delivery timestamp with midnight UTC and move
             // the whole window. The value travels only when the admin edits it.
-            next[u.id] = { serial: u.serial ?? '', months: String(u.months ?? res.config.default_months), start, start0: start };
+            // A printer sold with the services prints its device record: its months are not a field to fill.
+            next[u.id] = { serial: u.serial ?? '', months: u.services ? '' : String(u.months ?? res.config.default_months), start, start0: start };
           }
         }
         return next;
       });
       setErr(null);
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : String(e));
+      setErr(e instanceof ApiError ? apiRefusal(e, rl, d.loadFailed) : d.loadFailed);
     } finally {
       setLoading(false);
     }
-  }, [orderId]);
+  }, [orderId, rl, d.loadFailed]);
 
   useEffect(() => {
     void load();
@@ -380,6 +447,7 @@ export default function WarrantySection({
     setDuration({
       base: unit.base_months !== null ? String(unit.base_months) : String(unit.months ?? ''),
       ext: String(unit.ext_months ?? 0),
+      total: String(unit.months ?? unit.services?.warranty_months ?? ''),
       reason: '',
       shorter: false,
     });
@@ -394,7 +462,15 @@ export default function WarrantySection({
   const saveDuration = async (unit: WarrantyUnitRow) => {
     const base = Number(duration.base);
     const ext = Number(duration.ext || '0');
-    if (!Number.isInteger(base) || base < 1 || base > 240 || !Number.isInteger(ext) || ext < 0 || ext > 240) {
+    // Phase 8: a printer sold with the services takes ONE total — the owner's goodwill, never below what was sold.
+    const sold = unit.services ? unit.services.warranty_months : null;
+    const total = Number(duration.total);
+    if (sold !== null) {
+      if (duration.total.trim() === '' || !Number.isInteger(total) || total < sold || total > 240) {
+        setErr(d.svcBelowSold(sold));
+        return;
+      }
+    } else if (!Number.isInteger(base) || base < 1 || base > 240 || !Number.isInteger(ext) || ext < 0 || ext > 240) {
       setErr(t.monthsRequired);
       return;
     }
@@ -407,8 +483,7 @@ export default function WarrantySection({
     setErr(null);
     try {
       await api.patch(`/api/devices/admin/units/${unit.id}/warranty`, {
-        base_months: base,
-        ext_months: ext,
+        ...(sold !== null ? { total_months: total } : { base_months: base, ext_months: ext }),
         reason: duration.reason.trim(),
         confirm_shorter: duration.shorter || undefined,
       });
@@ -417,28 +492,34 @@ export default function WarrantySection({
       await load();
     } catch (e) {
       if (e instanceof ApiError && e.code === 'CONFIRM_SHORTER_REQUIRED') {
-        setDuration((d) => ({ ...d, shorter: true }));
+        setDuration((prev) => ({ ...prev, shorter: true }));
       }
-      setErr(e instanceof ApiError ? e.message : String(e));
+      setErr(e instanceof ApiError ? apiRefusal(e, rl, e.message) : String(e));
     } finally {
       setBusy(key, false);
     }
   };
 
   const generate = async (unit: WarrantyUnitRow) => {
-    const d = drafts[unit.id];
     const key = `gen:${unit.id}`;
     setBusy(key, true);
     setErr(null);
     try {
+      const draft = drafts[unit.id];
       await api.post('/api/admin/warranties', {
         unit_id: unit.id,
-        months: Number(d?.months) || undefined,
-        warranty_start_at: d?.start && d.start !== d.start0 ? toIso(d.start) : undefined,
+        // A printer sold with the services: the paper prints the device record — no months, no start are sent.
+        ...(unit.services
+          ? {}
+          : {
+              months: Number(draft?.months) || undefined,
+              warranty_start_at: draft?.start && draft.start !== draft.start0 ? toIso(draft.start) : undefined,
+            }),
       });
       await load();
     } catch (e) {
-      setErr(e instanceof ApiError ? e.message : String(e));
+      // NO_WARRANTY_BOUGHT / RECEIPT_FOLLOWS_DEVICE read in the admin's language.
+      setErr(e instanceof ApiError ? apiRefusal(e, rl, e.message) : String(e));
     } finally {
       setBusy(key, false);
     }
@@ -550,8 +631,8 @@ export default function WarrantySection({
 
           <div className="space-y-2.5">
             {data.units.map((u) => {
-              const d = drafts[u.id] ?? { serial: '', months: '', start: '', start0: '' };
-              const serialSaved = !!u.serial && u.serial === d.serial.trim();
+              const dr = drafts[u.id] ?? { serial: '', months: '', start: '', start0: '' };
+              const serialSaved = !!u.serial && u.serial === dr.serial.trim();
               return (
                 <div
                   key={u.id}
@@ -569,7 +650,7 @@ export default function WarrantySection({
                         {t.replaced}
                       </span>
                     )}
-                    {u.receipt && (
+                    {u.receipt && !u.receipt.no_warranty && (
                       <span
                         data-warranty-status={u.receipt.status}
                         className={`text-[10px] px-2 py-0.5 rounded-full ${statusClass(u.receipt.status)}`}
@@ -586,7 +667,7 @@ export default function WarrantySection({
                         <input
                           className="lv-input flex-1 min-w-0 min-h-10 px-2.5 text-[13px] font-mono"
                           dir="ltr"
-                          value={d.serial}
+                          value={dr.serial}
                           data-warranty-serial={u.id}
                           onChange={(e) => setDraft(u.id, { serial: e.target.value })}
                           placeholder={t.serialPlaceholder}
@@ -604,8 +685,17 @@ export default function WarrantySection({
                       </div>
                     </label>
 
-                    {!u.receipt && (
+                    {!u.receipt && u.months !== 0 && (
                       <div className="flex flex-wrap gap-2">
+                        {u.services ? (
+                          <div className="block" data-warranty-months-fixed={u.id}>
+                            <span className="block text-[11px] font-bold text-text-secondary mb-1" title={d.receiptMonthsFixed}>{t.months}</span>
+                            <span className="lv-well inline-flex items-center min-h-10 px-3 rounded-lg text-[13px] font-bold text-text-primary">
+                              {u.months ?? u.services.warranty_months}
+                            </span>
+                          </div>
+                        ) : (
+                        <>
                         <label className="block">
                           <span className="block text-[11px] font-bold text-text-secondary mb-1">{t.months}</span>
                           <input
@@ -614,7 +704,7 @@ export default function WarrantySection({
                             min={1}
                             max={240}
                             dir="ltr"
-                            value={d.months}
+                            value={dr.months}
                             data-warranty-months={u.id}
                             onChange={(e) => setDraft(u.id, { months: e.target.value })}
                           />
@@ -625,11 +715,13 @@ export default function WarrantySection({
                             className="lv-input w-auto min-h-10 px-2.5 text-[13px]"
                             type="date"
                             dir="ltr"
-                            value={d.start}
+                            value={dr.start}
                             data-warranty-start={u.id}
                             onChange={(e) => setDraft(u.id, { start: e.target.value })}
                           />
                         </label>
+                        </>
+                        )}
                         <button
                           type="button"
                           onClick={() => void generate(u)}
@@ -649,8 +741,29 @@ export default function WarrantySection({
                     )}
                   </div>
 
-                  {!u.serial && !u.receipt && (
+                  {!u.serial && !u.receipt && u.months !== 0 && (
                     <p className="mt-1.5 text-[11px] text-warning">{t.needSerial}</p>
+                  )}
+
+                  {/* NO WARRANTY, NO PAPER (phase 8): the customer bought this printer without a warranty. The row
+                      says so in plain words instead of offering a months box that used to default to twelve. */}
+                  {u.months === 0 && !u.receipt && (
+                    <div className="mt-2 lv-alert lv-alert-info text-[12px] text-text-primary leading-relaxed" data-warranty-none={u.id}>
+                      <p className="font-bold">{d.noReceipt}</p>
+                      <p className="text-text-secondary">{d.noReceiptOwner}</p>
+                    </div>
+                  )}
+                  {u.receipt?.no_warranty && (u.receipt.status === 'active' || u.receipt.status === 'draft') && (
+                    <div className="mt-2 lv-alert lv-alert-danger text-[12px] text-text-primary leading-relaxed" role="alert" data-warranty-wrong-receipt={u.id}>
+                      {d.wrongReceipt}
+                    </div>
+                  )}
+
+                  {/* WHAT THE CUSTOMER BOUGHT AND WHAT HOLDS TODAY (phase 8), before the dates. */}
+                  {u.cover && (
+                    <div className="mt-2 rounded-lg border border-border-subtle p-2.5" data-warranty-cover={u.id}>
+                      <UnitCoverBlock services={u.services ?? null} care={u.care ?? null} cover={u.cover} lang={lang} deliveredAt={u.delivered_at} />
+                    </div>
                   )}
 
                   {/* WHO HOLDS THE MACHINE, and the window it is under. The
@@ -688,11 +801,15 @@ export default function WarrantySection({
                       {' · '}
                       {t.start}: <span className="text-text-secondary" dir="ltr">{dateInput(u.warranty_start_at) || '—'}</span>
                       {' · '}
-                      {t.months}: <span className="text-text-secondary" dir="ltr">{u.months ?? '—'}</span>
-                      {' · '}
-                      {t.end}: <span className="text-text-secondary" dir="ltr">{dateInput(u.warranty_end_at) || '—'}</span>
+                      {t.months}: <span className="text-text-secondary" dir={u.months === 0 ? undefined : 'ltr'}>{u.months === 0 ? d.noWarranty : u.months ?? '—'}</span>
+                      {u.months !== 0 && (
+                        <>
+                          {' · '}
+                          {t.end}: <span className="text-text-secondary" dir="ltr">{dateInput(u.warranty_end_at) || '—'}</span>
+                        </>
+                      )}
                     </span>
-                    {u.carried_end ? (
+                    {u.carried_end && !(u.services && u.replacement_of) ? (
                       <span className="text-text-muted">{t.carriedEnd}</span>
                     ) : (
                       !u.replaced && (
@@ -702,7 +819,7 @@ export default function WarrantySection({
                           data-warranty-edit-duration={u.id}
                           className="text-text-secondary hover:text-text-primary underline underline-offset-2"
                         >
-                          {t.editDuration}
+                          {u.services ? d.svcOpen : t.editDuration}
                         </button>
                       )
                     )}
@@ -726,8 +843,35 @@ export default function WarrantySection({
 
                   {durationFor === u.id && (
                     <div className="mt-2 rounded-lg border border-border-subtle bg-surface p-3 space-y-2">
-                      <p className="text-[11px] text-text-secondary leading-relaxed">{t.durationTitle}</p>
-                      <div className="flex flex-wrap gap-2">
+                      <p className="text-[11px] text-text-secondary leading-relaxed">{u.services ? d.svcWarrantyBody : t.durationTitle}</p>
+                      {u.services && (
+                        <div className="space-y-2" data-warranty-services-duration={u.id}>
+                          <p className="text-[11px] text-text-secondary">
+                            {d.svcSold}: <span className="text-text-primary font-bold">{u.services.warranty_months === 0 ? d.noWarranty : d.warrantyMonths(u.services.warranty_months)}</span>
+                            {' · '}
+                            {d.svcNow}: <span className="text-text-primary font-bold">{(u.months ?? 0) === 0 ? d.noWarranty : d.warrantyMonths(u.months ?? 0)}</span>
+                          </p>
+                          {!viewerOwner ? (
+                            <div className="lv-alert lv-alert-warning text-[11px] text-text-primary">{d.svcOwnerOnly}</div>
+                          ) : (
+                            <label className="block">
+                              <span className="block text-[11px] font-bold text-text-secondary mb-1">{d.svcNewTotal}</span>
+                              <input
+                                className="lv-input w-24 min-h-10 px-2.5 text-[13px]"
+                                type="number"
+                                min={u.services.warranty_months}
+                                max={240}
+                                dir="ltr"
+                                value={duration.total}
+                                data-warranty-total={u.id}
+                                onChange={(e) => setDuration((prev) => ({ ...prev, total: e.target.value }))}
+                              />
+                              {u.services.care && <span className="block mt-1 text-[11px] text-text-muted">{d.svcCareFollows}</span>}
+                            </label>
+                          )}
+                        </div>
+                      )}
+                      <div className={u.services ? 'hidden' : 'flex flex-wrap gap-2'}>
                         <label className="block">
                           <span className="block text-[11px] font-bold text-text-secondary mb-1">{t.baseMonths}</span>
                           <input
@@ -738,7 +882,7 @@ export default function WarrantySection({
                             dir="ltr"
                             value={duration.base}
                             data-warranty-base={u.id}
-                            onChange={(e) => setDuration((d) => ({ ...d, base: e.target.value }))}
+                            onChange={(e) => setDuration((prev) => ({ ...prev, base: e.target.value }))}
                           />
                         </label>
                         <label className="block">
@@ -751,7 +895,7 @@ export default function WarrantySection({
                             dir="ltr"
                             value={duration.ext}
                             data-warranty-ext={u.id}
-                            onChange={(e) => setDuration((d) => ({ ...d, ext: e.target.value }))}
+                            onChange={(e) => setDuration((prev) => ({ ...prev, ext: e.target.value }))}
                           />
                         </label>
                       </div>
@@ -764,7 +908,7 @@ export default function WarrantySection({
                           maxLength={500}
                           value={duration.reason}
                           data-warranty-reason={u.id}
-                          onChange={(e) => setDuration((d) => ({ ...d, reason: e.target.value }))}
+                          onChange={(e) => setDuration((prev) => ({ ...prev, reason: e.target.value }))}
                         />
                       </label>
                       {duration.shorter && (
@@ -776,12 +920,12 @@ export default function WarrantySection({
                         <button
                           type="button"
                           onClick={() => void saveDuration(u)}
-                          disabled={busy(`dur:${u.id}`)}
+                          disabled={busy(`dur:${u.id}`) || (!!u.services && !viewerOwner)}
                           data-warranty-save-duration={u.id}
                           className="lv-button lv-button-primary lv-button-sm"
                         >
                           {busy(`dur:${u.id}`) ? <RefreshCw className="w-4 h-4 animate-spin" aria-hidden /> : <ShieldCheck className="w-4 h-4" aria-hidden />}
-                          {duration.shorter ? t.shorterConfirm : t.saveDuration}
+                          {duration.shorter ? t.shorterConfirm : u.services ? d.svcSave : t.saveDuration}
                         </button>
                         <button
                           type="button"
@@ -848,7 +992,7 @@ export default function WarrantySection({
                           type="button"
                           onClick={() => void openDoc(u.receipt!.id, true)}
                           data-warranty-pdf={u.id}
-                          title={lang === 'en' ? 'Choose “Save as PDF” in the print dialog' : 'اختر «حفظ بصيغة PDF» في نافذة الطباعة'}
+                          title={lang === 'en' ? 'Choose “Save as PDF” in the print dialog' : lang === 'ckb' ? 'لە پەنجەرەی چاپکردندا «پاشەکەوتکردن وەک PDF» هەڵبژێرە' : 'اختر «حفظ بصيغة PDF» في نافذة الطباعة'}
                           className="lv-button lv-button-secondary lv-button-sm"
                         >
                           <FileText className="w-3.5 h-3.5" aria-hidden /> {t.pdf}

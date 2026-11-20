@@ -104,6 +104,7 @@ import {
   ApiError,
   type AdminOrderRow,
   type AdminOrdersResponse,
+  type OrderServiceFilter,
   type OrderStatus,
 } from '../../lib/api';
 import OrderDetailModal from './OrderDetailModal';
@@ -201,6 +202,12 @@ export default function OrdersBoard() {
    * no line left waiting — a cancel voids them).
    */
   const [priceEstimate, setPriceEstimate] = useState(false);
+  /**
+   * «خدمات الطابعة» (row 364) — ONE service filter at a time: orders with a serviced printer, an inspection
+   * to do, a store pickup, Levo Care, a session to schedule, a membership waiting. Narrows whatever else is
+   * chosen; «أكاديمية للجدولة» alone also lists delivered orders (the session is arranged after delivery).
+   */
+  const [service, setService] = useState<'' | OrderServiceFilter>('');
   const [archiveScope, setArchiveScope] = useState<ArchiveScope>('delivered');
   /**
    * «الأحدث أولًا / الأقدم أولًا» (row 323) — the archive's order, by when each
@@ -292,6 +299,7 @@ export default function OrdersBoard() {
     if (query) params.set('q', query);
     if (priceHold && !archive) params.set('price_hold', '1');
     if (priceEstimate && !archive) params.set('price_estimate', '1');
+    if (service) params.set('service', service);
     try {
       setData(await api.get<BoardResponse>(`/api/admin/orders?${params}`));
     } catch (e) {
@@ -303,7 +311,7 @@ export default function OrdersBoard() {
     } finally {
       setLoading(false);
     }
-  }, [archive, archiveScope, archiveSort, journey, status, query, page, lang, priceHold, priceEstimate]);
+  }, [archive, archiveScope, archiveSort, journey, status, query, page, lang, priceHold, priceEstimate, service]);
 
   useEffect(() => {
     loadOrders();
@@ -613,6 +621,53 @@ export default function OrdersBoard() {
               {loc('بانتظار تأكيد السعر', 'Awaiting price confirmation', 'چاوەڕێی پشتڕاستکردنەوەی نرخ')}
               <span className="tabular-nums text-text-secondary">{countText(data?.price_estimate_count ?? 0, latin)}</span>
             </button>
+          )}
+        </div>
+      )}
+
+      {/* «خدمات الطابعة» (row 364): one filter at a time. The three that WAIT ON STAFF carry their board-wide
+          count and an amber dot; the other three are plain facts. The row is drawn once the store has sold a
+          serviced printer at all (a count above zero, a row with a service badge) or a filter is on. */}
+      {(service || (data?.orders ?? []).some((o) => o.service_flags) || Object.values(data?.service_counts ?? {}).some((n) => n > 0)) && (
+        <div data-order-service-filters className="min-w-0">
+          <p className="mb-1.5 text-[12px] leading-[1.5] font-bold text-text-secondary">{loc('خدمات الطابعة', 'Printer services', 'خزمەتگوزارییەکانی پرینتەر')}</p>
+          <div className="flex flex-wrap gap-2">
+            {([
+              ['inspection', loc('بانتظار الفحص', 'Awaiting inspection', 'چاوەڕێی پشکنین'), data?.service_counts?.inspection],
+              ['academy', loc('أكاديمية للجدولة', 'Training to schedule', 'فێرکاری بۆ کات‌دانان'), data?.service_counts?.academy],
+              ['membership_pending', loc('عضوية معلّقة', 'Membership pending', 'ئەندامێتیی هەڵپەسێردراو'), data?.service_counts?.membership_pending],
+              ['printer_services', loc('فيها خدمات طابعة', 'With printer services', 'خزمەتگوزاریی پرینتەری تێدایە'), undefined],
+              ['pickup', loc('استلام من المخزن', 'Store pickup', 'وەرگرتن لە کۆگا'), undefined],
+              ['care', loc('ليفو كير', 'Levo Care', 'لیڤۆ کێر'), undefined],
+            ] as const).map(([id, label, count]) =>
+              // A work filter with nothing waiting is not offered (unless it is the one in force).
+              count === 0 && service !== id ? null : (
+                <button
+                  key={id}
+                  type="button"
+                  data-order-filter={`service-${id}`}
+                  aria-pressed={service === id}
+                  onClick={() => {
+                    setService((v) => (v === id ? '' : id));
+                    setPage(0);
+                  }}
+                  className="lv-choice press-scale inline-flex min-h-[44px] items-center gap-2 px-3 text-[13px] leading-[1.4] font-bold"
+                >
+                  {typeof count === 'number' ? <span className="h-2 w-2 shrink-0 rounded-full bg-warning" aria-hidden /> : null}
+                  {label}
+                  {typeof count === 'number' ? <span className="tabular-nums text-text-secondary">{countText(count, latin)}</span> : null}
+                </button>
+              )
+            )}
+          </div>
+          {service === 'academy' && (
+            <p className="mt-1.5 text-[12px] leading-[1.5] text-text-muted">
+              {loc(
+                'تشمل الطلبات المسلَّمة: الدورة تُجدول بعد وصول الطابعة.',
+                'Includes delivered orders: the session is arranged after the printer arrives.',
+                'داواکارییە گەیەنراوەکانیش دەگرێتەوە: خولەکە دوای گەیشتنی پرینتەرەکە کاتی بۆ دادەنرێت.'
+              )}
+            </p>
           )}
         </div>
       )}

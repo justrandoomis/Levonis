@@ -1,3 +1,4 @@
+import { servicesOutOfShares } from './printerPart';
 import type { OrderProfitBase } from './orderProfit';
 import { hasUnknownRefund, isConfirmedOrderCost } from './financeLedger';
 
@@ -70,6 +71,8 @@ export function describeOrderProfit(base: OrderProfitBase) {
     cost.line_ids = targets.map(line => line.id);
     cost.basis = typeof rule.basis === 'string' ? rule.basis : null;
     cost.rate = amount(rule.amount);
+    // Phase 8 (DECISIONS row 364, ruling R1): a staff percentage whose base leaves a serviced printer's services to the shop — the sheet says so beside the base.
+    if (cost.staff_id && ['profit_percent', 'revenue_percent'].includes(String(cost.basis)) && targets.some(line => servicesOutOfShares(base.order, line) > 0)) cost.printer_part = true;
     cost.review_reasons = [] as ProfitReviewReason[];
     if (cost.state === 'pending_cost') {
       const refunds = ['profit_percent', 'revenue_percent'].includes(String(cost.basis)) ? targets.filter(hasUnknownRefund).flatMap(line => line.cost_review?.issues.filter(issue => issue.code === 'refund_amount_missing') ?? []) : [];
