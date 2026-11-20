@@ -189,7 +189,7 @@ function BannerSlide({
       {image && whole ? (
         <>
           <img src={banner.imageBackground || image} alt="" className={`absolute inset-0 size-full object-cover ${banner.imageBackground ? '' : 'blur-2xl'}`} />
-          <img src={image} alt={title} className="relative size-full object-contain pt-[132px]" />
+          <img src={image} alt={title} className="relative size-full object-contain pt-[132px] pb-12" />
         </>
       ) : image ? (
         <SafeImage sizes="100vw" src={image} alt={title} aspect="auto" eager className="w-full h-full" />
