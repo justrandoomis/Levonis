@@ -36,7 +36,7 @@ import { SubscriptionChangedV1 } from '@levonis/contracts/events/v1/Subscription
 import { rateLimit } from '../lib/ratelimit';
 import { afterSettingsWrite } from '../lib/edgePolicy';
 import { publishedPrinterServices } from '../lib/printerServices';
-import { offeredMembershipTiers, proServicesDiscountPct } from '@levonis/pricing/printerServices';
+import { offeredMembershipTiers, personalActiveOf, proServicesDiscountPct } from '@levonis/pricing/printerServices';
 import { PRO_RETURN_WINDOW_DAYS, RETURN_WINDOW_DAYS } from '../lib/returnWindow';
 import { normalizeFilamentLimits } from '../lib/filamentLimits';
 import { activateOrderMembership, orderMembershipPublic, type OrderMembershipPurchaseRow } from '../lib/orderMembershipSale';
@@ -1130,6 +1130,9 @@ membershipsRoutes.get('/plans', async (c) => {
       ? null
       : {
           services_discount_pct: proServicesDiscountPct(servicesConfig),
+          // Phase 7 follow-up (DECISIONS row 363): present (false) only while the owner's printer list has Personal
+          // delivery disabled — the page then does not advertise a discount on it. Absent = offered, as before.
+          ...(servicesConfig && !personalActiveOf(servicesConfig) ? { personal_delivery: false as const } : {}),
           return_window_days: { default: RETURN_WINDOW_DAYS, pro: PRO_RETURN_WINDOW_DAYS },
         },
     /** The filament limit per plan the checkout enforces (worker/lib/filamentLimits.ts), for the comparison. */

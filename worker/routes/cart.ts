@@ -2809,8 +2809,11 @@ export function upsertStatement(
   shared: AddShared,
   /**
    * The line this add merges into holds a stored services choice although this
-   * add carries none: the product is no longer enrolled (an enrolled printer
-   * cannot be added without one), so the stale choice is cleared (0234).
+   * add carries none AND the selection is no longer enrolled: the stale choice
+   * is cleared (0234). While it IS enrolled the stored choice stays — under the
+   * price anchor an add without services is legal (the default), and it must
+   * never turn a stored Just Printer / Complete / custom line into the default
+   * (DECISIONS row 363, follow-up): only the quantity merges.
    */
   opts: { clearServices?: boolean } = {}
 ): D1PreparedStatement {
@@ -3544,7 +3547,7 @@ cartRoutes.post('/items', async (c) => {
       // line that replaces it (B15).
       ...replacing,
       upsertStatement(c.env.DB, user.id, productId, judged, line, shared, {
-        clearServices: !!existingLine && !shared.services && String(existingLine.services ?? '') !== '',
+        clearServices: !!existingLine && !shared.services && String(existingLine.services ?? '') !== '' && !judged.servicesEnrolled,
       }),
       ...(extrasStatements.length && shared.services
         ? [
@@ -3922,7 +3925,7 @@ cartRoutes.post('/items/batch', async (c) => {
       ...judged.map((j, i) => {
         const row = existingFor(j, lines[i]);
         return upsertStatement(c.env.DB, user.id, productId, j, lines[i], shared, {
-          clearServices: !!row && !shared.services && String(row.services ?? '') !== '',
+          clearServices: !!row && !shared.services && String(row.services ?? '') !== '' && !j.servicesEnrolled,
         });
       }),
     ]);

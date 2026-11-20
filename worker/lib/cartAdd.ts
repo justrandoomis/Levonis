@@ -118,6 +118,12 @@ export interface AddContext {
 /** What a line that passed every check carries to the write. */
 export interface JudgedLine {
   doc: ProductDoc;
+  /**
+   * This selection sells the printer services under the published list. A re-add WITHOUT services onto such a
+   * line keeps the line's stored choice (under the price anchor a no-services add is legal: it is the default,
+   * never an instruction to erase what the customer chose); only a line the list no longer offers is cleared.
+   */
+  servicesEnrolled: boolean;
   canonical: string[];
   canonicalJson: string;
   /** The lexically first canonical value: it is part of the unique key. */
@@ -294,7 +300,7 @@ export function judgeLevonisLineOrThrow(actx: AddContext, line: AddLine, shared:
   const { optionValueIds, colorId, qty } = line;
   const { transportMethod, fulfillmentType, warrantyPlanId, services } = shared;
   const optionId = optionValueIds[0] ?? '';
-  const { doc, resolved, selectionErrors } = resolveCartLine(
+  const { doc, resolved, selectionErrors, servicesClasses } = resolveCartLine(
     product,
     { optionId, optionValueIds, colorId, transportMethod, fulfillmentType, warrantyPlanId, services },
     actx.tier,
@@ -442,6 +448,7 @@ export function judgeLevonisLineOrThrow(actx: AddContext, line: AddLine, shared:
   const canonical = canonicalOptionValueIds(optionValueIds);
   return {
     doc,
+    servicesEnrolled: servicesClasses !== null,
     canonical,
     canonicalJson: optionValueIdsJson(canonical),
     primaryOption: canonical[0] ?? '',

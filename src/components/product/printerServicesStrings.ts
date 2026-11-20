@@ -390,9 +390,9 @@ export const PS_STRINGS: Record<PsLang, PsStrings> = { ar: AR, en: EN, ckb: CKB 
  */
 export const SERVICES_ERRORS: Record<string, Record<PsLang, string>> = {
   SERVICES_REQUIRED: {
-    ar: 'اختر باقة الطابعة وطريقة التوصيل قبل إضافتها إلى السلة.',
-    en: 'Choose the printer package and delivery before adding it to the cart.',
-    ckb: 'پێش خستنە ناو سەبەتە، پاکێجی پرینتەر و جۆری گەیاندن هەڵبژێرە.',
+    ar: 'اختر باقة الطابعة وأكّدها قبل إضافتها إلى السلة.',
+    en: 'Choose and confirm the printer package before adding it to the cart.',
+    ckb: 'پێش خستنە ناو سەبەتە، پاکێجی پرینتەر هەڵبژێرە و دڵنیای بکەرەوە.',
   },
   SERVICES_NOT_OFFERED: {
     ar: 'خدمات هذه الطابعة تغيّرت أو لم تعد متاحة — اختر من جديد.',
@@ -435,14 +435,14 @@ export const SERVICES_ERRORS: Record<string, Record<PsLang, string>> = {
     ckb: 'هەڵبژاردنی خزمەتگوزارییەکان نەخوێندرایەوە — دووبارە هەڵبژێرە.',
   },
   SERVICES_DELIVERY_REQUIRED: {
-    ar: 'اختر التوصيل الاقتصادي أو الشخصي لكل طابعة.',
-    en: 'Choose Economy or Personal delivery for each printer.',
-    ckb: 'بۆ هەر پرینتەرێک گەیاندنی ئابووری یان تایبەت هەڵبژێرە.',
+    ar: 'اختر طريقة التوصيل لكل طابعة.',
+    en: 'Choose a delivery option for each printer.',
+    ckb: 'بۆ هەر پرینتەرێک جۆری گەیاندن هەڵبژێرە.',
   },
   SERVICES_DELIVERY_METHOD: {
-    ar: 'الطابعة مع خدماتها تُوصَّل بالتوصيل العادي (اقتصادي أو شخصي) أو تُستلم من المتجر — اختر أحدهما لإتمام الطلب.',
-    en: 'A printer with its services goes by standard delivery (Economy or Personal) or store pickup — choose one of them to place the order.',
-    ckb: 'پرینتەر لەگەڵ خزمەتگوزارییەکانی بە گەیاندنی ئاسایی (ئابووری یان تایبەت) دەنێردرێت یان لە فرۆشگا وەردەگیرێت — یەکێکیان هەڵبژێرە بۆ تەواوکردنی داواکاری.',
+    ar: 'الطابعة مع خدماتها تُوصَّل إلى المنزل بالتوصيل العادي أو تُستلم من المتجر — اختر أحدهما لإتمام الطلب.',
+    en: 'A printer with its services is delivered to your home by standard delivery or collected from the store — choose one of them to place the order.',
+    ckb: 'پرینتەر لەگەڵ خزمەتگوزارییەکانی بە گەیاندنی ئاسایی دەگەیەنرێتە ماڵەوە یان لە فرۆشگا وەردەگیرێت — یەکێکیان هەڵبژێرە بۆ تەواوکردنی داواکاری.',
   },
   CART_SERVICES_CONFLICT: {
     ar: 'هذه الطابعة في سلتك بباقة مختلفة — غيّر الباقة من السلة.',

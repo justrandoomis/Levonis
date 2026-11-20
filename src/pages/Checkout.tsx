@@ -385,7 +385,7 @@ interface CheckoutQuoteDto {
   /** Every configured delivery method priced for THIS cart by the server —
    *  so a card can print a true fee before anything is selected.
    *  `fee_iqd: null` + `available: false` = the cart cannot use that method. */
-  delivery_method_fees?: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: 'needs_configuration' | 'governorate_stopped' }>;
+  delivery_method_fees?: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: 'needs_configuration' | 'governorate_stopped' | 'printer_personal_paused'; message?: { ar: string; en: string; ckb: string } }>;
   shipping: ShippingQuoteDto;
   is_pickup: boolean;
   /**
@@ -1104,6 +1104,8 @@ export default function Checkout() {
     items.some((item) => item.id === line.cart_item_id && item.productId === line.product_id && item.qty === line.qty));
   const availableDeliveryMethods = checkoutDeliveryMethods.filter((method) => {
     if (method.id === 'pickup') return true;
+    // Phase 7 follow-up: a method the server answers as paused for a serviced printer is never a card to choose.
+    if (quote?.delivery_method_fees?.some((fee) => fee.id === method.id && fee.reason === 'printer_personal_paused')) return false;
     if (method.id !== 'standard' && method.id !== 'personal') {
       return !items.some((item) => item.delivery_availability !== undefined);
     }

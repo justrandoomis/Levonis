@@ -250,13 +250,13 @@ import { createInvoiceForOrder } from '../lib/invoices';
 import { announceAfterResponse, orderAnnouncement, orderTopic } from '../lib/adminTopicRouting';
 import { orderConfirmKeyboard } from '../lib/orderTelegramConfirm';
 import { notifyOrderPlaced } from '../lib/orderNotify';
-import { SERVICES_CODES, servicesAtCheckout, deliveryChooseAtOf, KIT_CHANGED, KIT_WITHOUT_PRINTER, MEMBERSHIP_NOT_OFFERED, MEMBERSHIP_NOT_WITH_BNPL, MEMBERSHIP_PRICE_CHANGED, offeredMembershipTiers } from '@levonis/pricing/printerServices';
+import { SERVICES_CODES, servicesAtCheckout, deliveryChooseAtOf, personalActiveOf, KIT_CHANGED, KIT_WITHOUT_PRINTER, MEMBERSHIP_NOT_OFFERED, MEMBERSHIP_NOT_WITH_BNPL, MEMBERSHIP_PRICE_CHANGED, offeredMembershipTiers } from '@levonis/pricing/printerServices';
 import { activateOrderMembership, orderMembershipPublic, orderMembershipPurchases } from '../lib/orderMembershipSale';
 import { addonLinesMatch, kitLinesMatch, offeredAddon, offeredKit } from '../lib/printerKits';
 import { addonChanged, addonWithoutPrinter, applyPrinterDiscount, attachedLineOf, benefitRegularUnit, printerDiscountView, printerLineDiscount, type AppliedPrinterDiscount } from '../lib/printerOffers';
 import { membershipPlanById, orderMembershipPendingRefusal, orderMembershipQuotePayload, quoteOrderMembership, tierLabel, type MembershipPlanRow } from './memberships';
 import { publishedFromSetting } from '../lib/printerServices';
-import { courierDeliveryOf, orderServicesView, serviceTaskStatements, servicesForMethod, SERVICES_DELIVERY_METHOD_MESSAGE, SERVICES_DELIVERY_METHOD_TEXT, SERVICES_PICKUP_METHOD, SERVICES_PICKUP_METHOD_MESSAGE, SERVICES_PICKUP_METHOD_TEXT, withAttachedLink, withServicesSnapshot } from '../lib/printerServices';
+import { PRINTER_PERSONAL_PAUSED_TEXT, courierDeliveryOf, orderServicesView, serviceTaskStatements, servicesForMethod, SERVICES_DELIVERY_METHOD_MESSAGE, SERVICES_DELIVERY_METHOD_TEXT, SERVICES_PICKUP_METHOD, SERVICES_PICKUP_METHOD_MESSAGE, SERVICES_PICKUP_METHOD_TEXT, withAttachedLink, withServicesSnapshot } from '../lib/printerServices';
 
 /**
  * 409 PRODUCT_CURRENTLY_UNAVAILABLE naming the products (the clean start, spec addendum A.5): a line
@@ -2147,7 +2147,7 @@ export interface CheckoutComputation {
   /** What each configured delivery method would cost for THIS cart, priced by
    *  the same function that prices the order. `fee_iqd: null` with
    *  `available: false` means the cart cannot use that method at all. */
-  deliveryMethodFees: Array<{ id: string; fee_iqd: number | null; available: boolean }>;
+  deliveryMethodFees: Array<{ id: string; fee_iqd: number | null; available: boolean; reason?: string; message?: { ar: string; en: string; ckb: string } }>;
   isPickup: boolean;
   independentFreeDelivery: boolean;
   /** «توصيل عادي مجاني — للدفع الكامل من محفظة Levo»: the verdict the final
@@ -4479,15 +4479,27 @@ export async function computeCheckout(
      * the screen can grey it out instead of quoting a delivery that would be
      * refused at the door.
      */
+    const printerCourierOnlyHome = !!pricingCtx.printerServices
+      && (!personalActiveOf(pricingCtx.printerServices) || deliveryChooseAtOf(pricingCtx.printerServices) === 'checkout')
+      && priced.shippingItems.some((it) => !!it.printer_service);
     const deliveryMethodFees: Array<{
       id: string;
       fee_iqd: number | null;
       available: boolean;
-      reason?: 'needs_configuration' | 'governorate_stopped';
+      reason?: 'needs_configuration' | 'governorate_stopped' | 'printer_personal_paused';
+      message?: typeof PRINTER_PERSONAL_PAUSED_TEXT;
     }> = (
       settings.checkoutDeliveryMethods as DeliveryMethod[]
     ).map((m) => {
       if (m.id === 'pickup') return { id: m.id, fee_iqd: 0, available: true };
+      // Phase 7 follow-up (DECISIONS row 363): a serviced printer goes home (Economy) or is collected. While the
+      // owner's list has Personal disabled — or decides the delivery at checkout — any other courier method would
+      // be refused at the order (SERVICES_DELIVERY_METHOD), so it is answered here as unavailable, in words, never
+      // priced as a card the customer can choose. A cart with no serviced printer, and a list without the two
+      // switches, answer exactly as before.
+      if (m.id !== 'standard' && printerCourierOnlyHome) {
+        return { id: m.id, fee_iqd: null, available: false, reason: 'printer_personal_paused' as const, message: PRINTER_PERSONAL_PAUSED_TEXT };
+      }
       // The SAME basis the chosen method's own final quote uses, so the
       // card's figure and the summary's figure cannot disagree.
       const q = runQuote(memberMerchandise, undefined, m.id);
@@ -5372,7 +5384,7 @@ export async function placeOrder(
   // with its own code — never defaulted to either (DECISIONS row 339).
   const undecided = comp.shipping.needs_config.find((n) => n.endsWith(':printer_delivery_required'));
   if (undecided) {
-    throw badRequest('Choose Economy or Personal delivery for the printer', 'SERVICES_DELIVERY_REQUIRED', {
+    throw badRequest('Choose a delivery option for the printer', 'SERVICES_DELIVERY_REQUIRED', {
       product_id: undecided.split(':')[1] ?? null,
     });
   }

@@ -73,7 +73,15 @@ export function filamentLimitLine(limit: number | null, loc: Loc): string {
 }
 
 /** The PRO services discount line, with the server's percent. */
-export function servicesDiscountLine(pct: number, loc: Loc): string {
+export function servicesDiscountLine(pct: number, loc: Loc, personal = true): string {
+  // While the owner has Personal delivery disabled for printers (the server says so), the line does not name it.
+  if (!personal) {
+    return loc(
+      `خصم ${pct}% على الضمان وليفو كير والتغليف الإضافي وخدمات الطابعات`,
+      `${pct}% off the warranty, Levo Care, extra packaging and printer services`,
+      `${pct}% داشکاندن بۆ گەرەنتی، لیڤۆ کێر، پێچانەوەی زیادە و خزمەتگوزارییەکانی چاپکەر`
+    );
+  }
   return loc(
     `خصم ${pct}% على الضمان وليفو كير والتغليف الإضافي والتوصيل الشخصي وخدمات الطابعات`,
     `${pct}% off the warranty, Levo Care, extra packaging, Personal delivery and printer services`,
@@ -158,12 +166,19 @@ export function buildCompare({ tiers, contract, benefits, features, points, proE
   const services = tick('proServicesDiscount');
   if (services) {
     const pct = proExtras?.services_discount_pct ?? null;
+    const personal = proExtras?.personal_delivery !== false;
     shopping.push({
       ...services,
+      ...(personal ? {} : { label: loc('خصم على خدمات الطابعات', 'Discount on printer services', 'داشکاندن بۆ خزمەتگوزارییەکانی چاپکەر') }),
       cells: Object.fromEntries(
         tiers.map((t) => [t, has(t, 'proServicesDiscount') ? (pct !== null && pct > 0 ? ({ kind: 'text', lines: [`${pct}%`] } as CompareCell) : YES) : NO])
       ) as Record<PaidTier, CompareCell>,
       note: note(
+        !personal ? loc(
+          'يشمل الضمان الممتد وليفو كير والتغليف الإضافي والفحص قبل الشحن والأكاديمية، على عنوانك الافتراضي المعتمد.',
+          'Covers the extended warranty, Levo Care, extra packaging, the pre-dispatch inspection and the academy, at your approved default address.',
+          'گەرەنتی درێژکراوە، لیڤۆ کێر، پێچانەوەی زیادە، پشکنین پێش ناردن و ئەکادیمیا دەگرێتەوە، لە ناونیشانی بنەڕەتیی پەسەندکراوت.'
+        ) :
         loc(
           'يشمل الضمان الممتد وليفو كير والتغليف الإضافي والفحص قبل الشحن والأكاديمية والتوصيل الشخصي للطابعة، على عنوانك الافتراضي المعتمد.',
           'Covers the extended warranty, Levo Care, extra packaging, the pre-dispatch inspection, the academy and the printer’s Personal delivery, at your approved default address.',
@@ -352,7 +367,7 @@ export function tierHighlights(
   // BNPL stays among them; the product discounts and free delivery are in the comparison below the card.
   if (tier === 'pro') {
     const pct = proExtras?.services_discount_pct ?? null;
-    if (has('proServicesDiscount') && pct !== null && pct > 0) out.push(servicesDiscountLine(pct, loc));
+    if (has('proServicesDiscount') && pct !== null && pct > 0) out.push(servicesDiscountLine(pct, loc, proExtras?.personal_delivery !== false));
     if (has('proFreeReturn14')) out.push(freeReturnLine(proExtras?.return_window_days.pro ?? 14, loc));
     const filament = filamentTable(filamentLimits);
     if (filament && filament.byTier.pro === null && filament.free !== null) {

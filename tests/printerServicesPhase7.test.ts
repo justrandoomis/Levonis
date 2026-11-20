@@ -408,3 +408,89 @@ test('admin: the draft saves the two switches, a page that omits them keeps them
   assert.deepEqual([q.printer_services.offer.delivery, q.printer_services.selection.blockers], [{ economy: 5_000, personal: null, personal_active: false, choose_at: 'checkout' }, []]);
   raw.close();
 });
+
+// ================================================================== the follow-up round (row 363, appended note)
+
+test('a re-add WITHOUT services keeps the line\'s stored choice — only the quantity merges (single add and the several-lines add)', async () => {
+  const c = liveConfig((x) => { atCheckout(x); x.price_anchor = 'smart'; });
+  for (const door of ['single', 'batch'] as const) {
+    for (const id of ['just', 'complete'] as const) {
+      const { db, raw } = setup(c);
+      const a = appAs(db, 'buyer');
+      const first = await json(await post(a, '/api/cart/items', { productId: 'p_a1', qty: 1, services: pkg(c, id, null) }));
+      const unit = first.items[0].unit_price_iqd;
+      assert.equal(unit, id === 'just' ? 796_000 : 927_000, `${door}/${id}`);
+      const stored = (raw.prepare("SELECT services FROM cart_items WHERE user_id = 'buyer'").get() as { services: string }).services;
+      // The several-colours panel and an older client send no services at all.
+      const again = door === 'single'
+        ? await post(a, '/api/cart/items', { productId: 'p_a1', qty: 1 })
+        : await post(a, '/api/cart/items/batch', { productId: 'p_a1', lines: [{ qty: 1 }] });
+      const body = await json(again);
+      assert.equal(again.status, 200, `${door}/${id}: ${JSON.stringify(body).slice(0, 300)}`);
+      const row = raw.prepare("SELECT services, qty FROM cart_items WHERE user_id = 'buyer'").get() as { services: string; qty: number };
+      assert.deepEqual([row.services, Number(row.qty)], [stored, 2], `${door}/${id}: the stored choice is untouched`);
+      const cart = await json(await get(a, '/api/cart'));
+      const line = cart.items[0];
+      assert.deepEqual([line.printer_services.selection.package, line.printer_services.selection.ack_no_warranty, line.unit_price_iqd, line.qty, 'defaulted' in line.printer_services],
+        [id, id === 'just', unit, 2, false], `${door}/${id}: still the same package at its price`);
+      raw.close();
+    }
+  }
+  // A line with NO stored choice still gets the anchor's default (Smart), as before.
+  const { db, raw } = setup(c);
+  const a = appAs(db, 'buyer');
+  await post(a, '/api/cart/items', { productId: 'p_a1', qty: 1 });
+  const again = await json(await post(a, '/api/cart/items', { productId: 'p_a1', qty: 1 }));
+  assert.deepEqual([again.items[0].printer_services.defaulted, again.items[0].printer_services.selection.package, again.items[0].qty], [true, 'smart', 2]);
+  raw.close();
+});
+
+test('a stored choice the list no longer offers is still cleared by a re-add (the line is an ordinary line again)', async () => {
+  const c = liveConfig();
+  const { db, raw } = setup(c);
+  const a = appAs(db, 'buyer');
+  assert.equal((await post(a, '/api/cart/items', { productId: 'p_a1', qty: 1, services: pkg(c, 'smart', 'economy') })).status, 200);
+  setList(raw, db, liveConfig((x) => { x.revision = 2; delete x.products.p_a1; }));
+  const again = await post(a, '/api/cart/items', { productId: 'p_a1', qty: 1 });
+  assert.equal(again.status, 200, JSON.stringify(await json(again.clone())).slice(0, 300));
+  const row = raw.prepare("SELECT services, qty FROM cart_items WHERE user_id = 'buyer'").get() as { services: string; qty: number };
+  assert.deepEqual([row.services, Number(row.qty)], ['', 2]);
+  raw.close();
+});
+
+test('checkout methods for a serviced printer: any courier method but home is answered unavailable, in words; other carts and lists without the switches are unchanged', async () => {
+  const fees = async (config: PrinterServicesConfig, productId: string | null) => {
+    const { db, raw } = setup(config);
+    raw.prepare(
+      `INSERT INTO products (id,slug,name,name_ar,price_iqd,prime_price_iqd,pro_price_iqd,status,stock,options,colors,selling_type,sale_types,warranty_plans,ops_policy,images)
+       VALUES ('p_pla','pla-basic','PLA Basic','PLA أساسي',25000,NULL,NULL,'active',500,'[]','[]','direct_sale','["direct_sale"]','[]','{}','[]')`
+    ).run();
+    const a = appAs(db, 'buyer');
+    const added = productId
+      ? await post(a, '/api/cart/items', { productId, qty: 1, services: pkg(config, 'smart', deliveryChooseAtOf(config) === 'checkout' ? null : 'economy') })
+      : await post(a, '/api/cart/items', { productId: 'p_pla', qty: 1 });
+    assert.equal(added.status, 200, JSON.stringify(await json(added.clone())).slice(0, 300));
+    const oq = await json(await post(a, '/api/orders/quote', orderBody()));
+    assert.equal(oq.success, true, JSON.stringify(oq).slice(0, 300));
+    const refused = productId ? await json(await post(a, '/api/orders', orderBody({ deliveryMethodId: 'personal' }))) : null;
+    raw.close();
+    return { list: oq.quote.delivery_method_fees as Array<Record<string, unknown>>, refused };
+  };
+  const personal = (list: Array<Record<string, unknown>>) => list.find((f) => f.id === 'personal');
+  const paused = { id: 'personal', fee_iqd: null, available: false, reason: 'printer_personal_paused',
+    message: { ar: 'التوصيل الشخصي متوقف مؤقتاً للطابعات', en: 'Personal delivery is paused for printers for now', ckb: 'گەیاندنی تایبەت بۆ پرینتەرەکان بۆ ماوەیەک ڕاگیراوە' } };
+  // Decided at checkout, and Personal disabled with the choice on the product page: both paused.
+  for (const config of [liveConfig(atCheckout), liveConfig((x) => { x.delivery.personal_active = false; }), liveConfig((x) => { x.delivery.choose_at = 'checkout'; })]) {
+    const { list, refused } = await fees(config, 'p_a1');
+    assert.deepEqual(personal(list), paused);
+    assert.deepEqual(list.filter((f) => f.id !== 'personal').map((f) => [f.id, f.available]), [['standard', true], ['pickup', true]]);
+    assert.equal(refused!.code, 'SERVICES_DELIVERY_METHOD', 'and the order door still refuses it');
+  }
+  // Without the switches, and for a cart with no serviced printer under them: the answer of before.
+  const before = personal((await fees(liveConfig(), 'p_a1')).list)!;
+  assert.equal('reason' in before || 'message' in before, false);
+  const plainOld = (await fees(liveConfig(), null)).list;
+  const plainNew = (await fees(liveConfig(atCheckout), null)).list;
+  assert.deepEqual(plainNew, plainOld, 'a cart with no serviced printer is unchanged');
+  assert.equal('reason' in personal(plainNew)!, false);
+});

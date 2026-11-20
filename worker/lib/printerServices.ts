@@ -594,11 +594,18 @@ export const SERVICES_PICKUP_METHOD_TEXT = {
 export const SERVICES_PICKUP_METHOD_MESSAGE =
   `${SERVICES_PICKUP_METHOD_TEXT.ar} / ${SERVICES_PICKUP_METHOD_TEXT.en} / ${SERVICES_PICKUP_METHOD_TEXT.ckb}`;
 
+/** Phase 7 follow-up: why a courier method other than home delivery is not offered for a serviced printer while Personal is disabled. */
+export const PRINTER_PERSONAL_PAUSED_TEXT = {
+  ar: 'التوصيل الشخصي متوقف مؤقتاً للطابعات',
+  en: 'Personal delivery is paused for printers for now',
+  ckb: 'گەیاندنی تایبەت بۆ پرینتەرەکان بۆ ماوەیەک ڕاگیراوە',
+} as const;
+
 /** The refusal of a serviced printer on a method that is neither standard delivery nor store pickup. */
 export const SERVICES_DELIVERY_METHOD_TEXT = {
-  ar: 'الطابعة مع خدماتها تُوصَّل بالتوصيل العادي (اقتصادي أو شخصي) أو تُستلم من المتجر — اختر التوصيل العادي أو الاستلام من المتجر',
-  en: 'A printer with its services is delivered by standard delivery (Economy or Personal) or collected from the store — choose standard delivery or store pickup',
-  ckb: 'چاپکەر لەگەڵ خزمەتگوزارییەکانی بە گەیاندنی ئاسایی (ئابووری یان تایبەت) دەگەیەنرێت یان لە فرۆشگاکە وەردەگیرێت — گەیاندنی ئاسایی یان وەرگرتن لە فرۆشگا هەڵبژێرە',
+  ar: 'الطابعة مع خدماتها تُوصَّل إلى المنزل بالتوصيل العادي أو تُستلم من المتجر — اختر التوصيل العادي أو الاستلام من المتجر',
+  en: 'A printer with its services is delivered to your home by standard delivery or collected from the store — choose standard delivery or store pickup',
+  ckb: 'چاپکەر لەگەڵ خزمەتگوزارییەکانی بە گەیاندنی ئاسایی دەگەیەنرێتە ماڵەوە یان لە فرۆشگاکە وەردەگیرێت — گەیاندنی ئاسایی یان وەرگرتن لە فرۆشگا هەڵبژێرە',
 } as const;
 export const SERVICES_DELIVERY_METHOD_MESSAGE =
   `${SERVICES_DELIVERY_METHOD_TEXT.ar} / ${SERVICES_DELIVERY_METHOD_TEXT.en} / ${SERVICES_DELIVERY_METHOD_TEXT.ckb}`;

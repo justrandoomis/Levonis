@@ -229,3 +229,33 @@ test('the sheet\'s footer shows that total, each part as its own row, and holds 
   // The card keeps the page's price as the printer's and names the extras beside it.
   assert.match(code('src/components/product/PrinterPackages.tsx'), /<p>\{s\.extrasBeside\}<\/p>/);
 });
+
+// ---------------------------------------------------------------- the follow-up round
+
+test('follow-up: the PRO lines do not advertise Personal delivery while the owner has it disabled — the server says so', async () => {
+  const { servicesDiscountLine } = await import('../src/components/subscription/compareModel');
+  const tri = (ar: string, en: string, ckb?: string) => [ar, en, ckb ?? ''].join(' | ');
+  assert.match(servicesDiscountLine(50, tri), /التوصيل الشخصي.*Personal delivery.*گەیاندنی تایبەت/, 'offered (and absent): as before');
+  assert.equal(servicesDiscountLine(50, tri, true), servicesDiscountLine(50, tri));
+  const off = servicesDiscountLine(50, tri, false);
+  assert.doesNotMatch(off, /الشخصي|Personal|تایبەت/);
+  assert.match(off, /50%.*50%.*50%/);
+  const model = code('src/components/subscription/compareModel.ts');
+  assert.match(model, /const personal = proExtras\?\.personal_delivery !== false;/);
+  assert.match(model, /servicesDiscountLine\(pct, loc, proExtras\?\.personal_delivery !== false\)/);
+  // The fact is the published list's own switch, sent only while it is off.
+  assert.match(code('worker/routes/memberships.ts'), /\.\.\.\(servicesConfig && !personalActiveOf\(servicesConfig\) \? \{ personal_delivery: false as const \} : \{\}\),/);
+});
+
+test('follow-up: the refusal sentences are true whether delivery is chosen on the page or at checkout, and name no Personal', async () => {
+  const { REFUSAL_STRINGS } = await import('../src/lib/refusalStrings');
+  const { SERVICES_ERRORS } = await import('../src/components/product/printerServicesStrings');
+  for (const codeName of ['SERVICES_REQUIRED', 'SERVICES_DELIVERY_METHOD', 'SERVICES_DELIVERY_REQUIRED']) {
+    assert.deepEqual(SERVICES_ERRORS[codeName], REFUSAL_STRINGS[codeName], codeName);
+    for (const lang of LANGS) assert.doesNotMatch(REFUSAL_STRINGS[codeName][lang], /شخصي|Personal|تایبەت/, `${codeName}.${lang}`);
+    assert.notEqual(REFUSAL_STRINGS[codeName].ckb, REFUSAL_STRINGS[codeName].ar);
+  }
+  for (const lang of LANGS) assert.doesNotMatch(REFUSAL_STRINGS.SERVICES_REQUIRED[lang], /توصيل|deliver|گەیاندن/i, `${lang}: a package is all an add needs`);
+  // A method the server answers as paused for a serviced printer is never a card.
+  assert.match(code('src/pages/Checkout.tsx'), /fee\.id === method\.id && fee\.reason === 'printer_personal_paused'\)\) return false;/);
+});

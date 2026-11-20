@@ -75,6 +75,8 @@ export interface FilamentLimits {
 /** The figures behind PRO's `proServicesDiscount` and `proFreeReturn14` entitlements, from the server. */
 export interface ProExtras {
   services_discount_pct: number;
+  /** false only while the owner's printer list has Personal delivery disabled (absent = offered): no line names it then. */
+  personal_delivery?: false;
   return_window_days: { default: number; pro: number };
 }
 
