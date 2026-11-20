@@ -309,6 +309,8 @@ export default {
         'POST /': 'open',
         'GET /': 'open',
         'GET /admin/queue': 'op',
+        // A return for a printer sold without a warranty: the owner's exception, with a written reason (DECISIONS row 365).
+        'POST /admin/exception': 'owner',
         'POST /admin/:id/transition': {
           cls: 'op',
           why: 'collection and inspection moves are any admin’s; resolving with a REFUND needs the financial scope, judged in the handler (owner decision 3, PP-B1)',

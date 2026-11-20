@@ -113,6 +113,8 @@ import AddressForm from '../components/address/AddressForm';
 import ChannelNudge from '../components/notify/ChannelNudge';
 import { apiRefusal, filamentLimitRefusal } from '../lib/refusalStrings';
 import { PS_STRINGS, servicesErrorText } from '../components/product/printerServicesStrings';
+import { OPEN_MAP_LABEL, noteWithoutLinks } from '../lib/noteLinks';
+import { NoteText } from '../components/ui/NoteLinks';
 import type { CartMembershipQuote, CartMembershipRefusal } from '../lib/api';
 import { CELEBRATION_MOTION_MS, mascot } from '../lib/mascot';
 import { duringBackgroundRefresh } from '../lib/mascotRequest';
@@ -1115,6 +1117,19 @@ export default function Checkout() {
   // Phase 7 (DECISIONS row 363): a serviced printer whose delivery is decided HERE — the home method is named
   // «توصيل إلى المنزل» for this order (its fee is the quote's: the printer's class at the Economy price).
   const printerHomeDelivery = items.some((item) => (item.printer_services?.offer?.delivery as { choose_at?: string } | null | undefined)?.choose_at === 'checkout');
+  // …and the owner's warehouse-pickup line for such a printer (row 365): drawn on the store-pickup card, its map
+  // address as a link. Empty when no printer here carries one, and the card is then exactly what it was.
+  const printerPickupLine = (() => {
+    for (const item of items) {
+      const d = item.printer_services?.offer?.delivery as
+        | { choose_at?: string; pickup?: { note?: Partial<Record<'ar' | 'en' | 'ckb', string>> | null } | null }
+        | null
+        | undefined;
+      const line = d?.choose_at === 'checkout' ? d.pickup?.note?.[psLang] : null;
+      if (typeof line === 'string' && line.trim()) return line.trim();
+    }
+    return '';
+  })();
   const quotedDeliveryFees = quoteMatchesItems ? quote?.delivery_method_fees : undefined;
   const quotedDeliveryKey = quotedDeliveryFees?.map((fee) => `${fee.id}:${fee.available}`).join(',') ?? '';
 
@@ -2893,6 +2908,13 @@ export default function Checkout() {
                           {printerHomeDelivery && method.id === 'standard' ? PS_STRINGS[psLang].homeDelivery : methodTitle(method, lang)}
                         </h3>
                         <p className="text-xs text-text-muted mt-0.5 font-light">{methodDesc(method, lang)}</p>
+                        {/* The printer's pickup line (row 365). Its own map link is drawn only when the method
+                            has none configured below — one way to the map, never two. */}
+                        {method.id === 'pickup' && printerPickupLine ? (
+                          <p data-printer-pickup-note className="mt-1 text-[11px] leading-relaxed text-text-secondary">
+                            <NoteText text={pickupMapUrl ? noteWithoutLinks(printerPickupLine) : printerPickupLine} label={OPEN_MAP_LABEL[psLang]} />
+                          </p>
+                        ) : null}
                         {/*
                           «بدل عرض كلمة محسوب حسب القطع بالكمية اجعل هناك
                            ملاحظة يظهر فيها عرض مكان المخزن على الخريطة».

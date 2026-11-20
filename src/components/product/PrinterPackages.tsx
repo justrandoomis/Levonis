@@ -48,6 +48,8 @@ import { useLanguage } from '../../LanguageContext';
 import { useMoney } from '../../CurrencyContext';
 import { useAuth } from '../../AuthContext';
 import { PS_STRINGS, ackSentence, servicesErrorText } from './printerServicesStrings';
+import { OPEN_MAP_LABEL, noteWithoutLinks } from '../../lib/noteLinks';
+import { NoteLinkRow } from '../ui/NoteLinks';
 import {
   AGREEMENT_HOT,
   AGREEMENT_HOT_MS,
@@ -353,7 +355,10 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
   const packageStop = tabStop(rows.map((r) => r.id), chosen === 'custom' ? null : chosen, (id) => rows.find((r) => r.id === id)?.delta !== null);
   const deliveryIds = deliveryChoices(offer);
   const deliveryStop = tabStop(deliveryIds, delivery, (d) => deliveryFee(offer, d) !== null);
-  const pickupNote = pickupOf(offer)?.note?.[lang] || s.deliveryPickupSub;
+  // The owner's pickup line may carry the map (row 365): its words go in the choice, its link under the group
+  // (an anchor cannot sit inside the choice button).
+  const pickupLine = pickupOf(offer)?.note?.[lang] ?? '';
+  const pickupNote = noteWithoutLinks(pickupLine) || s.deliveryPickupSub;
   const deliveryRows: Record<DeliveryPick, { name: string; sub: string }> = {
     economy: { name: s.deliveryEconomy, sub: s.deliveryEconomySub },
     personal: { name: s.deliveryPersonal, sub: s.deliveryPersonalSub },
@@ -541,6 +546,7 @@ function Packages({ offer, selection, onChange, quoted, quoteState, onReady, quo
               );
             })}
           </div>
+          {deliveryIds.includes('pickup') ? <NoteLinkRow text={pickupLine} label={OPEN_MAP_LABEL[lang]} lead={s.deliveryPickup} /> : null}
         </div>
       ) : null}
 

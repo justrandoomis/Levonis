@@ -273,11 +273,14 @@ export async function createUnitsOnDelivery(
     const policy = lineDevicePolicy(it.ops_policy, it.product_id, policyCtx);
     if (!policy.serialized) continue;
     serializedItems++;
-    const { cov, policyVersion } = ownUnitWindow(policy.warranty_base_months, it.warranty_snapshot, deliveredAtIso, servicesByItem.get(String(it.item_id)) ?? null);
+    const lineServices = servicesByItem.get(String(it.item_id)) ?? null;
+    const soldByServices = servicesSaleMonths(lineServices) !== null;
+    const { cov, policyVersion } = ownUnitWindow(policy.warranty_base_months, it.warranty_snapshot, deliveredAtIso, lineServices);
     const qty = Math.min(Math.max(Number(it.qty) || 0, 0), 500);
     for (let i = 1; i <= qty; i++) {
       planned++;
-      const prior = carried.get(`${it.item_id}:${i}`);
+      // A printer-services line is what THAT sale bought (owner, 2026-11-20; row 365): nothing is carried onto it.
+      const prior = soldByServices ? undefined : carried.get(`${it.item_id}:${i}`);
       const win = prior
         ? carriedWindow(prior, { ext_months: cov.ext_months, delivered_at: deliveredAtIso, condition_doc: it.condition_doc })
         : null;
@@ -327,6 +330,22 @@ export async function createUnitsOnDelivery(
 }
 
 /**
+ * THE WARRANTY A PRINTER-SERVICES SALE BOUGHT, in months from its delivery (0, 12 or 24) — or null for a line
+ * sold without the services (no snapshot, or one this code cannot read).
+ *
+ * It is also the answer to «may this unit carry a previous sale's window?» (owner, 2026-11-20; DECISIONS row
+ * 365: «Should a resold device sold as Just Printer keep the first sale's remaining warranty?» — «no, sold as
+ * smart choice»). Not null ⇒ the snapshot is the WHOLE promise: the delivery hook's head start, the activation
+ * and the preparation screen carry nothing onto the unit, whether the carried window was longer or shorter.
+ * null ⇒ the resale carries exactly as before (owner decision 3, row 193).
+ */
+export function servicesSaleMonths(servicesSnapshot: string | null | undefined): 0 | 12 | 24 | null {
+  const v = safeParse<{ warranty_months?: unknown } | null>(servicesSnapshot ?? null, null);
+  const m = v && typeof v === 'object' ? v.warranty_months : null;
+  return m === 0 || m === 12 || m === 24 ? m : null;
+}
+
+/**
  * A unit's OWN window — the one a sale that carries nothing gets: base and
  * purchased extension from its delivery (computeCoverage), and the
  * `policy_version` that records them. One definition for the delivery hook
@@ -346,9 +365,7 @@ export function ownUnitWindow(
   servicesSnapshot?: string | null
 ): { cov: CoverageCalc; policyVersion: string } {
   const services = safeParse<{ warranty_months?: unknown; revision?: unknown; selection?: { warranty?: unknown } } | null>(servicesSnapshot ?? null, null);
-  const bought = services && typeof services.warranty_months === 'number' && [0, 12, 24].includes(services.warranty_months)
-    ? services.warranty_months
-    : null;
+  const bought = servicesSaleMonths(servicesSnapshot);
   if (bought !== null) {
     return {
       cov: { base_months: bought, ext_months: 0, total_months: bought, end_at: addMonths(deliveredAtIso, bought) },

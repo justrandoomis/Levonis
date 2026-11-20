@@ -29,7 +29,8 @@
  *     (owner, 2026-11-05; DECISIONS row 301) with the review road, and
  *     payment 5 (owner, 2026-11-11; DECISIONS row 312) with cash at
  *     warehouse pickup, and returns 5 (owner, 2026-11-19) with PRO's
- *     fourteen-day, fee-free return.
+ *     fourteen-day, fee-free return, and returns 6 (owner, 2026-11-20;
+ *     DECISIONS row 365) with «no warranty = no free return».
  *
  * Adding a version: bump it in its module, run this file, and copy the
  * `key@version:lang → hash` lines the failure prints into the fixture.
@@ -262,6 +263,50 @@ test('cash at pickup moved payment to 5 on the day it goes live; payment 4 stays
     assert.ok(`payment@4:${lang}` in LEDGER, `payment@4:${lang} left the ledger`);
     assert.notEqual(LEDGER[`payment@5:${lang}`], LEDGER[`payment@4:${lang}`], `payment/${lang}: the new version is the old text`);
   }
+  for (const [key, version] of [['terms', 4], ['privacy', 4], ['quick_buy', 1]] as const) {
+    assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, `${key} moved: every consent would be asked again`);
+  }
+});
+
+/**
+ * «NO WARRANTY = NO FREE RETURN» MOVED returns TO 6 (owner, 2026-11-20; DECISIONS row 365). One paragraph
+ * closes article 4.3 in each language: a printer sold through the printer services without a warranty is not
+ * covered by the free return and takes no return request from the customer account (under PRO too); the other
+ * products of the order and a printer sold with a warranty are untouched; support and a recorded management
+ * exception are the way back for a legal right or damage on arrival; the consumer-rights sentence is kept.
+ * returns is not a consent document, so nobody is asked to accept again, and version 5 stays in the ledger as
+ * the archive holds it. Its date is the day it goes live (row 303): move it with the push if the build ships later.
+ */
+test('«no warranty = no free return» moved returns to 6; returns 5 stays in the ledger and no consent document moved', () => {
+  const doc = POLICY_DOCUMENTS.find((d) => d.key === 'returns')!;
+  assert.equal(doc.version, 6);
+  assert.equal(doc.effective_at, '2026-11-20', 'the day version 6 goes live: move it with the push if the build ships later');
+  for (const lang of POLICY_LANGS) {
+    assert.ok(`returns@6:${lang}` in LEDGER, `returns@6:${lang}`);
+    assert.ok(`returns@5:${lang}` in LEDGER, `returns@5:${lang} left the ledger`);
+    assert.notEqual(LEDGER[`returns@6:${lang}`], LEDGER[`returns@5:${lang}`], `returns/${lang}: the new version is the old text`);
+  }
+  // The rule, its limits, the way back and the consumer-rights sentence — in every language, inside 4.3.
+  const article = (body: string) => body.slice(body.indexOf('### 4.3 '), body.indexOf('### 4.4 '));
+  const ar = article(doc.body.ar);
+  assert.ok(ar.includes('الطابعة التي بيعت ضمن خدمات الطابعة بلا ضمان — باقة «الطابعة فقط» أو اختيار مخصص لا ضمان فيه — لا يشملها الإرجاع المجاني، ولا يُقبل عليها طلب إرجاع من حساب الزبون، ولو اشتُري الطلب باشتراك PRO.'));
+  assert.ok(ar.includes('يقتصر ذلك على الطابعة نفسها: بقية منتجات الطلب تبقى على أحكام هذه الوثيقة، وكذلك الطابعة التي بيعت مع ضمان.'));
+  assert.ok(ar.includes('ولإدارة المتجر أن تفتح له طلب إرجاع استثناءً بقرار معلل يُسجَّل.'));
+  assert.ok(ar.includes('حقوق الزبون القانونية كمستهلك تبقى قائمة.'));
+  const en = article(doc.body.en);
+  assert.ok(en.includes('A printer sold through the printer services without a warranty'));
+  assert.ok(en.includes('is not covered by the free return, and no return request is accepted on it from the customer account, even where the order was bought under a PRO membership.'));
+  assert.ok(en.includes('store management may open a return request for them exceptionally, by a reasoned decision that is recorded.'));
+  assert.ok(en.includes('The statutory rights of the customer as a consumer remain in force.'));
+  const ckb = article(doc.body.ckb);
+  assert.ok(ckb.includes('بەبێ گەرەنتی فرۆشراوە'));
+  assert.ok(ckb.includes('گەڕاندنەوەی بێبەرامبەر نایگرێتەوە'));
+  assert.ok(ckb.includes('مافە یاساییەکانی کڕیار وەک بەکاربەر هەر دەمێننەوە.'));
+  assert.ok(!ckb.includes('الطابعة'), 'the Sorani slot never carries the Arabic (row 183)');
+  // Nothing else of the document moved: the window (4.2), PRO's exception (4.4) and the reasons (4.5) read as in version 5.
+  assert.ok(doc.body.ar.includes('- تُقدَّم طلبات الإرجاع خلال سبعة أيام من تاريخ التسليم المسجل، لا من تاريخ الطلب ولا من تاريخ الدفع.'));
+  assert.ok(doc.body.en.includes('- An order bought under an active PRO membership has fourteen days instead of seven.'));
+  for (const lang of POLICY_LANGS) assert.doesNotMatch(doc.body[lang], /^### 4\.25 /m, `${lang}: no new article — the numbering every other document cites is unchanged`);
   for (const [key, version] of [['terms', 4], ['privacy', 4], ['quick_buy', 1]] as const) {
     assert.equal(POLICY_DOCUMENTS.find((d) => d.key === key)!.version, version, `${key} moved: every consent would be asked again`);
   }

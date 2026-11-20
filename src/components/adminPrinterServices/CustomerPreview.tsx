@@ -30,6 +30,8 @@ import { Fold, perPrinterEstimate, pick3, text3, useDocs, useNames } from './ite
 import { bundleName, useStoreBundles } from './StoreBundlesPanel';
 import { S, discountPreview, packageContents, pkgName, say, type Loc, type Tri } from './adminPrinterStrings';
 import { PS_STRINGS } from '../product/printerServicesStrings';
+import { OPEN_MAP_LABEL } from '../../lib/noteLinks';
+import { NoteText } from '../ui/NoteLinks';
 import type { ServicesPrinter } from './PrinterThisTab';
 
 export default function CustomerPreview({ draft, loc, lang, printer }: { draft: PrinterServicesConfig; loc: Loc; lang: string; printer: ServicesPrinter }) {
@@ -49,6 +51,9 @@ export default function CustomerPreview({ draft, loc, lang, printer }: { draft: 
   const money = (v: number | null | undefined): ReactNode => (v === null || v === undefined
     ? <span className="text-text-muted">{say(loc, S.pvNotOffered)}</span>
     : v === 0 ? say(loc, S.pvFree) : <span dir="ltr">{formatIqd(v)}</span>);
+  // The pickup line as the customer reads it: its words, and its map link as a link (row 365).
+  const pickupLine = offer?.delivery?.pickup ? text3(offer.delivery.pickup.note, lang) : '';
+  const pickupNote = pickupLine ? <NoteText text={pickupLine} label={OPEN_MAP_LABEL[lang === 'en' || lang === 'ckb' ? lang : 'ar']} /> : undefined;
   const row = (key: string, label: ReactNode, value: ReactNode, sub?: ReactNode) => (
     <li key={key} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 py-1">
       <span className="min-w-0 text-text-primary">{label}{sub ? <span className="block text-[11px] text-text-muted leading-relaxed">{sub}</span> : null}</span>
@@ -141,11 +146,11 @@ export default function CustomerPreview({ draft, loc, lang, printer }: { draft: 
           {/* Phase 7 (DECISIONS row 363): decided at checkout = what the checkout offers; a disabled Personal is not listed. */}
           {!offer.delivery ? off('delivery', S.pvDelivery) : offer.delivery.choose_at === 'checkout' ? group('delivery', S.pvDelivery, <>
             {row('home', say(loc, S.pvHome), money(offer.delivery.economy))}
-            {row('store', say(loc, S.pvStorePickup), say(loc, S.pvFree))}
+            {row('store', say(loc, S.pvStorePickup), say(loc, S.pvFree), pickupNote)}
           </>, S.pvAtCheckout) : group('delivery', S.pvDelivery, <>
             {row('economy', say(loc, S.pvEconomy), money(offer.delivery.economy))}
             {offer.delivery.personal_active === false ? null : row('personal', say(loc, S.pvPersonal), money(offer.delivery.personal))}
-            {offer.delivery.pickup ? row('pickup', say(loc, S.pvPickup), say(loc, S.pvFree), text3(offer.delivery.pickup.note, lang) || undefined) : null}
+            {offer.delivery.pickup ? row('pickup', say(loc, S.pvPickup), say(loc, S.pvFree), pickupNote) : null}
           </>)}
 
           {/* The three a customer weighs first stay open; the rest is one tap away. */}

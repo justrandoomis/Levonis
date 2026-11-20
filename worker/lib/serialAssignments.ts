@@ -51,7 +51,7 @@ import { unitOriginsInstalled } from './inventoryUnitOrigins';
 import { serverMessage } from '../../packages/contracts/src/costRefusals';
 import { comboKey } from './inventory';
 import { getSetting } from './settings';
-import { maskSerial, coverageState, headStartUndoStatements, type UnitRow } from './deviceOps';
+import { maskSerial, coverageState, headStartUndoStatements, servicesSaleMonths, servicesSnapshots, type UnitRow } from './deviceOps';
 import { resolveLabelProduct, serialStatusSql, type InventoryStatus } from './serialInventory';
 import { serialAssignmentsInstalled, serializationContext, lineDevicePolicy } from './serialPolicy';
 import { carriedWindow, tradedInSql, unitIdentity, warrantySourceOf } from './deviceCustody';
@@ -1654,6 +1654,12 @@ async function answer(
   };
 }
 
+/** Was this order line sold with the printer services (0234)? Then its units carry no previous sale's warranty (row 365). */
+async function soldByServices(db: D1Database, orderItemId: string | null | undefined): Promise<boolean> {
+  if (!orderItemId) return false;
+  return servicesSaleMonths((await servicesSnapshots(db, { itemId: orderItemId })).get(orderItemId) ?? null) !== null;
+}
+
 /** One slot's public shape. No cost, ever; the serial full or masked by scope. */
 export async function slotView(db: D1Database, actor: SerialActor, row: AssignmentRow | null, at?: { order_item_id: string; unit_index: number; part: string }): Promise<SlotView> {
   const base = { order_item_id: row?.order_item_id ?? at?.order_item_id ?? '', unit_index: row?.unit_index ?? at?.unit_index ?? 0, part: row?.part ?? at?.part ?? 'device' };
@@ -1677,6 +1683,8 @@ export async function slotView(db: D1Database, actor: SerialActor, row: Assignme
       ? db.prepare('SELECT warranty_end_at FROM order_item_units WHERE id = ?').bind(row.prior_unit_id).first<{ warranty_end_at: string | null }>()
       : Promise.resolve(null),
   ]);
+  // A printer-services line carries nothing (row 365): the screen never promises the previous sale's window for it.
+  const ownSale = !!prior && (await soldByServices(db, row.order_item_id));
   let state: NonNullable<SlotView['assignment']>['warranty']['state'] = 'PENDING_DELIVERY';
   if (unit) {
     if (unit.warranty_closed_at) state = unit.warranty_closed_reason === 'returned' || unit.warranty_closed_reason === 'returned_unsellable' ? 'RETURNED' : 'CLOSED';
@@ -1697,7 +1705,9 @@ export async function slotView(db: D1Database, actor: SerialActor, row: Assignme
       lot: lot ? { id: lot.id, received_at: lot.received_at ?? null, location: lot.location ?? null } : null,
       lot_source: row.lot_source,
       // A binding saved as `restart` before owner decision 3 carries at delivery like every resale.
-      warranty: { state, mode: row.warranty_mode === 'restart' ? 'carry' : row.warranty_mode, carries_until: prior?.warranty_end_at ?? null },
+      warranty: ownSale
+        ? { state, mode: 'new', carries_until: null }
+        : { state, mode: row.warranty_mode === 'restart' ? 'carry' : row.warranty_mode, carries_until: prior?.warranty_end_at ?? null },
       override_kind: row.override_kind,
     },
   };
@@ -2027,7 +2037,9 @@ async function activateOne(db: D1Database, a: AssignmentRow, unitId: string, ord
   // delivery hook already wrote this window when the binding was live then
   // (S8); a unit that carries from this prior is left exactly as it is, so
   // the new line's extension is never added twice.
-  if ((a.warranty_mode === 'carry' || a.warranty_mode === 'restart') && prior && prior.id !== unitId) {
+  // A unit on a printer-services line keeps what THAT sale bought (owner, 2026-11-20; row 365): nothing is
+  // carried onto it, so it stays exactly as the delivery hook wrote it (`ownUnitWindow`).
+  if ((a.warranty_mode === 'carry' || a.warranty_mode === 'restart') && prior && prior.id !== unitId && !(await soldByServices(db, a.order_item_id))) {
     const fresh = await db
       .prepare(
         `SELECT u.warranty_ext_months, u.delivered_at, u.policy_version, p.condition_doc

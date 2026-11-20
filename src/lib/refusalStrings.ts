@@ -3102,6 +3102,22 @@ export const REFUSAL_STRINGS: Record<string, RefusalStrings> = {
     en: 'This device is out of warranty and held by Levo Care only: Levo Care is a discount on parts, not a free replacement. If the owner still decides to replace it, confirm it explicitly with the reason.',
     ckb: 'ئەم ئامێرە لە دەرەوەی گەرەنتییە و تەنها لیڤۆ کێری لەسەرە: لیڤۆ کێر داشکاندنە لەسەر پارچەکان، نەک گۆڕینی بەخۆڕایی. ئەگەر خاوەن هێشتا بڕیاری گۆڕین بدات، با بە ڕوونی لەگەڵ هۆکار پشتڕاستی بکاتەوە.',
   },
+  // «No warranty = no free return» (owner, 2026-11-20; DECISIONS row 365; returns policy 4.3).
+  NO_WARRANTY_NO_FREE_RETURN: {
+    ar: 'بيعت هذه الطابعة بلا ضمان، ولذلك لا يشملها الإرجاع المجاني. تواصل مع الدعم إن وصلتك تالفة. حقوقك القانونية كمستهلك تبقى قائمة.',
+    en: 'This printer was sold without a warranty, so the free return does not cover it. Contact support if it arrived damaged. Your statutory consumer rights still apply.',
+    ckb: 'ئەم پرینتەرە بەبێ گەرەنتی فرۆشراوە، بۆیە گەڕاندنەوەی بەخۆڕایی نایگرێتەوە. ئەگەر بە زیانلێکەوتوویی گەیشتە دەستت، پەیوەندی بە پشتگیرییەوە بکە. مافە یاساییەکانت وەک بەکاربەر هەر دەمێننەوە.',
+  },
+  RETURN_EXCEPTION_NOT_NEEDED: {
+    ar: 'هذا السطر لا يحتاج استثناءً: يستطيع الزبون طلب الإرجاع من صفحة طلبه وفق المدة والأسباب المعتادة.',
+    en: 'This line needs no exception: the customer can request the return from their order page under the usual window and reasons.',
+    ckb: 'ئەم دێڕە پێویستی بە ئاوارتە نییە: کڕیار دەتوانێت لە پەڕەی داواکارییەکەیەوە بەپێی ماوە و هۆکارە ئاساییەکان داوای گەڕاندنەوە بکات.',
+  },
+  RETURN_EXCEPTION_REASON_REQUIRED: {
+    ar: 'اكتب سبب الاستثناء (خمسة أحرف على الأقل) — يُحفظ في السجل.',
+    en: 'Write the reason for the exception (at least five characters) — it is kept in the record.',
+    ckb: 'هۆکاری ئاوارتەکە بنووسە (لانیکەم پێنج پیت) — لە تۆمارەکەدا هەڵدەگیرێت.',
+  },
   RETURN_SERIAL_MISMATCH: {
     ar: 'هذا الرقم التسلسلي ليس جهازًا من هذا البند لدى هذا الزبون.',
     en: "This serial isn't a device of this line for this customer.",

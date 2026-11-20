@@ -24,6 +24,7 @@
  */
 import { ENTITLEMENT_MINIMUM_TIER } from './entitlements';
 import { TIER_RANK } from './pricing';
+import { servicesSaleMonths } from './deviceOps';
 
 export const RETURN_WINDOW_DAYS = 7;
 export const PRO_RETURN_WINDOW_DAYS = 14;
@@ -47,3 +48,40 @@ export function returnTermsFor(tierSnapshot: string | null | undefined): ReturnT
 export function returnWindowMs(terms: ReturnTerms): number {
   return terms.window_days * DAY_MS;
 }
+
+/**
+ * «NO WARRANTY = NO FREE RETURN» (owner, 2026-11-20; DECISIONS row 365; returns policy 4.3, version 6).
+ *
+ * A printer sold THROUGH THE PRINTER SERVICES with warranty NONE — «Just Printer», or a custom choice without a
+ * warranty — is not in the customer's return flow: the read of an order says so for that line and the request
+ * door refuses it by this code. It holds for an order bought under PRO too (PRO's fourteen days need a warranty
+ * on a serviced printer). The shop can still take such a printer back — a legal right, or damage on arrival —
+ * through THE OWNER's exception (POST /api/returns/admin/exception: a written reason, audited).
+ *
+ * WHAT IT NEVER TOUCHES: a serviced printer sold WITH a warranty (same window, same reasons), the kit, add-on
+ * and every other line of the same order, and any line sold without the services — a product that is not a
+ * printer, or a printer sold before the services existed (no `services_snapshot`). Those answer exactly as
+ * they did; `serviced: false` is how a caller knows to add nothing to its answer for them.
+ *
+ * The fact read is the SALE (`order_items.services_snapshot`, frozen at checkout — the same reading the device
+ * window uses, `servicesSaleMonths`), never today's price list and never a later goodwill on the device.
+ */
+export const NO_WARRANTY_NO_FREE_RETURN = 'NO_WARRANTY_NO_FREE_RETURN' as const;
+
+export interface LineReturnRule {
+  /** The line was sold through the printer services (its frozen snapshot is readable). */
+  serviced: boolean;
+  /** The customer may ask for a return of this line through their own flow (the window and reasons still apply). */
+  eligible: boolean;
+  reason?: typeof NO_WARRANTY_NO_FREE_RETURN;
+}
+
+export function lineReturnRule(servicesSnapshot: string | null | undefined): LineReturnRule {
+  const months = servicesSaleMonths(servicesSnapshot);
+  if (months === null) return { serviced: false, eligible: true };
+  return months === 0 ? { serviced: true, eligible: false, reason: NO_WARRANTY_NO_FREE_RETURN } : { serviced: true, eligible: true };
+}
+
+/** The refusal's sentence, as the server says it (the screens say it in the reader's language by the code). */
+export const NO_WARRANTY_NO_FREE_RETURN_MESSAGE =
+  'بيعت هذه الطابعة بلا ضمان، ولذلك لا يشملها الإرجاع المجاني. تواصل مع الدعم إن وصلتك تالفة. حقوقك القانونية كمستهلك تبقى قائمة. / This printer was sold without a warranty, so the free return does not cover it. Contact support if it arrived damaged. Your statutory consumer rights still apply.';

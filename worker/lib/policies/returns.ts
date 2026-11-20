@@ -72,11 +72,28 @@ import type { PolicyDocument } from './types';
  *   * 4.23 names the window of 4.2 instead of «seven days».
  * The accepted reasons (4.5) are unchanged: a PRO order gets more time and a
  * free return, not a change-of-mind return.
+ *
+ * VERSION 6 — WHY IT MOVED (owner, 2026-11-20: «returns rules follow the new
+ * wording: no warranty = no free return»; DECISIONS row 365). The archive
+ * keeps version 5 byte for byte. ONE paragraph closes 4.3 in each language:
+ *   * a printer sold THROUGH THE PRINTER SERVICES WITHOUT A WARRANTY («Just
+ *     Printer», or a custom choice with no warranty) is not covered by the
+ *     free return and takes no return request from the customer account —
+ *     under PRO too (4.2's fourteen days need a warranty on such a printer);
+ *   * nothing else moves: the order's other products, and a printer sold with
+ *     a warranty, stay under this document as it was;
+ *   * the way back for a legal right or a printer damaged on arrival is
+ *     support, and management may open the return exceptionally by a recorded,
+ *     reasoned decision (the owner's exception, `return.owner_exception`);
+ *   * the consumer-rights sentence the product card shows is kept.
+ * The code that applies it: `lineReturnRule` (worker/lib/returnWindow.ts) at
+ * the request door and the order's read (worker/routes/returns.ts). Its date
+ * is the day it goes live — move it with the push if the build ships later.
  */
 export const returns: PolicyDocument = {
   key: 'returns',
-  version: 5,
-  effective_at: '2026-11-19',
+  version: 6,
+  effective_at: '2026-11-20',
   title: {
     ar: 'سياسة الاسترجاع والاستبدال',
     en: 'Returns and Exchange Policy',
@@ -116,6 +133,8 @@ export const returns: PolicyDocument = {
 - ألا يكون المنتج قد استُعمل استعمالًا يتجاوز ما يلزم للتحقق من العيب.
 
 نقص أي بند من هذه البنود يخرج الحالة من الإرجاع المجاني، وتُعامل وفق المواد 4.10 و4.11 و4.12.
+
+الطابعة التي بيعت ضمن خدمات الطابعة بلا ضمان — باقة «الطابعة فقط» أو اختيار مخصص لا ضمان فيه — لا يشملها الإرجاع المجاني، ولا يُقبل عليها طلب إرجاع من حساب الزبون، ولو اشتُري الطلب باشتراك PRO. يقتصر ذلك على الطابعة نفسها: بقية منتجات الطلب تبقى على أحكام هذه الوثيقة، وكذلك الطابعة التي بيعت مع ضمان. إذا وصلت هذه الطابعة تالفة، أو كان للزبون حق يقرره القانون، فيتواصل مع الدعم، ولإدارة المتجر أن تفتح له طلب إرجاع استثناءً بقرار معلل يُسجَّل. حقوق الزبون القانونية كمستهلك تبقى قائمة.
 
 ### 4.4 كلفة إعادة الشحن
 - كلفة إعادة المنتج إلى المتجر يتحملها الزبون في جميع الأحوال، بما فيها حالة المنتج المعيب فعليًا. مجانية الإرجاع تعني عدم استيفاء رسم أو غرامة على الإرجاع نفسه، لا تحمُّل المتجر أجرة النقل.
@@ -294,6 +313,8 @@ A free return exists only for a genuinely defective product returned exactly as 
 
 The absence of any one of these takes the case out of the free return, and it is then treated under Articles 4.10, 4.11 and 4.12.
 
+A printer sold through the printer services without a warranty — the «Just Printer» package, or a custom choice with no warranty in it — is not covered by the free return, and no return request is accepted on it from the customer account, even where the order was bought under a PRO membership. This is limited to the printer itself: the other products of the order remain under this document, and so does a printer sold with a warranty. Where such a printer arrived damaged, or the customer holds a right given by law, the customer contacts support, and store management may open a return request for them exceptionally, by a reasoned decision that is recorded. The statutory rights of the customer as a consumer remain in force.
+
 ### 4.4 Return shipping cost
 - The cost of returning the product to the store is borne by the customer in every case, including the case of a genuinely defective product. A free return means that no fee or penalty is charged for the return itself; it does not mean the store carries the carriage.
 - Delivery charges and the taxes accompanying them are set by the delivery companies, not by Levonis. The store quotes what the company charges, adds nothing to it, and does not control it.
@@ -470,6 +491,8 @@ These steps are a condition of any transport-damage claim, and omitting them for
 - بەرهەمەکە زیاتر لەوەی پێویستە بۆ سەلماندنی کەموکووڕییەکە بەکارنەهاتبێت.
 
 نەبوونی هەر یەکێک لەمانە حاڵەتەکە لە گەڕاندنەوەی بێبەرامبەر دەردەهێنێت، و بەپێی ماددەکانی 4.10 و 4.11 و 4.12 مامەڵەی لەگەڵ دەکرێت.
+
+ئەو پرینتەرەی لە ڕێگەی خزمەتگوزارییەکانی پرینتەرەوە بەبێ گەرەنتی فرۆشراوە — پاکێجی «تەنها پرینتەر» یان هەڵبژاردنێکی دڵخواز کە گەرەنتی تێدا نییە — گەڕاندنەوەی بێبەرامبەر نایگرێتەوە، و لە هەژماری کڕیارەوە هیچ داواکارییەکی گەڕاندنەوەی لەسەر وەرناگیرێت، تەنانەت ئەگەر داواکارییەکە بە بەشداریکردنی PRO کڕدرابێت. ئەمە تەنها خودی پرینتەرەکە دەگرێتەوە: بەرهەمەکانی تری داواکارییەکە لەسەر حوکمەکانی ئەم بەڵگەنامەیە دەمێننەوە، هەروەها ئەو پرینتەرەش کە لەگەڵ گەرەنتی فرۆشراوە. ئەگەر ئەم پرینتەرە بە زیانلێکەوتوویی گەیشت، یان کڕیار مافێکی هەبوو کە یاسا دیاری کردووە، کڕیار پەیوەندی بە پشتگیرییەوە دەکات، و بەڕێوەبەرایەتی فرۆشگا دەتوانێت بە شێوەی ئاوارتە و بە بڕیارێکی هۆکارداری تۆمارکراو داواکاریی گەڕاندنەوەی بۆ بکاتەوە. مافە یاساییەکانی کڕیار وەک بەکاربەر هەر دەمێننەوە.
 
 ### 4.4 تێچووی گەڕاندنەوەی بار
 - تێچووی گەڕاندنەوەی بەرهەمەکە بۆ فرۆشگا لە هەموو حاڵەتێکدا لەسەر کڕیارە، لەوانەش حاڵەتی بەرهەمی بە ڕاستی کەموکووڕ. بێبەرامبەری گەڕاندنەوە واتای وەرنەگرتنی کرێ یان سزا لەسەر خودی گەڕاندنەوەکەیە، نەک هەڵگرتنی کرێی گواستنەوە لەلایەن فرۆشگاوە.

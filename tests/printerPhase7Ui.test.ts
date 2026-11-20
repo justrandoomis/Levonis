@@ -63,7 +63,8 @@ test('delivery on the page: asked as before without the switches, not asked when
   assert.match(card, /\{asksDelivery\(offer\) \? \(\s*<div className="mt-4">/);
   assert.doesNotMatch(card, /\{offer\.delivery \? \(/);
   const sheet = code('src/components/product/CustomizeSheet.tsx');
-  assert.match(sheet, /set\(\{ delivery: v as DeliveryChoice \}\)\), !asksDelivery\(offer\)\)\}/);
+  assert.match(sheet, /set\(\{ delivery: v as DeliveryChoice \}\)\)\}/);
+  assert.match(sheet, /<\/>, !asksDelivery\(offer\)\)\}/, 'the delivery row is still hidden when the checkout decides (row 365 wrapped it for the map link)');
   assert.match(sheet, /asksDelivery\(offer\) && draft\.delivery === null \? s\.deliveryChoose/);
 });
 

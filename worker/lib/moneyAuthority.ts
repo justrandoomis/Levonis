@@ -77,7 +77,9 @@ export type MoneyAct =
   /** Recording or voiding what a warranty / Care claim cost the shop, and the Care co-pay collected (finance scope). */
   | 'service_claim_cost'
   /** The monthly Levo Care draw (DECISIONS row 359): drawing, redrawing, skipping, confirming or cancelling a prize — the owner's. */
-  | 'care_draw';
+  | 'care_draw'
+  /** Opening a return for a printer sold without a warranty («no warranty = no free return», DECISIONS row 365) — the owner's exception. */
+  | 'return_owner_exception';
 
 /** The acts only the owner performs, whatever the amount (decision 3). */
 export const OWNER_ONLY_ACTS: ReadonlySet<MoneyAct> = new Set<MoneyAct>([
@@ -97,6 +99,8 @@ export const OWNER_ONLY_ACTS: ReadonlySet<MoneyAct> = new Set<MoneyAct>([
   'printer_services_publish',
   // The monthly Levo Care draw and its prize (DECISIONS row 359).
   'care_draw',
+  // A return for a printer sold without a warranty: a legal right or goodwill, with a written reason (row 365).
+  'return_owner_exception',
 ]);
 
 /** The shortest reason the owner may record for going above a ceiling. */

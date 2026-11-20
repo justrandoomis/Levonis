@@ -62,6 +62,8 @@ import { OFFER_STRINGS, offerErrorText } from './printerOfferStrings';
 import { Sheet } from '../ui/Sheet';
 import VariantImg from '../ui/VariantImg';
 import { PS_STRINGS, ackSentence, servicesErrorText, type PsLang } from './printerServicesStrings';
+import { OPEN_MAP_LABEL, noteWithoutLinks } from '../../lib/noteLinks';
+import { NoteLinkRow } from '../ui/NoteLinks';
 import { EXPLAIN } from './printerServicesExplain';
 import {
   AGREEMENT_HOT,
@@ -898,16 +900,20 @@ export default function CustomizeSheet({ open, onClose, onApply, onApplyAndAdd, 
         {/* How the printer arrives: Economy, Personal, or — when the owner offers it — the free warehouse pickup with its note. */}
         {row('delivery', <Truck className="w-5 h-5" aria-hidden="true" />, s.delivery, s.deliveryChoose,
           draft.delivery === null ? '—' : shown(deliveryFee(offer, draft.delivery)),
-          list(s.delivery, deliveryChoices(offer).map((d) => {
-            const fee = deliveryFee(offer, d);
-            return {
-              id: d as string,
-              label: d === 'economy' ? s.deliveryEconomy : d === 'personal' ? s.deliveryPersonal : s.deliveryPickup,
-              right: fee === null ? s.unavailable : fee === 0 ? s.free : `+${money(fee)}`,
-              lines: [d === 'economy' ? s.deliveryEconomySub : d === 'personal' ? s.deliveryPersonalSub : pickupOf(offer)?.note?.[lang] || s.deliveryPickupSub],
-              disabled: fee === null,
-            };
-          }), draft.delivery ?? '', (v) => set({ delivery: v as DeliveryChoice })), !asksDelivery(offer))}
+          <>
+            {list(s.delivery, deliveryChoices(offer).map((d) => {
+              const fee = deliveryFee(offer, d);
+              return {
+                id: d as string,
+                label: d === 'economy' ? s.deliveryEconomy : d === 'personal' ? s.deliveryPersonal : s.deliveryPickup,
+                right: fee === null ? s.unavailable : fee === 0 ? s.free : `+${money(fee)}`,
+                // The pickup line's words; its map link is drawn under the choices (row 365).
+                lines: [d === 'economy' ? s.deliveryEconomySub : d === 'personal' ? s.deliveryPersonalSub : noteWithoutLinks(pickupOf(offer)?.note?.[lang]) || s.deliveryPickupSub],
+                disabled: fee === null,
+              };
+            }), draft.delivery ?? '', (v) => set({ delivery: v as DeliveryChoice }))}
+            {deliveryChoices(offer).includes('pickup') ? <NoteLinkRow text={pickupOf(offer)?.note?.[lang]} label={OPEN_MAP_LABEL[lang]} lead={s.deliveryPickup} /> : null}
+          </>, !asksDelivery(offer))}
 
         {row('inspection', <ClipboardCheck className="w-5 h-5" aria-hidden="true" />, s.inspection, x.inspectionSum,
           valueOf('inspection', draft.inspection, draft.inspection === 'full' ? s.free : s.none),

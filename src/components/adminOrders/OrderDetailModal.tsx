@@ -59,6 +59,8 @@ const isMembershipLine = (it: unknown): boolean => (it as PhaseTwoLine).kind ===
 const SerialDetail = React.lazy(() => import('../adminWarranty/serial/SerialDetail'));
 // The owner's own supplier links of a pre-order line (docs/SMART_PRICING.md §3.10): his chunk, never a staff member's.
 const SupplierLinksPanel = React.lazy(() => import('../adminEstimates/SupplierLinksPanel'));
+// «بلا ضمان — لا إرجاع مجاني» and the owner's exception (row 365): loaded only for an order with such a printer.
+const ReturnExceptionPanel = React.lazy(() => import('./ReturnExceptionPanel'));
 
 /**
  * The order read since migration 0218 (worker/routes/admin.ts): true while a
@@ -904,6 +906,13 @@ export default function OrderDetailModal({ orderId, onClose }: { orderId: string
                           formatDay={(iso) => formatDate(iso, lang)}
                           tasks={serviceTasks.filter((t) => t.order_item_id === it.id)}
                         />
+                      ) : null}
+                      {/* A printer sold through the services WITHOUT a warranty is not in the customer's return flow
+                          (row 365): the fact, and the owner's exception for a legal right or damage on arrival. */}
+                      {it.services && it.services.warranty_months === 0 ? (
+                        <React.Suspense fallback={null}>
+                          <ReturnExceptionPanel orderItemId={it.id} qty={it.qty} delivered={detail.status === 'delivered'} viewerOwner={viewerOwner} loc={loc} lang={lang} />
+                        </React.Suspense>
                       ) : null}
                       {/* «اطلبها من المورّد»: the owner's supplier links of the exact SKU a pre-order line bought —
                           its own chunk and route, never drawn for staff, and never inside the price panels any

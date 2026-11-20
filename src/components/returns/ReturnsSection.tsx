@@ -3,7 +3,7 @@ import { RotateCcw, AlertCircle, Camera, X, ChevronDown, CheckCircle2, Clock } f
 import { api, ApiOrder, uploadFile } from '../../lib/api';
 import { useLanguage } from '../../LanguageContext';
 import { asLang, daysLeftLabel, formatDate } from '../orders/format';
-import { apiRefusal } from '../../lib/refusalStrings';
+import { apiRefusal, refusalText } from '../../lib/refusalStrings';
 import { useMoney } from '../../CurrencyContext';
 import VariantImg from '../ui/VariantImg';
 
@@ -21,6 +21,11 @@ import VariantImg from '../ui/VariantImg';
  *  - The window's length is the server's: GET /api/returns?orderId= sends the
  *    order's `terms` (7 days, or 14 and fee-free for an order bought under
  *    PRO — owner, 2026-11-19); 7 is only the figure shown before it answers.
+ *  - «No warranty = no free return» (owner, 2026-11-20; DECISIONS row 365): the
+ *    same read lists the order's serviced printer `lines`. A printer sold
+ *    without a warranty has no «طلب إرجاع» button — its row says why, in the
+ *    refusal's own sentence (with the consumer-rights line), and the server
+ *    refuses the request by the same code. Every other row is as it was.
  */
 
 const STATES = ['requested', 'assessment', 'approved', 'collection', 'received', 'inspected', 'resolved'] as const;
@@ -237,6 +242,8 @@ const DEFAULT_WINDOW_DAYS = 7;
 
 /** What GET /api/returns?orderId= says about this order's returns (worker/lib/returnWindow.ts). */
 interface ReturnTermsDto { window_days: number; free_return: boolean }
+/** One serviced printer line of the order: may the customer ask it back here, and the refusal's code when not. */
+interface ReturnLineDto { order_item_id: string; eligible: boolean; reason?: string }
 
 interface FormState {
   itemId: string;
@@ -263,6 +270,7 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
 
   const [cases, setCases] = useState<ReturnCaseDto[]>([]);
   const [terms, setTerms] = useState<ReturnTermsDto | null>(null);
+  const [lines, setLines] = useState<ReturnLineDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [open, setOpen] = useState(false);
@@ -277,8 +285,9 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
     setLoading(true);
     setLoadError(false);
     try {
-      const data = await api.get<{ cases: ReturnCaseDto[]; terms?: ReturnTermsDto }>(`/api/returns?orderId=${encodeURIComponent(order.id)}`);
+      const data = await api.get<{ cases: ReturnCaseDto[]; terms?: ReturnTermsDto; lines?: ReturnLineDto[] }>(`/api/returns?orderId=${encodeURIComponent(order.id)}`);
       setCases(data.cases || []);
+      setLines(Array.isArray(data.lines) ? data.lines : []);
       if (data.terms && Number.isInteger(data.terms.window_days) && data.terms.window_days > 0) setTerms(data.terms);
     } catch {
       setLoadError(true);
@@ -315,7 +324,14 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
     const d = daysLeftFrom(itemDeliveredAt(itemId), windowDays);
     return { state: d === null ? 'unknown' : d > 0 ? 'open' : 'closed', days: d };
   };
-  const anyRequestable = order.items.some((it) => itemWindow(it.id).state !== 'closed');
+  /** Why this line cannot be asked back here (a printer sold without a warranty), in words — or null when it can. */
+  const notEligible = (itemId: string): string | null => {
+    const line = lines.find((l) => l.order_item_id === itemId);
+    if (!line || line.eligible !== false) return null;
+    return refusalText(line.reason || 'NO_WARRANTY_NO_FREE_RETURN', asLang(lang)) || refusalText('NO_WARRANTY_NO_FREE_RETURN', asLang(lang));
+  };
+  // The list is drawn while any line can still be asked back — or has a reason to state.
+  const anyRequestable = order.items.some((it) => itemWindow(it.id).state !== 'closed' || notEligible(it.id) !== null);
 
   /** How many units of this row exist — whether it is a line or a part of one. */
   const maxQtyFor = (itemId: string): number => {
@@ -494,15 +510,16 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
             <div className="space-y-2">
               {order.items.map((it) => {
                 const w = itemWindow(it.id);
+                const refused = notEligible(it.id);
                 // A BUNDLE'S PARTS GET THEIR OWN FAULT BUTTON (owner decision 3).
                 // The whole-bundle button above is the commercial return; a
                 // broken part is claimed on its own, and the components are
                 // nested under the priced line — never top-level items — so
                 // without this row nothing in the app could ever post a
                 // component id, and the carve-out would be unreachable.
-                const parts = w.state !== 'closed' ? (it.bundle?.components ?? []) : [];
+                const parts = w.state !== 'closed' && !refused ? (it.bundle?.components ?? []) : [];
                 return (
-                  <div key={it.id} data-return-item={it.id} data-return-item-window={w.state} className="rounded-lg bg-surface-raised p-3">
+                  <div key={it.id} data-return-item={it.id} data-return-item-window={w.state} data-return-item-eligible={refused ? 'false' : undefined} className="rounded-lg bg-surface-raised p-3">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex items-center gap-3">
                         {it.image ? (
@@ -513,13 +530,13 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                         <div className="min-w-0">
                           <p className="text-xs text-text-primary truncate">{it.name}</p>
                           <p className="text-[10px] text-text-muted tabular-nums">× {it.qty} · {money(it.line_total_iqd)}</p>
-                          {w.state === 'open' && orderWindow !== 'open' && (
+                          {!refused && w.state === 'open' && orderWindow !== 'open' && (
                             <p className="text-[10px] text-success">{S.daysLeft(w.days as number)}</p>
                           )}
-                          {w.state === 'closed' && <p className="text-[10px] text-text-muted">{S.itemClosed}</p>}
+                          {!refused && w.state === 'closed' && <p className="text-[10px] text-text-muted">{S.itemClosed}</p>}
                         </div>
                       </div>
-                      {w.state !== 'closed' && (
+                      {!refused && w.state !== 'closed' && (
                         <button
                           type="button"
                           onClick={() => startForm(it.id)}
@@ -529,6 +546,13 @@ export default function ReturnsSection({ order, units }: { order: OrderLike; uni
                         </button>
                       )}
                     </div>
+                    {/* Sold without a warranty: no request here — the reason, and that the consumer's legal rights stand. */}
+                    {refused ? (
+                      <p className="mt-2 flex items-start gap-2 text-[11px] leading-relaxed text-text-secondary" data-return-not-eligible>
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-warning" strokeWidth={1.5} />
+                        <span>{refused}</span>
+                      </p>
+                    ) : null}
                     {parts.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-border-subtle space-y-1.5">
                         <p className="text-[10px] text-text-muted">{S.faultyPartHint}</p>

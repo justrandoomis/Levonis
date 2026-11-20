@@ -189,7 +189,9 @@ test('the delivery rows: Economy, Personal, and the free warehouse pickup only w
   // The card and the sheet draw the rows from that one list, with the note.
   const card = code('src/components/product/PrinterPackages.tsx');
   assert.match(card, /const deliveryIds = deliveryChoices\(offer\);/);
-  assert.match(card, /pickupOf\(offer\)\?\.note\?\.\[lang\] \|\| s\.deliveryPickupSub/);
+  assert.match(card, /pickupOf\(offer\)\?\.note\?\.\[lang\] \?\? ''/);
+  // Row 365: the note's words without its link, the store's own line when it has none; the map link is its own row.
+  assert.match(card, /noteWithoutLinks\(pickupLine\) \|\| s\.deliveryPickupSub/);
   assert.match(code('src/components/product/CustomizeSheet.tsx'), /deliveryChoices\(offer\)\.map\(/);
   // The cart's line names the pickup too.
   assert.match(code('src/pages/Cart.tsx'), /chosenDelivery === 'pickup' \? w\.deliveryPickup/);

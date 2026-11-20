@@ -83,7 +83,7 @@ import { PRICE_PROTECTION_OWNER_LINE_IQD } from '../../packages/contracts/src/mo
 import { assertMoneyAuthority, requireMoneyAuthority } from '../lib/moneyAuthority';
 import { canMoveMoney, isOwner } from '../lib/adminScope';
 import { likePattern, sqlLikeClause } from '../lib/sqlLike';
-import { closedClaimSql } from '../lib/deviceOps';
+import { closedClaimSql, servicesSnapshots } from '../lib/deviceOps';
 import { returnWinsStatements, tradedUnitsSql, tradeInInstalled, tradeInsOnLine } from '../lib/tradeIn';
 import { tradeInV2Installed } from '../lib/tradeInSchema';
 import { completeTradeInsForOrder } from '../lib/tradeInStock';
@@ -113,7 +113,14 @@ import { notifyCustomer } from '../lib/customerNotify';
 import { revokeRewardsForReturn } from '../lib/rewards/coupons';
 import { voidReviewGiftsOfLine } from '../lib/gifts/reviewCode';
 import type { EmailLang } from '../lib/emailTemplates';
-import { returnTermsFor, returnWindowMs, type ReturnTerms } from '../lib/returnWindow';
+import {
+  NO_WARRANTY_NO_FREE_RETURN,
+  NO_WARRANTY_NO_FREE_RETURN_MESSAGE,
+  lineReturnRule,
+  returnTermsFor,
+  returnWindowMs,
+  type ReturnTerms,
+} from '../lib/returnWindow';
 
 /**
  * PRICE PROTECTION's seven days. The RETURN window is no longer this constant:
@@ -280,9 +287,40 @@ function casePublic(r: ReturnCaseRow, extra: Record<string, unknown> = {}) {
 export const returnRoutes = new Hono<AppContext>();
 returnRoutes.use('*', requireAuth);
 
-returnRoutes.post('/', async (c) => {
-  await rateLimit(c, 'return_request', 10, 3600);
-  const user = c.get('user')!;
+/**
+ * The frozen printer services (0234) of some order lines, by line id — only the lines that carry any. Empty on
+ * a database one migration behind (CLAUDE.md rule 2), where no line can: every line then answers as it always did.
+ */
+async function servicesOfLines(db: D1Database, lineIds: readonly string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  try {
+    for (const part of chunk([...new Set(lineIds)], IN_CHUNK)) {
+      const { results } = await db
+        .prepare(`SELECT id, services_snapshot FROM order_items WHERE services_snapshot IS NOT NULL AND id IN (${part.map(() => '?').join(',')})`)
+        .bind(...part)
+        .all<{ id: string; services_snapshot: string }>();
+      for (const r of results ?? []) out.set(String(r.id), r.services_snapshot);
+    }
+  } catch (e) {
+    if (!/no such column/i.test(String((e as Error)?.message ?? e))) throw e;
+  }
+  return out;
+}
+
+/**
+ * OPENING A RETURN CASE — the customer's own door, and the owner's exception.
+ *
+ * `exception` is null for the customer (POST /api/returns): every rule below is theirs. It carries the owner's
+ * written reason on POST /api/returns/admin/exception, the ONE way a printer sold through the services without
+ * a warranty gets a return case («no warranty = no free return», owner 2026-11-20, DECISIONS row 365): the case
+ * is opened FOR the order's customer, in the ordinary pipeline, and every other rule of this door still holds
+ * (delivered, the quota, one door per defect, trade-ins, the bundle and mystery rules). Only two things differ:
+ * the no-warranty refusal is what the exception lifts, and the window is recorded (`within_window`) instead of
+ * refusing — a legal right is not always raised inside seven days, and the owner is the one deciding.
+ */
+async function openReturn(c: Context<AppContext>, exception: { reason: string } | null) {
+  const actor = c.get('user')!;
+  if (!exception) await rateLimit(c, 'return_request', 10, 3600);
   const body = await c.req.json().catch(() => ({}));
 
   const orderItemId = str(body.orderItemId, 'orderItemId', { min: 1, max: 60 });
@@ -302,9 +340,12 @@ returnRoutes.post('/', async (c) => {
   // prefix (owner-or-admin access only — worker/routes/uploads.ts policy).
   const evidenceRaw = Array.isArray(body.evidence) ? body.evidence : [];
   if (evidenceRaw.length > 6) throw badRequest('evidence: at most 6 files');
+  // The owner's exception carries no files: evidence lives under the CUSTOMER's private prefix, which only
+  // their own upload writes. What the owner saw is written in the description and the reason.
+  if (exception && evidenceRaw.length > 0) throw badRequest('evidence: an owner exception takes no files — describe what was seen');
   const evidence: string[] = [];
   for (const k of evidenceRaw) {
-    if (typeof k !== 'string' || k.length > 400 || !k.startsWith(`receipts/${user.id}/`)) {
+    if (typeof k !== 'string' || k.length > 400 || !k.startsWith(`receipts/${actor.id}/`)) {
       throw badRequest('evidence: each entry must be a private upload key belonging to you');
     }
     evidence.push(k);
@@ -355,7 +396,9 @@ returnRoutes.post('/', async (c) => {
     if (!(await isConditionColumnMissing(c.env.DB, e))) throw e;
     item = await readItem(CONDITION_DOC_DEFAULT_SQL);
   }
-  if (!item || item.user_id !== user.id) throw notFound('Order item not found');
+  if (!item || (!exception && item.user_id !== actor.id)) throw notFound('Order item not found');
+  // From here on `user` is the CUSTOMER the case belongs to — the caller, or the order's buyer on the owner's exception.
+  const user = { id: item.user_id };
   // 0235: A MEMBERSHIP BOUGHT WITH THE ORDER IS NEVER RETURNED (owner ruling
   // 2026-11-17): a printer return refunds the printer and its services only.
   // (trg_return_cases_no_membership_line is the same rule inside the write.)
@@ -429,6 +472,27 @@ returnRoutes.post('/', async (c) => {
   )
     .bind(orderItemId)
     .all<{ id: string; qty: number; name_snapshot: string }>();
+
+  /**
+   * «NO WARRANTY = NO FREE RETURN» (owner, 2026-11-20; DECISIONS row 365; policy 4.3). A printer sold through
+   * the printer services with warranty NONE is not in the customer's return flow — whatever the reason chosen,
+   * and under PRO too. The line itself, or any part of a bundle returned whole. Lines sold with a warranty,
+   * the kit and add-on lines of the same order, and every line sold without the services never reach this
+   * refusal (`lineReturnRule`). The owner's exception is the door for such a printer — and for nothing else.
+   */
+  const returnedLineIds = [orderItemId, ...bundleChildren.map((k) => String(k.id))];
+  const lineServices = await servicesOfLines(c.env.DB, returnedLineIds);
+  const noWarrantyLine = returnedLineIds.find((id) => !lineReturnRule(lineServices.get(id)).eligible) ?? null;
+  if (exception && !noWarrantyLine) {
+    throw new HttpError(
+      409,
+      'هذا السطر لا يحتاج استثناءً: يستطيع الزبون طلب الإرجاع من صفحة طلبه وفق المدة والأسباب المعتادة. / This line needs no exception: the customer can request the return from their order page under the usual window and reasons.',
+      'RETURN_EXCEPTION_NOT_NEEDED'
+    );
+  }
+  if (!exception && noWarrantyLine) {
+    throw new HttpError(409, NO_WARRANTY_NO_FREE_RETURN_MESSAGE, NO_WARRANTY_NO_FREE_RETURN, { order_item_id: noWarrantyLine });
+  }
 
   /** One component's share of a whole-bundle return of `qty` parents. The same
    *  ratio decides the quota check and the case that is written, so the two can
@@ -506,10 +570,12 @@ returnRoutes.post('/', async (c) => {
   const now = Date.now();
   const deliveredMs = Date.parse(deliveredAt);
   if (!Number.isFinite(deliveredMs)) throw badRequest('Delivery time for this item could not be read — contact support');
-  // 7 days, or 14 for an order bought under an active PRO (owner, 2026-11-19).
-  const terms = returnTermsFor(item.membership_tier_snapshot);
+  // 7 days, or 14 for an order bought under an active PRO (owner, 2026-11-19). PRO's fourteen days need a
+  // warranty on a serviced printer (row 365): a printer sold without one is measured against the ordinary seven.
+  const terms = returnTermsFor(noWarrantyLine ? null : item.membership_tier_snapshot);
   const withinWindow = now <= deliveredMs + returnWindowMs(terms);
-  if (!withinWindow) {
+  // The owner's exception records the window instead of refusing on it (see `openReturn`).
+  if (!withinWindow && !exception) {
     throw badRequest(
       `The ${terms.window_days}-day return window for this item has closed (counted from its delivery)`,
       'RETURN_WINDOW_CLOSED',
@@ -657,7 +723,7 @@ returnRoutes.post('/', async (c) => {
       statement: c.env.DB.prepare(
         `INSERT INTO return_cases (id, order_id, order_item_id, unit_id, user_id, qty, reason, description,
            evidence, requested_at, delivered_at_snapshot, within_window, state)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 'requested')`
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'requested')`
       ).bind(
         caseId,
         item.order_id,
@@ -669,7 +735,9 @@ returnRoutes.post('/', async (c) => {
         description,
         JSON.stringify(evidence),
         nowIso,
-        deliveredAt
+        deliveredAt,
+        // Always 1 on the customer's door (a late request was refused above); the truth on the owner's exception.
+        withinWindow ? 1 : 0
       ),
     };
   };
@@ -684,7 +752,7 @@ returnRoutes.post('/', async (c) => {
     ? bundleChildren.map((k) => caseFor(k.id, childCaseQty(k)))
     : [caseFor(orderItemId, qty)];
   const id = cases[0].id;
-  const cancels = (await Promise.all(tradeInCancels.map((t) => returnWinsStatements(c.env.DB, t.request, user.id, id, nowIso)))).flat();
+  const cancels = (await Promise.all(tradeInCancels.map((t) => returnWinsStatements(c.env.DB, t.request, actor.id, id, nowIso)))).flat();
   /**
    * ONE DOOR PER DEFECT, INSIDE THE BATCH (plan §1.3): the read above asked
    * again after the case is written — a warranty request opened in between
@@ -720,7 +788,21 @@ returnRoutes.post('/', async (c) => {
     throw e;
   }
 
-  await audit(c.env.DB, user.id, 'return.request', id, { order_id: item.order_id, order_item_id: orderItemId, qty, reason });
+  if (exception) {
+    // The owner's act, with the reason they wrote: who, for whom, which rule was set aside, and whether it was late.
+    await audit(c.env.DB, actor.id, 'return.owner_exception', id, {
+      order_id: item.order_id,
+      order_item_id: orderItemId,
+      customer_id: user.id,
+      qty,
+      reason,
+      rule: NO_WARRANTY_NO_FREE_RETURN,
+      exception_reason: exception.reason,
+      within_window: withinWindow,
+    });
+  } else {
+    await audit(c.env.DB, user.id, 'return.request', id, { order_id: item.order_id, order_item_id: orderItemId, qty, reason });
+  }
   /**
    * THE GROUP HEARS ABOUT IT IN THE QUEUE THE ORDER BELONGS TO.
    *
@@ -738,7 +820,9 @@ returnRoutes.post('/', async (c) => {
   announceAfterResponse(
     c,
     orderTopic(item.shipping_type),
-    `↩️ Return request ${id}\nOrder: ${item.order_id}\nItem: ${item.name_snapshot} × ${qty}\nReason: ${reason}`
+    `↩️ Return request ${id}\nOrder: ${item.order_id}\nItem: ${item.name_snapshot} × ${qty}\nReason: ${reason}${
+      exception ? '\nOwner exception — printer sold without a warranty' : ''
+    }`
   );
 
   const row = await c.env.DB.prepare('SELECT * FROM return_cases WHERE id = ?').bind(id).first<ReturnCaseRow>();
@@ -763,9 +847,34 @@ returnRoutes.post('/', async (c) => {
       case: casePublic(row!),
       bundle: { parent_item_id: orderItemId, name: item.name_snapshot },
       cases: rows.map((r) => casePublic(r)),
+      ...(exception ? { owner_exception: true } : {}),
     });
   }
-  return c.json({ success: true, case: casePublic(row!) });
+  return c.json({ success: true, case: casePublic(row!), ...(exception ? { owner_exception: true } : {}) });
+}
+
+returnRoutes.post('/', (c) => openReturn(c, null));
+
+/**
+ * THE OWNER'S EXCEPTION (owner, 2026-11-20; DECISIONS row 365). «No warranty = no free return» closes the
+ * customer's own door on a printer sold through the services without a warranty; the shop must still be able
+ * to honour a legal right or a goodwill case — a printer damaged on arrival. The owner, and only the owner,
+ * opens that return here with a written reason (five characters at least), audited as
+ * `return.owner_exception`. Any other staff member is refused in words (403 OWNER_REQUIRED, or
+ * FINANCIAL_SCOPE_REQUIRED for an assistant). It serves such a printer only (409 RETURN_EXCEPTION_NOT_NEEDED
+ * for any other line), and the case then walks the ordinary pipeline — nothing is approved or refunded here.
+ */
+returnRoutes.post('/admin/exception', requireAdmin, requireMoneyAuthority('return_owner_exception'), async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const reason = typeof body.exception_reason === 'string' ? body.exception_reason.trim() : '';
+  if (reason.length < 5) {
+    throw new HttpError(
+      400,
+      'اكتب سبب الاستثناء (خمسة أحرف على الأقل) — يُحفظ في السجل. / Write the reason for the exception (at least five characters) — it is kept in the record.',
+      'RETURN_EXCEPTION_REASON_REQUIRED'
+    );
+  }
+  return openReturn(c, { reason: reason.slice(0, 500) });
 });
 
 /** My return cases (optionally for one order). */
@@ -792,9 +901,20 @@ returnRoutes.get('/', async (c) => {
       .first<{ membership_tier_snapshot: string | null }>();
     if (order) terms = returnTermsFor(order.membership_tier_snapshot);
   }
+  // THE ORDER'S SERVICED PRINTER LINES (row 365): whether each may be asked back through this flow, and why
+  // not — a printer sold without a warranty is not. Absent on an order with no serviced printer, so every
+  // other order's answer is exactly what it was.
+  const lines: Array<{ order_item_id: string; eligible: boolean; reason?: string }> = [];
+  if (orderId && terms) {
+    for (const [lineId, snapshot] of await servicesSnapshots(c.env.DB, { orderId })) {
+      const rule = lineReturnRule(snapshot);
+      if (rule.serviced) lines.push({ order_item_id: lineId, eligible: rule.eligible, ...(rule.reason ? { reason: rule.reason } : {}) });
+    }
+  }
   return c.json({
     success: true,
     ...(terms ? { terms } : {}),
+    ...(lines.length > 0 ? { lines } : {}),
     cases: results.map((r) =>
       casePublic(r, {
         item: { name: r.name_snapshot, image: r.image_snapshot, variant: r.option_snapshot },
@@ -820,18 +940,39 @@ returnRoutes.get('/admin/queue', requireAdmin, async (c) => {
   }
   sql += ' ORDER BY rc.requested_at DESC LIMIT 200';
   const { results } = await c.env.DB.prepare(sql).bind(...params).all<ReturnCaseRow & { membership_tier_snapshot?: string | null }>();
+  // «بلا ضمان — لا إرجاع مجاني» (row 365): a case on a printer sold through the services without a warranty
+  // exists only by the owner's exception — the desk is told the fact and the owner's written reason. Both
+  // fields are absent on every other case.
+  const lineServices = await servicesOfLines(c.env.DB, results.map((r) => String(r.order_item_id)));
+  const noWarranty = new Set([...lineServices].filter(([, snap]) => !lineReturnRule(snap).eligible).map(([id]) => id));
+  const exceptions = new Map<string, { reason: string; at: string | null }>();
+  const exceptionCases = results.filter((r) => noWarranty.has(String(r.order_item_id))).map((r) => r.id);
+  for (const part of chunk(exceptionCases, IN_CHUNK)) {
+    const { results: rows } = await c.env.DB.prepare(
+      `SELECT target, detail, created_at FROM audit_log WHERE action = 'return.owner_exception' AND target IN (${part.map(() => '?').join(',')})`
+    )
+      .bind(...part)
+      .all<{ target: string; detail: string | null; created_at: string | null }>();
+    for (const row of rows ?? []) {
+      const detail = safeParse<{ exception_reason?: unknown }>(row.detail, {});
+      exceptions.set(String(row.target), { reason: typeof detail.exception_reason === 'string' ? detail.exception_reason : '', at: row.created_at ?? null });
+    }
+  }
   return c.json({
     success: true,
-    cases: results.map((r) =>
-      casePublic(r, {
+    cases: results.map((r) => {
+      const sold = noWarranty.has(String(r.order_item_id));
+      return casePublic(r, {
         item: { name: r.name_snapshot, image: r.image_snapshot, variant: r.option_snapshot },
         email: r.email,
         username: r.username,
         user_id: r.user_id,
-        // Bought under PRO (owner, 2026-11-19): no return delivery and no restocking fee is charged to this customer.
-        free_return: returnTermsFor(r.membership_tier_snapshot).free_return,
-      })
-    ),
+        // Bought under PRO (owner, 2026-11-19): no return delivery and no restocking fee is charged to this customer
+        // — never for a printer sold without a warranty (row 365).
+        free_return: !sold && returnTermsFor(r.membership_tier_snapshot).free_return,
+        ...(sold ? { no_warranty: true, owner_exception: exceptions.get(r.id) ?? null } : {}),
+      });
+    }),
   });
 });
 
